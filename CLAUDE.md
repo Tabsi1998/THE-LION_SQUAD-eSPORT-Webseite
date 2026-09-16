@@ -167,7 +167,8 @@ Seit dem 15. September gilt:
   (Avatar und Name, dahinter Dashboard, Mein Profil, Nachrichten,
   Mitgliederbereich nur für Mitglieder, Admin nur für Admins, Abmelden;
   eigener Knopf ohne Radix wie die Glocke). In `PublicLayout.jsx` bleiben
-  Suche, Admin-Knopf, Glocke, Nachrichten und das Handy-Klappmenü. Das
+  Suche, Glocke, Nachrichten und das Handy-Klappmenü; der blaue Admin-Knopf
+  ist auf Wunsch des Betreibers weg (Admin nur noch im Menü). Das
   Dashboard verlinkt oben rechts „Profil bearbeiten“. Browser-Test
   `frontend/e2e/header-user-menu.spec.js`; der Abmelde-Test in
   `e2e/public.spec.js` öffnet zuerst das Menü (`nav-user`, am Handy

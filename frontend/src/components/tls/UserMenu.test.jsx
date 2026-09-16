@@ -36,7 +36,7 @@ test("das Menue oeffnet sich und fuehrt ins Profil", async () => {
   expect(screen.getByTestId("nav-dashboard")).toHaveAttribute("href", "/dashboard");
   expect(screen.getByTestId("nav-messages-menu")).toHaveAttribute("href", "/messages");
   expect(screen.queryByTestId("nav-member-area")).toBeNull();
-  expect(screen.queryByTestId("nav-admin-menu")).toBeNull();
+  expect(screen.queryByTestId("nav-admin")).toBeNull();
 });
 
 test("Mitglieder sehen den Mitgliederbereich, Admins den Adminbereich", async () => {
@@ -47,7 +47,7 @@ test("Mitglieder sehen den Mitgliederbereich, Admins den Adminbereich", async ()
 
   await user.click(screen.getByTestId("nav-user"));
   expect(screen.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
-  expect(screen.getByTestId("nav-admin-menu")).toHaveAttribute("href", "/admin");
+  expect(screen.getByTestId("nav-admin")).toHaveAttribute("href", "/admin");
 });
 
 test("Abmelden ruft die Abmeldung auf und schliesst das Menue", async () => {

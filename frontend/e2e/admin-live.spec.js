@@ -65,7 +65,11 @@ test.describe("live admin checks", () => {
     await page.getByTestId("login-email").fill(email);
     await page.getByTestId("login-password").fill(password);
     await page.getByTestId("login-submit").click();
+    // Admin liegt seit #282 im Benutzermenü, nicht mehr als Knopf im Kopf.
+    await expect(page.getByTestId("nav-user")).toBeVisible();
+    await page.getByTestId("nav-user").click();
     await expect(page.getByTestId("nav-admin")).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("news editor exposes WYSIWYG, markdown, preview and HTML modes", async ({ page }) => {

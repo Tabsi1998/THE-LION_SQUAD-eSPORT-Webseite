@@ -83,7 +83,7 @@ export function UserMenu() {
             <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={`${itemClass} text-[#FFD700] hover:text-[#FFD700]`}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
           ) : null}
           {isAdmin ? (
-            <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin-menu" className={`${itemClass} text-[#29B6E8] hover:text-[#29B6E8]`}><Shield className="w-3.5 h-3.5" /> Admin</Link>
+            <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin" className={`${itemClass} text-[#29B6E8] hover:text-[#29B6E8]`}><Shield className="w-3.5 h-3.5" /> Admin</Link>
           ) : null}
           <button type="button" role="menuitem" onClick={doLogout} data-testid="nav-logout" className={`${itemClass} w-full text-left text-[#FF3B30] hover:text-[#FF3B30] border-t border-white/10`}>
             <LogOut className="w-3.5 h-3.5" /> Abmelden

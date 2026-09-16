@@ -34,6 +34,7 @@ test("das Benutzermenü führt ins Profil; ein Mitglied sieht den Mitgliederbere
     await page.getByTestId("nav-profile-mobile").click();
   } else {
     await expect(page.getByTestId("nav-member-area-button")).toHaveCount(0);
+    await expect(page.getByTestId("nav-admin")).toHaveCount(0);
     await page.getByTestId("nav-user").click();
     await expect(page.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
     await expect(page.getByTestId("nav-logout")).toBeVisible();
@@ -55,6 +56,6 @@ test("ohne Mitgliedschaft gibt es keinen Mitgliederbereich im Menü, und das Das
   } else {
     await page.getByTestId("nav-user").click();
     await expect(page.getByTestId("nav-member-area")).toHaveCount(0);
-    await expect(page.getByTestId("nav-admin-menu")).toHaveCount(0);
+    await expect(page.getByTestId("nav-admin")).toHaveCount(0);
   }
 });

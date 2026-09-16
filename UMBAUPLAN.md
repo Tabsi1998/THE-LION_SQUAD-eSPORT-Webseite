@@ -651,7 +651,8 @@ Grunddaten, Privatsphäre oder Passwort. Der Betreiber hat es im ersten Test bem
 **Sechs Knöpfe nebeneinander.** Mitgliederbereich, Admin, Glocke, Nachrichten, Name, Logout –
 auf einem Laptop lief die Kopfzeile über. Jetzt gibt es einen Knopf mit Avatar und Name und
 dahinter ein Menü: Dashboard, Mein Profil, Nachrichten, Mitgliederbereich (nur Mitglieder),
-Admin (nur Admins), Abmelden. Im Kopf bleiben Suche, Admin-Knopf, Glocke und Nachrichten.
+Admin (nur Admins), Abmelden. Im Kopf bleiben Suche, Glocke und Nachrichten; den blauen
+Admin-Knopf wollte der Betreiber nach dem ersten Blick auch weg haben – Admin steht im Menü.
 Am Handy hat das Klappmenü dieselben Einträge; das Dashboard bekommt „Profil bearbeiten“.
 
 **Kein Radix.** Wie die Glocke ist das Menü ein eigener Knopf (Klick daneben und Escape
