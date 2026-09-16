@@ -5,6 +5,7 @@
  *   npm run release:local -- --check     nur prüfen, was fehlt
  *   npm run release:local -- --dry-run   bauen und prüfen, nichts veröffentlichen
  *   npm run release:local                bauen, prüfen und das Release anlegen
+ *   npm run release:local -- --upload-only  die zuletzt gebaute APK nur an den Vereinsserver schicken
  *
  * Schlüssel, Passwörter und google-services.json liegen außerhalb des Repos,
  * standardmäßig in %USERPROFILE%\.lionsapp-release (Einrichtung: RELEASES.md).
@@ -29,7 +30,7 @@ const repoDir = path.resolve(mobileDir, "..");
 const buildsDir = path.join(mobileDir, "builds");
 const isWindows = process.platform === "win32";
 const flags = new Set(process.argv.slice(2));
-const mode = flags.has("--check") ? "check" : flags.has("--dry-run") ? "dry-run" : "release";
+const mode = flags.has("--check") ? "check" : flags.has("--dry-run") ? "dry-run" : flags.has("--upload-only") ? "upload-only" : "release";
 const releaseDir = process.env.LIONSAPP_RELEASE_DIR || path.join(os.homedir(), ".lionsapp-release");
 const BUILD_MARKER = ".lionsapp-build";
 
@@ -298,7 +299,32 @@ function removeGeneratedPushConfig(buildMobile) {
   }
 }
 
+/**
+ * Nur der Server-Upload (#305): die zuletzt gebaute APK der aktuellen Version
+ * aus mobile/builds an den Vereinsserver schicken - ohne neu zu bauen. Für den
+ * Fall, dass der Upload nach dem Veröffentlichen scheiterte.
+ */
+async function uploadOnly() {
+  const config = loadConfig();
+  if (config.broken) fail(config.broken);
+  const version = readJson("package.json").version;
+  const versionCode = readJson("app.json").expo.android.versionCode;
+  const prefix = `LionsAPP-v${version}-build${versionCode}-`;
+  const candidates = fs.existsSync(buildsDir)
+    ? fs.readdirSync(buildsDir).filter((name) => name.startsWith(prefix) && name.endsWith(".apk"))
+    : [];
+  if (!candidates.length) fail(`Keine APK für ${version} (Build ${versionCode}) in ${buildsDir}. Erst bauen.`);
+  const apk = candidates.sort((a, b) => fs.statSync(path.join(buildsDir, b)).mtimeMs - fs.statSync(path.join(buildsDir, a)).mtimeMs)[0];
+  const apkPath = path.join(buildsDir, apk);
+  const changelog = fs.readFileSync(path.join(mobileDir, "CHANGELOG.md"), "utf8");
+  step(`APK an den Vereinsserver schicken: ${apk}`);
+  const ok = await uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
+  if (!ok) process.exitCode = 1;
+  return ok;
+}
+
 function main() {
+  if (mode === "upload-only") return uploadOnly();
   const state = gatherChecks();
   printChecks(state.checks);
   const blocking = state.checks.filter((item) => !item.ok && !ignoredInThisMode(item));

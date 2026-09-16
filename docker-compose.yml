@@ -45,6 +45,8 @@ services:
       TRUSTED_HOSTS: "${TRUSTED_HOSTS:-}"
       SENDER_EMAIL: "${SENDER_EMAIL:-noreply@lionsquad.at}"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      # App-Releases (#250): Token, mit dem das Release-Skript die APK ablegt (#305).
+      APP_RELEASE_UPLOAD_TOKEN: "${APP_RELEASE_UPLOAD_TOKEN:-}"
       DISABLE_SCHEDULER: "${DISABLE_SCHEDULER:-false}"
       UPLOAD_DIR: "${UPLOAD_DIR:-/app/backend/uploads}"
       MAX_IMAGE_UPLOAD_MB: "${MAX_IMAGE_UPLOAD_MB:-50}"

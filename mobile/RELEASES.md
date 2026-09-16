@@ -107,8 +107,10 @@ ist das Update Pflicht und der Banner nicht wegdrückbar.
    sind – als Umgebungsvariablen `LIONSAPP_UPLOAD_URL` (z. B. `https://lionsquad.at`) und
    `LIONSAPP_UPLOAD_TOKEN`, oder als `uploadUrl`/`uploadToken` in `.lionsapp-release/signing.json`.
    Das Token ist dasselbe wie `APP_RELEASE_UPLOAD_TOKEN` in der `.env` des Servers (mindestens 24
-   Zeichen, `openssl rand -hex 24`). Schlägt der Upload fehl, bleibt das GitHub-Release gültig; die
-   APK lässt sich dann von Hand nachreichen.
+   Zeichen, `openssl rand -hex 24`; `docker-compose.yml` reicht die Variable an den Backend-Container
+   weiter, #305). Schlägt der Upload fehl, bleibt das GitHub-Release gültig; die APK lässt sich
+   nachreichen: `npm run release:local -- --upload-only` schickt die zuletzt gebaute APK der
+   aktuellen Version aus `mobile/builds/`, ohne neu zu bauen.
 2. Von Hand: Admin → System → App-Versionen, APK auswählen, Version und Build eintragen.
 
 Dort steht auch, welches Release „aktuell“ ist und ab welchem Build ein Update Pflicht wird.

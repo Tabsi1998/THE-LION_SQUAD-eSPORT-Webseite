@@ -40,7 +40,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 11 | PDF-Ausgabe | umgesetzt | #193, #194 |
 | 12 | Galerie und Medien: Tempo, Videos überall | umgesetzt | #196 |
 | 13 | Entflechtung: `tournament_routes.py` aufgeteilt | umgesetzt | #200 |
-| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60), v0.4.0-beta (Build 61) und v0.4.1-beta (Build 62) veröffentlicht, v0.5.0-beta (Build 63) vorbereitet | #201, #206, #207, #208, #209, #220, #237, #262, #264, #286, #304 |
+| 14 | LionsAPP in den Store | in Arbeit: 14.1 bis 14.4 umgesetzt, v0.3.1-beta (Build 60), v0.4.0-beta (Build 61) und v0.4.1-beta (Build 62) und v0.5.0-beta (Build 63) veröffentlicht | #201, #206, #207, #208, #209, #220, #237, #262, #264, #286, #304, #306 |
 | 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
@@ -409,6 +409,13 @@ derselben Person kommt keiner – die Nachricht steht ja schon da. Die Entscheid
 `lib/popups.ts`, damit sie ohne Gerät testbar sind.
 
 **Nickname weg** wie im Web (#258): ein Anzeigename, ein Satz dazu.
+
+**Der erste echte Upload scheiterte mit 401 (#305).** Das Token stand in der Server-`.env`, aber
+`docker-compose.yml` reicht nur aufgezählte Variablen an den Backend-Container weiter – die neue
+fehlte dort. Behoben in #306; dazu `npm run release:local -- --upload-only`, das die zuletzt
+gebaute APK ohne neuen Build nachreicht. Lehre: eine neue Umgebungsvariable braucht drei
+Stellen – `.env.example`, `docker-compose.yml`, `update.sh`-Hinweis – und einen Test durch den
+Container-Lauf, nicht nur durch die Anwendung.
 
 ## Block 15 — Abschluss
 
