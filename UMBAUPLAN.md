@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258) umgesetzt; Profil II (#254, #255, #256, #259) offen | #267, #275, #276 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: Profil I (#253, #257, #258) und #254 umgesetzt; #255, #256, #259 (Profil II) offen | #267, #275, #276, #278 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -432,7 +432,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
-| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
+| Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -569,6 +569,29 @@ Adressformen (Instagram, X/Twitter, Twitch, TikTok, YouTube mit `@`, `c/`, `user
 `/id/` und `/profiles/`). Beim Tippen bleibt der Text, eine Adresse wird sofort bereinigt, beim
 Verlassen des Felds fällt ein führendes `@`. Dateinamen unter Bildern sind weg, dafür gibt es
 „Ansehen“ und „Entfernen“ – in jedem `ImageUpload`, auch im Adminbereich.
+
+### Was 19.4 gefunden hat (#254, PR #278)
+
+**Die Unterhaltung war eine Seite, kein Chat.** Der Reiter im Profil lud bis zu 250 Nachrichten
+auf einmal und stellte sie untereinander; das Neueste stand ganz unten, die Eingabe auch. Jetzt
+ist `/messages` eine eigene Seite: Liste links, die Unterhaltung rechts in fester Höhe mit
+eigener Scrollleiste, beim Öffnen unten, die Eingabe klebt. Am Handy Liste und Gespräch als zwei
+Ansichten mit Zurück.
+
+**Nachladen gab es im Backend nicht.** `GET /api/messages/direct/{id}` kennt jetzt
+`?before=<id>&limit=50` (höchstens 100) und meldet `has_more`; gelesen markiert nur das Öffnen.
+Die Seite hält beim Einfügen älterer Nachrichten die Scrollposition, indem sie um die neue Höhe
+nachrückt. Neue Nachrichten kommen über den Änderungsstrom; wer nicht unten ist, sieht
+„N neue Nachrichten“ statt eines Sprungs.
+
+**Die App liest den Pfad der Benachrichtigung.** `rootNavigation.ts` öffnet bei
+`/profile?tab=inbox` ihren Chat. Deshalb behält die Web-Benachrichtigung diesen Pfad (plus
+`to=<absender>`), und das Web leitet `?tab=inbox` auf `/messages/<id>` um. Nur der Mail-Link,
+den keine App liest, zeigt direkt auf `/messages/<absender>`.
+
+**Der Browser-Test läuft ohne Backend.** Wie die Chat-Tests stellt er den Server mit
+`page.route` nach: 120 Nachrichten, davon zuerst 50; Hochscrollen holt 50 und dann 20, und die
+Seitenhöhe des Dokuments bleibt gleich – der Beweis, dass nur der Verlauf scrollt.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 
