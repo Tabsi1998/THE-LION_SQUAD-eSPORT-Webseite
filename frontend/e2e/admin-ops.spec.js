@@ -55,8 +55,14 @@ async function mockAdmin(page) {
   await page.route("**/api/admin/ops/errors**", json([]));
   await page.route("**/api/admin/ops/slow**", json({ hours: 24, threshold_ms: 1000, total: 0, routes: [], recent: [] }));
   await page.route("**/api/admin/ops/vitals**", json(VITALS));
-  await page.route("**/api/admin/ops/checks", json(CHECKS));
-  await page.route("**/api/admin/ops/checks/run", json({ ...CHECKS.latest, status: "ok", counts: { ok: 8, warn: 0, crit: 0 }, failing: [], checks: CHECKS.latest.checks.map((c) => ({ ...c, status: "ok" })) }));
+  // Wie der Server: nach „Jetzt prüfen“ liefert die Übersicht den neuen Lauf.
+  const green = { ...CHECKS.latest, status: "ok", counts: { ok: 8, warn: 0, crit: 0 }, failing: [], checks: CHECKS.latest.checks.map((c) => ({ ...c, status: "ok" })) };
+  let latest = CHECKS.latest;
+  await page.route("**/api/admin/ops/checks", (route) => json({ ...CHECKS, latest })(route));
+  await page.route("**/api/admin/ops/checks/run", (route) => {
+    latest = green;
+    return json(green)(route);
+  });
 }
 
 test("Betrieb hat die Reiter Vitals und Checks mit Ampel und Jetzt prüfen", async ({ page, isMobile }) => {

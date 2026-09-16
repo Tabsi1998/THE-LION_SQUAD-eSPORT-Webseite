@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { releaseTag, versionProblems } = require("./release-version.cjs");
+const { buildWhatsNew } = require("./whats-new.cjs");
 
 const root = path.resolve(__dirname, "..");
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(root, file), "utf8"));
@@ -43,6 +44,11 @@ check(changelogHeader.test(changelog), `CHANGELOG.md must contain a dated sectio
 const sectionMatch = changelog.match(new RegExp(`^## ${escapedVersion} - \\d{4}-\\d{2}-\\d{2}\\s*\\n([\\s\\S]*?)(?=^## |\\s*$)`, "m"));
 check(Boolean(sectionMatch && /(^|\n)- /.test(sectionMatch[1])), `CHANGELOG.md section for ${version} must contain bullet entries`);
 check(releases.includes(`\`${version}\``), `RELEASES.md release history must list \`${version}\``);
+// „Was ist neu“ (#249): die gebündelte Datei muss zum Changelog passen.
+const whatsNewPath = path.join(root, "src", "whatsnew.json");
+const expectedWhatsNew = `${JSON.stringify(buildWhatsNew({ changelog, version, build: versionCode }), null, 2)}\n`;
+const actualWhatsNew = fs.existsSync(whatsNewPath) ? fs.readFileSync(whatsNewPath, "utf8").replace(/\r\n/g, "\n") : "";
+check(actualWhatsNew === expectedWhatsNew, "src/whatsnew.json is stale - run `npm run whatsnew` and commit the file");
 
 if (tag) {
   const expectedTag = releaseTag(version, versionCode);

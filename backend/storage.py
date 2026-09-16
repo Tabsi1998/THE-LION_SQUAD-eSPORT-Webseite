@@ -13,6 +13,8 @@ PUBLIC_UPLOAD_DIR = UPLOAD_DIR / "public"
 PRIVATE_DOC_DIR = UPLOAD_DIR / "documents"
 # Chat-Anhänge: nie öffentlich, ausgeliefert nur über /api/chat-attachments.
 PRIVATE_CHAT_DIR = UPLOAD_DIR / "chat"
+# App-Releases (#250): APKs für angemeldete Nutzer über /api/mobile/app-download.
+APP_RELEASE_DIR = UPLOAD_DIR / "app-releases"
 
 
 def ensure_directory(path: Path) -> Path:
@@ -21,5 +23,5 @@ def ensure_directory(path: Path) -> Path:
 
 
 def ensure_storage_directories() -> None:
-    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR):
+    for path in (UPLOAD_DIR, PUBLIC_UPLOAD_DIR, PRIVATE_DOC_DIR, PRIVATE_CHAT_DIR, APP_RELEASE_DIR):
         ensure_directory(path)

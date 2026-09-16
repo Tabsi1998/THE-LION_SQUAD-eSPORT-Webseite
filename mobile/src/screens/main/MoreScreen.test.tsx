@@ -13,6 +13,8 @@ jest.mock("../../lib/api", () => ({
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "tabsi", is_club_member: true } }) }));
 jest.mock("../../live", () => ({ isGuestUser: () => false }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+const mockOpenWhatsNew = jest.fn();
+jest.mock("../../update/AppUpdateProvider", () => ({ useAppUpdate: () => ({ openWhatsNew: mockOpenWhatsNew, info: null, check: jest.fn() }) }));
 
 const navigate = jest.fn();
 const navigation = { navigate } as never;
@@ -63,4 +65,11 @@ test("Symbole je Kanal, Unbekanntes als Link", () => {
   expect(socialIcon("discord")).toBe("logo-discord");
   expect(socialIcon("TikTok")).toBe("logo-tiktok");
   expect(socialIcon("kununu")).toBe("link-outline");
+});
+
+test("unten bei der Version steht „Was ist neu“ und öffnet die Karte", async () => {
+  await render(<MoreScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByText(/LionsAPP v0\.5\.0-beta · Build 63/)).toBeTruthy());
+  await fireEvent.press(screen.getByTestId("more-whats-new"));
+  expect(mockOpenWhatsNew).toHaveBeenCalledTimes(1);
 });

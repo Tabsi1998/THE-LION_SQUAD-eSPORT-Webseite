@@ -99,6 +99,7 @@ const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
 const AdminModerationPage = lazy(() => import("@/pages/admin/AdminModerationPage"));
 const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
 const AdminMobilePushPage = lazy(() => import("@/pages/admin/AdminMobilePushPage"));
+const AdminAppReleasesPage = lazy(() => import("@/pages/admin/AdminAppReleasesPage"));
 const AdminWidgetsPage = lazy(() => import("@/pages/admin/AdminWidgetsPage"));
 const AdminMembersPage = lazy(() => import("@/pages/admin/AdminMembersPage"));
 const AdminClubMemberProfilesPage = lazy(() => import("@/pages/admin/AdminClubMemberProfilesPage"));
@@ -262,6 +263,7 @@ function App() {
           <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireClubAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireClubAdmin><AdminMobilePushPage /></ProtectedRoute>} />
+          <Route path="/admin/app-releases" element={<ProtectedRoute requireClubAdmin><AdminAppReleasesPage /></ProtectedRoute>} />
           <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 

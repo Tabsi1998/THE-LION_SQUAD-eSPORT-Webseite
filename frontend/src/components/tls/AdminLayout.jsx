@@ -9,6 +9,7 @@ import {
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
   Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker,
+  Smartphone,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -77,6 +78,7 @@ const ADMIN_GROUPS = [
       { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare },
       { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug, clubOnly: true },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, clubOnly: true },
+      { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, clubOnly: true },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, clubOnly: true },
     ],
   },
@@ -85,6 +87,7 @@ const ADMIN_GROUPS = [
 const ADMIN_SEARCH_TERMS = {
   "/admin": ["home", "start", "control"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
+  "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag"],
   "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],

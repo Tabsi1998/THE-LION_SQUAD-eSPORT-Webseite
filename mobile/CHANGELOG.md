@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0-beta - 2026-09-16
+
+- Mobile: Nach einem Update zeigt die App einmal „Was ist neu“ mit den Punkten der Version; unter Mehr ist die Karte jederzeit erreichbar (#249).
+- Mobile: Neue Versionen kommen aus der App heraus: Banner „Build N ist da“, Download vom Vereinsserver mit Fortschritt und Prüfsumme, dann der Android-Installer – ohne GitHub am Handy. Ein Pflicht-Update lässt sich nicht wegdrücken (#250).
+- Mobile: In-App-Banner für Benachrichtigungen: nur noch einer sichtbar, kurz hintereinander eintreffende Meldungen werden „2 neue Benachrichtigungen“, nach fünf Sekunden von selbst weg, nach oben wischen schließt sofort; im offenen Chat mit derselben Person kein Banner (#251).
+- Mobile: Das Feld „Nickname“ im Profil ist weg – ein Anzeigename wie im Web (#277).
+
 ## 0.4.1-beta - 2026-09-16
 
 - Mobile: Bilder im Chat: Antwortet der Server dem Bildlader mit einem Fehlercode („Unexpected HTTP code“), holt die App das Bild über denselben Weg wie jeden anderen Aufruf - mit Anmeldung und Token-Erneuerung - und zeigt es an; ab dann gehen weitere Bilder gleich so. Scheitert auch das, steht der HTTP-Status mit Grund in der Kachel statt einer abgeschnittenen Meldung (#238).

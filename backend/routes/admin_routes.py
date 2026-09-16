@@ -5,11 +5,11 @@ import logging
 import json
 import re
 from datetime import datetime, timezone, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import require_admin, require_club_admin, get_current_user
-from models import now_utc
+from auth import require_admin, require_club_admin, get_current_user, get_optional_user
+from models import new_id, now_utc
 from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
 
@@ -17,6 +17,7 @@ from services.ops_monitor import errors_overview, ops_summary, set_error_resolve
 from services.ops_alerts import alert_red_checks
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
+from services.app_releases import delete_release, list_releases, public_release, store_release, update_release, upload_token_matches
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("tls.admin")
@@ -712,3 +713,77 @@ async def delete_notification(nid: str, me: dict = Depends(get_current_user)):
     db = get_db()
     result = await db.notifications.delete_one({"id": nid, "user_id": me["id"], "in_app_visible": {"$ne": False}})
     return {"ok": True, "deleted": result.deleted_count}
+
+
+# ---------------------------------------------------------------- App-Releases (#250)
+
+class AppReleaseUpdate(BaseModel):
+    min_build: int | None = Field(default=None, ge=0)
+    is_current: bool | None = None
+    notes: str | None = Field(default=None, max_length=8000)
+
+
+async def _release_uploader(request: Request, user: dict | None = Depends(get_optional_user)) -> str:
+    """Wer darf hochladen: der Vereinsadmin (Sitzung) oder das Release-Skript (Token aus der Server-Umgebung)."""
+    if upload_token_matches(request.headers.get("X-Release-Token")):
+        return "release-script"
+    if not user:
+        raise HTTPException(status_code=401, detail="Nicht angemeldet")
+    if user.get("role") not in {"club_admin", "superadmin"}:
+        raise HTTPException(status_code=403, detail="Nur Vereinsadmins")
+    if not user.get("mfa_enabled") or not user.get("auth_mfa_verified"):
+        raise HTTPException(status_code=403, detail="Für den Adminbereich ist eine bestätigte Zwei-Faktor-Anmeldung erforderlich.")
+    return f"admin:{user.get('id')}"
+
+
+@router.get("/app-releases")
+async def admin_app_releases(me: dict = Depends(require_club_admin())):
+    return await list_releases(get_db())
+
+
+@router.post("/app-releases")
+async def admin_app_release_upload(
+    file: UploadFile = File(...),
+    version: str = Form(...),
+    build: int = Form(...),
+    notes: str = Form(default=""),
+    min_build: int | None = Form(default=None),
+    set_current: bool = Form(default=True),
+    source: str = Depends(_release_uploader),
+):
+
+    async def chunks():
+        while True:
+            piece = await file.read(1024 * 1024)
+            if not piece:
+                break
+            yield piece
+
+    try:
+        stored = await store_release(
+            get_db(), build=build, version=version, notes=notes, chunks=chunks(),
+            min_build=min_build, set_current=set_current, source=source,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await get_db().audit_logs.insert_one({
+        "id": new_id(), "action": "app_release.upload", "actor": source,
+        "target": f"build {int(build)}", "details": {"version": version, "size": stored.get("size"), "sha256": stored.get("sha256")},
+        "created_at": now_utc().isoformat(),
+    })
+    return public_release(stored)
+
+
+@router.patch("/app-releases/{build}")
+async def admin_app_release_update(build: int, body: AppReleaseUpdate, me: dict = Depends(require_club_admin())):
+    doc = await update_release(get_db(), build, min_build=body.min_build, is_current=body.is_current, notes=body.notes)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Release nicht gefunden")
+    return public_release(doc)
+
+
+@router.delete("/app-releases/{build}")
+async def admin_app_release_delete(build: int, me: dict = Depends(require_club_admin())):
+    if not await delete_release(get_db(), build):
+        raise HTTPException(status_code=404, detail="Release nicht gefunden")
+    return {"ok": True}

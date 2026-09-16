@@ -7,6 +7,7 @@ import { installMobileLogHandlers } from "./src/lib/mobileLog";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { NotificationProvider } from "./src/notifications/NotificationContext";
 import { LiveChangesProvider } from "./src/realtime/LiveChangesProvider";
+import { AppUpdateProvider } from "./src/update/AppUpdateProvider";
 
 installMobileLogHandlers();
 
@@ -18,8 +19,10 @@ export default function App() {
           <AuthProvider>
             <LiveChangesProvider>
               <NotificationProvider>
-                <StatusBar style="light" />
-                <AppNavigator />
+                <AppUpdateProvider>
+                  <StatusBar style="light" />
+                  <AppNavigator />
+                </AppUpdateProvider>
               </NotificationProvider>
             </LiveChangesProvider>
           </AuthProvider>
