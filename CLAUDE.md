@@ -412,6 +412,7 @@ cd mobile
 npm run release:local -- --check      # zeigt, was fehlt
 npm run release:local -- --dry-run    # bauen und prüfen, nichts veröffentlichen
 npm run release:local                 # bauen, prüfen, GitHub-Release und Tag anlegen
+npm run release:local -- --upload-only  # nur die zuletzt gebaute APK an den Server schicken (#305)
 ```
 
 - Erster Build auf einem PC: rund 12 Minuten (npm ci, prebuild, 8 Minuten
@@ -432,8 +433,10 @@ npm run release:local                 # bauen, prüfen, GitHub-Release und Tag a
 - Nach `gh release create` schickt das Skript die APK an den Vereinsserver
   (#250), wenn `uploadUrl`/`uploadToken` in `signing.json` oder
   `LIONSAPP_UPLOAD_URL`/`LIONSAPP_UPLOAD_TOKEN` gesetzt sind (Token =
-  `APP_RELEASE_UPLOAD_TOKEN` der Server-`.env`). Ohne: Hinweis, kein Fehler;
-  dann Admin → System → App-Versionen von Hand.
+  `APP_RELEASE_UPLOAD_TOKEN` der Server-`.env`; `docker-compose.yml` muss die
+  Variable durchreichen, sonst 401 – #305). Ohne: Hinweis, kein Fehler; dann
+  `-- --upload-only` nach dem nächsten `update.sh` oder Admin → System →
+  App-Versionen von Hand.
 - Nach jedem Build dem Betreiber Klick-Schritte geben (Release-Seite, APK,
   Installation; bei Schlüsselwechsel einmal deinstallieren).
 
@@ -461,33 +464,34 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #304 (App 0.5.0-beta: #249, #250, #251, #277). Nach dem Merge: keine;
-  Server-Update fällig (neue Endpunkte und Admin-Seite), dann Build 63.
+- #306 (#305 Token-Durchreichung in docker-compose, `--upload-only`). Nach dem
+  Merge: keine; Server-Update fällig, danach die APK von Build 63 nachreichen.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
   (`mobile-v0.3.1-beta-build60`), **Build 61** (`mobile-v0.4.0-beta-build61`,
   Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
   `46b6ce34`), **Build 62** (`mobile-v0.4.1-beta-build62`, Commit e64f840, am
-  16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238).
-  Nächster Build ist 63 mit App 0.5.0-beta (#249–#251, #277, PR #304) –
-  erst nach dem Merge und dem Server-Update, damit das Skript die APK am
-  Server ablegen kann.
+  16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238),
+  **Build 63** (`mobile-v0.5.0-beta-build63`, Commit 0b6bc11, am 16.09. vom
+  Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Der
+  Server-Upload dieser APK scheiterte mit 401 (#305) – nach dem Merge von #306
+  und `update.sh` mit `-- --upload-only` nachreichen. Nächster Build ist 64.
 
 ### Erledigungen beim Betreiber
 - #299 ist gemergt: `update.sh` am Server (Stand des Servers: #294 vom
   16.09.), dann Einstellungen → Discord: privaten Kanal als Betriebs-Webhook
   eintragen, „Testalarm senden“, Admin → Betrieb → Checks → „Jetzt prüfen“.
-- Nach dem Merge von #304: `update.sh`; in der Server-`.env`
-  `APP_RELEASE_UPLOAD_TOKEN` setzen (`openssl rand -hex 24`), in
-  `%USERPROFILE%\.lionsapp-release\signing.json` `uploadUrl`
-  (`https://lionsquad.at`) und `uploadToken` (derselbe Wert) eintragen –
-  dann Bescheid geben für Build 63. Build 62 auf dem Handy zeigt danach den
-  Update-Banner: das ist der Test für #250.
+- Nach dem Merge von #306: `update.sh` (damit der Backend-Container das
+  Token aus der `.env` bekommt), dann Bescheid geben – ich reiche die APK von
+  Build 63 mit `-- --upload-only` nach. Build 62 auf dem Handy zeigt danach den
+  Update-Banner: das ist der Test für #250. Token und `signing.json` sind seit
+  16.09. eingerichtet (die Server-Zeile liegt in
+  `%USERPROFILE%\.lionsapp-release\server-env-zeile.txt`).
 - #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
   Turnierleitung pro Turnier); nichts mehr offen.
 
-### Meilensteine und offene Issues (33 offen)
+### Meilensteine und offene Issues (33 offen; #305 schließt mit #306)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
@@ -510,7 +514,8 @@ braucht.
    #298) – Server-Update zusammen mit #299.
 3. App 0.4.1-beta ist als Build 62 veröffentlicht und bestätigt (#238 erledigt).
 4. Betrieb II #265 ist umgesetzt und gemergt (#299) – Server-Update fällig.
-5. App 0.5.0-beta ist umgesetzt (#304) → nach Merge und Server-Update Build 63.
+5. App 0.5.0-beta ist umgesetzt und als Build 63 veröffentlicht (#304); die APK
+   kommt nach #306 an den Server.
 6. Web: Rollen und Rechte (#287–#292) – Entscheidung liegt vor.
 7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
 8. Discord: Kanäle und Bot (#300–#303) – nach Rollen und Rechten; der Bot
