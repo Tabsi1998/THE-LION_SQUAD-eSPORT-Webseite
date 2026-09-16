@@ -175,7 +175,7 @@ async def _notify_team_mentions(db, team: dict, sender: dict, message: dict) -> 
         {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1, "notification_preferences": 1, "newsletter_consent": 1},
     ).to_list(500)
     url = await build_public_url(f"/teams/{team['id']}")
-    preferences_url = await build_public_url("/profile?tab=privacy")
+    preferences_url = await build_public_url("/profile?tab=notifications")
     notified_ids: set[str] = set()
     for member in members:
         if member.get("id") == sender.get("id"):

@@ -288,7 +288,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         sender_name=_label(me),
         preview=chat_message_preview(doc, 300),
         url=await build_public_url("/profile?tab=inbox"),
-        preferences_url=await build_public_url("/profile?tab=privacy"),
+        preferences_url=await build_public_url("/profile?tab=notifications"),
         dedupe_key=f"direct_message:{doc['id']}:{recipient['id']}",
         mail_meta={
             "kind": "direct_message",

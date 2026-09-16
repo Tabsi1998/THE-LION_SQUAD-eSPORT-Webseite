@@ -1,5 +1,7 @@
-import { Eye, Gamepad2, Globe, Medal, MessageSquare, MonitorSmartphone, User, UserPlus, Users } from "lucide-react";
+import { Bell, Eye, Gamepad2, Globe, Medal, MessageSquare, MonitorSmartphone, User, UserPlus, Users } from "lucide-react";
 
+// Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
+// verlinken die Benachrichtigungen mit ?tab=notifications.
 export const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
   { k: "gaming", label: "Gaming", icon: Gamepad2 },
@@ -10,6 +12,7 @@ export const TABS = [
   { k: "achievements", label: "Achievements", icon: Medal },
   { k: "sessions", label: "Sitzungen", icon: MonitorSmartphone },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
+  { k: "notifications", label: "Benachrichtigungen", icon: Bell },
 ];
 
 export const PLATFORMS = [
@@ -46,14 +49,6 @@ export const SUBSCRIPTIONS = [
   { value: "ea_play_pro", label: "EA Play Pro" },
   { value: "ubisoft_plus", label: "Ubisoft+" },
   { value: "geforce_now", label: "GeForce NOW" },
-];
-
-export const VISIBILITY = [
-  { k: "public", l: "Öffentlich" },
-  { k: "community", l: "Nur registrierte Community" },
-  { k: "members", l: "Nur Vereinsmitglieder" },
-  { k: "admins", l: "Nur Admins" },
-  { k: "private", l: "Privat" },
 ];
 
 export const DIRECT_MESSAGE_PRIVACY = [

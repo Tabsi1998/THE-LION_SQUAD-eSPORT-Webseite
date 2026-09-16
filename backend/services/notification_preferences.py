@@ -287,7 +287,7 @@ async def enqueue_newsletter_for_item(kind: str, item: dict, dedupe_suffix: str 
         return {"queued": 0, "reason": "no_recipients"}
 
     base = await _site_base_url()
-    preferences_url = f"{base}/profile?tab=privacy"
+    preferences_url = f"{base}/profile?tab=notifications"
     slug_or_id = item.get("slug") or item.get("id")
     if kind == "news":
         template_key = "newsletter_news"
