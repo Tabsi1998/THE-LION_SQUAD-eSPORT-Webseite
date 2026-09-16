@@ -159,6 +159,10 @@ Seit dem 15. September gilt:
   nötig); Termin-, Aktions- und Saisonlogik in `lib/dashboard.js`
   (Übertragung von `mobile/src/lib/dashboard.ts`). Kacheln nur noch
   Mitgliedervorteile, Strafen, Daten. Browser-Test `frontend/e2e/dashboard.spec.js`.
+- Freunde (#259, PR #281): `profile/FriendsPanel.jsx` sucht über
+  `/api/messages/users?q=` und rechnet den Stand zu mir aus `/api/friends`;
+  `ProfileNav` nimmt `badges` (Zähler und Punkt je Reiter), das Profil lädt
+  dafür `/api/friends` und hört auf die Ressource `friends`.
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -401,16 +405,15 @@ braucht.
   `46b6ce34`). Nächster Build ist 62 mit App 0.5.0-beta (#249–#251).
 
 ### Erledigungen beim Betreiber
-- `update.sh` am Server, sobald #276 gemergt ist: damit ist Web: Profil I
-  komplett am Server (Stand vorher: #275).
+- `update.sh` am Server, sobald #281 gemergt ist: damit sind Web: Profil I und
+  Profil II komplett am Server (Stand des Servers: #275 vom 16.09.).
 - Build 61 installieren (Release-Seite → APK → installieren; Build 60 muss
   nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (27 offen)
+### Meilensteine und offene Issues (26 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil II – Nachrichten und Dashboard | #259 Freunde (#254 mit #278, #255 mit #279, #256 mit #280 zu) |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
@@ -426,7 +429,8 @@ braucht.
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I ist fertig (#253, #257, #258 mit #267, #275, #276); der Meilenstein
    „Web: Profil I – Aufbau“ ist abgeschlossen, Server-Update fällig.
-2. Profil II: #259 (#254 mit #278, #255 mit #279, #256 mit #280 erledigt).
+2. Profil II ist fertig (#254, #255, #256, #259 mit #278, #279, #280, #281); der
+   Meilenstein „Web: Profil II“ ist abgeschlossen, Server-Update fällig.
 3. Betrieb II #265.
 4. App 0.5.0-beta (#249–#251) → Build 62.
 5. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
