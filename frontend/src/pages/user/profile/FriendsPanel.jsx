@@ -70,7 +70,7 @@ export function FriendsPanel() {
           <FriendList title="Meine Freunde" rows={data.friends || []} empty="Noch keine Freunde.">
             {(row) => (
               <>
-                <Link to={`/profile?tab=inbox&to=${row.user?.id}`} className="px-3 py-1.5 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" /> Schreiben</Link>
+                <Link to={`/messages/${row.user?.id}`} className="px-3 py-1.5 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-[10px] uppercase tracking-wider font-bold inline-flex items-center gap-1"><MessageSquare className="w-3 h-3" /> Schreiben</Link>
                 <button type="button" onClick={() => act(row, "remove")} className="px-3 py-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] uppercase tracking-wider font-bold">Entfernen</button>
               </>
             )}

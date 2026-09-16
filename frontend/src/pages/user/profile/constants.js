@@ -1,14 +1,14 @@
-import { Bell, Eye, Gamepad2, Globe, Medal, MessageSquare, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Bell, Eye, Gamepad2, Globe, Medal, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 
 // Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
-// verlinken die Benachrichtigungen mit ?tab=notifications.
+// verlinken die Benachrichtigungen mit ?tab=notifications. Die Inbox ist seit
+// #254 die eigene Seite /messages; ?tab=inbox leitet dorthin um.
 export const TABS = [
   { k: "basic", label: "Grunddaten", icon: User },
   { k: "gaming", label: "Gaming", icon: Gamepad2 },
   { k: "socials", label: "Socials", icon: Globe },
   { k: "teams", label: "Teams", icon: Users },
   { k: "friends", label: "Freunde", icon: UserPlus },
-  { k: "inbox", label: "Inbox", icon: MessageSquare },
   { k: "achievements", label: "Achievements", icon: Medal },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
   { k: "notifications", label: "Benachrichtigungen", icon: Bell },
