@@ -116,6 +116,18 @@ Seit dem 15. September gilt:
   `/api/admin/ops/*`, Sammlungen `ops_errors` / `ops_slow_requests` (TTL
   30 Tage), `SLOW_REQUEST_MS` (Standard 1000). Starlette packt Fehler in
   `ExceptionGroup` → `unwrap_exception`.
+- Betrieb II (#265, PR #299): `services/ops_checks.py` – acht Prüfungen
+  (Datenbank, Speicher, Upload-Volume, Mail-Queue, Änderungsstrom,
+  Bildvarianten, Fehlergruppen, Scheduler), Bewertung in `rate_*`, Lauf
+  alle 5 min über den Scheduler-Job `ops_checks`, Sammlung
+  `ops_check_runs` (TTL 7 Tage). `services/ops_alerts.py` – Discord-Webhook
+  für rote Prüfungen und neue 5xx-Gruppen (Hook in
+  `ops_monitor._upsert_error`), eine Meldung je Schlüssel und Stunde
+  (`ops_alert_state`). `services/ops_vitals.py` + `routes/ops_routes.py`:
+  `POST /api/ops/vitals` (anonym, 30 Sendungen je Adresse und Minute,
+  Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
+  Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
+  `ops_summary` trägt `checks` für die Tageszentrale.
 - Bild-Varianten beim Upload: `backend/services/image_variants.py`
   (`schedule_variants`).
 - Deutsch-Prüfung `test_german_copy.py` schlägt bei „fuer/ueber/weiss“ an –
@@ -192,7 +204,12 @@ Seit dem 15. September gilt:
   mit `type="button"`. `ImageUpload` zeigt keine Dateinamen mehr und hat
   „Ansehen“/„Entfernen“ – überall, auch im Adminbereich.
 - Admin-Seite Betrieb: `pages/admin/AdminOpsPage.jsx`, Route `/admin/ops`,
-  Menüpunkt „Betrieb“ unter System.
+  Menüpunkt „Betrieb“ unter System; Reiter Fehler, Tempo, Vitals, Checks
+  (#265). `lib/vitals.js` sammelt LCP/FCP/TTFB/CLS/INP (`web-vitals`
+  nachgeladen, Start in `index.jsx`, `sendBeacon` beim Verbergen der
+  Seite, nichts bei Do Not Track); `lib/ops.js` liefert Ampel-Sätze und
+  -Farben, die Tageszentrale führt „Betrieb“ als Aufgabe, sobald ein Check
+  gelb oder rot ist. Browser-Test `frontend/e2e/admin-ops.spec.js`.
 - ESLint nutzt `frontend/eslint-suppressions.json` (Sammel-Unterdrückungen).
   Nach dem Auslagern von Code: `npx eslint --prune-suppressions src`.
 - Web-Fehlersammlung ist standardmäßig **an** (`VITE_CLIENT_LOGGING` nur
@@ -438,7 +455,7 @@ braucht.
 ### Meilensteine und offene Issues (32 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
+| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Web: Mitgliederbereich und Kopfzeile | #284 Mitgliederbereich aufräumen (Vorschlag, wartet auf OK); #282 und #283 sind mit #285 umgesetzt |
 | App 0.4.1-beta | #238 Chat-Bild „Unexpected HTTP Code“ – Fix in #286, danach Build 62 |
