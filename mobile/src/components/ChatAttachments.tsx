@@ -21,6 +21,7 @@ import {
 } from "../lib/chatAttachments";
 import { colors } from "../theme";
 import type { ChatAttachment } from "../types";
+import { AuthorizedImage, type AuthorizedImageState } from "./AuthorizedImage";
 import { Muted } from "./Text";
 
 const UPLOAD_TIMEOUT_MS = 120_000;
@@ -190,24 +191,22 @@ export function MessageAttachments({ attachments }: { attachments?: ChatAttachme
 /**
  * Eine Kachel je Anhang. Lädt das Bild nicht, steht das dran - vorher blieb
  * die Kachel einfach schwarz, und niemand sah, ob es 404, 401 oder ein
- * Decoder-Fehler war (#238). Ein Tipp versucht es noch einmal.
+ * Decoder-Fehler war (#238). Scheitert der Bildlader mit einem Fehlercode,
+ * holt der API-Client das Bild; steht auch das nicht, zeigt die Kachel den
+ * HTTP-Status mit Grund. Ein Tipp versucht es noch einmal.
  */
 function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; token: string | null; small: boolean; onOpen: () => void }) {
-  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState("");
+  const [state, setState] = useState<AuthorizedImageState>({ status: "loading" });
   const [attempt, setAttempt] = useState(0);
-  const preview = item.kind === "video"
-    ? authorizedSource(item.poster_url, token)
-    : authorizedSource(item.url, token, 800);
-  const failed = state === "error";
+  const previewUrl = item.kind === "video" ? item.poster_url : item.url;
+  const failed = state.status === "error";
   return (
     <Pressable
       accessibilityLabel={failed ? "Bild erneut laden" : item.kind === "video" ? "Video abspielen" : "Bild öffnen"}
       accessibilityRole="imagebutton"
       onPress={() => {
         if (failed) {
-          setState("loading");
-          setError("");
+          setState({ status: "loading" });
           setAttempt((count) => count + 1);
           return;
         }
@@ -215,30 +214,28 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
       }}
       style={[styles.tile, small && styles.tileSmall]}
     >
-      {preview && !failed ? (
-        <Image
-          key={attempt}
-          source={preview}
+      {previewUrl && !failed ? (
+        <AuthorizedImage
+          url={previewUrl}
+          token={token}
+          width={item.kind === "video" ? undefined : 800}
+          attempt={attempt}
           style={StyleSheet.absoluteFill}
           resizeMode="cover"
           testID={`chat-attachment-image-${item.id}`}
-          onLoad={() => setState("ready")}
-          onError={(event) => {
-            setState("error");
-            setError(String(event?.nativeEvent?.error || "").slice(0, 80));
-          }}
+          onState={setState}
         />
       ) : null}
-      {!preview ? <Ionicons name="film-outline" size={28} color={colors.muted} /> : null}
-      {preview && state === "loading" ? (
+      {!previewUrl ? <Ionicons name="film-outline" size={28} color={colors.muted} /> : null}
+      {previewUrl && state.status === "loading" ? (
         <View style={styles.tileState} accessibilityLabel="Bild wird geladen">
           <ActivityIndicator color={colors.cyan} />
         </View>
       ) : null}
-      {failed ? (
+      {state.status === "error" ? (
         <View style={styles.tileState} testID={`chat-attachment-error-${item.id}`}>
           <Ionicons name="image-outline" size={22} color={colors.muted} />
-          <Muted style={styles.tileStateText} numberOfLines={2}>Bild konnte nicht geladen werden{error ? ` (${error})` : ""}. Tippen zum Wiederholen.</Muted>
+          <Muted style={styles.tileStateText} numberOfLines={3}>Bild konnte nicht geladen werden ({state.reason}). Tippen zum Wiederholen.</Muted>
         </View>
       ) : null}
       {item.kind === "video" && !failed ? (
@@ -252,13 +249,30 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
 
 function AttachmentViewer({ item, token, onClose }: { item: ChatAttachment | null; token: string | null; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  const [state, setState] = useState<AuthorizedImageState>({ status: "loading" });
   return (
     <Modal animationType="fade" onRequestClose={onClose} transparent visible={Boolean(item)}>
       <View style={styles.viewer}>
         {item?.kind === "video" ? (
           <VideoAttachmentPlayer item={item} token={token} />
         ) : item ? (
-          <Image source={authorizedSource(item.url, token, 1600) ?? undefined} style={styles.viewerImage} resizeMode="contain" />
+          <>
+            <AuthorizedImage
+              url={item.url}
+              token={token}
+              width={1600}
+              style={styles.viewerImage}
+              resizeMode="contain"
+              testID={`chat-attachment-viewer-${item.id}`}
+              onState={setState}
+            />
+            {state.status === "loading" ? <ActivityIndicator color={colors.cyan} style={styles.viewerState} /> : null}
+            {state.status === "error" ? (
+              <Muted style={[styles.viewerState, styles.viewerError]} testID="chat-attachment-viewer-error">
+                Bild konnte nicht geladen werden ({state.reason}).
+              </Muted>
+            ) : null}
+          </>
         ) : null}
         <Pressable
           accessibilityLabel="Schließen"
@@ -409,5 +423,12 @@ const styles = StyleSheet.create({
   viewerVideo: {
     height: "70%",
     width: "100%",
+  },
+  viewerState: {
+    position: "absolute",
+  },
+  viewerError: {
+    paddingHorizontal: 24,
+    textAlign: "center",
   },
 });

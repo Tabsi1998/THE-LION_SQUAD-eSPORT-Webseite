@@ -227,6 +227,32 @@ async def test_a_large_chat_image_is_offered_in_a_small_version(flow):
         assert image.width == 400
 
 
+@pytest.mark.asyncio
+async def test_the_sizes_the_app_asks_for_are_served_too(flow):
+    """Die App fragt Kacheln mit w=800 und die Vollansicht mit w=1600 ab (#238)."""
+    alice, bob, _carol = await people(flow)
+    flow.act_as(alice)
+    attachment_id = await uploaded_id(flow, content=png(1200, 800))
+    await flow.post(f"/api/messages/direct/{bob['id']}", json={"attachment_ids": [attachment_id]})
+
+    flow.act_as(bob)
+    medium = await flow.get(f"/api/chat-attachments/{attachment_id}?w=800")
+    assert medium.status_code == 200, medium.text
+    assert medium.headers["content-type"] == "image/webp"
+    with Image.open(io.BytesIO(medium.content)) as image:
+        assert image.width == 800
+
+    # 1600 ist breiter als das Bild: es kommt das Original, kein Fehler.
+    large = await flow.get(f"/api/chat-attachments/{attachment_id}?w=1600")
+    assert large.status_code == 200, large.text
+    with Image.open(io.BytesIO(large.content)) as image:
+        assert image.width == 1200
+
+    # Eine Breite außerhalb der Liste ist kein Fehler, sondern das Original.
+    odd = await flow.get(f"/api/chat-attachments/{attachment_id}?w=999")
+    assert odd.status_code == 200, odd.text
+
+
 # ---------------------------------------------------------------- Aufräumen und Löschen
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ const DEFAULT_TTL_MS = 10 * 60 * 1000;
 const NO_CACHE_PATTERNS = [
   "/auth/",
   "/admin/",
+  "/chat-attachments/",
   "/notifications/read",
   "/settings/site-banners/impression",
   "/settings/site-banners/click",
@@ -63,8 +64,16 @@ export async function invalidateCache(urlPattern?: string): Promise<void> {
   }
 }
 
+const clearers = new Set<() => void>();
+
+/** Wer eigene Zwischenspeicher hält (Chat-Bilder), räumt mit auf, wenn das Konto wechselt. */
+export function registerCacheClearer(clear: () => void) {
+  clearers.add(clear);
+}
+
 export async function clearAllCache(): Promise<void> {
   memoryCache.clear();
+  clearers.forEach((clear) => clear());
 }
 
 export async function getStaleCache<T>(cacheKey: string, url: string): Promise<T | null> {

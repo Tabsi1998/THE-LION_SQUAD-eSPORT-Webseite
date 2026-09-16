@@ -4,6 +4,8 @@ import {
   attachmentKindForAsset,
   authorizedSource,
   canSendChatMessage,
+  describeAttachmentError,
+  httpStatusFromImageError,
   readyAttachmentIds,
   tooLargeMessage,
   uploadPartForAsset,
@@ -81,5 +83,26 @@ describe("Quellen mit Anmeldung", () => {
   test("ohne Adresse keine Quelle, ohne Token keine Kopfzeile", () => {
     expect(authorizedSource(null, "token-1")).toBeNull();
     expect(authorizedSource("/api/chat-attachments/att-1", null)).not.toHaveProperty("headers");
+  });
+});
+
+describe("Fehlergrund eines Bildes (#238)", () => {
+  test("der HTTP-Status steckt in den Meldungen von Android, iOS und im Kurzformat", () => {
+    expect(httpStatusFromImageError("Unexpected HTTP code Response{protocol=h2, code=404, message=, url=https://x/a?w=800}")).toBe(404);
+    expect(httpStatusFromImageError("The operation couldn’t be completed. Response status code: 401")).toBe(401);
+    expect(httpStatusFromImageError("HTTP 503")).toBe(503);
+    expect(httpStatusFromImageError("Failed to decode image")).toBeNull();
+    expect(httpStatusFromImageError(undefined)).toBeNull();
+  });
+
+  test("die Beschreibung nennt Status und Grund des Servers, sonst die Netzmeldung", () => {
+    const denied = Object.assign(new Error("Request failed with status code 404"), {
+      isAxiosError: true,
+      response: { status: 404, data: { detail: "Anhang nicht gefunden" } },
+    });
+    expect(describeAttachmentError(denied)).toBe("HTTP 404: Anhang nicht gefunden");
+    const offline = Object.assign(new Error("Network Error"), { isAxiosError: true, code: "ERR_NETWORK" });
+    expect(describeAttachmentError(offline)).toBe("Keine Internetverbindung. Bitte prüfe dein Netz.");
+    expect(describeAttachmentError(new Error("Bild konnte nicht gelesen werden."))).toBe("Bild konnte nicht gelesen werden.");
   });
 });
