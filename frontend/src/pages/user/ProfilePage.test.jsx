@@ -276,3 +276,31 @@ test("?tab=inbox leitet zur eigenen Nachrichten-Seite weiter, mit to= direkt ins
   expect(await screen.findByTestId("messages-page-stub")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Inbox/i })).toBeNull();
 });
+
+test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet, Zaehler im Reiter", async () => {
+  const user = userEvent.setup();
+  const bob = { id: "u-2", username: "bob", display_name: "Bob", avatar_url: "" };
+  let outgoing = [];
+  apiMock.get.mockImplementation((url) => {
+    if (url === "/friends") return Promise.resolve({ data: { friends: [{ id: "f-1", status: "accepted", user: { id: "u-3", username: "anna", display_name: "Anna" } }], incoming: [], outgoing } });
+    if (String(url).startsWith("/messages/users?q=")) return Promise.resolve({ data: [bob] });
+    return Promise.resolve({ data: [] });
+  });
+  apiMock.post.mockImplementation((url) => {
+    if (url === "/friends/u-2/request") {
+      outgoing = [{ id: "f-2", status: "pending", outgoing: true, user: bob }];
+      return Promise.resolve({ data: { status: "pending_outgoing" } });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  renderPage(["/profile?tab=friends"]);
+
+  expect(await screen.findByRole("button", { name: /Freunde \(1\)/ })).toBeInTheDocument();
+  await user.type(screen.getByTestId("profile-friends-search"), "bo");
+  await user.click(await screen.findByTestId("friends-request-u-2"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/friends/u-2/request"));
+  expect(await screen.findByTestId("friends-outgoing-f-2")).toBeInTheDocument();
+  expect(screen.getByTestId("friends-candidate-u-2")).toHaveTextContent("Anfrage gesendet");
+  expect(screen.getByTestId("friends-friend-f-1")).toHaveTextContent("Anna");
+});

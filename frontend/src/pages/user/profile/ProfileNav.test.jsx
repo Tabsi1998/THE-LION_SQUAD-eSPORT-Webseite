@@ -22,3 +22,10 @@ test("ein Klick meldet den Reiter", async () => {
   await user.click(screen.getByRole("button", { name: /Privatsphäre/ }));
   expect(onSelect).toHaveBeenCalledWith("privacy");
 });
+
+test("ein Zaehler und ein Punkt haengen am Reiter Freunde", () => {
+  render(<ProfileNav tab="basic" onSelect={() => {}} badges={{ friends: { count: 6, alert: true } }} />);
+  expect(screen.getByRole("button", { name: /Freunde \(6\)/ })).toBeInTheDocument();
+  expect(screen.getByTestId("profile-tab-friends-alert")).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-tab-privacy-alert")).toBeNull();
+});
