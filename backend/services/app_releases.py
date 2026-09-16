@@ -41,6 +41,12 @@ def valid_version(version: str) -> bool:
     return bool(VERSION_PATTERN.match(str(version or "").strip()))
 
 
+def upload_token_status() -> dict:
+    """Ob am Server ein brauchbares Token liegt - nur ja/nein und Länge, nie der Wert (#307)."""
+    expected = os.environ.get(UPLOAD_TOKEN_ENV, "").strip()
+    return {"configured": len(expected) >= 24, "length": len(expected), "min_length": 24, "env": UPLOAD_TOKEN_ENV}
+
+
 def upload_token_matches(presented: str | None) -> bool:
     """Das Release-Skript weist sich mit dem Token aus der Server-Umgebung aus."""
     expected = os.environ.get(UPLOAD_TOKEN_ENV, "").strip()
@@ -48,6 +54,15 @@ def upload_token_matches(presented: str | None) -> bool:
     if len(expected) < 24 or not given:
         return False
     return hmac.compare_digest(expected, given)
+
+
+def upload_token_problem(presented: str | None) -> str | None:
+    """Warum ein mitgeschicktes Token nicht zählt - ohne das Geheimnis zu verraten."""
+    if not (presented or "").strip():
+        return None
+    if not upload_token_status()["configured"]:
+        return f"Am Server ist kein {UPLOAD_TOKEN_ENV} hinterlegt (mindestens 24 Zeichen in der .env, docker-compose reicht es durch, danach update.sh)."
+    return "Upload-Token stimmt nicht mit dem Server überein."
 
 
 def update_decision(own_build: int | None, current: dict | None) -> dict:

@@ -464,8 +464,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- #306 (#305 Token-Durchreichung in docker-compose, `--upload-only`). Nach dem
-  Merge: keine; Server-Update fällig, danach die APK von Build 63 nachreichen.
+- PR zu #307 (Token-Status unter Admin → App-Versionen, Grund bei 401 im
+  Skript). Nach dem Merge: keine; Server-Update, dann Build 63 nachreichen.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -475,8 +475,9 @@ braucht.
   16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238),
   **Build 63** (`mobile-v0.5.0-beta-build63`, Commit 0b6bc11, am 16.09. vom
   Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Der
-  Server-Upload dieser APK scheiterte mit 401 (#305) – nach dem Merge von #306
-  und `update.sh` mit `-- --upload-only` nachreichen. Nächster Build ist 64.
+  Server-Upload dieser APK scheiterte zweimal mit 401 (#305, #307): nach dem
+  Merge von #307 und `update.sh` zeigt Admin → App-Versionen, ob das Token
+  ankommt; dann `-- --upload-only`. Nächster Build ist 64.
 
 ### Erledigungen beim Betreiber
 - #299 ist gemergt: `update.sh` am Server (Stand des Servers: #294 vom
@@ -491,7 +492,7 @@ braucht.
 - #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
   Turnierleitung pro Turnier); nichts mehr offen.
 
-### Meilensteine und offene Issues (33 offen; #305 schließt mit #306)
+### Meilensteine und offene Issues (33 offen; #307 schließt mit seinem PR)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |

@@ -143,7 +143,14 @@ async function uploadToServer({ config, apkPath, apk, version, versionCode, chan
       body: form,
     });
     if (!response.ok) {
-      console.warn(`Warnung: Server-Upload fehlgeschlagen (HTTP ${response.status}). Das GitHub-Release gilt trotzdem; APK unter Admin → App-Versionen von Hand hochladen.`);
+      let reason = "";
+      try {
+        const body = await response.json();
+        reason = typeof body?.detail === "string" ? body.detail : "";
+      } catch {
+        reason = "";
+      }
+      console.warn(`Warnung: Server-Upload fehlgeschlagen (HTTP ${response.status}${reason ? `: ${reason}` : ""}). Das GitHub-Release gilt trotzdem; APK unter Admin → App-Versionen von Hand hochladen.`);
       return false;
     }
     console.log(`Am Server abgelegt: Build ${versionCode} (Admin → App-Versionen).`);
