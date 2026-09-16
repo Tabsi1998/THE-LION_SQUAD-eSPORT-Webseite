@@ -1,8 +1,8 @@
 # CLAUDE.md – Übergabe und Arbeitsregeln für THE LION SQUAD
 
 Diese Datei ist das Wissen aus der Arbeit mit Claude Code an diesem Repository,
-Stand **15. September 2026, spät abends (nach PR #270)**. Sie wird beim Start
-jeder Sitzung gelesen.
+Stand **16. September 2026, früh (Umzug auf den Haupt-PC, Build 61)**. Sie wird
+beim Start jeder Sitzung gelesen.
 Wer sie liest, soll ohne Rückfragen dort weitermachen können, wo die letzte
 Sitzung aufgehört hat. Alles hier ist bewusst frei von Geheimnissen.
 
@@ -220,43 +220,30 @@ Eingetragen wird er mit `Step(gruppe, name, beschreibung, aktion, needs)`;
 `needs` nennt Schritte derselben Gruppe oder `gruppe/name`. Neue
 Befund-Prüfungen laufen über `ratchet()`, CI-Gates nie.
 
-**Maschinenlokal (nicht in Git)** auf dem zweiten PC (`C:\Programmieren`):
-Werkzeuge unter `~/.local-toolchain` (Node 20/22, Go, llvm-mingw);
-`.ci-panel/test_checks.py` zeigt jeden Schritt im VS-Code-Testing-Panel
-(über `.git/info/exclude` ausgeblendet); `C:\Programmieren\check-all.py
---serve` ist das Dashboard über alle Repos, `Programmieren.code-workspace`
-öffnet alle fünf.
+**Maschinenlokal (nicht in Git)** auf dem Haupt-PC (`C:\Programmieren`, seit
+16.09. der einzige Arbeitsplatz): Werkzeuge unter `~/.local-toolchain`
+(Node 20/22, Go, llvm-mingw); `.ci-panel/test_checks.py` zeigt jeden Schritt
+im VS-Code-Testing-Panel (über `.git/info/exclude` ausgeblendet);
+`.vscode/tasks.json` ruft die Gruppen des Checks und das Release-Skript auf
+(Terminal → Run Task); `C:\Programmieren\check-all.py --serve` ist das
+Dashboard über alle Repos, `Programmieren.code-workspace` öffnet alle fünf.
 
-### 6.2 Der CI-Spiegel (Original-PC)
+### 6.2 Der alte CI-Spiegel (PC alt, abgelöst)
 
-`.vscode/ci_mirror.py` liest `.github/workflows/ci.yml` und führt dieselben
-Schritte in Git Bash aus, inklusive Playwright und Container-Smoke.
+Bis 15.09. lief auf dem alten PC (`C:\GIT Privat\…`) ein CI-Spiegel
+`.vscode/ci_mirror.py` mit Werkzeugen unter `.codex-tools`. Seit dem Umzug
+(#273) ist `scripts/local_check.py` der eine Weg; der Spiegel und sein
+Werkzeugverzeichnis wurden nicht übernommen. Was davon weiter gilt:
 
-```bash
-cd "C:/GIT Privat/THE-LION_SQUAD-eSPORT-Webseite"
-"C:/GIT Privat/.codex-tools/local-testing/bootstrap/Scripts/python.exe" .vscode/ci_mirror.py --changed --keep-going
-```
+- Playwright: Der Check installiert nur Chromium (wie GitHub). Für
+  Firefox/WebKit in `frontend/`: `npx playwright install firefox webkit`,
+  dann `CI=true E2E_WORKERS=2 E2E_EXTRA_BROWSERS=1 yarn test:e2e`. Mit mehr
+  als 2 Workern hängen Firefox-Admin-Seiten bei „Lade …“ – das ist Last,
+  kein App-Fehler. WebKit unter Windows hat einzelne flaky Tests (bestehen
+  bei Wiederholung).
+- Kennzahlen des vollständigen Checks stehen in 6.1.
 
-- Optionen: `--changed` (nur betroffene Jobs, wie GitHub), `--jobs backend,frontend,mobile`,
-  `--install`, `--keep-going`.
-- Bericht: `.local-testing/ci-mirror/bericht.json`; Logs `frontend.log`,
-  `backend.log`, `mobile.log`, `container-smoke.log`.
-- Der Spiegel setzt `CI=true`, `E2E_WORKERS=2`, `E2E_EXTRA_BROWSERS=1`
-  (zusätzlich Firefox/WebKit). GitHub selbst fährt nur chromium + mobile
-  (146 Tests + 8 übersprungen). Mit mehr Workern hängen Firefox-Admin-Seiten
-  bei „Lade …“ – das ist Last, kein App-Fehler. WebKit unter Windows hat
-  einzelne flaky Tests (bestehen bei Wiederholung).
-- Der Spiegel **installiert keine Playwright-Browser.** Nach einem
-  Playwright-Bump in `frontend/`: `npx playwright install chromium firefox webkit`.
-- Alternativ die VS-Code-Tasks (`.vscode/tasks.json`): Schnelle Tests,
-  Backend, Frontend, Mobile, Browser, Vollständige Prüfung, Setup. Läufer:
-  `.vscode/local_testing.py <aktion>` mit demselben Python.
-
-Baseline (15.09.): Backend rund 850 bestanden / 20 übersprungen; Web
-163 Vitest-Tests; Spiegel für #253: 22 bestanden, 0 fehlgeschlagen,
-3 übersprungen.
-
-### 6.3 Ohne Spiegel (Einzelbefehle wie in ci.yml)
+### 6.3 Einzelbefehle wie in ci.yml
 
 ```bash
 # Backend (venv: backend/.venv, Python 3.11)
@@ -301,28 +288,44 @@ npx expo install --check
 - Geheimes liegt **nur** in `%USERPROFILE%\.lionsapp-release\`
   (`upload.jks`, `signing.json`, `google-services.json`). Neuer Schlüssel seit
   Build 57, Signer-SHA-256 beginnt mit `6f69a289…` und endet auf `…cb98`.
-- Gebaut wird in einem **Git-Worktree ohne Leerzeichen im Pfad**, bisher
-  `C:\lsb` (der Projektpfad mit Leerzeichen bricht den nativen
-  reanimated-Build). JDK 21 unter `.codex-tools/local-testing/jdk21/`.
-- Zweiter PC (`C:\Programmieren`, Stand 15.09.): JDK 21 liegt unter
-  `C:\Program Files\Java\jdk-21.0.10` (im PATH steht Java 25, das reicht dem
-  Check). Android SDK, `%USERPROFILE%\.lionsapp-release\` und ein `buildDir`
-  in `signing.json` fehlen dort noch – ein App-Build geht bis dahin nur am
-  Original-PC. `npm run release:local -- --check` zeigt den Stand.
+- Gebaut wird in einem **Git-Worktree ohne Leerzeichen im Pfad**, `C:\lsb`
+  (Standard des Skripts; das Skript legt ihn selbst an und hält ihn aktuell).
+  Ein Projektpfad mit Leerzeichen bricht den nativen reanimated-Build.
+- Haupt-PC seit 16.09. (#273): JDK 21 unter `C:\Program Files\Java\jdk-21.0.10`
+  (im PATH steht Java 25, das reicht dem Check), Android SDK unter
+  `%LOCALAPPDATA%\Android\Sdk` (cmdline-tools, platform-tools, build-tools
+  36.0.0, platforms;android-36, ndk;27.1.12297006, cmake;3.22.1 – die
+  Versionen aus React Native 0.86 `libs.versions.toml`, Lizenzen
+  angenommen), `JAVA_HOME` und `ANDROID_HOME` als Benutzer-Variablen,
+  `signing.json` zeigt mit `javaHome`/`androidHome` dorthin.
+- `~/.gradle/gradle.properties` setzt `org.gradle.jvmargs=-Xmx6g
+  -XX:MaxMetaspaceSize=1g`: Das Expo-Template gibt 2 GB vor, damit stürzt der
+  Dex-Merge (`mergeDexRelease`) mit „OutOfMemoryError: Java heap space“ ab.
+  Die Benutzerdatei übersteuert die Projektdatei.
+- Claude führt das Release selbst aus; der Auto-Modus braucht dafür die
+  Freigabe `Bash(npm run release:local*)` in `~/.claude/settings.json`
+  (seit 16.09. eingetragen). Der Betreiber installiert danach nur die APK.
 
 ```bash
-git -C C:/lsb checkout main && git -C C:/lsb pull
-cd C:/lsb/mobile
+cd mobile
 npm run release:local -- --check      # zeigt, was fehlt
 npm run release:local -- --dry-run    # bauen und prüfen, nichts veröffentlichen
 npm run release:local                 # bauen, prüfen, GitHub-Release und Tag anlegen
 ```
+
+- Erster Build auf einem PC: rund 12 Minuten (npm ci, prebuild, 8 Minuten
+  Gradle); danach rund 4 Minuten mit warmem Cache.
 
 - Ändert sich `package-lock.json` (auch nur die Version), läuft `npm ci` neu
   und alles Native baut von vorn (~30 min).
 - Der NDK-Linker stürzt beim frischen Build gelegentlich einmal ab („linker
   command failed due to signal“, `libworklets.so`) – einfach erneut starten.
 - Eine `| tail`-Pipe verschluckt den Exit-Code: auf „Abgebrochen:“ achten.
+- Jest im Worktree kann mit „EPERM: operation not permitted, rename“ im
+  Transform-Cache unter `%TEMP%\jest` scheitern, obwohl alle Tests bestehen
+  (Windows-Dateisperre). Abhilfe: `%TEMP%\jest` löschen und neu starten.
+- `signing.json` ist strenges JSON: ein Komma nach dem letzten Eintrag macht
+  sie ungültig; das Skript nennt Zeile und Spalte, nie den Inhalt.
 - Nach jedem Build dem Betreiber Klick-Schritte geben (Release-Seite, APK,
   Installation; bei Schlüsselwechsel einmal deinstallieren).
 
@@ -347,27 +350,26 @@ Betreiber an `update.sh` erinnern.
 #270 (#269 lokaler Check). `main` steht auf `42b9d76`.
 
 ### Offene PRs
-- Keine, sobald dieser Doku-PR (#271) gemergt ist.
+- Keine, sobald der Doku-PR zu #273 (Umzug) gemergt ist.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
-  (`mobile-v0.3.1-beta-build60`).
-- **Build 61 (0.4.0-beta) ist noch nicht gebaut.** `main` trägt schon
-  Version 0.4.0-beta / versionCode 61, der Expo-Check ist seit #270 grün.
-  Nächster Schritt: Abschnitt 7 am Original-PC (der zweite PC hat weder
-  Android SDK noch die Release-Geheimnisse).
+  (`mobile-v0.3.1-beta-build60`), **Build 61** (`mobile-v0.4.0-beta-build61`,
+  Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
+  `46b6ce34`). Nächster Build ist 62 mit App 0.5.0-beta (#249–#251).
 
 ### Erledigungen beim Betreiber
 - `update.sh` am Server ausführen (#263, #266 und #267 sind Backend/Web).
-- Build 60 installieren, ein Bild im Chat senden und den Text aus der
-  Bildkachel in **#238** posten (dort steht jetzt der Fehlergrund).
+- Build 61 installieren (Release-Seite → APK → installieren; Build 60 muss
+  nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
+  Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (33 offen)
+### Meilensteine und offene Issues (32 offen)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Profil I – Aufbau | #257 Privatsphäre aufteilen, #258 Grunddaten + Sicherheit (#253 ist mit #267 zu) |
 | Web: Profil II – Nachrichten und Dashboard | #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde |
-| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II, #271 diese Doku |
+| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | App 0.3.1-beta | #238 schwarze Chat-Kachel (wartet auf Text vom Betreiber) |
 | App 0.5.0-beta | #249 Was ist neu, #250 Update aus der App, #251 In-App-Banner |
@@ -423,32 +425,31 @@ Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
 ---
 
-## 10. Auf einem anderen Gerät weitermachen
+## 10. Der Haupt-PC und was nicht über Git kommt
 
-Was über Git kommt: der Code, diese Datei, `UMBAUPLAN.md`, alle Zweige
-(`feat/253-profil-layout` liegt auf GitHub). Was **nicht** über Git kommt und
-von Hand mitmuss:
+Seit 16.09. (#273) ist `C:\Programmieren\THE-LION_SQUAD-eSPORT-Webseite` auf
+dem Haupt-PC der einzige Arbeitsplatz; der alte PC (`C:\GIT Privat\…`) ist
+nur noch Sicherung. Was über Git kommt: der Code, diese Datei,
+`UMBAUPLAN.md`, alle Zweige. Was **nicht** über Git kommt und auf einem
+frischen Gerät neu entsteht oder von Hand mitmuss:
 
-1. **`.vscode/`** des Repos (119 KB: `ci_mirror.py`, `local_testing.py`,
-   `tasks.json`, `testing.json`, `requirements-extra.txt`, `TESTING.md`).
-   Ohne diesen Ordner gibt es keinen Spiegel – dann Abschnitt 6.2 nutzen.
-2. **`C:\GIT Privat\.codex-tools\local-testing\`** (rund 6 GB: Python-
-   Bootstrap-venv, Node 24, yarn, JDK 21, Mongo, Go, .NET, …). Entweder
-   kopieren oder dort `install-tools.py` neu laufen lassen (nicht auf einem
-   frischen Gerät geprüft). `.vscode/testing.json` verweist auf diese Pfade;
-   bei anderem Laufwerk anpassen.
-3. **`%USERPROFILE%\.lionsapp-release\`** – nur über USB oder einen anderen
-   sicheren Weg, nie über Git, Chat oder einen Cloud-Link im Klartext.
-4. **Docker Desktop** (Container-Smoke, Messungen).
-5. Neu erzeugen statt kopieren:
-   - `python -m venv backend/.venv` + `pip install -r backend/requirements.txt -r backend/requirements-dev.txt -r .vscode/requirements-extra.txt`
-   - `cd frontend && yarn install && npx playwright install chromium firefox webkit`
-   - `cd mobile && npm ci`
-   - Build-Worktree: `git worktree add C:/lsb main` (Pfad ohne Leerzeichen).
+1. **`%USERPROFILE%\.lionsapp-release\`** (`upload.jks`, `signing.json`,
+   `google-services.json`) – nur über USB oder einen anderen sicheren Weg,
+   nie über Git, Chat oder einen Cloud-Link im Klartext. In `signing.json`
+   die Pfade `javaHome` und `androidHome` auf das Gerät anpassen.
+2. **Werkzeuge** (Abschnitt 6.1 und 7): Python 3.11, Node 24 und 20, Docker
+   Desktop, Git for Windows, gitleaks, JDK 21, Android SDK per
+   `sdkmanager` (Pakete in Abschnitt 7), `~/.gradle/gradle.properties` mit
+   dem 6-GB-Heap, Benutzer-Variablen `JAVA_HOME` und `ANDROID_HOME`.
+3. **Neu erzeugen statt kopieren:** der Check legt seine venvs unter
+   `~/.local-ci/` an; `cd frontend && yarn install`, `cd mobile && npm ci`;
+   den Build-Worktree `C:\lsb` legt das Release-Skript selbst an.
+4. **`.vscode/`** des Repos (maschinenlokal, in `.gitignore`):
+   `settings.json` (Testing-Panel), `tasks.json` (Check-Gruppen und
+   Release), `extensions.json`. Kein Spiegel mehr, siehe 6.2.
+5. **`.ci-panel/`** und `C:\Programmieren\check-all.py` (Testing-Panel und
+   Dashboard über alle Repos), siehe 6.1.
 6. Optional das Claude-Gedächtnis dieses Rechners:
-   `C:\Users\<user>\.claude\projects\c--GIT\memory\` (Index `MEMORY.md`,
-   Projektdatei `project_lion_squad_platform.md`). Diese `CLAUDE.md` enthält
-   alles Wesentliche daraus; das Gedächtnis ist nur Ergänzung.
-
-Am selben Projektpfad bleiben (`C:\GIT Privat\THE-LION_SQUAD-eSPORT-Webseite`),
-dann passen Tasks, Spiegel und Gedächtnis-Ordner ohne Änderung.
+   `C:\Users\<user>\.claude\projects\c--Programmieren\memory\` (Index
+   `MEMORY.md`). Diese `CLAUDE.md` enthält alles Wesentliche daraus; das
+   Gedächtnis ist nur Ergänzung.
