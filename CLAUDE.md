@@ -128,10 +128,18 @@ Seit dem 15. September gilt:
   Ressourcen-Schlüsseln (keine Unterstriche erlaubt).
 - Profil (seit #253 / PR #267): `pages/user/ProfilePage.jsx` ist nur noch
   Rahmen; je Reiter eine Datei unter `pages/user/profile/` (`BasicTab`,
-  `GamingTab`, `SocialsTab`, `AchievementsTab`, `PrivacyTab`, `TeamsPanel`,
-  `FriendsPanel`, `MessagesPanel`, `SessionsPanel`, `AchievementPanels`,
-  `ProfileNav`, `fields.jsx`, `constants.js`, `form.js`). Reiter bleiben
-  `?tab=…`, weil Mails und Benachrichtigungen aus dem Backend so verlinken.
+  `GamingTab`, `SocialsTab`, `AchievementsTab`, `PrivacyTab`,
+  `NotificationsTab`, `TeamsPanel`, `FriendsPanel`, `MessagesPanel`,
+  `SessionsPanel`, `AchievementPanels`, `ProfileNav`, `fields.jsx`,
+  `constants.js`, `form.js`). Reiter bleiben `?tab=…`, weil Mails und
+  Benachrichtigungen aus dem Backend so verlinken (Benachrichtigungen seit
+  #257: `?tab=notifications`).
+- Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
+  `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
+  während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
+  (eigener `role="switch"`-Knopf; die Radix-Switch braucht ResizeObserver),
+  Sichtbarkeits-Gruppen und Schnellwahl als reine Logik in
+  `profile/visibility.js`.
 - Admin-Seite Betrieb: `pages/admin/AdminOpsPage.jsx`, Route `/admin/ops`,
   Menüpunkt „Betrieb“ unter System.
 - ESLint nutzt `frontend/eslint-suppressions.json` (Sammel-Unterdrückungen).
@@ -364,10 +372,10 @@ Betreiber an `update.sh` erinnern.
   nicht deinstalliert werden), ein Bild im Chat senden und den Text aus der
   Bildkachel in **#238** posten (dort steht der Fehlergrund).
 
-### Meilensteine und offene Issues (32 offen)
+### Meilensteine und offene Issues (31 offen)
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Profil I – Aufbau | #257 Privatsphäre aufteilen, #258 Grunddaten + Sicherheit (#253 ist mit #267 zu) |
+| Web: Profil I – Aufbau | #258 Grunddaten + Sicherheit (#253 mit #267, #257 mit #275 zu) |
 | Web: Profil II – Nachrichten und Dashboard | #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg, #265 Betrieb II |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
@@ -382,7 +390,7 @@ Betreiber an `update.sh` erinnern.
 | Spaeter | #260 Plattform-Konten verknüpfen |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
-1. Profil I fertig: **#257**, dann **#258** (bauen auf den Reiter-Dateien aus #267 auf; ein PR je Issue ist in Ordnung, gern auch beide zusammen).
+1. Profil I fertig: **#258** (#257 ist mit PR #275 erledigt; baut auf den Reiter-Dateien aus #267 auf).
 2. Profil II: #254, #255, #256, #259.
 3. Betrieb II #265.
 4. App 0.5.0-beta (#249–#251) → Build 62.

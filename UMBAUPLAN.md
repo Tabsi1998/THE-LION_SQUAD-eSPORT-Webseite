@@ -45,7 +45,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
 | 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
-| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: #253 umgesetzt; #257, #258 (Profil I) und #254, #255, #256, #259 (Profil II) offen | #267 |
+| 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | in Arbeit: #253 und #257 umgesetzt; #258 (Profil I) und #254, #255, #256, #259 (Profil II) offen | #267, #275 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | #232 und #233 Teil 1 umgesetzt, Rest als #265 offen | #263, #266 |
@@ -431,7 +431,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233 umgesetzt; #223, #231, #265 offen |
-| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen, #258 Grunddaten und Sicherheit |
+| Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat, #255 Benachrichtigungen anklickbar, #256 Dashboard, #259 Freunde (#222 ist darin aufgegangen) |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
@@ -520,6 +520,30 @@ dass ein Reiterwechsel ein eigener Verlaufseintrag ist – „Zurück“ führt 
 **Vier Lint-Unterdrückungen waren versteckt.** `eslint-suppressions.json` erlaubte der alten
 Datei vier Kästchen-Labels ohne zugänglichen Text; in den neuen Dateien griff die Regel wieder.
 Die Labels haben jetzt ein `aria-label`, die Unterdrückung ist überflüssig.
+
+### Was 19.2 gefunden hat (#257, PR #275)
+
+**Vier Themen auf einer Seite, der Knopf ganz unten.** „Privatsphäre“ trug öffentliches Profil,
+Newsletter, Direktnachrichten, die Benachrichtigungstabelle und 20 einzelne Auswahlfelder;
+gespeichert wurde erst mit dem Knopf am Ende. Jetzt zwei Reiter: Privatsphäre (Profil,
+Direktnachrichten, Sichtbarkeit) und Benachrichtigungen (Kanäle, Tabelle, Newsletter – der
+gehört zu den Mails, nicht zur Privatsphäre). Die vier Mail-Links „Einstellungen ändern“ im
+Backend zeigten auf `?tab=privacy` und zeigen jetzt auf `?tab=notifications`.
+
+**Sichtbarkeit in fünf Gruppen.** Kontakt, Persönliches, Gaming-IDs, Social, Sonstiges; je Gruppe
+eine Schnellwahl für alle Felder, die Einzelfelder darunter aufklappbar, jede Stufe mit einem
+Satz („Verein: nur eingeloggte Vereinsmitglieder“). Unterschiedliche Stufen heißen „gemischt“.
+Die Logik ist reine Funktion (`visibility.js`) und einzeln getestet.
+
+**Speichern von selbst, wie in der App.** Schalter und Auswahlfelder speichern 0,7 s nach dem
+letzten Klick; mehrere Klicks ergeben genau einen PATCH, und was während des Speicherns noch
+umgeschaltet wird, bleibt stehen. Die Text-Reiter behalten eine feste Speicherleiste mit
+„Ungespeicherte Änderungen“.
+
+**Zwei Kleinigkeiten am Werkzeug.** Die Radix-Switch braucht `ResizeObserver` (fehlt in jsdom)
+und Design-Tokens, die die Webseite nicht setzt – deshalb ein eigener Schalter. Ein klebender
+Tabellenkopf und ein seitlich scrollender Rahmen schließen sich aus: am PC klebt der Kopf, am
+Handy scrollt die Tabelle seitwärts.
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
 
