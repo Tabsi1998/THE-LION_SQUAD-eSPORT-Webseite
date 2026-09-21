@@ -313,6 +313,16 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
             import logging
             logging.getLogger("tls.tournament").warning(f"results_published hook: {exc}")
 
+    # Turnierabschluss: alle Angemeldeten neu auswerten (#301) - nicht erst beim Profilbesuch.
+    if prev != status and status in ("completed", "results_published"):
+        try:
+            from services.achievement_queue import request_evaluation
+            from services.match_notifications import _participant_user_ids
+            regs = await db.tournament_registrations.find({"tournament_id": tid}, {"_id": 0, "user_id": 1, "team_id": 1}).to_list(2000)
+            await request_evaluation(await _participant_user_ids(db, regs), f"tournament_{status}")
+        except Exception:
+            pass
+
     # Discord trigger
     is_public_discord_status = (
         t.get("is_public") is not False
@@ -337,7 +347,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 f"🏆 {t.get('title') or 'Turnier'} · {labels[status]}",
                 t.get("description") or "",
                 color=colors[status], url=url, fields=fields,
-                event_key=f"tournament.{status}",
+                event_key=f"tournament.{status}", image_url=t.get("banner_url"),
             )
         except Exception:
             pass

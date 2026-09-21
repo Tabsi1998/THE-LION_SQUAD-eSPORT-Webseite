@@ -129,6 +129,15 @@ export default function AdminDashboardPage() {
       tone: opsTone(data?.ops),
     },
     {
+      label: "Discord",
+      detail: (data?.discord_broken || []).length
+        ? `Webhook gestört: ${data.discord_broken.map((entry) => `${entry.label} (${entry.status_code})`).join(", ")}`
+        : "Alle Webhooks in Ordnung",
+      to: "/admin/settings?tab=discord",
+      icon: AlertTriangle,
+      tone: (data?.discord_broken || []).length ? "#FF3B30" : "#00FF88",
+    },
+    {
       label: "Client-Logs",
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
       to: "/admin/mobile-logs",
@@ -179,6 +188,8 @@ export default function AdminDashboardPage() {
     if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
     if (item.to === "/admin/mobile-push") return pushErrors > 0;
     if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
+    // Discord (#303): ein Webhook, der 401/403/404 liefert, ist eine Aufgabe.
+    if (item.to === "/admin/settings?tab=discord") return (data?.discord_broken || []).length > 0;
     // Betrieb (#265): rote oder gelbe Auto-Checks und offene Fehlergruppen sind eine Aufgabe.
     if (item.to === "/admin/ops") return ["crit", "warn"].includes(data?.ops?.checks?.status) || Number(data?.ops?.open_error_groups || 0) > 0;
     return false;

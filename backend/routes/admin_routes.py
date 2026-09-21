@@ -164,8 +164,18 @@ async def dashboard(me: dict = Depends(require_any_admin())):
     except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
         logger.warning("ops summary failed", exc_info=True)
         ops = None
+    # Kaputter Discord-Webhook (#303): nur für den, der ihn in den Einstellungen reparieren kann.
+    discord_broken = []
+    try:
+        from services.permissions import user_has_area
+        if await user_has_area(me, "system"):
+            from discord_service import broken_targets
+            discord_broken = await broken_targets(db)
+    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+        logger.warning("discord status failed", exc_info=True)
     return {
         "ops": ops,
+        "discord_broken": discord_broken,
         "player_count": await db.users.count_documents({"is_active": True}),
         "team_count": await db.teams.count_documents({}),
         "active_tournaments": await db.tournaments.count_documents({"status": {"$in": ["live", "check_in"]}}),

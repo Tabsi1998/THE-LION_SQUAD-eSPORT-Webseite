@@ -200,7 +200,7 @@ async def test_alerts_use_only_the_ops_webhook_never_the_community_channel(flow,
 
     # Nur der Community-Webhook ist da: kein Alarm, und schon gar nicht dorthin.
     outcome = await discord_service.send_ops_discord("Betrieb: Test", "rot")
-    assert outcome == {"ok": False, "reason": "ops_webhook_missing", "error": "Discord ops webhook not configured"}
+    assert outcome == {"ok": False, "reason": "ops_webhook_missing", "error": "Discord ops webhook not configured", "target": "ops"}
     assert posted == []
     skipped = await flow.db.email_logs.find_one({"target": "ops"}, {"_id": 0})
     assert skipped and skipped["status"] == "skipped"

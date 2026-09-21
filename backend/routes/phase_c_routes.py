@@ -102,6 +102,10 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         "decision_note": None,
     }
     await db.membership_applications.insert_one(doc)
+    # Vorstands-Kanal (#300): nur der Hinweis, keine Namen - Discord ist ein fremder Dienst.
+    from services.discord_announcements import notify_board
+    await notify_board("membership.application", "📝 Neuer Mitgliedsantrag",
+                       "Ein neuer Antrag wartet auf die Entscheidung des Vorstands.", url="/admin/membership-applications")
     # Notify admin via SMTP queue (best-effort)
     try:
         from services.mail_queue import enqueue_mail

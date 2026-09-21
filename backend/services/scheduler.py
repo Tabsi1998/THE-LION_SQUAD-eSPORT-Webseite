@@ -134,6 +134,33 @@ async def _safe_birthday_greetings():
         _log_task_failure("birthday_greetings", exc)
 
 
+async def _safe_discord_announcements():
+    try:
+        from services.discord_announcements import announce_due
+        res = await announce_due()
+        if res.get("news") or res.get("events"):
+            logger.info(f"[scheduler] discord_announcements {res}")
+    except Exception as exc:
+        _log_task_failure("discord_announcements", exc)
+
+
+async def _safe_achievement_queue():
+    try:
+        from services.achievement_queue import flush_awards, process_queue
+        await process_queue()
+        await flush_awards()
+    except Exception as exc:
+        _log_task_failure("achievement_queue", exc)
+
+
+async def _safe_achievement_sweep():
+    try:
+        from services.achievement_queue import scheduled_sweep
+        await scheduled_sweep()
+    except Exception as exc:
+        _log_task_failure("achievement_sweep", exc)
+
+
 async def _safe_dolibarr_sync():
     try:
         from services.dolibarr_sync import run_sync
@@ -345,6 +372,12 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("twitch_poll", _safe_twitch_poll), IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("dolibarr_sync", _safe_dolibarr_sync, lease_seconds=300.0), IntervalTrigger(minutes=10), id="dolibarr_sync",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_announcements", _safe_discord_announcements), IntervalTrigger(seconds=60), id="discord_announcements",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("achievement_queue", _safe_achievement_queue, lease_seconds=120.0), IntervalTrigger(seconds=30), id="achievement_queue",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("dolibarr_pending", _safe_dolibarr_pending), IntervalTrigger(seconds=30), id="dolibarr_pending",
                   max_instances=1, coalesce=True)
