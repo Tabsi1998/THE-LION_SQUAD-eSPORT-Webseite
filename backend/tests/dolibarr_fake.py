@@ -95,6 +95,7 @@ class FakeDolibarr:
         self.fail_with: int | None = None
         self.fail_paths: set[str] = set()
         self.break_after_pages: int | None = None
+        self.core_status = 403
         self.server_time = "2026-09-21T10:00:00Z"
         self.module_version = MANIFEST["vereine"]["module_version"]
 
@@ -122,6 +123,9 @@ class FakeDolibarr:
         assert API_KEY not in str(request.url), "der Schlüssel gehört nur in den Header"
         if self.fail_with and (not self.fail_paths or path in self.fail_paths):
             return httpx.Response(self.fail_with, json={"error": {"code": self.fail_with, "message": "x"}})
+        if path == "/status":
+            # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
+            return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})
         if path == "/vereine/status":
             return self._json("/vereine/status", {
                 "module_version": self.module_version, "api_version": 1, "country_profile": "AT",

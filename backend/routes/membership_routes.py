@@ -438,6 +438,15 @@ async def my_membership(user: dict = Depends(get_current_user)):
     if view:
         # Der Rohstand der Anbindung gehört nicht in die Antwort; `dolibarr` unten ist die geprüfte Sicht.
         view.pop("dolibarr", None)
+        # Im Admin heißt das Feld „Interne Notizen“ - also sieht das Mitglied sie nicht (#345).
+        # Dasselbe gilt für die Notiz je Statuswechsel und dafür, wer ihn vorgenommen hat.
+        for internal in ("notes", "created_by", "updated_by"):
+            view.pop(internal, None)
+        view["history"] = [
+            {"at": entry.get("at"), "from_status": entry.get("from_status"), "to_status": entry.get("to_status"),
+             "source": "dolibarr" if entry.get("actor_id") == "dolibarr" else "verein"}
+            for entry in (view.get("history") or [])
+        ]
     return {
         "user_id": user["id"],
         "membership": view,

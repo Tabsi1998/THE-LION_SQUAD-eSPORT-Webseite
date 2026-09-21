@@ -379,29 +379,33 @@ async def migration_preview(db=None, *, max_users: int = 500) -> dict:
             if summary:
                 matched_members.setdefault(int(summary["id"]), []).append(user["id"])
             continue
-        if user.get("email_verified") is not True:
-            if is_local_member or link:
-                rows.append(_preview_row(user, membership, "email_unverified", None, link=link))
-            continue
+        # Auch ein Konto mit unbestätigter E-Mail wird gesucht: Hier bestätigt ein Mensch aus der
+        # Vereinsverwaltung, und der darf den Treffer sehen. Von selbst zugeordnet wird so ein
+        # Konto nie (try_auto_link verlangt die bestätigte E-Mail).
+        verified_email = user.get("email_verified") is True
         try:
             summary = await client.lookup_by_email(user["email"])
         except DolibarrError as exc:
             if exc.kind == "conflict":
                 rows.append(_preview_row(user, membership, "shared_email", None, link=link))
-            elif exc.kind == "not_found":
+            elif exc.kind in ("not_found", "bad_request"):
                 if is_local_member or link:
                     rows.append(_preview_row(user, membership, "not_in_dolibarr", None, link=link))
             else:
                 raise
             continue
         matched_members.setdefault(int(summary["id"]), []).append(user["id"])
-        rows.append(_preview_row(user, membership, "match", summary, link=link))
+        rows.append(_preview_row(user, membership, "match" if verified_email else "match_unverified_email", summary, link=link))
 
     for row in rows:
         if row["member_id"] and len(matched_members.get(row["member_id"], [])) > 1:
             row["state"] = "member_claimed_twice"
+    # Wer in Dolibarr steht und hier kein Konto hat - beendete Mitgliedschaften getrennt
+    # ausgewiesen, damit niemand Ehemalige für Mitglieder hält. Zugleich die Auswahl für
+    # das Zuordnen von Hand.
     without_account = [
-        {"member_id": mid, "ref": s.get("ref"), "name": _member_name(s), "status": s.get("status")}
+        {"member_id": mid, "ref": s.get("ref"), "name": _member_name(s), "status": s.get("status"),
+         "ended": s.get("status") in ("terminated", "excluded")}
         for mid, s in sorted(members.items()) if mid not in matched_members and s.get("status") != "draft"
     ]
     type_map = settings.get("type_map") or {}

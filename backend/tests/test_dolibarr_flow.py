@@ -473,6 +473,9 @@ async def test_migration_preview_lists_matches_and_conflicts_and_writes_nothing(
     fake.add(member(15), email="familie@example.test")
     fake.add(member(16), email="familie@example.test")
     fake.add(member(17, firstname="Ohne", lastname="Konto"))
+    fake.add(member(18), email="unbestaetigt@example.test")
+    fake.add(member(19, status="terminated", fee_status="inactive", firstname="Ehe", lastname="Malig"))
+    await person(flow, "unbestaetigt", email_verified=False)
     await person(flow, "paula")
     alt = await person(flow, "alt")
     await person(flow, "familie")
@@ -491,8 +494,13 @@ async def test_migration_preview_lists_matches_and_conflicts_and_writes_nothing(
     assert rows["familie"]["state"] == "shared_email" and rows["familie"]["member_id"] is None
     assert rows["nurlokal"]["state"] == "not_in_dolibarr"
     assert "gast" not in rows
+    # Konto mit unbestätigter E-Mail: Der Treffer wird gezeigt (ein Mensch bestätigt), aber gekennzeichnet.
+    assert rows["unbestaetigt"]["state"] == "match_unverified_email" and rows["unbestaetigt"]["member_id"] == 18
+    # Beendete Mitgliedschaften stehen getrennt - Ehemalige sind keine Mitglieder.
+    ended = {m["member_id"]: m["ended"] for m in preview["members_without_account"]}
+    assert ended[19] is True and ended[17] is False
     assert "Ohne Konto" in [m["name"] for m in preview["members_without_account"]]
-    assert {m["member_id"] for m in preview["members_without_account"]} == {15, 16, 17}
+    assert {m["member_id"] for m in preview["members_without_account"]} == {15, 16, 17, 19}
     assert preview["types"][0]["mapped_to"] == "ordinary"
 
     assert await flow.db.dolibarr_links.count_documents({}) == 0
@@ -522,3 +530,30 @@ async def test_ops_check_names_the_problem_without_the_key(flow, fake):
     fake.fail_with = None
     await dolibarr_sync.run_sync(flow.db, full=True)
     assert (await ops_checks.check_dolibarr_sync(flow.db))["status"] == "ok"
+
+
+# ---------------------------------------------------------------- #345: von Hand zuordnen, interne Notiz
+
+@pytest.mark.asyncio
+async def test_unverified_email_is_never_linked_by_itself_but_by_hand_it_works(flow, fake):
+    await connect(flow, auto_link_verified_email=True)
+    fake.add(member(18), email="unbestaetigt@example.test")
+    konto = await person(flow, "unbestaetigt", email_verified=False)
+    flow.act_as(konto)
+    assert (await flow.get("/api/membership/me")).json()["dolibarr"]["link"] is None
+    assert (await link(flow, konto, 18)).status_code == 200
+    assert (await membership_of(flow, konto))["member_status"] == "active"
+
+
+@pytest.mark.asyncio
+async def test_internal_notes_stay_internal(flow):
+    paula = await person(flow, "paula")
+    flow.act_as(await flow.add_user(role="club_admin"))
+    saved = await flow.put(f"/api/membership/user/{paula['id']}", json={"member_status": "active", "notes": "zahlt immer zu spät"})
+    assert saved.status_code == 200
+    flow.act_as(paula)
+    me = await flow.get("/api/membership/me")
+    assert "zahlt immer zu spät" not in me.text
+    membership = me.json()["membership"]
+    assert "notes" not in membership and "updated_by" not in membership
+    assert membership["history"] and set(membership["history"][0]) == {"at", "from_status", "to_status", "source"}

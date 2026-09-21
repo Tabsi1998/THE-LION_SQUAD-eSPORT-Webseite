@@ -18,6 +18,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import socket
+import ssl
 from urllib.parse import urlsplit
 
 import httpx
@@ -46,8 +48,17 @@ ERROR_TEXTS = {
     "conflict": "Mehrere Mitglieder passen (409)",
     "module_off": "Das Modul Vereine ist in Dolibarr deaktiviert (501)",
     "unavailable": "Dolibarr ist nicht erreichbar",
-    "invalid_response": "Dolibarr hat keine gültige Antwort geliefert",
+    "invalid_response": "Unter dieser Adresse antwortet etwas, aber nicht die Dolibarr-API (z. B. eine Anmeldeseite) – Adresse prüfen",
+    # Warum es nicht klappt (#345) - ohne Adresse, Schlüssel oder Antworttext preiszugeben.
+    "dns": "Diese Adresse gibt es nicht – bitte auf Tippfehler im Namen prüfen",
+    "tls": "Das Zertifikat der Adresse wird nicht akzeptiert (abgelaufen, selbst signiert oder auf einen anderen Namen ausgestellt)",
+    "timeout": "Der Server antwortet nicht rechtzeitig – läuft Dolibarr, und ist es vom Webserver aus erreichbar?",
+    "refused": "Der Server nimmt unter dieser Adresse keine Verbindung an (falscher Port, Firewall, Dienst gestoppt)",
+    "redirect": "Dolibarr leitet um – die Adresse genau so eintragen, wie sie im Browser nach dem Laden steht (https, mit Unterordner)",
+    "api_missing": "Unter dieser Adresse gibt es keine Dolibarr-API: In Dolibarr das Modul „API REST“ aktivieren; liegt Dolibarr in einem Unterordner, gehört er in die Adresse",
+    "vereine_missing": "Dolibarr antwortet, aber das Modul „Vereine“ bietet hier keine Schnittstelle an – Modul aktivieren und aktualisieren",
 }
+NO_RETRY_KINDS = {"dns", "tls", "refused", "redirect"}
 STATUS_KINDS = {400: "bad_request", 401: "unauthorized", 403: "forbidden", 404: "not_found", 409: "conflict", 501: "module_off"}
 
 # Was das Vereinsmodul heute liefert (API-Version 1) und worauf die Website
@@ -69,6 +80,31 @@ CAPABILITIES_V1 = {
 
 # Nur für Tests: ein httpx-Transport statt des Netzes.
 _transport = None
+
+
+def network_error_kind(exc: BaseException) -> str:
+    """Art des Netzfehlers aus der Ursachenkette - nie deren Text."""
+    seen = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, socket.gaierror):
+            return "dns"
+        if isinstance(current, ssl.SSLError):
+            return "tls"
+        if isinstance(current, ConnectionRefusedError):
+            return "refused"
+        current = current.__cause__ or current.__context__
+    if isinstance(exc, httpx.TimeoutException):
+        return "timeout"
+    text = str(exc).lower()
+    if "getaddrinfo" in text or "name or service not known" in text or "name resolution" in text or "nodename nor servname" in text:
+        return "dns"
+    if "certificate" in text or "ssl" in text:
+        return "tls"
+    if "refused" in text:
+        return "refused"
+    return "unavailable"
 
 
 class DolibarrError(Exception):
@@ -150,8 +186,10 @@ class DolibarrClient:
                 async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=_transport) as cli:
                     response = await cli.get(url, params=params, headers=headers)
             except httpx.HTTPError as exc:
-                logger.warning("[dolibarr] %s nicht erreichbar: %s", path, type(exc).__name__)
-                last_kind, last_status = "unavailable", None
+                last_kind, last_status = network_error_kind(exc), None
+                logger.warning("[dolibarr] %s nicht erreichbar: %s (%s)", path, type(exc).__name__, last_kind)
+                if last_kind in NO_RETRY_KINDS:
+                    break
             else:
                 if response.status_code == 200:
                     try:
@@ -160,6 +198,8 @@ class DolibarrClient:
                         raise DolibarrError("invalid_response", 200) from exc
                 if response.status_code in STATUS_KINDS:
                     raise DolibarrError(STATUS_KINDS[response.status_code], response.status_code)
+                if 300 <= response.status_code < 400:
+                    raise DolibarrError("redirect", response.status_code)
                 logger.warning("[dolibarr] %s antwortet mit %s", path, response.status_code)
                 last_kind, last_status = "unavailable", response.status_code
                 if response.status_code not in RETRY_STATUS:
@@ -170,10 +210,26 @@ class DolibarrClient:
 
     # ------------------------------------------------ feste Lesewege
     async def status(self) -> dict:
-        data = await self._get("/vereine/status")
+        try:
+            data = await self._get("/vereine/status")
+        except DolibarrError as exc:
+            if exc.kind != "not_found":
+                raise
+            # 404 auf dem Status-Weg heißt nie „kein Mitglied“. Gibt es die API überhaupt?
+            raise DolibarrError(await self._why_no_status(), 404) from exc
         if not isinstance(data, dict) or "api_version" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
+
+    async def _why_no_status(self) -> str:
+        """Fehlt Dolibarrs API ganz - oder nur die Schnittstelle des Vereinsmoduls?"""
+        try:
+            await self._get("/status")
+        except DolibarrError as exc:
+            # Dolibarrs eigener Status-Weg braucht Rechte, die der Website-Benutzer nicht hat:
+            # 401/403 beweisen, dass die API da ist.
+            return "vereine_missing" if exc.kind in ("unauthorized", "forbidden") else "api_missing"
+        return "vereine_missing"
 
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
