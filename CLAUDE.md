@@ -129,6 +129,33 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Discord I (#300, #301, #303; PR #350), Anleitung in `docs/DISCORD.md`.
+  `discord_service.py`: `TARGETS` (öffentlich: community, news, events,
+  achievements; privat: board, ops), `EVENTS` (Ereignis → Ziel, Beschriftung,
+  Standard), `send_event` – **die eine Stelle** für Schalter, Ziel und die
+  Grenze „privat nie öffentlich“; `resolve_target` (öffentlich fällt auf
+  Community zurück, privat nie), `send_to`, `build_embed` (auch für die
+  Vorschau), `target_status`, `broken_targets`. Einstellungen in `settings`
+  unter `discord`: `targets.<ziel>.webhook_url` (verschlüsselt) und
+  `events.<schlüssel mit __ statt Punkt>` (`event_field`; ein Punkt im
+  Feldnamen wäre für MongoDB ein Unterordner). Routen in `settings_routes.py`:
+  `PUT /settings/discord` (targets, events), `POST /discord/test?target=`,
+  `POST /discord/preview`, `POST /discord/resend/{log_id}`.
+  `services/discord_announcements.py`: Job `discord_announcements` (60 s) meldet
+  News und Events genau einmal (`discord_checked_at`, `discord_outcome`), nie
+  Privates, nie Altes (> 24 h), nie mit `discord_skip`; `notify_board` schickt
+  nur Hinweise ohne Namen. `services/achievement_queue.py` (#301):
+  `request_evaluation` (Sammlung `achievement_eval_queue`, eine Person höchstens
+  einmal), Job `achievement_queue` (30 s: `process_queue` + `flush_awards`),
+  Job `achievement_sweep` (15 min, einmal täglich alle); `badges.award_achievement`
+  merkt die Meldung nur noch vor (`achievement_outbox`), gesendet wird je Person
+  gebündelt und nur mit öffentlichem Profil und öffentlicher Gruppe. Auslöser:
+  `match_notifications.notify_match_result_confirmed`, Turnierstatus
+  `completed`/`results_published`. Web: `settings/DiscordTargets.jsx`,
+  `components/tls/DiscordPreview.jsx` (News- und Event-Formular),
+  `admin/achievements/EvaluationPanel.jsx`, Tageszentrale `discord_broken`.
+  **Neues Discord-Ereignis = Eintrag in `EVENTS` (Standard aus) + `send_event`
+  + Test, dass Privates nicht an ein öffentliches Ziel geht.**
 - Dolibarr I (#295, #297, #316 Teil 1, #330 Teil 1; PR #338), Anleitung in
   `docs/DOLIBARR.md`. **Ein** Weg zu Dolibarr: `services/dolibarr_client.py`
   (Einstellungen in `settings` unter `dolibarr`, Schlüssel verschlüsselt; feste
@@ -528,14 +555,14 @@ braucht.
 ### Gemergt zuletzt (16.–21. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
 (#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
-(#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen nach der Analyse),
-#311, #312 und #313 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I).
-`main` steht auf `1567846`.
+(#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen), #311–#313
+(Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
+#349 (#345 Dolibarr einrichten). `main` steht auf `0eee96a`.
 
 ### Offene PRs
-- Keiner außer dem Doku-Nachtrag zu #343. #338 (Dolibarr I) ist seit 21.09.
-  gemergt – Server-Update fällig, danach die Schritte aus `docs/DOLIBARR.md`.
-  Solange niemand die Verbindung einträgt, ändert sich nichts (Modus „Aus“).
+- #350 (Discord I: #300, #301, #303). Nach dem Merge `update.sh`; News und
+  Events gehen erst in den Discord, wenn der Betreiber die beiden Schalter
+  einschaltet (Einstellungen → Discord).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -565,7 +592,7 @@ braucht.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (49 offen nach dem Merge von #338)
+### Meilensteine und offene Issues (49 offen nach dem Merge von #350)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -579,14 +606,15 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #316 Rest: Geschäftspartner-Zuordnung und Kundenanlage bei Buchung (Adapter und Konto-Zuordnung sind fertig), #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
-| Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #303 Meldungen mit Bild und Vorschau – ohne Bot |
+| Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
+| Web: Anmeldung und Teilen | Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten und bevorzugen, Zwei-Faktor nur im Admin Pflicht; #347 Link-Vorschau beim Teilen (WhatsApp, Discord) – neutrale Vorschau für Vereinsinhalte, Bestandsaufnahme aller Seitentypen |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
-| App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Mitglieder. Eigene Beta, Versionsnummer beim Einplanen; Rechnungen (#296, #320, #325) und #327–#329 bringen ihren App-Teil selbst mit |
+| App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Mitglieder, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet). Eigene Beta, Versionsnummer beim Einplanen; Rechnungen (#296, #320, #325) und #327–#329 bringen ihren App-Teil selbst mit |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
@@ -604,8 +632,9 @@ sinnvoll hältst“):
 2. Dolibarr I – umgesetzt in #338 (ein PR für den Meilenstein). Eigener
    Server-Schritt, weil hier Rechte aus einem fremden System kommen; die
    Umstellung selbst macht der Betreiber nach `docs/DOLIBARR.md`.
-3. Discord I (#300, #301, #303).
-4. App 0.6.0-beta (#218).
+3. Discord I – umgesetzt in #350 (ein PR für den Meilenstein).
+4. Web: Anmeldung und Teilen (#348, #347) – vorgezogen, weil es den Betreiber
+   und die Mitglieder jeden Tag betrifft; danach App 0.6.0-beta (#218).
 5. Dolibarr II (#296, #325), danach App: Mitgliederbereich (#340, #339, #341,
    #342) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
 6. Web: Dynamik.

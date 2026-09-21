@@ -101,6 +101,12 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     user_ids = await _participant_user_ids(db, registrations)
     if not user_ids:
         return 0
+    # Ein bestätigtes Ergebnis kann für alle Beteiligten Erfolge auslösen (#301).
+    try:
+        from services.achievement_queue import request_evaluation
+        await request_evaluation(user_ids, "match_result")
+    except Exception:  # noqa: BLE001
+        pass
 
     regs_by_id = {reg["id"]: reg for reg in registrations if reg.get("id")}
     tournament = await db.tournaments.find_one(

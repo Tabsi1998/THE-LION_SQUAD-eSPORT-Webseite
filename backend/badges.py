@@ -118,21 +118,13 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
             schedule_crown_sync()
         except Exception as e:
             logger.debug(f"crown sync scheduling failed: {e}")
+        # Gemeldet wird gebündelt und nur, was öffentlich sein darf (#301):
+        # services/achievement_queue.py schickt eine Meldung je Person und Minute.
         try:
-            from discord_service import send_discord
-            user = await db.users.find_one({"id": user_id},
-                                            {"display_name": 1, "username": 1}) or {}
-            level_color = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
-            level_name = _level_name(tier.get("level", 1), group)
-            await send_discord(
-                f"🏆 {group['name']} · {level_name}",
-                f"**{user.get('display_name') or user.get('username') or 'Spieler'}** hat **{tier['name']}** freigeschaltet!\n_{tier.get('description','')}_",
-                color=level_color.get(tier["level"], 0x29B6E8),
-                fields=[{"name": "Punkte", "value": f"+{tier.get('points', 0)}", "inline": True}],
-                event_key="achievement.awarded",
-            )
+            from services.achievement_queue import note_award
+            await note_award(user_id, tier, group)
         except Exception as e:
-            logger.debug(f"Discord achievement trigger failed: {e}")
+            logger.debug(f"achievement announcement queue failed: {e}")
     return True
 
 

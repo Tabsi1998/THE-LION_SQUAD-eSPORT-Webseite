@@ -89,6 +89,10 @@ async def submit_contact(body: ContactSubmit, request: Request, me=Depends(get_c
         "internal_note": "",
     }
     await db.contact_messages.insert_one(doc)
+    # Vorstands-Kanal (#300): Thema ja, Absender und Text nein - die stehen in der Kontakt-Inbox.
+    from services.discord_announcements import notify_board
+    await notify_board("contact.request", "✉️ Neue Kontaktanfrage",
+                       f"Thema: {TOPIC_LABELS.get(body.topic, body.topic)}", url="/admin/contact")
     # Auto-reply via mail queue (uses render_template if admin customised it)
     from email_service import _wrap
     from services.mail_queue import enqueue_mail

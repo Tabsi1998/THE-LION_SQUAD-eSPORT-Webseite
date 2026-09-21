@@ -131,6 +131,20 @@ async def achievement_crowns():
 admin_router = APIRouter(prefix="/api/admin/achievements", tags=["achievements-admin"])
 
 
+# ---- Auswertung sofort (#301) ----
+@admin_router.get("/evaluation")
+async def evaluation_state(me: dict = Depends(require_area("content"))):
+    from services.achievement_queue import queue_state
+    return await queue_state()
+
+
+@admin_router.post("/evaluation/all")
+async def evaluate_everyone(me: dict = Depends(require_area("content"))):
+    """Alle Konten vormerken; abgearbeitet wird im Hintergrund, 100 je halber Minute."""
+    from services.achievement_queue import sweep
+    return await sweep(everyone=True)
+
+
 # ---- Group CRUD ----
 class GroupCreate(BaseModel):
     code: str = Field(min_length=2, max_length=80)

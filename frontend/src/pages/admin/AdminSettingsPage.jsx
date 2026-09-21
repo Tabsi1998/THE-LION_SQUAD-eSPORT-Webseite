@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, SystemCard } from "./settings/fields";
 import { TwitchTab } from "./settings/TwitchTab";
+import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
 
@@ -1590,6 +1591,7 @@ export default function AdminSettingsPage() {
               {discord.ops_configured && <button onClick={clearDiscordOpsWebhook} data-testid="discord-ops-clear" className="px-4 py-2 border border-white/20 text-white/70 font-bold uppercase tracking-wider rounded-sm">Betriebs-Webhook entfernen</button>}
             </div>
           </div>
+          <DiscordTargets />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { DiscordPreview } from "@/components/tls/DiscordPreview";
 import { eventTypeLabel } from "@/lib/eventTypes";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -321,6 +322,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     description: event.description || "",
     event_type: event.event_type || "general",
     visibility: event.visibility || "public",
+    discord_skip: event.discord_skip ?? false,
     start_date: toDateTimeLocalInput(event.start_date),
     end_date: toDateTimeLocalInput(event.end_date),
     door_time: toDateTimeLocalInput(event.door_time),
@@ -393,6 +395,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     description: event.description || "",
     event_type: event.event_type || "general",
     visibility: event.visibility || "public",
+    discord_skip: event.discord_skip ?? false,
     start_date: toDateTimeLocalInput(event.start_date),
     end_date: toDateTimeLocalInput(event.end_date),
     door_time: toDateTimeLocalInput(event.door_time),
@@ -515,6 +518,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
+          <DiscordPreview kind="event" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           {!isNew && (
             <AccessLinksPanel targetType="event" targetId={event.id} allowRegister={form.has_registration} />
           )}

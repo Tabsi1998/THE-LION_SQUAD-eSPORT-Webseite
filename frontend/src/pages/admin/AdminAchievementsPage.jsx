@@ -10,6 +10,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ACHIEVEMENT_ICON_NAMES, AchievementIcon } from "@/components/tls/AchievementIcon";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { EvaluationPanel } from "./achievements/EvaluationPanel";
 import { toast } from "sonner";
 import {
   Plus, X, Trophy, Award, AlertOctagon,
@@ -38,6 +39,7 @@ export default function AdminAchievementsPage() {
         Verwalte alle Achievement-Gruppen, Stufen, Sonderauszeichnungen und Negative-Vorfälle.
         Negative/Fun-Awards bleiben bis zur Freischaltung geheim und erscheinen danach im Profil.
       </p>
+      <EvaluationPanel />
 
       <div className="mt-6 flex gap-1 border-b border-white/10 overflow-x-auto">
         {[

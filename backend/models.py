@@ -298,6 +298,8 @@ class EventCreate(BaseModel):
     event_type: EventType = "general"
     visibility: EventVisibility = "public"
     status: EventStatus = "draft"
+    # „Ohne Discord ankündigen“ (#303)
+    discord_skip: bool = False
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     door_time: Optional[datetime] = None
@@ -336,6 +338,7 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     event_type: Optional[EventType] = None
     visibility: Optional[EventVisibility] = None
+    discord_skip: Optional[bool] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     door_time: Optional[datetime] = None
@@ -854,6 +857,8 @@ class NewsCreate(BaseModel):
     visibility: NewsVisibility = "public"
     published: bool = True
     published_at: Optional[datetime] = None
+    # „Ohne Discord veröffentlichen“ (#303)
+    discord_skip: bool = False
     pinned: bool = False
     linked_event_ids: List[str] = []
     linked_tournament_ids: List[str] = []
@@ -872,6 +877,7 @@ class NewsUpdate(BaseModel):
     visibility: Optional[NewsVisibility] = None
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
+    discord_skip: Optional[bool] = None
     pinned: Optional[bool] = None
     linked_event_ids: Optional[List[str]] = None
     linked_tournament_ids: Optional[List[str]] = None

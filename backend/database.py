@@ -285,6 +285,10 @@ async def init_indexes():
     await db.club_member_profiles.create_index("slug_history")
     await db.club_member_profiles.create_index("gamertag")
     await db.club_member_profiles.create_index("order_index")
+    # Erfolge sofort (#301): eine Person steht höchstens einmal in der Schlange.
+    await db.achievement_eval_queue.create_index("user_id", unique=True)
+    await db.achievement_eval_queue.create_index("due_at")
+    await db.achievement_outbox.create_index([("user_id", 1), ("created_at", 1)])
     # Dolibarr (#316): ein Dokument je Konto und Installation; `member_key` trägt nur eine
     # bestätigte Zuordnung - zwei Konten können nie dasselbe Mitglied beanspruchen.
     await db.dolibarr_links.create_index([("user_id", 1), ("instance", 1)], unique=True)

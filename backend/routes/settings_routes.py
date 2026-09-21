@@ -222,6 +222,11 @@ class DiscordSettings(BaseModel):
     username: Optional[str] = None
     avatar_url: Optional[str] = None
     enabled: bool = True
+    # Ein Webhook je Zweck (#300): news, events, achievements, board. Je Ziel
+    # `webhook_url` (leer lassen = behalten), `clear` und ein eigener Name.
+    targets: Optional[dict[str, dict]] = None
+    # Schalter je Ereignis; die Schlüssel stehen in discord_service.EVENTS.
+    events: Optional[dict[str, bool]] = None
 
 
 class AmpSettings(BaseModel):
@@ -1108,6 +1113,21 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     if s.get("ops_webhook_url"):
         s["ops_webhook_url_masked"] = "https://discord.com/api/webhooks/…"
         s.pop("ops_webhook_url", None)
+    # Ziele und Schalter (#300). Eine Webhook-Adresse verlässt den Server nie.
+    from discord_service import EVENTS, EXTRA_TARGETS, event_enabled, event_field, target_status
+    stored_targets = s.pop("targets", None) or {}
+    s["targets"] = {
+        name: {"configured": bool((stored_targets.get(name) or {}).get("webhook_url")),
+               "username": (stored_targets.get(name) or {}).get("username") or ""}
+        for name in EXTRA_TARGETS
+    }
+    stored_events = s.get("events") or {}
+    switches = {key: stored_events.get(event_field(key)) for key in EVENTS}
+    s["events"] = [
+        {"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": switches}, key)}
+        for key, spec in EVENTS.items()
+    ]
+    s["target_status"] = await target_status(db)
     last = await db.email_logs.find_one(
         {"channel": "discord"},
         {"_id": 0, "status": 1, "error": 1, "event_key": 1, "created_at": 1},
@@ -1144,6 +1164,34 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()
     current = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    from discord_service import EVENTS, EXTRA_TARGETS, event_field
+    incoming_targets = updates.pop("targets", None)
+    if incoming_targets is not None:
+        for name, entry in incoming_targets.items():
+            if name not in EXTRA_TARGETS or not isinstance(entry, dict):
+                raise HTTPException(400, f"Unbekanntes Discord-Ziel: {name}")
+            if entry.get("clear"):
+                unset[f"targets.{name}.webhook_url"] = ""
+            elif str(entry.get("webhook_url") or "").strip():
+                url = str(entry["webhook_url"]).strip()
+                if not is_valid_discord_webhook_url(url):
+                    raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
+                updates[f"targets.{name}.webhook_url"] = encrypt_secret(url)
+            if "username" in entry:
+                updates[f"targets.{name}.username"] = str(entry.get("username") or "").strip()[:80]
+    incoming_events = updates.pop("events", None)
+    if incoming_events is not None:
+        for key, value in incoming_events.items():
+            if key not in EVENTS:
+                raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
+            updates[f"events.{event_field(key)}"] = bool(value)
+    flat_current = dict(current)
+    for name, entry in (current.get("targets") or {}).items():
+        for field, value in (entry or {}).items():
+            flat_current[f"targets.{name}.{field}"] = value
+    for key, value in (current.get("events") or {}).items():
+        flat_current[f"events.{key}"] = value
+    current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
         return {"ok": True, "changed": False}
@@ -1230,9 +1278,46 @@ async def amp_test(me: dict = Depends(require_club_admin())):
     }
 
 
+@settings_router.post("/discord/preview")
+async def discord_preview(body: dict, me: dict = Depends(require_area("content", "tournaments", "system"))):
+    """So sieht die Meldung aus (#303) - dasselbe Embed wie beim Senden, plus ob und wohin es ginge."""
+    from services.discord_announcements import preview
+    kind = body.get("kind")
+    if kind not in ("news", "event") or not isinstance(body.get("item"), dict):
+        raise HTTPException(400, "kind ist „news“ oder „event“, item das Formular.")
+    return await preview(kind, body["item"])
+
+
+@settings_router.post("/discord/resend/{log_id}")
+async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
+    """Eine fehlgeschlagene Meldung noch einmal an dasselbe Ziel (#303)."""
+    from discord_service import send_to
+    db = get_db()
+    entry = await db.email_logs.find_one({"id": log_id, "channel": "discord"}, {"_id": 0})
+    if not entry or not entry.get("payload"):
+        raise HTTPException(404, "Diese Meldung lässt sich nicht erneut senden.")
+    if entry.get("status") != "failed":
+        raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden.")
+    payload = entry["payload"]
+    # An das Ziel, an das sie ging - nie an ein anderes. Privat bleibt privat.
+    result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
+                           color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
+                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom")
+    if result.get("ok"):
+        await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
+    return result
+
+
 @settings_router.post("/discord/test")
-async def discord_test(target: str = Query(default="community", pattern="^(community|ops)$"), me: dict = Depends(require_club_admin())):
-    from discord_service import send_discord, send_ops_discord
+async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|achievements|board|ops)$"), me: dict = Depends(require_club_admin())):
+    from discord_service import TARGET_LABELS, send_discord, send_ops_discord, send_to
+    if target not in ("community", "ops"):
+        return await send_to(
+            target, f"{TARGET_LABELS[target]} · Testnachricht",
+            "Diese Nachricht bestätigt, dass der Webhook für dieses Ziel funktioniert."
+            + (" Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen." if target == "board" else ""),
+            event_key="test",
+        )
     if target == "ops":
         return await send_ops_discord(
             "Betrieb · Testnachricht",

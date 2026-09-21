@@ -460,7 +460,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
-| App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente, #342 interne Events und News mit Empfängerprüfung. Eigene Beta nach Dolibarr II |
+| Web: Anmeldung und Teilen | Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor nur im Admin Pflicht; #347 Link-Vorschau beim Teilen, auch für Vereinsinhalte (neutral) |
+| App: Mitgliederbereich | Dazu seit 21.09. #346 digitale Mitgliedskarte mit QR-Code, Wallet vorbereitet. Wunsch des Betreibers vom 21.09.: #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente, #342 interne Events und News mit Empfängerprüfung. Eigene Beta nach Dolibarr II |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
@@ -470,7 +471,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Abrechnung I: Grundlage und Events | Epic #314, erster Durchstich: #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
-| Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Wunsch des Betreibers vom 16.09.: #300 ein Webhook je Zweck (News, Events, Erfolge, Vorstand, Betrieb) mit Schaltern je Ereignis, #301 Erfolge sofort auswerten statt erst beim Profilbesuch, #303 Meldungen mit Bild, Link und Vorschau – alles ohne Bot |
+| Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 |
@@ -601,6 +602,35 @@ Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Be
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
 
+## Block 25 — Discord I: Kanäle und Meldungen
+
+Wunsch des Betreibers vom 16.09.: Discord soll News, Events und Erfolge zeigen – aber nur, was
+für die Community ist – und Erfolgsmeldungen sollen schneller kommen. Anleitung:
+`docs/DISCORD.md`.
+
+### Was 25.1 gefunden hat (#300, #301, #303 – PR #350)
+
+**News und Events wurden gar nicht gemeldet.** Die Issues gingen davon aus; im Code meldeten
+nur Turnierstatus, Fast-Lap-Bestzeit, Erfolge und der Betrieb. Jetzt sieht ein Job jede Minute
+nach – dieselbe Stelle für „sofort“ und „geplant für 18 Uhr“, jede News und jedes Event genau
+einmal. Die neuen Schalter sind aus, bis der Betreiber sie einschaltet, und wer einschaltet,
+bekommt nicht das Archiv in den Kanal.
+
+**Erfolge gingen mit Namen in den Community-Kanal – auch bei nicht öffentlichem Profil und für
+nicht öffentliche Gruppen** (etwa die Vereinsmitgliedschaft). Jetzt erfährt der Discord nur, was
+öffentlich sein darf; die Person selbst wird immer benachrichtigt. Und die Auswertung hängt
+nicht mehr am Profilbesuch: Ein bestätigtes Ergebnis und ein Turnierabschluss merken alle
+Beteiligten vor. Auf die Frage des Betreibers, ob alle Erfolge erreichbar sind: Ja – 204
+automatische Stufen, jede mit einem Zähler, der berechnet wird; ein Test hält das fest.
+
+**Privat fällt nie zurück.** Öffentliche Ziele dürfen ohne eigenen Webhook in die Community;
+Vorstand und Betrieb nicht – fehlt ihr Webhook, passiert nichts. Und Discord ist ein fremder
+Dienst: In den Vorstands-Kanal geht nur „neuer Antrag“, nie ein Name.
+
+**Ein Punkt im Feldnamen ist für MongoDB ein Unterordner.** Die Schalter heißen
+`news.published` – gespeichert als `events.news.published` wären sie still ins Leere gegangen.
+Der erste Testlauf fand es; die Schlüssel liegen jetzt mit `__` in der Datenbank.
+
 ## Block 24 — Dolibarr I: Anbindung und Mitgliedschaft
 
 Wunsch des Betreibers: Dolibarr mit dem eigenen Vereinsmodul führt Mitglieder, Beiträge und
@@ -641,6 +671,16 @@ gegen seine `openapi.json`. Die Website hält dieselbe Datei fest, und ihr Test-
 jede eigene Antwort dagegen – weicht eine Testannahme vom Vertrag ab, scheitert der Test. Beim
 ersten Lauf fand die Oberflächen-Prüfung gleich einen echten Fehler: Die ungespeicherten Haken der
 Funktions-Freigabe verschwanden, sobald die Seite nachlud.
+
+### Was 24.2 gefunden hat (#345, PR #349 – das erste Einrichten beim Betreiber)
+
+„Verbindung testen“ sagte bei einem Buchstabendreher in der Adresse nur „nicht erreichbar“ –
+jetzt nennt der Adapter den Grund (Adresse gibt es nicht, Zertifikat, Zeitüberschreitung,
+abgelehnt, Umleitung, keine API, Modul fehlt), weiter ohne Adresse oder Schlüssel in der Meldung.
+Die Vorschau sagte „nur von Hand zuordnen“, aber von Hand ging nirgends; Konten mit
+unbestätigter E-Mail wurden gar nicht gesucht; beendete Mitgliedschaften standen zwischen den
+aktiven. Und ein Fund für „wer sieht was“: Das Admin-Feld heißt „Interne Notizen“, „Meine
+Mitgliedschaft“ zeigte sie dem Mitglied aber an – `/api/membership/me` liefert sie nicht mehr aus.
 
 **Was offen bleibt:** #316 für die Kundenanlage bei kostenpflichtigen Buchungen (Abrechnung I),
 #330 für die Durchläufe der späteren Pakete (Dolibarr III), die App-Seite „Meine Mitgliedschaft“
