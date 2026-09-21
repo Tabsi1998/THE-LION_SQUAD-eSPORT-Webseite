@@ -460,17 +460,22 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
-| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen |
+| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
-| Mitgliederbereich II: Dolibarr | Wunsch des Betreibers vom 16.09.: #295 Mitgliedsdaten und Beitragsstatus per Dolibarr-API in Mitgliederbereich und Admin, #296 Rechnungen ansehen/herunterladen und Zahlungslink, #297 Vorstandsbesetzung und Status aus Dolibarr (nach Bestätigung im Admin) – später, nach Rollen und Rechten |
-| Discord: Kanäle und Bot | Wunsch des Betreibers vom 16.09.: #300 ein Webhook je Zweck (News, Events, Erfolge, Vorstand, Betrieb) mit Schaltern je Ereignis, #301 Erfolge sofort auswerten statt erst beim Profilbesuch, #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle (braucht #260), #303 Meldungen mit Bild, Link und Vorschau – später, nach Rollen und Rechten |
+| Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. #316 gemeinsamer Adapter und sichere Kontoverknüpfung, #295 Mitgliedschaft und Beitragsstand automatisch übernehmen, #297 Vereinsrechte aus Funktionsperioden, #330 Vertragstests und Bestandsumstellung. Die APIs im Vereinsmodul gibt es schon (v0.3/v0.4) |
+| Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv und Zahlungsweg aus Dolibarr, #325 ein PDF-Betrachter für Web und App. Baubar, dolibarr-vereine#50 ist fertig |
+| Abrechnung I: Grundlage und Events | Epic #314, erster Durchstich: #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
+| Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
+| Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Wunsch des Betreibers vom 16.09.: #300 ein Webhook je Zweck (News, Events, Erfolge, Vorstand, Betrieb) mit Schaltern je Ereignis, #301 Erfolge sofort auswerten statt erst beim Profilbesuch, #303 Meldungen mit Bild, Link und Vorschau – alles ohne Bot |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
-| Später | Ideen ohne Termin: #260 Plattform-Konten verknüpfen |
+| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
 ## Block 22 — Tempo und Betrieb
 
@@ -774,7 +779,8 @@ besetzten Posten als Karte mit Link ins Mitgliedsprofil. Kein neuer Endpunkt.
 
 **Dolibarr ist der nächste Schritt, nicht dieser.** Beitrag bezahlt bis, Rechnungen als PDF,
 Zahlungslink und die Vorstandsbesetzung aus der Vereinsverwaltung stehen als eigener
-Meilenstein „Mitgliederbereich II: Dolibarr“ (#295–#297) – nach Rollen und Rechten, weil
+Meilenstein „Dolibarr I: Anbindung und Mitgliedschaft“ (#316, #295, #297, #330; Rechnungen in
+„Dolibarr II“, #296 und #325) – nach Rollen und Rechten, weil
 der Vorstand dort an die Rechte gehängt wird (#290).
 
 ## Block 16 — Turnier-Leitfaden im Adminbereich
