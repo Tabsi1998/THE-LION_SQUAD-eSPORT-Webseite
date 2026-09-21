@@ -8,6 +8,7 @@ import { api } from "../lib/api";
 import { isGuestUser } from "../live";
 import { navigateToNotification, navigationRef } from "../navigation/rootNavigation";
 import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
+import { announceAchievementUnlocked } from "../lib/achievements";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
@@ -61,6 +62,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (existing) return rows.map((row) => row.id === item.id ? { ...row, ...item, read: row.read } : row);
       return [item, ...rows].slice(0, 80);
     });
+    // Ein Erfolg bekommt seinen eigenen Moment (#218), keinen Banner obendrauf.
+    if (item.kind === "achievement") {
+      announceAchievementUnlocked();
+      return;
+    }
     if (suppressedByOpenChat(item, navigationRef.isReady() ? navigationRef.getCurrentRoute() : null)) return;
     setPopup((current) => mergePopup(current, item));
   }, []);
@@ -80,7 +86,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const nextUnread = rows.filter((item) => !item.read && item.id && !knownIds.current.has(item.id)).slice(0, 3);
       if (primed.current && nextUnread.length) {
         const route = navigationRef.isReady() ? navigationRef.getCurrentRoute() : null;
-        const fresh = nextUnread.filter((item) => !suppressedByOpenChat(item, route));
+        if (nextUnread.some((item) => item.kind === "achievement")) announceAchievementUnlocked();
+        const fresh = nextUnread.filter((item) => item.kind !== "achievement" && !suppressedByOpenChat(item, route));
         if (fresh.length) setPopup((current) => fresh.reduceRight((state, item) => mergePopup(state, item), current));
       }
       knownIds.current = new Set(rows.map((item) => item.id).filter(Boolean));

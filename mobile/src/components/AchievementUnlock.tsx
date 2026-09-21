@@ -3,6 +3,7 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius } from "../theme";
+import { useReduceMotion } from "./FadeIn";
 
 export type UnlockTier = {
   code?: string;
@@ -101,19 +102,26 @@ export function AchievementUnlockModal({
 
   const scale = useRef(new Animated.Value(0.7)).current;
   const opacity = useRef(new Animated.Value(0)).current;
+  // „Bewegung reduzieren“ am Handy (#218): der Moment erscheint, aber nichts federt oder regnet.
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
     if (!open) return;
     playHaptics(maxLevel);
-    scale.setValue(0.7);
-    opacity.setValue(0);
-    Animated.parallel([
-      Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 90 }),
-      Animated.timing(opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
-    ]).start();
+    if (reduceMotion) {
+      scale.setValue(1);
+      opacity.setValue(1);
+    } else {
+      scale.setValue(0.7);
+      opacity.setValue(0);
+      Animated.parallel([
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true, friction: 6, tension: 90 }),
+        Animated.timing(opacity, { toValue: 1, duration: 260, useNativeDriver: true }),
+      ]).start();
+    }
     const timer = setTimeout(onClose, 8000);
     return () => clearTimeout(timer);
-  }, [open, maxLevel, scale, opacity, onClose]);
+  }, [open, maxLevel, scale, opacity, onClose, reduceMotion]);
 
   if (!open) return null;
 
@@ -122,7 +130,7 @@ export function AchievementUnlockModal({
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} testID="achievement-unlock-overlay">
-        {R.confetti && (
+        {R.confetti && !reduceMotion && (
           <View style={StyleSheet.absoluteFill} pointerEvents="none">
             {CONFETTI.map((i) => (
               <ConfettiPiece key={i} index={i} color={confettiColors[i % confettiColors.length]} />

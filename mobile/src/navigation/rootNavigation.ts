@@ -103,7 +103,7 @@ function targetFromNotification(item: UserNotification): NotificationTarget | nu
   return targetFromUrl(item.url);
 }
 
-function targetFromUrl(url?: string | null): NotificationTarget | null {
+export function targetFromUrl(url?: string | null): NotificationTarget | null {
   const parsed = parsePath(url);
   if (!parsed.path) return null;
   const parts = parsed.path.split("/").filter(Boolean);
@@ -122,6 +122,8 @@ function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "profile" && second) return { area: "more", screen: "PublicProfile", params: { username: second } };
   if (first === "profile" && parsed.query.includes("tab=inbox")) return { area: "more", screen: "DirectMessages" };
   if (first === "profile" && parsed.query.includes("tab=teams")) return { area: "teams", screen: "TeamList" };
+  // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen, nicht nur ins Profil.
+  if (first === "profile" && parsed.query.includes("tab=achievements")) return { area: "profile", params: { tab: "achievements" } };
   if (first === "profile") return { area: "profile" };
   if (first === "me" && second === "prizes") return { area: "profile", params: { tab: "prizes" } };
   return null;
