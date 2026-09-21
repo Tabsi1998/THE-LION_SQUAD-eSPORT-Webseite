@@ -1,3 +1,4 @@
+import { areasOf, hasArea, isAnyAdmin } from "@/lib/permissions";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { normalizeApiPath } from "@/lib/apiInvalidation";
@@ -148,14 +149,17 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const isAdmin = user && ["tournament_admin", "club_admin", "superadmin"].includes(user.role);
-  const isModerator = user && (user.is_tournament_staff || ["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role));
+  // Rechte nach Bereichen (#287): der Server schickt `areas` mit, sonst aus der Rolle.
+  const areas = areasOf(user);
+  const can = (...wanted) => hasArea(user, ...wanted);
+  const isAdmin = Boolean(user) && isAnyAdmin(user);
+  const isModerator = Boolean(user) && (user.is_tournament_staff || isAdmin || hasArea(user, "moderation"));
   const isSuperAdmin = user?.role === "superadmin";
   const isClubMember = !!user?.is_club_member;
   const userType = user?.user_type || (user ? "community_user" : "guest");
 
   return (
-    <AuthContext.Provider value={{ user, setUser, login, completeMfa, mfaTicket, setMfaTicket, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, userType, refresh: fetchMe, googleAuthenticate, googleLink, googleProcessing }}>
+    <AuthContext.Provider value={{ user, setUser, login, completeMfa, mfaTicket, setMfaTicket, register, logout, error, isAdmin, isModerator, isSuperAdmin, isClubMember, areas, can, userType, refresh: fetchMe, googleAuthenticate, googleLink, googleProcessing }}>
       {children}
     </AuthContext.Provider>
   );

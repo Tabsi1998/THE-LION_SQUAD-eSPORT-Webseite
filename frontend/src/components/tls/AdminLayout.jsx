@@ -1,3 +1,4 @@
+import { hasArea, roleLabel } from "@/lib/permissions";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
@@ -18,68 +19,68 @@ const ADMIN_GROUPS = [
   {
     label: "Übersicht",
     items: [
-      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+      { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "content", "club", "system"] },
     ],
   },
   {
     label: "Mitglieder",
     items: [
-      { to: "/admin/members", label: "Mitglieder", icon: Crown, clubOnly: true },
-      { to: "/admin/member-profiles", label: "Mitgliederprofile", icon: UserCheck, clubOnly: true },
-      { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox, clubOnly: true },
-      { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, clubOnly: true },
-      { to: "/admin/documents", label: "Dokumente", icon: FileText, clubOnly: true },
-      { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, clubOnly: true },
-      { to: "/admin/board", label: "Vorstand", icon: UserCheck, clubOnly: true },
+      { to: "/admin/members", label: "Mitglieder", icon: Crown, areas: ["club"] },
+      { to: "/admin/member-profiles", label: "Mitgliederprofile", icon: UserCheck, areas: ["club"] },
+      { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox, areas: ["club"] },
+      { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
+      { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
+      { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
+      { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
     ],
   },
   {
     label: "eSports",
     items: [
-      { to: "/admin/tournaments", label: "Turniere", icon: Trophy },
-      { to: "/admin/f1", label: "Fast Lap", icon: Flag },
-      { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy },
-      { to: "/admin/games", label: "Spiele", icon: Gamepad2 },
-      { to: "/admin/stations", label: "Stationen", icon: Building2 },
-      { to: "/admin/game-servers", label: "Game-Server", icon: Server, clubOnly: true },
-      { to: "/admin/prizes", label: "Gewinne", icon: Award },
-      { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle },
+      { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy, areas: ["tournaments"] },
+      { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
+      { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/game-servers", label: "Game-Server", icon: Server, areas: ["system"] },
+      { to: "/admin/prizes", label: "Gewinne", icon: Award, areas: ["tournaments"] },
+      { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle, areas: ["tournaments"] },
     ],
   },
   {
     label: "Content",
     items: [
-      { to: "/admin/events", label: "Events", icon: CalendarDays },
-      { to: "/admin/news", label: "News", icon: Newspaper },
-      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon },
-      { to: "/admin/media", label: "Medien", icon: FolderOpen },
-      { to: "/admin/cms", label: "CMS-Seiten", icon: FileText },
-      { to: "/admin/nav", label: "Navigation", icon: Code2 },
-      { to: "/admin/achievements", label: "Achievements", icon: Medal },
-      { to: "/admin/stickers", label: "Sticker", icon: Sticker },
+      { to: "/admin/events", label: "Events", icon: CalendarDays, areas: ["tournaments"] },
+      { to: "/admin/news", label: "News", icon: Newspaper, areas: ["content"] },
+      { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content"] },
+      { to: "/admin/media", label: "Medien", icon: FolderOpen, areas: ["content"] },
+      { to: "/admin/cms", label: "CMS-Seiten", icon: FileText, areas: ["content"] },
+      { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
+      { to: "/admin/achievements", label: "Achievements", icon: Medal, areas: ["content"] },
+      { to: "/admin/stickers", label: "Sticker", icon: Sticker, areas: ["content"] },
     ],
   },
   {
     label: "Verein",
     items: [
-      { to: "/admin/sponsors", label: "Sponsoren", icon: Star, clubOnly: true },
-      { to: "/admin/partners", label: "Partner", icon: Handshake, clubOnly: true },
-      { to: "/admin/references", label: "Referenzen", icon: Medal, clubOnly: true },
-      { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, clubOnly: true },
+      { to: "/admin/sponsors", label: "Sponsoren", icon: Star, areas: ["content"] },
+      { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
+      { to: "/admin/references", label: "Referenzen", icon: Medal, areas: ["content"] },
+      { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, areas: ["club"] },
     ],
   },
   {
     label: "System",
     items: [
-      { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode },
-      { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, clubOnly: true },
-      { to: "/admin/logs", label: "Logs", icon: Activity, clubOnly: true },
-      { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, clubOnly: true },
-      { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare },
-      { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug, clubOnly: true },
-      { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, clubOnly: true },
-      { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, clubOnly: true },
-      { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, clubOnly: true },
+      { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode, areas: ["tournaments", "content", "club", "system"] },
+      { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, areas: ["system"] },
+      { to: "/admin/logs", label: "Logs", icon: Activity, areas: ["system"] },
+      { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, areas: ["system"] },
+      { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare, areas: ["moderation"], staff: true },
+      { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug, areas: ["system"] },
+      { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
+      { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
+      { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
     ],
   },
 ];
@@ -144,13 +145,6 @@ function itemMatchesQuery(item, groupLabel, query) {
 }
 
 // Moderatoren sehen nur diese Routen
-const MODERATOR_ROUTES = [
-  "/admin/tournaments",
-  "/admin/f1",
-  "/admin/stations",
-  "/admin/moderation",
-];
-
 // 34 Einträge ergaben eine 1689 Pixel hohe Liste, von der bei 1440x900 genau
 // zwölf gleichzeitig sichtbar waren. Wer auf "Push-Tests" stand, sah im Menü
 // nicht, wo er ist: die Liste blieb oben stehen. Gruppen lassen sich deshalb
@@ -190,7 +184,7 @@ function groupLabelForPath(pathname) {
 }
 
 export function AdminLayout({ children }) {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout } = useAuth();
   const nav = useNavigate();
   const location = useLocation();
   const [openMobile, setOpenMobile] = useState(false);
@@ -208,19 +202,16 @@ export function AdminLayout({ children }) {
     }
   }, [navQuery]);
 
-  const visibleGroups = useMemo(() => {
-    const roleGroups = isAdmin
-      ? ADMIN_GROUPS
-      : ADMIN_GROUPS.map((group) => ({
-          ...group,
-          items: group.items.filter((it) => MODERATOR_ROUTES.includes(it.to)),
-        })).filter((group) => group.items.length > 0);
-    const canSeeClub = ["club_admin", "superadmin"].includes(user?.role);
-    return roleGroups.map((group) => ({
-      ...group,
-      items: group.items.filter((item) => (!item.clubOnly || canSeeClub) && itemMatchesQuery(item, group.label, searchQuery)),
-    })).filter((group) => group.items.length > 0);
-  }, [isAdmin, searchQuery, user?.role]);
+  // Rechte nach Bereichen (#287): ein Eintrag erscheint, wenn die Person einen
+  // seiner Bereiche hat; die Seiten der Turnierleitung auch für zugewiesene
+  // Helfer (staff). Wer nichts davon hat, sieht kein Menü.
+  const visibleGroups = useMemo(() => ADMIN_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const allowed = hasArea(user, ...(item.areas || [])) || (item.staff && Boolean(user?.is_tournament_staff));
+      return allowed && itemMatchesQuery(item, group.label, searchQuery);
+    }),
+  })).filter((group) => group.items.length > 0), [searchQuery, user]);
 
   const activeGroup = groupLabelForPath(location.pathname);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {
@@ -376,7 +367,7 @@ export function AdminLayout({ children }) {
           <div className="px-3 pt-2 flex items-center justify-between">
             <div className="text-xs min-w-0">
               <div className="text-white font-semibold truncate max-w-[130px]">{user?.display_name || user?.username}</div>
-              <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest">{user?.role}</div>
+              <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest">{roleLabel(user?.role)}</div>
             </div>
             <button
               onClick={async () => { if (await logout()) nav("/"); }}

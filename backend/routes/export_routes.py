@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import io
 
 from database import get_db
-from auth import require_role, get_optional_user
+from auth import require_role, get_optional_user, require_area
 from services.visibility import user_can_see
 from services.access_links import validate_access_link
 from services.competition_read import load_competition_read_model, observe_structure_read
@@ -216,7 +216,7 @@ async def pdf_qr_sign_export(
     title: str = "THE LION SQUAD",
     subtitle: str = "",
     eyebrow: str = "QR CODE",
-    me: dict = Depends(require_role("moderator")),
+    me: dict = Depends(require_area("tournaments", "moderation")),
 ):
     db = get_db()
     sponsors = await _pdf_sponsors(db)
@@ -229,7 +229,7 @@ async def pdf_qr_sign_export(
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/participants.pdf")
-async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
+async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(require_area("tournaments", "moderation"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -248,7 +248,7 @@ async def pdf_tournament_participants(slug_or_id: str, me: dict = Depends(requir
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/checkin.pdf")
-async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
+async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_area("tournaments", "moderation"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -261,7 +261,7 @@ async def pdf_tournament_checkin(slug_or_id: str, me: dict = Depends(require_rol
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/registration-qr.pdf")
-async def pdf_tournament_registration_qr(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
+async def pdf_tournament_registration_qr(slug_or_id: str, me: dict = Depends(require_area("tournaments", "moderation"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -278,7 +278,7 @@ async def pdf_tournament_registration_qr(slug_or_id: str, me: dict = Depends(req
 
 
 @pdf_router.get("/tournaments/{slug_or_id}/matches.pdf")
-async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_role("moderator"))):
+async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_area("tournaments", "moderation"))):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})
     if not t:
@@ -299,7 +299,7 @@ async def pdf_tournament_matches(slug_or_id: str, me: dict = Depends(require_rol
 async def pdf_tournament_station_signs(
     slug_or_id: str,
     orientation: Literal["portrait", "landscape"] = "portrait",
-    me: dict = Depends(require_role("moderator")),
+    me: dict = Depends(require_area("tournaments", "moderation")),
 ):
     db = get_db()
     t = await db.tournaments.find_one({"$or": [{"id": slug_or_id}, {"slug": slug_or_id}]}, {"_id": 0})

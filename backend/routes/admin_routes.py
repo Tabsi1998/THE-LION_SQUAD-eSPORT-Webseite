@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import require_admin, require_club_admin, get_current_user, get_optional_user
+from auth import require_admin, require_club_admin, get_current_user, get_optional_user, require_any_admin
 from models import new_id, now_utc
 from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
@@ -100,7 +100,7 @@ def _source_summary(key: str, label: str, href: str, *, total: int, problem_coun
 
 
 @router.get("/growth-stats")
-async def growth_stats(days: int = 30, me: dict = Depends(require_admin())):
+async def growth_stats(days: int = 30, me: dict = Depends(require_any_admin())):
     """Login + member growth for the dashboard mini chart (last N days)."""
     days = max(7, min(int(days or 30), 90))
     db = get_db()
@@ -134,7 +134,7 @@ async def growth_stats(days: int = 30, me: dict = Depends(require_admin())):
 
 
 @router.get("/dashboard")
-async def dashboard(me: dict = Depends(require_admin())):
+async def dashboard(me: dict = Depends(require_any_admin())):
     db = get_db()
     try:
         from services.push_notifications import mobile_push_health_summary
@@ -607,7 +607,7 @@ def _upload_status() -> dict:
 
 
 @router.get("/system-status")
-async def system_status(me: dict = Depends(require_admin())):
+async def system_status(me: dict = Depends(require_any_admin())):
     db = get_db()
     mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
     discord = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}

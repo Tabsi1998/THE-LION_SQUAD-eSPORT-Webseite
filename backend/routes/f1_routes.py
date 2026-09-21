@@ -6,7 +6,7 @@ from urllib.parse import quote, urlencode
 from fastapi import APIRouter, HTTPException, Depends, Response
 from fastapi.responses import RedirectResponse, StreamingResponse
 from database import get_db
-from auth import get_current_user, require_admin, require_role, get_optional_user
+from auth import get_current_user, require_admin, require_role, get_optional_user, require_area
 from services.visibility import user_can_see
 from services.access_links import public_access_link_payload, touch_access_link, validate_access_link
 from services.public_phase import derive_public_phase
@@ -952,7 +952,7 @@ async def delete_time(time_id: str, me: dict = Depends(get_current_user)):
 
 
 @router.get("/challenges/{cid}/export.csv")
-async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_role("moderator"))):
+async def export_csv(cid: str, track_id: str | None = None, me: dict = Depends(require_area("tournaments", "moderation"))):
     db = get_db()
     c = await _get_visible_challenge(cid, me)
     cid = c["id"]

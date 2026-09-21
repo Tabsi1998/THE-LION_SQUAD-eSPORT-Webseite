@@ -23,9 +23,16 @@ def test_expired_access_session_signals_refresh_without_a_401():
     assert response.headers["x-session-refresh"] == "required"
 
 
-def test_authenticated_bootstrap_returns_the_user_without_refresh():
+def test_authenticated_bootstrap_returns_the_user_without_refresh(monkeypatch):
     response = Response()
     user = {"id": "user-1", "role": "player"}
+    # Die Bereiche (#287) fragen den Vorstand in der Datenbank ab - hier ohne Datenbank.
+    from services import permissions
 
-    assert asyncio.run(me(SimpleNamespace(cookies={"refresh_token": "opaque"}), response, user)) == user
+    async def no_areas(_user, db=None):
+        return set()
+
+    monkeypatch.setattr(permissions, "areas_for", no_areas)
+
+    assert asyncio.run(me(SimpleNamespace(cookies={"refresh_token": "opaque"}), response, user)) == {**user, "areas": []}
     assert "x-session-refresh" not in response.headers

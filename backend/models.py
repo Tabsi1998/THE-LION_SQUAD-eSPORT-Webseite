@@ -17,7 +17,7 @@ def new_id():
 
 # ---------- Users ----------
 # Backward compatible Role - keeps old roles as primary key, additional roles via roles[] array
-Role = Literal["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"]
+Role = Literal["player", "moderator", "tournament_admin", "club_admin", "superadmin"]
 UserType = Literal["guest", "community_user", "club_member"]
 VisibilityLevel = Literal["public", "community", "members", "admins", "private"]
 DirectMessagePrivacy = Literal["everyone", "friends", "team_members", "club_members", "admins_only", "none"]
@@ -1153,3 +1153,8 @@ class GalleryPhotoUpdate(BaseModel):
 # ---------- Admin ----------
 class RoleUpdate(BaseModel):
     role: Role
+
+
+class AreasUpdate(BaseModel):
+    """Freigaben je Bereich (#287): Turnierleitung, Redaktion, Vereinsverwaltung."""
+    areas: List[str] = []

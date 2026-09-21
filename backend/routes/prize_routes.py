@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 
 from database import get_db
-from auth import require_admin, get_current_user
+from auth import get_current_user
 from models import now_utc, new_id
 from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS, mark_ready, mark_picked_up
 from services.visibility import user_can_see
@@ -64,13 +64,34 @@ async def _hydrate_pickups(pickups: list[dict]) -> list[dict]:
     return pickups
 
 
+async def _ensure_prize_manager(user: dict, tournament_id: str | None) -> None:
+    """Gewinne verwaltet die Turnierleitung – oder der Organisator des jeweiligen Turniers (#288).
+
+    Die Zuweisung pro Turnier (Staff-Rolle organizer) braucht keinen Bereich und
+    keine Zwei-Faktor-Anmeldung, so wie beim Rest des Turnier-Betriebs.
+    """
+    from services.permissions import MFA_MESSAGE, missing_area_message, needs_mfa, user_has_area
+    from services.tournament_permissions import has_tournament_staff_permission
+
+    if await user_has_area(user, "tournaments"):
+        if needs_mfa(user):
+            raise HTTPException(status_code=403, detail=MFA_MESSAGE)
+        return
+    if tournament_id and await has_tournament_staff_permission(user, tournament_id, {"organizer"}):
+        return
+    if tournament_id:
+        raise HTTPException(status_code=403, detail="Gewinne dieses Turniers verwaltet die Turnierleitung oder der Organisator des Turniers.")
+    raise HTTPException(status_code=403, detail=missing_area_message(["tournaments"]))
+
+
 @router.get("")
 async def list_prizes(
     status: Optional[PrizeStatus] = None,
     tournament_id: Optional[str] = None,
     source_type: Optional[Literal["tournament", "fastlap"]] = None,
-    me: dict = Depends(require_admin()),
+    me: dict = Depends(get_current_user),
 ):
+    await _ensure_prize_manager(me, tournament_id)
     db = get_db()
     q: dict = {}
     if status:
@@ -300,11 +321,12 @@ async def my_open_prize_count(me: dict = Depends(get_current_user)):
 
 @router.put("/{pickup_id}")
 @router.patch("/{pickup_id}")
-async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(require_admin())):
+async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
     pickup = await db.prize_pickups.find_one({"id": pickup_id}, {"_id": 0})
     if not pickup:
         raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
+    await _ensure_prize_manager(me, pickup.get("tournament_id"))
     new_status = body.status
     if new_status == "ready":
         return await mark_ready(pickup_id, me["id"]) or pickup
@@ -325,8 +347,12 @@ async def update_prize(pickup_id: str, body: PrizeUpdate, me: dict = Depends(req
 
 
 @router.delete("/{pickup_id}")
-async def delete_prize(pickup_id: str, me: dict = Depends(require_admin())):
+async def delete_prize(pickup_id: str, me: dict = Depends(get_current_user)):
     db = get_db()
+    pickup = await db.prize_pickups.find_one({"id": pickup_id}, {"_id": 0, "tournament_id": 1})
+    if not pickup:
+        raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
+    await _ensure_prize_manager(me, pickup.get("tournament_id"))
     res = await db.prize_pickups.delete_one({"id": pickup_id})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Gewinn nicht gefunden")
@@ -343,7 +369,8 @@ class PrizeCreate(BaseModel):
 
 
 @router.post("")
-async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_admin())):
+async def create_prize_manually(body: PrizeCreate, me: dict = Depends(get_current_user)):
+    await _ensure_prize_manager(me, body.tournament_id)
     db = get_db()
     t = await db.tournaments.find_one({"id": body.tournament_id}, {"_id": 0}) or {}
     user = await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1})
@@ -388,7 +415,8 @@ async def create_prize_manually(body: PrizeCreate, me: dict = Depends(require_ad
 
 
 @router.post("/auto-create/missing")
-async def auto_create_missing(me: dict = Depends(require_admin())):
+async def auto_create_missing(me: dict = Depends(get_current_user)):
+    await _ensure_prize_manager(me, None)
     """Backfill pickups for all published tournaments and Fast-Lap challenges.
 
     Useful after older events were published before prize automation understood a
@@ -447,7 +475,8 @@ async def auto_create_missing(me: dict = Depends(require_admin())):
 
 
 @router.post("/auto-create/fastlap/{challenge_id}")
-async def auto_create_fastlap(challenge_id: str, me: dict = Depends(require_admin())):
+async def auto_create_fastlap(challenge_id: str, me: dict = Depends(get_current_user)):
+    await _ensure_prize_manager(me, None)
     """Manual trigger to create pickups for a Fast-Lap challenge."""
     from services.prize_service import auto_create_for_f1_challenge
     n = await auto_create_for_f1_challenge(challenge_id)
@@ -455,7 +484,8 @@ async def auto_create_fastlap(challenge_id: str, me: dict = Depends(require_admi
 
 
 @router.post("/auto-create/{tournament_id}")
-async def auto_create(tournament_id: str, me: dict = Depends(require_admin())):
+async def auto_create(tournament_id: str, me: dict = Depends(get_current_user)):
+    await _ensure_prize_manager(me, tournament_id)
     """Manual trigger to (re)create pickups for a tournament — useful when
     results were corrected after publishing."""
     from services.prize_service import auto_create_for_tournament

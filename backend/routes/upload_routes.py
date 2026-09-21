@@ -14,7 +14,7 @@ from io import BytesIO
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from PIL import Image, ImageChops, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
-from auth import require_admin, get_current_user
+from auth import require_admin, get_current_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.image_variants import schedule_variants
@@ -881,7 +881,7 @@ async def upload_media(
 async def upload_video(
     request: Request,
     file: UploadFile = File(...),
-    me: dict = Depends(require_admin()),
+    me: dict = Depends(require_area("content", "tournaments", "club")),
     media_scope: str = "gallery",
 ):
     started_at = time.perf_counter()
@@ -962,7 +962,7 @@ async def record_upload_client_failure(
 
 
 @router.post("/sponsor-logo")
-async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("content", "tournaments", "club"))):
     """Admin-only convenience alias for sponsor logos."""
     started_at = time.perf_counter()
     try:
@@ -992,7 +992,7 @@ async def upload_sponsor_logo(request: Request, file: UploadFile = File(...), me
 
 
 @router.post("/logo")
-async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_logo(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("content", "tournaments", "club"))):
     """Admin-only logo upload with automatic whitespace trimming."""
     started_at = time.perf_counter()
     try:
@@ -1022,7 +1022,7 @@ async def upload_logo(request: Request, file: UploadFile = File(...), me: dict =
 
 
 @router.post("/migrate-external-images")
-async def migrate_external_images(me: dict = Depends(require_admin())):
+async def migrate_external_images(me: dict = Depends(require_area("system"))):
     """Scan all collections and download external image URLs into local uploads.
     Idempotent. Returns a per-collection summary of {scanned, updated, failed}."""
     from services.image_migrate import migrate_all
@@ -1031,35 +1031,35 @@ async def migrate_external_images(me: dict = Depends(require_admin())):
 
 
 @router.get("/audit-images")
-async def audit_images(me: dict = Depends(require_admin())):
+async def audit_images(me: dict = Depends(require_area("system"))):
     """Report stored image references that are external, legacy or missing."""
     from services.media_audit import audit_image_references
     return await audit_image_references(repair=False)
 
 
 @router.post("/normalize-image-urls")
-async def normalize_image_urls(me: dict = Depends(require_admin())):
+async def normalize_image_urls(me: dict = Depends(require_area("system"))):
     """Normalize legacy local image URLs to /api/static/uploads/{filename}."""
     from services.media_audit import audit_image_references
     return await audit_image_references(repair=True)
 
 
 @router.post("/clear-missing-image-refs")
-async def clear_missing_image_refs(me: dict = Depends(require_admin())):
+async def clear_missing_image_refs(me: dict = Depends(require_area("system"))):
     """Clear direct image fields that point to missing local upload files."""
     from services.media_audit import audit_image_references
     return await audit_image_references(repair=True, clear_missing=True)
 
 
 @router.get("/audit-media-scopes")
-async def audit_media_upload_scopes(me: dict = Depends(require_admin())):
+async def audit_media_upload_scopes(me: dict = Depends(require_area("system"))):
     """Report legacy media metadata entries that need a media_scope."""
     from services.media_audit import audit_media_scopes
     return await audit_media_scopes(repair=False)
 
 
 @router.post("/repair-media-scopes")
-async def repair_media_upload_scopes(me: dict = Depends(require_admin())):
+async def repair_media_upload_scopes(me: dict = Depends(require_area("system"))):
     """Backfill media_scope on legacy media metadata entries."""
     from services.media_audit import audit_media_scopes
     return await audit_media_scopes(repair=True)
@@ -1080,7 +1080,7 @@ _EXT_BY_MIME = {
 
 
 @router.post("/document")
-async def upload_document(request: Request, file: UploadFile = File(...), me: dict = Depends(require_admin())):
+async def upload_document(request: Request, file: UploadFile = File(...), me: dict = Depends(require_area("club"))):
     """Upload an arbitrary document (PDF, DOCX, XLSX, ZIP, ...).
     Stores it outside the public static tree and returns a storage key."""
     started_at = time.perf_counter()

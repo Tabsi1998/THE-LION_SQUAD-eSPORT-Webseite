@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
 from database import get_db
-from auth import get_current_user, require_admin
+from auth import get_current_user, require_admin, require_area
 from models import now_utc, new_id
 from services.content_embed_service import resolve_content_embeds
 from services.slug_utils import unique_slug
@@ -98,13 +98,13 @@ admin_streams_router = APIRouter(prefix="/api/admin/streams", tags=["streams-adm
 
 
 @admin_streams_router.post("/refresh")
-async def admin_streams_refresh(me: dict = Depends(require_admin())):
+async def admin_streams_refresh(me: dict = Depends(require_area("content"))):
     from services.twitch_service import fetch_live_streams
     return await fetch_live_streams()
 
 
 @admin_streams_router.get("/status")
-async def admin_streams_status(me: dict = Depends(require_admin())):
+async def admin_streams_status(me: dict = Depends(require_area("content"))):
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     token = await db.settings.find_one({"id": "twitch_app_token"}, {"_id": 0}) or {}
@@ -190,13 +190,13 @@ class PagePatch(BaseModel):
 
 
 @admin_pages_router.get("")
-async def admin_list_pages(me: dict = Depends(require_admin())):
+async def admin_list_pages(me: dict = Depends(require_area("content"))):
     db = get_db()
     return await db.cms_pages.find({}, {"_id": 0}).sort("slug", 1).to_list(500)
 
 
 @admin_pages_router.post("")
-async def admin_create_page(body: PageCreate, me: dict = Depends(require_admin())):
+async def admin_create_page(body: PageCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
     doc["slug"] = await unique_slug(db.cms_pages, doc.get("slug") or doc.get("title"), fallback="seite", max_length=80)
@@ -210,7 +210,7 @@ async def admin_create_page(body: PageCreate, me: dict = Depends(require_admin()
 
 @admin_pages_router.put("/{slug}")
 @admin_pages_router.patch("/{slug}")
-async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(require_admin())):
+async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {"body_md", "meta_description"}
     raw = body.model_dump(exclude_unset=True)
@@ -225,7 +225,7 @@ async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(requi
 
 
 @admin_pages_router.delete("/{slug}")
-async def admin_delete_page(slug: str, me: dict = Depends(require_admin())):
+async def admin_delete_page(slug: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     p = await db.cms_pages.find_one({"slug": slug})
     if not p:
@@ -277,14 +277,14 @@ class TemplatePatch(BaseModel):
 
 
 @admin_emailt_router.get("")
-async def admin_list_templates(me: dict = Depends(require_admin())):
+async def admin_list_templates(me: dict = Depends(require_area("system"))):
     db = get_db()
     return await db.email_templates.find({}, {"_id": 0}).sort("key", 1).to_list(50)
 
 
 @admin_emailt_router.put("/{key}")
 @admin_emailt_router.patch("/{key}")
-async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_admin())):
+async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_area("system"))):
     db = get_db()
     nullable_fields = {"subject", "html", "name"}
     raw = body.model_dump(exclude_unset=True)
@@ -350,7 +350,7 @@ async def _discord_counter_projection(db, user_id: str):
 
 
 @admin_discord_router.post("/counter/{user_id}")
-async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends(require_admin())):
+async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends(require_area("club"))):
     db = get_db()
     if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Nutzer nicht gefunden.")
@@ -375,7 +375,7 @@ async def admin_bump_counter(user_id: str, body: CounterBody, me: dict = Depends
 
 
 @admin_discord_router.put("/counter/{user_id}")
-async def admin_set_counter(user_id: str, body: CounterSetBody, me: dict = Depends(require_admin())):
+async def admin_set_counter(user_id: str, body: CounterSetBody, me: dict = Depends(require_area("club"))):
     db = get_db()
     if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Nutzer nicht gefunden.")
@@ -395,7 +395,7 @@ async def admin_set_counter(user_id: str, body: CounterSetBody, me: dict = Depen
 
 
 @admin_discord_router.get("/counters")
-async def admin_list_counters(q: str = "", limit: int = 100, me: dict = Depends(require_admin())):
+async def admin_list_counters(q: str = "", limit: int = 100, me: dict = Depends(require_area("club"))):
     db = get_db()
     safe_limit = max(1, min(limit, 500))
     query: dict = {"discord_messages_count": {"$gt": 0}}

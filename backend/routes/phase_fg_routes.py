@@ -25,7 +25,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel
 
 from database import get_db
-from auth import require_admin, get_current_user
+from auth import require_admin, get_current_user, require_area
 from models import now_utc
 from services.media_formats import PUBLIC_IMAGE_EXTS, PUBLIC_MEDIA_EXTS, PUBLIC_ORIGINAL_EXTS, PUBLIC_VIDEO_EXTS
 
@@ -290,13 +290,13 @@ async def list_media(type: str = "", me: dict = Depends(get_current_user)):
 
 
 @admin_media_router.get("")
-async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, type: str = "", me: dict = Depends(require_admin())):
+async def admin_list_media(include_user_uploads: bool = False, include_usage: bool = False, type: str = "", me: dict = Depends(require_area("content"))):
     """List CMS/admin files in the upload directory with metadata."""
     return await _list_media_items(exclude_user_scope=not include_user_uploads, include_usage=include_usage, media_type_filter=type)
 
 
 @admin_media_router.get("/audit")
-async def admin_media_audit(me: dict = Depends(require_admin())):
+async def admin_media_audit(me: dict = Depends(require_area("content"))):
     """Return media-library health information for the admin media dashboard."""
     items = await _list_media_items(exclude_user_scope=False, include_usage=True)
     db = get_db()
@@ -375,7 +375,7 @@ def _media_file_path(filename: str) -> Path:
 
 
 @admin_media_router.post("/{filename}/rotate")
-async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = Depends(require_admin())):
+async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = Depends(require_area("content"))):
     """Rotate an uploaded public image in place."""
     p = _media_file_path(filename)
     ext = p.suffix.lower()
@@ -425,7 +425,7 @@ async def admin_rotate_media(filename: str, body: RotateMediaBody, me: dict = De
 
 
 @admin_media_router.delete("/{filename}")
-async def admin_delete_media(filename: str, me: dict = Depends(require_admin())):
+async def admin_delete_media(filename: str, me: dict = Depends(require_area("content"))):
     """Delete a file from upload dir. Path-traversal protected."""
     p = _media_file_path(filename)
     try:
@@ -579,7 +579,7 @@ admin_nav_router = APIRouter(prefix="/api/admin/nav", tags=["cms-admin"])
 
 
 @admin_nav_router.get("")
-async def admin_get_nav(me: dict = Depends(require_admin())):
+async def admin_get_nav(me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = await db.cms_nav.find_one({"id": NAV_DOC_ID}, {"_id": 0}) or DEFAULT_NAV
     return _normalize_nav_doc(doc)
@@ -590,7 +590,7 @@ class NavBody(BaseModel):
 
 
 @admin_nav_router.put("")
-async def admin_put_nav(body: NavBody, me: dict = Depends(require_admin())):
+async def admin_put_nav(body: NavBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     normalized = _normalize_nav_doc({"id": NAV_DOC_ID, "items": body.items})
     await db.cms_nav.update_one(

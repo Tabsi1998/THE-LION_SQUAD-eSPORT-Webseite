@@ -309,20 +309,38 @@ def require_club_member():
     return dep
 
 
-def require_admin():
-    """Admin = tournament_admin | club_admin | superadmin."""
-    async def dep(user: dict = Depends(require_role("tournament_admin", "club_admin", "superadmin"))) -> dict:
-        if not user.get("mfa_enabled") or not user.get("auth_mfa_verified"):
-            raise HTTPException(status_code=403, detail="Für den Adminbereich ist eine bestätigte Zwei-Faktor-Anmeldung erforderlich.")
+def require_area(*areas: str):
+    """Bereich statt Rang (#287): erlaubt, wer einen der Bereiche hat – aus Rolle,
+    Freigabe oder Vorstandsposten. Zwei-Faktor ist Pflicht, sobald ein Bereich
+    außer „Moderation“ verlangt wird (#291)."""
+    wanted = tuple(areas)
+
+    async def dep(user: dict = Depends(get_current_user)) -> dict:
+        from services.permissions import MFA_AREAS, MFA_MESSAGE, areas_for, missing_area_message, needs_mfa
+
+        held = await areas_for(user)
+        if not (set(wanted) & held):
+            raise HTTPException(status_code=403, detail=missing_area_message(wanted))
+        if (set(wanted) & MFA_AREAS) and needs_mfa(user):
+            raise HTTPException(status_code=403, detail=MFA_MESSAGE)
         return user
+
     return dep
+
+
+def require_any_admin():
+    """Irgendein Adminbereich – für Tageszentrale, Systemstatus und Downloads."""
+    return require_area("tournaments", "content", "club", "system")
+
+
+def require_admin():
+    """Turnierleitung: Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne (#288)."""
+    return require_area("tournaments")
 
 
 def require_club_admin():
-    """Club-wide configuration and sensitive operational data."""
-    async def dep(user: dict = Depends(require_role("club_admin", "superadmin"))) -> dict:
-        return user
-    return dep
+    """System: Einstellungen, Game-Server, Betrieb, Logs – Club-Admin und Superadmin, mit Zwei-Faktor (#291)."""
+    return require_area("system")
 
 
 def require_super():

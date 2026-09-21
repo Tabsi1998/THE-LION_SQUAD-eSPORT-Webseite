@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import get_current_user, get_optional_user, require_club_admin, require_super, hash_token
+from auth import get_current_user, get_optional_user, require_club_admin, require_super, hash_token, require_area
 from email_service import send_template
 from services.competition_privacy import registration_match_snapshot
 from services.competition_standings import registration_match_summary
@@ -21,6 +21,7 @@ from services.notification_preferences import (
 )
 from services.query_filters import safe_regex
 from models import (
+    AreasUpdate,
     AdminUserCreate, UserUpdate, RoleUpdate, UserSocialCreate, UserSocialUpdate,
     now_utc, new_id,
 )
@@ -259,7 +260,7 @@ async def _send_user_invite(user: dict, actor: dict) -> dict:
 @router.get("")
 async def list_users(q: str | None = None, role: str | None = None,
                      user_type: str | None = None,
-                     user: dict = Depends(require_club_admin())):
+                     user: dict = Depends(require_area("club"))):
     db = get_db()
     query = {}
     if q:
@@ -851,7 +852,7 @@ async def delete_my_social(social_id: str, me: dict = Depends(get_current_user))
 @router.put("/{user_id}")
 @router.patch("/{user_id}")
 async def admin_update_user(user_id: str, body: UserUpdate,
-                             me: dict = Depends(require_club_admin())):
+                             me: dict = Depends(require_area("club"))):
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
@@ -865,7 +866,7 @@ async def admin_update_user(user_id: str, body: UserUpdate,
 
 
 @router.post("/{user_id}/ban")
-async def ban_user(user_id: str, me: dict = Depends(require_club_admin())):
+async def ban_user(user_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     await db.users.update_one({"id": user_id}, {"$set": {"is_banned": True, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.ban", "target_id": user_id,
@@ -874,7 +875,7 @@ async def ban_user(user_id: str, me: dict = Depends(require_club_admin())):
 
 
 @router.post("/{user_id}/unban")
-async def unban_user(user_id: str, me: dict = Depends(require_club_admin())):
+async def unban_user(user_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     await db.users.update_one({"id": user_id}, {"$set": {"is_banned": False, "updated_at": now_utc().isoformat()}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.unban", "target_id": user_id,
@@ -892,6 +893,27 @@ async def set_role(user_id: str, body: RoleUpdate, me: dict = Depends(require_su
     )
     await db.audit_logs.insert_one({"id": new_id(), "action": "user.role_change", "target_id": user_id,
                                      "actor_id": me["id"], "data": {"role": body.role},
+                                     "created_at": now_utc().isoformat()})
+    u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
+    return u
+
+
+@router.put("/{user_id}/areas")
+async def set_areas(user_id: str, body: AreasUpdate, me: dict = Depends(require_super())):
+    """Freigaben je Bereich (#287): nur Turnierleitung, Redaktion, Vereinsverwaltung; System bleibt an der Rolle."""
+    from services.permissions import GRANTABLE_AREAS, clean_grants
+
+    unknown = [a for a in body.areas if a not in GRANTABLE_AREAS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unbekannter Bereich: {', '.join(unknown)}. Erlaubt: {', '.join(GRANTABLE_AREAS)}.")
+    areas = clean_grants(body.areas)
+    db = get_db()
+    target = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "areas": 1})
+    if not target:
+        raise HTTPException(status_code=404, detail="Nutzer nicht gefunden")
+    await db.users.update_one({"id": user_id}, {"$set": {"areas": areas, "updated_at": now_utc().isoformat()}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "user.areas_change", "target_id": user_id,
+                                     "actor_id": me["id"], "data": {"areas": areas, "from": target.get("areas") or []},
                                      "created_at": now_utc().isoformat()})
     u = await db.users.find_one({"id": user_id}, PRIVATE_AUTH_FIELDS)
     return u

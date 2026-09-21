@@ -6,7 +6,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
-from auth import get_optional_user, require_club_admin
+from auth import get_optional_user, require_club_admin, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
@@ -134,14 +134,14 @@ async def list_documents(
 
 
 @router.get("/admin")
-async def admin_list_documents(me: dict = Depends(require_club_admin())):
+async def admin_list_documents(me: dict = Depends(require_area("club"))):
     db = get_db()
     docs = await db.documents.find({}, {"_id": 0}).sort([("pinned", -1), ("order_index", 1)]).to_list(1000)
     return [_public_doc(doc, me) for doc in docs]
 
 
 @router.post("")
-async def create_document(body: DocumentCreate, me: dict = Depends(require_club_admin())):
+async def create_document(body: DocumentCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     doc = body.model_dump()
     doc["visibility"] = _normalise_visibility(doc.get("visibility"))
@@ -161,7 +161,7 @@ async def create_document(body: DocumentCreate, me: dict = Depends(require_club_
 
 @router.put("/{doc_id}")
 @router.patch("/{doc_id}")
-async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(require_club_admin())):
+async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(require_area("club"))):
     db = get_db()
     nullable_fields = {"description", "storage_key", "original_filename", "file_size", "mime", "tags"}
     raw = body.model_dump(exclude_unset=True)
@@ -181,7 +181,7 @@ async def update_document(doc_id: str, body: DocumentUpdate, me: dict = Depends(
 
 
 @router.delete("/{doc_id}")
-async def delete_document(doc_id: str, me: dict = Depends(require_club_admin())):
+async def delete_document(doc_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     res = await db.documents.delete_one({"id": doc_id})
     if res.deleted_count == 0:

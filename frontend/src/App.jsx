@@ -239,31 +239,31 @@ function App() {
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />
-          <Route path="/admin/members" element={<ProtectedRoute requireClubAdmin><AdminMembersPage /></ProtectedRoute>} />
-          <Route path="/admin/member-profiles" element={<ProtectedRoute requireClubAdmin><AdminClubMemberProfilesPage /></ProtectedRoute>} />
-          <Route path="/admin/benefits" element={<ProtectedRoute requireClubAdmin><AdminBenefitsPage /></ProtectedRoute>} />
+          <Route path="/admin/members" element={<ProtectedRoute requireArea="club"><AdminMembersPage /></ProtectedRoute>} />
+          <Route path="/admin/member-profiles" element={<ProtectedRoute requireArea="club"><AdminClubMemberProfilesPage /></ProtectedRoute>} />
+          <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
-          <Route path="/admin/tournaments/new" element={<ProtectedRoute requireAdmin><AdminTournamentNewPage /></ProtectedRoute>} />
+          <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireModerator><AdminTournamentEditPage /></ProtectedRoute>} />
           <Route path="/admin/f1" element={<ProtectedRoute requireModerator><AdminF1Page /></ProtectedRoute>} />
-          <Route path="/admin/f1/new" element={<ProtectedRoute requireAdmin><AdminF1NewPage /></ProtectedRoute>} />
+          <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
           <Route path="/admin/f1/:id" element={<ProtectedRoute requireModerator><AdminF1EditPage /></ProtectedRoute>} />
-          <Route path="/admin/games" element={<ProtectedRoute requireAdmin><AdminGamesPage /></ProtectedRoute>} />
-          <Route path="/admin/users" element={<ProtectedRoute requireClubAdmin><AdminUsersPage /></ProtectedRoute>} />
+          <Route path="/admin/games" element={<ProtectedRoute requireArea="tournaments"><AdminGamesPage /></ProtectedRoute>} />
+          <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireModerator><AdminStationsPage /></ProtectedRoute>} />
-          <Route path="/admin/events" element={<ProtectedRoute requireAdmin><AdminEventsPage /></ProtectedRoute>} />
-          <Route path="/admin/news" element={<ProtectedRoute requireAdmin><AdminNewsPage /></ProtectedRoute>} />
-          <Route path="/admin/gallery" element={<ProtectedRoute requireAdmin><AdminGalleryPage /></ProtectedRoute>} />
-          <Route path="/admin/documents" element={<ProtectedRoute requireClubAdmin><AdminDocumentsPage /></ProtectedRoute>} />
-          <Route path="/admin/settings" element={<ProtectedRoute requireClubAdmin><AdminSettingsPage /></ProtectedRoute>} />
-          <Route path="/admin/seasons" element={<ProtectedRoute requireAdmin><AdminSeasonsPage /></ProtectedRoute>} />
-          <Route path="/admin/logs" element={<ProtectedRoute requireClubAdmin><AdminLogsPage /></ProtectedRoute>} />
-          <Route path="/admin/ops" element={<ProtectedRoute requireClubAdmin><AdminOpsPage /></ProtectedRoute>} />
-          <Route path="/admin/audit" element={<ProtectedRoute requireClubAdmin><AdminAuditPage /></ProtectedRoute>} />
+          <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />
+          <Route path="/admin/news" element={<ProtectedRoute requireArea="content"><AdminNewsPage /></ProtectedRoute>} />
+          <Route path="/admin/gallery" element={<ProtectedRoute requireArea="content"><AdminGalleryPage /></ProtectedRoute>} />
+          <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
+          <Route path="/admin/seasons" element={<ProtectedRoute requireArea="tournaments"><AdminSeasonsPage /></ProtectedRoute>} />
+          <Route path="/admin/logs" element={<ProtectedRoute requireArea="system"><AdminLogsPage /></ProtectedRoute>} />
+          <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />
+          <Route path="/admin/audit" element={<ProtectedRoute requireArea="system"><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
-          <Route path="/admin/mobile-logs" element={<ProtectedRoute requireClubAdmin><AdminMobileLogsPage /></ProtectedRoute>} />
-          <Route path="/admin/mobile-push" element={<ProtectedRoute requireClubAdmin><AdminMobilePushPage /></ProtectedRoute>} />
-          <Route path="/admin/app-releases" element={<ProtectedRoute requireClubAdmin><AdminAppReleasesPage /></ProtectedRoute>} />
+          <Route path="/admin/mobile-logs" element={<ProtectedRoute requireArea="system"><AdminMobileLogsPage /></ProtectedRoute>} />
+          <Route path="/admin/mobile-push" element={<ProtectedRoute requireArea="system"><AdminMobilePushPage /></ProtectedRoute>} />
+          <Route path="/admin/app-releases" element={<ProtectedRoute requireArea="system"><AdminAppReleasesPage /></ProtectedRoute>} />
           <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
           <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
 
@@ -280,23 +280,23 @@ function App() {
           <Route path="/gallery/:slug" element={<GalleryLegacyRedirect />} />
 
           {/* Admin */}
-          <Route path="/admin/sponsors" element={<ProtectedRoute requireClubAdmin><AdminSponsorsPage /></ProtectedRoute>} />
-          <Route path="/admin/partners" element={<ProtectedRoute requireClubAdmin><AdminPartnersPage /></ProtectedRoute>} />
-          <Route path="/admin/references" element={<ProtectedRoute requireClubAdmin><AdminReferencesPage /></ProtectedRoute>} />
-          <Route path="/admin/game-servers" element={<ProtectedRoute requireClubAdmin><AdminGameServersPage /></ProtectedRoute>} />
-          <Route path="/admin/achievements" element={<ProtectedRoute requireAdmin><AdminAchievementsPage /></ProtectedRoute>} />
-          <Route path="/admin/stickers" element={<ProtectedRoute requireAdmin><AdminStickersPage /></ProtectedRoute>} />
-          <Route path="/admin/membership-applications" element={<ProtectedRoute requireClubAdmin><AdminMembershipApplicationsPage /></ProtectedRoute>} />
-          <Route path="/admin/cms" element={<ProtectedRoute requireAdmin><AdminCmsPage /></ProtectedRoute>} />
-          <Route path="/admin/media" element={<ProtectedRoute requireAdmin><AdminMediaPage /></ProtectedRoute>} />
-          <Route path="/admin/nav" element={<ProtectedRoute requireAdmin><AdminNavPage /></ProtectedRoute>} />
-          <Route path="/admin/prizes" element={<ProtectedRoute requireAdmin><AdminPrizesPage /></ProtectedRoute>} />
-          <Route path="/admin/penalties" element={<ProtectedRoute requireAdmin><AdminPenaltiesPage /></ProtectedRoute>} />
-          <Route path="/admin/contact" element={<ProtectedRoute requireClubAdmin><AdminContactPage /></ProtectedRoute>} />
-          <Route path="/admin/board" element={<ProtectedRoute requireClubAdmin><AdminBoardPage /></ProtectedRoute>} />
+          <Route path="/admin/sponsors" element={<ProtectedRoute requireArea="content"><AdminSponsorsPage /></ProtectedRoute>} />
+          <Route path="/admin/partners" element={<ProtectedRoute requireArea="content"><AdminPartnersPage /></ProtectedRoute>} />
+          <Route path="/admin/references" element={<ProtectedRoute requireArea="content"><AdminReferencesPage /></ProtectedRoute>} />
+          <Route path="/admin/game-servers" element={<ProtectedRoute requireArea="system"><AdminGameServersPage /></ProtectedRoute>} />
+          <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
+          <Route path="/admin/stickers" element={<ProtectedRoute requireArea="content"><AdminStickersPage /></ProtectedRoute>} />
+          <Route path="/admin/membership-applications" element={<ProtectedRoute requireArea="club"><AdminMembershipApplicationsPage /></ProtectedRoute>} />
+          <Route path="/admin/cms" element={<ProtectedRoute requireArea="content"><AdminCmsPage /></ProtectedRoute>} />
+          <Route path="/admin/media" element={<ProtectedRoute requireArea="content"><AdminMediaPage /></ProtectedRoute>} />
+          <Route path="/admin/nav" element={<ProtectedRoute requireArea="content"><AdminNavPage /></ProtectedRoute>} />
+          <Route path="/admin/prizes" element={<ProtectedRoute requireArea="tournaments"><AdminPrizesPage /></ProtectedRoute>} />
+          <Route path="/admin/penalties" element={<ProtectedRoute requireArea="tournaments"><AdminPenaltiesPage /></ProtectedRoute>} />
+          <Route path="/admin/contact" element={<ProtectedRoute requireArea="club"><AdminContactPage /></ProtectedRoute>} />
+          <Route path="/admin/board" element={<ProtectedRoute requireArea="club"><AdminBoardPage /></ProtectedRoute>} />
 
           {/* Setup wizard */}
-          <Route path="/setup" element={<ProtectedRoute requireClubAdmin><SetupWizardPage /></ProtectedRoute>} />
+          <Route path="/setup" element={<ProtectedRoute requireArea="system"><SetupWizardPage /></ProtectedRoute>} />
 
           {/* User: Meine Gewinne */}
           <Route path="/my/prizes" element={<ProtectedRoute><MyPrizesPage /></ProtectedRoute>} />

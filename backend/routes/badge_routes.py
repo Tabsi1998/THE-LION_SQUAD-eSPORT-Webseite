@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Literal
 from database import get_db
-from auth import get_optional_user, get_current_user, require_admin
+from auth import get_optional_user, get_current_user, require_admin, require_area
 from badges import (
     award_achievement, can_award_tier_to_user, list_groups_for_user, list_user_awards,
     evaluate_user_progress, trigger_negative_incident, on_season_completed,
@@ -158,13 +158,13 @@ class GroupPatch(BaseModel):
 
 
 @admin_router.get("/groups")
-async def admin_list_groups(me: dict = Depends(require_admin())):
+async def admin_list_groups(me: dict = Depends(require_area("content"))):
     db = get_db()
     return await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
 
 
 @admin_router.post("/groups")
-async def admin_create_group(body: GroupCreate, me: dict = Depends(require_admin())):
+async def admin_create_group(body: GroupCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     if await db.achievement_groups.find_one({"code": body.code}):
         raise HTTPException(409, "Code bereits vergeben.")
@@ -177,7 +177,7 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_admin
 
 @admin_router.put("/groups/{code}")
 @admin_router.patch("/groups/{code}")
-async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_admin())):
+async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {"description", "accent_color"}
     raw = body.model_dump(exclude_unset=True)
@@ -191,7 +191,7 @@ async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(requ
 
 
 @admin_router.delete("/groups/{code}")
-async def admin_delete_group(code: str, me: dict = Depends(require_admin())):
+async def admin_delete_group(code: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     g = await db.achievement_groups.find_one({"code": code})
     if not g:
@@ -233,7 +233,7 @@ class TierPatch(BaseModel):
 
 @admin_router.get("/tiers")
 async def admin_list_tiers(group_code: Optional[str] = None,
-                            me: dict = Depends(require_admin())):
+                            me: dict = Depends(require_area("content"))):
     db = get_db()
     q: dict = {}
     if group_code:
@@ -246,7 +246,7 @@ async def admin_list_tiers(group_code: Optional[str] = None,
 
 
 @admin_router.post("/tiers")
-async def admin_create_tier(body: TierCreate, me: dict = Depends(require_admin())):
+async def admin_create_tier(body: TierCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     if not await db.achievement_groups.find_one({"code": body.group_code}):
         raise HTTPException(404, "Group nicht gefunden.")
@@ -260,7 +260,7 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_admin()
 
 @admin_router.put("/tiers/{code}")
 @admin_router.patch("/tiers/{code}")
-async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_admin())):
+async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {"description", "condition_key", "progress_target", "icon"}
     raw = body.model_dump(exclude_unset=True)
@@ -274,7 +274,7 @@ async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(requir
 
 
 @admin_router.delete("/tiers/{code}")
-async def admin_delete_tier(code: str, me: dict = Depends(require_admin())):
+async def admin_delete_tier(code: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     res = await db.achievements.delete_one({"code": code})
     if res.deleted_count == 0:
@@ -291,7 +291,7 @@ class AwardBody(BaseModel):
 
 
 @admin_router.post("/award")
-async def admin_award(body: AwardBody, me: dict = Depends(require_admin())):
+async def admin_award(body: AwardBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Nutzer nicht gefunden.")
@@ -316,7 +316,7 @@ async def admin_award(body: AwardBody, me: dict = Depends(require_admin())):
 
 
 @admin_router.delete("/award")
-async def admin_revoke(body: AwardBody, me: dict = Depends(require_admin())):
+async def admin_revoke(body: AwardBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     res = await db.user_achievements.delete_one({"user_id": body.user_id, "tier_code": body.tier_code})
     if res.deleted_count == 0:
@@ -337,7 +337,7 @@ async def admin_revoke(body: AwardBody, me: dict = Depends(require_admin())):
 
 
 @admin_router.get("/negative/awards")
-async def admin_list_negative_awards(me: dict = Depends(require_admin())):
+async def admin_list_negative_awards(me: dict = Depends(require_area("content"))):
     """List all awarded negative achievements with user info — admin-only view."""
     db = get_db()
     neg_groups = [g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})]
@@ -364,7 +364,7 @@ async def admin_list_negative_awards(me: dict = Depends(require_admin())):
 
 
 @admin_router.get("/users/search")
-async def admin_search_users(q: str = "", me: dict = Depends(require_admin())):
+async def admin_search_users(q: str = "", me: dict = Depends(require_area("content"))):
     """Quick user search for the admin manual-award picker."""
     db = get_db()
     query: dict = {}
@@ -395,12 +395,12 @@ class IncidentBody(BaseModel):
 
 
 @admin_router.get("/incident-types")
-async def admin_incident_types(me: dict = Depends(require_admin())):
+async def admin_incident_types(me: dict = Depends(require_area("content"))):
     return [{"key": k, "tier_code": v} for k, v in NEGATIVE_INCIDENTS.items()]
 
 
 @admin_router.post("/trigger-incident")
-async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_admin())):
+async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     if body.incident_type not in NEGATIVE_INCIDENTS:
         raise HTTPException(400, f"Unbekannter Vorfall-Typ. Erlaubt: {sorted(NEGATIVE_INCIDENTS.keys())}")
@@ -423,7 +423,7 @@ async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_
 
 # ---- Phase B v4.1 — Season completion ----
 @admin_router.post("/season/{season_id}/award")
-async def admin_season_award(season_id: str, me: dict = Depends(require_admin())):
+async def admin_season_award(season_id: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     if not await db.seasons.find_one({"id": season_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Saison nicht gefunden.")

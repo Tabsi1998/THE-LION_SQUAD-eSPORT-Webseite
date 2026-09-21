@@ -11,8 +11,27 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id
 from services.secret_migration import migrate_plaintext_secrets
 
+async def migrate_team_leader_role(db) -> str:
+    """Die globale Rolle team_leader gab es nur in der Auswahl, geprüft hat sie nichts;
+    Teamleitung läuft pro Team (#292). Bestehende Konten werden Spieler, mit Audit-Eintrag."""
+    from datetime import datetime, timezone
+
+    ids = [u["id"] async for u in db.users.find({"role": "team_leader"}, {"_id": 0, "id": 1})]
+    if not ids:
+        return "no team_leader accounts"
+    now = datetime.now(timezone.utc).isoformat()
+    await db.users.update_many({"id": {"$in": ids}}, {"$set": {"role": "player", "roles": ["player"], "updated_at": now}})
+    await db.audit_logs.insert_many([
+        {"id": new_id(), "action": "user.role_change", "target_id": uid, "actor_id": "migration",
+         "data": {"role": "player", "from": "team_leader", "reason": "#292"}, "created_at": now}
+        for uid in ids
+    ])
+    return f"{len(ids)} team_leader accounts set to player"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
+    (2, "team_leader_role_to_player", migrate_team_leader_role),
 )
 
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from auth import get_current_user, require_admin
+from auth import get_current_user, require_admin, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.stickers import (
@@ -92,12 +92,12 @@ async def sticker_file(pack: str, filename: str):
 
 
 @router.get("/admin")
-async def admin_list_stickers(_me: dict = Depends(require_admin())):
+async def admin_list_stickers(_me: dict = Depends(require_area("content"))):
     return {"packs": await list_sticker_packs(get_db(), include_inactive=True), "source": builtin_source()}
 
 
 @router.post("/admin/packs")
-async def create_sticker_pack(body: StickerPackCreate, _me: dict = Depends(require_admin())):
+async def create_sticker_pack(body: StickerPackCreate, _me: dict = Depends(require_area("content"))):
     db = get_db()
     if await db.sticker_packs.count_documents({}) >= MAX_CUSTOM_PACKS:
         raise HTTPException(status_code=400, detail=f"Höchstens {MAX_CUSTOM_PACKS} eigene Stickerpakete.")
@@ -115,7 +115,7 @@ async def create_sticker_pack(body: StickerPackCreate, _me: dict = Depends(requi
 
 
 @router.patch("/admin/packs/{pack_id}")
-async def update_sticker_pack(pack_id: str, body: StickerPackUpdate, _me: dict = Depends(require_admin())):
+async def update_sticker_pack(pack_id: str, body: StickerPackUpdate, _me: dict = Depends(require_area("content"))):
     db = get_db()
     changes = body.model_dump(exclude_unset=True, exclude_none=True)
     now = now_utc().isoformat()
@@ -139,7 +139,7 @@ async def update_sticker_pack(pack_id: str, body: StickerPackUpdate, _me: dict =
 
 
 @router.delete("/admin/packs/{pack_id}")
-async def delete_sticker_pack(pack_id: str, _me: dict = Depends(require_admin())):
+async def delete_sticker_pack(pack_id: str, _me: dict = Depends(require_area("content"))):
     if pack_id in builtin_pack_ids():
         raise HTTPException(status_code=400, detail="Das Startpaket lässt sich abschalten, aber nicht löschen.")
     db = get_db()
@@ -150,7 +150,7 @@ async def delete_sticker_pack(pack_id: str, _me: dict = Depends(require_admin())
 
 
 @router.post("/admin/packs/{pack_id}/stickers")
-async def create_sticker(pack_id: str, body: StickerCreate, _me: dict = Depends(require_admin())):
+async def create_sticker(pack_id: str, body: StickerCreate, _me: dict = Depends(require_area("content"))):
     if pack_id in builtin_pack_ids():
         raise HTTPException(status_code=400, detail="Das Startpaket ist fest. Eigene Sticker gehören in ein eigenes Paket.")
     db = get_db()
@@ -179,7 +179,7 @@ async def create_sticker(pack_id: str, body: StickerCreate, _me: dict = Depends(
 
 
 @router.patch("/admin/stickers/{sticker_id}")
-async def update_sticker(sticker_id: str, body: StickerUpdate, _me: dict = Depends(require_admin())):
+async def update_sticker(sticker_id: str, body: StickerUpdate, _me: dict = Depends(require_area("content"))):
     db = get_db()
     if not await db.stickers.find_one({"id": sticker_id}, {"_id": 0, "id": 1}):
         raise HTTPException(status_code=404, detail="Sticker nicht gefunden")
@@ -194,7 +194,7 @@ async def update_sticker(sticker_id: str, body: StickerUpdate, _me: dict = Depen
 
 
 @router.delete("/admin/stickers/{sticker_id}")
-async def delete_sticker(sticker_id: str, _me: dict = Depends(require_admin())):
+async def delete_sticker(sticker_id: str, _me: dict = Depends(require_area("content"))):
     result = await get_db().stickers.delete_one({"id": sticker_id})
     if not result.deleted_count:
         raise HTTPException(status_code=404, detail="Sticker nicht gefunden")

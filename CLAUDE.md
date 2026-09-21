@@ -129,6 +129,19 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Rechte nach Bereichen (#287–#292): `services/permissions.py` (Bereiche
+  `tournaments`, `content`, `club`, `system`, `moderation`; Rolle → Bereiche,
+  Freigaben `user.areas`, Vorstandsposten → `club`), Wächter `require_area(...)`
+  und `require_any_admin()` in `auth.py`; `require_admin()` = Turnierleitung,
+  `require_club_admin()` = System – beide mit Zwei-Faktor. Redaktions-Routen
+  (News, Galerie, Sponsoren, Sticker, Achievements, CMS) verlangen `content`,
+  Vereins-Routen (Mitglieder, Dokumente, Vorstand, Kontakt, Benutzer) `club`.
+  Gewinne: Turnierleitung oder `organizer` des Turniers (`prize_routes.py`).
+  `/api/auth/me` liefert `areas`; `PUT /api/users/{id}/areas` (Superadmin,
+  Audit). Migration 2 setzt `team_leader` auf `player`. Matrix: `docs/ROLLEN.md`.
+  Web: `lib/permissions.js`, `useAuth().can(...)`, `ProtectedRoute requireArea`,
+  Adminmenü nach Bereich, 403 nennt den fehlenden Bereich, Freigaben unter
+  Admin → Alle Benutzer. **Neue Admin-Route = Bereich wählen, nie nach Rang.**
 - App-Releases (#250, PR #304): `services/app_releases.py`, Ablage
   `uploads/app-releases` (`storage.APP_RELEASE_DIR`), Sammlung `app_releases`
   (ein Eintrag je Build, `is_current`, `min_build`). `GET /api/mobile/app-version`
@@ -464,8 +477,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- PR zu #307 (Token-Status unter Admin → App-Versionen, Grund bei 401 im
-  Skript). Nach dem Merge: keine; Server-Update, dann Build 63 nachreichen.
+- #332 (#287–#292 Rollen und Rechte, ein PR für den Meilenstein). Nach dem
+  Merge: Server-Update fällig. Dazu drei Dependabot-PRs (#311–#313).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -474,32 +487,27 @@ braucht.
   `46b6ce34`), **Build 62** (`mobile-v0.4.1-beta-build62`, Commit e64f840, am
   16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `89180c42`; #238),
   **Build 63** (`mobile-v0.5.0-beta-build63`, Commit 0b6bc11, am 16.09. vom
-  Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Der
-  Server-Upload dieser APK scheiterte zweimal mit 401 (#305, #307): nach dem
-  Merge von #307 und `update.sh` zeigt Admin → App-Versionen, ob das Token
-  ankommt; dann `-- --upload-only`. Nächster Build ist 64.
+  Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Die
+  APK liegt seit 16.09. auch am Vereinsserver (nach #306/#308 mit
+  `-- --upload-only` nachgereicht). Nächster Build ist 64.
 
 ### Erledigungen beim Betreiber
-- #299 ist gemergt: `update.sh` am Server (Stand des Servers: #294 vom
-  16.09.), dann Einstellungen → Discord: privaten Kanal als Betriebs-Webhook
-  eintragen, „Testalarm senden“, Admin → Betrieb → Checks → „Jetzt prüfen“.
-- Nach dem Merge von #306: `update.sh` (damit der Backend-Container das
-  Token aus der `.env` bekommt), dann Bescheid geben – ich reiche die APK von
-  Build 63 mit `-- --upload-only` nach. Build 62 auf dem Handy zeigt danach den
-  Update-Banner: das ist der Test für #250. Token und `signing.json` sind seit
-  16.09. eingerichtet (die Server-Zeile liegt in
-  `%USERPROFILE%\.lionsapp-release\server-env-zeile.txt`).
-- #287 ist entschieden (Freigaben, Vorstand aus der Mitgliedschaft,
-  Turnierleitung pro Turnier); nichts mehr offen.
+- Nach dem Merge des Rechte-PRs: `update.sh`. Danach gilt: Club-Admins
+  brauchen auch für Mitglieder, Dokumente und Einstellungen eine bestätigte
+  Zwei-Faktor-Anmeldung; eine Turnierleitung sieht News, Galerie und
+  Sponsoren nicht mehr. Freigaben (Redaktion, Vereinsverwaltung,
+  Turnierleitung) vergibt der Superadmin unter Admin → Alle Benutzer; wer
+  einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst.
+- Discord: Betriebs-Webhook eintragen, falls noch nicht geschehen
+  (Einstellungen → Discord), sonst gibt es keine Alarme.
 
-### Meilensteine und offene Issues (33 offen; #307 schließt mit seinem PR)
+### Meilensteine und offene Issues (48 offen nach dem Merge von #332)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Mitgliederbereich II: Dolibarr | #295 Mitgliedsdaten und Beitrag per API, #296 Rechnungen und Zahlungslink, #297 Vorstand und Status aus Dolibarr (später, eigener Meilenstein) |
 | Discord: Kanäle und Bot | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #302 Discord-Bot (Aktivität, Rollen, Befehle; braucht #260), #303 Meldungen mit Bild und Vorschau (später) |
-| Web: Rollen und Rechte | #287 Ist-Stand und Zielbild (Entscheidung), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht, #290 Vereinsvorstand, #291 Zwei-Faktor für Club-Admin-Routen (bug), #292 Rechte sichtbar, team_leader weg |
 | App 0.5.0-beta | #249, #250, #251, #277 sind mit #304 umgesetzt – Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
@@ -507,7 +515,8 @@ braucht.
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
-| Spaeter | #260 Plattform-Konten verknüpfen |
+| Ohne Meilenstein | #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09., als Nächstes); #314–#331 Dolibarr: Abrechnung, Rechnungen, Mitgliedschaft, Generalversammlung (Planung aus einer anderen Sitzung – Meilensteine fehlen noch) |
+| Spaeter | #260 Plattform-Konten verknüpfen, #309 GitHub-Releases automatisch abgleichen (Beta und Release kennzeichnen) |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
 1. Profil I und Profil II sind fertig und seit 16.09. am Server.
@@ -517,7 +526,8 @@ braucht.
 4. Betrieb II #265 ist umgesetzt und gemergt (#299) – Server-Update fällig.
 5. App 0.5.0-beta ist umgesetzt und als Build 63 veröffentlicht (#304); die APK
    kommt nach #306 an den Server.
-6. Web: Rollen und Rechte (#287–#292) – Entscheidung liegt vor.
+6. Web: Rollen und Rechte (#287–#292) ist umgesetzt (ein PR) – nach dem Merge
+   Server-Update.
 7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
 8. Discord: Kanäle und Bot (#300–#303) – nach Rollen und Rechten; der Bot
    braucht die Konto-Verknüpfung #260.
