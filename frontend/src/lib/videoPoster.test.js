@@ -12,6 +12,22 @@ import { captureVideoPoster } from "./videoPoster";
 // keine Kachel spielt mehr von selbst.
 
 describe("Standbild aus einem Video", () => {
+  // Der Objekt-URL selbst spielt hier keine Rolle. Ihn echt zu erzeugen haengt
+  // davon ab, wessen File die Testumgebung annimmt - mit jsdom 30.1 wirft
+  // URL.createObjectURL dort einen TypeError (#334). Im Browser gibt es das nicht.
+  let createUrl;
+  let revokeUrl;
+
+  beforeEach(() => {
+    createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:test/kaputt");
+    revokeUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    createUrl.mockRestore();
+    revokeUrl.mockRestore();
+  });
+
   test("ohne Datei kommt null", async () => {
     await expect(captureVideoPoster(null)).resolves.toBeNull();
     await expect(captureVideoPoster(undefined)).resolves.toBeNull();
@@ -26,12 +42,11 @@ describe("Standbild aus einem Video", () => {
   });
 
   test("der Objekt-URL wird wieder freigegeben", async () => {
-    const revoke = vi.spyOn(URL, "revokeObjectURL");
     const file = new File([new Uint8Array([1, 2, 3, 4])], "kaputt.mp4", { type: "video/mp4" });
 
     await captureVideoPoster(file, { seek: 0.1, timeoutMs: 60 });
 
-    expect(revoke).toHaveBeenCalled();
-    revoke.mockRestore();
+    expect(createUrl).toHaveBeenCalledWith(file);
+    expect(revokeUrl).toHaveBeenCalledWith("blob:test/kaputt");
   });
 });

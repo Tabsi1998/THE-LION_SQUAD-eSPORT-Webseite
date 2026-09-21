@@ -214,8 +214,8 @@ Seit dem 15. September gilt:
   Ansprechpartner aus `/api/board?active_only=true`. Auswahl in
   `lib/memberArea.js` (`memberEvents`, `memberNews`, `boardContacts`).
   Leer-Satz statt leerer Karten. Browser-Test `frontend/e2e/member-area.spec.js`.
-  Dolibarr (Beitrag, Rechnungen, Vorstand) ist Meilenstein „Mitgliederbereich
-  II: Dolibarr“ (#295–#297).
+  Dolibarr (Beitrag, Rechnungen, Vorstand) steht in den Meilensteinen
+  „Dolibarr I“ (#316, #295, #297, #330) und „Dolibarr II“ (#296, #325).
 - Privatsphäre und Benachrichtigungen (#257, PR #275) speichern von selbst:
   `profile/useAutosave.js` (0,7 s Entprellung, ein PATCH je Lauf, Änderungen
   während des Speicherns bleiben stehen), Schalter in `profile/SwitchRow.jsx`
@@ -377,8 +377,17 @@ npx expo install --check
   --check`) fällt durch, sobald Expo Patches veröffentlicht. Kein
   Code-Fehler. Beheben im nächsten App-PR mit
   `npx expo install expo expo-image-picker expo-notifications` (eigener
-  Commit). Zuletzt am 15.09. mit #270 nachgezogen (expo 57.0.23,
-  expo-image-picker 57.0.18, expo-notifications 57.0.19); `main` ist grün.
+  Commit) oder gleich `npx expo install --fix` – mit dem Node 20 aus
+  `~/.local-toolchain`, damit `package-lock.json` zum CI passt. Zuletzt am
+  21.09. mit #335 nachgezogen (expo 57.0.24, expo-constants 57.0.19,
+  expo-image-picker 57.0.19, expo-notifications 57.0.20).
+- **Dependabot-PRs prüfen:** alle Zweige in einen eigenen Arbeitsordner
+  mergen (`git worktree add -b chore/dependabot-pruefung C:/ldep
+  origin/main`, dann `git merge origin/dependabot/…`), dort den lokalen
+  Check einmal laufen lassen, Ordner danach mit `git worktree remove`
+  entfernen. Ein CI-Job, der nach 2 s „fehlschlägt“ und alle anderen
+  überspringt, ist kein Code: die Meldung steht in den Annotations des
+  Check-Runs (am 21.09.: GitHub-Abrechnung).
 - **Git Bash + Docker:** `MSYS_NO_PATHCONV=1` setzen; Env-Dateien,
   `docker compose cp`-Quellen und curl `-K` brauchen Windows-Pfade
   (`cygpath -w`); `/dev/null` wird zu `C:\dev\null` (leere Datei nehmen);
@@ -467,18 +476,24 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (16. September 2026)
+## 9. Aktueller Stand (21. September 2026)
 
-### Gemergt zuletzt (15./16. September)
-#237 (App 14.4), #261 (#221 Live-Aktualisierung), #262 (App 0.3.1-beta),
-#263 (#232 Uploads über nginx), #264 (App 0.4.0-beta, Build 61 vorbereitet),
-#266 (#233 Teil 1, Betrieb), #267 (#253 Profil-Layout), #268 (diese Datei),
-#270 (#269 lokaler Check), #272–#276 (Umzug, Doku, Profil I), #278–#281
-(Profil II). `main` steht auf `72cef4c`.
+### Gemergt zuletzt (16.–21. September)
+#285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
+(#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
+(#287–#292 Rollen und Rechte). `main` steht auf `2a9350d`.
 
 ### Offene PRs
-- #332 (#287–#292 Rollen und Rechte, ein PR für den Meilenstein). Nach dem
-  Merge: Server-Update fällig. Dazu drei Dependabot-PRs (#311–#313).
+- Drei Dependabot-PRs vom 21.09.: #311 (Backend: pyjwt, resend, uvicorn), #312
+  (Frontend: sechs kleine Sprünge), #313 (App: React Navigation 7.19). Ihr
+  CI-Lauf ist rot, weil GitHub den ersten Job um 02:18 UTC gar nicht gestartet
+  hat („recent account payments have failed or your spending limit needs to
+  be increased“) – kein Codefehler. Lokal alle drei zusammen geprüft (eigener
+  Arbeitsordner `C:\ldep`): 33 Schritte grün, zwei rot, beide nicht wegen der
+  Updates selbst – `videoPoster.test.js` brach mit jsdom 30.1 (#334) und der
+  Expo-Abgleich war auch auf `main` rot (#335). Beides behebt der
+  Aufräum-PR zu #333. Danach an jedem der drei `@dependabot rebase`
+  kommentieren, den grünen Lauf abwarten, mergen.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -492,7 +507,7 @@ braucht.
   `-- --upload-only` nachgereicht). Nächster Build ist 64.
 
 ### Erledigungen beim Betreiber
-- Nach dem Merge des Rechte-PRs: `update.sh`. Danach gilt: Club-Admins
+- `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
   brauchen auch für Mitglieder, Dokumente und Einstellungen eine bestätigte
   Zwei-Faktor-Anmeldung; eine Turnierleitung sieht News, Galerie und
   Sponsoren nicht mehr. Freigaben (Redaktion, Vereinsverwaltung,
@@ -500,38 +515,59 @@ braucht.
   einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst.
 - Discord: Betriebs-Webhook eintragen, falls noch nicht geschehen
   (Einstellungen → Discord), sonst gibt es keine Alarme.
+- GitHub → Settings → Billing and plans ansehen: am 21.09. um 02:18 UTC hat
+  GitHub Actions-Jobs wegen Zahlung/Ausgabenlimit nicht gestartet (um 15:35
+  lief der CI wieder).
+- #310: unter Admin → Einstellungen den Twitch-Status ansehen (Zugangsdaten
+  eingerichtet?) – die Abfrage überspringt still, wenn sie fehlen.
 
-### Meilensteine und offene Issues (48 offen nach dem Merge von #332)
+### Meilensteine und offene Issues (48 offen nach dem Merge des Aufräum-PRs zu #333–#335)
+Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
+Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
+GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
+#314.
+
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
+| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09., als Nächstes), #223 große Admin-Dateien, #231 klassischer Match-Leseweg |
+| Dolibarr I: Anbindung und Mitgliedschaft | #316 gemeinsamer Adapter und sichere Kontoverknüpfung, #295 Mitgliedschaft und Beitragsstand automatisch übernehmen, #297 Vereinsrechte aus Funktionsperioden, #330 Vertragstests und Bestandsumstellung – baubar, die Modul-APIs gibt es (Vereine v0.3/v0.4) |
+| Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web und App – baubar (dolibarr-vereine#50 ist fertig) |
+| Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
+| Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
+| Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #303 Meldungen mit Bild und Vorschau – ohne Bot |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
-| Mitgliederbereich II: Dolibarr | #295 Mitgliedsdaten und Beitrag per API, #296 Rechnungen und Zahlungslink, #297 Vorstand und Status aus Dolibarr (später, eigener Meilenstein) |
-| Discord: Kanäle und Bot | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #302 Discord-Bot (Aktivität, Rollen, Befehle; braucht #260), #303 Meldungen mit Bild und Vorschau (später) |
-| App 0.5.0-beta | #249, #250, #251, #277 sind mit #304 umgesetzt – Build 63 nach Merge und Server-Update |
+| Admin und Turniere | #203, #204, #227, #228, #235 |
+| Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
-| Admin und Turniere | #203, #204, #227, #228, #235 |
-| Auszeichnungen und Marke | #229, #230 |
-| Ohne Meilenstein | #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09., als Nächstes); #314–#331 Dolibarr: Abrechnung, Rechnungen, Mitgliedschaft, Generalversammlung (Planung aus einer anderen Sitzung – Meilensteine fehlen noch) |
-| Spaeter | #260 Plattform-Konten verknüpfen, #309 GitHub-Releases automatisch abgleichen (Beta und Release kennzeichnen) |
+| Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
-### Reihenfolge danach (vom Betreiber freigegeben)
-1. Profil I und Profil II sind fertig und seit 16.09. am Server.
-2. Web: Mitgliederbereich und Kopfzeile ist fertig und gemergt (#285, #294,
-   #298) – Server-Update zusammen mit #299.
-3. App 0.4.1-beta ist als Build 62 veröffentlicht und bestätigt (#238 erledigt).
-4. Betrieb II #265 ist umgesetzt und gemergt (#299) – Server-Update fällig.
-5. App 0.5.0-beta ist umgesetzt und als Build 63 veröffentlicht (#304); die APK
-   kommt nach #306 an den Server.
-6. Web: Rollen und Rechte (#287–#292) ist umgesetzt (ein PR) – nach dem Merge
-   Server-Update.
-7. Mitgliederbereich II: Dolibarr (#295–#297) – später, nach Rollen und Rechten.
-8. Discord: Kanäle und Bot (#300–#303) – nach Rollen und Rechten; der Bot
-   braucht die Konto-Verknüpfung #260.
-9. Danach Dynamik, 0.6.0, Admin und Turniere, … Abwechselnd App und Web.
+Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
+(#240 Freunde in der App, #227 Tageszentrale, #216 Kalender, #245 Laufbanner,
+#231 Leseweg – alles noch offen im Code).
+
+### Reihenfolge
+Vom Betreiber freigegeben (Stand 16.09.): Dolibarr, dann Discord, danach
+Dynamik, App 0.6.0, Admin und Turniere – abwechselnd App und Web. Mit den
+neuen Meilensteinen heißt das (Vorschlag vom 21.09. ab Punkt 4):
+
+1. #310 Livestream-Bug (Diagnose unter Betrieb, Grund je Stream im Admin).
+2. Dolibarr I (#316 → #295 → #297, #330 begleitend). Eigener Server-Schritt,
+   weil hier Rechte aus einem fremden System kommen.
+3. Discord I (#300, #301, #303).
+4. App 0.6.0-beta (#218).
+5. Dolibarr II (#296, #325).
+6. Web: Dynamik.
+7. Abrechnung I, danach Admin und Turniere (#203/#204 berühren dieselben
+   Event-Formulare wie #318 – zusammen planen), App 0.7.0-beta.
+8. Abrechnung II, Discord II, App 0.8.0-beta, Auszeichnungen und Marke,
+   App 1.0.0.
+9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
+   ausliefert.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
@@ -542,7 +578,8 @@ Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
 ### GitHub-Befunde vom 15.09. (zweiter PC, nichts davon geändert)
 - **CodeQL** (`codeql.yml`, nur manuell) startet nicht: „recent account
-  payments have failed or your spending limit needs to be increased“. Die
+  payments have failed or your spending limit needs to be increased“ (am
+  21.09. traf dieselbe Meldung den normalen CI der Dependabot-PRs). Die
   drei offenen CodeQL-Warnungen sind alt: eine zeigt auf
   `tournament_routes.py:3149` aus der Zeit vor Block 13 (die Datei hat heute
   24 Zeilen), die zwei anderen (`pdf_service.py:891`, `user_routes.py:626`)
