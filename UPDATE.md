@@ -9,6 +9,29 @@ cd /root/THE-LION_SQUAD-eSPORT-Webseite
 
 Das Script zieht den neuesten Code, baut Frontend/Backend neu, startet die Container und prueft Backend, Frontend und wichtige SPA-Routen.
 
+## Einstellungen nur für diesen Server: `docker-compose.override.yml`
+
+`docker-compose.yml` wird auf dem Server nie von Hand geändert – sonst bricht
+`update.sh` mit „Tracked local changes detected“ ab. Was nur für diesen Server
+gilt (etwa ein zusätzlicher Host-Eintrag), gehört in `docker-compose.override.yml`.
+Docker Compose lädt diese Datei bei jedem `docker compose`-Aufruf automatisch
+mit, Git ignoriert sie, und sie bleibt bei jedem Update erhalten.
+
+Beispiel: Das Backend erreicht `erp.lionsquad.at` nur über die Adresse im
+Heimnetz, weil der Router die öffentliche Adresse nicht ins eigene Netz
+zurückleitet.
+
+```bash
+cd /root/THE-LION_SQUAD-eSPORT-Webseite
+git restore docker-compose.yml          # eine frühere Handänderung zurücknehmen
+cp docker-compose.override.example.yml docker-compose.override.yml
+nano docker-compose.override.yml        # Adresse anpassen
+./update.sh u
+```
+
+`update.sh` meldet dann „Using this server's settings from docker-compose.override.yml“.
+Prüfen, was Compose tatsächlich verwendet: `docker compose config | grep -A3 extra_hosts`.
+
 ## Abbruch: `Command createUser requires authentication`
 
 Der bisherige Vorbereitungscheck fragte MongoDB ohne Anmeldung nach dem Admin-Benutzer.

@@ -6,6 +6,8 @@ Thumbs.db
 
 # Environment and secrets
 .env
+# Einstellungen nur für diesen Server; Docker Compose lädt sie neben docker-compose.yml mit (#351)
+docker-compose.override.yml
 .env.*
 !.env.example
 !.env.staging.example
