@@ -1,4 +1,5 @@
 import { ShieldCheck } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -9,8 +10,6 @@ import { Section } from "./fields";
 import { PasswordPanel } from "./PasswordPanel";
 import { SessionsPanel } from "./SessionsPanel";
 
-const ADMIN_ROLES = ["tournament_admin", "club_admin", "superadmin"];
-
 // Reiter Sicherheit (#258): Passwort, Passkeys, Zwei-Faktor, Google-Konto und
 // angemeldete Geräte an einem Ort. Vorher standen Zwei-Faktor und Google
 // unter Grunddaten und die Geräte hatten einen eigenen Reiter.
@@ -18,7 +17,9 @@ export function SecurityTab({ user, refresh, siteSettings }) {
   const confirm = useConfirm();
   const googleLinked = !!user?.google_linked;
   const googleOnly = user?.auth_provider === "google";
-  const isAdmin = ADMIN_ROLES.includes(user?.role);
+  const [params] = useSearchParams();
+  // Von einer Adminseite hierher geschickt, weil Zwei-Faktor fehlt (#348).
+  const sentHereForMfa = params.get("mfa") === "required";
 
   const unlinkGoogle = async () => {
     if (!await confirm({
@@ -39,23 +40,21 @@ export function SecurityTab({ user, refresh, siteSettings }) {
     <Section>
       <p className="text-sm text-white/60">Passwort, Passkeys, Zwei-Faktor, Google-Konto und angemeldete Geräte an einem Ort.</p>
 
+      {sentHereForMfa && (
+        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
+          <ShieldCheck className="w-5 h-5 text-[#FFD700] mt-0.5 shrink-0" />
+          <div className="text-sm text-white/80">
+            <strong>Für den Adminbereich brauchst du die Zwei-Faktor-Anmeldung.</strong> Richte sie unten ein (dauert zwei Minuten),
+            melde dich danach einmal neu an – dann geht es weiter{params.get("next") ? ` zu ${params.get("next")}` : ""}.
+          </div>
+        </div>
+      )}
+
       <PasswordPanel googleOnly={googleOnly} />
 
       <PasskeysPanel />
 
-      {isAdmin ? (
-        <MfaSetupPanel user={user} onChanged={refresh} />
-      ) : (
-        <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="profile-mfa-note">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
-            <div>
-              <h3 className="font-heading font-black uppercase mb-1">Zwei-Faktor</h3>
-              <p className="text-xs text-white/50">Zwei-Faktor ist für Admin-Konten Pflicht. Dein Konto braucht ihn nicht; Passkeys schützen die Anmeldung genauso.</p>
-            </div>
-          </div>
-        </div>
-      )}
+      <MfaSetupPanel onChanged={refresh} highlight={sentHereForMfa} />
 
       {siteSettings?.google_linking_enabled !== false ? (
         <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="profile-google-link">

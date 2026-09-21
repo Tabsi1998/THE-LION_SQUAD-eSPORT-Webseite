@@ -11,7 +11,7 @@ from database import get_db
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, get_current_user, get_optional_user, _decode,
-    hash_token, refresh_expires_at, as_utc_datetime,
+    hash_token, refresh_expires_at, as_utc_datetime, token_remembers,
 )
 from email_service import send_template, _site_base_url
 from models import (
@@ -43,6 +43,7 @@ class MobileLogoutBody(BaseModel):
 class GoogleCredentialBody(BaseModel):
     credential: str = ""
     intent: str = "login"
+    remember: bool = True
     accept_privacy: bool = False
     accept_terms: bool = False
     newsletter_consent: bool = False
@@ -176,10 +177,16 @@ def _eligible_session_user(user: dict | None) -> dict:
 
 
 def _requires_admin_mfa(user: dict) -> bool:
-    return user.get("role") in ADMIN_ROLES and user.get("mfa_enabled") is True
+    """Wer Zwei-Faktor eingerichtet hat, wird beim Anmelden danach gefragt - egal mit welcher Rolle.
+
+    Seit den Rechten nach Bereichen (#287) kann auch ein Konto mit der Rolle „Spieler“ einen
+    Adminbereich haben (Freigabe, Vorstandsposten, Dolibarr-Funktion). Fragte der Login nur
+    Admin-Rollen, käme so jemand nie zu einer bestätigten Sitzung (#348).
+    """
+    return user.get("mfa_enabled") is True
 
 
-async def _create_mfa_login_challenge(db, user: dict, request: Request, client: str) -> dict:
+async def _create_mfa_login_challenge(db, user: dict, request: Request, client: str, *, remember: bool = True) -> dict:
     ticket = secrets.token_urlsafe(32)
     now = now_utc()
     user_agent, ip = _request_identity(request)
@@ -192,6 +199,7 @@ async def _create_mfa_login_challenge(db, user: dict, request: Request, client: 
         "ip": ip,
         "used": False,
         "attempts": 0,
+        "remember": bool(remember),
         "created_at": now,
         "expires_at": now + timedelta(minutes=5),
     })
@@ -234,8 +242,9 @@ async def _store_session(
     expires_at: datetime,
     client: str | None = None,
     mfa_verified: bool = False,
+    remember: bool = True,
 ) -> tuple[str, str]:
-    refresh = create_refresh_token(user["id"], token_id, family_id, expires_at, mfa_verified=mfa_verified)
+    refresh = create_refresh_token(user["id"], token_id, family_id, expires_at, mfa_verified=mfa_verified, remember=remember)
     access = create_access_token(
         user["id"], user["email"], user.get("role", "player"), token_id, family_id,
         mfa_verified=mfa_verified,
@@ -253,6 +262,7 @@ async def _store_session(
         "user_agent": user_agent,
         "ip": ip,
         "mfa_verified": bool(mfa_verified),
+        "remember": bool(remember),
     }
     if client:
         document["client"] = client
@@ -282,6 +292,7 @@ async def _issue_tokens(
     *,
     client: str | None = None,
     mfa_verified: bool = False,
+    remember: bool = True,
 ) -> tuple[str, str]:
     token_id = secrets.token_urlsafe(24)
     return await _store_session(
@@ -291,15 +302,16 @@ async def _issue_tokens(
         token_id=token_id,
         family_id=token_id,
         record_id=new_id(),
-        expires_at=refresh_expires_at(),
+        expires_at=refresh_expires_at(remember),
         client=client,
         mfa_verified=mfa_verified,
+        remember=remember,
     )
 
 
-async def _issue_session(db, response: Response, user: dict, request: Request, *, mfa_verified: bool = False):
-    access, refresh = await _issue_tokens(db, user, request, mfa_verified=mfa_verified)
-    set_auth_cookies(response, access, refresh)
+async def _issue_session(db, response: Response, user: dict, request: Request, *, mfa_verified: bool = False, remember: bool = True):
+    access, refresh = await _issue_tokens(db, user, request, mfa_verified=mfa_verified, remember=remember)
+    set_auth_cookies(response, access, refresh, remember=remember)
     return access, refresh
 
 
@@ -482,7 +494,8 @@ async def _rotate_session(
     family_id = payload.get("fid") or token_id
     replacement_jti = secrets.token_urlsafe(24)
     replacement_id = new_id()
-    replacement_expires_at = refresh_expires_at()
+    remember = token_remembers(payload)
+    replacement_expires_at = refresh_expires_at(remember)
     user_agent, ip = _request_identity(request)
     stored = await db.refresh_tokens.find_one_and_update(
         {
@@ -530,6 +543,7 @@ async def _rotate_session(
         expires_at=replacement_expires_at,
         client=client,
         mfa_verified=bool(payload.get("mfa")),
+        remember=remember,
     )
     return user, access, refresh
 
@@ -648,8 +662,8 @@ async def login(body: UserLogin, request: Request, response: Response):
 
     await _clear_failed(db, identifier)
     if _requires_admin_mfa(user):
-        return await _create_mfa_login_challenge(db, user, request, "web")
-    await _issue_session(db, response, user, request)
+        return await _create_mfa_login_challenge(db, user, request, "web", remember=body.remember)
+    await _issue_session(db, response, user, request, remember=body.remember)
     user = _public_user(user)
     # Attach membership for instant UI gating
     await _attach_membership(user)
@@ -771,8 +785,8 @@ async def google_session(body: GoogleCredentialBody, request: Request, response:
         raise HTTPException(status_code=403, detail="Account gesperrt")
 
     if _requires_admin_mfa(user):
-        return await _create_mfa_login_challenge(db, user, request, "web")
-    await _issue_session(db, response, user, request)
+        return await _create_mfa_login_challenge(db, user, request, "web", remember=body.remember)
+    await _issue_session(db, response, user, request, remember=body.remember)
     public = _public_user(user)
     await _attach_membership(public)
     public["_created"] = created
@@ -985,7 +999,7 @@ async def refresh(request: Request, response: Response):
         raise HTTPException(status_code=401, detail="No refresh token")
     db = get_db()
     _user, access, refresh_token = await _rotate_session(db, token, request)
-    set_auth_cookies(response, access, refresh_token)
+    set_auth_cookies(response, access, refresh_token, remember=token_remembers(_decode(refresh_token)))
     return {"ok": True}
 
 
@@ -1035,6 +1049,8 @@ async def list_sessions(request: Request, user: dict = Depends(get_current_user)
             "ip": row.get("ip") or "",
             "client": row.get("client") or "web",
             "current": bool(current_family and row.get("family_id") == current_family),
+            # „Bleibt angemeldet bis …“ (#348); verlängert sich mit jeder Nutzung.
+            "expires_at": expires_at.isoformat() if expires_at else None,
         })
     return sessions
 
@@ -1182,7 +1198,7 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
         public = _public_user(user)
         await _attach_membership(public)
         return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
-    await _issue_session(db, response, user, request, mfa_verified=True)
+    await _issue_session(db, response, user, request, mfa_verified=True, remember=challenge.get("remember") is not False)
     public = _public_user(user)
     await _attach_membership(public)
     return public
@@ -1215,8 +1231,11 @@ async def mfa_status(user: dict = Depends(get_current_user)):
         {"id": user["id"]},
         {"_id": 0, "mfa_recovery_code_hashes": 1},
     ) or {}
+    from services.permissions import MFA_AREAS, areas_for
     return {
-        "required_for_admin": user.get("role") in ADMIN_ROLES,
+        # Pflicht ist Zwei-Faktor für jeden Adminbereich außer Moderation - egal, ob er aus der
+        # Rolle, einer Freigabe, einem Vorstandsposten oder einer Dolibarr-Funktion kommt.
+        "required_for_admin": bool(MFA_AREAS & await areas_for(user)),
         "enabled": bool(user.get("mfa_enabled")),
         "session_verified": bool(user.get("auth_mfa_verified")),
         "recovery_codes_remaining": len(secret_state.get("mfa_recovery_code_hashes") or []),
@@ -1225,8 +1244,8 @@ async def mfa_status(user: dict = Depends(get_current_user)):
 
 @router.post("/mfa/setup")
 async def setup_mfa(body: MfaPasswordBody, request: Request, user: dict = Depends(get_current_user)):
-    if user.get("role") not in ADMIN_ROLES:
-        raise HTTPException(status_code=403, detail="MFA-Einrichtung ist derzeit für Administrationskonten vorgesehen.")
+    # Freiwillig für alle (#348). Pflicht bleibt es nur für Adminbereiche - und wer einen
+    # Bereich per Freigabe oder Funktion hat, muss es überhaupt einrichten können.
     await enforce_rate_limit(request, "auth:mfa-setup:user", limit=5, window_seconds=3600, subject=user["id"])
     db = get_db()
     full = await db.users.find_one({"id": user["id"]})

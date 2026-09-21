@@ -41,6 +41,7 @@ export function AuthProvider({ children }) {
         accept_privacy: !!options.acceptPrivacy,
         accept_terms: !!options.acceptTerms,
         newsletter_consent: !!options.newsletterConsent,
+        remember: options.remember !== false,
       });
       if (data?.mfa_required) return { ok: true, mfaRequired: true, ticket: data.mfa_ticket };
       setUser(data);
@@ -84,10 +85,10 @@ export function AuthProvider({ children }) {
   }, [fetchMe, user?.id]);
   useApiInvalidation(refreshCurrentUser, ["auth", "users", "membership"]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, { remember = true } = {}) => {
     setError(null);
     try {
-      const { data } = await api.post("/auth/login", { email, password });
+      const { data } = await api.post("/auth/login", { email, password, remember });
       if (data?.mfa_required) {
         return { ok: true, mfaRequired: true, ticket: data.mfa_ticket };
       }

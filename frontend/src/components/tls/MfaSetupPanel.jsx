@@ -3,8 +3,10 @@ import { QRCodeSVG } from "qrcode.react";
 import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
 
-export function MfaSetupPanel({ user, onChanged }) {
-  const isAdmin = ["tournament_admin", "club_admin", "superadmin"].includes(user?.role);
+// Zwei-Faktor ist freiwillig - außer für den Adminbereich (#348). Ob er Pflicht ist, sagt der
+// Server (`required_for_admin`): Ein Bereich kann auch aus einer Freigabe, einem Vorstandsposten
+// oder einer Dolibarr-Funktion kommen, nicht nur aus der Rolle.
+export function MfaSetupPanel({ onChanged, highlight = false }) {
   const [status, setStatus] = useState(null);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
@@ -13,14 +15,13 @@ export function MfaSetupPanel({ user, onChanged }) {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    if (!isAdmin) return;
     try {
       const { data } = await api.get("/auth/mfa/status");
       setStatus(data);
     } catch {}
-  }, [isAdmin]);
+  }, []);
   useEffect(() => { load(); }, [load]);
-  if (!isAdmin) return null;
+  const required = !!status?.required_for_admin;
 
   const begin = async () => {
     setBusy(true);
@@ -69,10 +70,14 @@ export function MfaSetupPanel({ user, onChanged }) {
   };
 
   return (
-    <div className="border border-[#FFD700]/25 rounded-sm p-5 bg-[#FFD700]/5 space-y-4" data-testid="profile-mfa-panel">
+    <div className={`border rounded-sm p-5 space-y-4 ${required || highlight ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#0A0A0A]"}`} data-testid="profile-mfa-panel">
       <div>
-        <h3 className="font-heading font-black uppercase">Admin Zwei-Faktor-Anmeldung</h3>
-        <p className="text-xs text-white/55 mt-1">Für den Adminbereich verpflichtend. Verwende eine TOTP-App und bewahre die Einmalcodes offline auf.</p>
+        <h3 className="font-heading font-black uppercase">Zwei-Faktor-Anmeldung</h3>
+        <p className="text-xs text-white/55 mt-1" data-testid="profile-mfa-intro">
+          {required
+            ? "Für deinen Adminbereich Pflicht. Du brauchst eine Authenticator-App (z. B. Google Authenticator, Aegis, 2FAS); die Einmalcodes bewahrst du offline auf."
+            : "Freiwillig. Beim Anmelden fragt die Seite dann zusätzlich nach einem Code aus deiner Authenticator-App. Ein Passkey schützt dein Konto genauso gut und ist bequemer."}
+        </p>
       </div>
       {recoveryCodes.length > 0 ? (
         <div className="space-y-3">
@@ -83,7 +88,7 @@ export function MfaSetupPanel({ user, onChanged }) {
       ) : status?.enabled ? (
         <div className="space-y-3">
           <p className="text-sm text-[#00FF88]">MFA ist aktiviert · {status.recovery_codes_remaining} Wiederherstellungscodes verbleiben.</p>
-          {!status.session_verified && <p className="text-xs text-[#FFD700]">Melde dich einmal neu an, um den Adminbereich freizuschalten.</p>}
+          {required && !status.session_verified && <p className="text-xs text-[#FFD700]">Melde dich einmal neu an, um den Adminbereich freizuschalten.</p>}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Aktuelles Passwort" autoComplete="current-password" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MFA- oder Wiederherstellungscode" autoComplete="one-time-code" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
           <button type="button" disabled={busy || !password || !code} onClick={disable} className="px-4 py-2 border border-[#FF3B30]/50 text-[#FF6B6B] text-xs font-bold uppercase disabled:opacity-40">MFA deaktivieren</button>
@@ -97,7 +102,7 @@ export function MfaSetupPanel({ user, onChanged }) {
         </div>
       ) : (
         <div className="space-y-3">
-          <p className="text-sm text-[#FFD700]">MFA ist noch nicht eingerichtet. Bis dahin bleibt der Adminbereich gesperrt.</p>
+          <p className={`text-sm ${required ? "text-[#FFD700]" : "text-white/60"}`}>{required ? "Noch nicht eingerichtet. Bis dahin bleibt dein Adminbereich gesperrt." : "Noch nicht eingerichtet."}</p>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Aktuelles Passwort" autoComplete="current-password" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
           <button type="button" disabled={busy || !password} onClick={begin} className="px-4 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase disabled:opacity-40">MFA einrichten</button>
         </div>
