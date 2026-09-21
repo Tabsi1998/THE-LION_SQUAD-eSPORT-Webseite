@@ -565,7 +565,7 @@ braucht.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (46 offen nach dem Merge von #338)
+### Meilensteine und offene Issues (49 offen nach dem Merge von #338)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -585,7 +585,8 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge |
-| App 0.7.0-beta | #216 Kalender, #236 Galerie, #339 Meine Mitgliedschaft mit Beitragsstand |
+| App 0.7.0-beta | #216 Kalender, #236 Galerie |
+| App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Mitglieder. Eigene Beta, Versionsnummer beim Einplanen; Rechnungen (#296, #320, #325) und #327–#329 bringen ihren App-Teil selbst mit |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
@@ -605,7 +606,8 @@ sinnvoll hältst“):
    Umstellung selbst macht der Betreiber nach `docs/DOLIBARR.md`.
 3. Discord I (#300, #301, #303).
 4. App 0.6.0-beta (#218).
-5. Dolibarr II (#296, #325).
+5. Dolibarr II (#296, #325), danach App: Mitgliederbereich (#340, #339, #341,
+   #342) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
 6. Web: Dynamik.
 7. Abrechnung I, danach Admin und Turniere (#203/#204 berühren dieselben
    Event-Formulare wie #318 – zusammen planen), App 0.7.0-beta.
