@@ -107,7 +107,7 @@ async def test_reads_use_fixed_paths_and_the_key_stays_in_the_header(fake):
 async def test_errors_are_named_and_masked(fake, status, kind):
     fake.fail_with = status
     with pytest.raises(DolibarrError) as caught:
-        await client().status()
+        await client().member_summary(1)
     assert caught.value.kind == kind and caught.value.status == status
     assert API_KEY not in str(caught.value) and API_KEY not in caught.value.text
     assert len(fake.calls) == 1, "ein klares Nein wird nicht wiederholt"
@@ -156,3 +156,84 @@ def test_missing_key_or_unreadable_key_is_a_clear_error():
     with pytest.raises(DolibarrError) as caught:
         DolibarrClient({"base_url": BASE_URL, "api_key": "enc:v1:kaputt"})
     assert caught.value.kind == "key_unreadable"
+
+
+# ---------------------------------------------------------------- Warum es nicht klappt (#345)
+
+def _raising(exc_factory):
+    def handler(request):
+        raise exc_factory(request)
+    return httpx.MockTransport(handler)
+
+
+def _with_cause(cause):
+    def factory(request):
+        error = httpx.ConnectError(f"boom {request.url} {API_KEY}")
+        error.__cause__ = cause
+        return error
+    return factory
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("factory, kind, calls", [
+    (_with_cause(__import__("socket").gaierror(-2, "Name or service not known")), "dns", 1),
+    (_with_cause(__import__("ssl").SSLCertVerificationError("certificate verify failed")), "tls", 1),
+    (_with_cause(ConnectionRefusedError(111, "refused")), "refused", 1),
+    (lambda request: httpx.ConnectTimeout("timed out"), "timeout", 3),
+])
+async def test_network_errors_say_what_is_wrong_without_leaking(monkeypatch, factory, kind, calls):
+    seen = []
+
+    def handler(request):
+        seen.append(1)
+        raise factory(request)
+
+    monkeypatch.setattr(dolibarr_client, "_transport", httpx.MockTransport(handler))
+    monkeypatch.setattr(dolibarr_client, "RETRY_PAUSES", (0, 0))
+    with pytest.raises(DolibarrError) as caught:
+        await client().status()
+    assert caught.value.kind == kind
+    assert API_KEY not in caught.value.text and "erp.example" not in caught.value.text
+    assert len(seen) == calls, "ein Tippfehler oder ein Zertifikat wird nicht dreimal versucht"
+
+
+def test_a_typo_in_the_address_gets_a_useful_sentence():
+    assert "Tippfehler" in DolibarrError("dns").text
+    assert "Zertifikat" in DolibarrError("tls").text
+    assert "API REST" in DolibarrError("api_missing").text
+
+
+@pytest.mark.asyncio
+async def test_404_on_the_status_path_names_the_missing_part(fake):
+    fake.fail_with = 404
+    with pytest.raises(DolibarrError) as caught:
+        await client().status()
+    assert caught.value.kind == "api_missing"
+
+    fake.fail_with = 404
+    fake.fail_paths = {"/vereine/status"}
+    with pytest.raises(DolibarrError) as caught:
+        await client().status()
+    assert caught.value.kind == "vereine_missing", "Dolibarrs API antwortet (403), nur das Vereinsmodul nicht"
+
+    fake.fail_with = None
+    fake.fail_paths = set()
+    with pytest.raises(DolibarrError) as caught:
+        await client().member_summary(999)
+    assert caught.value.kind == "not_found", "bei einem Mitglied bleibt 404 ein 404"
+
+
+@pytest.mark.asyncio
+async def test_a_redirect_is_named(monkeypatch):
+    monkeypatch.setattr(dolibarr_client, "_transport", httpx.MockTransport(lambda request: httpx.Response(301, headers={"Location": "https://x.example.test/"})))
+    with pytest.raises(DolibarrError) as caught:
+        await client().status()
+    assert caught.value.kind == "redirect"
+
+
+@pytest.mark.asyncio
+async def test_a_login_page_instead_of_the_api_is_named(monkeypatch):
+    monkeypatch.setattr(dolibarr_client, "_transport", httpx.MockTransport(lambda request: httpx.Response(200, text="<html>Login</html>")))
+    with pytest.raises(DolibarrError) as caught:
+        await client().status()
+    assert caught.value.kind == "invalid_response" and "Anmeldeseite" in caught.value.text

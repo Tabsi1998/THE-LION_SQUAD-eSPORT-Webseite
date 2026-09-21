@@ -5,7 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { CAPABILITY_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate } from "@/lib/dolibarr";
+import { CAPABILITY_LABELS, DOLIBARR_STATUS_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate, needsManualChoice, splitWithoutAccount } from "@/lib/dolibarr";
 
 // Dolibarr (#316, #295, #297, #330). Wer was sieht: Verbindung und Schlüssel nur
 // „System“, Zuordnungen und Umstellung die Vereinsverwaltung, die Freigabe
@@ -35,6 +35,7 @@ export default function AdminDolibarrPage() {
   const [webhookPath, setWebhookPath] = useState("");
   const [policyMap, setPolicyMap] = useState({});
   const [policyPreview, setPolicyPreview] = useState(null);
+  const [manualChoice, setManualChoice] = useState({});
   // Ungespeicherte Häkchen dürfen nicht verschwinden, nur weil die Seite nachlädt.
   const policyDirtyRef = useRef(false);
 
@@ -124,6 +125,11 @@ export default function AdminDolibarrPage() {
     }
   };
 
+  const withoutAccount = splitWithoutAccount(preview?.members_without_account);
+  const confirmManual = (row) => {
+    const chosen = (preview?.members_without_account || []).find((entry) => String(entry.member_id) === String(manualChoice[row.user_id]));
+    if (chosen) confirmLink({ ...row, member_id: chosen.member_id, member_ref: chosen.ref, member_name: chosen.name });
+  };
   const sync = describeSync(status?.sync, status?.mode);
   const functionCodes = preview?.function_codes || [];
   const knownCodes = [...new Set([...Object.keys(policyMap), ...functionCodes.map((fn) => fn.code)])].sort();
@@ -239,13 +245,26 @@ export default function AdminDolibarrPage() {
                         </div>
                         <div className="text-xs text-white/70 flex-1 min-w-0">
                           {PREVIEW_STATE_LABELS[row.state] || row.state}
-                          {row.member_id ? ` → ${row.member_name} (Nr. ${row.member_ref}, ${row.dolibarr_status})` : ""}
+                          {row.member_id ? ` → ${row.member_name} (Nr. ${row.member_ref}, ${DOLIBARR_STATUS_LABELS[row.dolibarr_status] || row.dolibarr_status})` : ""}
                           {row.would_change_status && <span className="text-[#FFD700]"> · Status ändert sich</span>}
                         </div>
-                        {row.state === "match" && (
+                        {(row.state === "match" || row.state === "match_unverified_email") && (
                           <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                             <Link2 className="w-3 h-3" /> Bestätigen
                           </button>
+                        )}
+                        {needsManualChoice(row) && (
+                          <div className="flex items-center gap-2">
+                            <select aria-label={`Mitglied für ${row.display_name || row.username}`} value={manualChoice[row.user_id] || ""} data-testid={`dolibarr-manual-${row.username}`}
+                              onChange={(e) => setManualChoice((current) => ({ ...current, [row.user_id]: e.target.value }))}
+                              className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs max-w-[14rem]">
+                              <option value="">– Mitglied wählen –</option>
+                              {(preview.members_without_account || []).map((entry) => (
+                                <option key={entry.member_id} value={entry.member_id}>{entry.name} · Nr. {entry.ref}{entry.ended ? " (beendet)" : ""}</option>
+                              ))}
+                            </select>
+                            <button type="button" onClick={() => confirmManual(row)} disabled={!!busy || !manualChoice[row.user_id]} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Zuordnen</button>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -268,10 +287,19 @@ export default function AdminDolibarrPage() {
                   ))}
                 </div>
               </Panel>
-              {preview.members_without_account.length > 0 && (
-                <Panel title="Mitglieder ohne Website-Konto">
-                  <div className="text-sm text-white/70 columns-1 sm:columns-2 lg:columns-3">
-                    {preview.members_without_account.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/35">Nr. {entry.ref}</span></div>)}
+              {withoutAccount.active.length > 0 && (
+                <Panel title={`Aktive Mitglieder ohne Website-Konto (${withoutAccount.active.length})`}>
+                  <p className="text-xs text-white/45 mb-3">Sie haben kein Konto – oder eines mit anderer E-Mail-Adresse. Dann oben beim Konto von Hand zuordnen.</p>
+                  <div className="text-sm text-white/70 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-without-account">
+                    {withoutAccount.active.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/35">Nr. {entry.ref}</span></div>)}
+                  </div>
+                </Panel>
+              )}
+              {withoutAccount.ended.length > 0 && (
+                <Panel title={`Beendete Mitgliedschaften ohne Konto (${withoutAccount.ended.length})`}>
+                  <p className="text-xs text-white/45 mb-3">Ehemalige – keine Mitglieder mehr. Sie stehen hier nur, damit nichts fehlt.</p>
+                  <div className="text-sm text-white/40 line-through decoration-white/20 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-ended">
+                    {withoutAccount.ended.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/25">Nr. {entry.ref}</span></div>)}
                   </div>
                 </Panel>
               )}
@@ -342,7 +370,18 @@ export default function AdminDolibarrPage() {
                   </select>
                 </label>
               </div>
-              <p className="text-xs text-white/40">In Dolibarr einen eigenen Benutzer „website“ anlegen, der nur „Vereinsübersicht lesen“ und „Mitglieder-Zusammenfassung für die Website“ darf. Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+              <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3" data-testid="dolibarr-howto">
+                <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">So richtest du es in Dolibarr ein</summary>
+                <ol className="list-decimal pl-5 mt-2 space-y-1.5">
+                  <li><strong>Start → Einstellungen → Module/Applikationen</strong>: „API REST“ und „Vereine“ müssen aktiv sein.</li>
+                  <li><strong>Start → Benutzer &amp; Gruppen → Neuer Benutzer</strong>: Login <code>website</code>, kein Administrator.</li>
+                  <li>Beim Benutzer Reiter <strong>Berechtigungen</strong>, Modul „Vereine“: „Vereinsübersicht und Vereinsdaten lesen“ und „Mitglieder-Zusammenfassung für die Website über die API lesen“ anhaken. Sonst nichts.</li>
+                  <li>Beim Benutzer <strong>Ändern</strong> → bei „API-Schlüssel“ auf <strong>Erzeugen</strong> → Speichern. Diesen Schlüssel hier oben eintragen.</li>
+                  <li><strong>Adresse:</strong> genau das, was im Browser vor <code>/index.php</code> steht, mit <code>https://</code> – z. B. <code>https://erp.deinverein.at</code> oder <code>https://deinverein.at/dolibarr</code>. Auf Tippfehler achten.</li>
+                  <li>Speichern → „Verbindung testen“. Steht dort „Verbunden“, rechts den Modus auf „Vorschau“ stellen.</li>
+                </ol>
+              </details>
+              <p className="text-xs text-white/40">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={() => saveSettings({ base_url: form.base_url, instance: form.instance, environment: form.environment, ...(form.api_key ? { api_key: form.api_key } : {}) }).then(() => setForm((current) => ({ ...current, api_key: "" })))}
                   className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
