@@ -477,8 +477,8 @@ braucht.
 (Profil II). `main` steht auf `72cef4c`.
 
 ### Offene PRs
-- PR zu #287–#292 (Rollen und Rechte, ein PR für den Meilenstein). Nach dem
-  Merge: keine; Server-Update fällig.
+- #332 (#287–#292 Rollen und Rechte, ein PR für den Meilenstein). Nach dem
+  Merge: Server-Update fällig. Dazu drei Dependabot-PRs (#311–#313).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -501,7 +501,7 @@ braucht.
 - Discord: Betriebs-Webhook eintragen, falls noch nicht geschehen
   (Einstellungen → Discord), sonst gibt es keine Alarme.
 
-### Meilensteine und offene Issues (28 offen)
+### Meilensteine und offene Issues (48 offen nach dem Merge von #332)
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #223 große Admin-Dateien, #231 klassischer Match-Leseweg; #265 Betrieb II ist mit #299 umgesetzt |
@@ -515,6 +515,7 @@ braucht.
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
+| Ohne Meilenstein | #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09., als Nächstes); #314–#331 Dolibarr: Abrechnung, Rechnungen, Mitgliedschaft, Generalversammlung (Planung aus einer anderen Sitzung – Meilensteine fehlen noch) |
 | Spaeter | #260 Plattform-Konten verknüpfen, #309 GitHub-Releases automatisch abgleichen (Beta und Release kennzeichnen) |
 
 ### Reihenfolge danach (vom Betreiber freigegeben)
