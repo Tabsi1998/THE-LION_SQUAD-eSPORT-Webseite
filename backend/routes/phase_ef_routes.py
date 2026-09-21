@@ -26,70 +26,30 @@ from database import get_db
 from auth import get_current_user, require_admin, require_area
 from models import now_utc, new_id
 from services.content_embed_service import resolve_content_embeds
+from services.permissions import user_has_area
 from services.slug_utils import unique_slug
+from services.stream_visibility import homepage_visibility, reason_text
 
 
 # ============= Streams (public + admin) =============
 streams_router = APIRouter(prefix="/api/streams", tags=["streams"])
-ACTIVE_STREAM_MEMBER_STATUSES = ("active", "honorary")
 
 
 @streams_router.get("/live")
 async def list_live_streams():
+    # Startseiten-Slider: nur aktive Vereinsmitglieder mit verknüpftem
+    # Mitgliederprofil. Die Regel steht in services/stream_visibility.py; der
+    # Admin zeigt mit derselben Regel, woran ein Kanal scheitert.
     db = get_db()
     streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(50)
-    user_ids = sorted({stream.get("user_id") for stream in streams if stream.get("user_id")})
-    if not user_ids:
-        return []
-
-    users = await db.users.find(
-        {"id": {"$in": user_ids}, "is_active": True, "is_banned": {"$ne": True}},
-        {"_id": 0, "id": 1, "username": 1, "privacy_public_profile": 1},
-    ).to_list(2000)
-    active_user_ids = {user["id"] for user in users}
-    memberships = await db.memberships.find(
-        {"user_id": {"$in": list(active_user_ids)}, "member_status": {"$in": list(ACTIVE_STREAM_MEMBER_STATUSES)}},
-        {"_id": 0, "user_id": 1},
-    ).to_list(2000)
-    member_user_ids = {membership.get("user_id") for membership in memberships if membership.get("user_id")}
-    if not member_user_ids:
-        return []
-    public_profile_by_user = {
-        user["id"]: f"/u/{user.get('username')}"
-        for user in users
-        if user.get("id") in member_user_ids and user.get("username") and user.get("privacy_public_profile") is True
-    }
-
-    # Homepage-Live-Slider: nur aktive Vereinsmitglieder. Profil-Twitch-Embeds bleiben separat pro Profil steuerbar.
-    member_profiles = await db.club_member_profiles.find(
-        {"user_id": {"$in": list(member_user_ids)}, "is_active": {"$ne": False}},
-        {
-            "_id": 0,
-            "id": 1,
-            "user_id": 1,
-            "slug": 1,
-            "display_name": 1,
-            "gamertag": 1,
-            "photo_url": 1,
-        },
-    ).to_list(2000)
-    profile_by_user = {profile.get("user_id"): profile for profile in member_profiles if profile.get("user_id")}
-
+    verdicts = await homepage_visibility(db, [stream.get("user_id") for stream in streams])
     linked_streams = []
     for stream in streams:
-        if stream.get("user_id") not in member_user_ids:
+        verdict = verdicts.get(stream.get("user_id"))
+        if not verdict or not verdict["visible"]:
             continue
-        profile = profile_by_user.get(stream.get("user_id"))
-        if not profile:
-            continue
-        stream["member_profile"] = {
-            "id": profile.get("id"),
-            "slug": profile.get("slug"),
-            "display_name": profile.get("display_name"),
-            "gamertag": profile.get("gamertag"),
-            "photo_url": profile.get("photo_url"),
-        }
-        stream["public_profile_url"] = public_profile_by_user.get(stream.get("user_id"))
+        stream["member_profile"] = verdict["member_profile"]
+        stream["public_profile_url"] = verdict["public_profile_url"]
         linked_streams.append(stream)
     return linked_streams
 
@@ -116,6 +76,41 @@ async def admin_streams_status(me: dict = Depends(require_area("content"))):
     }
     checked_users = await db.users.count_documents(twitch_user_query)
     live_streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).limit(10).to_list(10)
+
+    # Je Kanal: käme er auf die Startseite, und wenn nein, warum nicht (#310).
+    # Mitgliedschaft und Kontostatus sind Vereinsdaten - den genauen Grund
+    # sieht nur, wer die Vereinsverwaltung hat.
+    from services.secret_store import decrypt_secret
+    from services.twitch_service import poll_state
+
+    detailed = await user_has_area(me, "club")
+    twitch_users = await db.users.find(
+        twitch_user_query,
+        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "twitch_handle": 1, "twitch_channel": 1},
+    ).sort("username", 1).to_list(200)
+    verdicts = await homepage_visibility(db, [user["id"] for user in twitch_users])
+    live_user_ids = {
+        stream.get("user_id")
+        for stream in await db.live_streams.find({}, {"_id": 0, "user_id": 1}).to_list(500)
+    }
+    channels = []
+    for user in twitch_users:
+        verdict = verdicts.get(user["id"]) or {"visible": False, "reason": "account_inactive"}
+        channels.append({
+            "user_id": user["id"],
+            "username": user.get("username"),
+            "display_name": user.get("display_name"),
+            "twitch_login": (user.get("twitch_handle") or user.get("twitch_channel") or "").strip().lstrip("@").lower(),
+            "is_live": user["id"] in live_user_ids,
+            "homepage_visible": verdict["visible"],
+            "reason": verdict["reason"] if detailed or verdict["visible"] else "restricted",
+            "reason_text": reason_text(verdict["reason"], detailed=detailed),
+        })
+    try:
+        decrypt_secret(branding.get("twitch_client_secret"))
+        secret_readable = True
+    except RuntimeError:
+        secret_readable = False
     latest_session = await db.twitch_stream_sessions.find_one(
         {},
         {"_id": 0, "last_seen_at": 1, "started_at": 1, "ended_at": 1, "twitch_login": 1},
@@ -127,6 +122,11 @@ async def admin_streams_status(me: dict = Depends(require_area("content"))):
         "client_id_configured": bool(branding.get("twitch_client_id")),
         "client_secret_configured": bool(branding.get("twitch_client_secret")),
         "client_secret_masked": "********" if branding.get("twitch_client_secret") else "",
+        "client_secret_readable": secret_readable,
+        "poll": await poll_state(),
+        "channels": channels,
+        "channels_visible": sum(1 for channel in channels if channel["homepage_visible"]),
+        "channels_detailed": detailed,
         "channel": branding.get("twitch_channel"),
         "checked_users": checked_users,
         "live_count": len(live_streams),

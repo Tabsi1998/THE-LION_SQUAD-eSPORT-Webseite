@@ -21,24 +21,68 @@ logger = logging.getLogger("tls.twitch")
 TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token"
 TWITCH_STREAMS_URL = "https://api.twitch.tv/helix/streams"
 
+# Jeder Lauf hält sein Ergebnis fest (#310). Vorher übersprang die Abfrage
+# still, wenn Zugangsdaten fehlten oder Twitch ablehnte - die Startseite blieb
+# leer, und niemand sah, warum.
+POLL_STATE_ID = "twitch_poll_state"
+POLL_REASON_TEXTS = {
+    "ok": "Abfrage läuft",
+    "not_configured": "Client-ID oder Client-Secret fehlt",
+    "secret_unreadable": "Das gespeicherte Client-Secret lässt sich nicht entschlüsseln "
+                         "(SETTINGS_ENCRYPTION_KEY geändert?) – Secret neu eintragen und speichern",
+    "disabled": "Live-Erkennung ist ausgeschaltet",
+    "token_rejected": "Twitch lehnt Client-ID oder Client-Secret ab",
+    "streams_failed": "Twitch hat die Abfrage der Kanäle nicht beantwortet",
+    "error": "Abfrage abgebrochen",
+}
+# Gewollt aus oder noch nie eingerichtet: kein Alarm, nur ein Hinweis.
+POLL_QUIET_REASONS = ("not_configured", "disabled")
 
-async def _get_credentials() -> dict | None:
+
+async def _get_credentials() -> dict:
     db = get_db()
-    s = await db.settings.find_one({"id": "branding"})
-    if not s:
-        return None
+    s = await db.settings.find_one({"id": "branding"}) or {}
     cid = s.get("twitch_client_id") or os.environ.get("TWITCH_CLIENT_ID")
-    secret = decrypt_secret(s.get("twitch_client_secret")) or os.environ.get("TWITCH_CLIENT_SECRET")
+    try:
+        secret = decrypt_secret(s.get("twitch_client_secret")) or os.environ.get("TWITCH_CLIENT_SECRET")
+    except RuntimeError:
+        return {"problem": "secret_unreadable"}
     if not cid or not secret:
-        return None
-    return {
-        "client_id": cid,
-        "client_secret": secret,
-        "enabled": bool(s.get("twitch_live_detection", True)),
+        return {"problem": "not_configured"}
+    if not bool(s.get("twitch_live_detection", True)):
+        return {"problem": "disabled"}
+    return {"problem": None, "client_id": cid, "client_secret": secret}
+
+
+async def record_poll(reason: str, *, detail: str = "", checked: int = 0, live: int = 0) -> dict:
+    """Ergebnis des Laufs speichern und so zurückgeben, wie die Route es weiterreicht."""
+    now = datetime.now(timezone.utc).isoformat()
+    ok = reason == "ok"
+    state = {
+        "id": POLL_STATE_ID,
+        "last_run_at": now,
+        "ok": ok,
+        "reason": reason,
+        "reason_text": POLL_REASON_TEXTS.get(reason, reason),
+        "detail": detail[:200],
+        "checked": checked,
+        "live": live,
     }
+    if ok:
+        state["last_ok_at"] = now
+    await get_db().settings.update_one({"id": POLL_STATE_ID}, {"$set": state}, upsert=True)
+    summary = {"ok": ok, "reason": reason, "live": live, "checked": checked, "updated_at": now}
+    if not ok:
+        summary["skipped"] = state["reason_text"] + (f" ({detail[:200]})" if detail else "")
+    return summary
 
 
-async def _get_app_token(creds: dict) -> str | None:
+async def poll_state() -> dict:
+    return await get_db().settings.find_one({"id": POLL_STATE_ID}, {"_id": 0, "id": 0}) or {}
+
+
+async def _get_app_token(creds: dict) -> tuple[str | None, str]:
+    """Token und - wenn es keines gibt - was Twitch geantwortet hat."""
     db = get_db()
     cached = await db.settings.find_one({"id": "twitch_app_token"})
     if cached and cached.get("expires_at"):
@@ -47,7 +91,7 @@ async def _get_app_token(creds: dict) -> str | None:
             if exp.tzinfo is None:
                 exp = exp.replace(tzinfo=timezone.utc)
             if exp > datetime.now(timezone.utc):
-                return decrypt_secret(cached["access_token"])
+                return decrypt_secret(cached["access_token"]), ""
         except Exception:
             pass
     async with httpx.AsyncClient(timeout=10) as cli:
@@ -58,7 +102,7 @@ async def _get_app_token(creds: dict) -> str | None:
         })
     if r.status_code != 200:
         logger.warning("[twitch] token fetch failed: %s", r.text[:200])
-        return None
+        return None, f"HTTP {r.status_code}"
     body = r.json()
     expires_in = int(body.get("expires_in", 3600))
     exp_iso = datetime.fromtimestamp(
@@ -69,7 +113,7 @@ async def _get_app_token(creds: dict) -> str | None:
         {"$set": {"id": "twitch_app_token", "access_token": encrypt_secret(body["access_token"]), "expires_at": exp_iso}},
         upsert=True,
     )
-    return body["access_token"]
+    return body["access_token"], ""
 
 
 def _chunks(seq: list, n: int) -> Iterable[list]:
@@ -129,8 +173,8 @@ async def _close_offline_streams(db, active_logins: set[str], now_dt: datetime):
 async def fetch_live_streams() -> dict:
     """Refresh `live_streams` collection. Returns summary dict."""
     creds = await _get_credentials()
-    if not creds or not creds["enabled"]:
-        return {"ok": False, "skipped": "no credentials or disabled"}
+    if creds["problem"]:
+        return await record_poll(creds["problem"])
     db = get_db()
     # Collect all candidate Twitch usernames
     users = await db.users.find(
@@ -141,27 +185,35 @@ async def fetch_live_streams() -> dict:
     ).to_list(2000)
     if not users:
         await _close_offline_streams(db, set(), datetime.now(timezone.utc))
-        return {"ok": True, "live": 0, "checked": 0}
+        return await record_poll("ok")
     by_login: dict[str, dict] = {}
     for u in users:
         login = (u.get("twitch_handle") or u.get("twitch_channel") or "").strip().lstrip("@").lower()
         if login:
             by_login[login] = u
 
-    token = await _get_app_token(creds)
+    token, token_problem = await _get_app_token(creds)
     if not token:
-        return {"ok": False, "skipped": "no token"}
+        return await record_poll("token_rejected", detail=token_problem, checked=len(by_login))
     headers = {"Client-ID": creds["client_id"], "Authorization": f"Bearer {token}"}
 
     all_streams: list[dict] = []
+    failed_status = None
     async with httpx.AsyncClient(timeout=10) as cli:
         for batch in _chunks(list(by_login.keys()), 100):
             params = [("user_login", login) for login in batch]
             r = await cli.get(TWITCH_STREAMS_URL, params=params, headers=headers)
             if r.status_code != 200:
                 logger.warning("[twitch] streams %s: %s", r.status_code, r.text[:200])
+                failed_status = r.status_code
                 continue
             all_streams.extend(r.json().get("data", []))
+    if failed_status is not None:
+        # Eine Antwort fehlt: nichts schließen. Sonst beendet eine Störung bei
+        # Twitch laufende Streams und verbucht ihre Minuten zu früh.
+        if failed_status == 401:
+            await db.settings.delete_one({"id": "twitch_app_token"})
+        return await record_poll("streams_failed", detail=f"HTTP {failed_status}", checked=len(by_login))
 
     now_dt = datetime.now(timezone.utc)
     now = now_dt.isoformat()
@@ -235,7 +287,7 @@ async def fetch_live_streams() -> dict:
         )
     # Drop offline streams
     await _close_offline_streams(db, seen_logins, now_dt)
-    return {"ok": True, "live": len(seen_logins), "checked": len(by_login), "updated_at": now}
+    return await record_poll("ok", checked=len(by_login), live=len(seen_logins))
 
 
 _running = False
@@ -251,5 +303,9 @@ async def twitch_poll_loop(interval_seconds: int = 60):
         await fetch_live_streams()
     except Exception as e:
         logger.warning("[twitch] poll failed: %s", e)
+        try:
+            await record_poll("error", detail=type(e).__name__)
+        except Exception:  # noqa: BLE001 - die Datenbank selbst ist weg
+            pass
     finally:
         _running = False

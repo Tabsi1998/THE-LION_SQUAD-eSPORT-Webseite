@@ -97,9 +97,11 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     run = await ops_checks.run_checks(flow.db)
     assert {check["key"] for check in run["checks"]} == {
         "database", "disk", "uploads", "mail_queue", "change_stream", "image_variants", "error_groups", "scheduler",
+        "twitch_poll",
     }
     assert run["status"] in {"ok", "warn", "crit"}
-    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 8
+    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 9
+    assert {check["key"]: check for check in run["checks"]}["twitch_poll"]["value"] == "noch kein Lauf"
     by_key = {check["key"]: check for check in run["checks"]}
     assert by_key["database"]["status"] == "ok"
     assert by_key["uploads"]["status"] == "ok"
@@ -111,13 +113,13 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     overview = await flow.get("/api/admin/ops/checks")
     assert overview.status_code == 200, overview.text
     data = overview.json()
-    assert len(data["latest"]["checks"]) == 8
+    assert len(data["latest"]["checks"]) == 9
     assert data["history"][0]["runs"] == 1
     assert data["interval_minutes"] == 5
 
     again = await flow.post("/api/admin/ops/checks/run")
     assert again.status_code == 200, again.text
-    assert len(again.json()["checks"]) == 8
+    assert len(again.json()["checks"]) == 9
     assert await flow.db.ops_check_runs.count_documents({}) == 2
 
     summary = await flow.get("/api/admin/ops/summary")
