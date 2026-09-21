@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
-| Web: Anmeldung und Teilen | Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor nur im Admin Pflicht; #347 Link-Vorschau beim Teilen, auch für Vereinsinhalte (neutral) |
+| Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | App: Mitgliederbereich | Dazu seit 21.09. #346 digitale Mitgliedskarte mit QR-Code, Wallet vorbereitet. Wunsch des Betreibers vom 21.09.: #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente, #342 interne Events und News mit Empfängerprüfung. Eigene Beta nach Dolibarr II |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -601,6 +601,33 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 26 — Anmeldung und Teilen
+
+### Was 26.1 gefunden hat (#348, #347 – PR #353)
+
+**Die Rechte nach Bereichen hatten ein Loch im Login.** Seit Block 23 kann ein Konto mit der Rolle
+„Spieler“ einen Adminbereich haben – per Freigabe, Vorstandsposten oder, seit Block 24, über eine
+Funktion in Dolibarr. Jeder Adminbereich verlangt Zwei-Faktor. Einrichten durften ihn aber nur
+Konten mit Admin-*Rolle*, und nur sie fragte der Login nach dem Code. Der Kassier aus Dolibarr
+wäre also nie in die Vereinsverwaltung gekommen – und die Weiterleitung „Zwei-Faktor fehlt“
+zeigte obendrein auf den Reiter, in dem es seit Block 19 gar nicht mehr steht. Jetzt: für alle
+freiwillig einrichtbar, beim Login gefragt, wer es hat, Pflicht nur für Adminbereiche.
+
+**„Angemeldet bleiben“ gab es nicht.** Die Sitzung hielt 14 Tage, gleitend. Für jemanden, der
+alle drei Wochen aufs Handy schaut, fühlt sich das an wie „die Seite vergisst mich“. Jetzt 90
+Tage gleitend mit Haken (Standard an), ohne Haken bis zum Schließen des Browsers. Niemand wird
+durch die Umstellung abgemeldet: Sitzungen ohne Kennzeichen gelten als „bleiben“.
+
+**Eine Sicherheitsgrenze bleibt, wie sie ist.** Ein Test hält fest, dass ein Konto mit
+Zwei-Faktor auch nach dem Passkey-Login den Code eingibt. Ein Passkey mit Gerätesperre wäre als
+zweiter Faktor vertretbar – aber das entscheidet der Betreiber, nicht ein Komfort-PR (Frage an
+#348).
+
+**Gar keine Vorschau sieht kaputt aus.** Für alles Nicht-Öffentliche bekam WhatsApp ein 404. Der
+Schutz dahinter war richtig; die Lösung ist eine neutrale Karte, die nichts verrät – und ein
+Haken je News und Event, mit dem der Autor Titel und Bild bewusst freigibt. Internes bekommt den
+Haken nie.
 
 ## Block 25 — Discord I: Kanäle und Meldungen
 

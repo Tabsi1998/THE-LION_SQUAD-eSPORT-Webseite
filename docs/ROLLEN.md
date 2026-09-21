@@ -48,6 +48,17 @@ Freigaben bleiben davon unberührt. Anleitung: `docs/DOLIBARR.md`.
 Ein `organizer` darf in seinem Turnier alles – Struktur, Ergebnisse, Check-in, Stationen und die
 Gewinne dieses Turniers (#288). Das braucht keinen Bereich und keine Zwei-Faktor-Anmeldung.
 
+## Zwei-Faktor und Anmeldung (#348)
+
+- **Pflicht** ist Zwei-Faktor für jeden Adminbereich außer Moderation – egal, ob der Bereich aus
+  der Rolle, einer Freigabe, einem Vorstandsposten oder einer Dolibarr-Funktion kommt.
+- **Freiwillig** kann ihn jedes Konto einrichten (Profil → Sicherheit). Wer ihn eingerichtet hat,
+  wird beim Anmelden nach dem Code gefragt – auch nach einem Passkey-Login.
+- Wer einen Adminbereich betritt und noch keinen hat, landet unter Profil → Sicherheit mit der
+  Erklärung, warum.
+- **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu
+  beginnen. Ohne Haken endet die Sitzung mit dem Browser.
+
 ## Was nicht mehr gilt
 
 - Eine Turnierleitung darf keine News, Galerie, Sponsoren oder Partner mehr bearbeiten.

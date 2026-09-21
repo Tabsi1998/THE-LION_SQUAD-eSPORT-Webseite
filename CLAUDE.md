@@ -129,6 +129,25 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Anmeldung und Teilen (#348, #347; PR #353). `auth.py`: `REMEMBER_DAYS` (90,
+  gleitend) und `SESSION_ONLY_HOURS` (24); der Refresh-Token trägt `rem`,
+  `token_remembers` liest ihn (ohne Kennzeichen = bleiben), `set_auth_cookies(…,
+  remember=)` setzt ohne Haken Cookies ohne Ablaufdatum. `remember` läuft durch
+  `UserLogin`, Passkey-Login, Google, die Zwei-Faktor-Challenge und die Rotation.
+  `_requires_admin_mfa` heißt weiter so, fragt aber **jedes** Konto mit
+  eingerichtetem Zwei-Faktor; `POST /auth/mfa/setup` steht allen offen,
+  `GET /auth/mfa/status.required_for_admin` kommt aus den Bereichen
+  (`MFA_AREAS & areas_for`), nicht aus der Rolle. Grenze, die bleibt: mit
+  Zwei-Faktor auch nach dem Passkey-Login der Code
+  (`test_passkey_login_security_boundaries`). Web: `lib/loginComfort.js`,
+  `lib/passkeys.js` (`startPasskeyAutofill`, erneuert sich alle 4 min, vor dem
+  Knopf „Mit Passkey anmelden“ beenden), `LoginPage.jsx` (Haken, Angebot),
+  `MfaSetupPanel.jsx` (für alle), `ProtectedRoute` leitet nach
+  `/profile?tab=security&mfa=required`. Link-Vorschau:
+  `routes/seo_render_routes.py` `restricted_meta` – neutrale Karte für
+  Nicht-Öffentliches (noindex, keine strukturierten Daten zum Inhalt), Titel/Bild
+  nur mit `share_preview` und nie für `internal`; Entwürfe und Geplantes bleiben
+  404. Web: `components/tls/SharePreviewToggle.jsx` in News- und Event-Formular.
 - Discord I (#300, #301, #303; PR #350), Anleitung in `docs/DISCORD.md`.
   `discord_service.py`: `TARGETS` (öffentlich: community, news, events,
   achievements; privat: board, ops), `EVENTS` (Ereignis → Ziel, Beschriftung,
@@ -557,12 +576,12 @@ braucht.
 (#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
 (#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen), #311–#313
 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
-#349 (#345 Dolibarr einrichten). `main` steht auf `0eee96a`.
+#349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
+Compose-Override, andere Sitzung). `main` steht auf `9052488`.
 
 ### Offene PRs
-- #350 (Discord I: #300, #301, #303). Nach dem Merge `update.sh`; News und
-  Events gehen erst in den Discord, wenn der Betreiber die beiden Schalter
-  einschaltet (Einstellungen → Discord).
+- #353 (Web: Anmeldung und Teilen: #348, #347). Nach dem Merge `update.sh`.
+  Offene Entscheidung des Betreibers an #348: Passkey als zweiter Faktor?
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -583,7 +602,11 @@ braucht.
   Turnierleitung) vergibt der Superadmin unter Admin → Alle Benutzer; wer
   einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst.
 - Discord: Betriebs-Webhook eintragen, falls noch nicht geschehen
-  (Einstellungen → Discord), sonst gibt es keine Alarme.
+  (Einstellungen → Discord), sonst gibt es keine Alarme. Für News und Events
+  im Discord die beiden Schalter dort einschalten.
+- Server, einmalig: `docker-compose.override.yml` mit dem Host-Eintrag für
+  `erp.lionsquad.at` anlegen (`UPDATE.md`, #351) – seit #352 steht er nicht mehr
+  in `docker-compose.yml`, ohne ihn meldet Dolibarr „antwortet nicht rechtzeitig“.
 - GitHub → Settings → Billing and plans ansehen: am 21.09. um 02:18 UTC hat
   GitHub Actions-Jobs wegen Zahlung/Ausgabenlimit nicht gestartet (um 15:35
   lief der CI wieder).
@@ -592,7 +615,7 @@ braucht.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (49 offen nach dem Merge von #350)
+### Meilensteine und offene Issues (47 offen nach dem Merge von #353)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -608,7 +631,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
-| Web: Anmeldung und Teilen | Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten und bevorzugen, Zwei-Faktor nur im Admin Pflicht; #347 Link-Vorschau beim Teilen (WhatsApp, Discord) – neutrale Vorschau für Vereinsinhalte, Bestandsaufnahme aller Seitentypen |
+| Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
@@ -633,8 +656,7 @@ sinnvoll hältst“):
    Server-Schritt, weil hier Rechte aus einem fremden System kommen; die
    Umstellung selbst macht der Betreiber nach `docs/DOLIBARR.md`.
 3. Discord I – umgesetzt in #350 (ein PR für den Meilenstein).
-4. Web: Anmeldung und Teilen (#348, #347) – vorgezogen, weil es den Betreiber
-   und die Mitglieder jeden Tag betrifft; danach App 0.6.0-beta (#218).
+4. Web: Anmeldung und Teilen – umgesetzt in #353; danach App 0.6.0-beta (#218).
 5. Dolibarr II (#296, #325), danach App: Mitgliederbereich (#340, #339, #341,
    #342) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
 6. Web: Dynamik.
