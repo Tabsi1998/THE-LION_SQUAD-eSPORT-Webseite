@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { areaList } from "@/lib/permissions";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AlertTriangle, Home, ArrowLeft, ShieldOff, Search, Calendar, Trophy, Newspaper, Medal, LogIn, RefreshCw } from "lucide-react";
 
@@ -17,7 +18,7 @@ const QUICK_LINKS = [
   { to: "/seasons/current", label: "Jahreswertung", icon: Medal },
 ];
 
-export function ErrorPage({ code = "404" }) {
+export function ErrorPage({ code = "404", detail = "" }) {
   const def = ERROR_DEFS[code] || ERROR_DEFS["404"];
   const Icn = def.icon;
   useEffect(() => {
@@ -59,7 +60,7 @@ export function ErrorPage({ code = "404" }) {
           <h1 id={`error-heading-${def.code}`} className="font-heading text-3xl md:text-5xl font-black uppercase mb-3" data-testid={`error-title-${def.code}`}>
             {def.title}
           </h1>
-          <p className="text-white/60 mb-8">{def.desc}</p>
+          <p className="text-white/60 mb-8" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
           <div className="flex flex-wrap gap-3 justify-center">
             <Link to="/" data-testid="error-home-btn" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
               <Home className="w-4 h-4" /> Zur Startseite
@@ -100,5 +101,12 @@ export function ErrorPage({ code = "404" }) {
 }
 
 export function NotFoundPage() { return <ErrorPage code="404" />; }
-export function ForbiddenPage() { return <ErrorPage code="403" />; }
+// Rechte nach Bereichen (#292): die Seite sagt, welcher Bereich fehlt und wer ihn vergibt.
+export function ForbiddenPage() {
+  const areas = useLocation().state?.areas;
+  const detail = Array.isArray(areas) && areas.length
+    ? `Dafür fehlt dir der Bereich ${areaList(areas)}. Vergeben kann ihn der Superadmin unter Admin → Alle Benutzer.`
+    : "";
+  return <ErrorPage code="403" detail={detail} />;
+}
 export function ServerErrorPage() { return <ErrorPage code="500" />; }

@@ -303,6 +303,16 @@ async def _issue_session(db, response: Response, user: dict, request: Request, *
     return access, refresh
 
 
+async def with_areas(user: dict) -> dict:
+    """Die Bereiche einer Person (#287) für Web und App – ohne interne Felder."""
+    from services.permissions import areas_for
+
+    doc = dict(user)
+    doc["areas"] = sorted(await areas_for(user))
+    doc.pop("_areas", None)
+    return doc
+
+
 def _public_user(user: dict) -> dict:
     doc = dict(user)
     for field in (
@@ -963,6 +973,8 @@ async def me(request: Request, response: Response, user: dict | None = Depends(g
     response.headers["Cache-Control"] = "no-store"
     if user is None and request.cookies.get("refresh_token"):
         response.headers["X-Session-Refresh"] = "required"
+    if user is not None:
+        user = await with_areas(user)
     return user
 
 

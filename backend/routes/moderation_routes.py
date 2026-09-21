@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Literal
 
-from auth import get_current_user, require_role
+from auth import get_current_user, require_role, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
@@ -102,14 +102,14 @@ async def report_user(body: UserReportCreate, request: Request, me: dict = Depen
 
 
 @router.get("/reports")
-async def list_reports(status: ReportStatus | None = None, me: dict = Depends(require_role("moderator"))):
+async def list_reports(status: ReportStatus | None = None, me: dict = Depends(require_area("moderation"))):
     db = get_db()
     query = {"status": status} if status else {}
     return await db.user_reports.find(query, {"_id": 0}).sort("created_at", -1).to_list(500)
 
 
 @router.patch("/reports/{report_id}")
-async def review_report(report_id: str, body: UserReportPatch, me: dict = Depends(require_role("moderator"))):
+async def review_report(report_id: str, body: UserReportPatch, me: dict = Depends(require_area("moderation"))):
     db = get_db()
     now = now_utc().isoformat()
     result = await db.user_reports.update_one({"id": report_id}, {"$set": {

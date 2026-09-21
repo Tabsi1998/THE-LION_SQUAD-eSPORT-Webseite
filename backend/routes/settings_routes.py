@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import httpx
 
 from database import get_db
-from auth import require_admin, require_club_admin, require_super, get_optional_user
+from auth import require_admin, require_club_admin, require_super, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from services.auth_settings import is_google_client_id, load_auth_settings
 from services.secret_store import encrypt_secret, secret_is_configured
@@ -609,7 +609,7 @@ async def list_site_banners(response: Response, me: dict | None = Depends(get_op
 
 
 @settings_router.get("/site-banners/admin")
-async def admin_site_banners(me: dict = Depends(require_admin())):
+async def admin_site_banners(me: dict = Depends(require_area("content"))):
     db = get_db()
     rows = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(200)
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [row["id"] for row in rows if row.get("id")]}}, {"_id": 0}).to_list(200)
@@ -621,7 +621,7 @@ async def admin_site_banners(me: dict = Depends(require_admin())):
 
 
 @settings_router.post("/site-banners/admin")
-async def create_site_banner(body: SiteBannerPayload, me: dict = Depends(require_admin())):
+async def create_site_banner(body: SiteBannerPayload, me: dict = Depends(require_area("content"))):
     db = get_db()
     now = now_utc().isoformat()
     doc = {
@@ -639,7 +639,7 @@ async def create_site_banner(body: SiteBannerPayload, me: dict = Depends(require
 
 @settings_router.patch("/site-banners/admin/{banner_id}")
 @settings_router.put("/site-banners/admin/{banner_id}")
-async def update_site_banner(banner_id: str, body: SiteBannerPatch, me: dict = Depends(require_admin())):
+async def update_site_banner(banner_id: str, body: SiteBannerPatch, me: dict = Depends(require_area("content"))):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if not updates:
@@ -652,7 +652,7 @@ async def update_site_banner(banner_id: str, body: SiteBannerPatch, me: dict = D
 
 
 @settings_router.delete("/site-banners/admin/{banner_id}")
-async def delete_site_banner(banner_id: str, me: dict = Depends(require_admin())):
+async def delete_site_banner(banner_id: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     res = await db.site_banners.delete_one({"id": banner_id})
     if res.deleted_count == 0:
@@ -726,7 +726,7 @@ async def send_test(body: TestEmailBody, me: dict = Depends(require_club_admin()
 
 
 @settings_router.post("/newsletter/preview")
-async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(require_admin())):
+async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(require_area("content"))):
     from services.notification_preferences import newsletter_recipients
     item = await _newsletter_source(body.kind, body.id)
     visibility = item.get("visibility") or "public"
@@ -751,7 +751,7 @@ async def newsletter_preview(body: NewsletterTriggerBody, me: dict = Depends(req
 
 
 @settings_router.post("/newsletter/send")
-async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(require_admin())):
+async def newsletter_send(body: NewsletterTriggerBody, me: dict = Depends(require_area("content"))):
     db = get_db()
     from services.notification_preferences import enqueue_newsletter_for_item
     item = await _newsletter_source(body.kind, body.id)

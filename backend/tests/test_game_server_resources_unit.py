@@ -41,6 +41,9 @@ def setup(monkeypatch):
     db = SimpleNamespace(games=Documents([game]), game_servers=Documents())
     monkeypatch.setattr(routes, "get_db", lambda: db)
     monkeypatch.setattr(routes, "unique_slug", AsyncMock(return_value="modded-server"))
+    # Rechte nach Bereichen (#287): der Wächter fragt den Vorstand ab - hier ohne Datenbank.
+    from services import permissions
+    monkeypatch.setattr(permissions, "is_board_holder", AsyncMock(return_value=False))
     app = FastAPI()
     app.include_router(routes.router)
     app.dependency_overrides[get_current_user] = lambda: {"id": "admin", "role": "superadmin", "mfa_enabled": True, "auth_mfa_verified": True}

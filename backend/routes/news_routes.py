@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from typing import Optional
 from datetime import datetime, timezone
 from database import get_db
-from auth import require_admin, get_optional_user
+from auth import require_admin, get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors
@@ -482,14 +482,14 @@ async def get_news(slug_or_id: str, user: dict | None = Depends(get_optional_use
 
 
 @router.get("/admin/news")
-async def admin_list_news(me: dict = Depends(require_admin())):
+async def admin_list_news(me: dict = Depends(require_area("content"))):
     db = get_db()
     posts = await db.news_posts.find({}, {"_id": 0}).sort([("pinned", -1), ("published_at", -1), ("created_at", -1)]).to_list(500)
     return posts
 
 
 @router.post("/news")
-async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
+async def create_news(body: NewsCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
     doc["slug"] = await unique_slug(db.news_posts, doc.get("slug") or doc.get("title"), fallback="news")
@@ -524,7 +524,7 @@ async def create_news(body: NewsCreate, me: dict = Depends(require_admin())):
 
 @router.put("/news/{nid}")
 @router.patch("/news/{nid}")
-async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_admin())):
+async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     existing = await db.news_posts.find_one({"id": nid}, {"_id": 0})
     if not existing:
@@ -571,7 +571,7 @@ async def update_news(nid: str, body: NewsUpdate, me: dict = Depends(require_adm
 
 
 @router.delete("/news/{nid}")
-async def delete_news(nid: str, me: dict = Depends(require_admin())):
+async def delete_news(nid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.news_posts.delete_one({"id": nid})
     return {"ok": True}
@@ -714,7 +714,7 @@ async def list_sponsors(placement: Optional[str] = None):
 
 
 @router.get("/sponsors/admin")
-async def admin_list_sponsors(me: dict = Depends(require_admin())):
+async def admin_list_sponsors(me: dict = Depends(require_area("content"))):
     db = get_db()
     sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
     for s in sp:
@@ -724,7 +724,7 @@ async def admin_list_sponsors(me: dict = Depends(require_admin())):
 
 
 @router.post("/sponsors")
-async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin())):
+async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
     doc = _sponsor_defaults(doc)
@@ -737,7 +737,7 @@ async def create_sponsor(body: SponsorCreate, me: dict = Depends(require_admin()
 
 @router.put("/sponsors/{sid}")
 @router.patch("/sponsors/{sid}")
-async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_admin())):
+async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
         "logo_url", "link", "description", "event_ids",
@@ -757,7 +757,7 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
 
 
 @router.delete("/sponsors/{sid}")
-async def delete_sponsor(sid: str, me: dict = Depends(require_admin())):
+async def delete_sponsor(sid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.sponsors.delete_one({"id": sid})
     return {"ok": True}
@@ -1069,7 +1069,7 @@ async def list_partners():
 
 
 @router.get("/partners/admin")
-async def admin_list_partners(me: dict = Depends(require_admin())):
+async def admin_list_partners(me: dict = Depends(require_area("content"))):
     db = get_db()
     partners = await db.partners.find({}, {"_id": 0}).to_list(500)
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
@@ -1077,7 +1077,7 @@ async def admin_list_partners(me: dict = Depends(require_admin())):
 
 
 @router.post("/partners")
-async def create_partner(body: PartnerCreate, me: dict = Depends(require_admin())):
+async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = _partner_defaults(body.model_dump())
     doc["id"] = new_id()
@@ -1090,7 +1090,7 @@ async def create_partner(body: PartnerCreate, me: dict = Depends(require_admin()
 
 @router.put("/partners/{pid}")
 @router.patch("/partners/{pid}")
-async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_admin())):
+async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {"logo_url", "link", "description"}
     raw = body.model_dump(exclude_unset=True)
@@ -1105,7 +1105,7 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
 
 
 @router.delete("/partners/{pid}")
-async def delete_partner(pid: str, me: dict = Depends(require_admin())):
+async def delete_partner(pid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.partners.delete_one({"id": pid})
     return {"ok": True}
@@ -1125,7 +1125,7 @@ async def list_references(game_id: Optional[str] = None, user: dict | None = Dep
 
 
 @router.get("/references/admin")
-async def admin_list_references(me: dict = Depends(require_admin())):
+async def admin_list_references(me: dict = Depends(require_area("content"))):
     db = get_db()
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
     refs = _sort_references(await _enrich_references(refs))
@@ -1133,7 +1133,7 @@ async def admin_list_references(me: dict = Depends(require_admin())):
 
 
 @router.get("/references/admin/helpers")
-async def admin_get_reference_helpers(me: dict = Depends(require_admin())):
+async def admin_get_reference_helpers(me: dict = Depends(require_area("content"))):
     db = get_db()
     helpers = await _get_reference_helpers(db)
     refs = await db.references.find({}, {"_id": 0}).to_list(1000)
@@ -1141,7 +1141,7 @@ async def admin_get_reference_helpers(me: dict = Depends(require_admin())):
 
 
 @router.patch("/references/admin/helpers")
-async def admin_update_reference_helpers(body: dict, me: dict = Depends(require_admin())):
+async def admin_update_reference_helpers(body: dict, me: dict = Depends(require_area("content"))):
     db = get_db()
     helpers = _normalize_reference_helpers(body or {})
     helpers["id"] = "reference_helpers"
@@ -1164,7 +1164,7 @@ async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)
 
 
 @router.post("/references")
-async def create_reference(body: ReferenceCreate, me: dict = Depends(require_admin())):
+async def create_reference(body: ReferenceCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
@@ -1180,7 +1180,7 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_adm
 
 @router.put("/references/{rid}")
 @router.patch("/references/{rid}")
-async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(require_admin())):
+async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
         "organizer", "game_id", "game_name", "team_name", "placement", "placement_label",
@@ -1208,7 +1208,7 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
 
 
 @router.delete("/references/{rid}")
-async def delete_reference(rid: str, me: dict = Depends(require_admin())):
+async def delete_reference(rid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.references.delete_one({"id": rid})
     return {"ok": True}
@@ -1267,7 +1267,7 @@ async def get_album(slug_or_id: str, user: dict | None = Depends(get_optional_us
 
 
 @router.get("/admin/gallery")
-async def admin_list_albums(me: dict = Depends(require_admin())):
+async def admin_list_albums(me: dict = Depends(require_area("content"))):
     db = get_db()
     albums = await db.gallery_albums.find({}, {"_id": 0}).sort("order_index", 1).to_list(1000)
     for a in albums:
@@ -1276,7 +1276,7 @@ async def admin_list_albums(me: dict = Depends(require_admin())):
 
 
 @router.get("/admin/gallery/{aid}")
-async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
+async def admin_get_album(aid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     a = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0})
     if not a:
@@ -1289,7 +1289,7 @@ async def admin_get_album(aid: str, me: dict = Depends(require_admin())):
 
 
 @router.post("/gallery")
-async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admin())):
+async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
     doc["slug"] = await unique_slug(db.gallery_albums, doc.get("slug") or doc.get("title"), fallback="album")
@@ -1306,7 +1306,7 @@ async def create_album(body: GalleryAlbumCreate, me: dict = Depends(require_admi
 
 @router.put("/gallery/{aid}")
 @router.patch("/gallery/{aid}")
-async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_admin())):
+async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "slug": 1, "title": 1})
     if not album:
@@ -1326,7 +1326,7 @@ async def update_album(aid: str, body: GalleryAlbumUpdate, me: dict = Depends(re
 
 
 @router.delete("/gallery/{aid}")
-async def delete_album(aid: str, me: dict = Depends(require_admin())):
+async def delete_album(aid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1})
     if not album:
@@ -1337,7 +1337,7 @@ async def delete_album(aid: str, me: dict = Depends(require_admin())):
 
 
 @router.post("/gallery/{aid}/sections")
-async def add_gallery_section(aid: str, body: GallerySectionCreate, me: dict = Depends(require_admin())):
+async def add_gallery_section(aid: str, body: GallerySectionCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
     if not album:
@@ -1365,7 +1365,7 @@ async def add_gallery_section(aid: str, body: GallerySectionCreate, me: dict = D
 
 @router.put("/gallery/{aid}/sections/{sid}")
 @router.patch("/gallery/{aid}/sections/{sid}")
-async def update_gallery_section(aid: str, sid: str, body: GallerySectionUpdate, me: dict = Depends(require_admin())):
+async def update_gallery_section(aid: str, sid: str, body: GallerySectionUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
     if not album:
@@ -1392,7 +1392,7 @@ async def update_gallery_section(aid: str, sid: str, body: GallerySectionUpdate,
 
 
 @router.delete("/gallery/{aid}/sections/{sid}")
-async def delete_gallery_section(aid: str, sid: str, me: dict = Depends(require_admin())):
+async def delete_gallery_section(aid: str, sid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     album = await db.gallery_albums.find_one({"$or": [{"id": aid}, {"slug": aid}]}, {"_id": 0, "id": 1, "sections": 1})
     if not album:
@@ -1410,7 +1410,7 @@ async def delete_gallery_section(aid: str, sid: str, me: dict = Depends(require_
 
 
 @router.post("/gallery/{aid}/photos")
-async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(require_admin())):
+async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     if not await db.gallery_albums.find_one({"id": aid}):
         raise HTTPException(404, "Album nicht gefunden.")
@@ -1430,7 +1430,7 @@ async def add_photo(aid: str, body: GalleryPhotoCreate, me: dict = Depends(requi
 
 @router.put("/gallery/photos/{pid}")
 @router.patch("/gallery/photos/{pid}")
-async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(require_admin())):
+async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     update = body.model_dump(exclude_unset=True)
     if "section_id" in update:
@@ -1445,7 +1445,7 @@ async def update_photo(pid: str, body: GalleryPhotoUpdate, me: dict = Depends(re
 
 
 @router.delete("/gallery/photos/{pid}")
-async def delete_photo(pid: str, me: dict = Depends(require_admin())):
+async def delete_photo(pid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     res = await db.gallery_photos.delete_one({"id": pid})
     if res.deleted_count == 0:

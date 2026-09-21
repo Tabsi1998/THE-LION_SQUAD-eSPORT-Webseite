@@ -1,9 +1,17 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { ADMIN_AREAS, hasArea, isAnyAdmin } from "@/lib/permissions";
 
-export function ProtectedRoute({ children, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireModerator = false }) {
+// Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
+// Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, System, Moderation).
+// `requireAdmin` heißt „irgendein Adminbereich“, `requireClubAdmin` bleibt als
+// Kurzform für System. Zwei-Faktor ist Pflicht für alles außer Moderation.
+const MFA_AREAS = new Set(ADMIN_AREAS);
+
+export function ProtectedRoute({ children, requireArea = null, requireAdmin = false, requireClubAdmin = false, requireMember = false, requireModerator = false }) {
   const { user } = useAuth();
   const loc = useLocation();
+  const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
   if (user === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
@@ -15,19 +23,16 @@ export function ProtectedRoute({ children, requireAdmin = false, requireClubAdmi
   if (user.consent_required && loc.pathname !== "/consent") {
     return <Navigate to="/consent" replace />;
   }
-  if ((requireAdmin || requireClubAdmin) && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
-    return <Navigate to="/403" replace />;
+  if (wantedAreas.length && !hasArea(user, ...wantedAreas)) {
+    return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;
   }
-  if (requireClubAdmin && !["club_admin", "superadmin"].includes(user.role)) {
-    return <Navigate to="/403" replace />;
-  }
-  if ((requireAdmin || requireClubAdmin) && (!user.mfa_enabled || !user.auth_mfa_verified)) {
+  if (wantedAreas.some((area) => MFA_AREAS.has(area)) && (!user.mfa_enabled || !user.auth_mfa_verified)) {
     return <Navigate to="/profile?tab=basic&mfa=required" replace />;
   }
-  if (requireModerator && !user.is_tournament_staff && !["moderator", "tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
-    return <Navigate to="/403" replace />;
+  if (requireModerator && !user.is_tournament_staff && !hasArea(user, "moderation") && !isAnyAdmin(user)) {
+    return <Navigate to="/403" replace state={{ areas: ["moderation"], from: loc.pathname }} />;
   }
-  if (requireMember && !user.is_club_member && !["tournament_admin", "club_admin", "superadmin"].includes(user.role)) {
+  if (requireMember && !user.is_club_member && !isAnyAdmin(user)) {
     return <Navigate to="/membership/join" replace />;
   }
   return children;

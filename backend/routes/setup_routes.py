@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import bcrypt
 
 from database import get_db
-from auth import require_admin, require_super, get_current_user
+from auth import require_admin, require_super, get_current_user, require_any_admin
 from models import MIN_PASSWORD_LENGTH, now_utc, new_id
 from services.public_site_settings import build_public_legal_settings
 from services.secret_store import encrypt_secret
@@ -94,7 +94,7 @@ async def setup_status():
 
 
 @router.get("/defaults")
-async def setup_defaults(me: dict = Depends(require_admin())):
+async def setup_defaults(me: dict = Depends(require_any_admin())):
     """Admin-only: current setup values for pre-filling the wizard."""
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}

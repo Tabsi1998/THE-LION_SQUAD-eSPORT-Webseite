@@ -49,6 +49,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
 | 22 | **Tempo und Betrieb: Bilder über nginx, Messung, Fehler- und Tempo-Logs, Auto-Checks, Alarme** | umgesetzt: #232, #233 Teil 1, #265 Betrieb II | #263, #266, #299 |
+| 23 | **Rollen und Rechte: Bereiche statt Rangfolge** | umgesetzt: #287 Zielbild und Matrix, #288 Turnierleitung ohne Redaktion, #289 Redaktion, #290 Vereinsvorstand, #291 Zwei-Faktor überall, #292 Rechte sichtbar | PR zum Meilenstein |
 
 Reihenfolge ab hier, abwechselnd App und Web, damit beides vorankommt: 14.4 → 15 → 22 → 14.5 →
 19 → 14.6 → 20 → 14.7 → 21 → 16 → 14.8 → 17 (Rest) → 18. Block 22 steht früh, weil die
@@ -465,7 +466,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Mitgliederbereich II: Dolibarr | Wunsch des Betreibers vom 16.09.: #295 Mitgliedsdaten und Beitragsstatus per Dolibarr-API in Mitgliederbereich und Admin, #296 Rechnungen ansehen/herunterladen und Zahlungslink, #297 Vorstandsbesetzung und Status aus Dolibarr (nach Bestätigung im Admin) – später, nach Rollen und Rechten |
 | Discord: Kanäle und Bot | Wunsch des Betreibers vom 16.09.: #300 ein Webhook je Zweck (News, Events, Erfolge, Vorstand, Betrieb) mit Schaltern je Ereignis, #301 Erfolge sofort auswerten statt erst beim Profilbesuch, #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle (braucht #260), #303 Meldungen mit Bild, Link und Vorschau – später, nach Rollen und Rechten |
-| Web: Rollen und Rechte | Zusatzwunsch vom 16.09., nachdem der Betreiber als Admin den Adminbereich sah: #287 Ist-Stand und Zielbild (Entscheidung: Freigaben oder Rollen), #288 Turnierleitung ohne Redaktion, #289 Redaktionsrecht für News/Galerie/Sponsoren, #290 Vereinsvorstand für Mitglieder/Dokumente/Vorteile, #291 Zwei-Faktor auch für Club-Admin-Routen, #292 Rechte sichtbar und `team_leader` weg |
+| Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
@@ -548,6 +549,38 @@ Anfrage-Pfad nicht auf Discord wartet. Push an Admins bleibt aus – der Webhook
 
 **p75 mit Interpolation.** Bei wenigen Messwerten liefert der nächste Rang (wie bei Tempo)
 Sprünge; die Vitals rechnen linear zwischen den Rängen.
+
+## Block 23 — Rollen und Rechte
+
+Wunsch des Betreibers vom 16.09.: Wer welche Informationen bekommt und wer was darf, muss zu
+100 % stimmen. Die Rechte-Matrix steht in `docs/ROLLEN.md`.
+
+### Was 23.1 gefunden hat (#287–#292)
+
+**Rangfolge statt Zuständigkeit.** Sechs Rollen in einer Leiter, vier Wächter: `require_admin()`
+schützte 137 Routen – Turniere genauso wie News, Galerie und Sponsoren. Eine Turnierleitung
+konnte die Startseite umschreiben; wer Dokumente pflegen sollte, brauchte den Club-Admin samt
+Einstellungen und Game-Servern. Eine Redaktionsrolle gab es nicht, „Vorstand“ war ein Freitext.
+
+**Bereiche.** Turnierleitung, Redaktion, Vereinsverwaltung, System, Moderation. Die Rollen
+bleiben als Grundstufe; dazu kommen Freigaben je Person (Superadmin, mit Audit) und der
+Vorstand: wer einen aktiven Posten hält oder vertritt, hat die Vereinsverwaltung von selbst –
+so wollte es der Betreiber, und so kann die Besetzung später aus Dolibarr kommen (#297).
+System lässt sich nicht freigeben.
+
+**Zwei-Faktor fehlte genau bei den sensibelsten Daten.** `require_club_admin()` prüfte keine
+Zwei-Faktor-Anmeldung, `require_admin()` schon: Mitglieder, Dokumente und Einstellungen waren
+schwächer geschützt als Turniere. Jetzt gilt sie für jeden Bereich außer Moderation, auch für
+die PDF-Exporte.
+
+**Pro Turnier gab es das Modell schon.** Staff-Zuweisungen mit organizer, referee,
+scorekeeper … – ohne globale Rolle. Neu: ein organizer verwaltet auch die Gewinne seines
+Turniers, fremde nicht.
+
+**Sichtbar machen.** Das Adminmenü zeigt nur, wofür ein Bereich da ist; die 403-Seite und die
+Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
+Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
+Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
 
 ## Block 19 — Web-Profil
 

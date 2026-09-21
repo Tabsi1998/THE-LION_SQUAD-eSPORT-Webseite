@@ -12,7 +12,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Literal, List
 
 from database import get_db
-from auth import require_club_admin, get_optional_user as get_current_user_optional
+from auth import require_club_admin, get_optional_user as get_current_user_optional, require_area
 from models import now_utc, new_id
 from services.rate_limit import enforce_rate_limit
 from services.slug_utils import apply_slug_history, slug_source_for_update, slugify, unique_slug
@@ -155,7 +155,7 @@ async def list_topics():
 
 @contact_router.get("")
 async def list_contact_messages(status: Optional[ContactStatus] = None,
-                                 me: dict = Depends(require_club_admin())):
+                                 me: dict = Depends(require_area("club"))):
     db = get_db()
     q: dict = {}
     if status:
@@ -171,7 +171,7 @@ class ContactPatch(BaseModel):
 
 @contact_router.put("/{cid}")
 @contact_router.patch("/{cid}")
-async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends(require_club_admin())):
+async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends(require_area("club"))):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
     if body.status == "answered":
@@ -186,7 +186,7 @@ async def patch_contact_message(cid: str, body: ContactPatch, me: dict = Depends
 
 
 @contact_router.delete("/{cid}")
-async def delete_contact_message(cid: str, me: dict = Depends(require_club_admin())):
+async def delete_contact_message(cid: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     res = await db.contact_messages.delete_one({"id": cid})
     if res.deleted_count == 0:
@@ -323,7 +323,7 @@ async def list_board_positions(active_only: bool = False, me=Depends(get_current
 
 
 @board_router.post("")
-async def create_position(body: BoardPositionCreate, me: dict = Depends(require_club_admin())):
+async def create_position(body: BoardPositionCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     slug = await unique_slug(db.board_positions, body.slug or body.title_male, fallback="position", max_length=80)
     doc = {
@@ -338,7 +338,7 @@ async def create_position(body: BoardPositionCreate, me: dict = Depends(require_
 
 @board_router.put("/{pid}")
 @board_router.patch("/{pid}")
-async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depends(require_club_admin())):
+async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depends(require_area("club"))):
     db = get_db()
     existing = await db.board_positions.find_one({"id": pid}, {"_id": 0})
     if not existing:
@@ -359,7 +359,7 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
 
 
 @board_router.delete("/{pid}")
-async def delete_position(pid: str, me: dict = Depends(require_club_admin())):
+async def delete_position(pid: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     p = await db.board_positions.find_one({"id": pid})
     if not p:
@@ -371,7 +371,7 @@ async def delete_position(pid: str, me: dict = Depends(require_club_admin())):
 
 
 @board_router.get("/assignable-users")
-async def list_assignable_users(me: dict = Depends(require_club_admin())):
+async def list_assignable_users(me: dict = Depends(require_area("club"))):
     """Returns only editable club member profiles for board assignments."""
     db = get_db()
     profiles = await db.club_member_profiles.find(

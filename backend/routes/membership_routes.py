@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
 from database import get_db
-from auth import get_current_user, require_club_admin, get_optional_user
+from auth import get_current_user, require_club_admin, get_optional_user, require_area
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
     is_active_member, derived_user_type, VALID_STATUSES, VALID_TYPES,
@@ -391,7 +391,7 @@ async def list_memberships(
     status: str | None = None,
     membership_type: str | None = None,
     q: str | None = None,
-    me: dict = Depends(require_club_admin()),
+    me: dict = Depends(require_area("club")),
 ):
     db = get_db()
     query = {}
@@ -428,7 +428,7 @@ async def list_memberships(
 
 # ---------- Admin: get/update/upgrade a user's membership ----------
 @router.get("/user/{user_id}")
-async def get_user_membership(user_id: str, me: dict = Depends(require_club_admin())):
+async def get_user_membership(user_id: str, me: dict = Depends(require_area("club"))):
     user = await get_user_with_membership(user_id)
     if not user:
         raise HTTPException(404, "Benutzer nicht gefunden.")
@@ -439,7 +439,7 @@ async def get_user_membership(user_id: str, me: dict = Depends(require_club_admi
 async def update_user_membership(
     user_id: str,
     body: MembershipUpdate,
-    me: dict = Depends(require_club_admin()),
+    me: dict = Depends(require_area("club")),
 ):
     db = get_db()
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
@@ -509,14 +509,14 @@ async def list_benefits(user: dict | None = Depends(get_optional_user)):
 
 
 @router.get("/benefits/all")
-async def list_all_benefits(me: dict = Depends(require_club_admin())):
+async def list_all_benefits(me: dict = Depends(require_area("club"))):
     db = get_db()
     cursor = db.member_benefits.find({}, {"_id": 0}).sort("order_index", 1)
     return await cursor.to_list(500)
 
 
 @router.post("/benefits")
-async def create_benefit(body: MemberBenefitCreate, me: dict = Depends(require_club_admin())):
+async def create_benefit(body: MemberBenefitCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     doc = {
         "id": new_id(),
@@ -533,7 +533,7 @@ async def create_benefit(body: MemberBenefitCreate, me: dict = Depends(require_c
 @router.put("/benefits/{benefit_id}")
 @router.patch("/benefits/{benefit_id}")
 async def update_benefit(
-    benefit_id: str, body: MemberBenefitUpdate, me: dict = Depends(require_club_admin()),
+    benefit_id: str, body: MemberBenefitUpdate, me: dict = Depends(require_area("club")),
 ):
     db = get_db()
     nullable_fields = {
@@ -553,7 +553,7 @@ async def update_benefit(
 
 
 @router.delete("/benefits/{benefit_id}")
-async def delete_benefit(benefit_id: str, me: dict = Depends(require_club_admin())):
+async def delete_benefit(benefit_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     res = await db.member_benefits.delete_one({"id": benefit_id})
     if res.deleted_count == 0:
@@ -591,7 +591,7 @@ async def get_public_member_profile(slug: str):
 
 
 @router.get("/profiles/admin/all")
-async def admin_list_member_profiles(me: dict = Depends(require_club_admin())):
+async def admin_list_member_profiles(me: dict = Depends(require_area("club"))):
     db = get_db()
     rows = await db.club_member_profiles.find({}, {"_id": 0}).sort([("order_index", 1), ("display_name", 1)]).to_list(1000)
     board_titles = await _board_titles_by_profile_id(db)
@@ -605,7 +605,7 @@ async def admin_list_member_profiles(me: dict = Depends(require_club_admin())):
 
 
 @router.post("/profiles/admin")
-async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = Depends(require_club_admin())):
+async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = Depends(require_area("club"))):
     db = get_db()
     name = body.display_name.strip()
     if not name:
@@ -641,7 +641,7 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
 
 @router.put("/profiles/admin/{profile_id}")
 @router.patch("/profiles/admin/{profile_id}")
-async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUpdate, me: dict = Depends(require_club_admin())):
+async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUpdate, me: dict = Depends(require_area("club"))):
     db = get_db()
     existing = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
     if not existing:
@@ -684,7 +684,7 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
 
 
 @router.delete("/profiles/admin/{profile_id}")
-async def admin_delete_member_profile(profile_id: str, me: dict = Depends(require_club_admin())):
+async def admin_delete_member_profile(profile_id: str, me: dict = Depends(require_area("club"))):
     db = get_db()
     res = await db.club_member_profiles.delete_one({"id": profile_id})
     if res.deleted_count == 0:

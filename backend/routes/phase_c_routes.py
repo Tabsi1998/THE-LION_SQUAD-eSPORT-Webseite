@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, Literal
 
 from database import get_db
-from auth import get_current_user, require_club_admin
+from auth import get_current_user, require_club_admin, require_area
 from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
 
@@ -134,7 +134,7 @@ async def my_application(me: dict = Depends(get_current_user)):
 
 @router.get("/membership/applications")
 async def admin_list_applications(status: Optional[str] = None,
-                                   me: dict = Depends(require_club_admin())):
+                                   me: dict = Depends(require_area("club"))):
     db = get_db()
     q: dict = {}
     if status:
@@ -162,7 +162,7 @@ class DecisionBody(BaseModel):
 @router.put("/membership/applications/{app_id}")
 @router.patch("/membership/applications/{app_id}")
 async def admin_decide_application(app_id: str, body: DecisionBody,
-                                    me: dict = Depends(require_club_admin())):
+                                    me: dict = Depends(require_area("club"))):
     db = get_db()
     app = await db.membership_applications.find_one({"id": app_id})
     if not app:

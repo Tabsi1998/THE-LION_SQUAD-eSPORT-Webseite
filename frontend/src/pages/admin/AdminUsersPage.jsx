@@ -6,17 +6,20 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
+import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
 import { Link as LinkIcon, Plus, Trash2, X, ShieldCheck } from "lucide-react";
 
-const ROLE_OPTIONS = ["player", "team_leader", "moderator", "tournament_admin", "club_admin", "superadmin"];
+// Rollen und Rechte (#287–#292): die Rolle ist die Grundstufe, Freigaben je
+// Bereich kommen dazu. Die Rolle team_leader gibt es nicht mehr - Teamleitung
+// läuft pro Team. Quelle der Wahrheit: docs/ROLLEN.md.
+const ROLE_OPTIONS = ["player", "moderator", "tournament_admin", "club_admin", "superadmin"];
 const STAFF_ROLES = ["moderator", "tournament_admin", "club_admin", "superadmin"];
-const ROLE_INFO = {
-  player: ["Spieler", "Normale Teilnahme, Profil, App und eigene Registrierungen."],
-  team_leader: ["Team-Leader", "Kann Teams organisieren und Team-Anmeldungen verwalten."],
-  moderator: ["Moderator", "Operative Hilfe bei Turnieren, Fast-Lap und Stationen."],
-  tournament_admin: ["Turnierleitung", "Verwaltet Turniere, Ergebnisse, Staff-Zuweisungen und Vor-Ort-Ablauf."],
-  club_admin: ["Club-Admin", "Verwaltet Vereins-, Content- und Mitgliederbereiche."],
-  superadmin: ["Superadmin", "Voller Systemzugriff inklusive Rollen, Setup und sensibler Einstellungen."],
+export const ROLE_INFO = {
+  player: { can: ["Teilnahme, Profil, App, eigene Anmeldungen"], cannot: ["Adminbereich – außer mit Freigabe oder Vorstandsposten"] },
+  moderator: { can: ["Meldungen und Chats moderieren", "Turnier-, Fast-Lap- und Stationsseiten lesen"], cannot: ["Turniere anlegen, Redaktion, Mitgliederdaten"] },
+  tournament_admin: { can: ["Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne", "Moderation"], cannot: ["News, Galerie, Sponsoren (Redaktion)", "Mitglieder, Dokumente, Einstellungen"] },
+  club_admin: { can: ["Alle Bereiche inklusive System"], cannot: ["Rollen und Freigaben vergeben"] },
+  superadmin: { can: ["Alles, dazu Rollen, Freigaben und Setup"], cannot: [] },
 };
 
 export default function AdminUsersPage() {
@@ -42,6 +45,17 @@ export default function AdminUsersPage() {
     () => list.filter((user) => STAFF_ROLES.includes(user.role)).length,
     [list],
   );
+
+  // Freigaben je Bereich (#287): nur der Superadmin, nur Turnierleitung, Redaktion, Vereinsverwaltung.
+  const toggleArea = async (user, area) => {
+    const current = Array.isArray(user.areas) ? user.areas : [];
+    const next = current.includes(area) ? current.filter((a) => a !== area) : [...current, area];
+    try {
+      await api.put(`/users/${user.id}/areas`, { areas: next });
+      toast.success(`${AREA_LABELS[area]} ${next.includes(area) ? "freigegeben" : "entzogen"}.`);
+      load();
+    } catch (e) { toast.error(formatRequestError(e, "Freigabe konnte nicht gespeichert werden.")); }
+  };
 
   const setRole = async (id, role) => {
     try { await api.post(`/users/${id}/role`, { role }); toast.success("Rolle aktualisiert."); load(); }
@@ -99,7 +113,7 @@ export default function AdminUsersPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Rollen & Berechtigungen</div>
-            <p className="mt-1 text-xs text-white/50">Schneller Blick darauf, wer normale Nutzerrechte, Turnierleitung oder vollen Systemzugriff hat.</p>
+            <p className="mt-1 text-xs text-white/50">Die Rolle ist die Grundstufe; einzelne Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung) lassen sich je Person freigeben. Wer einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst.</p>
           </div>
           <Link to="/admin/audit?action=user.role_change" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white">
             <ShieldCheck className="h-3.5 w-3.5" /> Rollen-Audit
@@ -107,14 +121,22 @@ export default function AdminUsersPage() {
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {ROLE_OPTIONS.map((role) => {
-            const [label, description] = ROLE_INFO[role] || [role, ""];
+            const info = ROLE_INFO[role] || { can: [], cannot: [] };
+            const label = roleLabel(role);
             const count = roleCounts[role] || 0;
             return (
               <div key={role} className={`rounded-sm border px-3 py-3 ${role === "superadmin" ? "border-[#FFD700]/25 bg-[#FFD700]/5" : count ? "border-white/10 bg-black/15" : "border-white/5 bg-black/10 opacity-70"}`}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-bold text-white">{label}</div>
-                    <div className="mt-1 text-[11px] leading-relaxed text-white/45">{description}</div>
+                    <ul className="mt-1 text-[11px] leading-relaxed text-white/55" data-testid={`role-can-${role}`}>
+                      {info.can.map((line) => <li key={line}>✓ {line}</li>)}
+                    </ul>
+                    {info.cannot.length ? (
+                      <ul className="mt-1 text-[11px] leading-relaxed text-white/35" data-testid={`role-cannot-${role}`}>
+                        {info.cannot.map((line) => <li key={line}>✗ {line}</li>)}
+                      </ul>
+                    ) : null}
                   </div>
                   <div className="font-heading text-2xl font-black tabular-nums text-[#29B6E8]">{count}</div>
                 </div>
@@ -147,8 +169,29 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3 text-white/60 text-xs">{u.email}</td>
                 <td className="px-4 py-3">
                   <select value={u.role} onChange={(e) => setRole(u.id, e.target.value)} data-testid={`user-role-${u.username}`} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs">
-                    {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                   </select>
+                  {isSuperAdmin ? (
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1" data-testid={`user-areas-${u.username}`}>
+                      {GRANTABLE_AREAS.map((area) => {
+                        const fromRole = (ROLE_AREAS[u.role] || []).includes(area);
+                        const granted = Array.isArray(u.areas) && u.areas.includes(area);
+                        return (
+                          <label key={area} className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-wider ${fromRole ? "text-white/30" : "text-white/60"}`} title={fromRole ? "Schon in der Rolle enthalten" : AREA_HINTS[area]}>
+                            <input
+                              type="checkbox"
+                              className="accent-[#29B6E8]"
+                              checked={fromRole || granted}
+                              disabled={fromRole}
+                              onChange={() => toggleArea(u, area)}
+                              data-testid={`user-area-${u.username}-${area}`}
+                            />
+                            {AREA_LABELS[area]}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <div className="inline-flex items-center gap-2">
@@ -228,7 +271,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
           </div>
           <Field label="Rolle">
             <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="create-user-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-              {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+              {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
             </select>
           </Field>
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>
