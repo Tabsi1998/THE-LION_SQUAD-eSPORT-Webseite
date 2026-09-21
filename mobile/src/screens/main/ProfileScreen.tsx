@@ -10,6 +10,9 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
+import { AchievementGroupCard } from "../../components/AchievementGroupCard";
+import { FadeIn, staggerDelay } from "../../components/FadeIn";
+import { type AchievementGroup, achievementIcon } from "../../lib/achievements";
 import { API_BASE_URL } from "../../config";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
@@ -18,31 +21,6 @@ import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "
 
 type TabKey = "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
 type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
-type AchievementGroup = {
-  code: string;
-  name: string;
-  category?: string;
-  description?: string;
-  accent_color?: string;
-  tiers?: AchievementTier[];
-  earned_count?: number;
-  tier_count?: number;
-};
-type AchievementTier = {
-  code: string;
-  name: string;
-  description?: string;
-  level?: number;
-  level_name?: string;
-  earned?: boolean;
-  points?: number;
-  current?: number;
-  target?: number;
-  percent?: number;
-  manual_only?: boolean;
-  condition_status?: string;
-  earned_at?: string;
-};
 
 // Reiter nur für Inhalt. Bearbeiten erreicht man über die Aktionszeile,
 // Privatsphäre und Benachrichtigungen über das Zahnrad (#213). Vorher standen
@@ -81,13 +59,6 @@ const dmOptions = [
   ["none", "Niemand"],
 ];
 
-const levelColors: Record<number, string> = {
-  1: "#CD7F32",
-  2: "#C0C0C0",
-  3: colors.gold,
-  4: colors.cyan,
-  5: colors.live,
-};
 
 export function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -398,6 +369,8 @@ export function ProfileScreen() {
         {profileError ? <Muted style={styles.error}>{profileError}</Muted> : null}
         {profileLoading && !guest ? <SkeletonList count={3} hasImage={false} /> : null}
 
+        {/* Reiterwechsel ohne Sprung (#218): der Inhalt blendet kurz ein; nichts wird neu aufgebaut. */}
+        <FadeIn trigger={activeTab} style={styles.tabContent}>
         {!profileLoading && activeTab === "overview" ? (
           <>
             <Card style={styles.card}>
@@ -425,10 +398,13 @@ export function ProfileScreen() {
               <Heading>Nächster Erfolg</Heading>
               {insights.next ? (
                 <>
-                  <Body style={styles.strong}>{insights.next.name}</Body>
+                  <View style={styles.nextAchievement}>
+                    <Ionicons name={achievementIcon(insights.next.group)} size={20} color={insights.next.group.accent_color || colors.cyan} />
+                    <Body style={styles.strong}>{insights.next.name}</Body>
+                  </View>
                   <Muted>{insights.next.group.name}</Muted>
                   <ProgressBar value={Number(insights.next.percent || 0)} color={insights.next.group.accent_color || colors.cyan} />
-                  <Muted>{insights.next.current || 0}/{insights.next.target || 0}</Muted>
+                  <Muted>{Number(insights.next.current || 0).toLocaleString("de-DE")} von {Number(insights.next.target || 0).toLocaleString("de-DE")}</Muted>
                 </>
               ) : (
                 <EmptyState icon="checkmark-done-outline" title="Alles aktuell" detail="Keine offenen automatischen Fortschritte gefunden." />
@@ -525,13 +501,14 @@ export function ProfileScreen() {
               <Muted>{insights.earned.length} von {insights.tiers.length} Stufen freigeschaltet · {insights.points} Punkte</Muted>
             </Card>
             {(achievements.groups || []).length ? (
-              (achievements.groups || []).map((group) => (
-                <AchievementGroupCard
-                  key={group.code}
-                  group={group}
-                  open={Boolean(openGroups[group.code])}
-                  onToggle={() => setOpenGroups((current) => ({ ...current, [group.code]: !current[group.code] }))}
-                />
+              (achievements.groups || []).map((group, index) => (
+                <FadeIn key={group.code} delay={staggerDelay(index)}>
+                  <AchievementGroupCard
+                    group={group}
+                    open={Boolean(openGroups[group.code])}
+                    onToggle={() => setOpenGroups((current) => ({ ...current, [group.code]: !current[group.code] }))}
+                  />
+                </FadeIn>
               ))
             ) : (
               <Card style={styles.card}>
@@ -613,6 +590,8 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
+        </FadeIn>
+
         {guest ? (
           <Card style={styles.card}>
             <Muted>Live-Gastmodus aktiv. Profilbearbeitung und persönliche Einstellungen sind nach Login verfügbar.</Muted>
@@ -679,48 +658,6 @@ function MatrixToggle({ label, value, disabled, onValueChange }: { label: string
         trackColor={{ false: "rgba(255,255,255,0.16)", true: "rgba(41,182,232,0.45)" }}
         thumbColor={value ? colors.cyan : colors.muted}
       />
-    </View>
-  );
-}
-
-function AchievementGroupCard({ group, open, onToggle }: { group: AchievementGroup; open: boolean; onToggle: () => void }) {
-  const tiers = group.tiers || [];
-  const earned = tiers.filter((tier) => tier.earned);
-  const highest = [...earned].sort((a, b) => Number(b.level || 0) - Number(a.level || 0))[0];
-  const accent = group.accent_color || colors.cyan;
-  return (
-    <Card style={[styles.card, highest && Number(highest.level || 0) >= 4 && { borderColor: `${accent}88` }]}>
-      <Pressable onPress={onToggle} style={styles.achievementHead}>
-        <View style={[styles.achievementIcon, { borderColor: `${accent}77`, backgroundColor: `${accent}18` }]}>
-          <Body style={[styles.achievementIconText, { color: accent }]}>{highest ? "✓" : "•"}</Body>
-        </View>
-        <View style={styles.achievementTitle}>
-          <Body style={styles.strong}>{group.name}</Body>
-          <Muted>{group.description || `${earned.length}/${tiers.length} Stufen`}</Muted>
-          {highest ? <Muted style={{ color: levelColors[highest.level || 1] || accent }}>{highest.level_name || `Level ${highest.level}`}</Muted> : null}
-        </View>
-        <Muted style={styles.chevron}>{open ? "▲" : "▼"}</Muted>
-      </Pressable>
-      {open ? (
-        <View style={styles.tiers}>
-          {tiers.map((tier) => <TierRow key={tier.code} tier={tier} accent={accent} />)}
-        </View>
-      ) : null}
-    </Card>
-  );
-}
-
-function TierRow({ tier, accent }: { tier: AchievementTier; accent: string }) {
-  const color = levelColors[tier.level || 1] || accent;
-  return (
-    <View style={[styles.tierRow, tier.earned && { borderColor: `${color}66`, backgroundColor: `${color}10` }]}>
-      <View style={styles.tierText}>
-        <Muted style={[styles.tierLevel, { color }]}>{tier.earned ? "Freigeschaltet" : tier.condition_status === "planned" ? "Geplant" : "Gesperrt"}</Muted>
-        <Body style={styles.strong}>{tier.name}</Body>
-        {tier.description ? <Muted>{tier.description}</Muted> : null}
-        {!tier.earned && Number(tier.target || 0) > 0 ? <ProgressBar value={Number(tier.percent || 0)} color={accent} /> : null}
-      </View>
-      <Muted style={styles.points}>+{tier.points || 0}</Muted>
     </View>
   );
 }
@@ -1154,54 +1091,8 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontWeight: "900",
   },
-  achievementHead: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-  },
-  achievementIcon: {
-    alignItems: "center",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 46,
-    justifyContent: "center",
-    width: 46,
-  },
-  achievementIconText: {
-    fontSize: 18,
-    fontWeight: "900",
-  },
-  achievementTitle: {
-    flex: 1,
-    gap: 2,
-  },
-  chevron: {
-    color: colors.cyan,
-    fontWeight: "900",
-  },
-  tiers: {
-    gap: 8,
-    paddingTop: 4,
-  },
-  tierRow: {
-    alignItems: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.035)",
-    borderColor: colors.border,
-    borderRadius: 6,
-    borderWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    padding: 10,
-  },
-  tierText: {
-    flex: 1,
-    gap: 4,
-  },
-  tierLevel: {
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
+  tabContent: { gap: 16 },
+  nextAchievement: { flexDirection: "row", alignItems: "center", gap: 8 },
   referenceCard: {
     gap: 10,
   },
@@ -1251,10 +1142,6 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.72,
-  },
-  points: {
-    color: colors.gold,
-    fontWeight: "900",
   },
   progress: {
     backgroundColor: "rgba(255,255,255,0.08)",

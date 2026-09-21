@@ -140,6 +140,7 @@ Neueste oben.
 - `0.4.0-beta`: Build 61, Seiten aufräumen II – Events-Tab, Mehr, eigene Seiten, Sponsoren, Startseite (Meilenstein App 0.4.0-beta)
 - `0.4.1-beta`: Build 62, Chat-Bilder in der App über den API-Client, HTTP-Status in der Kachel (Meilenstein App 0.4.1-beta)
 - `0.5.0-beta`: Build 63, Was ist neu, Update aus der App, In-App-Banner gebündelt, Nickname weg (Meilenstein App 0.5.0-beta)
+- `0.6.0-beta`: Build 64, Erfolge mit Symbolen, Fortschritt und Freischalt-Moment, sanfte Übergänge (Meilenstein App 0.6.0-beta)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

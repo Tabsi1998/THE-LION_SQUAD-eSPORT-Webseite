@@ -1,11 +1,12 @@
 {
-  "version": "0.5.0-beta",
-  "build": 63,
-  "date": "2026-09-16",
+  "version": "0.6.0-beta",
+  "build": 64,
+  "date": "2026-09-21",
   "items": [
-    "Nach einem Update zeigt die App einmal „Was ist neu“ mit den Punkten der Version; unter Mehr ist die Karte jederzeit erreichbar.",
-    "Neue Versionen kommen aus der App heraus: Banner „Build N ist da“, Download vom Vereinsserver mit Fortschritt und Prüfsumme, dann der Android-Installer – ohne GitHub am Handy. Ein Pflicht-Update lässt sich nicht wegdrücken.",
-    "In-App-Banner für Benachrichtigungen: nur noch einer sichtbar, kurz hintereinander eintreffende Meldungen werden „2 neue Benachrichtigungen“, nach fünf Sekunden von selbst weg, nach oben wischen schließt sofort; im offenen Chat mit derselben Person kein Banner.",
-    "Das Feld „Nickname“ im Profil ist weg – ein Anzeigename wie im Web."
+    "Erfolge haben echte Symbole statt eines Punkts – eines je Erfolgsgruppe, in der Farbe der erreichten Stufe (Bronze, Silber, Gold, Platin, Legendär).",
+    "Der Fortschritt steht schon in der zugeklappten Zeile: Balken und „3 von 10“ zur nächsten Stufe; aufgeklappt zeigt jede Stufe ihren Stand.",
+    "Wird ein Erfolg freigeschaltet, während die App offen ist, erscheint der Freischalt-Moment sofort – nicht erst beim nächsten Start. Der Tipp auf die Benachrichtigung führt direkt zu den Erfolgen.",
+    "Sanfte Übergänge im Profil: Reiter wechseln ohne Sprung, die Erfolgsliste baut sich leicht auf. Wer am Handy „Bewegung reduzieren“ eingestellt hat, bekommt alles sofort und ohne Konfetti.",
+    "Aktuelle Patch-Stände von Expo und React Navigation."
   ]
 }

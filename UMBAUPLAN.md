@@ -456,7 +456,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.4.1-beta | #238 Chat-Bild: seit Build 61 steht der Grund in der Kachel („Unexpected HTTP Code“); #286 holt das Bild über den API-Client und nennt sonst den HTTP-Status – Build 62 veröffentlicht (16.09.) |
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg – umgesetzt in #304, Build 63 nach Merge und Server-Update |
-| App 0.6.0-beta | #218 Erfolge (14.5) |
+| App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
 | App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |

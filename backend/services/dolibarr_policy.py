@@ -17,12 +17,24 @@ in Dolibarr nicht.
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from models import now_utc
 from services.dolibarr_client import load_settings
 
 DERIVABLE_AREAS = ("club",)
+
+# Dolibarr nennt Tage ohne Uhrzeit - gemeint ist der Tag am Ort des Vereins, nicht der des
+# Servers (der in UTC läuft und um Mitternacht bis zu zwei Stunden hinterherhinkt).
+try:
+    CLUB_TZ = ZoneInfo("Europe/Vienna")
+except ZoneInfoNotFoundError:  # pragma: no cover - Container ohne Zeitzonendaten
+    CLUB_TZ = timezone(timedelta(hours=1), "Europe/Vienna")
+
+
+def club_today() -> str:
+    return now_utc().astimezone(CLUB_TZ).date().isoformat()
 # Ist der letzte gelungene Abgleich älter, gibt es keine abgeleiteten Rechte -
 # die Mitgliedschaft selbst bleibt davon unberührt.
 MAX_STATE_AGE_HOURS = 48
@@ -59,7 +71,7 @@ def _fresh(value: str | None) -> bool:
 
 def areas_from_functions(functions: list[dict] | None, policy_map: dict, today: str | None = None) -> list[dict]:
     """Je abgeleitetem Bereich die Funktion, die ihn trägt. Ein Beginn in der Zukunft zählt noch nicht."""
-    today = today or date.today().isoformat()
+    today = today or club_today()
     grants = []
     for fn in functions or []:
         code = str(fn.get("code") or "").lower()

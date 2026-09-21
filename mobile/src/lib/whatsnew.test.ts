@@ -3,11 +3,13 @@ import { currentWhatsNew, shouldShowWhatsNew, tidyItem, whatsNewTitle } from "./
 // „Was ist neu“ (#249): genau einmal nach einem Update, nie beim ersten Start.
 
 test("die gebündelte Datei passt zur App-Version", () => {
+  // Gegen app.json, nicht gegen feste Zahlen – sonst bricht der Test bei jedem Release (#218).
+  const { expo } = require("../../app.json");
   const entry = currentWhatsNew();
-  expect(entry.version).toBe("0.5.0-beta");
-  expect(entry.build).toBe(63);
+  expect(entry.version).toBe(expo.version);
+  expect(entry.build).toBe(expo.android.versionCode);
   expect(entry.items.length).toBeGreaterThan(0);
-  expect(whatsNewTitle(entry)).toBe("Neu in v0.5.0-beta (Build 63)");
+  expect(whatsNewTitle(entry)).toBe(`Neu in v${expo.version} (Build ${expo.android.versionCode})`);
 });
 
 test("gespeicherter Build kleiner als der eigene → Karte, gleich oder nichts gespeichert → keine", () => {

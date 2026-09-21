@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0-beta - 2026-09-21
+
+- Mobile: Erfolge haben echte Symbole statt eines Punkts – eines je Erfolgsgruppe, in der Farbe der erreichten Stufe (Bronze, Silber, Gold, Platin, Legendär) (#218).
+- Mobile: Der Fortschritt steht schon in der zugeklappten Zeile: Balken und „3 von 10“ zur nächsten Stufe; aufgeklappt zeigt jede Stufe ihren Stand (#218).
+- Mobile: Wird ein Erfolg freigeschaltet, während die App offen ist, erscheint der Freischalt-Moment sofort – nicht erst beim nächsten Start. Der Tipp auf die Benachrichtigung führt direkt zu den Erfolgen (#218).
+- Mobile: Sanfte Übergänge im Profil: Reiter wechseln ohne Sprung, die Erfolgsliste baut sich leicht auf. Wer am Handy „Bewegung reduzieren“ eingestellt hat, bekommt alles sofort und ohne Konfetti (#218).
+- Mobile: Aktuelle Patch-Stände von Expo und React Navigation (#335, #313).
+
 ## 0.5.0-beta - 2026-09-16
 
 - Mobile: Nach einem Update zeigt die App einmal „Was ist neu“ mit den Punkten der Version; unter Mehr ist die Karte jederzeit erreichbar (#249).

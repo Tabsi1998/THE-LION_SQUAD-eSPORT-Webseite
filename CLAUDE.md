@@ -129,6 +129,19 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- App 0.6.0-beta (#218, PR #354, Build 64): `mobile/src/lib/achievements.ts` –
+  `achievementIcon` (Lucide-Name des Katalogs → Ionicon, sonst nach Kategorie,
+  sonst Pokal; der Typ `IoniconName` prüft jeden Namen), `groupProgress` („3 von
+  10“ zur nächsten Stufe), `freshTiers`, `announceAchievementUnlocked` /
+  `onAchievementUnlocked`. `components/AchievementGroupCard.tsx` (aus dem Profil
+  herausgelöst), `components/FadeIn.tsx` (`FadeIn`, `staggerDelay`,
+  `useReduceMotion` – „Bewegung reduzieren“ schaltet Übergänge und Konfetti ab).
+  `NotificationContext` zeigt für `kind: "achievement"` keinen Banner, sondern
+  meldet es dem `AchievementCatchUpOverlay`, das den Freischalt-Moment sofort
+  zeigt; `rootNavigation.targetFromUrl` führt `/profile?tab=achievements` zum
+  Reiter Erfolge. Neues Symbol im Katalog → in `ICONS` eintragen, sonst greift
+  der Ersatz nach Kategorie (Test hält den Katalogstand fest).
+  `@testing-library/react-native` 14: `await render(…)`, `await fireEvent…`.
 - Anmeldung und Teilen (#348, #347; PR #353). `auth.py`: `REMEMBER_DAYS` (90,
   gleitend) und `SESSION_ONLY_HOURS` (24); der Refresh-Token trägt `rem`,
   `token_remembers` liest ihn (ohne Kennzeichen = bleiben), `set_auth_cookies(…,
@@ -577,11 +590,12 @@ braucht.
 (#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen), #311–#313
 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
 #349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
-Compose-Override, andere Sitzung). `main` steht auf `9052488`.
+Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen). `main` steht
+auf `fd6b6fb`.
 
 ### Offene PRs
-- #353 (Web: Anmeldung und Teilen: #348, #347). Nach dem Merge `update.sh`.
-  Offene Entscheidung des Betreibers an #348: Passkey als zweiter Faktor?
+- #354 (App 0.6.0-beta: #218). Nach dem Merge baut und veröffentlicht Claude
+  Build 64 und legt die APK am Vereinsserver ab.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -592,7 +606,8 @@ Compose-Override, andere Sitzung). `main` steht auf `9052488`.
   **Build 63** (`mobile-v0.5.0-beta-build63`, Commit 0b6bc11, am 16.09. vom
   Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Die
   APK liegt seit 16.09. auch am Vereinsserver (nach #306/#308 mit
-  `-- --upload-only` nachgereicht). Nächster Build ist 64.
+  `-- --upload-only` nachgereicht). **Build 64** (`0.6.0-beta`, #218) ist
+  vorbereitet und wird nach dem Merge gebaut. Danach ist der nächste Build 65.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -604,9 +619,9 @@ Compose-Override, andere Sitzung). `main` steht auf `9052488`.
 - Discord: Betriebs-Webhook eintragen, falls noch nicht geschehen
   (Einstellungen → Discord), sonst gibt es keine Alarme. Für News und Events
   im Discord die beiden Schalter dort einschalten.
-- Server, einmalig: `docker-compose.override.yml` mit dem Host-Eintrag für
-  `erp.lionsquad.at` anlegen (`UPDATE.md`, #351) – seit #352 steht er nicht mehr
-  in `docker-compose.yml`, ohne ihn meldet Dolibarr „antwortet nicht rechtzeitig“.
+- Server: `docker-compose.override.yml` mit dem Host-Eintrag für
+  `erp.lionsquad.at` ist seit 21.09. angelegt (#351) – Dolibarr ist wieder
+  erreichbar; `update.sh` fasst die Datei nie an.
 - GitHub → Settings → Billing and plans ansehen: am 21.09. um 02:18 UTC hat
   GitHub Actions-Jobs wegen Zahlung/Ausgabenlimit nicht gestartet (um 15:35
   lief der CI wieder).
@@ -615,7 +630,7 @@ Compose-Override, andere Sitzung). `main` steht auf `9052488`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (47 offen nach dem Merge von #353)
+### Meilensteine und offene Issues (46 offen nach dem Merge von #354)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -635,7 +650,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
-| App 0.6.0-beta | #218 Erfolge |
+| App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta | #216 Kalender, #236 Galerie |
 | App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Mitglieder, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet). Eigene Beta, Versionsnummer beim Einplanen; Rechnungen (#296, #320, #325) und #327–#329 bringen ihren App-Teil selbst mit |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
@@ -656,7 +671,8 @@ sinnvoll hältst“):
    Server-Schritt, weil hier Rechte aus einem fremden System kommen; die
    Umstellung selbst macht der Betreiber nach `docs/DOLIBARR.md`.
 3. Discord I – umgesetzt in #350 (ein PR für den Meilenstein).
-4. Web: Anmeldung und Teilen – umgesetzt in #353; danach App 0.6.0-beta (#218).
+4. Web: Anmeldung und Teilen – umgesetzt in #353. App 0.6.0-beta – umgesetzt in
+   #354, Build 64 nach dem Merge.
 5. Dolibarr II (#296, #325), danach App: Mitgliederbereich (#340, #339, #341,
    #342) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
 6. Web: Dynamik.

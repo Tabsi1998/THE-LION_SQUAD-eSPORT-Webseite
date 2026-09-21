@@ -8,7 +8,7 @@ Jahreswertung.
 """
 import pathlib
 import sys
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -35,6 +35,16 @@ def iso(days: float) -> str:
     return (now_utc() + timedelta(days=days)).isoformat()
 
 
+def earlier_today() -> str:
+    """Heute, eine Minute nach Mitternacht Wiener Zeit - egal, wann der Test läuft.
+
+    „Jetzt minus ein paar Stunden“ ist zwischen Mitternacht und dem frühen Morgen gestern; der
+    Test war damit jede Nacht einige Stunden rot (aufgefallen am 22.09. um 00:02, #218).
+    """
+    midnight = now_utc().astimezone(mobile_routes.LOCAL_TZ).replace(hour=0, minute=0, second=0, microsecond=0)
+    return (midnight + timedelta(minutes=1)).astimezone(timezone.utc).isoformat()
+
+
 async def event(flow, user, *, days: float, status: str = "registration_open", name: str = "Event") -> dict:
     doc = {
         "id": new_id(), "slug": f"event-{new_id()[:8]}", "name": name, "status": status,
@@ -53,7 +63,7 @@ async def test_own_dates_show_only_today_and_later_and_nothing_cancelled(flow):
     summer_cup = await flow.create_tournament(title="Summer Cup", start_date=iso(-115), status="results_published")
     cancelled = await flow.create_tournament(title="Championship", start_date=iso(3), status="cancelled")
     autumn_cup = await flow.create_tournament(title="Autumn Cup", start_date=iso(46))
-    today_cup = await flow.create_tournament(title="Heute-Cup", start_date=iso(-0.2), status="live")
+    today_cup = await flow.create_tournament(title="Heute-Cup", start_date=earlier_today(), status="live")
     for tournament in (summer_cup, cancelled, autumn_cup, today_cup):
         await flow.register(tournament, alice)
     await event(flow, alice, days=-115, status="completed", name="Summer Opening")

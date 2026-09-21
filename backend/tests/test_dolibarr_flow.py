@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, member  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import dolibarr_client, dolibarr_sync, ops_checks  # noqa: E402
+from services import dolibarr_client, dolibarr_policy, dolibarr_sync, ops_checks  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 KASSIER = [{"code": "kassier", "label": "Kassier:in", "since": "2026-03-01"}]
@@ -408,7 +408,8 @@ async def test_function_opens_the_club_area_and_its_end_closes_it_without_new_lo
 @pytest.mark.asyncio
 async def test_what_never_grants_rights(flow, fake):
     await connect(flow)
-    tomorrow = (now_utc() + timedelta(days=1)).date().isoformat()
+    # „Morgen“ am Ort des Vereins - der Servertag (UTC) liegt um Mitternacht daneben (#355).
+    tomorrow = (now_utc().astimezone(dolibarr_policy.CLUB_TZ) + timedelta(days=1)).date().isoformat()
     fake.add(member(12, functions=[{"code": "rechnungspruefung", "label": "Rechnungsprüfer:in", "since": "2026-01-01"},
                                    {"code": "beirat_neu", "label": "Beirat", "since": "2026-01-01"}]))
     fake.add(member(13, functions=[{"code": "kassier", "label": "Kassier:in", "since": tomorrow}]))
@@ -557,3 +558,15 @@ async def test_internal_notes_stay_internal(flow):
     membership = me.json()["membership"]
     assert "notes" not in membership and "updated_by" not in membership
     assert membership["history"] and set(membership["history"][0]) == {"at", "from_status", "to_status", "source"}
+
+
+def test_a_function_starts_on_the_clubs_day_not_the_servers(monkeypatch):
+    """Um 00:30 Wiener Zeit ist es am Server (UTC) noch gestern - die Funktion gilt trotzdem ab heute (#355)."""
+    from datetime import datetime, timezone
+
+    monkeypatch.setattr(dolibarr_policy, "now_utc", lambda: datetime(2026, 9, 30, 22, 30, tzinfo=timezone.utc))
+    assert dolibarr_policy.club_today() == "2026-10-01"
+    starts_today = [{"code": "kassier", "label": "Kassier:in", "since": "2026-10-01"}]
+    starts_tomorrow = [{"code": "kassier", "label": "Kassier:in", "since": "2026-10-02"}]
+    assert [g["area"] for g in dolibarr_policy.areas_from_functions(starts_today, {"kassier": ["club"]})] == ["club"]
+    assert dolibarr_policy.areas_from_functions(starts_tomorrow, {"kassier": ["club"]}) == []
