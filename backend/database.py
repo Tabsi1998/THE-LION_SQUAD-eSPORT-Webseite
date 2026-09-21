@@ -285,6 +285,13 @@ async def init_indexes():
     await db.club_member_profiles.create_index("slug_history")
     await db.club_member_profiles.create_index("gamertag")
     await db.club_member_profiles.create_index("order_index")
+    # Dolibarr (#316): ein Dokument je Konto und Installation; `member_key` trägt nur eine
+    # bestätigte Zuordnung - zwei Konten können nie dasselbe Mitglied beanspruchen.
+    await db.dolibarr_links.create_index([("user_id", 1), ("instance", 1)], unique=True)
+    await db.dolibarr_links.create_index("member_key", unique=True, sparse=True)
+    await db.dolibarr_links.create_index("status")
+    await db.dolibarr_pending.create_index("key", unique=True)
+    await db.dolibarr_pending.create_index("due_at")
     await db.live_streams.create_index("user_id", unique=True)
     await db.live_streams.create_index("twitch_login")
     await db.twitch_stream_sessions.create_index("stream_id", unique=True)

@@ -33,6 +33,16 @@ Jede Freigabe steht im Audit-Log.
 **Vorstand:** Wer einen aktiven Vorstandsposten hält oder vertritt (Admin → Vorstand), hat die
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe.
 
+**Vorstand aus Dolibarr (#297):** Ist die Mitgliederverwaltung angebunden (Modus „Live“) und hat der
+Superadmin unter Admin → Dolibarr → Funktionen freigegeben, welche Funktion die Vereinsverwaltung
+öffnet, dann gilt **nur noch das**: Beginnt die Funktion in Dolibarr, ist der Bereich da; endet sie,
+ist er beim nächsten Abgleich weg – ohne neues Anmelden. Der lokal gepflegte Vorstandsposten
+verleiht dann nichts mehr, weil er sich redaktionell ändern lässt. Ableitbar ist allein die
+Vereinsverwaltung, nie System, Moderation, Rollenvergabe oder Geldfreigaben; Rechnungsprüfung ist
+eine Funktion, aber kein Vorstand. Zwei-Faktor bleibt Pflicht. Liegt der letzte gelungene Abgleich
+mehr als 48 Stunden zurück, ruhen diese Rechte – die Mitgliedschaft nicht. Ausdrücklich vergebene
+Freigaben bleiben davon unberührt. Anleitung: `docs/DOLIBARR.md`.
+
 **Pro Turnier:** Unabhängig von der Rolle kann eine Person je Turnier zugewiesen werden
 (Turnierseite → Staff: organizer, referee, scorekeeper, station_manager, stream_operator).
 Ein `organizer` darf in seinem Turnier alles – Struktur, Ergebnisse, Check-in, Stationen und die

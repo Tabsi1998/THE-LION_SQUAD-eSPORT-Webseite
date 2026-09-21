@@ -129,6 +129,40 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Dolibarr I (#295, #297, #316 Teil 1, #330 Teil 1; PR #338), Anleitung in
+  `docs/DOLIBARR.md`. **Ein** Weg zu Dolibarr: `services/dolibarr_client.py`
+  (Einstellungen in `settings` unter `dolibarr`, Schlüssel verschlüsselt; feste
+  Lesewege, nur https, maskierte `DolibarrError`, Wiederholen nur beim Lesen,
+  `capabilities_for`). Zuordnung Konto ↔ Mitglied in
+  `services/dolibarr_links.py` (Sammlung `dolibarr_links`, ein Dokument je
+  Konto und Installation; `member_key` nur bei bestätigter Zuordnung,
+  eindeutig → ein Mitglied, ein Konto; `thirdparty_id` bleibt leer bis zur
+  Abrechnung). Übernahme in `services/dolibarr_sync.py`: `project_summary`,
+  `apply_summary` (schreibt `memberships` mit `source: "dolibarr"` und dem
+  Unterdokument `dolibarr`; nie Mails, nie Discord), `run_sync` (alle 10 min
+  `changed_since`, täglich alles; Merker in `dolibarr_sync_state` rückt nur nach
+  einem vollständigen Lauf vor), `process_pending` (Webhook → Sammlung
+  `dolibarr_pending`, Nachlesen nach 5 s), `try_auto_link`,
+  `migration_preview` (Trockenlauf, schreibt nichts). Rechte in
+  `services/dolibarr_policy.py`: Freigabe „Funktionscode → Bereich“
+  (`function_policy`, versioniert, nur Superadmin, ableitbar nur `club`);
+  `permissions.areas_from_dolibarr` ersetzt bei aktiver Freigabe den lokalen
+  Vorstandsposten; älter als 48 h → abgeleitete Rechte ruhen. Routen
+  `routes/dolibarr_routes.py`: `/api/admin/dolibarr/status|sync|preview|links`
+  (Bereich `club`), `/settings|test|webhook-token` (Bereich `system`),
+  `/function-policy` (Superadmin), `POST
+  /api/integrations/dolibarr/webhook/{token}`, `POST
+  /api/membership/dolibarr/link-request`; `/api/membership/me` trägt `dolibarr`
+  (geprüfte Sicht, ohne Rohstand). Modi `off → preview → live`, Live erst nach
+  sauberem Vorschau-Lauf. Geführte Mitglieder: `PUT /membership/user/{id}`
+  lehnt Status/Art/Nummer/Beginn mit 409 ab, `_activate_linked_membership`
+  tut nichts. Zehnte Auto-Prüfung `dolibarr_sync`. Vertragstests:
+  `tests/contracts/vereine-openapi.json` + `manifest.json` (Modul
+  0.5.12-beta), `tests/dolibarr_fake.py` prüft jede Testantwort dagegen. Web:
+  `pages/admin/AdminDolibarrPage.jsx`, `lib/dolibarr.js`, Beitragskarte in
+  `pages/user/MyMembershipPage.jsx`. **Neue Dolibarr-Funktion = über den
+  Adapter, nie ein zweiter HTTP-Client; neue Fähigkeit des Moduls erst nutzen,
+  wenn sie im Manifest steht.**
 - Livestreams auf der Startseite (#310, PR #337): Die Regel „nur aktive
   Mitglieder mit verknüpftem Mitgliederprofil“ steht einmal in
   `services/stream_visibility.py` (`homepage_visibility`) – für
@@ -495,13 +529,13 @@ braucht.
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
 (#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
 (#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen nach der Analyse),
-#311 und #313 (Dependabot: Backend, App). `main` steht auf `56ae588`.
+#311, #312 und #313 (Dependabot), #337 (#310 Livestreams). `main` steht auf
+`bc269ba`.
 
 ### Offene PRs
-- #337 (#310 Livestreams: Diagnose statt stillem Überspringen).
-- #312 (Dependabot Frontend, u. a. jsdom 30.1): am 21.09. neu aufgebaut
-  (`@dependabot rebase`), nach grünem Lauf mergen. Der Testfehler dazu ist mit
-  #334 behoben.
+- #338 (Dolibarr I: #295, #297, #316 Teil 1, #330 Teil 1). Nach dem Merge:
+  `update.sh`, dann die Schritte aus `docs/DOLIBARR.md`. Solange niemand die
+  Verbindung einträgt, ändert sich nichts (Modus „Aus“).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -531,7 +565,7 @@ braucht.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (48 offen nach dem Merge des Aufräum-PRs zu #333–#335)
+### Meilensteine und offene Issues (46 offen nach dem Merge von #338)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -540,18 +574,18 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Meilenstein | Issues |
 | --- | --- |
 | Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg |
-| Dolibarr I: Anbindung und Mitgliedschaft | #316 gemeinsamer Adapter und sichere Kontoverknüpfung, #295 Mitgliedschaft und Beitragsstand automatisch übernehmen, #297 Vereinsrechte aus Funktionsperioden, #330 Vertragstests und Bestandsumstellung – baubar, die Modul-APIs gibt es (Vereine v0.3/v0.4) |
+| Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web und App – baubar (dolibarr-vereine#50 ist fertig) |
-| Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
+| Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #316 Rest: Geschäftspartner-Zuordnung und Kundenanlage bei Buchung (Adapter und Konto-Zuordnung sind fertig), #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und melden, #303 Meldungen mit Bild und Vorschau – ohne Bot |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge |
-| App 0.7.0-beta | #216 Kalender, #236 Galerie |
+| App 0.7.0-beta | #216 Kalender, #236 Galerie, #339 Meine Mitgliedschaft mit Beitragsstand |
 | App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
@@ -566,8 +600,9 @@ sinnvoll hältst“):
 
 1. #310 Livestream-Bug – umgesetzt in #337 (Diagnose unter Betrieb, Grund je
    Kanal im Twitch-Reiter).
-2. Dolibarr I (#316 → #295 → #297, #330 begleitend). Eigener Server-Schritt,
-   weil hier Rechte aus einem fremden System kommen.
+2. Dolibarr I – umgesetzt in #338 (ein PR für den Meilenstein). Eigener
+   Server-Schritt, weil hier Rechte aus einem fremden System kommen; die
+   Umstellung selbst macht der Betreiber nach `docs/DOLIBARR.md`.
 3. Discord I (#300, #301, #303).
 4. App 0.6.0-beta (#218).
 5. Dolibarr II (#296, #325).

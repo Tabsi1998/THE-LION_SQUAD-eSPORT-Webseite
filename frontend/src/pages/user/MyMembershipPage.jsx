@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, formatMemberSince } from "@/lib/api";
+import { api, formatApiError, formatMemberSince } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History } from "lucide-react";
+import { feeCard, formatDate } from "@/lib/dolibarr";
+import { toast } from "sonner";
+import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet } from "lucide-react";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -29,6 +31,9 @@ export default function MyMembershipPage() {
   if (!data) return <PublicLayout><div className="p-20 text-center text-white/40">Lade …</div></PublicLayout>;
 
   const m = data.membership;
+  const erp = data.dolibarr;
+  const fee = feeCard(erp);
+  const canAskForLink = erp?.connected && !erp.led_by_dolibarr && !["verified", "requested"].includes(erp.link?.status);
   const memberSince = m?.member_since ? new Date(m.member_since) : null;
   const yearsAsMember = memberSince ? Math.floor((Date.now() - memberSince.getTime()) / (1000 * 60 * 60 * 24 * 365.25)) : null;
 
@@ -65,6 +70,39 @@ export default function MyMembershipPage() {
           <Stat icon={m?.show_member_number_publicly ? Eye : EyeOff} label="Nummer öffentlich" value={m?.show_member_number_publicly ? "Ja" : "Nein"} />
           <Stat icon={FileText} label="Mitgliedsart" value={m?.membership_type ? TYPE_LABELS[m.membership_type] : "—"} />
         </div>
+
+        {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
+        {fee && (
+          <div className={`mt-6 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
+            </div>
+            {fee.amount && <div className="mt-2 font-heading text-2xl font-black">{fee.amount} <span className="text-xs text-white/40 font-normal">je Beitragsperiode</span></div>}
+            <ul className="mt-2 space-y-1 text-sm text-white/75">
+              {fee.lines.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+            {!!erp.functions?.length && (
+              <div className="mt-3 text-sm text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
+            )}
+            <div className={`mt-3 text-xs ${fee.stale ? "text-[#FFD700]" : "text-white/40"}`}>
+              Stand aus der Mitgliederverwaltung vom {formatDate(fee.asOf)}{fee.stale ? " – seither nicht mehr abgeglichen" : ""}. Stimmt etwas nicht, melde dich beim Vorstand.
+            </div>
+          </div>
+        )}
+        {erp?.connected && !erp.led_by_dolibarr && (
+          <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
+            <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
+            {erp.link?.status === "requested" ? (
+              <p className="mt-2 text-sm text-white/70">Deine Anfrage vom {formatDate(erp.link.requested_at)} liegt beim Vorstand. Sobald sie bestätigt ist, erscheint hier dein Beitragsstand.</p>
+            ) : erp.link?.status === "conflict" ? (
+              <p className="mt-2 text-sm text-white/70">Deine Zuordnung braucht eine Klärung durch den Vorstand (z. B. geteilte E-Mail-Adresse in der Familie). Du musst nichts tun.</p>
+            ) : (
+              <p className="mt-2 text-sm text-white/70">Dein Konto ist noch keinem Mitglied in der Mitgliederverwaltung zugeordnet. Der Vorstand prüft und bestätigt die Zuordnung – eine Mitgliedsnummer allein reicht dafür nicht.</p>
+            )}
+            {canAskForLink && <LinkRequest onDone={load} />}
+          </div>
+        )}
 
         {/* Notes */}
         {m?.notes && (
@@ -105,6 +143,32 @@ export default function MyMembershipPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function LinkRequest({ onDone }) {
+  const [ref, setRef] = useState("");
+  const [busy, setBusy] = useState(false);
+  const send = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await api.post("/membership/dolibarr/link-request", { member_ref: ref.trim() || null });
+      toast.success("Anfrage gesendet – der Vorstand prüft sie.");
+      onDone();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-3 flex flex-col sm:flex-row gap-2">
+      <input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={40} placeholder="Mitgliedsnummer (falls bekannt)" data-testid="membership-link-ref"
+        className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm sm:w-64" />
+      <button type="button" onClick={send} disabled={busy} data-testid="membership-link-request"
+        className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Zuordnung anfragen</button>
+    </div>
   );
 }
 

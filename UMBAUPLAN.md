@@ -464,7 +464,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
-| Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. #316 gemeinsamer Adapter und sichere Kontoverknüpfung, #295 Mitgliedschaft und Beitragsstand automatisch übernehmen, #297 Vereinsrechte aus Funktionsperioden, #330 Vertragstests und Bestandsumstellung. Die APIs im Vereinsmodul gibt es schon (v0.3/v0.4) |
+| Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv und Zahlungsweg aus Dolibarr, #325 ein PDF-Betrachter für Web und App. Baubar, dolibarr-vereine#50 ist fertig |
 | Abrechnung I: Grundlage und Events | Epic #314, erster Durchstich: #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
@@ -599,6 +599,51 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 24 — Dolibarr I: Anbindung und Mitgliedschaft
+
+Wunsch des Betreibers: Dolibarr mit dem eigenen Vereinsmodul führt Mitglieder, Beiträge und
+Funktionen – die Website soll das nicht ein zweites Mal von Hand pflegen. Anleitung für den
+Betrieb: `docs/DOLIBARR.md`.
+
+### Was 24.1 gefunden hat (#295, #297, #316, #330 – PR #338)
+
+**Das Vereinsmodul kann schon mehr, als die Issues annahmen – und weniger, als sie verlangten.**
+Zusammenfassung je Mitglied mit Beitragsstand und Funktionen, Suche über E-Mail oder Nummer,
+`changed_since`, ein Webhook ohne Personendaten: alles da (Modul 0.5.12-beta). Verifizierte
+Identitäten, ein Änderungsfeed mit Löschhinweisen und signierte Webhooks fehlen noch
+(dolibarr-vereine#153–#155). Die Website setzt deshalb nur voraus, was im festgehaltenen Vertrag
+steht, und löst das Fehlende selbst: Bestätigung der Zuordnung durch die Vereinsverwaltung statt
+Identitätsnachweis aus dem Modul; täglicher vollständiger Lauf mit einzelnem Nachlesen statt
+Löschhinweisen; Token in der Adresse und „nur Anlass zum Nachlesen“ statt Signatur.
+
+**E-Mail und Mitgliedsnummer beweisen nichts.** Familien teilen sich Adressen, eine Nummer kann
+jeder abschreiben. Eine Zuordnung gilt erst, wenn sie bestätigt ist; ein eindeutiger Index sorgt
+dafür, dass zwei Konten nie dasselbe Mitglied beanspruchen. Die Zuordnung über die bestätigte
+E-Mail gibt es, aber nur, wenn der Betreiber sie einschaltet, und nur bei genau einem Treffer.
+
+**Die gefährlichen Fälle sind die stillen.** Ein Lauf, dem eine Seite fehlt, darf niemanden
+austragen; ein altes Ereignis darf keinen neuen Stand überschreiben; Beitragsrückstand ist kein
+Austritt; ein Abgleich darf keine Mails und keine Discord-Meldungen auslösen. Jeder dieser Fälle
+hat einen Test. Dazu die alte Falle im eigenen Code: Das Anlegen eines Mitgliederprofils setzte
+die Mitgliedschaft auf „aktiv“ – im geführten Betrieb hätte Profilpflege einen Austritt
+rückgängig gemacht.
+
+**Rechte aus einem fremden System brauchen eine Schwelle.** Welche Funktion was öffnet, legt der
+Superadmin einmal fest, mit Vorschau „wer bekäme was“, versioniert und im Audit. Ableitbar ist
+nur die Vereinsverwaltung. Ist die Freigabe aktiv, verleiht der lokale Vorstandsposten nichts
+mehr – er ließe sich sonst redaktionell als Hintertür benutzen. Nach 48 Stunden ohne gelungenen
+Abgleich ruhen die abgeleiteten Rechte; die Mitgliedschaft bleibt.
+
+**Vertragstests ohne Dolibarr im CI.** Das Modul prüft seine echten Antworten in Dolibarr 22–24
+gegen seine `openapi.json`. Die Website hält dieselbe Datei fest, und ihr Test-Dolibarr prüft
+jede eigene Antwort dagegen – weicht eine Testannahme vom Vertrag ab, scheitert der Test. Beim
+ersten Lauf fand die Oberflächen-Prüfung gleich einen echten Fehler: Die ungespeicherten Haken der
+Funktions-Freigabe verschwanden, sobald die Seite nachlud.
+
+**Was offen bleibt:** #316 für die Kundenanlage bei kostenpflichtigen Buchungen (Abrechnung I),
+#330 für die Durchläufe der späteren Pakete (Dolibarr III), die App-Seite „Meine Mitgliedschaft“
+(#339).
 
 ## Block 19 — Web-Profil
 

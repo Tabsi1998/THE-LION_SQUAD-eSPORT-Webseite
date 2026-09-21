@@ -44,6 +44,7 @@ def setup(monkeypatch):
     # Rechte nach Bereichen (#287): der Wächter fragt den Vorstand ab - hier ohne Datenbank.
     from services import permissions
     monkeypatch.setattr(permissions, "is_board_holder", AsyncMock(return_value=False))
+    monkeypatch.setattr(permissions, "areas_from_dolibarr", AsyncMock(return_value=None))
     app = FastAPI()
     app.include_router(routes.router)
     app.dependency_overrides[get_current_user] = lambda: {"id": "admin", "role": "superadmin", "mfa_enabled": True, "auth_mfa_verified": True}

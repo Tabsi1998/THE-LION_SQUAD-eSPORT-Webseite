@@ -10,7 +10,7 @@ import {
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
   Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker,
-  Smartphone,
+  Smartphone, Link2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -32,6 +32,7 @@ const ADMIN_GROUPS = [
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
       { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
       { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
+      { to: "/admin/dolibarr", label: "Dolibarr", icon: Link2, areas: ["club", "system"] },
     ],
   },
   {

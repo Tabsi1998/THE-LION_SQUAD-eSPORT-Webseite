@@ -134,6 +134,22 @@ async def _safe_birthday_greetings():
         _log_task_failure("birthday_greetings", exc)
 
 
+async def _safe_dolibarr_sync():
+    try:
+        from services.dolibarr_sync import run_sync
+        await run_sync()
+    except Exception as exc:
+        _log_task_failure("dolibarr_sync", exc)
+
+
+async def _safe_dolibarr_pending():
+    try:
+        from services.dolibarr_sync import process_pending
+        await process_pending()
+    except Exception as exc:
+        _log_task_failure("dolibarr_pending", exc)
+
+
 async def _safe_twitch_poll():
     try:
         from services.twitch_service import twitch_poll_loop
@@ -327,6 +343,10 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_poll", _safe_twitch_poll), IntervalTrigger(seconds=90), id="twitch_poll",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("dolibarr_sync", _safe_dolibarr_sync, lease_seconds=300.0), IntervalTrigger(minutes=10), id="dolibarr_sync",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("dolibarr_pending", _safe_dolibarr_pending), IntervalTrigger(seconds=30), id="dolibarr_pending",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("game_server_sync", _safe_game_server_sync), IntervalTrigger(seconds=60), id="game_server_sync",
                   max_instances=1, coalesce=True)
