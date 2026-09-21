@@ -116,9 +116,29 @@ async def areas_for(user: dict | None, db=None) -> set[str]:
         return set()
     areas = base_areas(user)
     if "club" not in areas:
-        if await is_board_holder(db, user.get("id")):
+        from_functions = await areas_from_dolibarr(db, user.get("id"))
+        if from_functions is not None:
+            areas |= from_functions
+        elif await is_board_holder(db, user.get("id")):
             areas.add("club")
     return areas
+
+
+async def areas_from_dolibarr(db, user_id: str | None) -> set[str] | None:
+    """Bereiche aus Dolibarr-Funktionen (#297) - oder None, wenn Dolibarr sie nicht führt.
+
+    Ist die Funktions-Freigabe aktiv, zählt nur die dort geführte Funktion; der
+    lokal pflegbare Vorstandsposten verleiht dann nichts mehr.
+    """
+    from services.dolibarr_client import load_settings
+    from services.dolibarr_policy import derived_areas, policy_active
+
+    if db is None:
+        db = get_db()
+    settings = await load_settings(db)
+    if not policy_active(settings):
+        return None
+    return await derived_areas(db, user_id, settings)
 
 
 async def user_has_area(user: dict | None, *areas: str, db=None) -> bool:

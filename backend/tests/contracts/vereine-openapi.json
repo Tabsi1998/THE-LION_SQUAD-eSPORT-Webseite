@@ -1,0 +1,1742 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Vereine-API",
+    "version": "1",
+    "description": "Schnittstellen des Dolibarr-Moduls Vereine unter Dolibarrs REST-API. Von einem Server aus mit dem API-Schlüssel eines Dolibarr-Benutzers aufrufen; siehe docs/API.md. Clients sollen Felder, die sie nicht kennen, übergehen; info.version ist die api_version und steigt, wenn ein Feld seine Bedeutung ändert oder wegfällt.",
+    "license": {
+      "name": "GPL-3.0-or-later",
+      "url": "https://www.gnu.org/licenses/gpl-3.0.html"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{dolibarr}/api/index.php",
+      "variables": {
+        "dolibarr": {
+          "default": "erp.example.org",
+          "description": "Host und Pfad der Dolibarr-Installation"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "DolibarrApiKey": []
+    }
+  ],
+  "paths": {
+    "/vereine/membershipfees": {
+      "get": {
+        "operationId": "getMembershipfees",
+        "summary": "Verwendete Mitgliedsarten mit ihrem Beitrag, für „Mitglied werden“",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Mitgliedsarten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MembershipFee"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/board": {
+      "get": {
+        "operationId": "getBoard",
+        "summary": "Funktionen des Vereins mit ihren heutigen Inhabern, Namen nur, wo die Website sie zeigen darf",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Funktionen in ihrer Reihenfolge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardFunction"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/consents": {
+      "get": {
+        "operationId": "getConsents",
+        "summary": "Einwilligungstexte, denen eine Person jetzt zustimmen kann, die neueste Version je Zweck",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen oder Beitrittsanträge anzulegen.",
+        "responses": {
+          "200": {
+            "description": "Einwilligungstexte",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConsentText"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read",
+            "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/applications": {
+      "post": {
+        "operationId": "postApplication",
+        "summary": "Beitrittsantrag von einer Website: ein Mitglied im Entwurf mit seinen Einwilligungen",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Nochmals mit derselben external_id geschickt, antwortet es mit dem beim ersten Mal angelegten Mitglied und duplicate true.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Application"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Das Mitglied im Entwurf",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/members": {
+      "get": {
+        "operationId": "getMembers",
+        "summary": "Mitglieds-Zusammenfassungen für einen Website-Abgleich, nach ID",
+        "description": "Alle Mitglieder, oder mit changed_since nur die, deren Zusammenfassung sich zu oder nach diesem Zeitpunkt geändert hat. Braucht dieselben Rechte wie die Zusammenfassung.",
+        "parameters": [
+          {
+            "name": "changed_since",
+            "in": "query",
+            "required": false,
+            "description": "Zeitpunkt nach ISO 8601 mit Zeitzone, etwa 2026-09-17T08:00:00Z",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Mitglieder je Seite, 100 ohne Angabe",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Seite, ab 0",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mitglieds-Zusammenfassungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberSummary"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/status": {
+      "get": {
+        "operationId": "getStatus",
+        "summary": "Modulversion und API-Version",
+        "description": "Braucht das Recht, den Verein zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/organization": {
+      "get": {
+        "operationId": "getOrganization",
+        "summary": "Der Verein, zum Beispiel für das Impressum einer Website",
+        "description": "Braucht das Recht, den Verein zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Der Verein",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Organization"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/taxprofiles": {
+      "get": {
+        "operationId": "getTaxprofiles",
+        "summary": "Die Steuerprofile des Vereins",
+        "description": "Braucht das Recht, den Verein zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Steuerprofile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaxProfile"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/thresholds": {
+      "get": {
+        "operationId": "getThresholds",
+        "summary": "Grenzen und Registrierkassenpflicht eines Kalenderjahres",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Rechnungen zu lesen.",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "required": false,
+            "description": "Kalenderjahr, ohne Angabe das laufende",
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grenzen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thresholds"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "facture:lire"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/summary": {
+      "get": {
+        "operationId": "getMemberSummary",
+        "summary": "Was eine Website einem Mitglied über die Mitgliedschaft zeigt",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen. Enthält nie Geburtsdatum, Anschrift, Telefon, Notizen oder Bankdaten.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zusammenfassung des Mitglieds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/lookup": {
+      "get": {
+        "operationId": "getMemberLookup",
+        "summary": "Ein Mitglied über Mitgliedsnummer oder E-Mail-Adresse finden",
+        "description": "Liefert die Zusammenfassung des Mitglieds. Entweder ref oder email angeben; E-Mail-Adressen passen ohne Unterschied zwischen Groß- und Kleinschreibung. Braucht dieselben Rechte wie die Zusammenfassung.",
+        "parameters": [
+          {
+            "name": "ref",
+            "in": "query",
+            "required": false,
+            "description": "Mitgliedsnummer",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "required": false,
+            "description": "E-Mail-Adresse ohne Leerzeichen davor oder danach; Dolibarrs API antwortet 400 bei einer ungültigen Adresse",
+            "schema": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zusammenfassung des Mitglieds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/invoices": {
+      "get": {
+        "operationId": "getMemberInvoices",
+        "summary": "Freigegebene Rechnungen eines Mitglieds, neueste zuerst",
+        "description": "Rechnungen des Geschäftspartners des Mitglieds; Entwürfe fehlen, eine leere Liste, wenn das Mitglied keinen Geschäftspartner hat. Braucht dieselben Rechte wie die Zusammenfassung, nicht das Recht, Rechnungen zu lesen.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Rechnungen je Seite, 100 ohne Angabe",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Seite, ab 0",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rechnungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Invoice"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/invoices/{invoice}/pdf": {
+      "get": {
+        "operationId": "getMemberInvoicePdf",
+        "summary": "PDF einer Rechnung eines Mitglieds",
+        "description": "Base64-kodiert. Die Rechnung eines anderen Mitglieds, ein Entwurf oder eine unbekannte Rechnung ergibt 404. Ein fehlendes PDF wird mit der Vorlage der Rechnung erzeugt. Nur dem Mitglied geben, dem es gehört.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "description": "Rechnungs-ID, wie members/{id}/invoices sie listet",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoicePdf"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "DolibarrApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "DOLAPIKEY"
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Fehlerantwort von Dolibarr",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Date": {
+        "type": "string",
+        "description": "JJJJ-MM-TT, oder leer, wenn unbekannt",
+        "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$"
+      },
+      "Moment": {
+        "type": "string",
+        "description": "ISO 8601 in UTC, etwa 2026-09-17T08:00:00Z",
+        "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "integer"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "Status": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "module_version",
+          "api_version",
+          "country_profile",
+          "country_profile_complete",
+          "server_time"
+        ],
+        "properties": {
+          "module_version": {
+            "type": "string"
+          },
+          "api_version": {
+            "type": "integer"
+          },
+          "country_profile": {
+            "type": "string",
+            "enum": [
+              "AT"
+            ],
+            "deprecated": true,
+            "description": "Immer AT: Das Modul ist für österreichische Vereine. Entfällt mit 1.0."
+          },
+          "country_profile_complete": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "deprecated": true,
+            "description": "Immer true. Entfällt mit 1.0."
+          },
+          "server_time": {
+            "$ref": "#/components/schemas/Moment"
+          }
+        }
+      },
+      "Organization": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "country_profile",
+          "country_profile_complete",
+          "name",
+          "register",
+          "authority",
+          "address",
+          "email",
+          "phone",
+          "url",
+          "founded",
+          "nonprofit",
+          "purpose",
+          "fiscal_year_start_month"
+        ],
+        "properties": {
+          "country_profile": {
+            "type": "string",
+            "enum": [
+              "AT"
+            ],
+            "deprecated": true,
+            "description": "Immer AT: Das Modul ist für österreichische Vereine. Entfällt mit 1.0."
+          },
+          "country_profile_complete": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "deprecated": true,
+            "description": "Immer true. Entfällt mit 1.0."
+          },
+          "name": {
+            "type": "string"
+          },
+          "register": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "number",
+              "court"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ZVR"
+                ],
+                "description": "Immer ZVR"
+              },
+              "number": {
+                "type": "string"
+              },
+              "court": {
+                "type": "string",
+                "enum": [
+                  ""
+                ],
+                "deprecated": true,
+                "description": "Immer leer. Entfällt mit 1.0."
+              }
+            }
+          },
+          "authority": {
+            "type": "string",
+            "description": "Vereinsbehörde"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "street",
+              "zip",
+              "town",
+              "country_code"
+            ],
+            "properties": {
+              "street": {
+                "type": "string"
+              },
+              "zip": {
+                "type": "string"
+              },
+              "town": {
+                "type": "string"
+              },
+              "country_code": {
+                "type": "string"
+              }
+            }
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "founded": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "nonprofit": {
+            "type": "boolean"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "fiscal_year_start_month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          }
+        }
+      },
+      "TaxProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "code",
+          "label",
+          "sphere",
+          "sphere_basis",
+          "treatment",
+          "treatment_basis",
+          "rate",
+          "note",
+          "active",
+          "standard"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Wert des Zusatzfelds vereine_taxprofile an Produkten und Rechnungszeilen"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "sphere": {
+            "$ref": "#/components/schemas/Sphere"
+          },
+          "sphere_basis": {
+            "type": "string"
+          },
+          "treatment": {
+            "type": "string",
+            "enum": [
+              "nonbusiness",
+              "hobby",
+              "small_business",
+              "sport",
+              "reduced10",
+              "reduced13",
+              "standard20"
+            ]
+          },
+          "treatment_basis": {
+            "type": "string"
+          },
+          "rate": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "standard": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Sphere": {
+        "type": "string",
+        "enum": [
+          "ideal",
+          "assets",
+          "essential",
+          "auxiliary",
+          "festival",
+          "harmful"
+        ]
+      },
+      "Thresholds": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "year",
+          "thresholds",
+          "unassigned",
+          "cash_register"
+        ],
+        "properties": {
+          "year": {
+            "type": "integer"
+          },
+          "thresholds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Threshold"
+            }
+          },
+          "unassigned": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "net",
+              "gross",
+              "lines"
+            ],
+            "properties": {
+              "net": {
+                "type": "number"
+              },
+              "gross": {
+                "type": "number"
+              },
+              "lines": {
+                "type": "integer"
+              }
+            }
+          },
+          "cash_register": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "turnover_limit",
+              "cash_limit",
+              "small_canteen_limit",
+              "small_canteen_days",
+              "spheres",
+              "unassigned_cash"
+            ],
+            "properties": {
+              "turnover_limit": {
+                "type": "number"
+              },
+              "cash_limit": {
+                "type": "number"
+              },
+              "small_canteen_limit": {
+                "type": "number"
+              },
+              "small_canteen_days": {
+                "type": "integer"
+              },
+              "spheres": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sphere",
+                    "turnover",
+                    "cash",
+                    "status"
+                  ],
+                  "properties": {
+                    "sphere": {
+                      "$ref": "#/components/schemas/Sphere"
+                    },
+                    "turnover": {
+                      "type": "number"
+                    },
+                    "cash": {
+                      "type": "number"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "not_relevant",
+                        "exempt",
+                        "exempt_festival",
+                        "ok",
+                        "near",
+                        "required"
+                      ]
+                    }
+                  }
+                }
+              },
+              "unassigned_cash": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "Threshold": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "year",
+          "limit",
+          "gross",
+          "tolerance",
+          "amount",
+          "remaining",
+          "ratio",
+          "status",
+          "basis",
+          "source",
+          "previous_exceeded"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "small_business",
+              "harmful_business"
+            ]
+          },
+          "year": {
+            "type": "integer"
+          },
+          "limit": {
+            "type": "number"
+          },
+          "gross": {
+            "type": "boolean"
+          },
+          "tolerance": {
+            "type": "number",
+            "description": "Toleranz in Prozent über der Grenze"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "remaining": {
+            "type": "number"
+          },
+          "ratio": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "near",
+              "tolerance",
+              "exceeded"
+            ]
+          },
+          "basis": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "pattern": "^https://"
+          },
+          "previous_exceeded": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MemberSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ref",
+          "firstname",
+          "lastname",
+          "company",
+          "type",
+          "status",
+          "member_since",
+          "paid_until",
+          "membership_ends",
+          "functions",
+          "currency",
+          "fee",
+          "open_invoices",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Mitgliedsnummer"
+          },
+          "firstname": {
+            "type": "string"
+          },
+          "lastname": {
+            "type": "string"
+          },
+          "company": {
+            "type": "string",
+            "description": "Name einer juristischen Person; leer bei natürlichen Personen"
+          },
+          "type": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "label"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "label": {
+                "type": "string"
+              }
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "terminated",
+              "excluded"
+            ]
+          },
+          "member_since": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "paid_until": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "functions": {
+            "type": "array",
+            "description": "Funktionen, die das Mitglied heute hat",
+            "items": {
+              "$ref": "#/components/schemas/MemberFunction"
+            }
+          },
+          "membership_ends": {
+            "type": "string",
+            "pattern": "^(\\d{4}-\\d{2}-\\d{2})?$",
+            "description": "Letzter Tag der Mitgliedschaft nach einem eingetragenen Austritt (Kündigung mit Frist, Ausschluss, Tod, Streichung); leer ohne Austritt"
+          },
+          "currency": {
+            "type": "string",
+            "description": "Währung aller Beträge, etwa EUR"
+          },
+          "fee": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "required",
+              "status",
+              "next_due",
+              "amount",
+              "discount",
+              "payer",
+              "payment_url"
+            ],
+            "properties": {
+              "required": {
+                "type": "boolean",
+                "description": "Ob die Mitgliedsart ein Abonnement braucht"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "paid",
+                  "invoiced",
+                  "due",
+                  "not_required",
+                  "inactive"
+                ]
+              },
+              "next_due": {
+                "$ref": "#/components/schemas/Date"
+              },
+              "amount": {
+                "type": "number",
+                "nullable": true,
+                "description": "Betrag einer ganzen Periode für dieses Mitglied: der Betrag der Mitgliedsart nach der Ermäßigung des Mitglieds, vor einem Familienrabatt; null, wenn die Art keinen festlegt oder kein Abonnement braucht"
+              },
+              "discount": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "label"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "exempt",
+                      "proof",
+                      "age"
+                    ]
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Name der Ermäßigung oder Grund einer Befreiung; leer ohne Ermäßigung"
+                  }
+                }
+              },
+              "payer": {
+                "type": "string",
+                "enum": [
+                  "self",
+                  "other"
+                ],
+                "description": "Wer die Beitragsrechnungen bekommt: der eigene Geschäftspartner des Mitglieds oder ein anderer als Zahler, etwa ein Elternteil; die Rechnungen eines Zahlers stehen nicht beim Mitglied"
+              },
+              "payment_url": {
+                "type": "string",
+                "description": "Dolibarrs Online-Zahlungsseite für den Beitrag; leer, außer der Beitrag ist fällig, das Mitglied zahlt selbst und ein Online-Zahlungsdienst ist eingerichtet"
+              }
+            }
+          },
+          "open_invoices": {
+            "type": "array",
+            "description": "Freigegebene, unbezahlte normale, Ersatz- und Anzahlungsrechnungen, älteste zuerst, höchstens 50",
+            "items": {
+              "$ref": "#/components/schemas/Invoice"
+            }
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Moment"
+          }
+        }
+      },
+      "BoardFunction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "label",
+          "board",
+          "represents",
+          "auditor",
+          "holders"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,31}$"
+          },
+          "label": {
+            "type": "string"
+          },
+          "board": {
+            "type": "boolean",
+            "description": "Teil des Vorstands (Leitungsorgan)"
+          },
+          "represents": {
+            "type": "boolean",
+            "description": "Vertritt den Verein nach außen"
+          },
+          "auditor": {
+            "type": "boolean"
+          },
+          "holders": {
+            "type": "array",
+            "description": "Heutige Inhaber; leer, wenn unbesetzt",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "since"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Name, oder null, wenn der Inhaber nicht eingewilligt hat und die Einstellung die Namen des Vorstands nicht verlangt"
+                },
+                "since": {
+                  "$ref": "#/components/schemas/Date"
+                }
+              }
+            }
+          }
+        }
+      },
+      "MemberFunction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "label",
+          "since"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "since": {
+            "$ref": "#/components/schemas/Date"
+          }
+        }
+      },
+      "ConsentText": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "label",
+          "version",
+          "text"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]{1,31}$",
+            "description": "Zweck, über alle Versionen gleich"
+          },
+          "label": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Diese Version mit der Einwilligung zurückschicken"
+          },
+          "text": {
+            "type": "string",
+            "description": "Der Text neben dem Ankreuzfeld"
+          }
+        }
+      },
+      "Application": {
+        "type": "object",
+        "required": [
+          "firstname",
+          "lastname",
+          "email",
+          "type_id"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string",
+            "description": "Die eigene Kennung des Antrags auf der Website, bis 64 Buchstaben, Ziffern und . _ : -; dieselbe Kennung legt nie ein zweites Mitglied an",
+            "example": "web-2026-0042"
+          },
+          "morphy": {
+            "type": "string",
+            "enum": [
+              "phy",
+              "mor"
+            ],
+            "description": "Natürliche Person (Standard) oder juristische Person"
+          },
+          "company": {
+            "type": "string",
+            "description": "Name einer juristischen Person, Pflicht bei mor"
+          },
+          "firstname": {
+            "type": "string"
+          },
+          "lastname": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "birth": {
+            "type": "string",
+            "description": "JJJJ-MM-TT; Pflicht, solange die Statuten ein Mindestalter festlegen, Jüngere ergeben 400"
+          },
+          "address": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "town": {
+            "type": "string"
+          },
+          "country_code": {
+            "type": "string",
+            "description": "Zwei Buchstaben, etwa AT"
+          },
+          "type_id": {
+            "type": "integer",
+            "description": "Eine aktive Mitgliedsart, siehe GET /vereine/membershipfees"
+          },
+          "note": {
+            "type": "string",
+            "description": "Nachricht der antragstellenden Person, gespeichert als private Notiz am Mitglied"
+          },
+          "consents": {
+            "type": "array",
+            "description": "Erteilte Einwilligungen, jede mit der Version aus GET /vereine/consents, die der Person gezeigt wurde",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "version"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ApplicationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ref",
+          "status",
+          "duplicate"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Mitglieds-ID; die Mitgliedskarte in Dolibarr und die Zusammenfassung verwenden sie"
+          },
+          "ref": {
+            "type": "string",
+            "description": "Mitgliedsnummer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "active",
+              "terminated",
+              "excluded"
+            ],
+            "description": "draft, bis der Verein das Mitglied freigibt"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "description": "true, wenn ein Antrag mit dieser external_id schon eingegangen ist; nichts Neues wurde angelegt"
+          }
+        }
+      },
+      "MembershipFee": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "description",
+          "for",
+          "subscription_required",
+          "amount",
+          "amount_editable",
+          "duration",
+          "year_starts_month",
+          "prorated",
+          "proration",
+          "admission_fee",
+          "currency"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "description": "Öffentliche Beschreibung der Mitgliedsart, reiner Text"
+          },
+          "for": {
+            "type": "string",
+            "enum": [
+              "natural",
+              "legal",
+              "both"
+            ]
+          },
+          "subscription_required": {
+            "type": "boolean"
+          },
+          "amount": {
+            "type": "number",
+            "nullable": true,
+            "description": "Beitrag je Periode; null, wenn die Art keinen festlegt oder kein Abonnement braucht"
+          },
+          "amount_editable": {
+            "type": "boolean",
+            "description": "Das Mitglied darf einen anderen Betrag zahlen"
+          },
+          "duration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value",
+              "unit"
+            ],
+            "properties": {
+              "value": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "unit": {
+                "type": "string",
+                "enum": [
+                  "y",
+                  "m",
+                  "w",
+                  "d"
+                ]
+              }
+            }
+          },
+          "year_starts_month": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 12,
+            "description": "Monat, in dem das Beitragsjahr beginnt, 0, wenn jedes Mitglied ab dem Eintritt zahlt"
+          },
+          "prorated": {
+            "type": "boolean",
+            "description": "Ein Eintritt während des Beitragsjahres zahlt weniger als den vollen Betrag; siehe proration"
+          },
+          "proration": {
+            "type": "string",
+            "enum": [
+              "none",
+              "month",
+              "quarter",
+              "half_year"
+            ],
+            "description": "Wie ein Eintritt während des Beitragsjahres zahlt: den vollen Betrag oder die restlichen Monate, Quartale oder Halbjahre, das des Eintritts voll gezählt"
+          },
+          "admission_fee": {
+            "type": "number",
+            "description": "Einmal, mit dem ersten Beitrag"
+          },
+          "currency": {
+            "type": "string"
+          }
+        }
+      },
+      "InvoicePdf": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "content_type",
+          "filesize",
+          "content"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "\\.pdf$"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "application/pdf"
+            ]
+          },
+          "filesize": {
+            "type": "integer",
+            "description": "Größe in Bytes nach dem Dekodieren"
+          },
+          "content": {
+            "type": "string",
+            "description": "Das PDF, base64-kodiert"
+          }
+        }
+      },
+      "Invoice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "ref",
+          "type",
+          "date",
+          "due_date",
+          "total",
+          "remaining",
+          "status",
+          "overdue",
+          "payment_url",
+          "fee"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Rechnungs-ID für das PDF"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "standard",
+              "replacement",
+              "credit_note",
+              "deposit"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "overdue",
+              "paid",
+              "abandoned"
+            ]
+          },
+          "date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "due_date": {
+            "$ref": "#/components/schemas/Date"
+          },
+          "total": {
+            "type": "number",
+            "description": "Betrag mit USt"
+          },
+          "remaining": {
+            "type": "number",
+            "description": "Noch offener Betrag; 0 bei bezahlten und aufgegebenen Rechnungen"
+          },
+          "overdue": {
+            "type": "boolean"
+          },
+          "payment_url": {
+            "type": "string",
+            "description": "Dolibarrs Online-Zahlungsseite für eine offene oder überfällige Rechnung außer einer Gutschrift; leer ohne eingerichteten Online-Zahlungsdienst"
+          },
+          "fee": {
+            "type": "boolean",
+            "description": "Eine Beitragsrechnung: mit einer Beitragsperiode verknüpft, aus einem Beitragslauf oder von der Mitgliedskarte"
+          }
+        }
+      }
+    }
+  }
+}

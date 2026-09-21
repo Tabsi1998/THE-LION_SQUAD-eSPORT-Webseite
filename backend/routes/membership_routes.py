@@ -16,6 +16,10 @@ from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
 from services.notification_preferences import send_user_template
+from services.dolibarr_client import load_settings as load_dolibarr_settings
+from services.dolibarr_links import link_for_user, public_link, verified_link
+from services.dolibarr_policy import MAX_STATE_AGE_HOURS
+from services.dolibarr_sync import try_auto_link
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 
@@ -326,9 +330,53 @@ async def _normalize_linked_user_id(db, user_id: str | None, current_profile_id:
     return user_id
 
 
+async def _led_by_dolibarr(user_id: str) -> bool:
+    """Führt Dolibarr die Mitgliedschaft dieser Person (#295)? Dann pflegt die Website sie nicht mehr selbst."""
+    settings = await load_dolibarr_settings()
+    if settings["mode"] != "live":
+        return False
+    return await verified_link(get_db(), settings, user_id) is not None
+
+
+def _dolibarr_view(membership: dict | None, link: dict | None, settings: dict) -> dict | None:
+    """Was die Person selbst über ihren Stand aus der Mitgliederverwaltung sieht."""
+    if settings["mode"] == "off":
+        return None
+    state = (membership or {}).get("dolibarr") or {}
+    led = settings["mode"] == "live" and (membership or {}).get("source") == "dolibarr" and (link or {}).get("status") == "verified"
+    view = {"connected": True, "led_by_dolibarr": led, "link": public_link(link)}
+    if not led:
+        return view
+    synced = state.get("synced_at")
+    stale = True
+    if synced:
+        try:
+            from datetime import datetime, timezone
+            parsed = datetime.fromisoformat(synced.replace("Z", "+00:00"))
+            parsed = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+            stale = (now_utc() - parsed).total_seconds() > MAX_STATE_AGE_HOURS * 3600
+        except ValueError:
+            stale = True
+    view.update({
+        "as_of": synced,
+        "stale": stale,
+        "member_ref": state.get("ref"),
+        "type_label": (state.get("type") or {}).get("label"),
+        "paid_until": state.get("paid_until"),
+        "membership_ends": state.get("membership_ends"),
+        "fee": state.get("fee"),
+        "functions": [{"label": fn.get("label"), "since": fn.get("since")} for fn in state.get("functions") or []],
+    })
+    return view
+
+
 async def _activate_linked_membership(profile: dict, actor_id: str):
     user_id = profile.get("user_id")
     if not user_id or profile.get("is_active") is False:
+        return
+    # Profilpflege ist Redaktion. Führt Dolibarr die Mitgliedschaft, darf sie
+    # weder einen Austritt rückgängig machen noch die Mitgliedsart setzen (#295).
+    if await _led_by_dolibarr(user_id):
         return
     existing = await get_membership(user_id)
     payload = {}
@@ -376,12 +424,26 @@ async def membership_meta():
 @router.get("/me")
 async def my_membership(user: dict = Depends(get_current_user)):
     """Return logged-in user's membership record (or None)."""
+    db = get_db()
+    settings = await load_dolibarr_settings(db)
+    link = None
+    if settings["mode"] != "off":
+        try:
+            link = await try_auto_link(db, settings, user)
+        except Exception:  # noqa: BLE001 - die eigene Seite darf nie an Dolibarr scheitern
+            link = None
+        link = link or await link_for_user(db, settings, user["id"])
     m = await get_membership(user["id"])
+    view = dict(m) if m else None
+    if view:
+        # Der Rohstand der Anbindung gehört nicht in die Antwort; `dolibarr` unten ist die geprüfte Sicht.
+        view.pop("dolibarr", None)
     return {
         "user_id": user["id"],
-        "membership": m,
+        "membership": view,
         "is_active_member": is_active_member(m),
         "user_type": derived_user_type(user, m),
+        "dolibarr": _dolibarr_view(m, link, settings),
     }
 
 
@@ -446,6 +508,9 @@ async def update_user_membership(
     if not user:
         raise HTTPException(404, "Benutzer nicht gefunden.")
     payload = body.model_dump(exclude_unset=True)
+    led_fields = {"member_status", "membership_type", "member_number", "member_since", "member_since_precision"} & set(payload)
+    if led_fields and await _led_by_dolibarr(user_id):
+        raise HTTPException(409, "Diese Mitgliedschaft wird in Dolibarr geführt. Status, Art, Nummer und Beginn dort ändern – hier bleiben Notiz, interne Rolle und die Sichtbarkeit der Nummer.")
     try:
         m = await upsert_membership(user_id=user_id, actor_id=me["id"], **payload)
     except ValueError as e:

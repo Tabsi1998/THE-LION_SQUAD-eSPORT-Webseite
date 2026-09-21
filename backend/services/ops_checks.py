@@ -38,6 +38,7 @@ DISK_CRIT_PCT = 5.0
 MAIL_CRIT_BACKLOG = 20
 STREAM_WARN_HOURS = 48.0
 TWITCH_STALE_MINUTES = 15.0
+DOLIBARR_STALE_MINUTES = 60.0
 VARIANTS_WARN_MISSING = 50
 VARIANT_SCAN_LIMIT = 5000
 UPLOAD_SCAN_LIMIT = 200_000
@@ -101,6 +102,18 @@ def rate_twitch(state: dict | None, age_minutes: float | None) -> str:
     if not state.get("ok"):
         return "warn"
     if age_minutes is None or age_minutes > TWITCH_STALE_MINUTES:
+        return "warn"
+    return "ok"
+
+
+def rate_dolibarr(mode: str, state: dict | None, age_minutes: float | None) -> str:
+    # Aus ist kein Alarm. Live ohne frischen Stand heißt: Mitgliedschaften und
+    # Vereinsrechte laufen auf altem Wissen - nach 48 h ruhen die Rechte ganz.
+    if mode == "off" or not state:
+        return "ok"
+    if not state.get("ok"):
+        return "crit" if mode == "live" and (age_minutes is None or age_minutes > 24 * 60) else "warn"
+    if age_minutes is None or age_minutes > DOLIBARR_STALE_MINUTES:
         return "warn"
     return "ok"
 
@@ -259,6 +272,32 @@ async def check_twitch_poll(db) -> dict:
     return result("twitch_poll", label, status, f"{state.get('live', 0)} live von {state.get('checked', 0)} Kanälen", "letzter Lauf in Ordnung")
 
 
+async def check_dolibarr_sync(db) -> dict:
+    label = "Dolibarr-Abgleich"
+    try:
+        settings = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "mode": 1}) or {}
+        state = await db.settings.find_one({"id": "dolibarr_sync_state"}, {"_id": 0}) or {}
+    except Exception as exc:  # noqa: BLE001
+        return failed("dolibarr_sync", label, exc)
+    mode = settings.get("mode") or "off"
+    if mode == "off":
+        return result("dolibarr_sync", label, "ok", "aus", "die Mitgliederverwaltung ist nicht angebunden")
+    if not state:
+        return result("dolibarr_sync", label, "ok", "noch kein Lauf", "der Abgleich läuft alle 10 min")
+    ok_hours = _hours_since(state.get("last_ok_at"))
+    age_minutes = None if ok_hours is None else ok_hours * 60
+    status = rate_dolibarr(mode, state, age_minutes)
+    where = "Vorschau" if mode == "preview" else "Live"
+    if not state.get("ok"):
+        error = state.get("last_error") or {}
+        since = f", letzter Erfolg vor {ok_hours:.1f} h" if ok_hours is not None else ", noch nie gelungen"
+        return result("dolibarr_sync", label, status, "liefert nichts", f"{error.get('text') or 'Fehler'}{since} – Admin → Dolibarr")
+    if status == "warn":
+        return result("dolibarr_sync", label, status, f"steht seit {age_minutes:.0f} min" if age_minutes is not None else "steht", "der letzte gelungene Lauf ist zu lange her")
+    counts = state.get("counts") or {}
+    return result("dolibarr_sync", label, status, f"{where}: {counts.get('seen', 0)} gelesen, {counts.get('applied', 0)} übernommen", "letzter Lauf in Ordnung")
+
+
 def _missing_variants(path: Path, limit: int = VARIANT_SCAN_LIMIT) -> tuple[int, int, bool]:
     scanned = 0
     missing = 0
@@ -328,6 +367,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("error_groups", "Fehlergruppen", lambda: check_error_groups(db)),
         ("scheduler", "Scheduler", check_scheduler),
         ("twitch_poll", "Twitch-Abfrage", lambda: check_twitch_poll(db)),
+        ("dolibarr_sync", "Dolibarr-Abgleich", lambda: check_dolibarr_sync(db)),
     ]
 
 
