@@ -1,0 +1,15 @@
+# Einstellungen nur für diesen einen Server, nicht in Git (#351).
+#
+# Auf dem Server kopieren:
+#   cp docker-compose.override.example.yml docker-compose.override.yml
+# Docker Compose lädt diese Datei bei jedem "docker compose"-Aufruf neben
+# docker-compose.yml mit, also auch in install.sh und update.sh. Git ignoriert
+# sie, update.sh bricht ihretwegen nie ab.
+#
+# Beispiel: Das Backend erreicht das eigene Dolibarr nur über die Adresse im
+# Heimnetz, weil der Router die öffentliche Adresse nicht ins eigene Netz
+# zurückleitet. Die Adresse durch die des eigenen Servers ersetzen.
+services:
+  backend:
+    extra_hosts:
+      - "erp.lionsquad.at:192.168.2.100"

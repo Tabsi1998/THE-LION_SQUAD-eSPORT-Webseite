@@ -79,6 +79,10 @@ if [ -d .git ] && [ "${SKIP_GIT_UPDATE:-false}" != "true" ]; then
   [ -n "$TARGET_BRANCH" ] && [ "$TARGET_BRANCH" != "HEAD" ] || fail "Cannot determine git branch. Set DEPLOY_BRANCH=<branch>."
 
   if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    if [ -n "$(git status --porcelain --untracked-files=no -- docker-compose.yml)" ]; then
+      warn "docker-compose.yml was changed on this server. Move those settings to docker-compose.override.yml"
+      warn "(template: docker-compose.override.example.yml, see UPDATE.md), then: git restore docker-compose.yml"
+    fi
     fail "Tracked local changes detected. Commit, stash, or revert them before updating."
   fi
 
@@ -136,6 +140,9 @@ if [ "$PROXY_UPLOAD_LIMIT_MB" -lt "$MAX_VIDEO_UPLOAD_MB" ]; then
 fi
 
 # 2. Rebuild
+if [ -f docker-compose.override.yml ]; then
+  info "Using this server's settings from docker-compose.override.yml"
+fi
 info "Rebuilding containers…"
 docker compose pull mongodb 2>/dev/null || true
 docker compose build
