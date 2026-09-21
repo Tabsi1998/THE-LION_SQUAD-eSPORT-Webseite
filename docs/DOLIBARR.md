@@ -139,7 +139,7 @@ Grund. Es steht nie ein Schlüssel oder ein Antworttext darin.
 | Modul Vereine ist deaktiviert (501) | in Dolibarr abgeschaltet | Modul aktivieren |
 | Diese Adresse gibt es nicht | Tippfehler im Namen | Adresse Buchstabe für Buchstabe prüfen |
 | Zertifikat wird nicht akzeptiert | abgelaufen, selbst signiert oder für einen anderen Namen | Zertifikat in Dolibarr bzw. am Proxy erneuern |
-| antwortet nicht rechtzeitig / nimmt keine Verbindung an | Dolibarr steht, Firewall, falscher Port | prüfen, ob Dolibarr **vom Webserver aus** erreichbar ist |
+| antwortet nicht rechtzeitig / nimmt keine Verbindung an | Dolibarr steht, Firewall, falscher Port – oder Dolibarr steht im selben Heimnetz und der Router leitet die öffentliche Adresse nicht zurück | prüfen, ob Dolibarr **vom Webserver aus** erreichbar ist; im Heimnetz den Host-Eintrag in `docker-compose.override.yml` anlegen (`UPDATE.md`, einmalig – `update.sh` fasst die Datei nie an) |
 | Dolibarr leitet um | `http` statt `https`, fehlender Unterordner | Adresse so eintragen, wie sie im Browser steht |
 | keine Dolibarr-API unter dieser Adresse | Modul *API REST* aus, oder Dolibarr liegt in einem Unterordner | Modul aktivieren bzw. Unterordner in die Adresse |
 | Modul „Vereine“ bietet keine Schnittstelle | Modul aus oder zu alt | aktivieren, aktualisieren |

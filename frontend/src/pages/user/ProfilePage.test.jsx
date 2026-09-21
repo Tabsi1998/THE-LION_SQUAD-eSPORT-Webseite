@@ -225,7 +225,9 @@ test("der Reiter Sicherheit buendelt Passwort, Passkeys, Zwei-Faktor, Google und
   expect(await screen.findByTestId("profile-password-panel")).toBeInTheDocument();
   expect(screen.getByTestId("profile-tab-security")).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("passkeys-panel")).toBeInTheDocument();
-  expect(screen.getByTestId("profile-mfa-note")).toBeInTheDocument();
+  // Zwei-Faktor kann seit #348 jedes Konto einrichten - für Spieler freiwillig.
+  expect(screen.getByTestId("mfa-panel")).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-mfa-required")).toBeNull();
   expect(screen.getByTestId("profile-google-link")).toBeInTheDocument();
   expect(await screen.findByTestId("profile-sessions-panel")).toBeInTheDocument();
   expect(screen.queryByTestId("profile-save")).toBeNull();

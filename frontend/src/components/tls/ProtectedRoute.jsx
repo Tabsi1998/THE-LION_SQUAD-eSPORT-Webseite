@@ -27,7 +27,8 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     return <Navigate to="/403" replace state={{ areas: wantedAreas, from: loc.pathname }} />;
   }
   if (wantedAreas.some((area) => MFA_AREAS.has(area)) && (!user.mfa_enabled || !user.auth_mfa_verified)) {
-    return <Navigate to="/profile?tab=basic&mfa=required" replace />;
+    // Zwei-Faktor wohnt seit #258 unter „Sicherheit“ - dorthin, mit der Erklärung, warum (#348).
+    return <Navigate to={`/profile?tab=security&mfa=required&next=${encodeURIComponent(loc.pathname)}`} replace />;
   }
   if (requireModerator && !user.is_tournament_staff && !hasArea(user, "moderation") && !isAnyAdmin(user)) {
     return <Navigate to="/403" replace state={{ areas: ["moderation"], from: loc.pathname }} />;

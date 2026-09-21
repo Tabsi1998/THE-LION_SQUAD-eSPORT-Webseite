@@ -24,7 +24,7 @@ def test_unverified_existing_account_cannot_skip_verification(monkeypatch, endpo
     monkeypatch.setattr(routes, "verify_password", lambda *_: True)
     challenge = AsyncMock()
     monkeypatch.setattr(routes, "_create_mfa_login_challenge", challenge)
-    body = SimpleNamespace(email="existing@example.test", password="test")
+    body = SimpleNamespace(email="existing@example.test", password="test", remember=False)
     args = (body, Mock(), Response()) if endpoint is routes.login else (body, Mock())
     with pytest.raises(HTTPException) as exc:
         asyncio.run(endpoint(*args))
@@ -64,11 +64,14 @@ def test_verified_admin_still_requires_mfa(monkeypatch, endpoint):
     issue = AsyncMock()
     monkeypatch.setattr(routes, "_issue_session", issue)
     monkeypatch.setattr(routes, "_issue_mobile_session", issue)
-    body = SimpleNamespace(email="existing@example.test", password="test")
+    body = SimpleNamespace(email="existing@example.test", password="test", remember=False)
     args = (body, Mock(), Response()) if endpoint is routes.login else (body, Mock())
     result = asyncio.run(endpoint(*args))
     assert result["mfa_required"] is True
     assert challenge.await_args.args[-1] == ("web" if endpoint is routes.login else "mobile")
+    if endpoint is routes.login:
+        # „Angemeldet bleiben“ (#348) überlebt den Umweg über den Code.
+        assert challenge.await_args.kwargs == {"remember": False}
     issue.assert_not_awaited()
 
 

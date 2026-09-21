@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { DiscordPreview } from "@/components/tls/DiscordPreview";
+import { SharePreviewToggle } from "@/components/tls/SharePreviewToggle";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
@@ -261,6 +262,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     pinned: source.pinned ?? false,
     published_at: toDateTimeLocalInput(source.published_at),
     discord_skip: source.discord_skip ?? false,
+    share_preview: source.share_preview ?? false,
   });
   const [form, setForm] = useState({
     ...formFromPost(post),
@@ -503,6 +505,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
             </label>
           </div>
           <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
 
           {events.length > 0 && (
             <Field label="Verknüpfte Events">

@@ -141,6 +141,7 @@ export function SessionsPanel() {
               <div className="mt-1 text-xs text-white/45 flex flex-wrap gap-x-4 gap-y-0.5">
                 <span>Angemeldet: {formatSessionTime(session.created_at)}</span>
                 <span>Zuletzt aktiv: {formatSessionTime(session.last_active)}</span>
+                {session.expires_at && <span data-testid="session-expires">Bleibt angemeldet bis: {formatSessionTime(session.expires_at)}</span>}
                 {session.ip && <span>IP: {session.ip}</span>}
               </div>
             </div>

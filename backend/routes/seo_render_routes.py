@@ -255,10 +255,46 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
     raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
 
 
+# Link-Vorschau für Inhalte, die nicht öffentlich sind (#347). Früher bekam WhatsApp hier ein
+# 404 - also gar keine Vorschau, was kaputt aussah. Jetzt gibt es eine neutrale Karte: Art des
+# Inhalts, Vereinsname, das Teilen-Bild des Vereins. Titel, Datum, Ort und Bild des Inhalts
+# stehen nur darin, wenn der Autor es für genau diesen Eintrag erlaubt hat (`share_preview`) -
+# und nie für Internes (nur Vorstand). Nie in Suchmaschinen, nie für Entwürfe.
+RESTRICTED_KINDS = {
+    "news": ("News für Mitglieder", "Diese News ist nur für Mitglieder sichtbar. Melde dich an, um sie zu lesen."),
+    "event": ("Vereinsevent", "Dieses Event ist nur für Mitglieder sichtbar. Melde dich an, um Details und Anmeldung zu sehen."),
+    "tournament": ("Turnier für Mitglieder", "Dieses Turnier ist nicht öffentlich. Melde dich an, um es zu sehen."),
+    "fastlap": ("Fast Lap für Mitglieder", "Diese Challenge ist nicht öffentlich. Melde dich an, um sie zu sehen."),
+    "gallery": ("Galerie für Mitglieder", "Dieses Album ist nur für Mitglieder sichtbar. Melde dich an, um die Bilder zu sehen."),
+}
+SHAREABLE_VISIBILITIES = {"community", "members"}
+
+
+def restricted_meta(kind: str, item: dict, base: dict, origin: str, canonical: str, *,
+                    title: str | None = None, image: str | None = None, details: list | None = None) -> dict:
+    label, hint = RESTRICTED_KINDS[kind]
+    allowed = bool(item.get("share_preview")) and (item.get("visibility") in SHAREABLE_VISIBILITIES)
+    meta = {**base, "url": canonical, "canonical": canonical, "robots": "noindex, nofollow", "type": "website"}
+    if allowed and title:
+        shown_details = " · ".join(str(part) for part in (details or []) if part)
+        meta["title"] = f"{title} · {base['site_name']}"
+        meta["description"] = clean_text(f"{label}{' · ' + shown_details if shown_details else ''}. {hint}")
+        if image:
+            meta["image"] = absolute_url(image, origin)
+    else:
+        meta["title"] = f"{label} · {base['site_name']}"
+        meta["description"] = hint
+    # Keine strukturierten Daten zum Inhalt - nur die allgemeinen der Website aus `base`.
+    return meta
+
+
 async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
     post, _ = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0})
-    if not post or not post.get("published", True) or not is_public_visibility(post) or not is_published_now(post):
+    if not post or not post.get("published", True) or not is_published_now(post):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    if not is_public_visibility(post):
+        return restricted_meta("news", post, base, origin, f"{origin}/news/{post.get('slug') or slug}",
+                               title=post.get("title"), image=post.get("banner_url"))
     description = seo_description(
         post.get("excerpt") or post.get("content") or post.get("title"),
         prefix=post.get("category") or "News",
@@ -294,8 +330,12 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
     event, _ = await find_by_slug_or_history(db.events, slug, {"_id": 0})
-    if not event or event.get("status") == "draft" or not is_public_visibility(event):
+    if not event or event.get("status") == "draft":
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    if not is_public_visibility(event):
+        return restricted_meta("event", event, base, origin, f"{origin}/events/{event.get('slug') or slug}",
+                               title=event.get("name"), image=event.get("banner_url"),
+                               details=[format_date_label(event.get("start_date")), event.get("location")])
     description = seo_description(
         event.get("description") or event.get("program") or event.get("name"),
         prefix="Gaming Event",
@@ -332,13 +372,10 @@ async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -> dict:
     tournament, _ = await find_by_slug_or_history(db.tournaments, slug, {"_id": 0})
-    if (
-        not tournament
-        or tournament.get("status") == "draft"
-        or tournament.get("is_public") is False
-        or not await user_can_see(None, tournament.get("visibility") or "public")
-    ):
+    if not tournament or tournament.get("status") == "draft":
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    if tournament.get("is_public") is False or not await user_can_see(None, tournament.get("visibility") or "public"):
+        return restricted_meta("tournament", tournament, base, origin, f"{origin}/tournaments/{tournament.get('slug') or slug}")
     suffix_label = {"bracket": "Turnierbaum", "matches": "Spielplan", "standings": "Rangliste"}.get(suffix)
     title = tournament.get("title") or "Turnier"
     description = seo_description(
@@ -384,8 +421,10 @@ async def tournament_meta(db, slug: str, suffix: str, base: dict, origin: str) -
 
 async def fastlap_meta(db, slug: str, base: dict, origin: str) -> dict:
     challenge, _ = await find_by_slug_or_history(db.f1_challenges, slug, {"_id": 0})
-    if not challenge or challenge.get("status") == "draft" or not is_public_visibility(challenge):
+    if not challenge or challenge.get("status") == "draft":
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    if not is_public_visibility(challenge):
+        return restricted_meta("fastlap", challenge, base, origin, f"{origin}/fastlap/{challenge.get('slug') or slug}")
     description = seo_description(
         challenge.get("description") or challenge.get("rules") or challenge.get("title"),
         prefix="F1 Fast-Lap-Challenge",
@@ -448,8 +487,10 @@ async def season_meta(db, slug: str, base: dict, origin: str) -> dict:
 
 async def gallery_meta(db, slug: str, base: dict, origin: str) -> dict:
     album, _ = await find_by_slug_or_history(db.gallery_albums, slug, {"_id": 0})
-    if not album or not album.get("published", True) or not is_public_visibility(album):
+    if not album or not album.get("published", True):
         raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    if not is_public_visibility(album):
+        return restricted_meta("gallery", album, base, origin, f"{origin}/galerie/{album.get('slug') or slug}")
     photo = await db.gallery_photos.find_one({"album_id": album.get("id")}, {"_id": 0}, sort=[("order_index", 1)])
     photo_count = album.get("photo_count")
     image = absolute_url(album.get("cover_url") or (photo or {}).get("thumbnail_url") or (photo or {}).get("image_url") or base["image"], origin)

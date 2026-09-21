@@ -37,10 +37,14 @@ export function GoogleAuthButton({
   acceptPrivacy = false,
   acceptTerms = false,
   newsletterConsent = false,
+  remember = true,
   onSuccess,
 }) {
   const settings = usePublicSiteSettings();
   const { googleAuthenticate, googleLink, googleProcessing, setMfaTicket } = useAuth();
+  // Der Haken „Angemeldet bleiben“ darf den Google-Knopf nicht neu aufbauen (#348).
+  const rememberRef = useRef(remember);
+  rememberRef.current = remember;
   const navigate = useNavigate();
   const buttonRef = useRef(null);
   const [loadError, setLoadError] = useState("");
@@ -67,7 +71,7 @@ export function GoogleAuthButton({
             if (!credential) return;
             const result = isLinking
               ? await googleLink(credential)
-              : await googleAuthenticate(credential, { intent, acceptPrivacy, acceptTerms, newsletterConsent });
+              : await googleAuthenticate(credential, { intent, acceptPrivacy, acceptTerms, newsletterConsent, remember: rememberRef.current });
             if (!result.ok) {
               toast.error(result.error);
               return;

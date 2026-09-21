@@ -12,6 +12,11 @@ from database import get_db
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = 60 * 12  # 12h
 REFRESH_TOKEN_DAYS = 14
+# „Angemeldet bleiben“ (#348): 90 Tage, die mit jeder Nutzung neu beginnen. Ohne den Haken
+# endet die Sitzung mit dem Browser (Cookies ohne Ablaufdatum) und am Server nach einem Tag
+# ohne Nutzung. Sitzungen von vor #348 tragen kein Kennzeichen und gelten als „bleiben“.
+REMEMBER_DAYS = 90
+SESSION_ONLY_HOURS = 24
 CSRF_TOKEN_BYTES = 32
 # Short grace so in-flight actions are not hard-killed mid-request by benign
 # security revocations (password reset / admin action). Theft & logout stay immediate.
@@ -66,20 +71,29 @@ def create_refresh_token(
     expires_at: datetime | None = None,
     *,
     mfa_verified: bool = False,
+    remember: bool = True,
 ) -> str:
     payload = {
         "sub": user_id,
         "jti": token_id,
         "fid": family_id,
-        "exp": expires_at or refresh_expires_at(),
+        "exp": expires_at or refresh_expires_at(remember),
         "type": "refresh",
         "mfa": bool(mfa_verified),
+        "rem": bool(remember),
     }
     return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 
-def refresh_expires_at() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_DAYS)
+def refresh_expires_at(remember: bool = True) -> datetime:
+    if remember:
+        return datetime.now(timezone.utc) + timedelta(days=REMEMBER_DAYS)
+    return datetime.now(timezone.utc) + timedelta(hours=SESSION_ONLY_HOURS)
+
+
+def token_remembers(payload: dict | None) -> bool:
+    """Ob diese Sitzung „angemeldet bleiben“ soll. Ohne Kennzeichen (Sitzung von früher): ja."""
+    return (payload or {}).get("rem") is not False
 
 
 def as_utc_datetime(value) -> datetime | None:
@@ -128,21 +142,24 @@ def _cookie_domain() -> str | None:
     return None
 
 
-def set_auth_cookies(response: Response, access: str, refresh: str, csrf_token: str | None = None):
+def set_auth_cookies(response: Response, access: str, refresh: str, csrf_token: str | None = None, *, remember: bool = True):
     secure = _secure_cookies()
     csrf_token = csrf_token or new_csrf_token()
     domain = _cookie_domain()
+    # Ohne „Angemeldet bleiben“ bekommen die Cookies kein Ablaufdatum: Der Browser wirft sie
+    # weg, wenn er geschlossen wird.
+    long_lived = REMEMBER_DAYS * 24 * 3600 if remember else None
     response.set_cookie(
         "access_token", access, httponly=True, secure=secure, samesite="lax",
-        max_age=ACCESS_TOKEN_MINUTES * 60, path="/", domain=domain,
+        max_age=ACCESS_TOKEN_MINUTES * 60 if remember else None, path="/", domain=domain,
     )
     response.set_cookie(
         "refresh_token", refresh, httponly=True, secure=secure, samesite="lax",
-        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
+        max_age=long_lived, path="/", domain=domain,
     )
     response.set_cookie(
         "csrf_token", csrf_token, httponly=False, secure=secure, samesite="lax",
-        max_age=REFRESH_TOKEN_DAYS * 24 * 3600, path="/", domain=domain,
+        max_age=long_lived, path="/", domain=domain,
     )
 
 

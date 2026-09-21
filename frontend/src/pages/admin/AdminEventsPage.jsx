@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { DiscordPreview } from "@/components/tls/DiscordPreview";
+import { SharePreviewToggle } from "@/components/tls/SharePreviewToggle";
 import { eventTypeLabel } from "@/lib/eventTypes";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -323,6 +324,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     event_type: event.event_type || "general",
     visibility: event.visibility || "public",
     discord_skip: event.discord_skip ?? false,
+    share_preview: event.share_preview ?? false,
     start_date: toDateTimeLocalInput(event.start_date),
     end_date: toDateTimeLocalInput(event.end_date),
     door_time: toDateTimeLocalInput(event.door_time),
@@ -396,6 +398,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
     event_type: event.event_type || "general",
     visibility: event.visibility || "public",
     discord_skip: event.discord_skip ?? false,
+    share_preview: event.share_preview ?? false,
     start_date: toDateTimeLocalInput(event.start_date),
     end_date: toDateTimeLocalInput(event.end_date),
     door_time: toDateTimeLocalInput(event.door_time),
@@ -519,6 +522,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
             Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
           <DiscordPreview kind="event" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
           {!isNew && (
             <AccessLinksPanel targetType="event" targetId={event.id} allowRegister={form.has_registration} />
           )}

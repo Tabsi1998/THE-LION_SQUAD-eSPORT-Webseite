@@ -44,6 +44,8 @@ class RegistrationStart(PasswordProof):
 
 class CredentialResponse(BaseModel):
     credential: dict
+    # „Angemeldet bleiben“ (#348) - nur beim Anmelden von Belang.
+    remember: bool = True
 
 
 def passkey_configuration():
@@ -232,9 +234,12 @@ async def login_verify(body: CredentialResponse, request: Request, response: Res
     if user.get("email_verified") is not True:
         raise HTTPException(403, "Bitte zuerst deine E-Mail-Adresse bestätigen.")
     await _security_audit(db, user["id"], "auth.passkey.login", request)
+    # Wer Zwei-Faktor eingerichtet hat, gibt den Code auch nach dem Passkey ein. Diese Grenze
+    # ist bewusst gesetzt (test_passkey_login_security_boundaries) und bleibt, bis der Betreiber
+    # anders entscheidet.
     if _requires_admin_mfa(user):
-        return await _create_mfa_login_challenge(db, user, request, "web")
-    await _issue_session(db, response, user, request)
+        return await _create_mfa_login_challenge(db, user, request, "web", remember=body.remember)
+    await _issue_session(db, response, user, request, remember=body.remember)
     public = _public_user(user)
     await _attach_membership(public)
     return public

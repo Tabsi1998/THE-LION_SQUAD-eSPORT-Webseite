@@ -39,6 +39,8 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    # „Angemeldet bleiben“ (#348). Standard an, damit App und ältere Clients nichts merken.
+    remember: bool = True
 
 
 class AdminUserCreate(BaseModel):
@@ -300,6 +302,8 @@ class EventCreate(BaseModel):
     status: EventStatus = "draft"
     # „Ohne Discord ankündigen“ (#303)
     discord_skip: bool = False
+    # Link-Vorschau beim Teilen (#347): Titel, Datum und Bild zeigen, obwohl nicht öffentlich.
+    share_preview: bool = False
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     door_time: Optional[datetime] = None
@@ -339,6 +343,7 @@ class EventUpdate(BaseModel):
     event_type: Optional[EventType] = None
     visibility: Optional[EventVisibility] = None
     discord_skip: Optional[bool] = None
+    share_preview: Optional[bool] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     door_time: Optional[datetime] = None
@@ -859,6 +864,8 @@ class NewsCreate(BaseModel):
     published_at: Optional[datetime] = None
     # „Ohne Discord veröffentlichen“ (#303)
     discord_skip: bool = False
+    # Link-Vorschau beim Teilen (#347)
+    share_preview: bool = False
     pinned: bool = False
     linked_event_ids: List[str] = []
     linked_tournament_ids: List[str] = []
@@ -878,6 +885,7 @@ class NewsUpdate(BaseModel):
     published: Optional[bool] = None
     published_at: Optional[datetime] = None
     discord_skip: Optional[bool] = None
+    share_preview: Optional[bool] = None
     pinned: Optional[bool] = None
     linked_event_ids: Optional[List[str]] = None
     linked_tournament_ids: Optional[List[str]] = None

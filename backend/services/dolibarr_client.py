@@ -52,7 +52,9 @@ ERROR_TEXTS = {
     # Warum es nicht klappt (#345) - ohne Adresse, Schlüssel oder Antworttext preiszugeben.
     "dns": "Diese Adresse gibt es nicht – bitte auf Tippfehler im Namen prüfen",
     "tls": "Das Zertifikat der Adresse wird nicht akzeptiert (abgelaufen, selbst signiert oder auf einen anderen Namen ausgestellt)",
-    "timeout": "Der Server antwortet nicht rechtzeitig – läuft Dolibarr, und ist es vom Webserver aus erreichbar?",
+    "timeout": "Der Server antwortet nicht rechtzeitig – läuft Dolibarr, und ist es vom Webserver aus erreichbar? "
+               "Steht Dolibarr im selben Heimnetz wie der Webserver, braucht das Backend den Host-Eintrag in "
+               "docker-compose.override.yml (UPDATE.md) – nach einem Update fehlt er, wenn er vorher direkt in docker-compose.yml stand",
     "refused": "Der Server nimmt unter dieser Adresse keine Verbindung an (falscher Port, Firewall, Dienst gestoppt)",
     "redirect": "Dolibarr leitet um – die Adresse genau so eintragen, wie sie im Browser nach dem Laden steht (https, mit Unterordner)",
     "api_missing": "Unter dieser Adresse gibt es keine Dolibarr-API: In Dolibarr das Modul „API REST“ aktivieren; liegt Dolibarr in einem Unterordner, gehört er in die Adresse",
