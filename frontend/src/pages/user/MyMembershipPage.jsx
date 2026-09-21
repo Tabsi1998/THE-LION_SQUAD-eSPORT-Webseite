@@ -104,14 +104,6 @@ export default function MyMembershipPage() {
           </div>
         )}
 
-        {/* Notes */}
-        {m?.notes && (
-          <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
-            <div className="text-[10px] uppercase tracking-widest text-white/50 font-bold mb-2">Notiz vom Vorstand</div>
-            <div className="text-sm text-white/85 whitespace-pre-line">{m.notes}</div>
-          </div>
-        )}
-
         {/* History */}
         {!!m?.history?.length && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -128,7 +120,7 @@ export default function MyMembershipPage() {
                       )}
                     </div>
                     <div className="text-xs text-white/40 mt-0.5">{new Date(h.at).toLocaleString("de-DE")}</div>
-                    {h.notes && <div className="text-xs text-white/60 mt-1 italic">„{h.notes}"</div>}
+                    {h.source === "dolibarr" && <div className="text-xs text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
                   </div>
                 </div>
               ))}

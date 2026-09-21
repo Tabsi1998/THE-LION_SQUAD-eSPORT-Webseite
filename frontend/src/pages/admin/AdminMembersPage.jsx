@@ -243,13 +243,17 @@ function EditModal({ entry, meta, onClose, onSave }) {
     show_member_number_publicly: !!m.show_member_number_publicly,
   });
   const [saving, setSaving] = useState(false);
+  // Führt Dolibarr diese Mitgliedschaft (#295), kommen Status, Art, Nummer und Beginn von dort.
+  const led = m.source === "dolibarr";
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const payload = { ...form };
+    const payload = led
+      ? { internal_role: form.internal_role, notes: form.notes, show_member_number_publicly: form.show_member_number_publicly }
+      : { ...form };
     if (!payload.membership_type) delete payload.membership_type;
     if (!payload.member_number) delete payload.member_number;
     if (payload.member_since_year) {
@@ -275,24 +279,30 @@ function EditModal({ entry, meta, onClose, onSave }) {
           <button type="button" onClick={onClose} className="p-1 text-white/60 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+          {led && (
+            <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
+              Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle, Notiz und Sichtbarkeit der Nummer bleiben hier.
+            </div>
+          )}
           <Field label="Status">
-            <select value={form.member_status} onChange={(e) => set("member_status", e.target.value)} data-testid="edit-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select disabled={led} value={form.member_status} onChange={(e) => set("member_status", e.target.value)} data-testid="edit-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm disabled:opacity-50">
               {meta.statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
             </select>
           </Field>
           <Field label="Mitgliedsart">
-            <select value={form.membership_type} onChange={(e) => set("membership_type", e.target.value)} data-testid="edit-type" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
+            <select disabled={led} value={form.membership_type} onChange={(e) => set("membership_type", e.target.value)} data-testid="edit-type" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm disabled:opacity-50">
               <option value="">— wählen —</option>
               {meta.types.map((t) => <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>)}
             </select>
           </Field>
-          <Field label="Mitgliedsnummer (leer = automatisch)">
-            <input value={form.member_number} onChange={(e) => set("member_number", e.target.value)} placeholder="z.B. TLS-2026-0007" data-testid="edit-number" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono" />
+          <Field label={led ? "Mitgliedsnummer (aus Dolibarr)" : "Mitgliedsnummer (leer = automatisch)"}>
+            <input disabled={led} value={form.member_number} onChange={(e) => set("member_number", e.target.value)} placeholder="z.B. TLS-2026-0007" data-testid="edit-number" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Mitglied seit Jahr">
               <input
                 type="number"
+                disabled={led}
                 min="1900"
                 max={new Date().getFullYear()}
                 value={form.member_since_year}
@@ -304,6 +314,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
             </Field>
             <Field label="Monat optional">
               <select
+                disabled={led}
                 value={form.member_since_month}
                 onChange={(e) => set("member_since_month", e.target.value)}
                 data-testid="edit-member-since-month"
@@ -316,7 +327,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
           <Field label="Interne Rolle">
             <input value={form.internal_role} onChange={(e) => set("internal_role", e.target.value)} placeholder="z.B. Vorstand, Captain, Helfer" data-testid="edit-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </Field>
-          <Field label="Interne Notizen">
+          <Field label="Interne Notizen (sieht das Mitglied nicht)">
             <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={3} data-testid="edit-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </Field>
           <label className="flex items-center gap-2 text-sm">

@@ -15,7 +15,12 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 const MyMembershipPage = (await import("./MyMembershipPage")).default;
-const membership = { member_status: "active", membership_type: "ordinary", member_number: "12", member_since: "2023-01-01", history: [] };
+const membership = {
+  member_status: "active", membership_type: "ordinary", member_number: "12", member_since: "2023-01-01",
+  // Käme vom Server je wieder eine interne Notiz mit, zeigt die Seite sie trotzdem nicht (#345).
+  notes: "intern: zahlt spät",
+  history: [{ at: "2026-09-21T10:00:00+00:00", from_status: "none", to_status: "active", source: "dolibarr", notes: "intern" }],
+};
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -51,7 +56,10 @@ test("ohne Zuordnung lässt sie sich anfragen – bestätigt wird sie vom Vorsta
 test("ist Dolibarr nicht angebunden, bleibt die Seite wie bisher", async () => {
   apiMock.get.mockResolvedValue({ data: { membership, is_active_member: true, dolibarr: null } });
   renderPage();
-  await waitFor(() => expect(screen.getByText("Aktives Mitglied")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getAllByText("Aktives Mitglied").length).toBeGreaterThan(0));
+  expect(screen.queryByText(/zahlt spät/)).toBeNull();
+  expect(screen.queryByText(/„intern/)).toBeNull();
+  expect(screen.getByText("aus der Mitgliederverwaltung übernommen")).toBeInTheDocument();
   expect(screen.queryByTestId("membership-fee-card")).toBeNull();
   expect(screen.queryByTestId("membership-link-card")).toBeNull();
 });

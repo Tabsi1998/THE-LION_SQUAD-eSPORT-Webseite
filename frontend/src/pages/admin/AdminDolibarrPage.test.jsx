@@ -26,10 +26,15 @@ const STATUS = {
   policy: { active: false, version: null, map: {}, approved_at: null, derivable_areas: ["club"] },
 };
 const PREVIEW = {
-  members_in_dolibarr: 40, users_checked: 12, members_without_account: [{ member_id: 17, ref: "17", name: "Ohne Konto" }],
+  members_in_dolibarr: 40, users_checked: 12,
+  members_without_account: [
+    { member_id: 17, ref: "17", name: "Ohne Konto", status: "active", ended: false },
+    { member_id: 19, ref: "19", name: "Ehe Malig", status: "terminated", ended: true },
+  ],
   rows: [
     { user_id: "u1", username: "paula", display_name: "Paula", state: "match", local_status: "active", member_id: 12, member_ref: "12", member_name: "Paula Beispiel", dolibarr_status: "active", would_change_status: false },
     { user_id: "u2", username: "familie", display_name: "Familie", state: "shared_email", local_status: "none", member_id: null },
+    { user_id: "u3", username: "altkonto", display_name: "Altkonto", state: "match_unverified_email", local_status: "active", member_id: 18, member_ref: "18", member_name: "Alt Konto", dolibarr_status: "active" },
   ],
   types: [{ id: 2, label: "Ordentliches Mitglied", members: 38, mapped_to: "ordinary" }],
   function_codes: [{ code: "kassier", label: "Kassier:in", holders: 1 }, { code: "rechnungspruefung", label: "Rechnungsprüfer:in", holders: 2 }],
@@ -81,7 +86,9 @@ test("eine Zuordnung geht erst nach Bestätigung hinaus, und nur für einen eind
   await user.click(screen.getByTestId("dolibarr-preview-run"));
   await waitFor(() => expect(screen.getByTestId("dolibarr-preview-summary")).toHaveTextContent("40 Mitglieder in Dolibarr"));
   expect(screen.getByTestId("dolibarr-preview-familie")).toHaveTextContent("mehrere Mitglieder teilen sich die E-Mail");
-  expect(screen.getByTestId("dolibarr-preview-familie").querySelector("button")).toBeNull();
+  // Ohne Treffer gibt es keinen „Bestätigen“-Knopf – nur die Auswahl von Hand, und die ist erst nach der Wahl scharf.
+  expect(screen.getByTestId("dolibarr-preview-familie")).not.toHaveTextContent("Bestätigen");
+  expect(screen.getByTestId("dolibarr-preview-familie").querySelector("button")).toBeDisabled();
 
   confirmMock.mockResolvedValueOnce(false);
   await user.click(screen.getByTestId("dolibarr-preview-paula").querySelector("button"));
@@ -118,4 +125,22 @@ test("der Superadmin sieht erst, wer was bekäme, und gibt dann frei", async () 
   expect(apiMock.put).toHaveBeenLastCalledWith("/admin/dolibarr/function-policy", { map: { kassier: ["club"] }, confirm: false });
   await user.click(screen.getByTestId("dolibarr-policy-approve"));
   await waitFor(() => expect(apiMock.put).toHaveBeenLastCalledWith("/admin/dolibarr/function-policy", { map: { kassier: ["club"] }, confirm: true }));
+});
+
+test("Beendete stehen getrennt, und ein Konto lässt sich von Hand zuordnen", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-preview"));
+  await user.click(screen.getByTestId("dolibarr-preview-run"));
+  await waitFor(() => expect(screen.getByTestId("dolibarr-without-account")).toHaveTextContent("Ohne Konto"));
+  expect(screen.getByTestId("dolibarr-without-account")).not.toHaveTextContent("Ehe Malig");
+  expect(screen.getByTestId("dolibarr-ended")).toHaveTextContent("Ehe Malig");
+
+  // Treffer trotz unbestätigter E-Mail: gekennzeichnet, aber bestätigbar – ein Mensch entscheidet.
+  expect(screen.getByTestId("dolibarr-preview-altkonto")).toHaveTextContent("nicht bestätigt, also genau hinsehen");
+  expect(screen.getByTestId("dolibarr-preview-altkonto")).toHaveTextContent("Bestätigen");
+
+  await user.selectOptions(screen.getByTestId("dolibarr-manual-familie"), "17");
+  await user.click(screen.getByTestId("dolibarr-preview-familie").querySelector("button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/links", { user_id: "u2", member_id: 17 }));
 });

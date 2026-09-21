@@ -20,11 +20,25 @@ export const LINK_STATUS_LABELS = {
 export const PREVIEW_STATE_LABELS = {
   linked: "schon zugeordnet",
   match: "Treffer über die bestätigte E-Mail",
+  match_unverified_email: "Treffer über die E-Mail – am Konto ist sie aber nicht bestätigt, also genau hinsehen",
   shared_email: "mehrere Mitglieder teilen sich die E-Mail",
   member_claimed_twice: "zwei Konten passen auf dasselbe Mitglied",
   not_in_dolibarr: "lokal Mitglied, in Dolibarr nicht gefunden",
   email_unverified: "E-Mail nicht bestätigt – nur von Hand zuordnen",
 };
+
+export const DOLIBARR_STATUS_LABELS = { draft: "Entwurf", active: "aktiv", terminated: "beendet", excluded: "ausgeschlossen" };
+
+/** Zeilen, bei denen ein Mensch das Mitglied aus der Liste wählen muss. */
+export function needsManualChoice(row) {
+  return !row.member_id && row.state !== "linked";
+}
+
+/** Mitglieder ohne Konto: die aktiven zuerst, Beendete getrennt – Ehemalige sind keine Mitglieder. */
+export function splitWithoutAccount(entries) {
+  const list = Array.isArray(entries) ? entries : [];
+  return { active: list.filter((entry) => !entry.ended), ended: list.filter((entry) => entry.ended) };
+}
 
 export const FEE_STATUS_LABELS = {
   paid: "bezahlt",

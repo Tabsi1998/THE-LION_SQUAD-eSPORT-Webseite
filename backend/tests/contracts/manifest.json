@@ -12,6 +12,7 @@
       "/vereine/members/{id}/summary",
       "/vereine/members/lookup"
     ],
+    "core_paths": ["/status"],
     "waiting_for": {
       "verified_identities": "dolibarr-vereine#153",
       "change_feed": "dolibarr-vereine#154",

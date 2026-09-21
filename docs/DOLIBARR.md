@@ -59,6 +59,12 @@ folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
 
 7. Reiter *Umstellung* → **Vorschau erstellen**. Die Liste zeigt je Konto:
    - *Treffer über die bestätigte E-Mail* → mit **Bestätigen** zuordnen;
+   - *Treffer über die E-Mail – am Konto nicht bestätigt* → die Adresse stimmt,
+     aber das Konto hat sie nie bestätigt (ältere Konten). Kurz prüfen, ob es
+     wirklich diese Person ist, dann **Bestätigen**;
+   - *kein Treffer* → rechts in der Zeile das **Mitglied aus der Liste wählen**
+     und **Zuordnen** (z. B. wenn das Konto eine andere E-Mail-Adresse hat als
+     das Mitglied in Dolibarr);
    - *mehrere Mitglieder teilen sich die E-Mail* → in Dolibarr nachsehen, wer
      gemeint ist, dann von Hand zuordnen;
    - *lokal Mitglied, in Dolibarr nicht gefunden* → in Dolibarr anlegen oder
@@ -76,6 +82,28 @@ folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
 
 Mitglieder, die noch nicht zugeordnet sind, bleiben, wie sie sind, und werden
 weiter hier gepflegt. Niemand verliert durch das Umschalten seinen Zugang.
+
+### Was braucht es, damit ein Konto von selbst erkannt wird?
+
+1. Im Dolibarr-Mitglied steht **dieselbe E-Mail-Adresse** wie im Website-Konto
+   (Groß- und Kleinschreibung egal).
+2. Diese Adresse hat in Dolibarr **genau ein** Mitglied. Teilen sich zwei die
+   Adresse (Familie), wird nie geraten – von Hand zuordnen.
+3. Für die Zuordnung **ohne** Zutun der Vereinsverwaltung zusätzlich: Das Konto
+   hat seine E-Mail bestätigt, und der Schalter *Konten über die bestätigte
+   E-Mail von selbst zuordnen* ist an.
+
+Alles andere geht von Hand: In der Vorschau steht bei jedem Konto ohne Treffer
+die Auswahl aller Mitglieder ohne Konto.
+
+**Mitgliedsnummern** kommen nach der Zuordnung aus Dolibarr (dort die *Ref.Nr.*)
+und lassen sich hier nicht mehr ändern. Soll die Nummer ein Format wie
+`TLS-2026-0007` haben, stellt man das in Dolibarr ein (*Einstellungen → Module →
+Mitglieder → Nummerierung*) – die Website übernimmt, was dort steht.
+
+**Beendete Mitgliedschaften** stehen in der Vorschau in einem eigenen Kasten.
+Ein zugeordnetes Konto, dessen Mitgliedschaft in Dolibarr beendet ist, wird im
+Live-Betrieb „ehemalig“ und verliert den Mitgliederzugang.
 
 ## Im Betrieb
 
@@ -109,7 +137,14 @@ Grund. Es steht nie ein Schlüssel oder ein Antworttext darin.
 | kennt den API-Schlüssel nicht (401) | Schlüssel falsch oder Benutzer deaktiviert | neuen Schlüssel erzeugen und eintragen |
 | fehlt ein Recht im Modul Vereine (403) | dem Benutzer `website` fehlt ein Haken | Schritt 3 prüfen |
 | Modul Vereine ist deaktiviert (501) | in Dolibarr abgeschaltet | Modul aktivieren |
-| nicht erreichbar | Netz, Zertifikat, Wartung | später läuft es von selbst weiter; nichts wird ausgetragen |
+| Diese Adresse gibt es nicht | Tippfehler im Namen | Adresse Buchstabe für Buchstabe prüfen |
+| Zertifikat wird nicht akzeptiert | abgelaufen, selbst signiert oder für einen anderen Namen | Zertifikat in Dolibarr bzw. am Proxy erneuern |
+| antwortet nicht rechtzeitig / nimmt keine Verbindung an | Dolibarr steht, Firewall, falscher Port | prüfen, ob Dolibarr **vom Webserver aus** erreichbar ist |
+| Dolibarr leitet um | `http` statt `https`, fehlender Unterordner | Adresse so eintragen, wie sie im Browser steht |
+| keine Dolibarr-API unter dieser Adresse | Modul *API REST* aus, oder Dolibarr liegt in einem Unterordner | Modul aktivieren bzw. Unterordner in die Adresse |
+| Modul „Vereine“ bietet keine Schnittstelle | Modul aus oder zu alt | aktivieren, aktualisieren |
+| antwortet etwas, aber nicht die API | Anmeldeseite, Wartungsseite | Adresse prüfen |
+| nicht erreichbar | sonstiger Netzfehler | später läuft es von selbst weiter; nichts wird ausgetragen |
 | Schlüssel lässt sich nicht entschlüsseln | `SETTINGS_ENCRYPTION_KEY` am Server geändert | Schlüssel neu eintragen |
 | gelb: „steht seit … min“ | der letzte gelungene Lauf ist über eine Stunde her | Ursache oben suchen |
 | rot | Live und seit über einem Tag kein gelungener Lauf | **nach 48 Stunden ruhen die Rechte aus Funktionen**; Mitgliedschaften bleiben |
