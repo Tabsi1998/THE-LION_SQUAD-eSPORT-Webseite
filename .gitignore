@@ -79,3 +79,6 @@ chainlit.md
 /frontend/coverage/
 # Berichte des CI-Backend-Jobs (auch vom lokalen CI-Spiegel)
 /test-results/
+
+# Playwright-Reste, falls ein Lauf aus dem falschen Ordner gestartet wurde
+backend/test-results/
