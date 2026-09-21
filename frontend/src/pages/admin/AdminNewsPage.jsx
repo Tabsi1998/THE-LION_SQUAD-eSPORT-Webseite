@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
+import { DiscordPreview } from "@/components/tls/DiscordPreview";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { EditorialChecklist } from "@/components/tls/EditorialChecklist";
@@ -259,6 +260,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
     published: source.published ?? true,
     pinned: source.pinned ?? false,
     published_at: toDateTimeLocalInput(source.published_at),
+    discord_skip: source.discord_skip ?? false,
   });
   const [form, setForm] = useState({
     ...formFromPost(post),
@@ -500,6 +502,7 @@ function NewsModal({ post, meta, onClose, onSaved }) {
               <Pin className="w-3 h-3 text-[#FFD700]" /> Anpinnen
             </label>
           </div>
+          <DiscordPreview kind="news" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
 
           {events.length > 0 && (
             <Field label="Verknüpfte Events">

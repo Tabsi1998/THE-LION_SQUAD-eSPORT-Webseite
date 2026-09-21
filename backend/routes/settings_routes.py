@@ -1114,7 +1114,7 @@ async def get_discord(me: dict = Depends(require_club_admin())):
         s["ops_webhook_url_masked"] = "https://discord.com/api/webhooks/…"
         s.pop("ops_webhook_url", None)
     # Ziele und Schalter (#300). Eine Webhook-Adresse verlässt den Server nie.
-    from discord_service import EVENTS, EXTRA_TARGETS, event_enabled, target_status
+    from discord_service import EVENTS, EXTRA_TARGETS, event_enabled, event_field, target_status
     stored_targets = s.pop("targets", None) or {}
     s["targets"] = {
         name: {"configured": bool((stored_targets.get(name) or {}).get("webhook_url")),
@@ -1122,8 +1122,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
         for name in EXTRA_TARGETS
     }
     stored_events = s.get("events") or {}
+    switches = {key: stored_events.get(event_field(key)) for key in EVENTS}
     s["events"] = [
-        {"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": stored_events}, key)}
+        {"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": switches}, key)}
         for key, spec in EVENTS.items()
     ]
     s["target_status"] = await target_status(db)
@@ -1163,7 +1164,7 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()
     current = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
-    from discord_service import EVENTS, EXTRA_TARGETS
+    from discord_service import EVENTS, EXTRA_TARGETS, event_field
     incoming_targets = updates.pop("targets", None)
     if incoming_targets is not None:
         for name, entry in incoming_targets.items():
@@ -1183,7 +1184,7 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         for key, value in incoming_events.items():
             if key not in EVENTS:
                 raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
-            updates[f"events.{key}"] = bool(value)
+            updates[f"events.{event_field(key)}"] = bool(value)
     flat_current = dict(current)
     for name, entry in (current.get("targets") or {}).items():
         for field, value in (entry or {}).items():

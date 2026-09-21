@@ -48,6 +48,11 @@ EVENTS = {
 }
 
 
+def event_field(event_key: str) -> str:
+    """Feldname eines Schalters in der Datenbank. Ein Punkt im Namen wäre für MongoDB ein Unterordner."""
+    return event_key.replace(".", "__")
+
+
 def is_valid_discord_webhook_url(url: str) -> bool:
     parsed = urlparse((url or "").strip())
     if parsed.scheme != "https" or parsed.netloc.lower() not in VALID_WEBHOOK_HOSTS:
@@ -153,7 +158,7 @@ async def _get_discord_config() -> dict:
         "username": s.get("username") or "THE LION SQUAD",
         "avatar_url": await _public_avatar_url(s.get("avatar_url")),
         "targets": targets,
-        "events": s.get("events") or {},
+        "events": {key: (s.get("events") or {}).get(event_field(key)) for key in EVENTS},
     }
 
 

@@ -89,7 +89,7 @@ def event_message(event: dict) -> dict:
             fields.append({"name": "Plätze", "value": str(event["max_participants"]), "inline": True})
     return {
         "event_key": "event.announced",
-        "title": f"📅 {event.get('title') or 'Event'}",
+        "title": f"📅 {event.get('name') or event.get('title') or 'Event'}",
         "description": plain_text(event.get("short_description") or event.get("description"), 400),
         "color": EVENT_COLOR,
         "url": f"/events/{event.get('slug') or event.get('id')}",
