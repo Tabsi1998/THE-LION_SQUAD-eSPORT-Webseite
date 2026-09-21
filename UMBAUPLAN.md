@@ -545,6 +545,19 @@ Fehlergruppen, Scheduler – alle fünf Minuten, sieben Tage Verlauf. Die Bewert
 von der Messung, damit die Schwellen testbar sind. Die In-Memory-Datenbank der Tests kennt
 kein `ping`; die Prüfung weicht dort auf ein Lesen aus.
 
+**Nachtrag #310 (21.09., PR #337): Livestreams fehlten, und nichts sagte warum.** Das
+Twitch-Client-Secret war weg; die Abfrage lief alle 90 Sekunden weiter und übersprang still
+(„no credentials or disabled“ stand nur im Rückgabewert), im Twitch-Reiter stand trotzdem
+nichts Rotes. Jetzt hält jeder Lauf sein Ergebnis fest – fehlt etwas, ist das Secret nicht mehr
+lesbar, lehnt Twitch ab (mit HTTP-Status) – und die neunte Auto-Prüfung „Twitch-Abfrage“ zeigt
+es gelb unter Betrieb. Antwortet Twitch einmal nicht, bleiben laufende Streams stehen; vorher
+hätte eine Störung dort alle Streams beendet und die Minuten zu früh verbucht. Zweite stille
+Stelle: Auf die Startseite kommen nur aktive Mitglieder, deren Mitgliederprofil mit dem
+Plattform-Konto verknüpft ist. Die Regel steht jetzt einmal (`services/stream_visibility.py`),
+und der Twitch-Reiter nennt je Kanal den Grund. Mitgliedschaft und Kontostatus sind
+Vereinsdaten: den genauen Grund sieht nur die Vereinsverwaltung, die Redaktion liest „nicht
+freigeschaltet“ – mit Test.
+
 **Alarme über einen eigenen Webhook, gedrosselt.** Der erste Entwurf schickte Alarme über den
 Community-Webhook – dort gehören nur News, Turniere und Erfolge hin (Einwand des Betreibers).
 Jetzt gibt es in den Discord-Einstellungen einen zweiten, privaten Betriebs-Webhook; fehlt er,

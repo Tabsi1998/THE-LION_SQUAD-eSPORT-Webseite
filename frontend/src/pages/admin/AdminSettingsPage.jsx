@@ -10,6 +10,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
+import { BrandField, SystemCard } from "./settings/fields";
+import { TwitchTab } from "./settings/TwitchTab";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
 
@@ -1640,72 +1642,16 @@ export default function AdminSettingsPage() {
       )}
 
       {tab === "twitch" && (
-        <div className="max-w-4xl space-y-4">
-          {!twitchStatus?.configured && (
-            <div className="flex items-start gap-3 border border-[#9146FF]/30 bg-[#9146FF]/10 rounded-sm p-4">
-              <Radio className="w-5 h-5 text-[#9146FF] shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <div className="font-bold text-[#b88cff] uppercase tracking-wider text-xs">Twitch Helix noch nicht aktiv</div>
-                <p className="text-white/70 mt-1">Für Live-Erkennung, Streamer-Achievements und den Live-Slider brauchst du Client-ID und Client-Secret aus einer Twitch Developer App.</p>
-              </div>
-            </div>
-          )}
-          <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-4">
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="font-heading font-bold uppercase">Live-Erkennung</div>
-                  <p className="mt-1 text-xs text-white/45">Prüft verknüpfte Twitch-Kanäle, füllt /streams/live und wertet Streamer-Achievements aus.</p>
-                </div>
-                <label className="flex items-center gap-2 text-sm whitespace-nowrap">
-                  <input type="checkbox" checked={brand.twitch_live_detection !== false} onChange={(e) => setBrandField("twitch_live_detection", e.target.checked)} className="accent-[#9146FF]" data-testid="twitch-live-detection" />
-                  <span>Aktiv</span>
-                </label>
-              </div>
-              <div className="grid md:grid-cols-2 gap-3">
-                <BrandField label="TLS Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrandField("twitch_channel", v)} testId="twitch-channel" />
-                <BrandField label="Twitch Client ID" value={brand.twitch_client_id} onChange={(v) => setBrandField("twitch_client_id", v)} testId="twitch-client-id" />
-              </div>
-              <label className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">
-                  Twitch Client Secret {brand.twitch_client_secret_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}
-                </div>
-                <input type="password" value={brand.twitch_client_secret || ""} onChange={(e) => setBrandField("twitch_client_secret", e.target.value)} data-testid="twitch-client-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={brand.twitch_client_secret_masked ? "Leer lassen, um Secret beizubehalten" : "Client Secret eintragen"} />
-                <p className="mt-1 text-xs text-white/40">Das Secret wird beim Laden nicht mehr im Klartext zurückgegeben.</p>
-                {brand.twitch_client_secret_masked && <button type="button" onClick={() => clearTwitchSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 text-[10px] uppercase font-bold text-[#FF6B6B]">Gespeichertes Secret entfernen</button>}
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button onClick={saveTwitch} disabled={savingTwitch} data-testid="twitch-save" className="px-5 py-2 bg-[#9146FF] text-white font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingTwitch ? "Speichere..." : "Speichern"}</button>
-                <button onClick={refreshTwitch} disabled={refreshingTwitch || !twitchStatus?.configured || brand.twitch_live_detection === false} data-testid="twitch-refresh" className="px-4 py-2 border border-[#9146FF]/70 text-[#b88cff] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshingTwitch ? "animate-spin" : ""}`} /> Jetzt prüfen
-                </button>
-              </div>
-            </div>
-            <div className="grid gap-3">
-              <SystemCard title="Twitch API" ok={twitchStatus?.configured && twitchStatus?.enabled} detail={twitchStatus?.configured ? "Credentials gespeichert" : "Client-ID oder Secret fehlt"} />
-              <SystemCard title="Kanäle" ok={(twitchStatus?.checked_users || 0) > 0} detail={`${twitchStatus?.checked_users || 0} Accounts mit Twitch-Feld`} />
-              <SystemCard title="Live" ok={(twitchStatus?.live_count || 0) > 0} detail={`${twitchStatus?.live_count || 0} Stream(s) aktuell live`} />
-              <SystemCard title="Token" ok={!!twitchStatus?.token_expires_at} detail={twitchStatus?.token_expires_at ? `gültig bis ${new Date(twitchStatus.token_expires_at).toLocaleString("de-DE")}` : "wird beim nächsten Refresh erstellt"} />
-            </div>
-          </div>
-          {twitchStatus?.live_streams?.length > 0 && (
-            <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/5 font-heading font-bold uppercase">Aktuell live</div>
-              <div className="divide-y divide-white/5">
-                {twitchStatus.live_streams.map((stream) => (
-                  <a key={stream.stream_id || stream.user_id} href={stream.stream_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
-                    <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold truncate">{stream.display_name || stream.username || stream.twitch_login}</div>
-                      <div className="text-xs text-white/45 truncate">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>
-                    </div>
-                    <span className="inline-flex items-center gap-1 text-xs text-white/60"><Eye className="w-3.5 h-3.5" /> {stream.viewer_count || 0}</span>
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <TwitchTab
+          brand={brand}
+          setBrandField={setBrandField}
+          status={twitchStatus}
+          saving={savingTwitch}
+          refreshing={refreshingTwitch}
+          onSave={saveTwitch}
+          onRefresh={refreshTwitch}
+          onClearSecret={() => clearTwitchSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))}
+        />
       )}
 
       {tab === "brand" && (
@@ -2099,14 +2045,6 @@ function BannerScopePicker({ value, onChange }) {
   );
 }
 
-function BrandField({ label, value, onChange, testId, placeholder = "" }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
-  );
-}
 
 function BrandSelect({ label, value, onChange, testId, options }) {
   return (
@@ -2158,18 +2096,3 @@ function LegalTextArea({ label, value, onChange, testId, rows = 4 }) {
   );
 }
 
-function SystemCard({ title, ok, detail, problem }) {
-  const ready = !!ok;
-  return (
-    <div className={`border rounded-sm bg-[#121212] p-5 ${ready ? "border-[#00FF88]/25" : "border-[#FFD700]/30"}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-heading font-bold uppercase">{title}</div>
-        <span className={`text-[10px] font-black uppercase tracking-widest ${ready ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
-          {ready ? "OK" : "Prüfen"}
-        </span>
-      </div>
-      <div className="mt-3 text-xs text-white/55 break-words">{detail || "-"}</div>
-      {problem && <div className="mt-2 text-xs text-[#FF3B30] break-words">{problem}</div>}
-    </div>
-  );
-}

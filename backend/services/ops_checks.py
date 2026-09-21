@@ -37,6 +37,7 @@ DISK_WARN_PCT = 15.0
 DISK_CRIT_PCT = 5.0
 MAIL_CRIT_BACKLOG = 20
 STREAM_WARN_HOURS = 48.0
+TWITCH_STALE_MINUTES = 15.0
 VARIANTS_WARN_MISSING = 50
 VARIANT_SCAN_LIMIT = 5000
 UPLOAD_SCAN_LIMIT = 200_000
@@ -87,6 +88,21 @@ def rate_stream(age_hours: float | None) -> str:
     if age_hours is None:
         return "ok"
     return "warn" if age_hours > STREAM_WARN_HOURS else "ok"
+
+
+def rate_twitch(state: dict | None, age_minutes: float | None) -> str:
+    # Nie eingerichtet oder bewusst aus ist kein Alarm. Eingerichtet und
+    # trotzdem ohne Ergebnis heißt: die Startseite zeigt keine Streams (#310).
+    state = state or {}
+    if state.get("reason") in ("not_configured", "disabled"):
+        return "ok"
+    if not state:
+        return "ok"
+    if not state.get("ok"):
+        return "warn"
+    if age_minutes is None or age_minutes > TWITCH_STALE_MINUTES:
+        return "warn"
+    return "ok"
 
 
 def rate_variants(missing: int) -> str:
@@ -221,6 +237,28 @@ async def check_change_stream() -> dict:
     return result("change_stream", label, rate_stream(age), value, "letztes Ereignis")
 
 
+async def check_twitch_poll(db) -> dict:
+    label = "Twitch-Abfrage"
+    try:
+        state = await db.settings.find_one({"id": "twitch_poll_state"}, {"_id": 0}) or {}
+    except Exception as exc:  # noqa: BLE001
+        return failed("twitch_poll", label, exc)
+    if not state:
+        return result("twitch_poll", label, "ok", "noch kein Lauf", "die Abfrage läuft alle 90 s, sobald Zugangsdaten gespeichert sind")
+    hours = _hours_since(state.get("last_run_at"))
+    age_minutes = None if hours is None else hours * 60
+    status = rate_twitch(state, age_minutes)
+    reason = state.get("reason_text") or state.get("reason") or ""
+    if state.get("reason") in ("not_configured", "disabled"):
+        return result("twitch_poll", label, status, "aus", reason)
+    if not state.get("ok"):
+        detail = f"{reason} ({state.get('detail')})" if state.get("detail") else reason
+        return result("twitch_poll", label, status, "liefert nichts", detail + " – Einstellungen → Twitch")
+    if status == "warn":
+        return result("twitch_poll", label, status, f"steht seit {age_minutes:.0f} min" if age_minutes is not None else "steht", "der letzte Lauf ist zu lange her")
+    return result("twitch_poll", label, status, f"{state.get('live', 0)} live von {state.get('checked', 0)} Kanälen", "letzter Lauf in Ordnung")
+
+
 def _missing_variants(path: Path, limit: int = VARIANT_SCAN_LIMIT) -> tuple[int, int, bool]:
     scanned = 0
     missing = 0
@@ -289,6 +327,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("image_variants", "Bildvarianten", check_image_variants),
         ("error_groups", "Fehlergruppen", lambda: check_error_groups(db)),
         ("scheduler", "Scheduler", check_scheduler),
+        ("twitch_poll", "Twitch-Abfrage", lambda: check_twitch_poll(db)),
     ]
 
 
