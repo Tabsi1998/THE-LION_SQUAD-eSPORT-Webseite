@@ -129,6 +129,19 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Livestreams auf der Startseite (#310, PR #337): Die Regel „nur aktive
+  Mitglieder mit verknüpftem Mitgliederprofil“ steht einmal in
+  `services/stream_visibility.py` (`homepage_visibility`) – für
+  `/api/streams/live` und für die Erklärung je Kanal in
+  `/api/admin/streams/status` (`channels`). Den genauen Grund (Mitgliedschaft,
+  Kontostatus) sieht nur der Bereich `club`; die Redaktion bekommt
+  „nicht freigeschaltet“. `services/twitch_service.py` hält jeden Lauf in
+  `settings` unter `twitch_poll_state` fest (`record_poll`: Grund, HTTP-Status,
+  Zahlen) statt still zu überspringen; antwortet Twitch nicht, wird nichts
+  geschlossen. Neunte Auto-Prüfung `twitch_poll` („Twitch-Abfrage“, gelb, kein
+  Alarm; aus oder nie eingerichtet ist grün). Web: Twitch-Reiter in
+  `pages/admin/settings/TwitchTab.jsx`, gemeinsame Bausteine in
+  `settings/fields.jsx` (erster Schnitt für #223).
 - Rechte nach Bereichen (#287–#292): `services/permissions.py` (Bereiche
   `tournaments`, `content`, `club`, `system`, `moderation`; Rolle → Bereiche,
   Freigaben `user.areas`, Vorstandsposten → `club`), Wächter `require_area(...)`
@@ -481,19 +494,14 @@ braucht.
 ### Gemergt zuletzt (16.–21. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
 (#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
-(#287–#292 Rollen und Rechte). `main` steht auf `2a9350d`.
+(#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen nach der Analyse),
+#311 und #313 (Dependabot: Backend, App). `main` steht auf `56ae588`.
 
 ### Offene PRs
-- Drei Dependabot-PRs vom 21.09.: #311 (Backend: pyjwt, resend, uvicorn), #312
-  (Frontend: sechs kleine Sprünge), #313 (App: React Navigation 7.19). Ihr
-  CI-Lauf ist rot, weil GitHub den ersten Job um 02:18 UTC gar nicht gestartet
-  hat („recent account payments have failed or your spending limit needs to
-  be increased“) – kein Codefehler. Lokal alle drei zusammen geprüft (eigener
-  Arbeitsordner `C:\ldep`): 33 Schritte grün, zwei rot, beide nicht wegen der
-  Updates selbst – `videoPoster.test.js` brach mit jsdom 30.1 (#334) und der
-  Expo-Abgleich war auch auf `main` rot (#335). Beides behebt der
-  Aufräum-PR zu #333. Danach an jedem der drei `@dependabot rebase`
-  kommentieren, den grünen Lauf abwarten, mergen.
+- #337 (#310 Livestreams: Diagnose statt stillem Überspringen).
+- #312 (Dependabot Frontend, u. a. jsdom 30.1): am 21.09. neu aufgebaut
+  (`@dependabot rebase`), nach grünem Lauf mergen. Der Testfehler dazu ist mit
+  #334 behoben.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -518,8 +526,10 @@ braucht.
 - GitHub → Settings → Billing and plans ansehen: am 21.09. um 02:18 UTC hat
   GitHub Actions-Jobs wegen Zahlung/Ausgabenlimit nicht gestartet (um 15:35
   lief der CI wieder).
-- #310: unter Admin → Einstellungen den Twitch-Status ansehen (Zugangsdaten
-  eingerichtet?) – die Abfrage überspringt still, wenn sie fehlen.
+- #310: erledigt am 21.09. – das Twitch-Client-Secret fehlte, der Betreiber
+  hat es neu eingetragen, die Kanäle werden wieder erkannt. Nach dem Merge von
+  #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
+  Startseite käme.
 
 ### Meilensteine und offene Issues (48 offen nach dem Merge des Aufräum-PRs zu #333–#335)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
@@ -529,7 +539,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09., als Nächstes), #223 große Admin-Dateien, #231 klassischer Match-Leseweg |
+| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg |
 | Dolibarr I: Anbindung und Mitgliedschaft | #316 gemeinsamer Adapter und sichere Kontoverknüpfung, #295 Mitgliedschaft und Beitragsstand automatisch übernehmen, #297 Vereinsrechte aus Funktionsperioden, #330 Vertragstests und Bestandsumstellung – baubar, die Modul-APIs gibt es (Vereine v0.3/v0.4) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web und App – baubar (dolibarr-vereine#50 ist fertig) |
 | Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
@@ -551,11 +561,11 @@ Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
 #231 Leseweg – alles noch offen im Code).
 
 ### Reihenfolge
-Vom Betreiber freigegeben (Stand 16.09.): Dolibarr, dann Discord, danach
-Dynamik, App 0.6.0, Admin und Turniere – abwechselnd App und Web. Mit den
-neuen Meilensteinen heißt das (Vorschlag vom 21.09. ab Punkt 4):
+Vom Betreiber am 21.09. so bestätigt („wir machen es so, wie du es für
+sinnvoll hältst“):
 
-1. #310 Livestream-Bug (Diagnose unter Betrieb, Grund je Stream im Admin).
+1. #310 Livestream-Bug – umgesetzt in #337 (Diagnose unter Betrieb, Grund je
+   Kanal im Twitch-Reiter).
 2. Dolibarr I (#316 → #295 → #297, #330 begleitend). Eigener Server-Schritt,
    weil hier Rechte aus einem fremden System kommen.
 3. Discord I (#300, #301, #303).
