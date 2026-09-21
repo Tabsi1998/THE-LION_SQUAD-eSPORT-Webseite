@@ -42,3 +42,10 @@ condition = "AND"
 paths = ['''^frontend/src/pages/user/ProfilePage\.test\.jsx$''']
 regexTarget = "secret"
 regexes = ['''^neues-passwort-123$''']
+
+[[allowlists]]
+description = "The made-up password the login tests sign in with (#348); the accounts live only in the in-memory test database."
+condition = "AND"
+paths = ['''^backend/tests/test_login_comfort_flow\.py$''']
+regexTarget = "secret"
+regexes = ['''^Ein-langes-Testpasswort-42$''']
