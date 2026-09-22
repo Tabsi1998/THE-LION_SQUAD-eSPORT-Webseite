@@ -1,6 +1,7 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useState } from "react";
-import { Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { BrandLogo } from "../../components/BrandLogo";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { FormInput } from "../../components/FormInput";
@@ -56,7 +57,7 @@ export function LoginScreen({ navigation }: Props) {
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
         <View style={styles.brand}>
-          <Image source={require("../../../assets/brand/tls-wordmark.png")} style={styles.wordmark} resizeMode="contain" />
+          <BrandLogo style={styles.wordmark} />
           <Muted>Native App</Muted>
           <Body>Einloggen und Turniere, Teams, Matches und Profil direkt am Handy nutzen.</Body>
         </View>

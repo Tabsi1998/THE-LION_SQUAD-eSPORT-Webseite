@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.1-beta - 2026-09-23
+
+- Mobile: Logo, Maskottchen und Vereinsname kommen aus den Einstellungen der Website: Ändert der Verein sein Logo oder seinen Namen, zeigt die App es beim Anmelden und in den Kopfzeilen – live, ohne neues Update. Ohne Netz bleiben die eingebauten Bilder (#229).
+
 ## 0.9.0-beta - 2026-09-22
 
 - Mobile: Freunde in der App: Auf einem Spielerprofil „Freund hinzufügen“, Anfragen annehmen oder ablehnen, gesendete zurückziehen, Freunde entfernen. In der Profil-Übersicht die Karte „Freunde“ mit offenen Anfragen oben und der Liste – kommt live an, ohne Neuladen (#240).

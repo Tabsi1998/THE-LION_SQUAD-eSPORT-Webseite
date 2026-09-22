@@ -171,6 +171,28 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Marke (#229; PR #379, baut auf #378 auf; Build 68). **Standard-Favicon für
+  hell und dunkel:** Browser ohne `prefers-color-scheme` und der Home-
+  Bildschirm nehmen nur `favicon_url`; beim Verein war das die weiße
+  Fassung. `services/brand_favicon.py`: `pick_source` (favicon_dark →
+  mascot → logo_dark → eingebautes Maskottchen), `dark_only_default` (der
+  Hinweis im Admin), `asset_path` (nur `/assets/brand/` und Upload-Ordner,
+  kein Pfad-Ausbruch), `compose`/`universal_favicon_png` (weißes Logo auf
+  Kreis in `primary_color`, 512², vierfach gezeichnet), `store_png`. Route
+  `POST /api/settings/branding/favicon/universal` (Club-Admin): legt die
+  Datei wie einen Upload ab (`media_uploads`, Scope `branding`, Varianten),
+  setzt `favicon_url`, Audit. Admin: Kasten unter den Favicons mit Hinweis
+  (`brand-favicon-dark-only`) und Knopf `brand-favicon-generate`. **App liest
+  die Markenbilder:** `lib/branding.ts` (`brandingFromSettings`: dunkle
+  Fassung zuerst wie `Logo.jsx`, `DEFAULT_BRANDING`),
+  `branding/BrandingProvider.tsx` (`/settings/public` beim Start, live über
+  „settings/branding“; ohne Provider oder ohne Netz die eingebauten Werte),
+  `components/BrandLogo.tsx` (Bild des Vereins, bei Fehler das eingebaute).
+  Login zeigt `BrandLogo`, Kopfzeilen von Start, News und „Mehr“ den
+  `clubName`. Boot-Screen bleibt eingebaut (vor dem ersten Laden). Tests
+  `test_brand_favicon_unit.py` (4), `test_brand_favicon_flow.py` (3),
+  Admin-Settings-Test (+1), App `branding.test.ts`, `BrandLogo.test.tsx`,
+  `BrandingProvider.test.tsx` (7).
 - Discord-Bot (#302, Discord II Teil 2; PR #378). Läuft
   **im Backend** als Task (Entscheidung des Betreibers vom 22.09.: Token im
   Admin, kein Container, nichts in der `.env`). `services/discord_bot.py`:
@@ -986,9 +1008,15 @@ Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen), #377 (App
 Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
 
 ### Offene PRs
+Reihenfolge beim Mergen: erst #378, dann #379 (#379 baut auf #378 auf, sonst
+Konflikte in CLAUDE.md und UMBAUPLAN).
 - #378 (#302 Discord-Bot im Backend; Token im Admin). Nach dem Merge
   `update.sh` (neue Abhängigkeit discord.py im Backend-Image), dann im Admin
   Einstellungen → Discord → „Discord-Bot“ nach der Anleitung dort einrichten.
+- #379 (#229 Standard-Favicon für hell und dunkel, Markenbilder in der App).
+  Nach dem Merge `update.sh`, im Admin → Einstellungen → Branding einmal
+  „Aus Logo und Akzentfarbe erzeugen“ klicken, und Build 68 vom Haupt-PC
+  (`npm run release:local`).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -1007,7 +1035,9 @@ Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
   am Vereinsserver abgelegt, **Build 66** (`mobile-v0.8.0-beta-build66`,
   Commit b364246, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
   `0d1a60d4`; #216, #236, Startgeld-Haken aus #319), am Vereinsserver
-  abgelegt. Nächster Build ist 67.
+  abgelegt, **Build 67** (`mobile-v0.9.0-beta-build67`, Commit 1d02528, am
+  23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `aea3415c`; #240,
+  #245), am Vereinsserver abgelegt. Nächster Build ist 68.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1030,7 +1060,7 @@ Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378)
+### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378, #229 schließt #379)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1049,11 +1079,11 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
-| Auszeichnungen und Marke | #229, #230 |
+| Auszeichnungen und Marke | #229 Standard-Favicon für hell und dunkel (im Admin erzeugt) und Markenbilder/Vereinsname in der App – umgesetzt in #379, Build 68 nach dem Merge. #230 Gewinnerbanner und Trophäen – **wartet** auf drei Entscheidungen des Betreibers (Vorlagensystem oder fertige Bilder; Bilder bei der Vergabe oder beim Ansehen; was bei korrigierten Ergebnissen gilt), Vorschlag steht als Kommentar an #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
-| App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 nach dem Merge. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
+| App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
@@ -1083,8 +1113,9 @@ sinnvoll hältst“):
    Event-Formulare wie #318 – zusammen planen). Abrechnung II – umgesetzt in
    #371 (baut auf #369 auf). App 0.8.0-beta.
 8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
-   umgesetzt in #377, Build 67 nach dem Merge. Offen: Auszeichnungen und
-   Marke, App 1.0.0.
+   umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
+   #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
+   Offen: App 1.0.0.
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 

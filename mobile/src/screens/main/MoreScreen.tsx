@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { useBranding } from "../../branding/BrandingProvider";
 import { API_BASE_URL } from "../../config";
 import { api } from "../../lib/api";
 import { isGuestUser } from "../../live";
@@ -83,6 +84,7 @@ export function socialIcon(platform?: string | null): keyof typeof Ionicons.glyp
 
 export function MoreScreen({ navigation }: Props) {
   const { user } = useAuth();
+  const { clubName } = useBranding();
   const { openWhatsNew } = useAppUpdate();
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const appVersion = Constants.expoConfig?.version ?? "?";
@@ -121,7 +123,7 @@ export function MoreScreen({ navigation }: Props) {
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Muted style={styles.eyebrow}>THE LION SQUAD</Muted>
+          <Muted style={styles.eyebrow}>{clubName}</Muted>
           <Title>Mehr</Title>
         </View>
 

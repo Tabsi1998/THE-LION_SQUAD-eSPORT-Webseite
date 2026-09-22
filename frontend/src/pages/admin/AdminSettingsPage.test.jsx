@@ -193,3 +193,27 @@ test("eine unerwartet geformte Antwort legt nicht die ganze Seite lahm", async (
   await waitForLoadedEmailTab();
   expect(screen.getByTestId("settings-tab-queue")).toBeInTheDocument();
 });
+
+test("Branding: „Aus Logo und Akzentfarbe erzeugen“ ruft den Server, übernimmt den neuen Standard-Favicon und warnt vorher, wenn der Standard nur die dunkle Fassung ist (#229)", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/settings/branding")) return Promise.resolve({ data: { club_name: "THE LION SQUAD", favicon_url: "/api/static/uploads/m.png", mascot_url: "/api/static/uploads/m.png" } });
+    return Promise.resolve(responseFor(path));
+  });
+  apiMock.post.mockResolvedValue({ data: { favicon_url: "/api/static/uploads/neu.png", source: "/api/static/uploads/m.png", color: "#29B6E8" } });
+  const user = userEvent.setup();
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings?tab=brand"]}>
+        <AdminSettingsPage />
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+
+  expect(await screen.findByTestId("brand-favicon-dark-only")).toHaveTextContent("Fassung für dunkel");
+  await user.click(screen.getByTestId("brand-favicon-generate"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/branding/favicon/universal"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Standard-Favicon erzeugt und gespeichert."));
+  // Der neue Standard ist eine eigene Datei - der Hinweis verschwindet.
+  await waitFor(() => expect(screen.queryByTestId("brand-favicon-dark-only")).not.toBeInTheDocument());
+});

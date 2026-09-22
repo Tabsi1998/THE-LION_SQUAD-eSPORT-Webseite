@@ -459,7 +459,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
-| App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 nach dem Merge; #239 Tastatur-Sticker bleibt offen (natives Modul) |
+| App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
@@ -476,7 +476,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
-| Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
+| Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), Build 68 nach dem Merge; #230 Block 18 Banner und Trophäen – wartet auf die drei Entscheidungen aus Block 18 (Kommentar an #230) |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
 ## Block 22 — Tempo und Betrieb
@@ -601,6 +601,25 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 37 — Marke: Standard-Favicon und Markenbilder in der App
+
+### Was 37.1 gefunden hat (#229 – PR #379)
+
+**Der Standard-Favicon des Vereins war das weiße Maskottchen.** Die Fassungen für hell und dunkel
+stimmen – aber Browser ohne Hell/Dunkel-Erkennung, Lesezeichen und der Home-Bildschirm nehmen nur
+den Standard, und der war beim Verein dieselbe Datei wie die dunkle Fassung. Weiß auf einer hellen
+Tableiste zeigt nichts. Statt ein drittes Bild zu verlangen, baut der Server auf Knopfdruck eine
+Fassung, die überall trägt: das weiße Logo auf einem Kreis in der Akzentfarbe. Der Admin sagt
+vorher, ob der Standard nur die dunkle Fassung ist. Das Ergebnis ist ein normaler Upload – in der
+Medienliste, mit Varianten – und wird als Standard gesetzt; die hell/dunkel-Fassungen bleiben.
+
+**Die App brachte ihre Marke fest mit.** Wordmark und Vereinsname standen im Code; ein neues
+Logo in den Einstellungen hätte ein neues App-Update gebraucht. Jetzt holt die App Logo,
+Maskottchen und Namen aus `/settings/public` – beim Start und live, wenn der Admin etwas
+ändert – mit derselben Reihenfolge wie das Web (die App ist dunkel, also zuerst die Fassung für
+dunklen Hintergrund). Fehlt ein Bild oder lädt es nicht, bleibt das eingebaute; der Boot-Screen
+zeigt immer das eingebaute, weil er vor dem ersten Laden kommt. Ohne Netz ändert sich nichts.
 
 ## Block 36 — Discord II, Teil 2: Der Bot
 

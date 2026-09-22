@@ -9,6 +9,7 @@ import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListSt
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { useBranding } from "../../branding/BrandingProvider";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
@@ -62,6 +63,7 @@ function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): Mobi
 
 export function DashboardScreen({ navigation }: Props) {
   const { user, refreshMe } = useAuth();
+  const { clubName } = useBranding();
   const [data, setData] = useState<MobileDashboardData>(emptyDashboard);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -154,7 +156,7 @@ export function DashboardScreen({ navigation }: Props) {
       <Screen padded={false}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.header}>
-            <Muted>THE LION SQUAD</Muted>
+            <Muted>{clubName}</Muted>
             <Title>LionsAPP</Title>
             <Muted>Dein Vereins- und eSports-Hub wird vorbereitet.</Muted>
           </View>
@@ -177,7 +179,7 @@ export function DashboardScreen({ navigation }: Props) {
               <Ionicons name={isGuest ? "radio-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
             </View>
             <View style={styles.flex}>
-              <Muted style={styles.heroEyebrow}>{isGuest ? "THE LION SQUAD" : "Hallo"}</Muted>
+              <Muted style={styles.heroEyebrow}>{isGuest ? clubName : "Hallo"}</Muted>
               <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
             </View>
             <View style={styles.heroBadges}>
