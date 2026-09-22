@@ -144,6 +144,17 @@ async def _safe_discord_announcements():
         _log_task_failure("discord_announcements", exc)
 
 
+async def _safe_matchday_schedule():
+    try:
+        from database import get_db
+        from services.matchday_schedule import persist_all_matchday_schedules
+        res = await persist_all_matchday_schedules(get_db())
+        if res.get("written"):
+            logger.info(f"[scheduler] matchday_schedule {res}")
+    except Exception as exc:
+        _log_task_failure("matchday_schedule", exc)
+
+
 async def _safe_billing_orders():
     try:
         from services.billing_orders import classify_due
@@ -410,6 +421,9 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("member_announcements", _safe_member_announcements), IntervalTrigger(seconds=60), id="member_announcements",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
+                  max_instances=1, coalesce=True)
+    # Geltende Spieltag-Termine in die Partien schreiben (#235): abgelaufene Fristen, neue Partien.
+    sched.add_job(_single_replica("matchday_schedule", _safe_matchday_schedule), IntervalTrigger(minutes=15), id="matchday_schedule",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",
                   max_instances=1, coalesce=True)

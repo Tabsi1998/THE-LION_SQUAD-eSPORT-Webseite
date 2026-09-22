@@ -465,6 +465,18 @@ async def _assert_match_visible(match: dict, user: dict | None) -> None:
         raise HTTPException(status_code=403, detail="Match ist nicht sichtbar")
 
 
+async def _rewrite_matchday_schedule(db, tournament_id: str | None) -> None:
+    """Nach einer Entscheidung über einen Vorschlag gilt für die Partie vielleicht wieder Heimrecht oder
+    Standardzeit - nachtragen, damit Erinnerungen und Anzeigen den geltenden Termin lesen (#235)."""
+    if not tournament_id:
+        return
+    from services.matchday_schedule import persist_matchday_schedule
+
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if tournament:
+        await persist_matchday_schedule(db, tournament)
+
+
 def _schedule_deadline(match: dict, tournament: dict | None = None) -> str:
     value = match.get("schedule_deadline_at") or (match.get("settings") or {}).get("schedule_deadline_at")
     if value:
@@ -751,6 +763,9 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         await getattr(db, collection).update_one({"id": match_id}, {"$set": {
             "scheduled_at": scheduled_at,
             "schedule_status": "accepted",
+            # Der geltende Termin steht in der Partie, mit Quelle (#235).
+            "schedule_source": "accepted",
+            "schedule_written_at": now_iso,
             "status": "scheduled" if match.get("status") in {"pending", "ready", "preview"} else match.get("status"),
             "updated_at": now_iso,
         }})
@@ -763,6 +778,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
             "updated_at": now_iso,
         }})
         await getattr(db, collection).update_one({"id": match_id}, {"$set": {"schedule_status": "declined", "updated_at": now_iso}})
+        await _rewrite_matchday_schedule(db, match.get("tournament_id"))
         return {"ok": True, "status": "declined", "idempotent_replay": False}
     if not body.scheduled_at:
         raise HTTPException(status_code=400, detail="Gegenvorschlag braucht Datum und Uhrzeit")
@@ -936,6 +952,9 @@ async def update_match(match_id: str, body: MatchUpdate, me: dict = Depends(get_
         updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
         if "scheduled_at" in updates:
             updates["scheduled_at"] = updates["scheduled_at"].isoformat() if updates["scheduled_at"] else None
+            # Von der Turnierleitung gesetzt: gilt, bis sie es ändert - der Spieltag-Lauf fasst es nicht an (#235).
+            # Leer gesetzt heißt: die Regel gilt wieder.
+            updates["schedule_source"] = "manual" if updates["scheduled_at"] else None
         if updates.get("scheduled_at") and v2_match.get("status") in {"pending", "ready", "preview"} and "status" not in updates:
             updates["status"] = "scheduled"
         await ensure_station_slot_available(db, v2_match, updates, "matches_v2")

@@ -34,9 +34,26 @@ function fullAddress(e) {
   return [e.address, cityLine, e.country].filter(Boolean).join(", ");
 }
 
+// Die Karte sucht nur die Adresse; der Name des Veranstaltungsorts steht daneben (#204).
+// Der Server liefert `map_query` je Event und je Standort; ältere Antworten fallen auf die Adresse zurück.
+function mapQuery(e) {
+  return e.map_query || fullAddress(e) || e.location || "";
+}
+
 function mapEmbedUrl(e) {
-  const query = [e.location, fullAddress(e)].filter(Boolean).join(", ");
+  const query = mapQuery(e);
   return query ? `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed` : "";
+}
+
+function mapLinkUrl(query) {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function placeTimeLine(place) {
+  if (!place.start_date) return "";
+  const start = new Date(place.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  const end = place.end_date ? new Date(place.end_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "";
+  return end ? `${start} – ${end}` : start;
 }
 
 function sponsorKey(sponsor) {
@@ -120,7 +137,9 @@ export default function EventDetailPage() {
           {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
           <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70 min-w-0">
             {e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short" })}</span></span>}
-            {(e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
+            {(e.locations?.length || 0) > 1
+              ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
+              : (e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
             {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
             {e.max_participants && <span className="inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#9F7AEA] shrink-0" />max. {e.max_participants}</span>}
             {e.has_registration && e.registration_summary && <span className="inline-flex items-center gap-2"><UserPlus className="w-4 h-4 text-[#9F7AEA] shrink-0" />{e.registration_summary.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze reserviert</span>}
@@ -151,20 +170,49 @@ export default function EventDetailPage() {
             {e.has_registration && (
               <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={load} />
             )}
-            {e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
+            {(e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e) && hasConsent("external_media") && (
               <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
                 <iframe title={`Karte ${e.name}`} src={mapEmbedUrl(e)} className="w-full h-72 border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
               </div>
             )}
-            {e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
+            {(e.locations?.length || 0) <= 1 && e.show_map && mapEmbedUrl(e) && !hasConsent("external_media") && (
               <ExternalMediaNotice
                 service="Google Maps"
                 reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen, weil dabei Daten an Google übertragen werden können."
-                url={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([e.location, fullAddress(e)].filter(Boolean).join(", "))}`}
+                url={mapLinkUrl(mapQuery(e))}
                 accent="#9F7AEA"
                 testId="event-map-consent-notice"
               />
             )}
+          </div>
+        )}
+
+        {(e.locations?.length || 0) > 1 && (
+          <div data-testid="event-locations">
+            <h2 className="font-heading text-2xl font-black uppercase mb-4">Standorte</h2>
+            <div className="grid md:grid-cols-2 gap-5">
+              {e.locations.map((place, index) => (
+                <div key={place.key || index} className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden flex flex-col" data-testid={`event-location-${index}`}>
+                  <div className="p-5 space-y-1.5">
+                    <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Standort {index + 1}</div>
+                    {place.name && <div className="font-heading text-xl font-black uppercase">{place.name}</div>}
+                    {placeTimeLine(place) && <div className="text-sm text-white/75 inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" /> {placeTimeLine(place)}</div>}
+                    {place.door_time && <div className="text-xs text-white/50">Einlass {new Date(place.door_time).toLocaleTimeString("de-DE", { timeStyle: "short" })}</div>}
+                    {place.address_line && <div className="text-sm text-white/65 inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0 mt-0.5" /> <span>{place.address_line}</span></div>}
+                    {place.max_participants != null && <div className="text-xs text-white/50 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5" /> {place.max_participants} Plätze</div>}
+                    {place.note && <div className="text-sm text-white/60">{place.note}</div>}
+                  </div>
+                  {e.show_map && place.map_query && hasConsent("external_media") && (
+                    <iframe title={`Karte ${place.name || `Standort ${index + 1}`}`} src={`https://www.google.com/maps?q=${encodeURIComponent(place.map_query)}&output=embed`} className="w-full h-56 border-0 border-t border-white/10" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+                  )}
+                  {e.show_map && place.map_query && !hasConsent("external_media") && (
+                    <div className="p-3 border-t border-white/10">
+                      <ExternalMediaNotice service="Google Maps" reason="Die Karte wird erst nach Zustimmung zu externen Medien geladen." url={mapLinkUrl(place.map_query)} accent="#9F7AEA" testId={`event-map-consent-notice-${index}`} />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -328,6 +328,18 @@ async def news_meta(db, slug: str, base: dict, origin: str) -> dict:
     return add_breadcrumbs(meta, origin, [("News", "/news")], post.get("title"))
 
 
+def _event_places(event: dict, fallback_name: str):
+    from services.event_locations import address_line, event_locations
+
+    places = [
+        {"@type": "Place", "name": clean_text(place.get("name") or fallback_name), "address": clean_text(address_line(place) or place.get("name") or fallback_name)}
+        for place in event_locations(event)
+    ]
+    if not places:
+        return {"@type": "Place", "name": fallback_name, "address": fallback_name}
+    return places[0] if len(places) == 1 else places
+
+
 async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
     event, _ = await find_by_slug_or_history(db.events, slug, {"_id": 0})
     if not event or event.get("status") == "draft":
@@ -363,7 +375,8 @@ async def event_meta(db, slug: str, base: dict, origin: str) -> dict:
         "endDate": event.get("end_date"),
         "eventStatus": "https://schema.org/EventScheduled",
         "eventAttendanceMode": "https://schema.org/MixedEventAttendanceMode" if event.get("is_hybrid") else ("https://schema.org/OnlineEventAttendanceMode" if event.get("is_online") else "https://schema.org/OfflineEventAttendanceMode"),
-        "location": {"@type": "Place", "name": place, "address": clean_text(", ".join(filter(None, [event.get("address"), event.get("postal_code"), event.get("city"), event.get("country")])) or place)},
+        # Mehrere Standorte (#203): schema.org erlaubt eine Liste von Orten.
+        "location": _event_places(event, place),
         "organizer": {"@type": "Organization", "name": event.get("organizer_name") or base["site_name"], "url": event.get("organizer_url") or origin},
         "url": meta["canonical"],
     }

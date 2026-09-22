@@ -238,3 +238,55 @@ def test_the_later_agreement_wins_after_a_counter_offer():
     ], window)
 
     assert resolution.scheduled_at == later
+
+
+# ---------------------------------------------------------------- Den geltenden Termin schreiben (#235)
+
+from services.matchday_schedule import schedule_writes  # noqa: E402
+
+
+def league(**extra):
+    return {"id": "t1", "format": "league", "start_date": TUESDAY.isoformat(), **extra}
+
+
+def fixture(match_id, number, **extra):
+    return {"id": match_id, "tournament_id": "t1", "matchday_number": number, "status": "pending", **match(), **extra}
+
+
+def test_the_default_time_is_written_with_its_source_and_only_once():
+    writes = schedule_writes(league(), [fixture("m1", 1)], [])
+    assert len(writes) == 1
+    update = writes[0]["update"]
+    assert update["schedule_source"] == "default" and update["status"] == "scheduled"
+    assert datetime.fromisoformat(update["scheduled_at"]).weekday() == 6
+
+    # Steht es schon so in der Partie, wird nichts geschrieben - der Lauf ist idempotent.
+    written = fixture("m1", 1, scheduled_at=update["scheduled_at"], schedule_source="default", status="scheduled")
+    assert schedule_writes(league(), [written], []) == []
+
+
+def test_home_right_and_agreement_replace_the_default():
+    window = matchday_window(TUESDAY, 1)
+    home_time = window.start + timedelta(days=2)
+    agreed = window.start + timedelta(days=3)
+    stored = fixture("m1", 1, scheduled_at=default_time_in(window).isoformat(), schedule_source="default")
+
+    only_home = schedule_writes(league(), [stored], [proposal("reg-home", home_time, match_id="m1")])
+    assert only_home[0]["update"]["schedule_source"] == "home"
+    assert only_home[0]["update"]["scheduled_at"] == home_time.isoformat()
+
+    both = schedule_writes(league(), [stored], [proposal("reg-home", home_time, match_id="m1"), proposal("reg-away", agreed, status="accepted", match_id="m1")])
+    assert both[0]["update"]["schedule_source"] == "accepted"
+    assert both[0]["update"]["scheduled_at"] == agreed.isoformat()
+
+
+def test_a_manual_time_and_a_finished_match_are_never_touched():
+    window = matchday_window(TUESDAY, 1)
+    manual = fixture("m1", 1, scheduled_at=(window.start + timedelta(days=1)).isoformat(), schedule_source="manual")
+    done = fixture("m2", 1, status="completed")
+    running = fixture("m3", 1, status="running", scheduled_at=None)
+    assert schedule_writes(league(), [manual, done, running], []) == []
+
+
+def test_formats_without_matchdays_get_nothing_written():
+    assert schedule_writes({"id": "t", "format": "single_elim", "start_date": TUESDAY.isoformat()}, [fixture("m1", 1)], []) == []

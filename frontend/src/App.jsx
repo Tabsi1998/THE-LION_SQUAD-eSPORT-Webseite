@@ -83,6 +83,7 @@ const ConsentPage = lazy(() => import("@/pages/user/ConsentPage"));
 const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage"));
 const AdminTournamentsPage = lazy(() => import("@/pages/admin/AdminTournamentsPage"));
 const AdminTournamentNewPage = lazy(() => import("@/pages/admin/AdminTournamentNewPage"));
+const AdminTournamentGuidePage = lazy(() => import("@/pages/admin/AdminTournamentGuidePage"));
 const AdminTournamentEditPage = lazy(() => import("@/pages/admin/AdminTournamentEditPage"));
 const AdminF1Page = lazy(() => import("@/pages/admin/AdminF1Page"));
 const AdminF1NewPage = lazy(() => import("@/pages/admin/AdminF1NewPage"));
@@ -257,6 +258,7 @@ function App() {
           <Route path="/admin/benefits" element={<ProtectedRoute requireArea="club"><AdminBenefitsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
+          <Route path="/admin/tournament-guide" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentGuidePage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireModerator><AdminTournamentEditPage /></ProtectedRoute>} />
           <Route path="/admin/f1" element={<ProtectedRoute requireModerator><AdminF1Page /></ProtectedRoute>} />
           <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
