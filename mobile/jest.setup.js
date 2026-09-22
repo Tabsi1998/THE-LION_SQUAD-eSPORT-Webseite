@@ -57,6 +57,16 @@ jest.mock("expo-sharing", () => ({
   shareAsync: jest.fn(async () => undefined),
 }));
 
+// App-Sperre (#217): im Test ein Gerät mit Fingerabdruck, das jede Abfrage bestätigt -
+// abgebrochene Versuche und Geräte ohne Sperre stellen die Tests selbst ein.
+jest.mock("expo-local-authentication", () => ({
+  AuthenticationType: { FINGERPRINT: 1, FACIAL_RECOGNITION: 2, IRIS: 3 },
+  SecurityLevel: { NONE: 0, SECRET: 1, BIOMETRIC_WEAK: 2, BIOMETRIC_STRONG: 3 },
+  getEnrolledLevelAsync: jest.fn(async () => 3),
+  supportedAuthenticationTypesAsync: jest.fn(async () => [1]),
+  authenticateAsync: jest.fn(async () => ({ success: true })),
+}));
+
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),

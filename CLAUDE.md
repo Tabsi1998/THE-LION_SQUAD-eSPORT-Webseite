@@ -171,6 +171,26 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- App-Sperre (#217 Stufe 1; PR #380, baut auf #379 auf; Build 69).
+  `lib/appLock.ts`: `shouldRelock(hiddenAt, now)` (≥ 60 s im Hintergrund),
+  `lockAvailability` über `getEnrolledLevelAsync` (NONE → nicht einschaltbar,
+  SECRET → „Gerätesperre“, sonst `methodLabel` aus den Typen), `authenticate`
+  (`authenticateAsync`, Gerätesperre als Rückfall erlaubt), Schalter in
+  SecureStore `tls.mobile.appLock` – nichts davon geht zum Server.
+  `lock/AppLockProvider.tsx` (`useAppLock`: `ready`, `enabled`, `locked`,
+  `availability`, `setEnabled` verlangt beim Einschalten einmal den
+  Fingerabdruck, `unlock`; AppState background/active mit einspeisbarer Uhr
+  `now`; ohne Provider keine Sperre; eine gespeicherte Sperre ohne
+  Gerätesperre gilt nicht). `screens/LockScreen.tsx` (fragt beim Erscheinen
+  selbst, Knopf „Entsperren“, „Abmelden“ geht immer). `AppNavigator`:
+  `signedIn && locked` → LockScreen statt Tabs (Gäste nie). Profil → Zahnrad →
+  Karte „Sicherheit“ mit dem Schalter und dem Text, was das Gerät kann.
+  `expo-local-authentication` ~57.0.3 (Plugin in app.json; neues natives Modul
+  → neue APK). **Stufe 2** (Passkey-Login in der App) bleibt offen: braucht
+  ein natives Credential-Manager-Modul, die App-Herkunft
+  `android:apk-key-hash:` im Backend und `/.well-known/assetlinks.json` auf
+  der Website – Server-Teil mit dem Betreiber. Tests `appLock.test.ts` (4),
+  `AppLockProvider.test.tsx` (4).
 - Marke (#229; PR #379, baut auf #378 auf; Build 68). **Standard-Favicon für
   hell und dunkel:** Browser ohne `prefers-color-scheme` und der Home-
   Bildschirm nehmen nur `favicon_url`; beim Verein war das die weiße
@@ -1008,8 +1028,8 @@ Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen), #377 (App
 Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
 
 ### Offene PRs
-Reihenfolge beim Mergen: erst #378, dann #379 (#379 baut auf #378 auf, sonst
-Konflikte in CLAUDE.md und UMBAUPLAN).
+Reihenfolge beim Mergen: erst #378, dann #379, dann #380 (jeder baut auf dem
+vorigen auf, sonst Konflikte in CLAUDE.md und UMBAUPLAN).
 - #378 (#302 Discord-Bot im Backend; Token im Admin). Nach dem Merge
   `update.sh` (neue Abhängigkeit discord.py im Backend-Image), dann im Admin
   Einstellungen → Discord → „Discord-Bot“ nach der Anleitung dort einrichten.
@@ -1017,6 +1037,9 @@ Konflikte in CLAUDE.md und UMBAUPLAN).
   Nach dem Merge `update.sh`, im Admin → Einstellungen → Branding einmal
   „Aus Logo und Akzentfarbe erzeugen“ klicken, und Build 68 vom Haupt-PC
   (`npm run release:local`).
+- #380 (#217 Stufe 1 App-Sperre; nur App). Nach dem Merge Build 69 vom
+  Haupt-PC. Sind #379 und #380 gleichzeitig gemergt, reicht ein Build (69)
+  mit beidem – Build 68 fällt dann aus.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -1060,7 +1083,7 @@ Konflikte in CLAUDE.md und UMBAUPLAN).
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378, #229 schließt #379)
+### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378, #229 schließt #379; #217 bleibt für Stufe 2 offen, #380 ist Stufe 1)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1084,7 +1107,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, Build 69 nach dem Merge; Stufe 2 Passkey-Login in der App **wartet** auf den Server-Teil mit dem Betreiber (assetlinks.json, App-Herkunft im Backend). #219 Store-Reife **wartet** auf das Play-Console-Konto des Betreibers und seine Entscheidung zu Absturzberichten (Crashlytics oder Sentry → Datenschutzerklärung); AAB-Option im Release-Skript und Bildgrößen-Prüfung lassen sich vorher machen |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
@@ -1115,7 +1138,8 @@ sinnvoll hältst“):
 8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
    umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
    #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
-   Offen: App 1.0.0.
+   App 1.0.0: #217 Stufe 1 umgesetzt in #380; Stufe 2 und #219 brauchen den
+   Betreiber (assetlinks am Server, Play-Console-Konto, Absturzberichte).
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 
