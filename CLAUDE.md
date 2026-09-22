@@ -881,12 +881,10 @@ angelegt), #366 (#364 Mitgliederbereich aufgeräumt), #367 (Leistungen aus
 Dolibarr im Event auswählen), #369 (Admin und Turniere – der Spieltag-Lauf
 trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 (Abrechnung II – #319 Startgelder; Epic #314 geschlossen), #372 (#370
-Rechnungskonditionen und lesbare Belege). `main` steht auf `225c87f`.
+Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
+Konditionstexte, Anleitung zur Kontonummer). `main` steht auf `a12a348`.
 
 ### Offene PRs
-- #373 (#370 Nachtrag: deutsche Konditionstexte, Anleitung bei fehlender
-  Kontenliste). Nach dem Merge `update.sh`; danach beim Website-Benutzer
-  in Dolibarr „Bankkonten einsehen“ vergeben oder die Kontonummer eintragen.
 - #374 (App 0.8.0-beta – #216 Kalender, #236 Galerie; Web: „In meinen
   Kalender“). Nach dem Merge `update.sh` (Web-Teil) und Build 66 vom
   Haupt-PC (`npm run release:local`).
@@ -928,7 +926,7 @@ Rechnungskonditionen und lesbare Belege). `main` steht auf `225c87f`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (26 offen nach dem Merge von #372; #216/#236 schließt #374)
+### Meilensteine und offene Issues (26 offen nach dem Merge von #373; #216/#236 schließt #374)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
