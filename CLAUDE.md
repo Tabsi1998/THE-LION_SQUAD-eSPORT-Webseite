@@ -273,7 +273,15 @@ Seit dem 15. September gilt:
   **#228** `lib/tournamentGuide.js` (`GUIDE_STEPS` mit `fields`,
   `GUIDE_GAME_TYPES` mit `format`, `GUIDE_FORMATS`) + `AdminTournamentGuidePage`
   (`/admin/tournament-guide`, Bereich tournaments, Adminmenü-Eintrag 40);
-  Schritt 2 „Voreinstellung übernehmen“ = #368.
+  Schritt 2 „Voreinstellung übernehmen“ (#368, PR #375): `GUIDE_GAME_TYPES[].preset`
+  (Format, `team_mode`/`team_size`, `best_of` + Spielregel-Werte wie
+  `RULE_PRESETS` online/vor Ort), `PRESET_FIELDS` (nur diese sieben Felder),
+  `presetFor(key)`, `presetLink(key)` → `/admin/tournaments/new?preset=<key>`;
+  Leitfaden-Spalte „Anlegen“ (`guide-preset-<key>`), `AdminTournamentNewPage`
+  liest `?preset=`, mischt die Werte in den Startzustand und zeigt den Hinweis
+  `new-tr-preset-hint`; unbekannter Schlüssel ändert nichts. Tests: Leitfaden
+  (+1: jede Turnierform hat den Knopf, setzt nur bekannte Felder, Spielregel =
+  RulePresetPicker), `AdminTournamentNewPage.test.jsx` (3, neu).
 - Abrechnung I, Teil 1 (#315, #318, Grundlagen für #316/#317/#322; PR #363).
   `services/pricing.py`: Cent-Beträge (`cents_from_amount`, nie float),
   `normalize_offer` (typisierte Positionen: `basis` per_registration/
@@ -882,12 +890,12 @@ Dolibarr im Event auswählen), #369 (Admin und Turniere – der Spieltag-Lauf
 trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 (Abrechnung II – #319 Startgelder; Epic #314 geschlossen), #372 (#370
 Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
-Konditionstexte, Anleitung zur Kontonummer). `main` steht auf `a12a348`.
+Konditionstexte, Anleitung zur Kontonummer), #374 (App 0.8.0-beta – Kalender,
+Galerie; Build 66 steht aus). `main` steht auf `05092d7`.
 
 ### Offene PRs
-- #374 (App 0.8.0-beta – #216 Kalender, #236 Galerie; Web: „In meinen
-  Kalender“). Nach dem Merge `update.sh` (Web-Teil) und Build 66 vom
-  Haupt-PC (`npm run release:local`).
+- #375 (#368 Leitfaden Schritt 2: „Voreinstellung übernehmen“). Nach dem
+  Merge `update.sh`.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -926,7 +934,7 @@ Konditionstexte, Anleitung zur Kontonummer). `main` steht auf `a12a348`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (26 offen nach dem Merge von #373; #216/#236 schließt #374)
+### Meilensteine und offene Issues (24 offen nach dem Merge von #374; #368 schließt #375)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -944,7 +952,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
-| Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) offen |
+| Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
