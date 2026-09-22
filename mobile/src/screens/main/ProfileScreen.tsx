@@ -5,6 +5,7 @@ import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -388,6 +389,8 @@ export function ProfileScreen() {
                 <Muted>Alle wichtigen Profilfelder sind gepflegt.</Muted>
               )}
             </Card>
+            {/* Freunde (#240): offene Anfragen oben, darunter die Liste - live über den Änderungsstrom. */}
+            <FriendsCard onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })} />
             <Card style={styles.card}>
               <Heading>Gaming</Heading>
               <Info label="Lieblingsspiele" value={form.favorite_games || "-"} />

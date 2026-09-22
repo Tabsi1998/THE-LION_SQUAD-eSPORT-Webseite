@@ -160,6 +160,7 @@ BannerPosition = Literal["below_nav", "bottom_fixed", "above_footer"]
 BannerScope = Literal["all", "tournaments", "fastlap", "events", "news", "community", "servers", "members", "custom"]
 BannerAudience = Literal["all", "logged_in", "members", "admins"]
 BannerTemplate = Literal["custom", "live", "maintenance", "event", "registration", "discord"]
+BannerChannel = Literal["web", "app"]
 
 
 class SiteBannerPayload(BaseModel):
@@ -180,6 +181,8 @@ class SiteBannerPayload(BaseModel):
     starts_at: Optional[str] = None
     ends_at: Optional[str] = None
     template: BannerTemplate = "custom"
+    # Wo der Banner läuft (#245): Website, App oder beides. Bestehende Banner bleiben Website-only.
+    channels: List[BannerChannel] = ["web"]
 
 
 class SiteBannerPatch(BaseModel):
@@ -200,6 +203,7 @@ class SiteBannerPatch(BaseModel):
     starts_at: Optional[str] = None
     ends_at: Optional[str] = None
     template: Optional[BannerTemplate] = None
+    channels: Optional[List[BannerChannel]] = None
 
 
 class SiteBannerStatBody(BaseModel):
@@ -409,6 +413,15 @@ def _banner_active(doc: dict, user: dict | None) -> bool:
     return False
 
 
+def banner_channels(doc: dict) -> list[str]:
+    """Wo ein Banner läuft (#245): gespeicherte Kanäle; ohne Angabe Website - automatische
+    Banner (Wartung, Anmeldung offen, Check-in) laufen überall."""
+    stored = [channel for channel in (doc.get("channels") or []) if channel in ("web", "app")]
+    if stored:
+        return sorted(set(stored), key=("web", "app").index)
+    return ["web", "app"] if doc.get("source") == "auto" else ["web"]
+
+
 def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
     return {
         "id": doc.get("id"),
@@ -428,6 +441,7 @@ def _public_banner_doc(doc: dict, stats: dict | None = None) -> dict:
         "priority": int(doc.get("priority") or 0),
         "template": doc.get("template") or "custom",
         "source": doc.get("source") or "manual",
+        "channels": banner_channels(doc),
         "stats": {
             "impressions": int((stats or {}).get("impressions") or doc.get("impressions") or 0),
             "clicks": int((stats or {}).get("clicks") or doc.get("clicks") or 0),
@@ -607,14 +621,16 @@ async def get_site_banner(response: Response, me: dict | None = Depends(get_opti
 
 
 @settings_router.get("/site-banners")
-async def list_site_banners(response: Response, me: dict | None = Depends(get_optional_user)):
+async def list_site_banners(response: Response, me: dict | None = Depends(get_optional_user), channel: Optional[str] = Query(None)):
+    """Aktive Banner; ``?channel=app`` nur die für die App freigegebenen (#245), sonst die der Website."""
     response.headers["Cache-Control"] = "no-store"
     db = get_db()
     manual = await db.site_banners.find({}, {"_id": 0}).sort([("priority", -1), ("updated_at", -1)]).to_list(100)
     # The legacy branding banner is intentionally no longer emitted. The
     # Banner-Manager owns public notice bars from here on.
     all_docs = manual + await _auto_site_banners(db)
-    active = [doc for doc in all_docs if _banner_active(doc, me)]
+    wanted = "app" if channel == "app" else "web"
+    active = [doc for doc in all_docs if _banner_active(doc, me) and wanted in banner_channels(doc)]
     stats_rows = await db.site_banner_stats.find({"id": {"$in": [doc["id"] for doc in active if doc.get("id")]}}, {"_id": 0}).to_list(200)
     stats = {row["id"]: row for row in stats_rows}
     items = [_public_banner_doc(doc, stats.get(doc.get("id"))) for doc in active]

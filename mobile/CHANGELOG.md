@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.0-beta - 2026-09-22
+
+- Mobile: Freunde in der App: Auf einem Spielerprofil „Freund hinzufügen“, Anfragen annehmen oder ablehnen, gesendete zurückziehen, Freunde entfernen. In der Profil-Übersicht die Karte „Freunde“ mit offenen Anfragen oben und der Liste – kommt live an, ohne Neuladen (#240).
+- Mobile: Laufbanner der Website auch in der App: Was im Admin für „App“ freigegeben ist, läuft oben über den Tabs – mit Ton-Farbe und Lauftext; Tipp öffnet das Ziel in der App, das X blendet den Banner aus, bis er sich ändert. Automatische Hinweise (Wartung, Anmeldung offen) erscheinen immer (#245).
+
 ## 0.8.0-beta - 2026-09-22
 
 - Mobile: Der Events-Tab hat einen Kalender: Monatsansicht mit Punkten je Tag – blau Event, gold Turnier, rot Fast Lap –, ein goldener Rahmen an Tagen mit eigener Anmeldung. Tag antippen zeigt die Termine, Vormonate sind erreichbar (#216).

@@ -146,6 +146,31 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- App 0.9.0-beta (#240 Freunde, #245 Laufbanner; Build 67; PR #377). **#240**
+  Backend `friend_routes`: jede Änderung ruft `publish_user_change([beide],
+  "friends")` (der Änderungsstrom kennt „friends“ nur je Nutzer), Meta
+  `requester_username`/`username` an den Benachrichtigungen. App
+  `lib/friends.ts` (`friendButton` Zustand → Knopf/Aktion, `friendRequest`
+  Aktion → Pfad, `normalizeFriends`), `components/FriendButton.tsx` (im
+  öffentlichen Profil, Startzustand aus `profile.relationship`, live über
+  „friends“/„notifications“), `components/FriendsCard.tsx` (Profil-Übersicht:
+  offene Anfragen oben mit Annehmen/Ablehnen, gesendete zurückziehbar, Liste
+  mit Zähler, Entfernen mit Rückfrage). **#245** Backend `settings_routes`:
+  `BannerChannel`, `SiteBannerPayload.channels` (Standard `["web"]`),
+  `SiteBannerPatch.channels`, `banner_channels(doc)` (ohne Feld Website,
+  `source == "auto"` beides), `GET /api/settings/site-banners?channel=app`
+  filtert, `_public_banner_doc.channels`. Admin: Häkchen „Läuft auf:
+  Webseite/App“ (`site-banner-channel-<k>`, nie beide aus). App
+  `lib/banners.ts` (`visibleBanners`, `dismissKey` = id+Text,
+  `tickerDurationMs`, `toneColor`, Wegwischen in SecureStore, max. 40),
+  `components/SiteBannerTicker.tsx` (über `MainTabs` in `AppNavigator`,
+  Ticker per `Animated.loop`, Tipp → `navigateToNotification` bei In-App-Ziel
+  sonst Browser, X blendet aus bis der Text sich ändert, live über
+  „settings“). **#239** (Tastatur-Sticker) bleibt offen: braucht ein
+  natives Modul um Reacts `TextInput` (`onCommitContent`), eigener Schritt.
+  Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
+  (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
+  `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
 - Plattform-Konten verknüpfen (#260, Discord II Teil 1; PR #376).
   `services/platform_links.py`: `PLATFORMS` (discord → `discord_name` +
   `discord_id`, twitch → `twitch_handle`, steam → `steam_id`; `delivers` =
@@ -925,14 +950,14 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 (Abrechnung II – #319 Startgelder; Epic #314 geschlossen), #372 (#370
 Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
 Konditionstexte, Anleitung zur Kontonummer), #374 (App 0.8.0-beta – Kalender,
-Galerie; Build 66 steht aus), #375 (#368 Leitfaden Schritt 2). `main` steht
-auf `b364246`.
+Galerie; Build 66 am 22.09. gebaut und am Vereinsserver), #375 (#368
+Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen). `main` steht
+auf `a4c77db`.
 
 ### Offene PRs
-- #376 (#260 Plattform-Konten verknüpfen). Nach dem Merge `update.sh`; dann
-  Admin → Einstellungen → Anmeldung: Discord-App (Client-ID + Secret) eintragen
-  und die drei Rückrufadressen in Discord-/Twitch-Konsole hinterlegen (Steam
-  braucht nichts). Ohne App bleibt der Knopf „Mit Discord verknüpfen“ grau.
+- #377 (App 0.9.0-beta – #240 Freunde, #245 Laufbanner; Backend + Admin-
+  Häkchen). Nach dem Merge `update.sh` (Backend/Admin) und Build 67 vom
+  Haupt-PC (`npm run release:local`).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -948,7 +973,10 @@ auf `b364246`.
   `44959a8c`; #218), am Vereinsserver abgelegt, **Build 65**
   (`mobile-v0.7.0-beta-build65`, Commit 770aaec, am 22.09. vom Haupt-PC
   gebaut, APK-SHA-256 beginnt mit `02de39d5`; #340, #339, #341, #342, #346),
-  am Vereinsserver abgelegt. Nächster Build ist 66.
+  am Vereinsserver abgelegt, **Build 66** (`mobile-v0.8.0-beta-build66`,
+  Commit b364246, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
+  `0d1a60d4`; #216, #236, Startgeld-Haken aus #319), am Vereinsserver
+  abgelegt. Nächster Build ist 67.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -971,7 +999,7 @@ auf `b364246`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (23 offen nach dem Merge von #375; #260 schließt #376)
+### Meilensteine und offene Issues (22 offen nach dem Merge von #376; #240/#245 schließt #377)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -993,8 +1021,8 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
-| App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 nach dem Merge. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
-| App 0.9.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
+| App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
+| App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 nach dem Merge. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 

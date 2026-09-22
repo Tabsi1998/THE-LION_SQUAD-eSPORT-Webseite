@@ -459,7 +459,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
-| App 0.9.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner (bis 22.09. „0.8.0-beta“) |
+| App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 nach dem Merge; #239 Tastatur-Sticker bleibt offen (natives Modul) |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
@@ -601,6 +601,26 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 35 — App 0.9.0-beta: Freunde und Laufbanner
+
+### Was 35.1 gefunden hat (#240, #245 – PR #377)
+
+**Das Backend konnte alles, die App nichts davon.** Freundschaftsanfragen gab es seit #259 –
+aber nur im Web. Die App bekommt den Knopf im öffentlichen Profil und die Karte „Freunde“ in
+der Übersicht; der Zustand kommt vom Server, nie aus dem Text. Neu ist nur eins im Backend: Der
+Änderungsstrom kennt „friends“ nicht als öffentliche Ressource, deshalb sagt jede Änderung jetzt
+beiden Seiten je Nutzer Bescheid – sonst käme eine Anfrage erst beim nächsten Neuladen an.
+
+**Ein Banner läuft dort, wo man ihn freigibt.** Bestehende Banner bleiben Website-only, damit
+sich für niemanden etwas ändert; automatische Hinweise (Wartung, Anmeldung offen) laufen überall.
+Die App fragt `?channel=app` und zeigt den wichtigsten Banner über den Tabs. Wegwischen merkt
+sich Kennung und Text – ändert sich der Text, kommt der Banner wieder; das ist gewollt.
+
+**Tastatur-Sticker (#239) sind ein natives Thema.** Android reicht Sticker und GIFs über
+`InputConnection.commitContent` an das Eingabefeld; Reacts `TextInput` meldet keine Bildtypen.
+Das braucht ein eigenes Modul um das Eingabefeld – nicht in einem Release, das sonst nur
+JavaScript ändert. Bleibt offen, eigener Schritt.
 
 ## Block 34 — Discord II, Teil 1: Plattform-Konten verknüpfen
 
