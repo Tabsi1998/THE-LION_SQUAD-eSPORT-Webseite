@@ -24,6 +24,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
+import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -233,6 +234,11 @@ export default function TournamentDetailPage() {
             <div className="mt-3 text-xs text-white/45 max-w-3xl" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</div>
           )}
 
+          <AddToCalendar className="mt-6" item={{
+            id: t.id, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
+            location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
+            url: typeof window !== "undefined" && t.slug ? `${window.location.origin}/tournaments/${t.slug}` : null,
+          }} />
           <div className="mt-8 flex flex-wrap gap-3">
             {canSelfRegister && !myReg && (
               <button

@@ -458,7 +458,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg – umgesetzt in #304, Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
-| App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie (bis 22.09. „0.7.0-beta“) |
+| App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #373 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner (bis 22.09. „0.8.0-beta“) |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
@@ -601,6 +601,29 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 33 — App 0.8.0-beta: Kalender und Galerie
+
+### Was 33.1 gefunden hat (#216, #236 – PR #373)
+
+**Der Kalender ist eine zweite Sicht, keine zweite Liste.** Der Events-Tab lädt Events, Turniere
+und Fast Laps ohnehin; der Kalender legt sie auf ein Monatsraster – Punkte je Art, ein goldener
+Rahmen, wo man angemeldet ist. Ein Termin, der über mehrere Tage geht, steht an jedem Tag; ein
+offenes Ende wird bei 31 Tagen gekappt, sonst füllt eine Saison das Jahr. Die Filter (Art,
+Verein) gelten in beiden Sichten. Vergangenes ist im Kalender einfach der Vormonat – die Liste
+braucht ihren Schalter weiter, weil sie sortiert, was ansteht.
+
+**„In meinen Kalender“ fragt erst beim Antippen.** Die Berechtigung für den Gerätekalender kommt
+nicht beim Start der App, sondern wenn jemand den Knopf drückt; verweigert oder ohne
+beschreibbaren Kalender öffnet sich Google Kalender mit dem vorausgefüllten Termin – das geht
+ohne jede Berechtigung. Im Web dasselbe als .ics-Download und Google-Link. Der persönliche
+Kalender-Feed zum Abonnieren bleibt der spätere Schritt aus #216.
+
+**Die Galerie nimmt die Fassungen, die es gibt.** Kacheln laden 400 px, die Großansicht 1600 px
+– nur für eigene Uploads, fremde Adressen bleiben, wie sie sind (Block 12 im Web). Videos laufen
+im Player aus dem Chat, Einbettungen (YouTube) öffnen sich draußen. Teilen und Speichern ist ein
+System-Teilen mit der heruntergeladenen Datei – kein eigener Speicherdialog, keine
+Fotos-Berechtigung. Sichtbarkeit entscheidet der Server, die App zeigt, was er liefert.
 
 ## Block 32 — Rechnungskonditionen und lesbare Belege
 

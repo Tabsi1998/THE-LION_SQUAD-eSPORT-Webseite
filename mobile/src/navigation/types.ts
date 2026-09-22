@@ -34,6 +34,10 @@ export type MoreStackParamList = {
   PublicProfile: { username: string };
   NewsList: undefined;
   NewsDetail: { id: string };
+  // Galerie (#236): Alben, Album-Raster, Großansicht ab einem Bild.
+  Gallery: undefined;
+  GalleryAlbum: { id: string };
+  GalleryViewer: { albumId: string; index: number };
   FastLapList: undefined;
   FastLapDetail: { id: string };
   DirectMessages: undefined;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0-beta - 2026-09-22
+
+- Mobile: Der Events-Tab hat einen Kalender: Monatsansicht mit Punkten je Tag – blau Event, gold Turnier, rot Fast Lap –, ein goldener Rahmen an Tagen mit eigener Anmeldung. Tag antippen zeigt die Termine, Vormonate sind erreichbar (#216).
+- Mobile: „In meinen Kalender“ an Event, Turnier und Fast Lap trägt den Termin in den Gerätekalender ein (Berechtigung erst beim Antippen); ohne Berechtigung öffnet sich Google Kalender mit dem vorausgefüllten Termin (#216).
+- Mobile: Die Galerie ist in der App: Alben unter „Mehr“ und im Mitgliederbereich, Raster je Abschnitt, Großansicht mit Wischen und Zoomen, Videos im Player, Teilen und Speichern über das System-Teilen. Mitglieder-Alben nur angemeldet (#236).
+- Mobile: Bei Turnieren mit Startgeld zeigt die App den Betrag und fragt beim Anmelden die Kostenübernahme ab – ohne Haken keine Anmeldung, wie im Web (#319).
+
 ## 0.7.0-beta - 2026-09-22
 
 - Mobile: Der Mitgliederbereich ist in der App: unter „Mehr“ steht für Vereinsmitglieder eine goldene Karte, dahinter Mitgliedschaft, Mitgliedskarte, Dokumente, Vorteile, interne Events und News sowie die Ansprechpartner aus dem Vorstand und der Vereins-Discord. Wer kein Mitglied ist, sieht „Mitglied werden“ (#340).

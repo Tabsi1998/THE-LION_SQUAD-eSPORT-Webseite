@@ -19,6 +19,7 @@ import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
 import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
+import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
@@ -151,6 +152,11 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
+          <AddToCalendar className="mt-6" item={{
+            id: e.id, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
+            location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
+            detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
+          }} />
           {(e.tournaments?.length || e.f1_challenges?.length) && (
             <div className="mt-7 flex flex-wrap gap-3">
               <Link to={liveUrl} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-white transition">

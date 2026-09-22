@@ -146,6 +146,31 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- App 0.8.0-beta (#216 Kalender, #236 Galerie; Build 66; PR #373). **#216**
+  `mobile/src/lib/calendar.ts` (reine Rechnung: `monthMatrix` ab Montag,
+  `itemsByDay` – mehrtägig an jedem Tag, Kappung 31 Tage –, `initialMonth`
+  = nächster Termin, `icsFor`, `googleCalendarUrl`, ohne Ende zwei Stunden),
+  `components/MonthCalendar.tsx` (Punkte je Art: Event cyan, Turnier gold,
+  Fast Lap rot; goldener Rahmen = eigene Anmeldung; `calendar-day-<key>`),
+  `TournamentsScreen` Umschalter Liste/Kalender (dieselben Termine, Filter
+  gelten mit; Vergangenes = Vormonat), `lib/deviceCalendar.ts` +
+  `components/AddToCalendarButton.tsx` (expo-calendar: Berechtigung erst
+  beim Antippen, Standardkalender oder erster beschreibbarer; sonst Google
+  Kalender per Link) an Event, Turnier, Fast Lap. Web:
+  `lib/calendarLinks.js` (gleiche Rechnung), `components/tls/AddToCalendar.jsx`
+  (.ics per Blob-Download + Google-Link) auf Event- und Turnierseite.
+  **#236** `lib/gallery.ts` (`mediaType`, `mediaUrl`, `posterUrl`,
+  `sizedUpload` nur für eigene Uploads 400/800/1600, `groupBySection`),
+  `GalleryScreen` (`GET /gallery?compact=true`), `GalleryAlbumScreen`
+  (Raster 3 je Zeile, Abschnitte, Index in Albumreihenfolge),
+  `GalleryViewerScreen` (FlatList mit Paging, Bilder 1600 px in ScrollView mit
+  `maximumZoomScale`, Videos `expo-video`, Einbettungen draußen, Teilen =
+  Download in den Cache + `expo-sharing`); Einträge „Galerie“ unter Mehr →
+  Verein und als Kachel im Mitgliederbereich. Neue native Module
+  `expo-calendar` (Plugin mit Berechtigungstext) und `expo-sharing` →
+  neue APK; Jest-Mocks in `jest.setup.js`. Tests `calendar.test.ts` (4),
+  `gallery.test.ts` (3), `GalleryScreen.test.tsx` (2), Web
+  `calendarLinks.test.js` (2).
 - Rechnungskonditionen und lesbare Belege (#370; PR #372). `dolibarr_billing`:
   `TERM_FIELDS` (`invoice_payment_term_id`, `invoice_payment_mode_id`,
   `invoice_bank_account_id` in den Dolibarr-Einstellungen), `invoice_terms(settings)`
@@ -856,9 +881,13 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 `30dec3d`.
 
 ### Offene PRs
+Reihenfolge: erst #372, dann #373 (#373 baut auf #372 auf).
 - #372 (#370 Rechnungskonditionen und lesbare Belege). Nach dem Merge
   `update.sh`, dann unter Admin → Dolibarr → Schreibzugriff die drei
   Konditionen eintragen („Vorschlag übernehmen“, Konto prüfen).
+- #373 (App 0.8.0-beta – #216 Kalender, #236 Galerie; Web: „In meinen
+  Kalender“). Nach dem Merge `update.sh` (Web-Teil) und Build 66 vom
+  Haupt-PC (`npm run release:local`).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -897,7 +926,7 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (27 offen nach dem Merge von #371; #370 schließt #372)
+### Meilensteine und offene Issues (27 offen nach dem Merge von #371; #370 schließt #372, #216/#236 schließt #373)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -919,7 +948,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
-| App 0.8.0-beta | #216 Kalender, #236 Galerie |
+| App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #373, Build 66 nach dem Merge. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |

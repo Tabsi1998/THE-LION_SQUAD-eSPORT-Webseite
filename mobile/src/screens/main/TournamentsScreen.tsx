@@ -5,9 +5,11 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { initialMonth, itemsByDay, parseDay, shiftMonth, type CalendarItem } from "../../lib/calendar";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { splitOpenAndPast } from "../../lib/dashboard";
 import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
@@ -21,11 +23,19 @@ const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = "all" | "events" | "tournaments" | "fastlaps";
+type ViewMode = "list" | "calendar";
 type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; visibility?: string | null };
 type HubItem =
   | (HubBase & { kind: "event"; raw: ClubEvent })
   | (HubBase & { kind: "tournament"; raw: Tournament })
   | (HubBase & { kind: "fastlap"; raw: F1Challenge });
+
+// Liste oder Kalender (#216): dieselben Termine, zweite Sicht - Vergangenes ist im Kalender
+// einfach der Vormonat.
+const views: Array<{ key: ViewMode; label: string }> = [
+  { key: "list", label: "Liste" },
+  { key: "calendar", label: "Kalender" },
+];
 
 const filters: Array<{ key: Filter; label: string }> = [
   { key: "all", label: "Alle" },
@@ -43,6 +53,9 @@ const scopes: Array<{ key: ScopeFilter; label: string }> = [
 export function TournamentsScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
   const [scope, setScope] = useState<ScopeFilter>("all");
+  const [view, setView] = useState<ViewMode>("list");
+  const [month, setMonth] = useState<{ year: number; month: number } | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [showPast, setShowPast] = useState(false);
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -136,6 +149,26 @@ export function TournamentsScreen({ navigation }: Props) {
     fastlaps: openItems.filter((item) => item.kind === "fastlap"),
   }), [openItems]);
 
+  // Kalender (#216): jeder Termin an seinen Tagen; eigene Anmeldungen bekommen den Ring.
+  const calendarItems = useMemo<CalendarItem[]>(() => items
+    .filter((item) => item.date)
+    .map((item) => ({
+      id: item.id, kind: item.kind, title: item.title, start: item.date as string, end: item.endDate,
+      mine: Boolean(item.kind === "event" ? item.raw.own_registration : item.kind === "tournament" ? item.raw.my_registration : false),
+      detail: item.detail,
+    })), [items]);
+  const shownMonth = month || initialMonth(calendarItems);
+  const dayItems = useMemo(() => {
+    if (!selectedDay) return [];
+    const ids = new Set((itemsByDay(calendarItems).get(selectedDay) || []).map((entry) => `${entry.kind}-${entry.id}`));
+    return items.filter((item) => ids.has(`${item.kind}-${item.id}`));
+  }, [calendarItems, items, selectedDay]);
+  const selectDay = useCallback((key: string) => {
+    setSelectedDay((current) => (current === key ? null : key));
+    const date = parseDay(key);
+    setMonth({ year: date.getFullYear(), month: date.getMonth() });
+  }, []);
+
   const open = useCallback((item: HubItem) => {
     if (item.kind === "event") navigation.navigate("EventDetail", { id: item.id });
     if (item.kind === "tournament") navigation.navigate("TournamentDetail", { id: item.id });
@@ -162,10 +195,36 @@ export function TournamentsScreen({ navigation }: Props) {
         </View>
         {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
-        <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
+        <SegmentedTabs items={views} value={view} onChange={setView} />
+        <SegmentedTabs items={filters} value={filter} onChange={setFilter} style={styles.scopeTabs} />
         {hasInternal ? <SegmentedTabs items={scopes} value={scope} onChange={setScope} style={styles.scopeTabs} /> : null}
 
-        {filter === "all" && openItems.length ? (
+        {view === "calendar" ? (
+          <View style={styles.section}>
+            <MonthCalendar
+              year={shownMonth.year}
+              month={shownMonth.month}
+              items={calendarItems}
+              selected={selectedDay}
+              onSelect={selectDay}
+              onShift={(delta) => { setMonth(shiftMonth(shownMonth.year, shownMonth.month, delta)); setSelectedDay(null); }}
+            />
+            {selectedDay ? (
+              dayItems.length ? (
+                <View style={styles.section} testID="calendar-day-items">
+                  <Heading>{parseDay(selectedDay).toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" })}</Heading>
+                  {dayItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)}
+                </View>
+              ) : (
+                <Muted testID="calendar-day-empty">An diesem Tag ist nichts geplant.</Muted>
+              )
+            ) : (
+              <Muted>Tag antippen, um die Termine zu sehen. Punkte zeigen, was an einem Tag ist; ein goldener Rahmen heißt: du bist angemeldet.</Muted>
+            )}
+          </View>
+        ) : null}
+
+        {view === "list" && filter === "all" && openItems.length ? (
           <View style={styles.stats}>
             <Stat label="Events" value={String(groupedItems.events.length)} />
             <Stat label="Turniere" value={String(groupedItems.tournaments.length)} tone="gold" />
@@ -173,7 +232,7 @@ export function TournamentsScreen({ navigation }: Props) {
           </View>
         ) : null}
 
-        {openItems.length && filter === "all" ? (
+        {view === "list" ? (openItems.length && filter === "all" ? (
           <>
             <HubSection title="Events" items={groupedItems.events} onOpen={open} />
             <HubSection title="Turniere" items={groupedItems.tournaments} onOpen={open} />
@@ -183,9 +242,9 @@ export function TournamentsScreen({ navigation }: Props) {
           openItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)
         ) : (
           <EmptyState icon="calendar-clear-outline" title="Nichts Offenes" detail={pastItems.length ? "Alles, was hier war, ist vorbei – unten lässt sich Vergangenes einblenden." : "Sobald etwas geplant ist, steht es hier."} />
-        )}
+        )) : null}
 
-        {pastItems.length ? (
+        {view === "list" && pastItems.length ? (
           <View style={styles.section}>
             <Pressable
               onPress={() => setShowPast((value) => !value)}
