@@ -340,6 +340,14 @@ export function PrivacyPage() {
           Wenn Discord-Webhooks aktiviert sind, können Ereignisse wie Turniere, Spiele,
           Achievements oder Tests in einen konfigurierten Discord-Kanal übermittelt werden.
         </p>
+        <p data-testid="privacy-platform-links">
+          Wer im Profil ein Discord-, Twitch- oder Steam-Konto verknüpft, meldet sich dafür bei der
+          jeweiligen Plattform an. Die Website erhält dabei nur die Kennung und den Nutzer- bzw.
+          Anzeigenamen des Kontos (bei Steam die SteamID64) und speichert sie zusammen mit dem
+          Zeitpunkt der Verknüpfung, um den Eintrag als verifiziert zu kennzeichnen. Keine Passwörter,
+          keine Freundeslisten, keine Nachrichten. Die Verknüpfung lässt sich im Profil jederzeit
+          trennen; sie ist Teil des Datenexports und wird bei der Anonymisierung gelöscht.
+        </p>
       </Section>
 
       <Section title="Hosting, Logs und Backups">

@@ -40,6 +40,7 @@ from routes.dolibarr_routes import admin_router as dolibarr_admin_router, member
 from routes.invoice_routes import router as invoice_router
 from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
+from routes.platform_link_routes import router as platform_link_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.sticker_routes import router as sticker_router
@@ -230,6 +231,7 @@ app.include_router(dolibarr_member_router)
 app.include_router(invoice_router)
 app.include_router(member_card_router)
 app.include_router(finance_router)
+app.include_router(platform_link_router)
 app.include_router(settings_router)
 app.include_router(season_router)
 app.include_router(widget_router)

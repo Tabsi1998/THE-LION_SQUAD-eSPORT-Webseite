@@ -146,6 +146,40 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- Plattform-Konten verknüpfen (#260, Discord II Teil 1; PR #376).
+  `services/platform_links.py`: `PLATFORMS` (discord → `discord_name` +
+  `discord_id`, twitch → `twitch_handle`, steam → `steam_id`; `delivers` =
+  Datenschutztext), `providers_configured(branding)` (Discord/Twitch brauchen
+  Client-ID + Secret aus den Branding-Einstellungen, Steam nichts),
+  `make_state`/`read_state` (JWT mit `type: platform_link`, 10 min, über
+  `auth.get_jwt_secret`), `redirect_uri` = `<PUBLIC_BACKEND_URL|FRONTEND_URL>
+  /api/platform-links/<p>/callback`, `authorize_url` (Discord `identify`,
+  Twitch leerer Scope + `force_verify`, Steam OpenID `checkid_setup` mit
+  state in `return_to`), `fetch_identity` (Token-Tausch + `users/@me` bzw.
+  Helix `users`; Steam `check_authentication` gegen Steam + optional
+  `GetPlayerSummaries` mit `steam_api_key`), `link_account` (ein Konto → ein
+  Nutzer, sonst `taken`; setzt Feld + `platform_verified.<p>`), `unlink`
+  (Häkchen weg, Text bleibt), `changed_verified_platforms` (Handänderung
+  nimmt das Häkchen – `update_me` vergleicht mit dem gespeicherten Stand),
+  `verified_platforms`, `callback_target` (`/profile?tab=socials&linked=`
+  bzw. `&link_error=denied|taken|exchange_failed|invalid|not_configured`);
+  `_transport` für Tests. Routen `routes/platform_link_routes.py`: `GET
+  /api/me/platform-links` (links, available, platforms), `POST
+  /api/me/platform-links/{p}/start` (409 ohne App, 503 ohne öffentliche
+  Adresse), `GET /api/platform-links/{p}/callback` (immer Redirect),
+  `DELETE /api/me/platform-links/{p}`; Audit `platform_link.linked/unlinked`.
+  Öffentliches Profil `verified_platforms` (nur sichtbare Felder); DSGVO
+  Export `platform_links`, Anonymisieren löscht sie und `platform_verified`.
+  Branding-Einstellungen: `discord_client_id/secret`, `steam_api_key`
+  (`BRANDING_SECRET_FIELDS`: maskiert, leer = behalten, `clear_<feld>`).
+  Web: `lib/platformLinks.js`, `SocialsTab` (Verknüpfen/Trennen, gesperrtes
+  Feld mit „verifiziert“, Hinweis mit `delivers`), `ProfilePage` lädt
+  `/me/platform-links` im Reiter Socials und meldet `?linked`/`?link_error`
+  einmal; `PublicProfilePage` Häkchen an Discord/Twitch/Steam;
+  `pages/admin/settings/PlatformLinkSettings.jsx` im Reiter Anmeldung
+  (Discord-App, Steam-Schlüssel, Rückrufadressen zum Kopieren);
+  Datenschutzseite Absatz. Tests `test_platform_links_flow.py` (5),
+  `SocialsTab.test.jsx` (2), `platformLinks.test.js`.
 - App 0.8.0-beta (#216 Kalender, #236 Galerie; Build 66; PR #374). **#216**
   `mobile/src/lib/calendar.ts` (reine Rechnung: `monthMatrix` ab Montag,
   `itemsByDay` – mehrtägig an jedem Tag, Kappung 31 Tage –, `initialMonth`
@@ -891,11 +925,14 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 (Abrechnung II – #319 Startgelder; Epic #314 geschlossen), #372 (#370
 Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
 Konditionstexte, Anleitung zur Kontonummer), #374 (App 0.8.0-beta – Kalender,
-Galerie; Build 66 steht aus). `main` steht auf `05092d7`.
+Galerie; Build 66 steht aus), #375 (#368 Leitfaden Schritt 2). `main` steht
+auf `b364246`.
 
 ### Offene PRs
-- #375 (#368 Leitfaden Schritt 2: „Voreinstellung übernehmen“). Nach dem
-  Merge `update.sh`.
+- #376 (#260 Plattform-Konten verknüpfen). Nach dem Merge `update.sh`; dann
+  Admin → Einstellungen → Anmeldung: Discord-App (Client-ID + Secret) eintragen
+  und die drei Rückrufadressen in Discord-/Twitch-Konsole hinterlegen (Steam
+  braucht nichts). Ohne App bleibt der Knopf „Mit Discord verknüpfen“ grau.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -934,7 +971,7 @@ Galerie; Build 66 steht aus). `main` steht auf `05092d7`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (24 offen nach dem Merge von #374; #368 schließt #375)
+### Meilensteine und offene Issues (23 offen nach dem Merge von #375; #260 schließt #376)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -949,7 +986,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot folgt (braucht #260 und den Bot-Token vom Betreiber) |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
