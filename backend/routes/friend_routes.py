@@ -8,6 +8,8 @@ from services.friend_service import friend_pair_key, relationship_status
 from services.moderation import interaction_is_blocked
 from services.user_notifications import create_user_notification
 
+from services.change_events import publish_user_change
+
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
 
@@ -111,8 +113,10 @@ async def request_friend(user_id: str, me: dict = Depends(get_current_user)):
         body=f"{_label(me)} möchte dich als Freund hinzufügen.",
         url="/profile?tab=friends",
         kind="friend_request",
-        meta={"friendship_id": doc["id"], "requester_id": me["id"]},
+        meta={"friendship_id": doc["id"], "requester_id": me["id"], "requester_username": me.get("username")},
     )
+    # Beide Seiten sehen die Anfrage sofort (#240): der Änderungsstrom kennt „friends“ nur je Nutzer.
+    await publish_user_change([me["id"], recipient["id"]], "friends")
     return await relationship_status(db, me["id"], recipient["id"])
 
 
@@ -139,8 +143,9 @@ async def accept_friend(friendship_id: str, me: dict = Depends(get_current_user)
         body="Ihr seid jetzt Freunde.",
         url="/profile?tab=friends",
         kind="friend_accept",
-        meta={"friendship_id": friendship_id, "user_id": me["id"]},
+        meta={"friendship_id": friendship_id, "user_id": me["id"], "username": me.get("username")},
     )
+    await publish_user_change([me["id"], row["requester_id"]], "friends")
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
@@ -165,6 +170,7 @@ async def decline_friend(friendship_id: str, me: dict = Depends(get_current_user
         {"user_id": me["id"], "meta.friendship_id": friendship_id},
         {"$set": {"read": True}},
     )
+    await publish_user_change([me["id"], row["requester_id"]], "friends")
     return {"ok": True}
 
 
@@ -184,4 +190,5 @@ async def remove_or_cancel_friend(user_id: str, me: dict = Depends(get_current_u
         {"pair_key": pair_key},
         {"$set": {"status": status, "acted_at": now, "updated_at": now}},
     )
+    await publish_user_change([me["id"], user_id], "friends")
     return {"ok": True}

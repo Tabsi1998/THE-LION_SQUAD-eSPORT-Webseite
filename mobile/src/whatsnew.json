@@ -1,11 +1,9 @@
 {
-  "version": "0.8.0-beta",
-  "build": 66,
+  "version": "0.9.0-beta",
+  "build": 67,
   "date": "2026-09-22",
   "items": [
-    "Der Events-Tab hat einen Kalender: Monatsansicht mit Punkten je Tag – blau Event, gold Turnier, rot Fast Lap –, ein goldener Rahmen an Tagen mit eigener Anmeldung. Tag antippen zeigt die Termine, Vormonate sind erreichbar.",
-    "„In meinen Kalender“ an Event, Turnier und Fast Lap trägt den Termin in den Gerätekalender ein (Berechtigung erst beim Antippen); ohne Berechtigung öffnet sich Google Kalender mit dem vorausgefüllten Termin.",
-    "Die Galerie ist in der App: Alben unter „Mehr“ und im Mitgliederbereich, Raster je Abschnitt, Großansicht mit Wischen und Zoomen, Videos im Player, Teilen und Speichern über das System-Teilen. Mitglieder-Alben nur angemeldet.",
-    "Bei Turnieren mit Startgeld zeigt die App den Betrag und fragt beim Anmelden die Kostenübernahme ab – ohne Haken keine Anmeldung, wie im Web."
+    "Freunde in der App: Auf einem Spielerprofil „Freund hinzufügen“, Anfragen annehmen oder ablehnen, gesendete zurückziehen, Freunde entfernen. In der Profil-Übersicht die Karte „Freunde“ mit offenen Anfragen oben und der Liste – kommt live an, ohne Neuladen.",
+    "Laufbanner der Website auch in der App: Was im Admin für „App“ freigegeben ist, läuft oben über den Tabs – mit Ton-Farbe und Lauftext; Tipp öffnet das Ziel in der App, das X blendet den Banner aus, bis er sich ändert. Automatische Hinweise (Wartung, Anmeldung offen) erscheinen immer."
   ]
 }

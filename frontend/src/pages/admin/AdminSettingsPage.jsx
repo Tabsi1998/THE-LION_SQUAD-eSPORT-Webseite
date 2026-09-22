@@ -147,6 +147,8 @@ function emptyBannerForm() {
     starts_at: "",
     ends_at: "",
     template: "custom",
+    // Wo der Banner läuft (#245): Website, App oder beides.
+    channels: ["web"],
   };
 }
 
@@ -1762,6 +1764,27 @@ export default function AdminSettingsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <BrandSelect label="Position" value={bannerForm.position} onChange={(v) => setBannerField("position", v)} testId="site-banner-position" options={[["below_nav", "Unter Navigation"], ["bottom_fixed", "Unten fixiert"], ["above_footer", "Über Footer"]]} />
                     <BrandSelect label="Zielgruppe" value={bannerForm.audience} onChange={(v) => setBannerField("audience", v)} testId="site-banner-audience" options={[["all", "Alle Besucher"], ["logged_in", "Eingeloggt"], ["members", "Vereinsmitglieder"], ["admins", "Admins"]]} />
+                  </div>
+                  {/* Wo der Banner läuft (#245): mindestens ein Kanal; in der App oben über den Tabs. */}
+                  <div className="flex flex-wrap items-center gap-4 text-sm" data-testid="site-banner-channels">
+                    <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">Läuft auf</span>
+                    {[["web", "Webseite"], ["app", "App"]].map(([channel, label]) => (
+                      <label key={channel} className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={(bannerForm.channels || ["web"]).includes(channel)}
+                          onChange={(e) => {
+                            const current = bannerForm.channels || ["web"];
+                            const next = e.target.checked ? [...new Set([...current, channel])] : current.filter((item) => item !== channel);
+                            setBannerField("channels", next.length ? next : [channel === "web" ? "app" : "web"]);
+                          }}
+                          data-testid={`site-banner-channel-${channel}`}
+                          className="accent-[#29B6E8]"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                    {(bannerForm.channels || ["web"]).includes("app") && <span className="text-xs text-[#29B6E8]">Läuft auch in der App – oben über den Tabs.</span>}
                   </div>
                   <BannerScopePicker value={bannerForm.scope} onChange={(v) => setBannerField("scope", v)} />
                   {bannerForm.scope === "custom" && <BrandField label="Eigener URL-Pfad" value={bannerForm.path} onChange={(v) => setBannerField("path", v)} testId="site-banner-path" placeholder="/tournaments/gamers-heaven" />}

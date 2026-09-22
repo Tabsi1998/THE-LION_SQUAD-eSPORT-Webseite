@@ -17,6 +17,7 @@ import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { EventDetailScreen } from "../screens/main/EventDetailScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
+import { SiteBannerTicker } from "../components/SiteBannerTicker";
 import { GalleryScreen } from "../screens/main/GalleryScreen";
 import { GalleryAlbumScreen } from "../screens/main/GalleryAlbumScreen";
 import { GalleryViewerScreen } from "../screens/main/GalleryViewerScreen";
@@ -77,7 +78,13 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>
-      {signedIn && user?.consent_required ? <ConsentScreen /> : user ? <MainTabs /> : <AuthScreens />}
+      {signedIn && user?.consent_required ? <ConsentScreen /> : user ? (
+        <View style={styles.mainWithBanner}>
+          {/* Laufbanner (#245): über allen Tabs, dieselben Banner wie die Website mit Kanal „app“. */}
+          <SiteBannerTicker />
+          <View style={styles.mainWithBanner}><MainTabs /></View>
+        </View>
+      ) : <AuthScreens />}
       {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}
     </NavigationContainer>
@@ -264,6 +271,9 @@ function NotificationBellOverlay() {
 }
 
 const styles = StyleSheet.create({
+  mainWithBanner: {
+    flex: 1,
+  },
   tabIconWrap: {
     alignItems: "center",
     height: 28,

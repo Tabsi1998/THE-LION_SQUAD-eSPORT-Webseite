@@ -3,6 +3,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
+import { FriendButton } from "../../components/FriendButton";
+import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
@@ -54,6 +56,7 @@ type PublicProfilePayload = {
   membership?: Record<string, unknown> | null;
   socials?: Array<{ platform?: string; value?: string; url?: string }>;
   can_message?: boolean;
+  relationship?: Relationship | null;
   stats?: Record<string, number | string | undefined>;
   achievement_level?: { level?: number; title?: string; points?: number; progress?: number };
   badges?: any[];
@@ -169,6 +172,8 @@ export function PublicProfileScreen({ navigation, route }: Props) {
                   <Body style={styles.messageButtonText}>Nachricht</Body>
                 </Pressable>
               ) : null}
+              {/* Freund hinzufügen (#240): der Zustand kommt aus der Profil-Antwort und wird live nachgeladen. */}
+              {profile.relationship && profile.relationship.status !== "self" ? <FriendButton userId={profile.id} initial={profile.relationship} /> : null}
             </View>
           </View>
         </View>
