@@ -709,11 +709,11 @@ braucht.
 Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II), #357 (App 0.7.0-beta:
 Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
-(#358 Passkey als zweiter Faktor), #360 (Web: Dynamik). `main` steht auf
-`02aa860`.
+(#358 Passkey als zweiter Faktor), #360 (Web: Dynamik), #362 (#361
+PDF-Worker als JavaScript – nginx kannte .mjs nicht). `main` steht auf
+`7b0552d`.
 
 ### Offene PRs
-- #362 (#361 PDF-Worker als JavaScript). Nach dem Merge `update.sh`.
 - #363 (Abrechnung I, Teil 1: #315, #318). Nach dem Merge `update.sh`; die
   Rechnungen selbst kommen mit Teil 2.
 
