@@ -105,6 +105,29 @@ Mitglieder → Nummerierung*) – die Website übernimmt, was dort steht.
 Ein zugeordnetes Konto, dessen Mitgliedschaft in Dolibarr beendet ist, wird im
 Live-Betrieb „ehemalig“ und verliert den Mitgliederzugang.
 
+## Eigene Rechnungen (Dolibarr II)
+
+Jedes zugeordnete Konto sieht unter **Meine Mitgliedschaft → Meine Rechnungen**
+(`/account/invoices`) seine Belege aus Dolibarr: offene und überfällige oben,
+bezahlte, Gutschriften und aufgegebene im Archiv. „Ansehen“ öffnet das PDF im
+Betrachter der Website, „Bezahlen“ führt auf Dolibarrs Zahlungsseite (Stripe,
+PayPal oder was dort eingerichtet ist) – ohne zweite Anbieter-Einrichtung auf der
+Website.
+
+- **Wer sieht was:** nur das eigene Konto. Es zählt die bestätigte Zuordnung,
+  nicht der Mitgliedsstatus – Ehemalige behalten ihre alten Belege. Kein
+  Admin sieht hier fremde Rechnungen; dafür gibt es Dolibarr.
+- **Bezahlen** prüft der Server im Moment des Klicks neu: eigener Beleg, noch
+  offen, Ziel auf der eigenen Dolibarr-Installation. Keine Gutschrift, nichts
+  Bezahltes, kein fremdes Ziel. Ob eine Zahlung angekommen ist, sagt Dolibarr –
+  die Website liest es beim nächsten Abgleich.
+- **PDFs** werden durchgereicht und nie gespeichert; die Bytes bleiben, wie
+  Dolibarr sie liefert, der SHA-256 steht im Betrachter.
+- **Ausfall:** Antwortet Dolibarr nicht, zeigt die Seite den letzten bekannten
+  Stand mit Datum und ohne Bezahlen-Knopf – nie „keine Rechnungen“.
+- Voraussetzung im Modul: `GET /vereine/members/{id}/invoices` und `…/pdf`
+  (Vereine ab 0.3). Der Website-Benutzer braucht dafür keine Rechnungsrechte.
+
 ## Im Betrieb
 
 - **Abgleich:** alle 10 Minuten das Geänderte, einmal am Tag alles. *Jetzt

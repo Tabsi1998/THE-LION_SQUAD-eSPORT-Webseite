@@ -245,6 +245,20 @@ class DolibarrClient:
     async def lookup_by_ref(self, ref: str) -> dict:
         return await self._get("/vereine/members/lookup", {"ref": str(ref or "").strip()})
 
+    async def member_invoices(self, member_id: int, *, page: int = 0) -> list[dict]:
+        """Freigegebene Rechnungen des Geschäftspartners des Mitglieds, neueste zuerst (#296)."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/invoices", {"limit": PAGE_LIMIT, "page": int(page)})
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def member_invoice_pdf(self, member_id: int, invoice_id: int) -> dict:
+        """Das PDF einer eigenen Rechnung, base64 - fremde und Entwürfe antworten 404 (#296)."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/invoices/{int(invoice_id)}/pdf")
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def members_page(self, *, page: int, changed_since: str | None = None) -> list[dict]:
         params: dict = {"limit": PAGE_LIMIT, "page": int(page)}
         if changed_since:

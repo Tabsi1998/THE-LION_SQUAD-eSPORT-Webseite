@@ -97,6 +97,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
         "email": anonymous_email, "first_name": None, "last_name": None, "phone": None,
         "address": None, "member_status": "former", "updated_at": now,
     }})
+    # Dolibarr (#316, #296): Zuordnung lösen, Rechnungs-Stand vergessen - das Mitglied selbst bleibt in Dolibarr.
+    await db.dolibarr_links.update_many({"user_id": user_id}, {"$set": {"status": "revoked", "updated_at": now}, "$unset": {"member_key": ""}})
+    await db.dolibarr_invoice_cache.delete_many({"user_id": user_id})
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
         "data": {"personal_data_removed": True}, "created_at": now,

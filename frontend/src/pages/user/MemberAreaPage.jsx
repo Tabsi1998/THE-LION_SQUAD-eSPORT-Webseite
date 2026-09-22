@@ -12,6 +12,7 @@ import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, Messag
 // dieselben Themen noch einmal als Karten, drei davon leer.
 const LINKS = [
   { to: "/members/membership", label: "Mitgliedschaft" },
+  { to: "/account/invoices", label: "Rechnungen" },
   { to: "/members/benefits", label: "Vorteile" },
   { to: "/members/documents", label: "Dokumente" },
   { to: "/members/news", label: "Interne News" },

@@ -72,6 +72,14 @@ def response_schema(path_template: str) -> dict:
     return OPENAPI["paths"][path_template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
 
 
+def invoice(invoice_id: int, *, ref: str | None = None, kind: str = "standard", status: str = "open", total: float = 60,
+            remaining: float | None = None, date: str = "2026-08-01", due: str = "2026-08-15", payment_url: str = "", fee: bool = True) -> dict:
+    if remaining is None:
+        remaining = 0 if status in ("paid", "abandoned") else total
+    return {"id": invoice_id, "ref": ref or f"FA-{invoice_id}", "type": kind, "date": date, "due_date": due, "total": total,
+            "remaining": remaining, "status": status, "overdue": status == "overdue", "payment_url": payment_url, "fee": fee}
+
+
 def member(member_id: int, *, status: str = "active", firstname: str = "Paula", lastname: str = "Beispiel",
            type_id: int = 2, type_label: str = "Ordentliches Mitglied", functions: list | None = None,
            fee_status: str = "paid", paid_until: str = "2026-12-31", membership_ends: str = "",
@@ -91,6 +99,9 @@ class FakeDolibarr:
     def __init__(self):
         self.members: dict[int, dict] = {}
         self.emails: dict[str, list[int]] = {}
+        # Rechnungen je Mitglied (#296); PDFs werden daraus erzeugt, Bytes fest je Rechnung.
+        self.invoices: dict[int, list[dict]] = {}
+        self.pdf_failures: set[int] = set()
         self.calls: list[tuple[str, dict]] = []
         self.fail_with: int | None = None
         self.fail_paths: set[str] = set()
@@ -104,6 +115,14 @@ class FakeDolibarr:
         if email:
             self.emails.setdefault(email.lower(), []).append(summary["id"])
         return summary
+
+    def add_invoice(self, member_id: int, invoice: dict) -> dict:
+        self.invoices.setdefault(member_id, []).append(invoice)
+        return invoice
+
+    @staticmethod
+    def pdf_bytes(invoice_id: int) -> bytes:
+        return b"%PDF-1.7\n%fake-invoice-" + str(invoice_id).encode() + b"\n%%EOF\n"
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self._handle)
@@ -151,6 +170,29 @@ class FakeDolibarr:
             if len(ids) > 1:
                 return httpx.Response(409, json={"error": {"code": 409, "message": "x"}})
             return self._json("/vereine/members/lookup", self.members[ids[0]])
+        match = re.fullmatch(r"/vereine/members/(\d+)/invoices", path)
+        if match:
+            member_id = int(match.group(1))
+            if member_id not in self.members:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            page, limit = int(params.get("page", 0)), int(params.get("limit", 100))
+            if not 1 <= limit <= 100 or page < 0:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "x"}})
+            rows = sorted(self.invoices.get(member_id, []), key=lambda r: (r["date"], r["id"]), reverse=True)
+            return self._json("/vereine/members/{id}/invoices", rows[page * limit:(page + 1) * limit])
+        match = re.fullmatch(r"/vereine/members/(\d+)/invoices/(\d+)/pdf", path)
+        if match:
+            member_id, invoice_id = int(match.group(1)), int(match.group(2))
+            own = any(r["id"] == invoice_id for r in self.invoices.get(member_id, []))
+            if member_id not in self.members or not own:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            if invoice_id in self.pdf_failures:
+                return httpx.Response(500, json={"error": {"code": 500, "message": "x"}})
+            content = self.pdf_bytes(invoice_id)
+            return self._json("/vereine/members/{id}/invoices/{invoice}/pdf", {
+                "filename": f"FA-{invoice_id}.pdf", "content_type": "application/pdf",
+                "filesize": len(content), "content": __import__("base64").b64encode(content).decode(),
+            })
         match = re.fullmatch(r"/vereine/members/(\d+)/summary", path)
         if match:
             summary = self.members.get(int(match.group(1)))
