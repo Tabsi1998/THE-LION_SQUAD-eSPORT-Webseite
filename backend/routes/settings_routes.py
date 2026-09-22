@@ -117,6 +117,12 @@ class BrandingSettings(BaseModel):
     twitch_client_secret: Optional[str] = None
     clear_twitch_client_secret: Optional[bool] = None
     twitch_live_detection: Optional[bool] = None
+    # Plattform-Konten verknüpfen (#260): Discord-App und optionaler Steam-Schlüssel (Twitch nutzt die Helix-App).
+    discord_client_id: Optional[str] = None
+    discord_client_secret: Optional[str] = None
+    clear_discord_client_secret: Optional[bool] = None
+    steam_api_key: Optional[str] = None
+    clear_steam_api_key: Optional[bool] = None
     site_banner_enabled: Optional[bool] = None
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
@@ -246,14 +252,17 @@ class AuthSettings(BaseModel):
     google_client_id: Optional[str] = None
 
 
-SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret"}
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key"}
+# Geheimnisse der Branding-Einstellungen: nie zurückgeben, nur „gespeichert“ melden (#260 dazu: Discord, Steam).
+BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key")
 
 
 def _hide_branding_secrets(settings: dict) -> dict:
     out = dict(settings or {})
-    if secret_is_configured(out.get("twitch_client_secret")):
-        out["twitch_client_secret_masked"] = "********"
-        out.pop("twitch_client_secret", None)
+    for field in BRANDING_SECRET_FIELDS:
+        if secret_is_configured(out.get(field)):
+            out[f"{field}_masked"] = "********"
+        out.pop(field, None)
     return out
 
 
@@ -973,11 +982,16 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     db = get_db()
     nullable_fields = set(BrandingSettings.model_fields.keys())
     raw = body.model_dump(exclude_unset=True)
-    clear_twitch_secret = bool(raw.pop("clear_twitch_client_secret", False))
-    unset = {"twitch_client_secret": ""} if clear_twitch_secret else {}
+    unset = {}
+    for field in BRANDING_SECRET_FIELDS:
+        if raw.pop(f"clear_{field}", False):
+            unset[field] = ""
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if updates.get("twitch_client_secret"):
-        updates["twitch_client_secret"] = encrypt_secret(updates["twitch_client_secret"])
+    for field in BRANDING_SECRET_FIELDS:
+        if updates.get(field):
+            updates[field] = encrypt_secret(updates[field])
+        elif field in updates:
+            updates.pop(field)   # leer gelassen heißt: das gespeicherte Geheimnis behalten
     _sync_legacy_social_fields(updates)
     current = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
     changed_fields = _changed_setting_fields(current, updates, unset)
@@ -990,7 +1004,7 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     if unset:
         operation["$unset"] = unset
     await db.settings.update_one({"id": "branding"}, operation, upsert=True)
-    if clear_twitch_secret:
+    if "twitch_client_secret" in unset:
         await db.settings.delete_one({"id": "twitch_app_token"})
     await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], changed_fields)
     saved = await db.settings.find_one({"id": "branding"}, {"_id": 0})

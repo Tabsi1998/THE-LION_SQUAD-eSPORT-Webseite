@@ -70,6 +70,25 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
 - Eine fehlgeschlagene Meldung lässt sich aus dem Versand-Log erneut senden –
   immer an dasselbe Ziel, nie an ein anderes.
 
+## Konten verknüpfen (Discord, Twitch, Steam)
+
+Mitglieder verknüpfen im Profil → Socials ihr Discord-, Twitch- oder Steam-Konto per Anmeldung
+bei der Plattform; der Eintrag wird befüllt und trägt „verifiziert“. Was ihr dafür einrichtet:
+
+1. **Discord-App:** discord.com/developers → New Application → OAuth2. Client-ID und Client
+   Secret unter Admin → Einstellungen → Anmeldung → „Konten verknüpfen“ eintragen. Unter
+   „Redirects“ die Adresse `https://lionsquad.at/api/platform-links/discord/callback` hinterlegen
+   (steht dort zum Kopieren). Mehr braucht die App nicht – kein Bot, keine Rechte.
+2. **Twitch:** die Helix-App aus dem Twitch-Reiter genügt; in der Twitch Developer Console
+   zusätzlich `https://lionsquad.at/api/platform-links/twitch/callback` als OAuth Redirect URL
+   eintragen.
+3. **Steam:** nichts einzurichten. Optional ein Web-API-Schlüssel (steamcommunity.com/dev/apikey),
+   dann steht der Anzeigename statt der SteamID an der Verknüpfung.
+
+Was die Website erhält: Kennung und Nutzer-/Anzeigename des Kontos (Steam: SteamID64) und den
+Zeitpunkt – keine Passwörter, keine Freundeslisten, keine Nachrichten. Trennen geht jederzeit im
+Profil; der Text bleibt, das Häkchen nicht. Ein Konto kann nur an einem Profil hängen.
+
 ## Für die Entwicklung
 
 - `backend/discord_service.py`: `TARGETS`, `EVENTS`, `resolve_target`,

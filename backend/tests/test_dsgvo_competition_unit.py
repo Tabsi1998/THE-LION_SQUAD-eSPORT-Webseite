@@ -64,7 +64,7 @@ class FakeDb:
             "consent_records", "memberships", "user_socials", "event_registrations", "team_members",
             "team_invites", "user_achievements", "season_points", "prize_pickups", "notifications",
             "direct_messages", "friendships", "user_blocks", "user_reports", "mobile_push_tokens",
-            "mobile_client_logs", "audit_logs",
+            "mobile_client_logs", "audit_logs", "platform_links",
         ):
             setattr(self, name, FakeCollection())
 

@@ -18,6 +18,7 @@ import { ProfileNav } from "./profile/ProfileNav";
 import { BasicTab } from "./profile/BasicTab";
 import { GamingTab } from "./profile/GamingTab";
 import { SocialsTab } from "./profile/SocialsTab";
+import { linkErrorText, linkedText } from "@/lib/platformLinks";
 import { AchievementsTab } from "./profile/AchievementsTab";
 import { PrivacyTab } from "./profile/PrivacyTab";
 import { NotificationsTab } from "./profile/NotificationsTab";
@@ -138,6 +139,51 @@ export default function ProfilePage() {
   }, [user]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Verknüpfte Plattform-Konten (#260): Liste vom Server; „Verknüpfen“ schickt den Browser zur
+  // Plattform, die Rückkehr landet mit ?linked= oder ?link_error= hier und wird einmal gemeldet.
+  const [platformLinks, setPlatformLinks] = useState({ links: [], available: {}, platforms: {} });
+  const loadPlatformLinks = useCallback(async () => {
+    try {
+      const { data } = await api.get("/me/platform-links");
+      setPlatformLinks({ links: data?.links || [], available: data?.available || {}, platforms: data?.platforms || {} });
+    } catch {
+      setPlatformLinks({ links: [], available: {}, platforms: {} });
+    }
+  }, []);
+  useEffect(() => {
+    if (tab === "socials") loadPlatformLinks();
+  }, [tab, loadPlatformLinks]);
+  const linkedParam = params.get("linked");
+  const linkErrorParam = params.get("link_error");
+  useEffect(() => {
+    if (!linkedParam && !linkErrorParam) return;
+    if (linkedParam) toast.success(linkedText(linkedParam));
+    if (linkErrorParam) toast.error(linkErrorText(linkErrorParam));
+    const next = new URLSearchParams(params);
+    next.delete("linked");
+    next.delete("link_error");
+    setParams(next, { replace: true });
+    refresh?.();
+  }, [linkedParam, linkErrorParam, params, setParams, refresh]);
+  const startPlatformLink = async (platform) => {
+    try {
+      const { data } = await api.post(`/me/platform-links/${platform}/start`);
+      if (data?.url) window.location.assign(data.url);
+    } catch (err) {
+      toast.error(formatRequestError(err, "Die Verknüpfung konnte nicht gestartet werden."));
+    }
+  };
+  const unlinkPlatform = async (platform) => {
+    try {
+      await api.delete(`/me/platform-links/${platform}`);
+      toast.success("Verknüpfung getrennt – der Eintrag bleibt, das Häkchen ist weg.");
+      await loadPlatformLinks();
+      refresh?.();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Die Verknüpfung konnte nicht getrennt werden."));
+    }
+  };
   // Schalter und Auswahlfelder auf Privatsphäre und Benachrichtigungen
   // speichern kurz nach dem letzten Klick von selbst.
   const setSetting = (k, v) => {
@@ -293,7 +339,7 @@ export default function ProfilePage() {
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}
             {tab === "gaming" && <GamingTab form={form} set={set} setGameId={setGameId} gameIdGroups={gameIdGroups} />}
-            {tab === "socials" && <SocialsTab form={form} set={set} />}
+            {tab === "socials" && <SocialsTab form={form} set={set} links={platformLinks} onLink={startPlatformLink} onUnlink={unlinkPlatform} />}
             {tab === "achievements" && (
               <AchievementsTab
                 achData={achData}

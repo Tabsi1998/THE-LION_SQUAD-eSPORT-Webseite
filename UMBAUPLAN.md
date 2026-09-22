@@ -472,7 +472,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
@@ -601,6 +601,30 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 34 — Discord II, Teil 1: Plattform-Konten verknüpfen
+
+### Was 34.1 gefunden hat (#260 – PR #376)
+
+**Getippte Namen beweisen nichts.** Discord-Name, Twitch-Name und Steam-ID standen als Freitext im
+Profil; ob der Tag echt ist, sah niemand. Jetzt meldet man sich einmal bei der Plattform an, die
+Plattform sagt, wer man ist, und die Website trägt Wert und Häkchen ein – im Profil, im
+öffentlichen Profil und bei Turnieren. Der Text bleibt weiter tippbar; wer ihn von Hand ändert,
+verliert das Häkchen, nicht den Eintrag.
+
+**Der Rückruf kennt keinen angemeldeten Nutzer.** Die Plattform ruft den Browser zurück, ohne
+unsere Sitzung zu kennen. Deshalb trägt der Start einen signierten `state` (zehn Minuten, Nutzer
+und Plattform), und der Rückruf glaubt nur ihm. Jeder Ausgang ist eine Weiterleitung ins Profil
+mit einem Grund – abgebrochen, schon vergeben, nicht bestätigt, ungültig – nie eine nackte
+Fehlerseite. Bei Steam wird die Antwort bei Steam gegengeprüft, sonst könnte jeder eine SteamID
+in die Adresse schreiben.
+
+**Ein Konto, ein Profil.** Ein Discord-Konto kann nur an einem Profil hängen; das zweite bekommt
+„schon vergeben“. Die Zugangsdaten liegen wie bei Twitch in den Einstellungen (Discord-App,
+optionaler Steam-Schlüssel für den Anzeigenamen), die Rückrufadressen stehen dort zum Kopieren.
+Was die Plattform liefert, steht als Text an der Plattform und daher im Profil und im
+Datenschutz – Kennung und Name, keine Freunde, keine Nachrichten. Der Bot (#302) baut darauf auf:
+gezählt wird nur, wer verknüpft ist.
 
 ## Block 33 — App 0.8.0-beta: Kalender und Galerie
 

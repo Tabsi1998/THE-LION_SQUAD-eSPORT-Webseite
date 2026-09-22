@@ -549,6 +549,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
             "internal_role": membership.get("internal_role"),
             "member_number": membership.get("member_number") if membership.get("show_member_number_publicly") else None,
         }
+    from services.platform_links import verified_platforms
     # Base profile (always visible)
     base = {
         "id": u["id"],
@@ -583,6 +584,8 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "is_club_member": is_member,
         "user_type": "club_member" if is_member else "community_user",
         "membership": public_member,
+        # Verknüpfte Konten (#260): das Häkchen, nie die Plattform-Kennung.
+        "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, {"discord": "discord", "twitch": "twitch", "steam": "steam"}[p], public)],
     }
     if viewer:
         from services.friend_service import relationship_status
@@ -774,7 +777,14 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
         await _attach_membership(me)
         return me
     updates["updated_at"] = now_utc().isoformat()
+    # Verknüpfte Konten (#260): wer das Feld von Hand ändert, verliert das Häkchen - der Text bleibt.
+    # Verglichen wird mit dem gespeicherten Stand, nicht mit dem Sitzungsobjekt.
+    from services.platform_links import changed_verified_platforms, unlink
+    current = await db.users.find_one({"id": me["id"]}, {"_id": 0, "platform_verified": 1, "discord_name": 1, "twitch_handle": 1, "steam_id": 1}) or {}
+    dropped = changed_verified_platforms(updates, current)
     await db.users.update_one({"id": me["id"]}, {"$set": updates})
+    for platform in dropped:
+        await unlink(db, me["id"], platform)
     u = await db.users.find_one({"id": me["id"]}, PRIVATE_AUTH_FIELDS)
     await _attach_membership(u)
     return u

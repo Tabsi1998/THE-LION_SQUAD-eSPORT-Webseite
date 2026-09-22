@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, SystemCard } from "./settings/fields";
 import { TwitchTab } from "./settings/TwitchTab";
+import { PlatformLinkSettings } from "./settings/PlatformLinkSettings";
 import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
@@ -183,10 +184,15 @@ function smtpPayload(source) {
   return payload;
 }
 
+// Geheimnisse gehen nur mit, wenn neu eingetippt; die „gespeichert“-Marke nie (#260 dazu: Discord, Steam).
+const BRAND_SECRET_FIELDS = ["twitch_client_secret", "discord_client_secret", "steam_api_key"];
+
 function brandPayload(source = {}) {
   const payload = normalizeAnalyticsPayload(source);
-  if (!payload.twitch_client_secret) delete payload.twitch_client_secret;
-  delete payload.twitch_client_secret_masked;
+  for (const field of BRAND_SECRET_FIELDS) {
+    if (!payload[field]) delete payload[field];
+    delete payload[`${field}_masked`];
+  }
   return payload;
 }
 
@@ -248,6 +254,7 @@ export default function AdminSettingsPage() {
     vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "", terms_of_use: "",
     discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
+    discord_client_id: "", discord_client_secret: "", discord_client_secret_masked: "", steam_api_key: "", steam_api_key_masked: "",
     whatsapp_channel_url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
     social_links: defaultSocialLinks(),
     analytics_provider: "", google_analytics_id: "", plausible_domain: "",
@@ -287,6 +294,7 @@ export default function AdminSettingsPage() {
   const [savingBrand, setSavingBrand] = useState(false);
   const [savingDiscord, setSavingDiscord] = useState(false);
   const [savingTwitch, setSavingTwitch] = useState(false);
+  const [savingPlatformApps, setSavingPlatformApps] = useState(false);
   const [refreshingTwitch, setRefreshingTwitch] = useState(false);
   const [submittingIndexNow, setSubmittingIndexNow] = useState(false);
   const [indexNowResult, setIndexNowResult] = useState(null);
@@ -346,7 +354,11 @@ export default function AdminSettingsPage() {
       return next;
     });
     if (b && !brandDirtyRef.current) setBrand((prev) => {
-      const next = { ...prev, ...b, twitch_client_secret: "", twitch_client_secret_masked: b.twitch_client_secret_masked || "" };
+      const next = { ...prev, ...b };
+      for (const field of BRAND_SECRET_FIELDS) {
+        next[field] = "";
+        next[`${field}_masked`] = b[`${field}_masked`] || "";
+      }
       originalBrandRef.current = brandPayload(next);
       return next;
     });
@@ -643,6 +655,29 @@ export default function AdminSettingsPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingTwitch(false); }
+  };
+  // Konten verknüpfen (#260): Discord-App und Steam-Schlüssel liegen in den Branding-Einstellungen wie Twitch.
+  const savePlatformApps = async () => {
+    if (savingPlatformApps) return;
+    setSavingPlatformApps(true);
+    try {
+      const payload = brandPayload({ discord_client_id: brand.discord_client_id, discord_client_secret: brand.discord_client_secret, steam_api_key: brand.steam_api_key });
+      const patch = buildDirtyPayload(payload, originalBrandRef.current);
+      if (!hasPayloadChanges(patch)) { toast.info("Keine Änderungen zum Speichern."); return; }
+      loadSeqRef.current += 1;
+      const { data } = await api.put("/settings/branding", patch);
+      brandDirtyRef.current = false;
+      setBrand((prev) => ({ ...prev, ...data, discord_client_secret: "", steam_api_key: "" }));
+      toast.success("Plattform-Zugänge gespeichert.");
+      load();
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setSavingPlatformApps(false); }
+  };
+  const clearBrandSecret = async (field) => {
+    if (!await confirm({ title: "Gespeichertes entfernen?", description: "Das gespeicherte Geheimnis wird gelöscht; die Verknüpfung über diese Plattform geht dann nicht mehr, bis ein neues eingetragen ist.", confirmLabel: "Entfernen" })) return;
+    await api.put("/settings/branding", { [`clear_${field}`]: true });
+    toast.success("Entfernt.");
+    load();
   };
   const clearTwitchSecret = async () => {
     if (!await confirm({ title: "Twitch Secret entfernen?", description: "Client Secret und zwischengespeicherter Twitch-Token werden entfernt.", confirmLabel: "Secret entfernen" })) return;
@@ -954,6 +989,7 @@ export default function AdminSettingsPage() {
             <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Login & Google</div>
             <p>Steuere zentral, wie sich Nutzer anmelden und registrieren. Google wird direkt über ein Google-Cloud-Projekt des Vereins angebunden; ein Client Secret ist für die Anmeldung nicht erforderlich.</p>
           </div>
+          <PlatformLinkSettings brand={brand} setBrandField={setBrandField} saving={savingPlatformApps} onSave={savePlatformApps} onClearSecret={clearBrandSecret} />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <div className="flex items-center justify-between gap-4">
               <div>

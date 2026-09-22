@@ -162,8 +162,8 @@ function socialUrl(platform, value) {
 
 function publicSocialLinks(profile, twitchUrl) {
   const links = [
-    profile.discord_name && { platform: "discord", label: "Discord", value: profile.discord_name },
-    twitchUrl && { platform: "twitch", label: "Twitch", value: normalizeTwitchChannel(profile.twitch_handle), url: twitchUrl },
+    profile.discord_name && { platform: "discord", label: "Discord", value: profile.discord_name, verified: isVerified(profile, "discord") },
+    twitchUrl && { platform: "twitch", label: "Twitch", value: normalizeTwitchChannel(profile.twitch_handle), url: twitchUrl, verified: isVerified(profile, "twitch") },
     profile.youtube_handle && { platform: "youtube", label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
     profile.instagram_handle && { platform: "instagram", label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
     profile.tiktok_handle && { platform: "tiktok", label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle) },
@@ -209,9 +209,14 @@ function SocialIcon({ kind, className = "w-4 h-4" }) {
   return <Globe className={className} />;
 }
 
+// Verknüpfte Konten (#260): das Häkchen kommt vom Server, nie aus dem Text.
+function isVerified(profile, platform) {
+  return Array.isArray(profile?.verified_platforms) && profile.verified_platforms.includes(platform);
+}
+
 function publicGamingIds(profile) {
   return [
-    profile.steam_id && { label: "Steam", value: profile.steam_id, url: socialUrl("steam", profile.steam_id) },
+    profile.steam_id && { label: "Steam", value: profile.steam_id, url: socialUrl("steam", profile.steam_id), verified: isVerified(profile, "steam") },
     profile.epic_id && { label: "Epic", value: profile.epic_id },
     profile.psn_id && { label: "PSN", value: profile.psn_id },
     profile.xbox_id && { label: "Xbox", value: profile.xbox_id },
@@ -873,7 +878,7 @@ function ProfileLinksCard({ links }) {
         {links.map((link) => {
           const meta = socialMeta(link);
           const key = `${meta.key}:${link.url || link.value}`;
-          const className = "inline-flex h-10 w-10 items-center justify-center border border-white/10 bg-[#0A0A0A] rounded-sm text-white/70 transition hover:bg-white/[0.03]";
+          const className = "relative inline-flex h-10 w-10 items-center justify-center border border-white/10 bg-[#0A0A0A] rounded-sm text-white/70 transition hover:bg-white/[0.03]";
           const style = { "--social-color": meta.color };
           if (link.url) {
             return (
@@ -889,6 +894,7 @@ function ProfileLinksCard({ links }) {
                 style={style}
               >
                 <SocialIcon kind={meta.key} />
+                {link.verified && <BadgeCheck className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[#00FF88] bg-[#0A0A0A] rounded-full" aria-label="verifiziert" data-testid={`profile-social-${meta.key}-verified`} />}
               </a>
             );
           }
@@ -904,6 +910,7 @@ function ProfileLinksCard({ links }) {
               style={style}
             >
               <SocialIcon kind={meta.key} />
+              {link.verified && <BadgeCheck className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[#00FF88] bg-[#0A0A0A] rounded-full" aria-label="verifiziert" data-testid={`profile-social-${meta.key}-verified`} />}
             </button>
           );
         })}
@@ -921,7 +928,7 @@ function GamingIdsCard({ ids }) {
       <div className="grid gap-2">
         {ids.map((id) => (
           <div key={`${id.label}:${id.value}`} className="border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm">
-            <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{id.label}</div>
+            <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1">{id.label}{id.verified && <BadgeCheck className="w-3 h-3 text-[#00FF88]" aria-label="verifiziert" data-testid={`profile-gaming-${id.label.toLowerCase()}-verified`} />}</div>
             {id.url ? (
               <a href={id.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex max-w-full items-center gap-1 text-sm text-white/85 hover:text-[#29B6E8]">
                 <span className="truncate">{id.value}</span><ExternalLink className="w-3 h-3 shrink-0" />
