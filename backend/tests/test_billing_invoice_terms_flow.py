@@ -140,6 +140,10 @@ async def test_settings_offer_the_dolibarr_lists_and_refuse_auto_validate_withou
     options = (await flow.get("/api/admin/dolibarr/invoice-options")).json()
     assert options["available"] is True
     assert [t["code"] for t in options["terms"]] == ["RECEP", "30D", "30DENDMONTH"]
+    # Die API liefert Englisch - die Website zeigt Deutsch, unbekannte Codes bleiben, wie sie kommen.
+    assert [t["label"] for t in options["terms"]] == ["Sofort bei Erhalt", "30 Tage", "30 Tage zum Monatsende"]
+    assert [m["label"] for m in options["modes"]] == ["Banküberweisung", "Bar", "Kreditkarte"]
+    assert options["accounts_reason"] is None
     assert options["suggested"] == {"payment_term_id": 2, "payment_mode_id": 2, "bank_account_id": 1}
     assert options["accounts"][0]["label"] == "Girokonto"
 
@@ -158,6 +162,7 @@ async def test_settings_offer_the_dolibarr_lists_and_refuse_auto_validate_withou
     fake.bank_readable = False
     options = (await flow.get("/api/admin/dolibarr/invoice-options")).json()
     assert options["available"] is True and options["accounts"] is None and options["terms"]
+    assert options["accounts_reason"] == "forbidden"
 
 
 @pytest.mark.asyncio

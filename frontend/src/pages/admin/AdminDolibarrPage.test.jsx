@@ -166,6 +166,9 @@ test("Konditionen kommen als Listen aus Dolibarr, der Vorschlag füllt sie, und 
   await user.click(await screen.findByTestId("dolibarr-tab-connection"));
   expect(await screen.findByTestId("invoice-terms-state")).toHaveTextContent("unvollständig");
   expect(screen.getByTestId("dolibarr-invoice-auto-validate")).toBeDisabled();
+  // Ohne Kontenliste steht da, welches Recht fehlt und wo die Nummer steht - nicht nur ein leeres Feld.
+  expect(await screen.findByTestId("invoice-terms-accounts-help")).toHaveTextContent("Bankkonten einsehen");
+  expect(screen.getByTestId("invoice-terms-accounts-help")).toHaveTextContent("card.php?id=");
 
   await user.click(await screen.findByTestId("invoice-terms-suggest"));
   expect(screen.getByTestId("invoice-terms-payment_term_id")).toHaveValue("2");

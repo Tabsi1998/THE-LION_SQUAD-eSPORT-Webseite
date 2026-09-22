@@ -212,7 +212,7 @@ async def invoice_options(me: dict = Depends(require_area("system"))):
         return {"available": False, "reason": "not_connected", "terms": None, "modes": None, "accounts": None, "suggested": {}}
     client = DolibarrClient(settings)
 
-    async def view(rows: list[dict] | None, label_keys: tuple[str, ...]) -> list[dict] | None:
+    async def view(rows: list[dict] | None, label_keys: tuple[str, ...], german: dict[str, str] | None = None) -> list[dict] | None:
         if rows is None:
             return None
         out = []
@@ -223,13 +223,16 @@ async def invoice_options(me: dict = Depends(require_area("system"))):
                 continue
             if row_id < 1:
                 continue
-            label = next((str(row[key]) for key in label_keys if row.get(key)), "") or f"Nr. {row_id}"
-            out.append({"id": row_id, "code": str(row.get("code") or row.get("ref") or ""), "label": label})
+            code = str(row.get("code") or row.get("ref") or "")
+            raw = next((str(row[key]) for key in label_keys if row.get(key)), "") or f"Nr. {row_id}"
+            # Die API liefert die Wörterbuch-Texte auf Englisch - übersetzen tut nur Dolibarrs
+            # eigene Oberfläche. Bekannte Codes bekommen hier ihren deutschen Text.
+            out.append({"id": row_id, "code": code, "label": (german or {}).get(code) or raw})
         return out
 
     try:
-        terms = await view(await client.payment_terms(), ("label", "libelle_facture", "libelle"))
-        modes = await view(await client.payment_types(), ("label", "libelle"))
+        terms = await view(await client.payment_terms(), ("label", "libelle_facture", "libelle"), PAYMENT_TERM_LABELS)
+        modes = await view(await client.payment_types(), ("label", "libelle"), PAYMENT_MODE_LABELS)
         accounts = await view(await client.bank_accounts(), ("label", "ref", "bank"))
     except DolibarrError as exc:
         return {"available": False, "reason": exc.kind, "reason_text": exc.text, "terms": None, "modes": None, "accounts": None, "suggested": {}}
@@ -238,7 +241,24 @@ async def invoice_options(me: dict = Depends(require_area("system"))):
         "payment_mode_id": next((row["id"] for row in modes or [] if row["code"] == DEFAULT_MODE_CODE), None),
         "bank_account_id": accounts[0]["id"] if accounts and len(accounts) == 1 else None,
     }
-    return {"available": True, "terms": terms, "modes": modes, "accounts": accounts, "suggested": suggested}
+    return {
+        "available": True, "terms": terms, "modes": modes, "accounts": accounts, "suggested": suggested,
+        # Warum die Kontenliste fehlt - damit die Seite sagen kann, welches Recht fehlt.
+        "accounts_reason": None if accounts is not None else "forbidden",
+    }
+
+
+# Dolibarrs Wörterbuch-Codes auf Deutsch (die API liefert die englischen Rohtexte).
+PAYMENT_TERM_LABELS = {
+    "RECEP": "Sofort bei Erhalt", "30D": "30 Tage", "30DENDMONTH": "30 Tage zum Monatsende", "60D": "60 Tage",
+    "60DENDMONTH": "60 Tage zum Monatsende", "PT_ORDER": "Bei Bestellung", "PT_DELIVERY": "Bei Lieferung",
+    "PT_5050": "50 % bei Bestellung, 50 % bei Lieferung", "10D": "10 Tage", "10DENDMONTH": "10 Tage zum Monatsende",
+    "14D": "14 Tage", "14DENDMONTH": "14 Tage zum Monatsende", "7D": "7 Tage", "45D": "45 Tage", "90D": "90 Tage",
+}
+PAYMENT_MODE_LABELS = {
+    "VIR": "Banküberweisung", "PRE": "Lastschrift", "LIQ": "Bar", "CB": "Kreditkarte", "CHQ": "Scheck", "TIP": "Zahlschein",
+    "VAD": "Online-Zahlung", "FAC": "Factoring", "TRA": "Wechsel", "DC": "Bankkarte", "PP": "PayPal",
+}
 
 
 @admin_router.post("/test")
