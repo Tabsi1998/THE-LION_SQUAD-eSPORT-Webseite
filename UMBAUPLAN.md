@@ -469,7 +469,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. Offen: #320, #321 im Detail |
-| Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #370; damit schließt das Epic #314 |
+| Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
@@ -604,7 +604,7 @@ Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
 
 ## Block 31 — Abrechnung II: Startgelder für Turniere
 
-### Was 31.1 gefunden hat (#319 – PR #370)
+### Was 31.1 gefunden hat (#319 – PR #371)
 
 **Dasselbe Preismodell, derselbe Rechnungsweg.** Ein Turnier trägt ein Angebot wie ein Event
 (Positionen, Preisbasis, Steuerprofil, Leistung aus Dolibarr); die Anmeldung friert den Preis
