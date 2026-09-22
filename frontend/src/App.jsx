@@ -97,6 +97,7 @@ const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
 const AdminLogsPage = lazy(() => import("@/pages/admin/AdminLogsPage"));
 const AdminOpsPage = lazy(() => import("@/pages/admin/AdminOpsPage"));
 const AdminDolibarrPage = lazy(() => import("@/pages/admin/AdminDolibarrPage"));
+const AdminFinancePage = lazy(() => import("@/pages/admin/AdminFinancePage"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
 const AdminModerationPage = lazy(() => import("@/pages/admin/AdminModerationPage"));
 const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
@@ -269,6 +270,7 @@ function App() {
           <Route path="/admin/logs" element={<ProtectedRoute requireArea="system"><AdminLogsPage /></ProtectedRoute>} />
           <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />
           <Route path="/admin/dolibarr" element={<ProtectedRoute requireArea={["club", "system"]}><AdminDolibarrPage /></ProtectedRoute>} />
+          <Route path="/admin/finance" element={<ProtectedRoute requireArea={["finance"]}><AdminFinancePage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireArea="system"><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireArea="system"><AdminMobileLogsPage /></ProtectedRoute>} />

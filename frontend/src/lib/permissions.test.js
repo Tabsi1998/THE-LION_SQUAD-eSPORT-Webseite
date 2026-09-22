@@ -3,7 +3,7 @@ import { areaList, areasOf, hasArea, isAnyAdmin, roleLabel } from "./permissions
 test("Bereiche kommen vom Server, sonst aus der Rolle", () => {
   expect(areasOf({ role: "player", areas: ["content", "unsinn"] })).toEqual(["content"]);
   expect(areasOf({ role: "tournament_admin" })).toEqual(["tournaments", "moderation"]);
-  expect(areasOf({ role: "superadmin" })).toHaveLength(5);
+  expect(areasOf({ role: "superadmin" })).toHaveLength(6);
   expect(areasOf({ role: "player" })).toEqual([]);
   expect(areasOf(null)).toEqual([]);
 });

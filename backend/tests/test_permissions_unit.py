@@ -31,7 +31,7 @@ def test_grants_add_areas_but_never_system():
 
 
 def test_every_area_but_moderation_needs_a_second_factor():
-    assert MFA_AREAS == {"tournaments", "content", "club", "system"}
+    assert MFA_AREAS == {"tournaments", "content", "club", "finance", "system"}
     assert needs_mfa({"mfa_enabled": True, "auth_mfa_verified": True}) is False
     assert needs_mfa({"mfa_enabled": True, "auth_mfa_verified": False}) is True
     assert needs_mfa({}) is True

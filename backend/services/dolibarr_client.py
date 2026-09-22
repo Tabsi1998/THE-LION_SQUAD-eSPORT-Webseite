@@ -153,6 +153,12 @@ async def load_settings(db=None) -> dict:
     return doc
 
 
+def write_capable(settings: dict | None) -> bool:
+    """Schreibzugriff (Rechnungen, Geschäftspartner) nur mit eigenem, bewusst hinterlegtem Schlüssel
+    und Schalter (#316). Der Lese-Schlüssel wird nie still dafür verwendet."""
+    return bool(settings and settings.get("mode") == "live" and settings.get("write_enabled") and settings.get("write_api_key"))
+
+
 def instance_key(settings: dict) -> str:
     """Kennung der Installation. Nummern zweier Installationen sind nie dasselbe Mitglied."""
     return f"{str(settings.get('instance') or '').strip() or 'default'}:{int(settings.get('entity') or 1)}"

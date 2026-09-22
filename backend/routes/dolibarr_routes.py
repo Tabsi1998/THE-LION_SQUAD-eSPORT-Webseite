@@ -65,6 +65,8 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "entity": settings.get("entity") or 1,
         "base_url": settings.get("base_url") or "",
         "api_key_configured": secret_is_configured(settings.get("api_key")),
+        "write_api_key_configured": secret_is_configured(settings.get("write_api_key")),
+        "write_enabled": bool(settings.get("write_enabled")),
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "type_map": settings.get("type_map") or {},
@@ -88,6 +90,10 @@ class DolibarrSettingsUpdate(BaseModel):
     environment: str | None = None
     base_url: str | None = Field(None, max_length=300)
     api_key: str | None = Field(None, max_length=300)
+    # Schreibzugriff (#316): eigener Schlüssel eines Dolibarr-Benutzers mit Rechten auf Kunden
+    # und Rechnungen - getrennt vom Lese-Schlüssel, getrennt einschaltbar.
+    write_api_key: str | None = Field(None, max_length=300)
+    write_enabled: bool | None = None
     instance: str | None = Field(None, max_length=60)
     entity: int | None = Field(None, ge=1, le=9999)
     auto_link_verified_email: bool | None = None
@@ -117,6 +123,12 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
             raise HTTPException(400, "Die gespeicherte Adresse ist für diese Umgebung nicht zulässig (https nötig).")
     if data.get("api_key"):
         updates["api_key"] = encrypt_secret(data["api_key"].strip())
+    if data.get("write_api_key"):
+        updates["write_api_key"] = encrypt_secret(data["write_api_key"].strip())
+    if "write_enabled" in data:
+        if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key")):
+            raise HTTPException(400, "Schreibzugriff braucht einen eigenen API-Schlüssel.")
+        updates["write_enabled"] = bool(data["write_enabled"])
     if "instance" in data:
         updates["instance"] = (data["instance"] or "").strip()
     if "entity" in data and data["entity"]:

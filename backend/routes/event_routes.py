@@ -15,6 +15,8 @@ from services.competition_standings import standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
+from services import billing_orders, pricing
+from services.permissions import user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -181,6 +183,15 @@ def _public_event_registration(registration: dict, is_staff: bool = False) -> di
         "created_at": registration.get("created_at"),
         "updated_at": registration.get("updated_at"),
     }
+    snapshot = registration.get("price_snapshot")
+    if snapshot and is_staff:
+        # Nur die eigene Anmeldung (is_staff=True in own_registration) und die Verwaltung sehen den
+        # eingefrorenen Preis - in der öffentlichen Teilnehmerliste steht kein Geld. Dolibarr-Nummern nie.
+        payload["price"] = {
+            "total_cents": snapshot.get("total_cents"), "currency": snapshot.get("currency"),
+            "positions": [{k: line.get(k) for k in ("key", "label", "quantity", "unit_cents", "total_cents", "optional")} for line in snapshot.get("positions") or []],
+            "accepted_at": snapshot.get("accepted_at"), "billing_status": registration.get("billing_status") or "pending",
+        }
     if is_staff:
         payload["email"] = registration.get("email")
         payload["note"] = registration.get("note")
@@ -517,8 +528,14 @@ async def list_events(
                 fresh.append(ev)
         events = fresh
     out = []
+    finance = bool(user) and await user_has_area(user, "finance")
     for ev in events:
         if await _user_can_see(user, ev.get("visibility") or "public"):
+            # Preisangabe für alle, die Konfiguration mit Dolibarr-Nummern nur für Finanzen (#322).
+            offer = ev.pop("billing", None)
+            ev["offer"] = pricing.public_offer(offer)
+            if finance:
+                ev["billing"] = offer or pricing.normalize_offer(None)
             await _decorate_event(ev)
             out.append(ev)
     if compact:
@@ -617,6 +634,11 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     await _attach_event_registration_view(event, user)
+    # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
+    offer = event.pop("billing", None)
+    event["offer"] = pricing.public_offer(offer)
+    if user and await user_has_area(user, "finance"):
+        event["billing"] = offer or pricing.normalize_offer(None)
     if access_link:
         await touch_access_link(db, access_link, user)
         event["access_link"] = public_access_link_payload(access_link)
@@ -720,6 +742,13 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
     if existing and existing.get("status") not in {"cancelled", "no_show"}:
         raise HTTPException(status_code=409, detail="Du bist für dieses Event bereits angemeldet")
 
+    # Preis (#315, #318): vor der Buchung rechnen, damit eine unbekannte Position sauber scheitert.
+    offer = event.get("billing") or {}
+    try:
+        price = pricing.quote(offer, seats=requested_seats, selected=body.selected_positions)
+    except pricing.PricingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
     summary = await _event_registration_summary(event, exclude_registration_id=existing.get("id") if existing else None)
     status = "registered"
     max_participants = event.get("max_participants")
@@ -736,8 +765,14 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
         "companion_count": companion_count,
         "seat_count": requested_seats,
         "note": body.note,
+        "selected_positions": list(body.selected_positions or []),
         "updated_at": now,
     }
+    # Eingefroren wird nur eine verbindliche Anmeldung - die Warteliste bekommt ihren Preis beim
+    # Nachrücken (Admin setzt „registered“), nicht jetzt.
+    if status == "registered" and not price.get("free"):
+        doc["price_snapshot"] = pricing.snapshot(price, recipient=me, source={"kind": "event", "id": event["id"], "slug": event.get("slug")})
+        doc["billing_status"] = "pending"
     if existing:
         await db.event_registrations.update_one(
             {"id": existing["id"]},
@@ -754,9 +789,13 @@ async def register_for_event(event_id: str, body: EventRegistrationCreate,
         "action": "event.registration.create",
         "target_id": event["id"],
         "actor_id": me["id"],
-        "data": {"registration_id": doc["id"], "status": status, "companion_count": companion_count},
+        "data": {"registration_id": doc["id"], "status": status, "companion_count": companion_count,
+                 "total_cents": doc.get("price_snapshot", {}).get("total_cents")},
         "created_at": now,
     })
+    if doc.get("price_snapshot"):
+        await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=doc["id"], user_id=me["id"],
+                                          snapshot=doc["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
     if register_access:
         await record_access_link_use(db, register_access, me)
     return _public_event_registration(doc, is_staff=True)
@@ -777,8 +816,9 @@ async def cancel_my_event_registration(event_id: str, me: dict = Depends(get_cur
     now = now_utc().isoformat()
     await db.event_registrations.update_one(
         {"id": reg["id"]},
-        {"$set": {"status": "cancelled", "updated_at": now}},
+        {"$set": {"status": "cancelled", "updated_at": now, **({"billing_status": "cancelled"} if reg.get("price_snapshot") else {})}},
     )
+    await billing_orders.cancel_orders_for(db, kind="event", registration_id=reg["id"], reason="Anmeldung storniert")
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.cancel",
@@ -816,8 +856,30 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
         summary = await _event_registration_summary(event, exclude_registration_id=registration_id)
         if summary["reserved_seats"] + _registration_seats(proposed) > int(event["max_participants"]):
             raise HTTPException(status_code=400, detail="Kapazität wäre überschritten")
+    # Nachrücken von der Warteliste oder Änderung der Begleitpersonen: Preis einfrieren, solange
+    # noch kein Beleg entstanden ist. Ein angelegter Beleg wird nicht still ersetzt (#321).
+    offer = event.get("billing") or {}
+    becomes_active = proposed_status in ACTIVE_EVENT_REGISTRATION_STATUSES
+    seats_changed = "seat_count" in updates and updates["seat_count"] != _registration_seats(current)
+    if pricing.is_paid(offer) and becomes_active and (not current.get("price_snapshot") or (seats_changed and current.get("billing_status") in (None, "pending"))):
+        try:
+            price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
+        except pricing.PricingError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        recipient = await db.users.find_one({"id": current["user_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1}) or {"id": current["user_id"]}
+        updates["price_snapshot"] = pricing.snapshot(price, recipient=recipient, source={"kind": "event", "id": event["id"], "slug": event.get("slug"), "by_admin": me["id"]})
+        updates["billing_status"] = "pending"
+        if seats_changed:
+            await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert")
+    if proposed_status in {"cancelled", "no_show"} and current.get("status") not in {"cancelled", "no_show"}:
+        await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Anmeldung durch Verwaltung beendet")
+        if current.get("price_snapshot"):
+            updates["billing_status"] = "cancelled"
     updates["updated_at"] = now_utc().isoformat()
     await db.event_registrations.update_one({"id": registration_id}, {"$set": updates})
+    if updates.get("price_snapshot") and proposed_status == "registered":
+        await billing_orders.create_order(db, kind="event", source_id=event["id"], registration_id=registration_id, user_id=current["user_id"],
+                                          snapshot=updates["price_snapshot"], timing=offer.get("invoice_timing") or "on_confirm")
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "event.registration.update",
@@ -832,10 +894,25 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     return _public_event_registration(updated, is_staff=True)
 
 
+async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict | None:
+    """Kosten pflegt nur, wer den Bereich Finanzen hat (#322). Ohne Angabe bleibt alles wie es ist."""
+    if "billing" not in raw:
+        return None
+    if not await user_has_area(me, "finance"):
+        raise HTTPException(status_code=403, detail="Kosten und Abrechnung pflegt der Bereich „Finanzen“.")
+    try:
+        offer = pricing.normalize_offer(raw.get("billing") or {})
+    except pricing.PricingError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return pricing.bump_version((existing or {}).get("billing"), offer)
+
+
 @router.post("")
 async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
+    billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
+    doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
     doc["slug"] = await unique_slug(db.events, doc.get("slug") or doc.get("name"), fallback="event")
     doc["id"] = new_id()
     if not doc.get("status"):
@@ -879,6 +956,11 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    billing = await _billing_updates(raw, existing, me)
+    if billing is not None:
+        updates["billing"] = billing
+    else:
+        updates.pop("billing", None)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")
