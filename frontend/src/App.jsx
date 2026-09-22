@@ -140,6 +140,7 @@ const MemberBenefitsPage = lazy(() => import("@/pages/user/MemberBenefitsPage"))
 const MemberDocumentsPage = lazy(() => import("@/pages/user/MemberDocumentsPage"));
 const MemberNewsPage = lazy(() => import("@/pages/user/MemberNewsPage"));
 const MyMembershipPage = lazy(() => import("@/pages/user/MyMembershipPage"));
+const MyInvoicesPage = lazy(() => import("@/pages/user/MyInvoicesPage"));
 
 const F1TVPage = lazy(() => import("@/pages/display/F1TVPage"));
 const BracketTVPage = lazy(() => import("@/pages/display/BracketTVPage"));
@@ -237,6 +238,8 @@ function App() {
           <Route path="/members/documents" element={<ProtectedRoute requireMember><MemberDocumentsPage /></ProtectedRoute>} />
           <Route path="/members/news" element={<ProtectedRoute requireMember><MemberNewsPage /></ProtectedRoute>} />
           <Route path="/members/membership" element={<ProtectedRoute requireMember><MyMembershipPage /></ProtectedRoute>} />
+          {/* Eigene Rechnungen (#296): auch für Ehemalige - es zählt die Zuordnung, nicht die Mitgliedschaft. */}
+          <Route path="/account/invoices" element={<ProtectedRoute><MyInvoicesPage /></ProtectedRoute>} />
 
           {/* Admin */}
           <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminDashboardPage /></ProtectedRoute>} />

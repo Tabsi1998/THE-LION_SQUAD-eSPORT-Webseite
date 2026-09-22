@@ -269,6 +269,8 @@ async def remove_link(user_id: str, me: dict = Depends(require_area("club"))):
     if not link:
         raise HTTPException(404, "Keine Zuordnung.")
     await close_link(db, link, status="revoked", actor_id=me["id"], note="von der Vereinsverwaltung gelöst")
+    from services.dolibarr_invoices import forget_cache
+    await forget_cache(db, user_id)
     await db.memberships.update_one({"user_id": user_id, "source": "dolibarr"}, {"$set": {"source": "local", "dolibarr.functions": []}})
     await _audit(me["id"], "dolibarr.link_revoked", user_id, {"member_id": link.get("member_id")})
     return {"ok": True}

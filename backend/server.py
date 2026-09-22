@@ -37,6 +37,7 @@ from routes.mobile_routes import router as mobile_router
 from routes.admin_routes import router as admin_router
 from routes.ops_routes import router as ops_router
 from routes.dolibarr_routes import admin_router as dolibarr_admin_router, member_router as dolibarr_member_router, public_router as dolibarr_public_router
+from routes.invoice_routes import router as invoice_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.sticker_routes import router as sticker_router
@@ -224,6 +225,7 @@ app.include_router(ops_router)
 app.include_router(dolibarr_admin_router)
 app.include_router(dolibarr_public_router)
 app.include_router(dolibarr_member_router)
+app.include_router(invoice_router)
 app.include_router(settings_router)
 app.include_router(season_router)
 app.include_router(widget_router)

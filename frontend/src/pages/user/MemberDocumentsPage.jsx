@@ -4,6 +4,7 @@ import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText, Download, Pin, ArrowLeft, Search, Eye } from "lucide-react";
+import { DocumentViewer } from "@/components/tls/DocumentViewer";
 
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
@@ -31,6 +32,8 @@ export default function MemberDocumentsPage() {
   const [activeCat, setActiveCat] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  // PDFs öffnen im gemeinsamen Betrachter (#325) statt in einem neuen Tab; alles andere wie bisher.
+  const [viewing, setViewing] = useState(null);
 
   const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}), []);
   useEffect(() => { loadMeta(); }, [loadMeta]);
@@ -97,31 +100,41 @@ export default function MemberDocumentsPage() {
         ) : (
           <div className="mt-10 space-y-8">
             {pinned.length > 0 && (
-              <Group label="Angepinnt" docs={pinned} />
+              <Group label="Angepinnt" docs={pinned} onView={setViewing} />
             )}
             {rest.length > 0 && (
-              <Group label={pinned.length ? "Weitere" : null} docs={rest} />
+              <Group label={pinned.length ? "Weitere" : null} docs={rest} onView={setViewing} />
             )}
           </div>
         )}
       </section>
+      {viewing && (
+        <DocumentViewer
+          path={`/documents/${viewing.id}/view`}
+          downloadPath={viewing.allow_download ? `/documents/${viewing.id}/download` : null}
+          title={viewing.title}
+          subtitle={CATEGORY_LABELS[viewing.category] || viewing.category}
+          onClose={() => setViewing(null)}
+        />
+      )}
     </PublicLayout>
   );
 }
 
-function Group({ label, docs }) {
+function Group({ label, docs, onView }) {
   return (
     <div>
       {label && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">{label}</div>}
       <div className="space-y-2">
-        {docs.map((d) => <DocRow key={d.id} d={d} />)}
+        {docs.map((d) => <DocRow key={d.id} d={d} onView={onView} />)}
       </div>
     </div>
   );
 }
 
-function DocRow({ d }) {
+function DocRow({ d, onView }) {
   const c = CATEGORY_COLORS[d.category] || "#29B6E8";
+  const isPdf = /pdf$/i.test(d.mime || "") || /\.pdf$/i.test(d.original_filename || "");
   return (
     <div data-testid={`doc-row-${d.id}`} className="border border-white/10 hover:border-white/25 rounded-sm bg-[#121212] p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition">
       <div className="w-12 h-12 shrink-0 rounded-sm flex items-center justify-center" style={{ background: `${c}15`, border: `1px solid ${c}40` }}>
@@ -141,15 +154,26 @@ function DocRow({ d }) {
           {d.allow_download && d.download_count > 0 && <span>{d.download_count} Downloads</span>}
         </div>
       </div>
-      <a
-        href={`${API}/documents/${d.id}/view`}
-        target="_blank"
-        rel="noreferrer"
-        data-testid={`doc-view-${d.id}`}
-        className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
-      >
-        <Eye className="w-3.5 h-3.5" /> Ansehen
-      </a>
+      {isPdf ? (
+        <button
+          type="button"
+          onClick={() => onView(d)}
+          data-testid={`doc-view-${d.id}`}
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
+        >
+          <Eye className="w-3.5 h-3.5" /> Ansehen
+        </button>
+      ) : (
+        <a
+          href={`${API}/documents/${d.id}/view`}
+          target="_blank"
+          rel="noreferrer"
+          data-testid={`doc-view-${d.id}`}
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
+        >
+          <Eye className="w-3.5 h-3.5" /> Ansehen
+        </a>
+      )}
       {d.allow_download && (
         <a
           href={`${API}/documents/${d.id}/download`}
