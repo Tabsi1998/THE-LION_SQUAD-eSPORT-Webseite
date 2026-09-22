@@ -475,7 +475,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
-| Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 offen |
+| Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
@@ -624,6 +624,18 @@ Kalender-Feed zum Abonnieren bleibt der spätere Schritt aus #216.
 im Player aus dem Chat, Einbettungen (YouTube) öffnen sich draußen. Teilen und Speichern ist ein
 System-Teilen mit der heruntergeladenen Datei – kein eigener Speicherdialog, keine
 Fotos-Berechtigung. Sichtbarkeit entscheidet der Server, die App zeigt, was er liefert.
+
+## Block 30.2 — Leitfaden, Schritt 2: der Weg ins Formular
+
+### Was 30.2 gefunden hat (#368 – PR #375)
+
+**Ein Leitfaden, der nur beschreibt, bleibt Dokumentation neben der Software.** Jede Turnierform
+hat jetzt den Knopf „Voreinstellung übernehmen“: er öffnet „Turnier anlegen“ mit Format,
+Teilnahme, Teamgröße, Best of und der Spielregel-Vorgabe (online: Spieler melden; vor Ort: die
+Turnierleitung wertet und plant) – als `?preset=` in der Adresse, damit der Weg auch als Link
+weitergegeben werden kann. Die Werte stehen bei der Turnierform selbst; eine Voreinstellung darf
+nur diese sieben Felder setzen, und ein Test hält das fest. Alles bleibt änderbar, ein Hinweis
+oben nennt die Turnierform; ein unbekannter Schlüssel ändert nichts.
 
 ## Block 32 — Rechnungskonditionen und lesbare Belege
 

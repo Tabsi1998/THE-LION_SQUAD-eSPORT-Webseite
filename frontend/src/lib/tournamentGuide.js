@@ -59,22 +59,44 @@ export const GUIDE_FORMATS = [
   { key: "ffa", label: "Freies Feld (FFA)", when: "Alle gleichzeitig in einer Lobby – Rennen, Battle Royale, Party-Spiele. Gewertet nach Platzierung." },
 ];
 
+// Voreinstellung (#368): dieselben Werte wie der RulePresetPicker im Formular – online melden
+// Spieler, vor Ort wertet und plant die Turnierleitung.
+const ONLINE = { event_mode: "online", result_entry_mode: "player_confirmed", schedule_mode: "player_proposal" };
+const LOCAL = { event_mode: "local", result_entry_mode: "staff_only", schedule_mode: "fixed_by_staff" };
+const solo = (extra) => ({ team_mode: "solo", team_size: 1, ...ONLINE, ...extra });
+const team = (size, extra) => ({ team_mode: "team", team_size: size, ...ONLINE, ...extra });
+
+// Felder, die eine Voreinstellung im Formular „Turnier anlegen“ setzen darf – sonst nichts.
+export const PRESET_FIELDS = ["format", "team_mode", "team_size", "best_of", "event_mode", "result_entry_mode", "schedule_mode"];
+
 // Turnierformen nach Spielart – Teamgröße, übliche Serie, Besonderheiten. Die Liste wächst mit
-// den Spielen, die der Verein wirklich spielt.
+// den Spielen, die der Verein wirklich spielt. `preset` sind die Feldwerte für „Diese
+// Voreinstellung übernehmen“ (#368): Format, Teamgröße, Best-of und die Spielregel-Vorgabe.
 export const GUIDE_GAME_TYPES = [
-  { key: "team-shooter", label: "Team-Shooter 5v5", examples: "Counter-Strike 2, Valorant, Rainbow Six Siege", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 in Playoffs, Finale Best of 5", format: "swiss", notes: "Map-Veto vor der Partie; die Heimseite hostet. Schweizer System für die Gruppenphase, danach Double Elimination." },
-  { key: "cod", label: "Call of Duty", examples: "Call of Duty (Ligaregeln)", team: "4v4", series: "Best of 5", format: "double_elim", notes: "Feste Modusfolge, etwa Hardpoint, Search & Destroy, Control." },
-  { key: "moba", label: "MOBA", examples: "League of Legends, Dota 2", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 bis 5 in Playoffs", format: "groups", notes: "Draft-Reihenfolge und Seitenwahl in die Regeln." },
-  { key: "arcade-sport", label: "Arcade-Sport 3v3", examples: "Rocket League", team: "3v3", series: "Gruppen und Playoffs Best of 5, Finale Best of 7", format: "groups", notes: "Kurze Spiele – viele Runden an einem Abend möglich." },
-  { key: "battle-royale", label: "Battle Royale", examples: "Fortnite, Warzone, Apex", team: "Solo, Duo oder Trio", series: "3 bis 6 Runden, Punkte je Platzierung und Abschuss", format: "ffa", notes: "Punktetabelle in die Regeln; Ergebnisse je Runde erfassen." },
-  { key: "sport-1v1", label: "1v1 Sport", examples: "EA SPORTS FC, NBA 2K", team: "1v1", series: "Hin- und Rückspiel oder Best of 3", format: "league", notes: "Passt gut auf Liga mit Spielwochen." },
-  { key: "strategy-1v1", label: "1v1 Strategie", examples: "Age of Empires, StarCraft", team: "1v1", series: "Best of 3, Finale Best of 5", format: "double_elim", notes: "Fester Map-Pool ohne Wiederholung; ELO-Grenze für Amateurturniere." },
-  { key: "fighting", label: "Fighting", examples: "Street Fighter, Tekken, Smash", team: "1v1", series: "Best of 3, ab Halbfinale Best of 5", format: "double_elim", notes: "Double Elimination ist hier Standard; Charakterwahl nach Sieg fest, Verlierer darf wechseln." },
-  { key: "racing", label: "Rennen auf Zeit", examples: "F1, Gran Turismo, Mario Kart", team: "Solo", series: "Zeitfahren oder Rennen mit Punkten", format: "ffa", notes: "Für Zeitfahren die Fast-Lap-Challenge nutzen; Rennen als freies Feld mit Platzierung." },
-  { key: "mobile", label: "Mobil", examples: "Brawl Stars, Clash Royale", team: "1v1 bis 3v3", series: "Best of 3", format: "single_elim", notes: "Kurze Partien; Check-in besonders wichtig, weil Handys wechseln." },
-  { key: "party-lan", label: "Party und LAN", examples: "Mario Kart, Jackbox, Poker-Abend", team: "Solo oder Team", series: "Eine Runde oder Punkte über den Abend", format: "ffa", notes: "Vor Ort: Stationen und Check-in am Eingang; Ergebnisse trägt die Turnierleitung ein." },
+  { key: "team-shooter", label: "Team-Shooter 5v5", examples: "Counter-Strike 2, Valorant, Rainbow Six Siege", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 in Playoffs, Finale Best of 5", format: "swiss", notes: "Map-Veto vor der Partie; die Heimseite hostet. Schweizer System für die Gruppenphase, danach Double Elimination.", preset: { format: "swiss", best_of: 1, ...team(5) } },
+  { key: "cod", label: "Call of Duty", examples: "Call of Duty (Ligaregeln)", team: "4v4", series: "Best of 5", format: "double_elim", notes: "Feste Modusfolge, etwa Hardpoint, Search & Destroy, Control.", preset: { format: "double_elim", best_of: 5, ...team(4) } },
+  { key: "moba", label: "MOBA", examples: "League of Legends, Dota 2", team: "5v5", series: "Best of 1 in Gruppen, Best of 3 bis 5 in Playoffs", format: "groups", notes: "Draft-Reihenfolge und Seitenwahl in die Regeln.", preset: { format: "groups", best_of: 1, ...team(5) } },
+  { key: "arcade-sport", label: "Arcade-Sport 3v3", examples: "Rocket League", team: "3v3", series: "Gruppen und Playoffs Best of 5, Finale Best of 7", format: "groups", notes: "Kurze Spiele – viele Runden an einem Abend möglich.", preset: { format: "groups", best_of: 5, ...team(3) } },
+  { key: "battle-royale", label: "Battle Royale", examples: "Fortnite, Warzone, Apex", team: "Solo, Duo oder Trio", series: "3 bis 6 Runden, Punkte je Platzierung und Abschuss", format: "ffa", notes: "Punktetabelle in die Regeln; Ergebnisse je Runde erfassen.", preset: { format: "ffa", best_of: 1, ...solo() } },
+  { key: "sport-1v1", label: "1v1 Sport", examples: "EA SPORTS FC, NBA 2K", team: "1v1", series: "Hin- und Rückspiel oder Best of 3", format: "league", notes: "Passt gut auf Liga mit Spielwochen.", preset: { format: "league", best_of: 3, ...solo() } },
+  { key: "strategy-1v1", label: "1v1 Strategie", examples: "Age of Empires, StarCraft", team: "1v1", series: "Best of 3, Finale Best of 5", format: "double_elim", notes: "Fester Map-Pool ohne Wiederholung; ELO-Grenze für Amateurturniere.", preset: { format: "double_elim", best_of: 3, ...solo() } },
+  { key: "fighting", label: "Fighting", examples: "Street Fighter, Tekken, Smash", team: "1v1", series: "Best of 3, ab Halbfinale Best of 5", format: "double_elim", notes: "Double Elimination ist hier Standard; Charakterwahl nach Sieg fest, Verlierer darf wechseln.", preset: { format: "double_elim", best_of: 3, ...solo() } },
+  { key: "racing", label: "Rennen auf Zeit", examples: "F1, Gran Turismo, Mario Kart", team: "Solo", series: "Zeitfahren oder Rennen mit Punkten", format: "ffa", notes: "Für Zeitfahren die Fast-Lap-Challenge nutzen; Rennen als freies Feld mit Platzierung.", preset: { format: "ffa", best_of: 1, ...solo() } },
+  { key: "mobile", label: "Mobil", examples: "Brawl Stars, Clash Royale", team: "1v1 bis 3v3", series: "Best of 3", format: "single_elim", notes: "Kurze Partien; Check-in besonders wichtig, weil Handys wechseln.", preset: { format: "single_elim", best_of: 3, ...solo() } },
+  { key: "party-lan", label: "Party und LAN", examples: "Mario Kart, Jackbox, Poker-Abend", team: "Solo oder Team", series: "Eine Runde oder Punkte über den Abend", format: "ffa", notes: "Vor Ort: Stationen und Check-in am Eingang; Ergebnisse trägt die Turnierleitung ein.", preset: { format: "ffa", best_of: 1, ...solo(LOCAL) } },
 ];
 
 export function formatLabel(key) {
   return GUIDE_FORMATS.find((item) => item.key === key)?.label || key;
+}
+
+/** Die Voreinstellung einer Turnierform – oder null, wenn es sie nicht gibt. */
+export function presetFor(key) {
+  const kind = GUIDE_GAME_TYPES.find((item) => item.key === key);
+  if (!kind?.preset) return null;
+  return { label: kind.label, values: Object.fromEntries(Object.entries(kind.preset).filter(([field]) => PRESET_FIELDS.includes(field))) };
+}
+
+export function presetLink(key) {
+  return `/admin/tournaments/new?preset=${encodeURIComponent(key)}`;
 }

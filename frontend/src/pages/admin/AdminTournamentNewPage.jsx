@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
+import { presetFor } from "@/lib/tournamentGuide";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -61,9 +62,13 @@ function buildPlanningWarnings(form, isTeam) {
 
 export default function AdminTournamentNewPage() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Voreinstellung aus dem Leitfaden (#368): setzt nur Format, Teamgröße, Best-of und die
+  // Spielregel-Vorgabe - alles bleibt änderbar, der Rest des Formulars ist wie immer.
+  const preset = presetFor(searchParams.get("preset") || "");
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => ({
     title: "", slug: "", description: "", game_id: "",
     platform: "", event_id: "", format: "single_elim", format_label: "",
     team_mode: "solo", team_size: 1,
@@ -86,7 +91,8 @@ export default function AdminTournamentNewPage() {
     ],
     twitch_channel: "", twitch_enabled: false, show_chat: false,
     location: "", stream_link: "", discord_link: "",
-  });
+    ...(preset?.values || {}),
+  }));
   const [saving, setSaving] = useState(false);
   const isTeam = form.team_mode === "team";
   const planningWarnings = buildPlanningWarnings(form, isTeam);
@@ -158,6 +164,11 @@ export default function AdminTournamentNewPage() {
           Titel und Spiel genügen zum Anlegen. Alles Weitere lässt sich danach in Ruhe
           einstellen — das Turnier startet als Entwurf und ist noch nicht öffentlich.
         </p>
+        {preset && (
+          <div className="mt-3 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm max-w-2xl" data-testid="new-tr-preset-hint">
+            Voreinstellung <strong className="text-white">„{preset.label}“</strong> aus dem <Link to="/admin/tournament-guide#turnierformen" className="text-[#29B6E8] hover:underline">Leitfaden</Link> übernommen: Format, Teilnahme, Best of und die Spielregel-Vorgabe sind gesetzt – alles bleibt änderbar.
+          </div>
+        )}
       </div>
       <form onSubmit={submit} className="max-w-3xl space-y-5">
         <Section title="Das Turnier" hint="Mehr als das braucht es nicht zum Anlegen — alles Weitere lässt sich danach in Ruhe einstellen.">

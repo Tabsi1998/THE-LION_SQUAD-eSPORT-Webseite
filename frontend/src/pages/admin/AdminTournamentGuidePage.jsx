@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { BookOpen, ListChecks, Gamepad2, GitBranch } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { GUIDE_FORMATS, GUIDE_GAME_TYPES, GUIDE_STEPS, formatLabel } from "@/lib/tournamentGuide";
+import { GUIDE_FORMATS, GUIDE_GAME_TYPES, GUIDE_STEPS, formatLabel, presetLink } from "@/lib/tournamentGuide";
 
 // Turnier-Leitfaden (#228, Block 16): welches Turnier man wie einstellt. Teil 1 Ablauf, Teil 2
 // nach Turnierform, Teil 3 welches Format wofür. Der Knopf „Voreinstellung übernehmen“ folgt
@@ -57,6 +57,7 @@ export default function AdminTournamentGuidePage() {
                 <th className="text-left px-4 py-3">Übliche Serie</th>
                 <th className="text-left px-4 py-3">Format hier</th>
                 <th className="text-left px-4 py-3">Besonderheit</th>
+                <th className="text-right px-4 py-3">Anlegen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -67,6 +68,15 @@ export default function AdminTournamentGuidePage() {
                   <td className="px-4 py-3 text-white/80">{kind.series}</td>
                   <td className="px-4 py-3 text-[#FFD700] whitespace-nowrap">{formatLabel(kind.format)}</td>
                   <td className="px-4 py-3 text-white/65">{kind.notes}</td>
+                  <td className="px-4 py-3 text-right">
+                    {/* Schritt 2 (#368): der Weg vom Leitfaden ins Formular - Format, Teamgröße,
+                        Best-of und Spielregel-Vorgabe gesetzt, alles bleibt änderbar. */}
+                    {kind.preset && (
+                      <Link to={presetLink(kind.key)} className="inline-flex items-center gap-1 px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" data-testid={`guide-preset-${kind.key}`}>
+                        Voreinstellung übernehmen
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
