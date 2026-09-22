@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0-beta - 2026-09-23
+
+- Mobile: „Meine Rechnungen“ unter Mehr → Konto – für alle, nicht nur Mitglieder: Event- und Turnierrechnungen mit ihrem Vorgang (Event, Datum, Personen oder Team), Filter nach Quelle und Stand, PDF per Tipp. Wer nicht Mitglied ist, bezahlt per Überweisung laut Rechnung (#320).
+
 ## 0.10.0-beta - 2026-09-23
 
 - Mobile: App-Sperre: Im Profil unter dem Zahnrad „App beim Öffnen sperren“ einschalten – dann fragt die App beim Start und nach einer Minute im Hintergrund nach Fingerabdruck, Gesicht oder Gerätesperre, bevor Chats und Profil sichtbar sind. Gilt nur auf diesem Gerät; Abmelden geht immer (#217, Stufe 1).

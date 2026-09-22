@@ -26,7 +26,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass";
+  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices";
   ownPublicProfile?: boolean;
 };
 
@@ -41,6 +41,8 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
     entries: [
       { title: "Nachrichten", icon: "chatbubbles-outline", screen: "DirectMessages" },
       { title: "Benachrichtigungen", icon: "notifications-outline", screen: "Notifications" },
+      // Meine Rechnungen (#320): für alle Konten - Event- und Turnierrechnungen auch ohne Mitgliedschaft.
+      { title: "Meine Rechnungen", icon: "receipt-outline", screen: "MyInvoices" },
       { title: "Öffentliches Profil", icon: "open-outline", ownPublicProfile: true },
     ],
   },

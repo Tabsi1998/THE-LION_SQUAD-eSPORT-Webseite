@@ -107,16 +107,23 @@ Live-Betrieb „ehemalig“ und verliert den Mitgliederzugang.
 
 ## Eigene Rechnungen (Dolibarr II)
 
-Jedes zugeordnete Konto sieht unter **Meine Mitgliedschaft → Meine Rechnungen**
-(`/account/invoices`) seine Belege aus Dolibarr: offene und überfällige oben,
-bezahlte, Gutschriften und aufgegebene im Archiv. „Ansehen“ öffnet das PDF im
-Betrachter der Website, „Bezahlen“ führt auf Dolibarrs Zahlungsseite (Stripe,
+Jedes Konto sieht unter **Konto-Menü → Meine Rechnungen** (`/account/invoices`,
+in der App unter Mehr → Konto) seine Belege aus Dolibarr: offene und überfällige
+oben, bezahlte, Gutschriften und aufgegebene im Archiv. „Ansehen“ öffnet das PDF
+im Betrachter der Website, „Bezahlen“ führt auf Dolibarrs Zahlungsseite (Stripe,
 PayPal oder was dort eingerichtet ist) – ohne zweite Anbieter-Einrichtung auf der
-Website.
+Website. Jeder Beleg trägt seine Quelle – Mitgliedsbeitrag, Event oder Turnier
+mit Datum, Personen oder Team –, und sobald es mehr als eine Quelle gibt, lässt
+sich danach filtern (Abrechnung I, #320).
 
-- **Wer sieht was:** nur das eigene Konto. Es zählt die bestätigte Zuordnung,
-  nicht der Mitgliedsstatus – Ehemalige behalten ihre alten Belege. Kein
-  Admin sieht hier fremde Rechnungen; dafür gibt es Dolibarr.
+- **Wer sieht was:** nur das eigene Konto. Mitglieder sehen alle Belege ihres
+  Mitglieds (bestätigte Zuordnung; Ehemalige behalten ihre alten Belege).
+  **Nicht-Mitglieder** sehen genau die Belege ihrer eigenen Vorgänge – Startgeld,
+  Event-Teilnahme –, einzeln nachgelesen; nie „alle Rechnungen des
+  Geschäftspartners“, denn den kann eine Familie teilen. Für diese Belege gibt
+  es keinen Online-Zahlungsweg (den kennt nur das Vereinsmodul): bezahlt wird
+  per Überweisung, die Bankdaten stehen auf der Rechnung. Kein Admin sieht hier
+  fremde Rechnungen; dafür gibt es Dolibarr.
 - **Bezahlen** prüft der Server im Moment des Klicks neu: eigener Beleg, noch
   offen, Ziel auf der eigenen Dolibarr-Installation. Keine Gutschrift, nichts
   Bezahltes, kein fremdes Ziel. Ob eine Zahlung angekommen ist, sagt Dolibarr –

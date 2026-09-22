@@ -13,7 +13,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, invoice, member  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from services import dolibarr_client  # noqa: E402
-from services.dolibarr_invoices import payment_url_allowed, summarize, view_invoice  # noqa: E402
+from services.dolibarr_invoices import payment_url_allowed, summarize, view_core_invoice, view_invoice  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 PAY = BASE_URL + "/public/payment/newpayment.php?source=invoice&ref=FA-31&securekey=abc"
@@ -108,7 +108,7 @@ async def test_only_own_invoices_across_all_pages(flow, fake, monkeypatch):
     fremd = await flow.add_user(role="player", name="fremd")
     flow.act_as(fremd)
     empty = (await flow.get("/api/account/invoices")).json()
-    assert empty == {"connected": False, "available": True, "invoices": [], "summary": {"count": 0, "open_count": 0, "open_total": 0, "overdue_count": 0}, "currency": "EUR"}
+    assert empty == {"connected": False, "available": True, "invoices": [], "summary": {"count": 0, "open_count": 0, "open_total": 0, "overdue_count": 0}, "currency": "EUR", "member": False, "sources": {}}
     _ = paula
 
 

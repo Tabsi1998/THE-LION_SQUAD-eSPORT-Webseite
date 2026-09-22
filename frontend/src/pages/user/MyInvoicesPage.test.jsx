@@ -71,5 +71,25 @@ test("bei Ausfall steht der letzte Stand da, Bezahlen ist weg", async () => {
 test("ohne Zuordnung eine Erklärung statt einer leeren Seite", async () => {
   apiMock.get.mockResolvedValue({ data: { connected: false, available: true, invoices: [], summary: { count: 0 }, currency: "EUR" } });
   renderPage();
-  expect(await screen.findByTestId("invoices-summary")).toHaveTextContent("noch keinem Mitglied");
+  expect(await screen.findByTestId("invoices-summary")).toHaveTextContent("noch keine Rechnungen zu deinem Konto");
+});
+
+test("Quelle am Beleg, Filter nach Quelle und Stand; Nicht-Mitglieder gehen zurück ins Profil (#320)", async () => {
+  const user = userEvent.setup();
+  const event = { key: "d-501", ref: "FA2609-0501", type: "standard", type_label: "Rechnung", status: "open", status_label: "offen", date: "2026-09-01", total: 40, remaining: 40, is_fee: false, can_pay: false, source: "event", source_label: "Weihnachtsfeier", booking: { name: "Weihnachtsfeier", date: "12.12.2026", seats: 2, companions: 1, team: "", players: 0 } };
+  apiMock.get.mockResolvedValue({ data: { ...DATA, member: false, sources: { club: 3, event: 1 }, invoices: [...DATA.invoices.map((row) => ({ ...row, source: "club" })), event] } });
+  renderPage();
+  expect(await screen.findByTestId("invoice-source-d-501")).toHaveTextContent("Weihnachtsfeier · 12.12.2026 · 2 Personen");
+  expect(screen.queryByTestId("invoice-source-d-31")).toBeNull();
+  expect(screen.getByText("Mein Profil")).toBeInTheDocument();
+
+  await user.click(screen.getByTestId("invoices-source-event"));
+  expect(screen.queryByTestId("invoice-d-31")).toBeNull();
+  expect(screen.getByTestId("invoice-d-501")).toBeInTheDocument();
+
+  await user.click(screen.getByTestId("invoices-source-all"));
+  await user.click(screen.getByTestId("invoices-state-paid"));
+  expect(screen.queryByTestId("invoice-d-501")).toBeNull();
+  expect(screen.getByTestId("invoice-d-30")).toBeInTheDocument();
+  expect(screen.getByTestId("invoice-d-29")).toBeInTheDocument();
 });

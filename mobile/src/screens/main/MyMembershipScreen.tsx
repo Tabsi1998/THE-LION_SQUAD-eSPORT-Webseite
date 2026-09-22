@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { InvoiceList as InvoiceRows } from "../../components/InvoiceList";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -181,27 +182,7 @@ export function MyMembershipScreen({ navigation }: Props) {
               ) : null}
               {openError ? <Muted style={styles.error}>{openError}</Muted> : null}
               {invoices.invoices.length ? (
-                invoices.invoices.map((invoice) => (
-                  <Pressable
-                    key={invoice.key}
-                    onPress={() => open(invoice)}
-                    disabled={busyKey === invoice.key}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${invoice.type_label} ${invoice.ref} öffnen`}
-                    testID={`invoice-${invoice.key}`}
-                    style={({ pressed }) => [styles.invoice, pressed && styles.pressed]}
-                  >
-                    <Ionicons name={busyKey === invoice.key ? "hourglass-outline" : "document-text-outline"} color={colors.gold} size={20} />
-                    <View style={styles.invoiceText}>
-                      <Body style={styles.invoiceTitle}>{invoice.type_label} {invoice.ref}</Body>
-                      <Muted>{[invoice.date ? formatDate(invoice.date) : "", invoice.is_fee ? "Mitgliedsbeitrag" : ""].filter(Boolean).join(" · ")}</Muted>
-                    </View>
-                    <View style={styles.invoiceRight}>
-                      <Body style={styles.invoiceAmount}>{formatMoney(invoice.total, invoices.currency)}</Body>
-                      <Badge label={invoice.status_label} tone={invoice.status === "paid" ? "ok" : invoice.overdue ? "warn" : "info"} />
-                    </View>
-                  </Pressable>
-                ))
+                <InvoiceRows invoices={invoices.invoices} currency={invoices.currency} busyKey={busyKey} onOpen={open} />
               ) : (
                 <EmptyState title="Keine Belege" detail="Sobald der Verein dir eine Rechnung stellt, erscheint sie hier." />
               )}

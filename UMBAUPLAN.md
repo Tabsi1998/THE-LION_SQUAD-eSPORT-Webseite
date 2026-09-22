@@ -468,7 +468,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). Offen: #320, #321 im Detail |
+| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). Offen: #321 im Detail |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
@@ -601,6 +601,29 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 39 — Abrechnung I, Teil 3: Eigene Rechnungen für alle
+
+### Was 39.1 gefunden hat (#320 – PR #381)
+
+**„Meine Rechnungen“ gab es nur für Mitglieder.** Der Lesedienst aus #296 holte die Belege über das
+Mitglied im Vereinsmodul. Wer kein Mitglied ist, aber ein Startgeld oder eine Event-Teilnahme
+bezahlt, bekam „nicht zugeordnet“ – obwohl die Website die Rechnung selbst angelegt hatte. Der
+Grund war kein Versehen, sondern eine Grenze: Ein Geschäftspartner in Dolibarr kann eine Familie
+sein. „Alle Rechnungen des Geschäftspartners“ wäre zu viel gewesen.
+
+**Die Website weiß, welche Belege wem gehören.** Jeder Vorgang (Block 29) trägt seinen Beleg. Genau
+diese Belege – einzeln nachgelesen, nie der Geschäftspartner im Ganzen – bekommt ein Nicht-Mitglied
+zu sehen, das PDF über Dolibarrs Dokument-API. Entwürfe gibt es nach außen nicht, gelöschte Belege
+verschwinden, und was dem Konto nicht ausdrücklich zugeordnet ist, antwortet mit 404 wie ein
+unbekannter Beleg. Online bezahlen geht dabei nicht – den Zahlungslink kennt nur das Vereinsmodul;
+die Seite sagt das und verweist auf die Überweisung laut Rechnung.
+
+**Jeder Beleg trägt seine Quelle.** Mitgliedsbeitrag, Event oder Turnier – mit Name, Datum,
+Personen oder Team – steht am Beleg, in Web und App gleich; Filter nach Quelle und Stand gibt es
+erst, wenn es mehr als eine Quelle gibt. Der Einstieg „Meine Rechnungen“ steht jetzt im Konto-Menü
+für alle, in der App unter „Mehr → Konto“; der Mitgliederbereich behält seinen Link. Was #321
+bleibt: Teilzahlung, Korrektur, Storno und Erstattung als eigene Vorgänge.
 
 ## Block 38 — App 1.0.0, Teil 1: App-Sperre, Bildgrößen, App Bundle
 
