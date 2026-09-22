@@ -118,6 +118,11 @@ class FakeDolibarr:
         self.next_id = 100
         self.write_key = API_KEY
         self.posts: list[tuple[str, dict]] = []
+        # Konditionen (#370): Wörterbücher wie in einem frischen Dolibarr, Bankkonten nur mit Recht.
+        self.payment_terms = [{"id": 1, "code": "RECEP", "label": "Sofort"}, {"id": 2, "code": "30D", "label": "30 Tage"}, {"id": 3, "code": "30DENDMONTH", "label": "30 Tage Monatsende"}]
+        self.payment_types = [{"id": 2, "code": "VIR", "label": "Banküberweisung"}, {"id": 4, "code": "LIQ", "label": "Bar"}, {"id": 6, "code": "CB", "label": "Kreditkarte"}]
+        self.bank_accounts: list[dict] = [{"id": 1, "ref": "GIRO", "label": "Girokonto", "bank": "Raiffeisen"}]
+        self.bank_readable = True
 
     def add(self, summary: dict, email: str | None = None) -> dict:
         self.members[summary["id"]] = summary
@@ -195,9 +200,19 @@ class FakeDolibarr:
             self.next_id += 1
             total = round(sum(float(l["subprice"]) * int(l["qty"]) * (1 + float(l["tva_tx"]) / 100) for l in body["lines"]), 2)
             row = {"id": self.next_id, "ref": f"(PROV{self.next_id})", "ref_ext": body.get("ref_ext"), "socid": int(body["socid"]),
-                   "statut": 0, "paye": 0, "total_ttc": total, "remaintopay": total, "lines": body["lines"], "note_public": body.get("note_public", "")}
+                   "statut": 0, "paye": 0, "total_ttc": total, "remaintopay": total, "lines": body["lines"], "note_public": body.get("note_public", ""),
+                   # Konditionen (#370): Dolibarr übernimmt sie beim Anlegen, sonst bleiben sie leer.
+                   "cond_reglement_id": body.get("cond_reglement_id"), "mode_reglement_id": body.get("mode_reglement_id"), "fk_account": body.get("fk_account")}
             self.core_invoices[row["id"]] = row
             return httpx.Response(200, json=row["id"])
+        if path == "/setup/dictionary/payment_terms" and method == "GET":
+            return httpx.Response(200, json=self.payment_terms)
+        if path == "/setup/dictionary/payment_types" and method == "GET":
+            return httpx.Response(200, json=self.payment_types)
+        if path == "/bankaccounts" and method == "GET":
+            if not self.bank_readable:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Insufficient rights"}})
+            return httpx.Response(200, json=self.bank_accounts) if self.bank_accounts else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         match = re.fullmatch(r"/invoices/(\d+)/validate", path)
         if match and method == "POST":
             row = self.core_invoices.get(int(match.group(1)))

@@ -52,6 +52,8 @@ async def person(flow, name, *, role="player", **fields):
 OFFER = {"enabled": True, "positions": [
     {"key": "beitrag", "label": "Kostenbeitrag", "description": "Essen und Getränke", "amount": "20", "basis": "per_person"},
 ]}
+# Konditionen (#370): 30 Tage (Wörterbuch 2), Banküberweisung (2), Girokonto (1) - wie im Fake.
+TERMS = {"invoice_payment_term_id": 2, "invoice_payment_mode_id": 2, "invoice_bank_account_id": 1}
 
 
 async def paid_event(flow, admin, **extra):
@@ -98,8 +100,12 @@ async def test_member_gets_the_invoice_on_the_thirdparty_of_her_membership(flow,
     assert link["thirdparty_id"] == socid, "die Nummer des Geschäftspartners wird an der Zuordnung gemerkt"
     invoice = fake.core_invoices[order["invoice_id"]]
     assert invoice["socid"] == socid and invoice["ref_ext"] == f"tls-{order['id']}"
-    assert invoice["lines"] == [{"desc": "Kostenbeitrag – Essen und Getränke", "subprice": 20.0, "qty": 2, "tva_tx": 0.0, "product_type": 1}]
+    [line] = invoice["lines"]
+    # Der Vorgang steht unter der Position (#370): Event mit Datum, Personen und Begleitperson.
+    assert line["desc"].startswith("Kostenbeitrag – Essen und Getränke\nWeihnachtsfeier am ") and line["desc"].endswith(" – 2 Personen (Paula + 1 Begleitperson)")
+    assert {k: v for k, v in line.items() if k != "desc"} == {"subprice": 20.0, "qty": 2, "tva_tx": 0.0, "product_type": 1}
     assert invoice["total_ttc"] == 40.0
+    assert invoice["cond_reglement_id"] is None, "ohne eingetragene Konditionen bleibt der Beleg, wie Dolibarr ihn vorschlägt"
     assert [p for p, _ in fake.posts] == ["/invoices"], "kein Geschäftspartner angelegt - es gab ihn"
 
     flow.act_as(paula)
@@ -109,7 +115,7 @@ async def test_member_gets_the_invoice_on_the_thirdparty_of_her_membership(flow,
 
 @pytest.mark.asyncio
 async def test_non_member_gets_a_new_thirdparty_and_a_validated_invoice_when_configured(flow, fake):
-    await connect(flow, invoice_auto_validate=True)
+    await connect(flow, invoice_auto_validate=True, **TERMS)
     kassier = await person(flow, "kassier", role="club_admin")
     event = await paid_event(flow, kassier)
     gast = await person(flow, "gast")
@@ -123,6 +129,9 @@ async def test_non_member_gets_a_new_thirdparty_and_a_validated_invoice_when_con
     assert customer["thirdparty_id"] == party["id"] and customer["source"] == "created"
     assert order["invoice_status"] == "validated" and order["invoice_ref"].startswith("FA2609-")
     assert [p for p, _ in fake.posts] == ["/thirdparties", "/invoices", f"/invoices/{order['invoice_id']}/validate"]
+    invoice = fake.core_invoices[order["invoice_id"]]
+    # Konditionen (#370) stehen am Beleg, bevor er freigegeben wird.
+    assert (invoice["cond_reglement_id"], invoice["mode_reglement_id"], invoice["fk_account"]) == (2, 2, 1)
 
     # Zweite Buchung derselben Person: derselbe Geschäftspartner, kein zweiter Kunde.
     event2 = await paid_event(flow, kassier)

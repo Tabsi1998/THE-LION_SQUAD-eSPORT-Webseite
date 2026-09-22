@@ -15,15 +15,23 @@ Ablauf je Auftrag (``billing_orders``, Status ``pending``/``ready``/``waiting_*`
    Anmeldung. Dolibarr ist führend für den Beleg; die Website für die Buchung.
 
 Kein Löschen, keine Zahlungen buchen, keine zweite Rechnung für denselben Auftrag.
+
+**Konditionen und Texte (#370):** Jeder Beleg trägt Zahlungsziel, Zahlungsart und Bankkonto aus den
+Dolibarr-Einstellungen (``invoice_terms``) - ohne die drei bleibt er Entwurf, auch wenn „gleich
+freigeben“ an ist. Jede Zeile nennt den Vorgang (Event oder Turnier mit Datum, Personen und
+Begleitpersonen, Team), damit die Rechnung für den Kunden lesbar ist und nicht nur „Leistung“.
+Die Finanzverwaltung kann je Auftrag einen Zusatztext ergänzen, solange kein Beleg existiert.
 """
 from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime
 
 from models import new_id, now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key
 from services.dolibarr_links import verified_link
+from services.dolibarr_policy import CLUB_TZ
 
 logger = logging.getLogger("tls.billing.dolibarr")
 
@@ -52,34 +60,154 @@ def tax_rate_for(settings: dict, profile: str) -> float:
     return rates.get(profile or "none", 0.0)
 
 
-def invoice_lines(snapshot: dict, settings: dict) -> list[dict]:
+# ---------------------------------------------------------------- Konditionen (#370)
+
+TERM_FIELDS = ("invoice_payment_term_id", "invoice_payment_mode_id", "invoice_bank_account_id")
+# Dolibarrs Wörterbuch-Codes für die Vorgaben des Vereins: 30 Tage, Banküberweisung.
+DEFAULT_TERM_CODE = "30D"
+DEFAULT_MODE_CODE = "VIR"
+MAX_DESC = 1000
+MAX_EXTRA_TEXT = 500
+
+
+def invoice_terms(settings: dict) -> dict:
+    """Zahlungsziel, Zahlungsart, Bankkonto - als Dolibarr-Felder des Belegs. Nur gesetzte Werte."""
+    def number(key: str) -> int | None:
+        try:
+            value = int(settings.get(key) or 0)
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
+    term, mode, account = (number(key) for key in TERM_FIELDS)
+    payload = {}
+    if term:
+        payload["cond_reglement_id"] = term
+    if mode:
+        payload["mode_reglement_id"] = mode
+    if account:
+        payload["fk_account"] = account
+    return payload
+
+
+def terms_complete(settings: dict) -> bool:
+    """Ohne die drei Konditionen wird kein Beleg automatisch freigegeben (#370)."""
+    return len(invoice_terms(settings)) == 3
+
+
+# ---------------------------------------------------------------- Texte (#370)
+
+def _club_date(value) -> str:
+    """„31.10.2026“ am Wiener Tag - oder leer."""
+    if not value:
+        return ""
+    try:
+        moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(CLUB_TZ)
+    return moment.strftime("%d.%m.%Y")
+
+
+async def booking_facts(db, order: dict) -> dict:
+    """Was vom Vorgang auf die Rechnung gehört: Name und Datum des Events oder Turniers, die Person,
+    Personen und Begleitpersonen (Event), Team und Spielerzahl (Turnier)."""
+    snapshot = order.get("snapshot") or {}
+    recipient = snapshot.get("recipient") or {}
+    facts = {"kind": order.get("kind"), "name": "", "date": "", "person": recipient.get("display_name") or "",
+             "seats": 1, "companions": 0, "team": "", "players": 0}
+    if order.get("kind") == "event":
+        event = await db.events.find_one({"id": order.get("source_id")}, {"_id": 0, "name": 1, "start_date": 1})
+        registration = await db.event_registrations.find_one({"id": order.get("registration_id")}, {"_id": 0, "companion_count": 1, "seat_count": 1})
+        facts["name"] = (event or {}).get("name") or "Event"
+        facts["date"] = _club_date((event or {}).get("start_date"))
+        companions = max(0, int((registration or {}).get("companion_count") or 0))
+        facts["companions"] = companions
+        facts["seats"] = max(1, int((registration or {}).get("seat_count") or (1 + companions)))
+    elif order.get("kind") == "tournament":
+        tournament = await db.tournaments.find_one({"id": order.get("source_id")}, {"_id": 0, "title": 1, "start_date": 1})
+        facts["name"] = (tournament or {}).get("title") or "Turnier"
+        facts["date"] = _club_date((tournament or {}).get("start_date"))
+        facts["team"] = (snapshot.get("source") or {}).get("display_name") or ""
+        per_person = [int(line.get("quantity") or 1) for line in snapshot.get("positions") or [] if line.get("basis") == "per_person"]
+        facts["players"] = max(per_person) if per_person else 0
+    return facts
+
+
+def source_label(facts: dict) -> str:
+    """„Startgeld Herbst-Cup – Team Lions“ oder „Vereinsausflug“ - der Vorgang in einem Wort."""
+    if facts.get("kind") == "tournament":
+        return f"Startgeld {facts.get('name') or 'Turnier'}" + (f" – {facts['team']}" if facts.get("team") else "")
+    return facts.get("name") or "Event"
+
+
+def line_context(facts: dict, line: dict) -> str:
+    """Der Satz unter der Position, der die Rechnung lesbar macht:
+    „Vereinsausflug am 31.10.2026 – 2 Personen (Paula Muster + 1 Begleitperson)“."""
+    head = facts.get("name") or ""
+    if facts.get("date"):
+        head = f"{head} am {facts['date']}"
+    quantity = int(line.get("quantity") or 1)
+    per_person = line.get("basis") == "per_person"
+    person = facts.get("person") or ""
+    if facts.get("kind") == "tournament":
+        team = f"Team {facts['team']}" if facts.get("team") else person
+        who = f"{team}, {quantity} Spieler" if per_person and quantity > 1 else team
+    elif per_person and quantity > 1:
+        companions = int(facts.get("companions") or 0)
+        extra = f" + {companions} Begleitperson{'' if companions == 1 else 'en'}" if companions else ""
+        who = f"{quantity} Personen ({person}{extra})" if person else f"{quantity} Personen"
+    else:
+        who = person
+    return f"{head} – {who}" if who else head
+
+
+def invoice_lines(snapshot: dict, settings: dict, facts: dict | None = None, extra_text: str = "") -> list[dict]:
     """Positionen des Snapshots als Dolibarr-Rechnungszeilen. Beträge sind Brutto; ohne Steuer ist
     netto = brutto. Mit Steuerprofil wird der Nettopreis auf sechs Stellen gerechnet - Dolibarr
-    rundet den Bruttobetrag selbst, deshalb bleibt der Entwurf zur Prüfung."""
+    rundet den Bruttobetrag selbst, deshalb bleibt der Entwurf zur Prüfung.
+
+    Jede Zeile: Bezeichnung – Beschreibung, darunter der Vorgang (#370); der Zusatztext der
+    Finanzverwaltung steht unter der ersten Zeile."""
     lines = []
-    for line in snapshot.get("positions") or []:
+    for index, line in enumerate(snapshot.get("positions") or []):
         gross = int(line.get("unit_cents") or 0) / 100
         rate = tax_rate_for(settings, line.get("tax_profile") or "none")
         net = gross if rate == 0 else round(gross / (1 + rate / 100), 6)
         desc = line.get("label") or "Position"
         if line.get("description"):
             desc = f"{desc} – {line['description']}"
-        entry = {"desc": desc[:255], "subprice": net, "qty": int(line.get("quantity") or 1), "tva_tx": rate, "product_type": 1}
+        if facts:
+            context = line_context(facts, line)
+            if context:
+                desc = f"{desc}\n{context}"
+        if index == 0 and (extra_text or "").strip():
+            desc = f"{desc}\n{extra_text.strip()}"
+        entry = {"desc": desc[:MAX_DESC], "subprice": net, "qty": int(line.get("quantity") or 1), "tva_tx": rate, "product_type": 1}
         if line.get("dolibarr_product_id"):
             entry["fk_product"] = int(line["dolibarr_product_id"])
         lines.append(entry)
     return lines
 
 
-def invoice_payload(order: dict, socid: int, settings: dict, *, source_name: str, person: str) -> dict:
+def invoice_text_preview(order: dict, settings: dict, facts: dict) -> list[str]:
+    """Die Zeilentexte, wie sie auf den Beleg kämen - für die Finanzübersicht vor dem Anlegen."""
+    return [line["desc"] for line in invoice_lines(order.get("snapshot") or {}, settings, facts, order.get("invoice_extra_text") or "")]
+
+
+def invoice_payload(order: dict, socid: int, settings: dict, *, facts: dict, person: str) -> dict:
     snapshot = order.get("snapshot") or {}
+    note = f"Anmeldung: {source_label(facts)} – {person}"
+    if (order.get("invoice_extra_text") or "").strip():
+        note = f"{note}\n{order['invoice_extra_text'].strip()}"
     return {
         "socid": int(socid),
         "type": 0,
         "date": int(time.time()),
         "ref_ext": ref_ext_for(order),
-        "note_public": f"Anmeldung: {source_name} – {person}"[:255],
-        "lines": invoice_lines(snapshot, settings),
+        "note_public": note[:MAX_DESC],
+        "lines": invoice_lines(snapshot, settings, facts, order.get("invoice_extra_text") or ""),
+        **invoice_terms(settings),
     }
 
 
@@ -207,19 +335,15 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     if existing:
         invoice = await client.invoice(int(existing[0]["id"]))
         return _invoice_state(invoice)
-    source_name = order.get("source_name") or ""
-    if order.get("kind") == "event" and not source_name:
-        event = await db.events.find_one({"id": order["source_id"]}, {"_id": 0, "name": 1})
-        source_name = (event or {}).get("name") or "Event"
-    if order.get("kind") == "tournament" and not source_name:
-        tournament = await db.tournaments.find_one({"id": order["source_id"]}, {"_id": 0, "title": 1})
-        team = (order.get("snapshot") or {}).get("source", {}).get("display_name")
-        source_name = f"Startgeld {(tournament or {}).get('title') or 'Turnier'}" + (f" – {team}" if team else "")
-    payload = invoice_payload(order, socid, settings, source_name=source_name, person=user.get("display_name") or user.get("username") or "")
+    facts = await booking_facts(db, order)
+    if not facts.get("person"):
+        facts["person"] = user.get("display_name") or user.get("username") or ""
+    payload = invoice_payload(order, socid, settings, facts=facts, person=user.get("display_name") or user.get("username") or "")
     invoice_id = await client.create_invoice(payload)
     # Sofort merken: Ab hier gibt es den Beleg - ein Abbruch darf keinen zweiten erzeugen.
     await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"invoice_id": invoice_id, "thirdparty_id": socid, "updated_at": now_utc().isoformat()}})
-    if settings.get("invoice_auto_validate"):
+    # Freigeben nur mit vollständigen Konditionen (#370) - sonst bleibt der Beleg Entwurf zur Prüfung.
+    if settings.get("invoice_auto_validate") and terms_complete(settings):
         await client.validate_invoice(invoice_id)
     invoice = await client.invoice(invoice_id)
     return _invoice_state(invoice)

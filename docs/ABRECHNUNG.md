@@ -64,6 +64,26 @@ prüfen“ in der Finanzübersicht läuft sofort statt in zwei Minuten.
    in Dolibarr gebucht – die Website zeigt es der Person an der Anmeldung und dem Kassier in der
    Finanzübersicht.
 
+**Konditionen und Text auf dem Beleg (#370).** Jeder Beleg bekommt beim Anlegen Zahlungsziel,
+Zahlungsart und Bankkonto aus Admin → Dolibarr → „Schreibzugriff“ → Rechnungskonditionen. Die
+Listen kommen aus Dolibarr (Vorschlag: 30 Tage, Banküberweisung; das Konto, wenn es nur eines
+gibt). Darf der Website-Benutzer die Konten nicht lesen, tragt ihr die Nummer aus Dolibarr ein
+(Adresszeile des Kontos, „id=…“). **Ohne alle drei bleibt jeder Beleg Entwurf**, auch wenn „gleich
+freigeben“ an ist – der Haken lässt sich erst setzen, wenn die drei da sind.
+
+Jede Rechnungszeile nennt den Vorgang, nicht nur die Leistung:
+
+```
+Kostenbeitrag – Essen und Getränke
+Weihnachtsfeier am 12.12.2026 – 2 Personen (Paula Beispiel + 1 Begleitperson)
+```
+
+Beim Turnier: „Herbst-Cup am 02.10.2026 – Team [TLS] Lions, 5 Spieler“. In der Finanzübersicht
+steht der Text bei jedem offenen Auftrag („Rechnungstext“), und ihr könnt einen **Zusatz**
+ergänzen (z. B. „Tisch 4 reserviert“, „Menü vegetarisch“) – er kommt unter die erste Zeile und
+in die öffentliche Notiz des Belegs. Sobald der Beleg existiert, wird der Text in Dolibarr
+geändert, nicht mehr hier.
+
 **Ein Turnier kann Startgeld kosten (Abrechnung II).** Unter Admin → Turniere → Turnier →
 Bearbeiten gibt es den Abschnitt „Startgeld“ – wieder nur für den Bereich **Finanzen**, mit
 denselben Positionen und Leistungen aus Dolibarr wie beim Event. Zwei Dinge sind anders:
@@ -103,18 +123,23 @@ und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
    - Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner und
      deren Objekte erweitern“ – sonst darf er für niemanden eine Rechnung anlegen.
    - Rechnungen: einsehen, erstellen/bearbeiten. **Nicht:** Zahlungen erstellen, löschen.
-   - Produkte und Leistungen: einsehen. Mitglieder: einsehen.
+   - Produkte und Leistungen: einsehen. Mitglieder: einsehen. Bank: einsehen (für die Kontenliste
+     bei den Rechnungskonditionen – sonst Nummer eintippen).
    - Vereine (Österreich): die vier Rechte des Moduls, darunter „Mitglieder und Geschäftspartner
      verknüpfen und abgleichen“.
 2. Admin → Dolibarr → „Schreibzugriff für Rechnungen“: Haken **Schreibzugriff einschalten**.
    Der Modus muss auf „Live“ stehen. Ohne Haken schreibt die Website nichts.
-3. Haken **Rechnungen gleich freigeben** erst setzen, wenn ein paar Entwürfe in Dolibarr geprüft
-   sind und die Zeilen stimmen (Steuer, Leistung, Text).
-4. Steuer: Das Steuerprofil je Position („ohne Umsatzsteuer“, „Normalsatz“, „ermäßigt“) ist ein
+3. Dort **Rechnungskonditionen** eintragen: Zahlungsziel 30 Tage, Zahlungsart Banküberweisung,
+   Bankkonto Girokonto („Vorschlag übernehmen“, Konto prüfen). Fehlt die Kontenliste, dem
+   Website-Benutzer das Recht „Bank: einsehen“ geben oder die Nummer eintippen.
+4. Haken **Rechnungen gleich freigeben** erst setzen, wenn ein paar Entwürfe in Dolibarr geprüft
+   sind und die Zeilen stimmen (Steuer, Leistung, Text). Er geht erst mit vollständigen
+   Konditionen.
+5. Steuer: Das Steuerprofil je Position („ohne Umsatzsteuer“, „Normalsatz“, „ermäßigt“) ist ein
    Buchhaltungsentscheid. Für einen gemeinnützigen Verein ohne Umsatzsteuerpflicht bleibt es bei
    „ohne Umsatzsteuer“ – im Zweifel den Steuerberater fragen. Mit Steuer rechnet die Website den
    Nettopreis aus dem Bruttobetrag; Dolibarr rundet selbst – deshalb erst Entwürfe prüfen.
-5. Optional bleibt ein eigener Schlüssel eines zweiten Benutzers möglich (Admin → Dolibarr →
+6. Optional bleibt ein eigener Schlüssel eines zweiten Benutzers möglich (Admin → Dolibarr →
    „Optional: eigener Schlüssel“).
 
 ## Wer darf was

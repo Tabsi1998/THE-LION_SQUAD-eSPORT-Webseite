@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_area, require_super
 from database import get_db
 from models import new_id, now_utc
+from services.dolibarr_billing import DEFAULT_MODE_CODE, DEFAULT_TERM_CODE, TERM_FIELDS, terms_complete
 from services.dolibarr_client import (
     ENVIRONMENTS, MODES, SETTINGS_ID, DolibarrClient, DolibarrError, capabilities_for, clean_base_url, load_settings,
     write_capable,
@@ -70,6 +71,13 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "write_enabled": bool(settings.get("write_enabled")),
         "write_capable": write_capable(settings),
         "invoice_auto_validate": bool(settings.get("invoice_auto_validate")),
+        # Konditionen (#370): ohne die drei bleibt jeder Beleg Entwurf.
+        "invoice_terms": {
+            "payment_term_id": settings.get("invoice_payment_term_id") or None,
+            "payment_mode_id": settings.get("invoice_payment_mode_id") or None,
+            "bank_account_id": settings.get("invoice_bank_account_id") or None,
+            "complete": terms_complete(settings),
+        },
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "type_map": settings.get("type_map") or {},
@@ -99,6 +107,10 @@ class DolibarrSettingsUpdate(BaseModel):
     write_enabled: bool | None = None
     # Rechnungen gleich freigeben - oder als Entwurf zur Prüfung lassen (sichere Erstinbetriebnahme, #317).
     invoice_auto_validate: bool | None = None
+    # Konditionen (#370): Dolibarr-Nummern aus den Wörterbüchern und der Kontenliste; 0 löscht.
+    invoice_payment_term_id: int | None = Field(None, ge=0, le=999999)
+    invoice_payment_mode_id: int | None = Field(None, ge=0, le=999999)
+    invoice_bank_account_id: int | None = Field(None, ge=0, le=999999)
     instance: str | None = Field(None, max_length=60)
     entity: int | None = Field(None, ge=1, le=9999)
     auto_link_verified_email: bool | None = None
@@ -134,7 +146,12 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key") or data.get("api_key") or current.get("api_key")):
             raise HTTPException(400, "Schreibzugriff braucht einen API-Schlüssel (der des Website-Benutzers reicht).")
         updates["write_enabled"] = bool(data["write_enabled"])
+    for key in TERM_FIELDS:
+        if key in data:
+            updates[key] = int(data[key]) if data[key] else None
     if "invoice_auto_validate" in data:
+        if data["invoice_auto_validate"] and not terms_complete({**current, **updates}):
+            raise HTTPException(400, "Zum automatischen Freigeben braucht es Zahlungsziel, Zahlungsart und Bankkonto (unten eintragen).")
         updates["invoice_auto_validate"] = bool(data["invoice_auto_validate"])
     if "instance" in data:
         updates["instance"] = (data["instance"] or "").strip()
@@ -182,6 +199,46 @@ async def clear_dolibarr_key(me: dict = Depends(require_area("system"))):
     await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"api_key": "", "mode": "off", "updated_at": now_utc().isoformat()}})
     await _audit(me["id"], "dolibarr.key_removed", SETTINGS_ID)
     return {"ok": True}
+
+
+@admin_router.get("/invoice-options")
+async def invoice_options(me: dict = Depends(require_area("system"))):
+    """Konditionen (#370) zum Auswählen: Zahlungsziele und Zahlungsarten aus den Wörterbüchern,
+    Bankkonten aus der Kontenliste. Darf der Website-Benutzer eine Liste nicht lesen, ist sie
+    ``null`` - dann wird die Nummer eingetippt. Vorschlag: 30 Tage, Banküberweisung."""
+    db = get_db()
+    settings = await load_settings(db)
+    if settings.get("mode") == "off":
+        return {"available": False, "reason": "not_connected", "terms": None, "modes": None, "accounts": None, "suggested": {}}
+    client = DolibarrClient(settings)
+
+    async def view(rows: list[dict] | None, label_keys: tuple[str, ...]) -> list[dict] | None:
+        if rows is None:
+            return None
+        out = []
+        for row in rows:
+            try:
+                row_id = int(row.get("id") or row.get("rowid") or 0)
+            except (TypeError, ValueError):
+                continue
+            if row_id < 1:
+                continue
+            label = next((str(row[key]) for key in label_keys if row.get(key)), "") or f"Nr. {row_id}"
+            out.append({"id": row_id, "code": str(row.get("code") or row.get("ref") or ""), "label": label})
+        return out
+
+    try:
+        terms = await view(await client.payment_terms(), ("label", "libelle_facture", "libelle"))
+        modes = await view(await client.payment_types(), ("label", "libelle"))
+        accounts = await view(await client.bank_accounts(), ("label", "ref", "bank"))
+    except DolibarrError as exc:
+        return {"available": False, "reason": exc.kind, "reason_text": exc.text, "terms": None, "modes": None, "accounts": None, "suggested": {}}
+    suggested = {
+        "payment_term_id": next((row["id"] for row in terms or [] if row["code"] == DEFAULT_TERM_CODE), None),
+        "payment_mode_id": next((row["id"] for row in modes or [] if row["code"] == DEFAULT_MODE_CODE), None),
+        "bank_account_id": accounts[0]["id"] if accounts and len(accounts) == 1 else None,
+    }
+    return {"available": True, "terms": terms, "modes": modes, "accounts": accounts, "suggested": suggested}
 
 
 @admin_router.post("/test")

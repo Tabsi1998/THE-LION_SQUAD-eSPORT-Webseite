@@ -318,6 +318,28 @@ class DolibarrClient:
         data = await self._send("POST", "/invoices", payload)
         return _as_id(data)
 
+    # ------------------------------------------------ Konditionen (#370): Wörterbücher und Konten
+    async def _rows(self, path: str, params: dict) -> list[dict] | None:
+        """Eine Liste - oder None, wenn der Website-Benutzer sie nicht lesen darf (dann Nummer tippen)."""
+        try:
+            data = await self._get(path, params)
+        except DolibarrError as exc:
+            if exc.kind == "not_found":
+                return []
+            if exc.kind in ("forbidden", "unauthorized"):
+                return None
+            raise
+        return [row for row in data if isinstance(row, dict)] if isinstance(data, list) else []
+
+    async def payment_terms(self) -> list[dict] | None:
+        return await self._rows("/setup/dictionary/payment_terms", {"sortfield": "sortorder", "sortorder": "ASC", "limit": 100, "active": 1})
+
+    async def payment_types(self) -> list[dict] | None:
+        return await self._rows("/setup/dictionary/payment_types", {"sortfield": "id", "sortorder": "ASC", "limit": 100, "active": 1})
+
+    async def bank_accounts(self) -> list[dict] | None:
+        return await self._rows("/bankaccounts", {"sortfield": "t.rowid", "sortorder": "ASC", "limit": 100})
+
     async def validate_invoice(self, invoice_id: int) -> dict:
         data = await self._send("POST", f"/invoices/{int(invoice_id)}/validate", {"idwarehouse": 0, "notrigger": 0})
         return data if isinstance(data, dict) else {}

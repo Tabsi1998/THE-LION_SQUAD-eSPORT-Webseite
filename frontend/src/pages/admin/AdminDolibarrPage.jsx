@@ -5,6 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { InvoiceTermsPanel } from "@/components/tls/InvoiceTermsPanel";
 import { CAPABILITY_LABELS, DOLIBARR_STATUS_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate, needsManualChoice, splitWithoutAccount } from "@/lib/dolibarr";
 
 // Dolibarr (#316, #295, #297, #330). Wer was sieht: Verbindung und Schlüssel nur
@@ -405,9 +406,10 @@ export default function AdminDolibarrPage() {
                   Schreibzugriff einschalten (Kunden und Rechnungen anlegen)
                 </label>
                 <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
-                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr)
+                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy || (!status?.invoice_auto_validate && !status?.invoice_terms?.complete)} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
+                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr){!status?.invoice_terms?.complete && <span className="text-xs text-[#FFD700]"> – erst mit vollständigen Konditionen</span>}
                 </label>
+                <InvoiceTermsPanel terms={status?.invoice_terms} connected={Boolean(status && status.mode !== "off")} busy={busy} onSave={(payload) => saveSettings(payload, "Rechnungskonditionen gespeichert.")} />
                 <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>
                   <ul className="list-disc pl-5 mt-2 space-y-1">

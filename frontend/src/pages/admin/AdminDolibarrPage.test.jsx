@@ -144,3 +144,34 @@ test("Beendete stehen getrennt, und ein Konto lässt sich von Hand zuordnen", as
   await user.click(screen.getByTestId("dolibarr-preview-familie").querySelector("button"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/links", { user_id: "u2", member_id: 17 }));
 });
+
+// Rechnungskonditionen (#370): Listen aus Dolibarr, Vorschlag „30 Tage, Überweisung“, und ohne
+// alle drei bleibt „gleich freigeben“ gesperrt - Belege wären sonst Entwürfe ohne Zahlungsziel.
+test("Konditionen kommen als Listen aus Dolibarr, der Vorschlag füllt sie, und Freigeben braucht alle drei", async () => {
+  authState.areas = ["system"];
+  const OPTIONS = {
+    available: true,
+    terms: [{ id: 1, code: "RECEP", label: "Sofort" }, { id: 2, code: "30D", label: "30 Tage" }],
+    modes: [{ id: 2, code: "VIR", label: "Banküberweisung" }, { id: 4, code: "LIQ", label: "Bar" }],
+    accounts: null,
+    suggested: { payment_term_id: 2, payment_mode_id: 2, bank_account_id: null },
+  };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/dolibarr/status") return { data: { ...STATUS, mode: "live", write_enabled: true, invoice_terms: { payment_term_id: null, payment_mode_id: null, bank_account_id: null, complete: false } } };
+    if (url === "/admin/dolibarr/invoice-options") return { data: OPTIONS };
+    throw new Error(url);
+  });
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  expect(await screen.findByTestId("invoice-terms-state")).toHaveTextContent("unvollständig");
+  expect(screen.getByTestId("dolibarr-invoice-auto-validate")).toBeDisabled();
+
+  await user.click(await screen.findByTestId("invoice-terms-suggest"));
+  expect(screen.getByTestId("invoice-terms-payment_term_id")).toHaveValue("2");
+  expect(screen.getByTestId("invoice-terms-payment_mode_id")).toHaveValue("2");
+  // Konten darf der Website-Benutzer nicht lesen: die Nummer wird getippt.
+  await user.type(screen.getByTestId("invoice-terms-bank_account_id"), "1");
+  await user.click(screen.getByTestId("invoice-terms-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { invoice_payment_term_id: 2, invoice_payment_mode_id: 2, invoice_bank_account_id: 1 }));
+});
