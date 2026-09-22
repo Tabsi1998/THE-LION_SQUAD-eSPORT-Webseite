@@ -467,7 +467,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
-| Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv und Zahlungsweg aus Dolibarr, #325 ein PDF-Betrachter für Web und App. Baubar, dolibarr-vereine#50 ist fertig |
+| Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314, erster Durchstich: #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
@@ -708,6 +708,26 @@ Die Vorschau sagte „nur von Hand zuordnen“, aber von Hand ging nirgends; Kon
 unbestätigter E-Mail wurden gar nicht gesucht; beendete Mitgliedschaften standen zwischen den
 aktiven. Und ein Fund für „wer sieht was“: Das Admin-Feld heißt „Interne Notizen“, „Meine
 Mitgliedschaft“ zeigte sie dem Mitglied aber an – `/api/membership/me` liefert sie nicht mehr aus.
+
+### Was 24.3 gefunden hat (#296, #325 – PR #356)
+
+**Der Zahlungslink gehört nicht in die Liste.** Dolibarr liefert je Rechnung eine Zahlungs-URL
+mit Sicherheitsschlüssel. Stünde sie in der Antwort der Liste, läge sie in jedem Browser-Speicher
+und jeder Ausfall-Kopie. Sie bleibt am Server; wer klickt, bekommt sie frisch – geprüft auf
+eigenen Beleg, noch offen, https und die eigene Installation. Ein Beleg, der zwischen Anzeige und
+Klick bezahlt wurde, wird abgelehnt.
+
+**Ein Ausfall darf nicht wie „nichts offen“ aussehen.** Antwortet Dolibarr nicht, zeigt die Seite
+den letzten Stand mit Datum, aber ohne Bezahlen – bezahlt wird nur gegen frische Daten.
+
+**Kein 303 für eine API.** Die Zahlungsweiterleitung war zuerst eine Weiterleitung; der API-Client
+im Browser hätte sie als fremden Aufruf verfolgt und wäre an CORS gescheitert, ein HTML-Formular
+kann den CSRF-Header nicht setzen. Der Server nennt das Ziel als JSON, der Browser wechselt die
+Seite selbst.
+
+**PDFs im eigenen Haus.** pdf.js liegt lokal im Bundle samt Worker und wird erst geladen, wenn
+jemand ein Dokument öffnet. Nichts geht an einen fremden Betrachter; der Service Worker cacht
+nichts unter `/api/`. Vereinsdokumente öffnen im selben Betrachter statt in einem neuen Tab.
 
 **Was offen bleibt:** #316 für die Kundenanlage bei kostenpflichtigen Buchungen (Abrechnung I),
 #330 für die Durchläufe der späteren Pakete (Dolibarr III), die App-Seite „Meine Mitgliedschaft“

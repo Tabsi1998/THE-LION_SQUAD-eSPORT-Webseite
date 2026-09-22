@@ -129,6 +129,23 @@ Seit dem 15. September gilt:
   Sammlung `ops_vitals` TTL 30 Tage), Auswertung p50/p75 je Route.
   Admin-Endpunkte `/api/admin/ops/vitals`, `/checks`, `POST /checks/run`;
   `ops_summary` trägt `checks` für die Tageszentrale.
+- Dolibarr II (#296, #325; PR #356). `services/dolibarr_invoices.py`:
+  `list_invoices` (alle Seiten über `client.member_invoices`, Sicht ohne
+  `payment_url`; Ausfall → letzter Stand aus `dolibarr_invoice_cache`, TTL 14 d,
+  `can_pay` dann false), `invoice_pdf` (Bytes unverändert, `%PDF`-Prüfung,
+  SHA-256, nie gespeichert), `payment_target` (frisch gelesen, `can_pay`,
+  `payment_url_allowed` = https + Host der eigenen Installation),
+  `forget_cache`. Zugriff nur über `verified_link` des angemeldeten Kontos –
+  Status egal, Mitglieds-ID nie aus der Anfrage. Routen `routes/invoice_routes.py`:
+  `GET /api/account/invoices`, `GET …/{key}/pdf[?download=1]` (`Cache-Control:
+  no-store`, `X-Content-SHA256`), `POST …/{key}/pay` → `{url}` (kein 303: der
+  API-Client würde die Weiterleitung als fremden Aufruf verfolgen). Schlüssel
+  `d-<id>`. Anonymisierung und Lösen der Zuordnung leeren den Cache. Web:
+  `pages/user/MyInvoicesPage.jsx`, `lib/invoices.js`, PDF-Betrachter
+  `components/tls/DocumentViewer.jsx` + `lib/pdfViewer.js` (pdf.js `pdfjs-dist`
+  lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
+  `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
+  DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
 - App 0.6.0-beta (#218, PR #354, Build 64): `mobile/src/lib/achievements.ts` –
   `achievementIcon` (Lucide-Name des Katalogs → Ionicon, sonst nach Kategorie,
   sonst Pokal; der Typ `IoniconName` prüft jeden Namen), `groupProgress` („3 von
@@ -584,18 +601,17 @@ braucht.
 
 ## 9. Aktueller Stand (21. September 2026)
 
-### Gemergt zuletzt (16.–21. September)
+### Gemergt zuletzt (16.–22. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
 (#265 Betrieb II), #304 (App 0.5.0-beta), #306/#308 (Release-Upload), #332
 (#287–#292 Rollen und Rechte), #336 (#333–#335 Aufräumen), #311–#313
 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
 #349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
-Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen). `main` steht
-auf `fd6b6fb`.
+Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
+0.6.0-beta, #355 Tagesgrenze). `main` steht auf `5621ed5`.
 
 ### Offene PRs
-- #354 (App 0.6.0-beta: #218). Nach dem Merge baut und veröffentlicht Claude
-  Build 64 und legt die APK am Vereinsserver ab.
+- #356 (Dolibarr II: #296, #325). Nach dem Merge `update.sh`.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -606,8 +622,9 @@ auf `fd6b6fb`.
   **Build 63** (`mobile-v0.5.0-beta-build63`, Commit 0b6bc11, am 16.09. vom
   Haupt-PC gebaut, APK-SHA-256 beginnt mit `dc235dff`; #249–#251, #277). Die
   APK liegt seit 16.09. auch am Vereinsserver (nach #306/#308 mit
-  `-- --upload-only` nachgereicht). **Build 64** (`0.6.0-beta`, #218) ist
-  vorbereitet und wird nach dem Merge gebaut. Danach ist der nächste Build 65.
+  `-- --upload-only` nachgereicht), **Build 64** (`mobile-v0.6.0-beta-build64`,
+  Commit 5621ed5, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
+  `44959a8c`; #218), am Vereinsserver abgelegt. Nächster Build ist 65.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -630,7 +647,7 @@ auf `fd6b6fb`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (46 offen nach dem Merge von #354)
+### Meilensteine und offene Issues (44 offen nach dem Merge von #356)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -640,7 +657,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | --- | --- |
 | Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
-| Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web und App – baubar (dolibarr-vereine#50 ist fertig) |
+| Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | #315 Preis- und Buchungsmodell, #316 Rest: Geschäftspartner-Zuordnung und Kundenanlage bei Buchung (Adapter und Konto-Zuordnung sind fertig), #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
 | Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
@@ -673,8 +690,8 @@ sinnvoll hältst“):
 3. Discord I – umgesetzt in #350 (ein PR für den Meilenstein).
 4. Web: Anmeldung und Teilen – umgesetzt in #353. App 0.6.0-beta – umgesetzt in
    #354, Build 64 nach dem Merge.
-5. Dolibarr II (#296, #325), danach App: Mitgliederbereich (#340, #339, #341,
-   #342) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
+5. Dolibarr II – umgesetzt in #356. Danach App: Mitgliederbereich (#340, #339,
+   #341, #342, #346) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
 6. Web: Dynamik.
 7. Abrechnung I, danach Admin und Turniere (#203/#204 berühren dieselben
    Event-Formulare wie #318 – zusammen planen), App 0.7.0-beta.
