@@ -22,6 +22,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.dolibarr_client import (
     ENVIRONMENTS, MODES, SETTINGS_ID, DolibarrClient, DolibarrError, capabilities_for, clean_base_url, load_settings,
+    write_capable,
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
@@ -67,6 +68,8 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "api_key_configured": secret_is_configured(settings.get("api_key")),
         "write_api_key_configured": secret_is_configured(settings.get("write_api_key")),
         "write_enabled": bool(settings.get("write_enabled")),
+        "write_capable": write_capable(settings),
+        "invoice_auto_validate": bool(settings.get("invoice_auto_validate")),
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
         "type_map": settings.get("type_map") or {},
@@ -94,6 +97,8 @@ class DolibarrSettingsUpdate(BaseModel):
     # und Rechnungen - getrennt vom Lese-Schlüssel, getrennt einschaltbar.
     write_api_key: str | None = Field(None, max_length=300)
     write_enabled: bool | None = None
+    # Rechnungen gleich freigeben - oder als Entwurf zur Prüfung lassen (sichere Erstinbetriebnahme, #317).
+    invoice_auto_validate: bool | None = None
     instance: str | None = Field(None, max_length=60)
     entity: int | None = Field(None, ge=1, le=9999)
     auto_link_verified_email: bool | None = None
@@ -126,9 +131,11 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
     if data.get("write_api_key"):
         updates["write_api_key"] = encrypt_secret(data["write_api_key"].strip())
     if "write_enabled" in data:
-        if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key")):
-            raise HTTPException(400, "Schreibzugriff braucht einen eigenen API-Schlüssel.")
+        if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key") or data.get("api_key") or current.get("api_key")):
+            raise HTTPException(400, "Schreibzugriff braucht einen API-Schlüssel (der des Website-Benutzers reicht).")
         updates["write_enabled"] = bool(data["write_enabled"])
+    if "invoice_auto_validate" in data:
+        updates["invoice_auto_validate"] = bool(data["invoice_auto_validate"])
     if "instance" in data:
         updates["instance"] = (data["instance"] or "").strip()
     if "entity" in data and data["entity"]:

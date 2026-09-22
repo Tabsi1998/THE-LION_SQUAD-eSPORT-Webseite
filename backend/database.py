@@ -299,6 +299,8 @@ async def init_indexes():
     await db.billing_orders.create_index("id", unique=True)
     await db.billing_orders.create_index([("kind", 1), ("registration_id", 1), ("status", 1)])
     await db.billing_orders.create_index([("status", 1), ("created_at", 1)])
+    # Geschäftspartner von Nicht-Mitgliedern je Installation (#316)
+    await db.billing_customers.create_index([("user_id", 1), ("instance", 1)], unique=True)
     # Prüfcodes der Mitgliedskarte (#346): fünf Minuten, dann weg.
     await db.member_card_tokens.create_index("token", unique=True)
     await db.member_card_tokens.create_index("expires_at", expireAfterSeconds=0)

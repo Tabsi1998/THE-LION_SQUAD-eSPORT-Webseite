@@ -109,6 +109,15 @@ class FakeDolibarr:
         self.core_status = 403
         self.server_time = "2026-09-21T10:00:00Z"
         self.module_version = MANIFEST["vereine"]["module_version"]
+        # Kern-API für die Abrechnung (#316, #317): Geschäftspartner, Belege, Mitglieder (fk_soc),
+        # Leistungen. Formen wie Dolibarrs eigene REST-API (22-24); kein Vertrag des Vereinsmoduls.
+        self.thirdparties: dict[int, dict] = {}
+        self.core_members: dict[int, dict] = {}
+        self.products: dict[int, dict] = {}
+        self.core_invoices: dict[int, dict] = {}
+        self.next_id = 100
+        self.write_key = API_KEY
+        self.posts: list[tuple[str, dict]] = []
 
     def add(self, summary: dict, email: str | None = None) -> dict:
         self.members[summary["id"]] = summary
@@ -132,16 +141,91 @@ class FakeDolibarr:
             validate(payload, response_schema(template))
         return httpx.Response(status, json=payload)
 
+    # ------------------------------------------------ Kern-API (Abrechnung)
+    def add_thirdparty(self, name: str, email: str = "", **extra) -> dict:
+        self.next_id += 1
+        row = {"id": self.next_id, "name": name, "email": email, "client": 1, **extra}
+        self.thirdparties[row["id"]] = row
+        return row
+
+    def add_core_member(self, member_id: int, fk_soc: int | None = None) -> dict:
+        row = {"id": member_id, "fk_soc": fk_soc}
+        self.core_members[member_id] = row
+        return row
+
+    def _core(self, request: httpx.Request, path: str, params: dict) -> httpx.Response | None:
+        method = request.method
+        body = json.loads(request.content.decode("utf-8")) if request.content else {}
+        if method == "POST":
+            self.posts.append((path, body))
+            assert request.headers.get("DOLAPIKEY") == self.write_key, "Schreiben nur mit dem Schreib-Schlüssel"
+        if path == "/thirdparties" and method == "GET":
+            match = re.search(r"t\.email:=:'([^']*)'", params.get("sqlfilters", ""))
+            rows = [r for r in self.thirdparties.values() if match and r.get("email", "").lower() == match.group(1).lower()]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/thirdparties" and method == "POST":
+            assert body.get("client") == 1 and body.get("name"), "ein Kunde braucht einen Namen"
+            row = self.add_thirdparty(body["name"], body.get("email", ""), note_private=body.get("note_private", ""))
+            return httpx.Response(200, json=row["id"])
+        match = re.fullmatch(r"/thirdparties/(\d+)", path)
+        if match and method == "GET":
+            row = self.thirdparties.get(int(match.group(1)))
+            return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        match = re.fullmatch(r"/members/(\d+)", path)
+        if match and method == "GET":
+            row = self.core_members.get(int(match.group(1)))
+            return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        match = re.fullmatch(r"/products/(\d+)", path)
+        if match and method == "GET":
+            row = self.products.get(int(match.group(1)))
+            return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/invoices" and method == "GET":
+            match = re.search(r"t\.ref_ext:=:'([^']*)'", params.get("sqlfilters", ""))
+            rows = [r for r in self.core_invoices.values() if match and r.get("ref_ext") == match.group(1)]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/invoices" and method == "POST":
+            assert int(body.get("socid") or 0) in self.thirdparties, "Rechnung braucht einen bestehenden Geschäftspartner"
+            assert body.get("lines"), "Rechnung ohne Zeilen"
+            for line in body["lines"]:
+                assert isinstance(line["subprice"], (int, float)) and int(line["qty"]) >= 1 and "tva_tx" in line
+            self.next_id += 1
+            total = round(sum(float(l["subprice"]) * int(l["qty"]) * (1 + float(l["tva_tx"]) / 100) for l in body["lines"]), 2)
+            row = {"id": self.next_id, "ref": f"(PROV{self.next_id})", "ref_ext": body.get("ref_ext"), "socid": int(body["socid"]),
+                   "statut": 0, "paye": 0, "total_ttc": total, "remaintopay": total, "lines": body["lines"], "note_public": body.get("note_public", "")}
+            self.core_invoices[row["id"]] = row
+            return httpx.Response(200, json=row["id"])
+        match = re.fullmatch(r"/invoices/(\d+)/validate", path)
+        if match and method == "POST":
+            row = self.core_invoices.get(int(match.group(1)))
+            if not row:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            row["statut"] = 1
+            row["ref"] = f"FA2609-{row['id']:04d}"
+            return httpx.Response(200, json=row)
+        match = re.fullmatch(r"/invoices/(\d+)", path)
+        if match and method == "GET":
+            row = self.core_invoices.get(int(match.group(1)))
+            return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        return None
+
+    def pay(self, invoice_id: int) -> None:
+        """Der Kassier bucht in Dolibarr eine Zahlung - die Website liest es nur."""
+        row = self.core_invoices[invoice_id]
+        row.update(statut=2, paye=1, remaintopay=0)
+
     def _handle(self, request: httpx.Request) -> httpx.Response:
         assert request.url.scheme == "https", "die Website darf Dolibarr nur über https ansprechen"
         path = request.url.path.removeprefix("/api/index.php")
         params = dict(request.url.params)
         self.calls.append((path, params))
-        if request.headers.get("DOLAPIKEY") != API_KEY:
+        if request.headers.get("DOLAPIKEY") not in (API_KEY, self.write_key):
             return httpx.Response(401, json={"error": {"code": 401, "message": "Unauthorized"}})
         assert API_KEY not in str(request.url), "der Schlüssel gehört nur in den Header"
         if self.fail_with and (not self.fail_paths or path in self.fail_paths):
             return httpx.Response(self.fail_with, json={"error": {"code": self.fail_with, "message": "x"}})
+        core = self._core(request, path, params)
+        if core is not None:
+            return core
         if path == "/status":
             # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
             return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})

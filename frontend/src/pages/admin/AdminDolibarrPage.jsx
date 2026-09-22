@@ -399,24 +399,30 @@ export default function AdminDolibarrPage() {
           <div className="space-y-4">
             <Panel title="Schreibzugriff für Rechnungen">
               <div className="space-y-3 text-sm" data-testid="dolibarr-write">
-                <p className="text-xs text-white/55">Rechnungen und Geschäftspartner legt die Website nur mit einem <strong>zweiten</strong> Dolibarr-Benutzer an, der Kunden und Rechnungen anlegen darf. Der Lese-Schlüssel oben wird dafür nie verwendet. Ohne diesen Schlüssel bleiben Rechnungsaufträge in der Finanzübersicht stehen – nichts geht verloren.</p>
-                <Field label={`API-Schlüssel des Schreib-Benutzers${status?.write_api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={writeKey} onChange={setWriteKey} type="password" testId="dolibarr-write-key" />
-                <div className="flex flex-wrap items-center gap-3">
-                  <button type="button" disabled={!!busy || !writeKey} data-testid="dolibarr-write-save" onClick={() => saveSettings({ write_api_key: writeKey }, "Schreib-Schlüssel gespeichert.").then(() => setWriteKey(""))}
-                    className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Schlüssel speichern</button>
-                  <label className="inline-flex items-center gap-2">
-                    <input type="checkbox" checked={Boolean(status?.write_enabled)} disabled={!!busy || !status?.write_api_key_configured} onChange={(e) => saveSettings({ write_enabled: e.target.checked }, e.target.checked ? "Schreibzugriff eingeschaltet." : "Schreibzugriff ausgeschaltet.")} data-testid="dolibarr-write-enabled" />
-                    Schreibzugriff einschalten
-                  </label>
-                </div>
+                <p className="text-xs text-white/55">Rechnungen und Geschäftspartner legt die Website mit dem Website-Benutzer an, sobald der Haken gesetzt ist und der Modus auf „Live“ steht. Ohne Haken schreibt sie nichts – Rechnungsaufträge bleiben in der Finanzübersicht stehen, nichts geht verloren. Ein eigener Schlüssel für einen zweiten Benutzer ist möglich, aber nicht nötig.</p>
+                <label className="inline-flex items-center gap-2">
+                  <input type="checkbox" checked={Boolean(status?.write_enabled)} disabled={!!busy || !(status?.api_key_configured || status?.write_api_key_configured)} onChange={(e) => saveSettings({ write_enabled: e.target.checked }, e.target.checked ? "Schreibzugriff eingeschaltet." : "Schreibzugriff ausgeschaltet.")} data-testid="dolibarr-write-enabled" />
+                  Schreibzugriff einschalten (Kunden und Rechnungen anlegen)
+                </label>
+                <label className="inline-flex items-center gap-2">
+                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
+                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr)
+                </label>
                 <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
-                  <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">So richtest du den Schreib-Benutzer ein</summary>
-                  <ol className="list-decimal pl-5 mt-2 space-y-1.5">
-                    <li><strong>Start → Benutzer &amp; Gruppen → Neuer Benutzer</strong>: Login <code>website-rechnungen</code>, kein Administrator.</li>
-                    <li>Reiter <strong>Berechtigungen</strong>: Modul „Drittparteien“ – lesen und anlegen/ändern; Modul „Rechnungen“ – lesen, anlegen/ändern, freigeben. Sonst nichts – insbesondere kein Löschen, keine Zahlungen.</li>
-                    <li><strong>Ändern</strong> → „API-Schlüssel“ auf <strong>Erzeugen</strong> → Speichern. Diesen Schlüssel hier eintragen.</li>
-                    <li>Erst danach „Schreibzugriff einschalten“. Der Modus muss auf „Live“ stehen.</li>
-                  </ol>
+                  <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>
+                  <ul className="list-disc pl-5 mt-2 space-y-1">
+                    <li>Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner erweitern“.</li>
+                    <li>Rechnungen: einsehen, erstellen/bearbeiten. Keine Zahlungen, kein Löschen.</li>
+                    <li>Produkte und Leistungen: einsehen. Mitglieder: einsehen. Vereine: „Mitglieder und Geschäftspartner verknüpfen“.</li>
+                  </ul>
+                </details>
+                <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
+                  <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Optional: eigener Schlüssel eines zweiten Benutzers</summary>
+                  <div className="mt-2 space-y-2">
+                    <Field label={`API-Schlüssel des Schreib-Benutzers${status?.write_api_key_configured ? " (gespeichert – leer lassen, um ihn zu behalten)" : ""}`} value={writeKey} onChange={setWriteKey} type="password" testId="dolibarr-write-key" />
+                    <button type="button" disabled={!!busy || !writeKey} data-testid="dolibarr-write-save" onClick={() => saveSettings({ write_api_key: writeKey }, "Schreib-Schlüssel gespeichert.").then(() => setWriteKey(""))}
+                      className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Schlüssel speichern</button>
+                  </div>
                 </details>
               </div>
             </Panel>

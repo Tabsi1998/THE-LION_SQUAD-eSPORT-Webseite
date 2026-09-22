@@ -176,9 +176,39 @@ Seit dem 15. September gilt:
   `EventDetailPage` Anmeldung mit Kosten/Wahlpositionen/Summe,
   `AdminFinancePage` (`/admin/finance`), Schreibzugriff-Panel in
   `AdminDolibarrPage`; `lib/permissions.js` kennt `finance`. Doku
-  `docs/ABRECHNUNG.md`. **Teil 2** (eigener PR): Kunden/Rechnungen in
-  Dolibarr anlegen (`/thirdparties`, `/invoices` der Kern-API), Abgleich,
-  Storno, #320 – braucht den Schreib-Benutzer des Betreibers.
+  `docs/ABRECHNUNG.md`.
+- Abrechnung I, Teil 2 (#316, #317, #321 Anfang; PR #365).
+  `services/dolibarr_billing.py`: `ensure_thirdparty` (Reihenfolge:
+  `thirdparty_id` an der bestätigten Zuordnung → `billing_customers`
+  (Nicht-Mitglieder je Installation) → `fk_soc` des Kern-Mitglieds
+  (`client.core_member`) → E-Mail-Dublette in Dolibarr → **`Waiting(
+  waiting_review)`**, nie still übernehmen → sonst `create_thirdparty`),
+  `assign_thirdparty` (Finanzen nennt die Nummer, geprüft per GET),
+  `invoice_lines` (Brutto→Netto je `tax_rates`, `none` immer 0,
+  `fk_product`), `invoice_payload` (`ref_ext` = `tls-<order.id>`),
+  `create_invoice_for` (erst `invoices_by_ref_ext` – **nie eine zweite
+  Rechnung nach Abbruch**; `invoice_id` sofort speichern; Entwurf, außer
+  `invoice_auto_validate`), `process_order` (Waiting → Status; DolibarrError
+  → `attempts`, nach 5 `failed`), `sync_invoiced` (Status/`paye`/
+  `remaintopay` → Auftrag + Anmeldung `billing_status` invoiced/paid).
+  `dolibarr_client`: `_request(method, …, key=, retries=)`, `_send`
+  (**ohne Wiederholung**, Schreib-Schlüssel = `write_api_key` oder der des
+  Website-Benutzers), Kern-Wege `thirdparty`, `thirdparties_by_email`,
+  `create_thirdparty`, `core_member`, `product`, `invoice`,
+  `invoices_by_ref_ext`, `create_invoice`, `validate_invoice`; 404 auf
+  Listen = leer. `write_capable` = live + `write_enabled` + irgendein
+  Schlüssel (Entscheidung des Betreibers vom 22.09.: **ein** Dolibarr-
+  Benutzer, der Schalter ist die Sicherung). `billing_orders.classify_due`
+  führt mit Schreibzugriff aus; `sync_due` (Job `billing_sync` alle 10 min),
+  `retry_order`; Status `waiting_review`. Routen: `POST
+  /api/admin/finance/orders/{id}/retry`, `…/thirdparty {thirdparty_id}`,
+  `…/new-thirdparty`; `orders/run` führt aus und liest nach. Einstellung
+  `invoice_auto_validate`. Test-Dolibarr `tests/dolibarr_fake.py` kennt die
+  Kern-Wege (`_core`, `add_thirdparty`, `core_members`, `core_invoices`,
+  `pay`, `posts`) – Formen wie Dolibarrs REST-API 22–24, kein Modulvertrag.
+  Web: Finanzübersicht mit Zuordnen/Trotzdem neu anlegen/Erneut versuchen und
+  Tabelle „Angelegte Rechnungen“; Dolibarr-Panel mit den beiden Haken;
+  Anmeldung zeigt Rechnungsnummer und „bezahlt“.
 - Web: Dynamik (#224, #225, #226; PR #360). `lib/liveChanges.js` (ohne React):
   `changedKeys`/`movedKeys` (Vergleich zweier Stände nach Schlüssel und
   Signatur), `timelineSignature`/`liveCountLine` (Startseite),
@@ -710,12 +740,13 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II), #357 (App 0.7.0-beta:
 Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
 (#358 Passkey als zweiter Faktor), #360 (Web: Dynamik), #362 (#361
-PDF-Worker als JavaScript – nginx kannte .mjs nicht). `main` steht auf
-`7b0552d`.
+PDF-Worker als JavaScript – nginx kannte .mjs nicht), #363 (Abrechnung I,
+Teil 1). `main` steht auf `b9be4d2`.
 
 ### Offene PRs
-- #363 (Abrechnung I, Teil 1: #315, #318). Nach dem Merge `update.sh`; die
-  Rechnungen selbst kommen mit Teil 2.
+- #365 (Abrechnung I, Teil 2: #316, #317). Nach dem Merge `update.sh`, dann
+  Admin → Dolibarr → „Schreibzugriff einschalten“ – erst dann entstehen
+  Belege (als Entwurf).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -754,7 +785,7 @@ PDF-Worker als JavaScript – nginx kannte .mjs nicht). `main` steht auf
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (35 offen nach dem Merge von #362; #315 und #318 schließt #363)
+### Meilensteine und offene Issues (34 offen nach dem Merge von #363; #316 und #317 schließt #365; neu #364 Mitgliederbereich aufräumen)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -762,10 +793,10 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg |
+| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Teil 1 in #363: #315 Preis- und Buchungsmodell, #318 Kostenbeiträge für Events mit Begleitpersonen (Anmeldung, Snapshot, Aufträge), Grundlagen für #316 (Schreibschlüssel), #317 (Postfach), #322 (Bereich Finanzen, Übersicht). Teil 2 offen: #316 Rest Kundenanlage, #317 Belege in Dolibarr anlegen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Rest – braucht den Schreib-Benutzer in Dolibarr (docs/ABRECHNUNG.md) |
+| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
 | Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
@@ -800,9 +831,10 @@ sinnvoll hältst“):
 5. Dolibarr II – umgesetzt in #356. App 0.7.0-beta: Mitgliederbereich (#340,
    #339, #341, #342, #346) – umgesetzt in #357, Build 65 nach dem Merge.
 6. Web: Dynamik – umgesetzt in #360.
-7. Abrechnung I – Teil 1 in #363 (Modell, Events, Aufträge, Finanzen);
-   Teil 2 (Dolibarr-Schreibzugriff) sobald der Schreib-Benutzer eingerichtet
-   ist. Danach Admin und Turniere (#203/#204 berühren dieselben
+7. Abrechnung I – Teil 1 in #363 (Modell, Events, Aufträge, Finanzen),
+   Teil 2 in #365 (Kunden und Belege in Dolibarr). Rest (#320, #321) nach
+   dem ersten echten Durchlauf beim Betreiber. Danach Admin und Turniere
+   (#203/#204 berühren dieselben
    Event-Formulare wie #318 – zusammen planen), App 0.8.0-beta.
 8. Abrechnung II, Discord II, App 0.9.0-beta, Auszeichnungen und Marke,
    App 1.0.0.

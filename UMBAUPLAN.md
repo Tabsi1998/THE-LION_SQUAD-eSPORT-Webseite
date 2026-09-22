@@ -468,7 +468,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29): #315 Preis- und Buchungsmodell, #318 Kostenbeiträge für Events; Grundlagen für #316/#317/#322. Teil 2 offen: Belege und Kunden in Dolibarr anlegen (#316/#317), #320, #321, #322 Rest |
+| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. Offen: #320, #321 im Detail |
 | Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
@@ -630,10 +630,37 @@ Schreibzugriff, Geschäftspartner –, ohne in diesem Teil einen Beleg anzulegen
 zeigt, wo es hakt, und gibt zurückgehaltene Aufträge frei. Nichts geht verloren, nichts wird
 doppelt.
 
-**Schreiben braucht einen eigenen Schlüssel.** Der Lese-Schlüssel des Website-Benutzers wird nie
-zum Schreiben verwendet (#316). Ein zweiter Dolibarr-Benutzer mit Rechten nur auf Kunden und
-Rechnungen bekommt seinen Schlüssel unter Admin → Dolibarr → Schreibzugriff, dazu ein Schalter.
-Das richtet der Betreiber ein; erst dann kommt Teil 2 mit den Belegen.
+**Schreiben braucht einen Schalter.** Vorgeschlagen war ein zweiter Dolibarr-Benutzer nur fürs
+Schreiben; der Betreiber hat am 22.09. entschieden, dass **ein** Website-Benutzer alles macht.
+Der Haken „Schreibzugriff einschalten“ (nur im Modus „Live“) ist die Sicherung; ein eigener
+Schlüssel bleibt möglich.
+
+### Was 29.2 gefunden hat (#316, #317 – PR #365)
+
+**Kunde ist nicht Mitglied.** In Dolibarr hängt eine Rechnung am Geschäftspartner, nicht am
+Mitglied. Bei Mitgliedern mit bestätigter Zuordnung liest die Website den am Mitglied verknüpften
+Geschäftspartner (`fk_soc`); fehlt er, legt sie ihn an und merkt sich die Nummer an der Zuordnung.
+Nicht-Mitglieder bekommen einen Kunden in einer eigenen Sammlung je Installation. Gibt es in
+Dolibarr schon jemanden mit derselben E-Mail (Familien teilen Adressen), entscheidet die
+Finanzverwaltung – Zuordnen oder bewusst neu anlegen –, nie die Website aus einer E-Mail.
+
+**Nie zwei Rechnungen.** Zwischen „Beleg in Dolibarr angelegt“ und „Nummer bei uns gespeichert“
+kann der Prozess sterben. Deshalb trägt jeder Beleg die Auftragskennung als externe Referenz, und
+vor jedem Anlegen fragt die Website danach; schreibende Aufrufe werden nie automatisch
+wiederholt. Ein Auftrag, bei dem Dolibarr fünfmal nicht antwortet, wird „gescheitert“ und lässt
+sich von Hand neu starten – nichts geht still verloren.
+
+**Entwurf zuerst.** Neue Belege sind Entwürfe zur Prüfung in Dolibarr (Steuer, Leistung, Text).
+Erst ein bewusster Haken gibt sie sofort frei. Zahlungen bucht der Kassier in Dolibarr; die
+Website liest Freigabe und Zahlung alle zehn Minuten nach und zeigt sie der Person an der
+Anmeldung und dem Kassier in der Finanzübersicht. Dolibarr ist führend für den Beleg, die Website
+für die Buchung.
+
+**Test-Dolibarr mit Kern-API.** Das Vereinsmodul hat keine Schreibwege, die Kern-API schon.
+Der Test-Dolibarr kennt jetzt Geschäftspartner, Belege, Mitglieder und Leistungen in den Formen
+der Dolibarr-REST-API 22–24 – ohne Vertrag des Moduls, aber mit denselben Prüfungen (nur https,
+Schlüssel nur im Header, Schreiben nur mit dem Schreib-Schlüssel, Rechnung nur für bestehende
+Kunden).
 
 ## Block 28 — Web: Dynamik
 

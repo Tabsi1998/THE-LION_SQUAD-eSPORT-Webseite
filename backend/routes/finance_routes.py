@@ -10,8 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from auth import require_area
 from database import get_db
 from models import new_id, now_utc
+from pydantic import BaseModel, Field
+
 from services import billing_orders, pricing
-from services.dolibarr_client import load_settings, write_capable
+from services.dolibarr_billing import assign_thirdparty
+from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings, write_capable
 
 router = APIRouter(prefix="/api/admin/finance", tags=["finance"])
 
@@ -22,17 +25,17 @@ async def finance_overview(me: dict = Depends(require_area("finance"))):
     settings = await load_settings(db)
     data = await billing_orders.overview(db)
     # Namen der Angebote dazu, damit die Liste ohne zweite Abfrage lesbar ist.
-    event_ids = sorted({row["source_id"] for row in data["open"] if row.get("kind") == "event"})
+    event_ids = sorted({row["source_id"] for row in data["open"] + data["invoiced"] if row.get("kind") == "event"})
     names = {}
     if event_ids:
         async for event in db.events.find({"id": {"$in": event_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}):
             names[event["id"]] = {"name": event.get("name"), "slug": event.get("slug")}
-    user_ids = sorted({row["user_id"] for row in data["open"]})
+    user_ids = sorted({row["user_id"] for row in data["open"] + data["invoiced"]})
     people = {}
     if user_ids:
         async for user in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
             people[user["id"]] = user.get("display_name") or user.get("username")
-    for row in data["open"]:
+    for row in data["open"] + data["invoiced"]:
         row["source"] = names.get(row.get("source_id"))
         row["person"] = people.get(row.get("user_id"))
         row["status_label"] = billing_orders.STATUS_LABELS.get(row.get("status"), row.get("status"))
@@ -63,5 +66,70 @@ async def release_billing_order(order_id: str, me: dict = Depends(require_area("
 
 @router.post("/orders/run")
 async def run_billing_orders(me: dict = Depends(require_area("finance"))):
-    """Einsortieren jetzt statt in zwei Minuten - für die Übersicht nach einer Einstellung."""
-    return await billing_orders.classify_due()
+    """Jetzt statt in zwei Minuten: Aufträge ausführen und Belegstände nachlesen."""
+    processed = await billing_orders.classify_due()
+    synced = await billing_orders.sync_due()
+    return {**processed, "synced": synced}
+
+
+@router.post("/orders/{order_id}/retry")
+async def retry_billing_order(order_id: str, me: dict = Depends(require_area("finance"))):
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") != "failed":
+        raise HTTPException(409, "Nur gescheiterte Aufträge werden neu gestartet.")
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.retry", "target_id": order_id, "actor_id": me["id"], "data": {}, "created_at": now_utc().isoformat()})
+    return await billing_orders.retry_order(db, order_id, me["id"])
+
+
+class ThirdpartyAssignment(BaseModel):
+    thirdparty_id: int = Field(..., ge=1)
+
+
+@router.post("/orders/{order_id}/thirdparty")
+async def assign_order_thirdparty(order_id: str, body: ThirdpartyAssignment, me: dict = Depends(require_area("finance"))):
+    """„Zuordnung prüfen“: die Finanzverwaltung nennt den Geschäftspartner (Nr. aus Dolibarr) - geprüft, dass es ihn gibt."""
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") not in ("waiting_review", "waiting_link", "pending", "failed"):
+        raise HTTPException(409, "Dieser Auftrag wartet nicht auf eine Zuordnung.")
+    settings = await load_settings(db)
+    try:
+        client = DolibarrClient(settings)
+        party = await assign_thirdparty(db, settings, client, order["user_id"], body.thirdparty_id, me["id"])
+    except DolibarrError as exc:
+        raise HTTPException(exc.status if exc.status in (401, 403, 404) else 503, f"Dolibarr: {exc.text}")
+    await db.billing_orders.update_one({"id": order_id}, {"$set": {"status": "pending", "note": f"Geschäftspartner Nr. {party['id']} zugeordnet.", "updated_at": now_utc().isoformat()}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.thirdparty.assign", "target_id": order_id, "actor_id": me["id"],
+                                    "data": {"user_id": order["user_id"], "thirdparty_id": party["id"]}, "created_at": now_utc().isoformat()})
+    return {"ok": True, "thirdparty": party}
+
+
+@router.post("/orders/{order_id}/new-thirdparty")
+async def create_new_thirdparty_for_order(order_id: str, me: dict = Depends(require_area("finance"))):
+    """„Zuordnung prüfen“, andere Antwort: trotz gleicher E-Mail bewusst einen neuen Geschäftspartner anlegen."""
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") != "waiting_review":
+        raise HTTPException(409, "Dieser Auftrag wartet nicht auf eine Zuordnung.")
+    user = await db.users.find_one({"id": order["user_id"]}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
+    if not user:
+        raise HTTPException(404, "Konto nicht gefunden.")
+    settings = await load_settings(db)
+    try:
+        client = DolibarrClient(settings)
+        socid = await client.create_thirdparty(name=str(user.get("display_name") or user.get("username") or "Website-Konto"), email=user.get("email"),
+                                               note=f"Angelegt von der Website für Konto {user['id']} (Freigabe durch {me['id']})")
+        await assign_thirdparty(db, settings, client, user["id"], socid, me["id"])
+    except DolibarrError as exc:
+        raise HTTPException(503, f"Dolibarr: {exc.text}")
+    await db.billing_orders.update_one({"id": order_id}, {"$set": {"status": "pending", "note": f"Neuer Geschäftspartner Nr. {socid} angelegt.", "updated_at": now_utc().isoformat()}})
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.thirdparty.create", "target_id": order_id, "actor_id": me["id"],
+                                    "data": {"user_id": user["id"], "thirdparty_id": socid}, "created_at": now_utc().isoformat()})
+    return {"ok": True, "thirdparty_id": socid}

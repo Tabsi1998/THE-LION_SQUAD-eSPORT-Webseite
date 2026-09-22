@@ -154,9 +154,13 @@ async def load_settings(db=None) -> dict:
 
 
 def write_capable(settings: dict | None) -> bool:
-    """Schreibzugriff (Rechnungen, Geschäftspartner) nur mit eigenem, bewusst hinterlegtem Schlüssel
-    und Schalter (#316). Der Lese-Schlüssel wird nie still dafür verwendet."""
-    return bool(settings and settings.get("mode") == "live" and settings.get("write_enabled") and settings.get("write_api_key"))
+    """Schreibzugriff (Rechnungen, Geschäftspartner) nur im Modus „live“ und mit bewusst gesetztem
+    Schalter (#316). Entscheidung des Betreibers vom 22.09.: **ein** Website-Benutzer in Dolibarr
+    mit allen nötigen Rechten - der Schalter ist die Sicherung; ein eigener Schreib-Schlüssel
+    bleibt möglich, ist aber nicht Pflicht."""
+    if not settings or settings.get("mode") != "live" or not settings.get("write_enabled"):
+        return False
+    return bool(settings.get("write_api_key") or settings.get("api_key"))
 
 
 def instance_key(settings: dict) -> str:
@@ -170,6 +174,17 @@ def capabilities_for(status: dict | None) -> dict:
     return dict(CAPABILITIES_V1)
 
 
+def _as_id(data) -> int:
+    """Dolibarr antwortet auf POST mit der neuen Kennung - als Zahl, manchmal als Text."""
+    try:
+        value = int(data if not isinstance(data, dict) else data.get("id"))
+    except (TypeError, ValueError) as exc:
+        raise DolibarrError("invalid_response", 200) from exc
+    if value < 1:
+        raise DolibarrError("invalid_response", 200)
+    return value
+
+
 class DolibarrClient:
     def __init__(self, settings: dict):
         self.settings = settings
@@ -180,19 +195,34 @@ class DolibarrClient:
             raise DolibarrError("key_unreadable") from exc
         if not self._key:
             raise DolibarrError("not_configured")
+        # Schreiben mit eigenem Schlüssel, wenn einer hinterlegt ist - sonst mit dem des Website-Benutzers.
+        try:
+            self._write_key = decrypt_secret(settings.get("write_api_key")) or self._key
+        except RuntimeError as exc:
+            raise DolibarrError("key_unreadable") from exc
 
     @classmethod
     async def from_db(cls, db=None) -> "DolibarrClient":
         return cls(await load_settings(db))
 
     async def _get(self, path: str, params: dict | None = None):
+        return await self._request("GET", path, params=params)
+
+    async def _send(self, method: str, path: str, payload: dict | None = None):
+        """Schreibender Aufruf mit dem Schreib-Schlüssel - **ohne Wiederholung**: ein zweites
+        POST /invoices wäre eine zweite Rechnung. Wer wiederholt, prüft vorher (ref_ext)."""
+        return await self._request(method, path, payload=payload, key=self._write_key, retries=0)
+
+    async def _request(self, method: str, path: str, *, params: dict | None = None, payload: dict | None = None,
+                       key: str | None = None, retries: int | None = None):
         url = f"{self.base_url}/api/index.php{path}"
-        headers = {"DOLAPIKEY": self._key, "Accept": "application/json"}
+        headers = {"DOLAPIKEY": key or self._key, "Accept": "application/json"}
+        attempts = (len(RETRY_PAUSES) if retries is None else retries) + 1
         last_kind, last_status = "unavailable", None
-        for attempt in range(len(RETRY_PAUSES) + 1):
+        for attempt in range(attempts):
             try:
                 async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=_transport) as cli:
-                    response = await cli.get(url, params=params, headers=headers)
+                    response = await cli.request(method, url, params=params, json=payload, headers=headers)
             except httpx.HTTPError as exc:
                 last_kind, last_status = network_error_kind(exc), None
                 logger.warning("[dolibarr] %s nicht erreichbar: %s (%s)", path, type(exc).__name__, last_kind)
@@ -212,9 +242,75 @@ class DolibarrClient:
                 last_kind, last_status = "unavailable", response.status_code
                 if response.status_code not in RETRY_STATUS:
                     break
-            if attempt < len(RETRY_PAUSES):
-                await asyncio.sleep(RETRY_PAUSES[attempt])
+            if attempt < attempts - 1:
+                await asyncio.sleep(RETRY_PAUSES[min(attempt, len(RETRY_PAUSES) - 1)])
         raise DolibarrError(last_kind, last_status)
+
+    # ------------------------------------------------ Kern-API: Geschäftspartner, Rechnungen (#316, #317)
+    # Dolibarrs eigene REST-API (Module „Drittparteien“, „Rechnungen“, „Mitglieder“, „Produkte“).
+    # Feste Pfade, feste Felder - kein Durchreichen von Aufrufen aus dem Browser.
+
+    async def thirdparty(self, thirdparty_id: int) -> dict:
+        data = await self._get(f"/thirdparties/{int(thirdparty_id)}")
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def thirdparties_by_email(self, email: str) -> list[dict]:
+        """Alle Geschäftspartner mit dieser E-Mail - zum Erkennen von Doppelanlagen, nie zum stillen Zuordnen."""
+        clean = str(email or "").strip().replace("'", "")
+        if not clean:
+            return []
+        try:
+            data = await self._get("/thirdparties", {"sqlfilters": f"(t.email:=:'{clean}')", "limit": 20})
+        except DolibarrError as exc:
+            if exc.kind == "not_found":   # Dolibarr antwortet 404 auf eine leere Liste
+                return []
+            raise
+        return data if isinstance(data, list) else []
+
+    async def create_thirdparty(self, *, name: str, email: str | None, note: str) -> int:
+        payload = {"name": name[:120], "email": email or "", "client": 1, "code_client": "-1", "note_private": note[:500]}
+        data = await self._send("POST", "/thirdparties", payload)
+        return _as_id(data)
+
+    async def core_member(self, member_id: int) -> dict:
+        """Das Mitglied aus Dolibarrs Mitgliedermodul - wegen `fk_soc`, dem verknüpften Geschäftspartner."""
+        data = await self._get(f"/members/{int(member_id)}")
+        if not isinstance(data, dict):
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def product(self, product_id: int) -> dict:
+        data = await self._get(f"/products/{int(product_id)}")
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def invoice(self, invoice_id: int) -> dict:
+        data = await self._get(f"/invoices/{int(invoice_id)}")
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def invoices_by_ref_ext(self, ref_ext: str) -> list[dict]:
+        """Gibt es den Beleg zu diesem Auftrag schon? Der Schutz vor Doppelrechnungen nach einem Abbruch."""
+        clean = str(ref_ext or "").replace("'", "")
+        try:
+            data = await self._get("/invoices", {"sqlfilters": f"(t.ref_ext:=:'{clean}')", "limit": 5})
+        except DolibarrError as exc:
+            if exc.kind == "not_found":
+                return []
+            raise
+        return data if isinstance(data, list) else []
+
+    async def create_invoice(self, payload: dict) -> int:
+        data = await self._send("POST", "/invoices", payload)
+        return _as_id(data)
+
+    async def validate_invoice(self, invoice_id: int) -> dict:
+        data = await self._send("POST", f"/invoices/{int(invoice_id)}/validate", {"idwarehouse": 0, "notrigger": 0})
+        return data if isinstance(data, dict) else {}
 
     # ------------------------------------------------ feste Lesewege
     async def status(self) -> dict:
