@@ -851,13 +851,11 @@ Teil 1), #365 (Abrechnung I, Teil 2 – Schreibzugriff beim Betreiber
 eingeschaltet, erster Durchlauf am 22.09. bestätigt: Beleg als Entwurf sauber
 angelegt), #366 (#364 Mitgliederbereich aufgeräumt), #367 (Leistungen aus
 Dolibarr im Event auswählen), #369 (Admin und Turniere – der Spieltag-Lauf
-trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach). `main`
-steht auf `8f7d6a2`.
+trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
+(Abrechnung II – #319 Startgelder; Epic #314 geschlossen). `main` steht auf
+`30dec3d`.
 
 ### Offene PRs
-Reihenfolge: erst #371, dann #372 (#372 baut auf #371 auf).
-- #371 (Abrechnung II – #319 Startgelder für Turniere). Nach dem Merge
-  `update.sh`; schließt das Epic #314.
 - #372 (#370 Rechnungskonditionen und lesbare Belege). Nach dem Merge
   `update.sh`, dann unter Admin → Dolibarr → Schreibzugriff die drei
   Konditionen eintragen („Vorschlag übernehmen“, Konto prüfen).
@@ -899,7 +897,7 @@ Reihenfolge: erst #371, dann #372 (#372 baut auf #371 auf).
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (29 offen nach dem Merge von #369; #319 und Epic #314 schließt #371, #370 schließt #372)
+### Meilensteine und offene Issues (27 offen nach dem Merge von #371; #370 schließt #372)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
