@@ -8,6 +8,9 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
+import { EventBillingSection } from "@/components/tls/EventBillingSection";
+import { useAuth } from "@/context/AuthContext";
+import { billingFormError, formToBilling, positionsToForm } from "@/lib/pricing";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { SkeletonLines } from "@/components/tls/Skeleton";
@@ -310,6 +313,18 @@ export default function AdminEventsPage() {
 
 function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges = [], onClose, onSaved }) {
   const isNew = !event?.id;
+  // Kosten und Abrechnung (#315, #322): eigener Zustand, nur für den Bereich Finanzen sichtbar
+  // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
+  const { can } = useAuth();
+  const canFinance = can("finance");
+  const [billingForm, setBillingForm] = useState(() => ({
+    enabled: Boolean(event?.billing?.enabled),
+    positions: positionsToForm(event?.billing),
+    invoice_timing: event?.billing?.invoice_timing || "on_confirm",
+  }));
+  const billingDirty = JSON.stringify(billingForm) !== JSON.stringify({
+    enabled: Boolean(event?.billing?.enabled), positions: positionsToForm(event?.billing), invoice_timing: event?.billing?.invoice_timing || "on_confirm",
+  });
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -450,15 +465,22 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
 
   const submit = async (ev) => {
     ev.preventDefault();
+    const billingProblem = canFinance && billingDirty ? billingFormError(billingForm) : "";
+    if (billingProblem) {
+      toast.error(billingProblem);
+      return;
+    }
     setSaving(true);
     try {
       const payload = normalizeEventPayload(form);
+      if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
       let savedEvent;
       if (isNew) {
         const { data } = await api.post("/events", payload);
         savedEvent = data;
       } else {
         const patch = buildDirtyPayload(payload, originalEventPayload());
+        if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
         const relatedChanged = tournaments.some((t) => relatedTournamentIds.includes(t.id) !== (t.event_id === event.id))
           || f1Challenges.some((c) => relatedF1Ids.includes(c.id) !== (c.event_id === event.id));
         if (!hasPayloadChanges(patch) && !relatedChanged) {
@@ -522,6 +544,9 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
+          {form.has_registration && !form.registration_url && (
+            <EventBillingSection value={billingForm} onChange={setBillingForm} canEdit={canFinance} dolibarrConnected={Boolean(meta?.dolibarr_connected)} />
+          )}
           <DiscordPreview kind="event" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
           {!isNew && (

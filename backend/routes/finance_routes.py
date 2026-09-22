@@ -1,0 +1,67 @@
+"""Finanzverwaltung (#322): Übersicht der Rechnungsaufträge, Freigabe zurückgehaltener Aufträge.
+
+Nur der Bereich „Finanzen“ (mit Zwei-Faktor). Kein Rechnungs- oder Sync-Dienst - der lebt in
+``services/billing_orders`` und (Teil 2) im Dolibarr-Adapter.
+"""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from auth import require_area
+from database import get_db
+from models import new_id, now_utc
+from services import billing_orders, pricing
+from services.dolibarr_client import load_settings, write_capable
+
+router = APIRouter(prefix="/api/admin/finance", tags=["finance"])
+
+
+@router.get("/overview")
+async def finance_overview(me: dict = Depends(require_area("finance"))):
+    db = get_db()
+    settings = await load_settings(db)
+    data = await billing_orders.overview(db)
+    # Namen der Angebote dazu, damit die Liste ohne zweite Abfrage lesbar ist.
+    event_ids = sorted({row["source_id"] for row in data["open"] if row.get("kind") == "event"})
+    names = {}
+    if event_ids:
+        async for event in db.events.find({"id": {"$in": event_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}):
+            names[event["id"]] = {"name": event.get("name"), "slug": event.get("slug")}
+    user_ids = sorted({row["user_id"] for row in data["open"]})
+    people = {}
+    if user_ids:
+        async for user in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}):
+            people[user["id"]] = user.get("display_name") or user.get("username")
+    for row in data["open"]:
+        row["source"] = names.get(row.get("source_id"))
+        row["person"] = people.get(row.get("user_id"))
+        row["status_label"] = billing_orders.STATUS_LABELS.get(row.get("status"), row.get("status"))
+        row["total"] = pricing.format_cents(int(row.get("total_cents") or 0), row.get("currency") or "EUR")
+    return {
+        **data,
+        "dolibarr": {"connected": settings.get("mode") != "off", "mode": settings.get("mode"), "write_capable": write_capable(settings)},
+        "tax_profiles": pricing.TAX_PROFILES,
+        "price_bases": pricing.PRICE_BASE_LABELS,
+    }
+
+
+@router.post("/orders/{order_id}/release")
+async def release_billing_order(order_id: str, me: dict = Depends(require_area("finance"))):
+    """Rechnungszeitpunkt „bewusst später“ - hier gibt die Finanzverwaltung frei."""
+    db = get_db()
+    order = await db.billing_orders.find_one({"id": order_id}, {"_id": 0})
+    if not order:
+        raise HTTPException(404, "Auftrag nicht gefunden.")
+    if order.get("status") != "held":
+        raise HTTPException(409, "Dieser Auftrag wartet nicht auf eine Freigabe.")
+    updated = await billing_orders.release_order(db, order_id, me["id"])
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.order.release", "target_id": order_id, "actor_id": me["id"],
+                                    "data": {"registration_id": order.get("registration_id"), "total_cents": order.get("total_cents")},
+                                    "created_at": now_utc().isoformat()})
+    return updated
+
+
+@router.post("/orders/run")
+async def run_billing_orders(me: dict = Depends(require_area("finance"))):
+    """Einsortieren jetzt statt in zwei Minuten - für die Übersicht nach einer Einstellung."""
+    return await billing_orders.classify_due()

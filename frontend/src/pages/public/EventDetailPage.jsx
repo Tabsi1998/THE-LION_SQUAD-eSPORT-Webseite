@@ -18,6 +18,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { eventTypeLabel, normalizeEventType } from "@/lib/eventTypes";
+import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
@@ -251,6 +252,10 @@ const EVENT_REGISTRATION_LABELS = {
 function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const [companionCount, setCompanionCount] = useState(0);
   const [note, setNote] = useState("");
+  // Kosten (#318): Positionen und Summe vor dem Absenden; wählbare Positionen als Haken.
+  const [selectedPositions, setSelectedPositions] = useState([]);
+  const offer = event.offer;
+  const quote = offer ? previewQuote(offer, { seats: 1 + Number(companionCount || 0), selected: selectedPositions }) : null;
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const [actionError, setActionError] = useState("");
   const summary = event.registration_summary || {};
@@ -265,6 +270,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   useEffect(() => {
     setCompanionCount(0);
     setNote("");
+    setSelectedPositions([]);
     setActionError("");
   }, [event.id]);
 
@@ -275,6 +281,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
       await api.post(`/events/${event.id}/registrations`, {
         companion_count: Number(companionCount || 0),
         note: note.trim() || null,
+        selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Anmeldung gespeichert.");
       await onChanged();
@@ -312,6 +319,17 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
       {!!summary.waitlist_count && (
         <div className="mt-2 text-xs text-[#FFD700]">{summary.waitlist_count} Anmeldung(en) auf der Warteliste.</div>
       )}
+      {offer && (
+        <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="event-offer">
+          <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Kosten</div>
+          <div className="mt-1 text-white">{offerSummary(offer, 1 + Number(companionCount || 0))}</div>
+          <ul className="mt-2 space-y-0.5 text-xs text-white/60">
+            {offer.positions.filter((position) => !position.optional).map((position) => (
+              <li key={position.key}>{position.label}: {formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Person" : "je Anmeldung"}{position.description ? ` – ${position.description}` : ""}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="mt-4 space-y-1 text-sm text-white/65">
         {event.registration_opens_at && <div>Öffnet: {new Date(event.registration_opens_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
         {event.registration_closes_at && <div>Schließt: {new Date(event.registration_closes_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
@@ -331,6 +349,14 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
               ? `Du stehst mit ${own.seat_count || 1} Platz/Plätzen auf der Warteliste${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`
               : `${own.seat_count || 1} Platz/Plätze reserviert${own.companion_count ? `, davon ${own.companion_count} Begleitperson(en)` : ""}.`}
           </div>
+          {own.price && (
+            <div className="mt-2 text-sm" data-testid="event-own-price">
+              <span className="text-white/65">Dein Kostenbeitrag: </span>
+              <strong className="text-white">{formatCents(own.price.total_cents, own.price.currency)}</strong>
+              <span className="text-white/45"> · {own.price.billing_status === "cancelled" ? "storniert" : "die Rechnung kommt in dein Konto unter „Meine Rechnungen“"}</span>
+            </div>
+          )}
+          {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
           <button type="button" disabled={saving} onClick={cancel} className="mt-4 inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
@@ -350,12 +376,29 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
               <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
             </label>
           )}
+          {offer?.positions.some((position) => position.optional) && (
+            <fieldset className="border border-white/10 rounded-sm p-3">
+              <legend className="text-[11px] uppercase tracking-widest text-white/50 font-bold px-1">Zusätzlich wählbar</legend>
+              {offer.positions.filter((position) => position.optional).map((position) => (
+                <label key={position.key} className="flex items-center gap-2 text-sm py-1">
+                  <input type="checkbox" checked={selectedPositions.includes(position.key)} onChange={(ev) => setSelectedPositions((current) => (ev.target.checked ? [...current, position.key] : current.filter((key) => key !== position.key)))} data-testid={`event-offer-option-${position.key}`} />
+                  <span>{position.label} <span className="text-white/50">{formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Person" : "je Anmeldung"}</span></span>
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {quote && !quote.free && (
+            <div className="border border-[#FFD700]/40 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-quote">
+              <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
+              <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+            </div>
+          )}
           <label className="block">
             <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
             <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
           <button disabled={saving} data-testid="event-register-submit" className="inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
-            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Anmelden"}
+            <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </form>
       )}

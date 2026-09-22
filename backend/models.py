@@ -293,6 +293,27 @@ EventStatus = Literal[
 EventVisibility = Literal["public", "community", "members", "internal"]
 
 
+class BillingPosition(BaseModel):
+    """Eine Kostenposition (#315): typisiert, kein Freitext-Geld. Beträge kommen als Zahl oder Cent."""
+    key: Optional[str] = Field(default=None, max_length=40)
+    label: str = Field(..., max_length=120)
+    description: Optional[str] = Field(default=None, max_length=500)
+    amount: Optional[str | float | int] = None
+    amount_cents: Optional[int] = Field(default=None, ge=0)
+    currency: str = "EUR"
+    basis: Literal["per_registration", "per_person", "per_team"] = "per_person"
+    tax_profile: Literal["none", "standard", "reduced"] = "none"
+    optional: bool = False
+    dolibarr_product_id: Optional[int] = Field(default=None, ge=1)
+
+
+class BillingConfig(BaseModel):
+    """Abrechnung eines Angebots. Standard: aus - bestehende Angebote bleiben kostenlos."""
+    enabled: bool = False
+    positions: List[BillingPosition] = []
+    invoice_timing: Literal["on_confirm", "manual"] = "on_confirm"
+
+
 class EventCreate(BaseModel):
     name: str
     slug: Optional[str] = None
@@ -334,6 +355,7 @@ class EventCreate(BaseModel):
     has_live_stream: bool = False
     stream_platform: Optional[str] = None
     stream_url: Optional[str] = None
+    billing: Optional[BillingConfig] = None
 
 
 class EventUpdate(BaseModel):
@@ -375,6 +397,7 @@ class EventUpdate(BaseModel):
     stream_platform: Optional[str] = None
     stream_url: Optional[str] = None
     status: Optional[EventStatus] = None
+    billing: Optional[BillingConfig] = None
 
 
 EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]
@@ -383,6 +406,8 @@ EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cance
 class EventRegistrationCreate(BaseModel):
     companion_count: int = Field(0, ge=0, le=20)
     note: Optional[str] = Field(default=None, max_length=500)
+    # Gewählte optionale Kostenpositionen (#318); Pflichtpositionen zählen immer.
+    selected_positions: List[str] = []
 
 
 class EventRegistrationUpdate(BaseModel):

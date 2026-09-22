@@ -144,6 +144,16 @@ async def _safe_discord_announcements():
         _log_task_failure("discord_announcements", exc)
 
 
+async def _safe_billing_orders():
+    try:
+        from services.billing_orders import classify_due
+        res = await classify_due()
+        if res.get("looked"):
+            logger.info(f"[scheduler] billing_orders {res}")
+    except Exception as exc:
+        _log_task_failure("billing_orders", exc)
+
+
 async def _safe_member_announcements():
     try:
         from services.member_announcements import notify_due
@@ -388,6 +398,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("achievement_queue", _safe_achievement_queue, lease_seconds=120.0), IntervalTrigger(seconds=30), id="achievement_queue",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("member_announcements", _safe_member_announcements), IntervalTrigger(seconds=60), id="member_announcements",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
                   max_instances=1, coalesce=True)

@@ -29,14 +29,17 @@ from __future__ import annotations
 
 from database import get_db
 
-AREAS: tuple[str, ...] = ("tournaments", "content", "club", "system", "moderation")
-GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "content", "club")
-MFA_AREAS: frozenset[str] = frozenset({"tournaments", "content", "club", "system"})
+# „finance“ (#322): Kosten an Angeboten pflegen, Rechnungsaufträge sehen und freigeben. Kein
+# Admin hat das pauschal - Club-Admin und Superadmin bringen es mit, andere per Freigabe.
+AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance", "system", "moderation")
+GRANTABLE_AREAS: tuple[str, ...] = ("tournaments", "content", "club", "finance")
+MFA_AREAS: frozenset[str] = frozenset({"tournaments", "content", "club", "finance", "system"})
 
 AREA_LABELS: dict[str, str] = {
     "tournaments": "Turnierleitung",
     "content": "Redaktion",
     "club": "Vereinsverwaltung",
+    "finance": "Finanzen",
     "system": "System",
     "moderation": "Moderation",
 }

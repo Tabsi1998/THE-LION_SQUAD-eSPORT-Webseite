@@ -295,6 +295,10 @@ async def init_indexes():
     await db.dolibarr_links.create_index("member_key", unique=True, sparse=True)
     await db.dolibarr_links.create_index("status")
     await db.dolibarr_pending.create_index("key", unique=True)
+    # Rechnungsaufträge (#317): je Buchung höchstens ein offener Auftrag.
+    await db.billing_orders.create_index("id", unique=True)
+    await db.billing_orders.create_index([("kind", 1), ("registration_id", 1), ("status", 1)])
+    await db.billing_orders.create_index([("status", 1), ("created_at", 1)])
     # Prüfcodes der Mitgliedskarte (#346): fünf Minuten, dann weg.
     await db.member_card_tokens.create_index("token", unique=True)
     await db.member_card_tokens.create_index("expires_at", expireAfterSeconds=0)

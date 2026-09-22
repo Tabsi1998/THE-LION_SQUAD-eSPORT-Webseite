@@ -2,14 +2,15 @@
 // Der Server schickt die Bereiche mit (`user.areas`); fehlt das Feld (älterer
 // Server, Tests), leiten wir sie aus der Rolle ab.
 
-export const AREAS = ["tournaments", "content", "club", "system", "moderation"];
-export const ADMIN_AREAS = ["tournaments", "content", "club", "system"];
-export const GRANTABLE_AREAS = ["tournaments", "content", "club"];
+export const AREAS = ["tournaments", "content", "club", "finance", "system", "moderation"];
+export const ADMIN_AREAS = ["tournaments", "content", "club", "finance", "system"];
+export const GRANTABLE_AREAS = ["tournaments", "content", "club", "finance"];
 
 export const AREA_LABELS = {
   tournaments: "Turnierleitung",
   content: "Redaktion",
   club: "Vereinsverwaltung",
+  finance: "Finanzen",
   system: "System",
   moderation: "Moderation",
 };
@@ -18,6 +19,7 @@ export const AREA_HINTS = {
   tournaments: "Turniere, Events, Stationen, Fast Lap, Saisons, Gewinne",
   content: "News, Galerie, Medien, Sponsoren, Partner, Referenzen, CMS, Sticker, Achievements",
   club: "Mitglieder, Anträge, Dokumente, Vorteile, Vorstand, Kontakt-Inbox, Benutzer",
+  finance: "Kosten an Events und Turnieren, Rechnungsaufträge, Freigaben",
   system: "Einstellungen, Game-Server, Betrieb, Logs, Audit, App-Versionen",
   moderation: "Meldungen und Chats",
 };

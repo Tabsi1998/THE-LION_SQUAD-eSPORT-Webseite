@@ -468,7 +468,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Epic #314, erster Durchstich: #315 Preis- und Buchungsmodell, #317 Rechnungen ohne Dubletten, #318 Kostenbeiträge für Events mit Begleitpersonen, #320 eigene Rechnungen im Konto, #321 Zahlungsabgleich und Storno, #322 Finanzrechte und Rollout |
+| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29): #315 Preis- und Buchungsmodell, #318 Kostenbeiträge für Events; Grundlagen für #316/#317/#322. Teil 2 offen: Belege und Kunden in Dolibarr anlegen (#316/#317), #320, #321, #322 Rest |
 | Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
@@ -601,6 +601,39 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 29 — Abrechnung I, Teil 1: Preis, Buchung, Aufträge
+
+### Was 29.1 gefunden hat (#315, #318 – PR #363)
+
+**Kein Preisfeld je Eventtyp.** Der Wunsch war „20 € pro Person inkl. Essen, bei einer
+Begleitperson 40 €, danach automatisch die Rechnung“. Statt eines Preisfelds am Event gibt es
+ein Angebot mit typisierten Positionen: Bezeichnung, Betrag in Cent, Preisbasis (je Anmeldung,
+je Person, je Team), Steuerprofil, wählbar oder Pflicht, optional die Dolibarr-Leistung. Keine
+Formeln, kein Geld aus Freitext, kein Gleitkomma. Turniere (#319) nutzen dasselbe Modell später.
+
+**Der Preis gehört zur Buchung, nicht zum Angebot.** Bei der verbindlichen Anmeldung wird
+gerechnet und eingefroren (Snapshot mit Version des Angebots und Prüfwert). Ändert der Kassier
+danach die Positionen, zählt das nur für neue Anmeldungen. Die Warteliste zahlt nichts, bis sie
+nachrückt; eine Änderung der Begleitpersonen vor dem Beleg rechnet neu und ersetzt den Auftrag.
+Das ist die Grenze zu #321: Ein angelegter Beleg wird nie still ersetzt.
+
+**Geld sieht nur, wen es angeht.** Die Anmeldeseite zeigt Positionen und Summe vor dem Absenden,
+die eigene Anmeldung ihren Betrag – die Teilnehmerliste kein Geld, das Angebot keine
+Dolibarr-Nummern. Pflegen darf Kosten nur der neue Bereich **Finanzen** (#322): Die
+Turnierleitung bearbeitet Events weiter, ohne den Abschnitt zu sehen; der Server lehnt Änderungen
+daran mit 403 ab.
+
+**Ein Postfach statt eines Hintergrundgedankens.** Jede kostenpflichtige Anmeldung schreibt einen
+Rechnungsauftrag in dieselbe Datenbank (#317). Ein Job sortiert ein, was fehlt – Anbindung,
+Schreibzugriff, Geschäftspartner –, ohne in diesem Teil einen Beleg anzulegen. Die Finanzübersicht
+zeigt, wo es hakt, und gibt zurückgehaltene Aufträge frei. Nichts geht verloren, nichts wird
+doppelt.
+
+**Schreiben braucht einen eigenen Schlüssel.** Der Lese-Schlüssel des Website-Benutzers wird nie
+zum Schreiben verwendet (#316). Ein zweiter Dolibarr-Benutzer mit Rechten nur auf Kunden und
+Rechnungen bekommt seinen Schlüssel unter Admin → Dolibarr → Schreibzugriff, dazu ein Schalter.
+Das richtet der Betreiber ein; erst dann kommt Teil 2 mit den Belegen.
 
 ## Block 28 — Web: Dynamik
 
