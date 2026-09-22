@@ -17,6 +17,9 @@ import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { EventDetailScreen } from "../screens/main/EventDetailScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
+import { GalleryScreen } from "../screens/main/GalleryScreen";
+import { GalleryAlbumScreen } from "../screens/main/GalleryAlbumScreen";
+import { GalleryViewerScreen } from "../screens/main/GalleryViewerScreen";
 import { MemberAreaScreen } from "../screens/main/MemberAreaScreen";
 import { MemberCardScreen } from "../screens/main/MemberCardScreen";
 import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
@@ -203,6 +206,9 @@ function MoreStackScreen() {
       <MoreStack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: "Profil" }} />
       <MoreStack.Screen name="NewsList" component={NewsScreen} options={{ title: "News" }} />
       <MoreStack.Screen name="NewsDetail" component={NewsDetailScreen} options={{ title: "News" }} />
+      <MoreStack.Screen name="Gallery" component={GalleryScreen} options={{ title: "Galerie" }} />
+      <MoreStack.Screen name="GalleryAlbum" component={GalleryAlbumScreen} options={{ title: "Album" }} />
+      <MoreStack.Screen name="GalleryViewer" component={GalleryViewerScreen} options={{ title: "Galerie", headerTintColor: colors.white }} />
       <MoreStack.Screen name="FastLapList" component={FastLapScreen} options={{ title: "Fast Laps" }} />
       <MoreStack.Screen name="FastLapDetail" component={FastLapDetailScreen} options={{ title: "Fast Lap" }} />
       <MoreStack.Screen name="DirectMessages" component={DirectMessagesScreen} options={{ title: "Nachrichten" }} />

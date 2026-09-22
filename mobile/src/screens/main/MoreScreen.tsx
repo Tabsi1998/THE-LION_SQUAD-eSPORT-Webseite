@@ -25,7 +25,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "DirectMessages" | "Notifications" | "SeasonPass";
+  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass";
   ownPublicProfile?: boolean;
 };
 
@@ -56,6 +56,7 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
     title: "Verein",
     entries: [
       { title: "News", icon: "newspaper-outline", screen: "NewsList" },
+      { title: "Galerie", icon: "images-outline", screen: "Gallery" },
       { title: "Referenzen", icon: "medal-outline", section: "references" },
       { title: "Sponsoren", icon: "ribbon-outline", section: "sponsors" },
       { title: "Partner", icon: "link-outline", section: "partners" },

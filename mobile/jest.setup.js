@@ -43,6 +43,20 @@ jest.mock("expo-video", () => ({
   VideoView: () => null,
 }));
 
+// Gerätekalender und System-Teilen (#216, #236) haben im Test kein Gerät: Berechtigung
+// verweigert, Teilen verfügbar aber ohne Wirkung - die Tests setzen Abweichungen selbst.
+jest.mock("expo-calendar", () => ({
+  requestCalendarPermissionsAsync: jest.fn(async () => ({ status: "denied", granted: false })),
+  getCalendarsAsync: jest.fn(async () => []),
+  getDefaultCalendarAsync: jest.fn(async () => null),
+  createEventAsync: jest.fn(async () => "event-1"),
+  EntityTypes: { EVENT: "event" },
+}));
+jest.mock("expo-sharing", () => ({
+  isAvailableAsync: jest.fn(async () => true),
+  shareAsync: jest.fn(async () => undefined),
+}));
+
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),

@@ -90,6 +90,7 @@ export function MemberAreaScreen({ navigation }: Props) {
           <Tile icon="qr-code-outline" label="Mitgliedskarte" onPress={() => navigation.navigate("MemberCard")} testID="member-area-card" />
           <Tile icon="document-text-outline" label={docs.length ? `Dokumente (${docs.length})` : "Dokumente"} onPress={() => navigation.navigate("MemberDocuments")} testID="member-area-documents" />
           <Tile icon="gift-outline" label="Vorteile" onPress={() => navigation.navigate("InfoCenter", { section: "benefits" })} testID="member-area-benefits" />
+          <Tile icon="images-outline" label="Galerie" onPress={() => navigation.navigate("Gallery")} testID="member-area-gallery" />
         </View>
 
         {loading ? <SkeletonList count={3} hasImage={false} /> : null}

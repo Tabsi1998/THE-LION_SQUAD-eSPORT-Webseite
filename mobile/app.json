@@ -2,13 +2,13 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "0.7.0-beta",
+    "version": "0.8.0-beta",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "65",
+      "buildNumber": "66",
       "bundleIdentifier": "at.lionsquad.app",
       "infoPlist": {
         "NSAppTransportSecurity": {
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 65,
+      "versionCode": 66,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -62,6 +62,14 @@
           "photosPermission": "LionsAPP greift auf deine Fotos und Videos zu, damit du sie im Chat senden kannst.",
           "cameraPermission": false,
           "microphonePermission": false
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Die LionsAPP trägt Termine in deinen Kalender ein, wenn du es antippst.",
+          "remindersPermission": false
         }
       ]
     ],

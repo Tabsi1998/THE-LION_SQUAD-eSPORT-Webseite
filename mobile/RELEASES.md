@@ -142,6 +142,7 @@ Neueste oben.
 - `0.5.0-beta`: Build 63, Was ist neu, Update aus der App, In-App-Banner gebündelt, Nickname weg (Meilenstein App 0.5.0-beta)
 - `0.6.0-beta`: Build 64, Erfolge mit Symbolen, Fortschritt und Freischalt-Moment, sanfte Übergänge (Meilenstein App 0.6.0-beta)
 - `0.7.0-beta`: Build 65, Mitgliederbereich in der App – Mitgliedschaft, Belege, Dokumente, Intern-Kennzeichen, Mitgliedskarte mit QR (Meilenstein App: Mitgliederbereich)
+- `0.8.0-beta`: Build 66, Kalender mit „In meinen Kalender“, Galerie in der App, Startgeld-Haken (Meilenstein App 0.8.0-beta)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Button } from "../../components/Button";
+import { AddToCalendarButton } from "../../components/AddToCalendarButton";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { FormInput } from "../../components/FormInput";
@@ -195,6 +196,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
         </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+
+        {event.start_date || event.date ? (
+          <AddToCalendarButton item={{
+            id: event.id, kind: "event", title: event.title || event.name || "Event", start: (event.start_date || event.date) as string, end: event.end_date,
+            location: placeParts(event.location, event.city).join(", ") || null, detail: event.event_type || event.type || null,
+            url: event.slug ? `https://lionsquad.at/events/${event.slug}` : null,
+          }} />
+        ) : null}
 
         {(event.locations?.length || 0) > 1 ? (
           <Card style={styles.card} testID="event-locations">
