@@ -925,8 +925,8 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 (Abrechnung II – #319 Startgelder; Epic #314 geschlossen), #372 (#370
 Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
 Konditionstexte, Anleitung zur Kontonummer), #374 (App 0.8.0-beta – Kalender,
-Galerie; Build 66 steht aus), #375 (#368 Leitfaden Schritt 2). `main` steht
-auf `b364246`.
+Galerie; Build 66 am 22.09. gebaut und am Vereinsserver), #375 (#368
+Leitfaden Schritt 2). `main` steht auf `b364246`.
 
 ### Offene PRs
 - #376 (#260 Plattform-Konten verknüpfen). Nach dem Merge `update.sh`; dann
@@ -948,7 +948,10 @@ auf `b364246`.
   `44959a8c`; #218), am Vereinsserver abgelegt, **Build 65**
   (`mobile-v0.7.0-beta-build65`, Commit 770aaec, am 22.09. vom Haupt-PC
   gebaut, APK-SHA-256 beginnt mit `02de39d5`; #340, #339, #341, #342, #346),
-  am Vereinsserver abgelegt. Nächster Build ist 66.
+  am Vereinsserver abgelegt, **Build 66** (`mobile-v0.8.0-beta-build66`,
+  Commit b364246, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
+  `0d1a60d4`; #216, #236, Startgeld-Haken aus #319), am Vereinsserver abgelegt.
+  Nächster Build ist 67.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -993,7 +996,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
-| App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 nach dem Merge. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
+| App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
