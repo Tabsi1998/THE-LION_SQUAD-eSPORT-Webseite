@@ -9,11 +9,11 @@ from fastapi.responses import FileResponse
 from auth import get_optional_user, require_club_admin, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
+from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 ADMIN_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
-INTERNAL_ROLES = {"club_admin", "superadmin"}
 
 
 def _normalise_visibility(value: str | None) -> str:
@@ -30,7 +30,7 @@ async def _user_can_see(user: dict | None, visibility: str | None) -> bool:
         return False
     visibility = _normalise_visibility(visibility)
     if visibility == "internal":
-        return user.get("role") in INTERNAL_ROLES
+        return await user_can_see(user, "internal")   # nach Bereich, wie News und Events
     return bool(user.get("is_club_member") or _is_admin(user))
 
 

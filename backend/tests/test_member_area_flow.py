@@ -27,6 +27,7 @@ async def person(flow, name, *, role="player", member=False, push=False, **field
     user = await flow.add_user(role=role, name=name)
     if fields:
         await flow.db.users.update_one({"id": user["id"]}, {"$set": fields})
+        user.update(fields)   # der Harness reicht dieses Dict als angemeldete Person durch
     if member:
         await flow.db.memberships.insert_one({"id": f"m-{name}", "user_id": user["id"], "member_status": "active",
                                               "membership_type": "ordinary", "member_number": f"TLS-{name}", "member_since": "2024-03-01"})
@@ -86,6 +87,15 @@ async def test_internal_news_and_board_by_area_not_by_role(flow):
     assert [n["body"] for n in await notifications_of(flow, freigabe, "news_")] == ["Nur für den Vorstand"], "Freigabe zählt wie ein Vorstandsposten"
     assert sorted(n["body"] for n in await notifications_of(flow, kassier, "news_")) == ["Nur für Mitglieder", "Nur für den Vorstand"], "Dolibarr-Funktion zählt"
     assert await flow.db.notifications.count_documents({"body": "Kommt morgen"}) == 0
+
+    # Wer die Meldung bekommt, kann den Beitrag auch lesen - sonst wäre der Push ein 403.
+    flow.act_as(kassier)
+    assert (await flow.get("/api/news/vorstand")).status_code == 200
+    flow.act_as(freigabe)
+    assert (await flow.get("/api/news/vorstand")).status_code == 200
+    flow.act_as(mitglied)
+    assert (await flow.get("/api/news/vorstand")).status_code == 403
+    assert (await flow.get("/api/news/intern")).status_code == 200
 
 
 @pytest.mark.asyncio
