@@ -1,9 +1,12 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Crown, Users, Heart, Trophy, Gamepad2, Mail } from "lucide-react";
 
 export default function JoinMembershipPage() {
+  // Wer aus dem Mitgliederbereich hierher kam, erfährt warum - statt stumm umgeleitet zu werden (#364).
+  const [params] = useSearchParams();
+  const fromMembers = params.get("from") === "members";
   useDocumentTitle(
     "Mitglied werden",
     "Mitglied werden bei THE LION SQUAD: eSports Verein, Gaming Community, Mitgliederbereich, Events, Turniere und Vorteile in Tirol."
@@ -14,6 +17,11 @@ export default function JoinMembershipPage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,215,0,0.12),transparent_50%)]" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+          {fromMembers && (
+            <div className="mb-6 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 text-sm text-white/80" data-testid="join-from-members">
+              Der Mitgliederbereich ist Vereinsmitgliedern vorbehalten. Sobald deine Mitgliedschaft bestätigt ist, findest du ihn rechts oben im Menü.
+            </div>
+          )}
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREINSMITGLIEDSCHAFT</span>
           <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-[1.05]">
             Werde Teil <br />des <span className="text-[#FFD700]">Rudels</span>

@@ -4,20 +4,14 @@ import { API, api, formatMemberSince, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
+import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle } from "lucide-react";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
 // dieselben Themen noch einmal als Karten, drei davon leer.
-const LINKS = [
-  { to: "/members/membership", label: "Mitgliedschaft" },
-  { to: "/account/invoices", label: "Rechnungen" },
-  { to: "/members/benefits", label: "Vorteile" },
-  { to: "/members/documents", label: "Dokumente" },
-  { to: "/members/news", label: "Interne News" },
-  { to: "/board", label: "Vorstand" },
-];
+// Die Verweise stehen in lib/memberArea.js (MEMBER_AREA_LINKS) - ein Test hält
+// fest, dass jede Adresse eine Seite hat (#364).
 
 export default function MemberAreaPage() {
   const { user } = useAuth();

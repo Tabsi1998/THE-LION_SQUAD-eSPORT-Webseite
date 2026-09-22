@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { ADMIN_AREAS, hasArea, isAnyAdmin } from "@/lib/permissions";
+import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 // Rechte nach Bereichen (#287): `requireArea` verlangt einen der genannten
 // Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, System, Moderation).
@@ -14,8 +15,8 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
   const wantedAreas = requireArea ? [requireArea].flat() : requireClubAdmin ? ["system"] : requireAdmin ? ADMIN_AREAS : [];
   if (user === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0A]">
-        <div className="font-display text-[#29B6E8] tracking-widest text-sm">LADE …</div>
+      <div className="min-h-screen bg-[#0A0A0A] px-4 sm:px-6 lg:px-8 py-16 max-w-5xl mx-auto">
+        <SkeletonDetailHeader label="Lade Anmeldung" />
       </div>
     );
   }
@@ -34,7 +35,8 @@ export function ProtectedRoute({ children, requireArea = null, requireAdmin = fa
     return <Navigate to="/403" replace state={{ areas: ["moderation"], from: loc.pathname }} />;
   }
   if (requireMember && !user.is_club_member && !isAnyAdmin(user)) {
-    return <Navigate to="/membership/join" replace />;
+    // Kein Mitglied: auf die Beitrittsseite, mit dem Grund - nicht stumm umgeleitet (#364).
+    return <Navigate to="/membership/join?from=members" replace />;
   }
   return children;
 }

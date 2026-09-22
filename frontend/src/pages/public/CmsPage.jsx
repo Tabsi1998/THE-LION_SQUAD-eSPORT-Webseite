@@ -11,6 +11,7 @@ import { useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { useSeoPage } from "@/hooks/useSeoPage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { renderMarkdownLite } from "@/lib/markdownLite";
@@ -29,7 +30,7 @@ export default function CmsPage({ slug: forced }) {
   useApiInvalidation(load, ["pages", "cms"]);
 
   if (error === 404) return <PublicLayout><Empty title="Seite nicht gefunden" /></PublicLayout>;
-  if (!page) return <PublicLayout><div className="max-w-4xl mx-auto px-6 py-20 text-white/40 font-display tracking-widest">LADE …</div></PublicLayout>;
+  if (!page) return <PublicLayout><div className="max-w-4xl mx-auto px-6 py-20"><SkeletonDetailHeader label="Lade Seite" /><SkeletonLines lines={6} className="mt-8" label="Lade Seite" /></div></PublicLayout>;
 
   return (
     <PublicLayout>

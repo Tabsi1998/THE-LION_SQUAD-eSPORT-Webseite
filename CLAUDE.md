@@ -741,12 +741,12 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
 (#358 Passkey als zweiter Faktor), #360 (Web: Dynamik), #362 (#361
 PDF-Worker als JavaScript – nginx kannte .mjs nicht), #363 (Abrechnung I,
-Teil 1). `main` steht auf `b9be4d2`.
+Teil 1), #365 (Abrechnung I, Teil 2 – Schreibzugriff beim Betreiber
+eingeschaltet, erster echter Durchlauf steht aus). `main` steht auf `fc454a5`.
 
 ### Offene PRs
-- #365 (Abrechnung I, Teil 2: #316, #317). Nach dem Merge `update.sh`, dann
-  Admin → Dolibarr → „Schreibzugriff einschalten“ – erst dann entstehen
-  Belege (als Entwurf).
+- #366 (#364 Mitgliederbereich Web aufräumen). Nach dem Merge `update.sh`
+  (nginx-Weiterleitung `/mitgliederbereich`).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -785,7 +785,7 @@ Teil 1). `main` steht auf `b9be4d2`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (34 offen nach dem Merge von #363; #316 und #317 schließt #365; neu #364 Mitgliederbereich aufräumen)
+### Meilensteine und offene Issues (32 offen nach dem Merge von #365; #364 schließt #366)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -793,7 +793,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) |
+| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366 |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |

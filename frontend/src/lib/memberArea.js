@@ -5,6 +5,19 @@ import { formatVienna } from "@/lib/dashboard";
 // anstehen – nach Datum sortiert.
 const MEMBER_LEVELS = new Set(["members", "internal"]);
 
+// Die Verweiszeile des Mitgliederbereichs (#364): eine Quelle für Seite und Test.
+// Jede Adresse hat eine Route in App.jsx; die Mitgliedskarte liegt auf „Meine
+// Mitgliedschaft“ (Anker), weil sie dort mit Beitrag und Nummer zusammengehört.
+export const MEMBER_AREA_LINKS = [
+  { to: "/members/membership", label: "Mitgliedschaft" },
+  { to: "/members/membership#mitgliedskarte", label: "Mitgliedskarte" },
+  { to: "/account/invoices", label: "Rechnungen" },
+  { to: "/members/benefits", label: "Vorteile" },
+  { to: "/members/documents", label: "Dokumente" },
+  { to: "/members/news", label: "Interne News" },
+  { to: "/board", label: "Vorstand" },
+];
+
 function toTime(value) {
   if (!value) return null;
   const ms = new Date(value).getTime();

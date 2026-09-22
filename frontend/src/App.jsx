@@ -240,6 +240,9 @@ function App() {
 
           {/* Member-only */}
           <Route path="/members/area" element={<ProtectedRoute requireMember><MemberAreaPage /></ProtectedRoute>} />
+          {/* Alte und deutsche Adressen des Mitgliederbereichs (#364) */}
+          <Route path="/mitgliederbereich" element={<Navigate to="/members/area" replace />} />
+          <Route path="/member-area" element={<Navigate to="/members/area" replace />} />
           <Route path="/members/benefits" element={<ProtectedRoute requireMember><MemberBenefitsPage /></ProtectedRoute>} />
           <Route path="/members/documents" element={<ProtectedRoute requireMember><MemberDocumentsPage /></ProtectedRoute>} />
           <Route path="/members/news" element={<ProtectedRoute requireMember><MemberNewsPage /></ProtectedRoute>} />
