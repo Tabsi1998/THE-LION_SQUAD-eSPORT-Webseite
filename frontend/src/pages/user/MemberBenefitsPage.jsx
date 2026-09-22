@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Gift, ExternalLink } from "lucide-react";
+import { Gift, ExternalLink, ArrowLeft } from "lucide-react";
 
 export default function MemberBenefitsPage() {
   const [benefits, setBenefits] = useState([]);
@@ -19,7 +20,10 @@ export default function MemberBenefitsPage() {
   return (
     <PublicLayout>
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">EXKLUSIV</span>
+        <Link to="/members/area" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#FFD700]">
+          <ArrowLeft className="w-3.5 h-3.5" /> Mitgliederbereich
+        </Link>
+        <span className="mt-6 block text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">EXKLUSIV</span>
         <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Mitgliedervorteile</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Rabatte, Partnerangebote, Mitglieder-only Aktionen und exklusive Erlebnisse — alles, was deine Mitgliedschaft im Rudel besonders macht.

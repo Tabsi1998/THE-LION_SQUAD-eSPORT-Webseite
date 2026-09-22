@@ -53,3 +53,21 @@ test("Ansprechpartner: nur besetzte, aktive Posten mit Titel, Name und Profil-Li
   ]);
   expect(boardContacts("kaputt")).toEqual([]);
 });
+
+// #364: Jede Adresse der Verweiszeile hat eine Route in App.jsx - eine tote Adresse fällt hier auf,
+// nicht erst beim Klick eines Mitglieds. Der Anker der Mitgliedskarte wird ohne Raute geprüft.
+test("jede Adresse der Verweiszeile hat eine Route", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const app = fs.readFileSync(path.resolve(process.cwd(), "src/App.jsx"), "utf-8");
+  const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((match) => match[1]);
+  const { MEMBER_AREA_LINKS } = await import("./memberArea");
+  expect(MEMBER_AREA_LINKS.map((link) => link.label)).toEqual(["Mitgliedschaft", "Mitgliedskarte", "Rechnungen", "Vorteile", "Dokumente", "Interne News", "Vorstand"]);
+  for (const link of MEMBER_AREA_LINKS) {
+    const path = link.to.split("#")[0];
+    expect(routes, `${link.label} → ${link.to}`).toContain(path);
+  }
+  // Alte Adressen leiten weiter, statt 404 zu zeigen.
+  expect(routes).toContain("/mitgliederbereich");
+  expect(routes).toContain("/member-area");
+});

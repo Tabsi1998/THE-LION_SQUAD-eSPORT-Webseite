@@ -40,7 +40,7 @@ export function MemberCardPanel() {
 
   const accent = card.accent_color || "#FFD700";
   return (
-    <div className="mt-6 border rounded-sm bg-[#0A0A0A] p-5 md:p-6" style={{ borderColor: accent }} data-testid="member-card">
+    <div id="mitgliedskarte" className="mt-6 border rounded-sm bg-[#0A0A0A] p-5 md:p-6 scroll-mt-24" style={{ borderColor: accent }} data-testid="member-card">
       <div className="flex flex-col md:flex-row gap-6 md:items-center">
         <div className="shrink-0 self-center md:self-auto rounded-sm bg-white p-2">
           <BrandedQRCode value={card.verify_url} size={168} logoRatio={0.2} />
