@@ -170,23 +170,20 @@ async def test_orders_are_sorted_by_what_is_missing_and_finance_sees_it(flow):
     order = await flow.db.billing_orders.find_one({}, {"_id": 0})
     assert order["status"] == "waiting_write_access" and "nicht angebunden" in order["note"]
 
-    # Angebunden, aber nur Lese-Schlüssel → immer noch kein Schreiben.
+    # Angebunden, aber Schalter aus → immer noch kein Schreiben (Teil 2 prüft den Weg mit Schalter).
     await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"id": "dolibarr", "mode": "live", "base_url": "https://erp.example", "api_key": "x"}}, upsert=True)
     assert (await billing_orders.classify_due())["waiting_write_access"] == 1
-    # Schreibschlüssel und Schalter → jetzt fehlt der Geschäftspartner der Person.
-    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"write_enabled": True, "write_api_key": "y"}})
-    assert (await billing_orders.classify_due())["waiting_link"] == 1
-    assert (await flow.db.billing_orders.find_one({}, {"_id": 0}))["status"] == "waiting_link"
+    assert (await flow.db.billing_orders.find_one({}, {"_id": 0}))["status"] == "waiting_write_access"
     assert await flow.db.dolibarr_links.count_documents({}) == 0, "es wird kein Kunde angelegt, ohne dass jemand es freigibt"
 
     flow.act_as(paula)
     assert (await flow.get("/api/admin/finance/overview")).status_code == 403
     flow.act_as(kassier)
     overview = (await flow.get("/api/admin/finance/overview")).json()
-    assert overview["by_status"]["waiting_link"]["count"] == 1
+    assert overview["by_status"]["waiting_write_access"]["count"] == 1
     row = overview["open"][0]
     assert row["person"] == "paula" and row["source"]["name"] == "Weihnachtsfeier" and row["total"] == "20,00 €"
-    assert "snapshot" not in row and overview["dolibarr"]["write_capable"] is True
+    assert "snapshot" not in row and overview["dolibarr"]["write_capable"] is False
 
 
 @pytest.mark.asyncio
@@ -206,12 +203,15 @@ async def test_manual_timing_holds_the_order_until_finance_releases_it(flow):
 
 
 @pytest.mark.asyncio
-async def test_write_access_needs_its_own_key(flow):
+async def test_write_access_needs_a_key_and_the_switch(flow):
+    """Entscheidung des Betreibers (22.09.): ein Website-Benutzer mit allen Rechten - der Schalter ist die Sicherung."""
     admin = await person(flow, "admin", role="superadmin")
     flow.act_as(admin)
-    assert (await flow.put("/api/admin/dolibarr/settings", json={"write_enabled": True})).status_code == 400
-    assert (await flow.put("/api/admin/dolibarr/settings", json={"write_api_key": "schreib-schluessel-test", "write_enabled": True})).status_code == 200
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"write_enabled": True})).status_code == 400, "ohne irgendeinen Schlüssel geht nichts"
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"api_key": "lese-und-schreib-schluessel-test", "write_enabled": True})).status_code == 200
     status = (await flow.get("/api/admin/dolibarr/status")).json()
-    assert status["write_enabled"] is True and status["write_api_key_configured"] is True
+    assert status["write_enabled"] is True and status["write_api_key_configured"] is False
+    assert status["write_capable"] is False, "im Modus „aus“ wird nie geschrieben"
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"write_api_key": "eigener-schreib-schluessel-test"})).status_code == 200
     stored = await flow.db.settings.find_one({"id": "dolibarr"}, {"_id": 0})
-    assert stored["write_api_key"] != "schreib-schluessel-test", "der Schlüssel liegt verschlüsselt"
+    assert "schluessel-test" not in str(stored), "beide Schlüssel liegen verschlüsselt"

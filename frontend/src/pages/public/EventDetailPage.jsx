@@ -353,7 +353,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             <div className="mt-2 text-sm" data-testid="event-own-price">
               <span className="text-white/65">Dein Kostenbeitrag: </span>
               <strong className="text-white">{formatCents(own.price.total_cents, own.price.currency)}</strong>
-              <span className="text-white/45"> · {own.price.billing_status === "cancelled" ? "storniert" : "die Rechnung kommt in dein Konto unter „Meine Rechnungen“"}</span>
+              <span className="text-white/45">
+                {" · "}
+                {own.price.billing_status === "cancelled" ? "storniert"
+                  : own.price.billing_status === "paid" ? `Rechnung ${own.price.invoice_ref || ""} bezahlt – danke!`
+                    : own.price.invoice_ref && own.price.invoice_status !== "draft" ? `Rechnung ${own.price.invoice_ref} offen – du findest sie unter „Meine Rechnungen“`
+                      : "die Rechnung kommt in dein Konto unter „Meine Rechnungen“"}
+              </span>
             </div>
           )}
           {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}

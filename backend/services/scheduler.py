@@ -154,6 +154,16 @@ async def _safe_billing_orders():
         _log_task_failure("billing_orders", exc)
 
 
+async def _safe_billing_sync():
+    try:
+        from services.billing_orders import sync_due
+        res = await sync_due()
+        if res.get("changed"):
+            logger.info(f"[scheduler] billing_sync {res}")
+    except Exception as exc:
+        _log_task_failure("billing_sync", exc)
+
+
 async def _safe_member_announcements():
     try:
         from services.member_announcements import notify_due
@@ -400,6 +410,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("member_announcements", _safe_member_announcements), IntervalTrigger(seconds=60), id="member_announcements",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_orders", _safe_billing_orders), IntervalTrigger(seconds=120), id="billing_orders",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
                   max_instances=1, coalesce=True)

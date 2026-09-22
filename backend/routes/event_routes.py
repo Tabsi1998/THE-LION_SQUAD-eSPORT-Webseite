@@ -191,6 +191,7 @@ def _public_event_registration(registration: dict, is_staff: bool = False) -> di
             "total_cents": snapshot.get("total_cents"), "currency": snapshot.get("currency"),
             "positions": [{k: line.get(k) for k in ("key", "label", "quantity", "unit_cents", "total_cents", "optional")} for line in snapshot.get("positions") or []],
             "accepted_at": snapshot.get("accepted_at"), "billing_status": registration.get("billing_status") or "pending",
+            "invoice_ref": registration.get("invoice_ref"), "invoice_status": registration.get("invoice_status"),
         }
     if is_staff:
         payload["email"] = registration.get("email")

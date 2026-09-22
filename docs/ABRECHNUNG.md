@@ -3,7 +3,7 @@
 Für Vorstand und Kassier: Was die Website kann, was sie noch nicht kann, und was auf eurer
 Seite eingerichtet sein muss. Fachlich ist das Epic #314 mit den Paketen #315–#322.
 
-## Was heute geht (Abrechnung I, Teil 1)
+## Was heute geht (Abrechnung I, Teil 1 und 2)
 
 **Ein Event kann etwas kosten.** Unter Admin → Events → Event bearbeiten gibt es den Abschnitt
 „Kosten und Abrechnung“ – nur für Personen mit dem Bereich **Finanzen**. Dort steht zum Beispiel:
@@ -35,39 +35,60 @@ Admin → Finanzen mit ihrem Status:
 
 | Status | Bedeutung | Was zu tun ist |
 | --- | --- | --- |
-| neu | gerade angelegt | nichts – der Job sortiert alle zwei Minuten ein |
-| wartet auf Schreibzugriff | Dolibarr ist nicht angebunden oder darf nicht schreiben | Schreib-Schlüssel eintragen (siehe unten) |
-| wartet auf Geschäftspartner | die Person hat in Dolibarr noch keinen Kunden/Geschäftspartner | kommt mit Teil 2 (automatische Anlage nach Freigabe) |
-| bereit | alles da | Teil 2 legt die Rechnung an |
+| neu | gerade angelegt | nichts – der Job läuft alle zwei Minuten |
+| wartet auf Schreibzugriff | Dolibarr ist nicht angebunden oder der Haken „Schreibzugriff“ fehlt | Haken setzen (siehe unten) |
+| Zuordnung prüfen | in Dolibarr gibt es schon einen Geschäftspartner mit derselben E-Mail (z. B. Familie) | in der Finanzübersicht die Nummer eintragen und „Zuordnen“ – oder „Trotzdem neu anlegen“ |
 | wartet auf Freigabe | Rechnungszeitpunkt „erst nach Freigabe“ | in der Finanzübersicht „Freigeben“ |
+| Rechnung angelegt | Beleg in Dolibarr da – Nummer und Stand stehen dabei | Entwürfe in Dolibarr prüfen und freigeben; Zahlungen dort buchen |
 | storniert | Anmeldung storniert, bevor eine Rechnung entstand | nichts |
-| gescheitert | dauerhaft ein Fehler | Text lesen, ggf. melden |
+| gescheitert | Dolibarr hat fünfmal nicht geantwortet | Text lesen, „Erneut versuchen“ |
 
-Nichts davon geht verloren: Ein Auftrag bleibt stehen, bis die Voraussetzung da ist.
+Nichts davon geht verloren: Ein Auftrag bleibt stehen, bis die Voraussetzung da ist. „Jetzt
+prüfen“ in der Finanzübersicht läuft sofort statt in zwei Minuten.
 
-## Was noch nicht geht (Teil 2)
+**Was beim Anlegen passiert (Teil 2):**
 
-- **Rechnungen in Dolibarr anlegen** (#317): Aus „bereit“ wird ein Beleg in Dolibarr, Entwurf
-  oder freigegeben je Einstellung, Nummer und Status kommen zurück, der Beleg erscheint unter
-  „Meine Rechnungen“.
-- **Geschäftspartner anlegen** (#316): Wer noch keinen Kunden in Dolibarr hat, bekommt einen –
-  nur nach bestätigter Zuordnung, nie still aus einer E-Mail-Adresse.
-- **Zahlungsabgleich, Storno mit Beleg, Erstattungen** (#321) und **Turnier-Startgelder** (#319).
-- **Rechnungen für Nicht-Mitglieder im Konto** (#320).
+1. **Geschäftspartner.** Mitglieder mit bestätigter Zuordnung bekommen den Geschäftspartner, der
+   in Dolibarr am Mitglied hängt; fehlt er, legt die Website einen an und merkt sich die Nummer.
+   Nicht-Mitglieder bekommen einen eigenen Kunden. Gibt es in Dolibarr schon jemanden mit
+   derselben E-Mail, entscheidet die Finanzverwaltung („Zuordnung prüfen“) – nie die Website.
+2. **Rechnung.** Positionen wie eingefroren, Menge, Steuerprofil; die Auftragskennung steht als
+   externe Referenz am Beleg – so entsteht auch nach einem Abbruch nie eine zweite Rechnung.
+   Neue Belege sind **Entwürfe** zur Prüfung in Dolibarr; mit dem Haken „Rechnungen gleich
+   freigeben“ (Admin → Dolibarr) sind sie sofort freigegeben.
+3. **Stand.** Alle zehn Minuten liest die Website Nummer, Freigabe und Zahlung nach. Bezahlt wird
+   in Dolibarr gebucht – die Website zeigt es der Person an der Anmeldung und dem Kassier in der
+   Finanzübersicht.
 
-## Was ihr in Dolibarr einrichtet, bevor Teil 2 kommt
+## Was noch nicht geht
 
-1. **Ein zweiter Dolibarr-Benutzer nur fürs Schreiben**, z. B. `website-rechnungen`, kein
-   Administrator. Rechte: Drittparteien lesen und anlegen/ändern; Rechnungen lesen,
-   anlegen/ändern, freigeben. Kein Löschen, keine Zahlungen.
-2. Bei diesem Benutzer einen **API-Schlüssel erzeugen** und ihn unter Admin → Dolibarr →
-   „Schreibzugriff für Rechnungen“ eintragen. Der Lese-Schlüssel des Website-Benutzers bleibt,
-   wie er ist – er wird nie zum Schreiben verwendet.
-3. **Schreibzugriff einschalten** (Haken). Ohne Haken schreibt die Website nichts, auch mit
-   Schlüssel nicht.
+- **Storno mit Beleg, Gutschriften, Erstattungen, Teilzahlungen im Detail** (#321).
+- **Rechnungen für Nicht-Mitglieder im eigenen Konto** (#320) – heute sehen Mitglieder ihre
+  Belege unter „Meine Rechnungen“, Nicht-Mitglieder nur den Stand an der Anmeldung.
+- **Turnier-Startgelder** (#319), Preisgelder (#323).
+
+## Was ihr in Dolibarr einrichtet
+
+Entscheidung des Betreibers (22.09.): **ein** Website-Benutzer in Dolibarr macht alles – lesen
+und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
+
+1. Beim Website-Benutzer (kein Administrator) diese Rechte setzen:
+   - Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner und
+     deren Objekte erweitern“ – sonst darf er für niemanden eine Rechnung anlegen.
+   - Rechnungen: einsehen, erstellen/bearbeiten. **Nicht:** Zahlungen erstellen, löschen.
+   - Produkte und Leistungen: einsehen. Mitglieder: einsehen.
+   - Vereine (Österreich): die vier Rechte des Moduls, darunter „Mitglieder und Geschäftspartner
+     verknüpfen und abgleichen“.
+2. Admin → Dolibarr → „Schreibzugriff für Rechnungen“: Haken **Schreibzugriff einschalten**.
+   Der Modus muss auf „Live“ stehen. Ohne Haken schreibt die Website nichts.
+3. Haken **Rechnungen gleich freigeben** erst setzen, wenn ein paar Entwürfe in Dolibarr geprüft
+   sind und die Zeilen stimmen (Steuer, Leistung, Text).
 4. Steuer: Das Steuerprofil je Position („ohne Umsatzsteuer“, „Normalsatz“, „ermäßigt“) ist ein
    Buchhaltungsentscheid. Für einen gemeinnützigen Verein ohne Umsatzsteuerpflicht bleibt es bei
-   „ohne Umsatzsteuer“ – im Zweifel den Steuerberater fragen.
+   „ohne Umsatzsteuer“ – im Zweifel den Steuerberater fragen. Mit Steuer rechnet die Website den
+   Nettopreis aus dem Bruttobetrag; Dolibarr rundet selbst – deshalb erst Entwürfe prüfen.
+5. Optional bleibt ein eigener Schlüssel eines zweiten Benutzers möglich (Admin → Dolibarr →
+   „Optional: eigener Schlüssel“).
 
 ## Wer darf was
 
