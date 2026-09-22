@@ -146,6 +146,33 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- Rechnungskonditionen und lesbare Belege (#370; PR #372). `dolibarr_billing`:
+  `TERM_FIELDS` (`invoice_payment_term_id`, `invoice_payment_mode_id`,
+  `invoice_bank_account_id` in den Dolibarr-Einstellungen), `invoice_terms(settings)`
+  → `cond_reglement_id`/`mode_reglement_id`/`fk_account` am Beleg,
+  `terms_complete` (alle drei; sonst **kein** `validate`, auch mit
+  `invoice_auto_validate`), `booking_facts(db, order)` (Event/Turnier mit Name,
+  Wiener Datum, Person, Begleitpersonen, Team, Spieler), `line_context`
+  („Weihnachtsfeier am 12.12.2026 – 2 Personen (Paula + 1 Begleitperson)“ /
+  „Herbst-Cup am … – Team [TLS] Lions, 5 Spieler“), `invoice_lines(snapshot,
+  settings, facts, extra_text)` (Kontext als zweite Zeile, Zusatz unter der
+  ersten Position, `MAX_DESC` 1000), `invoice_text_preview`, `source_label`;
+  `note_public` = „Anmeldung: <Quelle> – <Person>“ + Zusatz. Client:
+  `payment_terms()`, `payment_types()`, `bank_accounts()` (None bei 403 →
+  Nummer tippen). Routen: `GET /api/admin/dolibarr/invoice-options` (Listen +
+  `suggested` 30D/VIR/einziges Konto), Settings-PUT nimmt die drei Nummern
+  (0 löscht) und lehnt `invoice_auto_validate` ohne vollständige Konditionen
+  mit 400 ab; Status liefert `invoice_terms{…, complete}`; Finanzübersicht
+  liefert je offenem Auftrag `invoice_text` + `extra_text` und
+  `dolibarr.terms_complete`; `PUT /api/admin/finance/orders/{id}/text`
+  (`invoice_extra_text`, 409 sobald ein Beleg existiert). Web:
+  `components/tls/InvoiceTermsPanel.jsx` (Select aus Liste oder Nummernfeld,
+  „Vorschlag übernehmen“), Freigeben-Haken gesperrt bis vollständig;
+  `AdminFinancePage` „Rechnungstext“ je Auftrag mit Zusatz, Hinweis bei
+  fehlenden Konditionen. Fake: Wörterbücher, `/bankaccounts`
+  (`bank_readable`), Konditionen am Beleg. Tests
+  `test_billing_invoice_terms_flow.py` (6), `AdminFinancePage.test.jsx`,
+  Dolibarr-Seite +1.
 - Abrechnung II (#319 Startgelder für Turniere; schließt Epic #314; PR #371).
   `services/tournament_fees.py`: `BILLABLE_STATUSES` (approved, checked_in),
   `billing_updates(raw, existing, me)` (403 ohne Bereich Finanzen, dazu
@@ -828,8 +855,12 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach). `main`
 steht auf `8f7d6a2`.
 
 ### Offene PRs
+Reihenfolge: erst #371, dann #372 (#372 baut auf #371 auf).
 - #371 (Abrechnung II – #319 Startgelder für Turniere). Nach dem Merge
   `update.sh`; schließt das Epic #314.
+- #372 (#370 Rechnungskonditionen und lesbare Belege). Nach dem Merge
+  `update.sh`, dann unter Admin → Dolibarr → Schreibzugriff die drei
+  Konditionen eintragen („Vorschlag übernehmen“, Konto prüfen).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -868,7 +899,7 @@ steht auf `8f7d6a2`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (29 offen nach dem Merge von #369; #319 und Epic #314 schließt #371; neu #370 vom Betreiber)
+### Meilensteine und offene Issues (29 offen nach dem Merge von #369; #319 und Epic #314 schließt #371, #370 schließt #372)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -879,7 +910,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366 |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
+| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |

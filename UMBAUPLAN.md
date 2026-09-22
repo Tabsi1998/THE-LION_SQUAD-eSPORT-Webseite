@@ -468,7 +468,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. Offen: #320, #321 im Detail |
+| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). Offen: #320, #321 im Detail |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
@@ -601,6 +601,23 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 32 — Rechnungskonditionen und lesbare Belege
+
+### Was 32.1 gefunden hat (#370 – PR #372)
+
+**Ein Beleg ohne Zahlungsziel ist kein fertiger Beleg.** Die Website legte Rechnungen ohne
+Zahlungsziel, Zahlungsart und Bankkonto an – Dolibarr nahm dann seine Vorgaben oder gar nichts.
+Solange Belege Entwürfe waren, fiel das beim Prüfen auf; mit „gleich freigeben“ wären Rechnungen
+ohne Zahlungsziel hinausgegangen. Jetzt stehen die drei Konditionen in den Einstellungen
+(Listen aus Dolibarr, Vorschlag 30 Tage / Überweisung), und ohne alle drei gibt die Website
+nichts automatisch frei – der Haken lässt sich gar nicht erst setzen.
+
+**„Kostenbeitrag“ allein sagt dem Kunden nichts.** Auf der Rechnung stand die Leistung, nicht der
+Anlass. Jede Zeile nennt jetzt den Vorgang – Event oder Turnier mit Datum, Personen und
+Begleitpersonen, Team und Spielerzahl – aus den Daten, die die Buchung ohnehin hat. Was die
+Buchung nicht weiß (Tisch, Menü, Sonderwunsch), ergänzt die Finanzverwaltung als Zusatz, solange
+der Beleg noch nicht existiert; danach ist Dolibarr die Stelle für Änderungen, nicht die Website.
 
 ## Block 31 — Abrechnung II: Startgelder für Turniere
 

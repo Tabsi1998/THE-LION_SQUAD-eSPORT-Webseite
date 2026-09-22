@@ -80,6 +80,9 @@ export default function AdminFinancePage() {
                 : !data.dolibarr?.connected
                   ? <>Dolibarr ist nicht angebunden – Aufträge bleiben hier stehen. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Zur Anbindung</Link></>
                   : <>Für Rechnungen fehlt der Schreibzugriff (eigener Schlüssel unter <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Dolibarr → Schreibzugriff</Link>). Aufträge bleiben bis dahin hier stehen.</>}
+              {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
+                <div className="mt-1 text-xs text-[#FFD700]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Unter Dolibarr → Schreibzugriff eintragen</Link>.</div>
+              )}
             </div>
           </div>
 
@@ -98,8 +101,11 @@ export default function AdminFinancePage() {
                 {data.open.map((row) => (
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
-                      {row.source?.slug ? <Link to={`/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : row.source?.name || row.source_id}
+                      {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : row.source?.name || row.source_id}
                       <div className="text-[11px] text-white/40">{new Date(row.created_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>
+                      {Array.isArray(row.invoice_text) && (
+                        <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
+                      )}
                     </td>
                     <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
                     <td className="px-4 py-3 text-right font-display font-bold tabular-nums">{row.total}</td>
@@ -176,6 +182,28 @@ export default function AdminFinancePage() {
         </>
       )}
     </AdminLayout>
+  );
+}
+
+// Rechnungstext (#370): so kämen die Zeilen auf den Beleg; ein Zusatztext geht mit, solange
+// kein Beleg existiert - danach ist der Text in Dolibarr zu Hause.
+function InvoiceTextEditor({ row, busy, onSave }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(row.extra_text || "");
+  useEffect(() => { setText(row.extra_text || ""); }, [row.extra_text]);
+  return (
+    <details className="mt-1 text-[11px]" open={open} onToggle={(ev) => setOpen(ev.currentTarget.open)} data-testid={`finance-text-${row.id}`}>
+      <summary className="cursor-pointer text-white/55 hover:text-white uppercase tracking-wider font-bold">Rechnungstext{row.extra_text ? " · mit Zusatz" : ""}</summary>
+      <div className="mt-2 space-y-2">
+        {row.invoice_text.map((line, index) => (
+          <pre key={index} className="whitespace-pre-wrap font-sans text-white/70 border border-white/10 rounded-sm px-2 py-1.5 bg-black/20" data-testid={`finance-text-line-${row.id}-${index}`}>{line}</pre>
+        ))}
+        <textarea value={text} onChange={(ev) => setText(ev.target.value)} rows={2} maxLength={500} placeholder="Zusatz für die Rechnung, z. B. „inkl. Essen und Getränke“ oder „Tisch 4 reserviert“" className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Zusatztext für die Rechnung" />
+        <button type="button" disabled={!!busy || text.trim() === (row.extra_text || "")} onClick={() => onSave(text)} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-text-save-${row.id}`}>
+          Zusatz speichern
+        </button>
+      </div>
+    </details>
   );
 }
 
