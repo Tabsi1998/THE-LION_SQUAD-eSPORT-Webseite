@@ -165,6 +165,18 @@ async def _safe_billing_orders():
         _log_task_failure("billing_orders", exc)
 
 
+async def _safe_discord_bot_roles():
+    """Discord-Rollen abgleichen (#302) - nur wenn der Bot verbunden ist."""
+    try:
+        from services.discord_bot import bot
+        if bot.status().get("connected"):
+            res = await bot.sync_roles()
+            if res.get("changes"):
+                logger.info(f"[scheduler] discord_bot_roles {res}")
+    except Exception as exc:
+        _log_task_failure("discord_bot_roles", exc)
+
+
 async def _safe_billing_sync():
     try:
         from services.billing_orders import sync_due
@@ -426,6 +438,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("matchday_schedule", _safe_matchday_schedule), IntervalTrigger(minutes=15), id="matchday_schedule",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
                   max_instances=1, coalesce=True)

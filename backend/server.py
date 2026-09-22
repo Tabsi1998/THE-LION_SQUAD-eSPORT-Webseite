@@ -41,6 +41,7 @@ from routes.invoice_routes import router as invoice_router
 from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
 from routes.platform_link_routes import router as platform_link_router
+from routes.discord_bot_routes import router as discord_bot_router
 from routes.upload_routes import router as upload_router
 from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.sticker_routes import router as sticker_router
@@ -127,8 +128,20 @@ async def lifespan(app: FastAPI):
             start_scheduler()
         except Exception as exc:
             logger.warning(f"[scheduler] failed to start: {exc}")
+    # Discord-Bot (#302): läuft im Backend, sobald Token und Schalter im Admin gesetzt sind.
+    if os.environ.get("DISABLE_SCHEDULER", "").lower() != "true":
+        try:
+            from services.discord_bot import bot as discord_bot
+            await discord_bot.start_if_enabled()
+        except Exception as exc:
+            logger.warning(f"[discord-bot] failed to start: {exc}")
     logger.info("[THE LION SQUAD] Startup complete.")
     yield
+    try:
+        from services.discord_bot import bot as discord_bot
+        await discord_bot.stop()
+    except Exception:
+        pass
     try:
         from services.scheduler import stop_scheduler
         stop_scheduler()
@@ -232,6 +245,7 @@ app.include_router(invoice_router)
 app.include_router(member_card_router)
 app.include_router(finance_router)
 app.include_router(platform_link_router)
+app.include_router(discord_bot_router)
 app.include_router(settings_router)
 app.include_router(season_router)
 app.include_router(widget_router)
