@@ -12,6 +12,12 @@ def fetch(base, path):
         return response.headers, response.read(2_000_000).decode("utf-8")
 
 
+def header_line(headers, name):
+    """Alle Werte einer Kopfzeile, kommagetrennt - nginx darf Cache-Control mehrfach schicken."""
+    values = headers.get_all(name) if hasattr(headers, "get_all") else [headers.get(name)]
+    return ", ".join(value for value in (values or []) if value)
+
+
 def check(base):
     parsed = urlsplit(base)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
@@ -37,11 +43,32 @@ def check(base):
         if not assets or (root_assets is not None and assets != root_assets):
             raise ValueError(f"{path}: stale or missing application assets")
         root_assets = assets
-    for asset in root_assets:
-        headers, _body = fetch(base, "/" + asset)
-        if "text/html" in headers.get("Content-Type", ""):
-            raise ValueError("Missing application asset returned HTML")
-    return {"origin": base, "version": version, "ok": True}
+    # Jede Skriptdatei, die die Bundles nachladen (auch Worker als .mjs), muss als JavaScript
+    # und unveränderlich gecacht kommen. Ein .mjs als octet-stream sah man nur im Browser:
+    # „Setting up fake worker failed“, kein PDF (#361). Zwei Ebenen: Einstieg → Chunks → Worker.
+    seen, queue, checked = set(), list(root_assets), 0
+    while queue and checked < 400:
+        asset = queue.pop(0)
+        if asset in seen:
+            continue
+        seen.add(asset)
+        headers, body = fetch(base, "/" + asset)
+        checked += 1
+        content_type = headers.get("Content-Type", "")
+        if "text/html" in content_type:
+            raise ValueError(f"Missing application asset returned HTML: {asset}")
+        if asset.endswith((".js", ".mjs")):
+            if "javascript" not in content_type:
+                raise ValueError(f"{asset}: served as {content_type or 'unknown'} instead of JavaScript")
+            if "immutable" not in header_line(headers, "Cache-Control").lower():
+                raise ValueError(f"{asset}: application asset must be cached immutable")
+            # Vite schreibt Nachlade-Pfade relativ (`./chunk.js`) und Worker-Adressen absolut (`/assets/x.mjs`);
+            # nur Namen mit Vite-Hash zählen - `./pdf.worker.mjs` in pdf.js ist ein interner Ersatzname, keine Datei.
+            for name in set(re.findall(r'(?:assets/|\./)([\w.-]+-[\w-]{8}\.(?:js|mjs))', body)):
+                ref = "assets/" + name
+                if ref not in seen:
+                    queue.append(ref)
+    return {"origin": base, "version": version, "ok": True, "assets_checked": checked}
 
 
 def main():
