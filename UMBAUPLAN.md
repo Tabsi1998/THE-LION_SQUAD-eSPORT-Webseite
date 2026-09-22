@@ -458,7 +458,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg – umgesetzt in #304, Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
-| App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #373 (Block 33), Build 66 nach dem Merge |
+| App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner (bis 22.09. „0.8.0-beta“) |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
@@ -604,7 +604,7 @@ Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
 
 ## Block 33 — App 0.8.0-beta: Kalender und Galerie
 
-### Was 33.1 gefunden hat (#216, #236 – PR #373)
+### Was 33.1 gefunden hat (#216, #236 – PR #374)
 
 **Der Kalender ist eine zweite Sicht, keine zweite Liste.** Der Events-Tab lädt Events, Turniere
 und Fast Laps ohnehin; der Kalender legt sie auf ein Monatsraster – Punkte je Art, ein goldener

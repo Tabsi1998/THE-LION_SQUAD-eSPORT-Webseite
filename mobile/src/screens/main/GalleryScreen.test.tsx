@@ -16,7 +16,7 @@ jest.mock("../../lib/api", () => ({
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 
-const navigation = { navigate: jest.fn(), setOptions: jest.fn() } as never;
+const navigation = { navigate: jest.fn(), setOptions: jest.fn() };
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -27,7 +27,7 @@ test("Alben: Titel, Datum, Anzahl und Kennzeichen; Antippen öffnet das Album", 
     { id: "a1", slug: "lan-2026", title: "LAN 2026", cover_url: "/api/static/uploads/lan.webp", taken_at: "2026-09-12T10:00:00Z", visibility: "public", photo_count: 12, video_count: 2 },
     { id: "a2", slug: "intern", title: "Vorstandsklausur", visibility: "members", photo_count: 3, video_count: 0 },
   ] });
-  await render(<GalleryScreen navigation={navigation} route={{ key: "g", name: "Gallery" } as never} />);
+  await render(<GalleryScreen navigation={navigation as never} route={{ key: "g", name: "Gallery" } as never} />);
   await waitFor(() => expect(screen.getByTestId("gallery-album-lan-2026")).toBeTruthy());
   expect(mockGet).toHaveBeenCalledWith("/gallery", { params: { compact: true, limit: 80 } });
   expect(screen.getByText(/12 Bilder · 2 Videos/)).toBeTruthy();
@@ -46,7 +46,7 @@ test("Album: Kacheln je Abschnitt, Antippen öffnet die Großansicht mit dem ric
       { id: "v1", order_index: 3, section_id: "s1", media_type: "video", video_url: "/api/static/uploads/v1.mp4", thumbnail_url: "/api/static/uploads/v1.jpg" },
     ],
   } });
-  await render(<GalleryAlbumScreen navigation={navigation} route={{ key: "al", name: "GalleryAlbum", params: { id: "lan-2026" } } as never} />);
+  await render(<GalleryAlbumScreen navigation={navigation as never} route={{ key: "al", name: "GalleryAlbum", params: { id: "lan-2026" } } as never} />);
   await waitFor(() => expect(screen.getByTestId("gallery-item-v1")).toBeTruthy());
   expect(screen.getByText("Samstag")).toBeTruthy();
   expect(navigation.setOptions).toHaveBeenCalledWith({ title: "LAN 2026" });
