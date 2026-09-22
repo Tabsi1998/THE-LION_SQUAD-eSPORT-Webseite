@@ -1,4 +1,4 @@
-import { billingFormError, centsFromInput, formToBilling, formatCents, inputFromCents, offerSummary, positionsToForm, previewQuote } from "./pricing";
+import { billingFormError, centsFromInput, formToBilling, formatCents, inputFromCents, offerSummary, positionsToForm, previewQuote, startFeeSummary, tournamentBillingToForm } from "./pricing";
 
 // Preis-Vorschau im Web (#315, #318): dieselben Regeln wie der Server, ganze Cent.
 
@@ -42,4 +42,20 @@ test("Formular ↔ Server und Fehlertexte vor dem Speichern", () => {
   expect(billingFormError({ enabled: true, positions: [{ label: "x", amount: "abc" }] })).toMatch(/Betrag/);
   expect(billingFormError({ enabled: true, positions: [{ label: "x", amount: "1", optional: true }] })).toMatch(/Pflicht/);
   expect(billingFormError({ enabled: true, positions: [{ label: "x", amount: "1", dolibarr_product_id: "a1" }] })).toMatch(/Nummer/);
+});
+
+// Startgeld am Turnier (#319): „Person“ ist ein Spieler des Rosters; die zwei Turnier-Schalter
+// gehen nur mit, wenn das Formular sie führt - das Event-Formular bleibt unverändert.
+test("Startgeld: Satz je Turnierart und Turnier-Schalter nur im Turnierformular", () => {
+  expect(startFeeSummary(OFFER, { teamMode: "solo" })).toBe("20,00 € Startgeld");
+  expect(startFeeSummary(OFFER, { teamMode: "team", teamSize: 5 })).toBe("20,00 € je Spieler · Team mit 5 Spielern 100,00 €");
+  const perTeam = { ...OFFER, positions: [{ key: "s", label: "Startgeld", amount_cents: 5000, basis: "per_team", optional: false }] };
+  expect(startFeeSummary(perTeam, { teamMode: "team", teamSize: 5 })).toBe("50,00 € je Team");
+  expect(startFeeSummary({ enabled: false })).toBe("");
+
+  const eventForm = { enabled: true, positions: positionsToForm(OFFER) };
+  expect("count_substitutes" in formToBilling(eventForm)).toBe(false);
+  const tournamentForm = tournamentBillingToForm({ ...OFFER, count_substitutes: true });
+  expect(tournamentForm).toMatchObject({ enabled: true, count_substitutes: true, included_in_event: false, invoice_timing: "on_confirm" });
+  expect(formToBilling(tournamentForm)).toMatchObject({ count_substitutes: true, included_in_event: false });
 });

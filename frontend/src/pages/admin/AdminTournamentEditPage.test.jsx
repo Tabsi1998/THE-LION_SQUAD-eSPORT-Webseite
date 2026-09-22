@@ -24,8 +24,10 @@ vi.mock("@/lib/api", () => ({
   resolveMediaUrl: (value) => value || "",
 }));
 
+// Der Bereich Finanzen (#322) entscheidet, ob das Startgeld (#319) im Formular steht.
+const authState = { areas: [] };
 vi.mock("@/context/AuthContext", () => ({
-  useAuth: () => ({ isAdmin: true, isModerator: true, user: { id: "admin-1", display_name: "Admin" } }),
+  useAuth: () => ({ isAdmin: true, isModerator: true, user: { id: "admin-1", display_name: "Admin" }, can: (area) => authState.areas.includes(area) }),
 }));
 
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
@@ -86,10 +88,46 @@ function renderPage() {
 }
 
 beforeEach(() => {
+  authState.areas = [];
   apiMock.get.mockImplementation((url) => Promise.resolve(routeFor(String(url))));
   apiMock.post.mockResolvedValue({ data: {} });
   apiMock.patch.mockImplementation((_url, body) => Promise.resolve({ data: { ...TOURNAMENT, ...body } }));
   apiMock.delete.mockResolvedValue({ data: {} });
+});
+
+// Startgeld (#319): nur der Bereich Finanzen sieht den Abschnitt, und nur dann geht `billing`
+// beim Speichern mit - der Server lehnt es sonst mit 403 ab.
+test("ohne Bereich Finanzen gibt es im Formular kein Startgeld", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  expect(await screen.findByTestId("tr-edit-save")).toBeInTheDocument();
+  expect(screen.queryByTestId("event-billing")).not.toBeInTheDocument();
+});
+
+test("Finanzen schaltet das Startgeld ein und Speichern schickt es mit den Turnier-Schaltern", async () => {
+  authState.areas = ["finance"];
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const section = await screen.findByTestId("event-billing");
+  expect(section).toHaveTextContent("Startgeld");
+  await user.click(screen.getByTestId("event-billing-enabled"));
+  await user.type(screen.getByTestId("event-billing-amount-0"), "10");
+  await user.click(screen.getByTestId("tournament-billing-substitutes"));
+  expect(screen.getByTestId("tr-edit-unsaved")).toBeInTheDocument();
+  await user.click(screen.getByTestId("tr-edit-save"));
+
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({
+    billing: expect.objectContaining({
+      enabled: true, count_substitutes: true, included_in_event: false,
+      positions: [expect.objectContaining({ label: "Startgeld", amount_cents: 1000, basis: "per_person" })],
+    }),
+  })));
 });
 
 test("laedt das Turnier und zeigt Titel und Status", async () => {

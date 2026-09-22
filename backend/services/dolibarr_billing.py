@@ -190,8 +190,9 @@ async def _mark_invoiced(db, order: dict, state: dict) -> None:
         **({"paid_at": now} if state.get("paid") and not order.get("paid_at") else {}),
     }})
     billing_status = "paid" if state.get("paid") else "invoiced"
-    if order.get("kind") == "event":
-        await db.event_registrations.update_one({"id": order["registration_id"]}, {"$set": {
+    collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
+    if collection is not None:
+        await collection.update_one({"id": order["registration_id"]}, {"$set": {
             "billing_status": billing_status, "invoice_id": state["invoice_id"], "invoice_ref": state["invoice_ref"], "invoice_status": state["invoice_status"],
         }})
 
@@ -210,6 +211,10 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     if order.get("kind") == "event" and not source_name:
         event = await db.events.find_one({"id": order["source_id"]}, {"_id": 0, "name": 1})
         source_name = (event or {}).get("name") or "Event"
+    if order.get("kind") == "tournament" and not source_name:
+        tournament = await db.tournaments.find_one({"id": order["source_id"]}, {"_id": 0, "title": 1})
+        team = (order.get("snapshot") or {}).get("source", {}).get("display_name")
+        source_name = f"Startgeld {(tournament or {}).get('title') or 'Turnier'}" + (f" – {team}" if team else "")
     payload = invoice_payload(order, socid, settings, source_name=source_name, person=user.get("display_name") or user.get("username") or "")
     invoice_id = await client.create_invoice(payload)
     # Sofort merken: Ab hier gibt es den Beleg - ein Abbruch darf keinen zweiten erzeugen.

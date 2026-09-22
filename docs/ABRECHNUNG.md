@@ -1,9 +1,9 @@
-# Abrechnung: Kosten an Events, Rechnungen aus Dolibarr
+# Abrechnung: Kosten an Events, Startgelder, Rechnungen aus Dolibarr
 
 Für Vorstand und Kassier: Was die Website kann, was sie noch nicht kann, und was auf eurer
 Seite eingerichtet sein muss. Fachlich ist das Epic #314 mit den Paketen #315–#322.
 
-## Was heute geht (Abrechnung I, Teil 1 und 2)
+## Was heute geht (Abrechnung I, Teil 1 und 2; Abrechnung II)
 
 **Ein Event kann etwas kosten.** Unter Admin → Events → Event bearbeiten gibt es den Abschnitt
 „Kosten und Abrechnung“ – nur für Personen mit dem Bereich **Finanzen**. Dort steht zum Beispiel:
@@ -64,12 +64,35 @@ prüfen“ in der Finanzübersicht läuft sofort statt in zwei Minuten.
    in Dolibarr gebucht – die Website zeigt es der Person an der Anmeldung und dem Kassier in der
    Finanzübersicht.
 
+**Ein Turnier kann Startgeld kosten (Abrechnung II).** Unter Admin → Turniere → Turnier →
+Bearbeiten gibt es den Abschnitt „Startgeld“ – wieder nur für den Bereich **Finanzen**, mit
+denselben Positionen und Leistungen aus Dolibarr wie beim Event. Zwei Dinge sind anders:
+
+- **je Spieler** zählt die Spieler des Turnier-Rosters, nicht die Mitglieder des Community-Teams.
+  Solo ist eine Person. Ersatzspieler zählen nur mit dem Haken „Ersatzspieler zählen mit“. Steht
+  bei der Freigabe noch kein Roster, gilt die Teamgröße des Turniers. **je Team** ist ein Betrag
+  je Anmeldung, egal wie groß das Team ist.
+- **Wer anmeldet, zahlt.** Solo die Person selbst; bei Teams die Teamleitung, die beim Anmelden
+  den Haken „Ich übernehme das Startgeld für das Team (Rechnung an mich)“ setzt – ohne den Haken
+  nimmt die Website die Anmeldung nicht an. Teamname und Team stehen als Bezug auf der Rechnung.
+  Einzelrechnungen je Spieler gibt es nicht (das wäre eine eigene Stufe).
+
+**Bezahlt wird erst mit der verbindlichen Teilnahme.** Warteliste und offene Freigabe kosten
+nichts; der Preis entsteht, wenn die Anmeldung auf „freigegeben“ geht – mit den dann gültigen
+Positionen, und wird dann eingefroren. Ablehnung, „nicht erschienen“ oder Abmeldung vor dem
+Beleg schließen den Auftrag. Die Aufträge stehen in derselben Finanzübersicht wie die der Events
+(Quelle „Startgeld <Turnier>“), der Rechnungsweg nach Dolibarr ist derselbe.
+
+**Turnier im Event.** Hängt das Turnier an einem Event, dessen Kostenbeitrag das Startgeld schon
+enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
+das Turnier kein Startgeld und es entsteht keine zweite Rechnung.
+
 ## Was noch nicht geht
 
 - **Storno mit Beleg, Gutschriften, Erstattungen, Teilzahlungen im Detail** (#321).
 - **Rechnungen für Nicht-Mitglieder im eigenen Konto** (#320) – heute sehen Mitglieder ihre
   Belege unter „Meine Rechnungen“, Nicht-Mitglieder nur den Stand an der Anmeldung.
-- **Turnier-Startgelder** (#319), Preisgelder (#323).
+- **Einzelrechnungen je Spieler** bei Team-Startgeldern; Preisgelder (#323).
 
 ## Was ihr in Dolibarr einrichtet
 
@@ -96,9 +119,10 @@ und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
 
 ## Wer darf was
 
-- **Finanzen** (neuer Bereich): Kosten an Events pflegen, Finanzübersicht sehen, Aufträge
-  freigeben. Club-Admin und Superadmin haben ihn; anderen gibt ihn der Superadmin unter
+- **Finanzen** (neuer Bereich): Kosten an Events und Startgelder an Turnieren pflegen,
+  Finanzübersicht sehen, Aufträge freigeben. Club-Admin und Superadmin haben ihn; anderen gibt ihn der Superadmin unter
   Admin → Alle Benutzer als Freigabe. Wie jeder Adminbereich verlangt er Zwei-Faktor.
-- **Turnierleitung** bearbeitet Events weiterhin – ohne den Bereich Finanzen sieht sie den
-  Abschnitt „Kosten und Abrechnung“ nicht, und der Server lehnt Änderungen daran ab.
+- **Turnierleitung** bearbeitet Events und Turniere weiterhin – ohne den Bereich Finanzen sieht
+  sie die Abschnitte „Kosten und Abrechnung“ und „Startgeld“ nicht, und der Server lehnt
+  Änderungen daran ab.
 - Die Teilnehmerliste zeigt keine Beträge; der eigene Preis steht nur bei der eigenen Anmeldung.

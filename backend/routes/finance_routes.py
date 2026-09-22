@@ -26,10 +26,14 @@ async def finance_overview(me: dict = Depends(require_area("finance"))):
     data = await billing_orders.overview(db)
     # Namen der Angebote dazu, damit die Liste ohne zweite Abfrage lesbar ist.
     event_ids = sorted({row["source_id"] for row in data["open"] + data["invoiced"] if row.get("kind") == "event"})
+    tournament_ids = sorted({row["source_id"] for row in data["open"] + data["invoiced"] if row.get("kind") == "tournament"})
     names = {}
     if event_ids:
         async for event in db.events.find({"id": {"$in": event_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}):
-            names[event["id"]] = {"name": event.get("name"), "slug": event.get("slug")}
+            names[event["id"]] = {"name": event.get("name"), "slug": event.get("slug"), "kind": "event"}
+    if tournament_ids:
+        async for tournament in db.tournaments.find({"id": {"$in": tournament_ids}}, {"_id": 0, "id": 1, "title": 1, "slug": 1}):
+            names[tournament["id"]] = {"name": f"Startgeld {tournament.get('title')}", "slug": tournament.get("slug"), "kind": "tournament"}
     user_ids = sorted({row["user_id"] for row in data["open"] + data["invoiced"]})
     people = {}
     if user_ids:

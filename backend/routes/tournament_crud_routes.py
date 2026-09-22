@@ -33,6 +33,8 @@ from services.slug_utils import (
     unique_slug,
 )
 from models import TournamentCreate, TournamentUpdate, now_utc, new_id
+from services import pricing, tournament_fees
+from services.permissions import user_has_area
 from routes.tournament_common import (
     STAFF_ROLES,
     _create_initial_stage_bracket_preview,
@@ -172,8 +174,10 @@ async def list_tournaments(status: str | None = None, game_id: str | None = None
             elif t.get("is_public") is not False and await user_can_see(user, t.get("visibility") or "public"):
                 visible.append(t)
         tournaments = visible
+    finance = bool(user) and await user_has_area(user, "finance")
     for t in tournaments:
         await _enrich_tournament(t, user)
+        _expose_offer(t, finance)
     if compact:
         tournaments = [_compact_tournament(t) for t in tournaments]
         return _page_items(tournaments, limit, offset, paged)
@@ -230,7 +234,16 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
         else:
             for c in t["related_f1_challenges"]:
                 c["public_phase"] = derive_public_phase(c, "f1")
+    _expose_offer(t, bool(user) and await user_has_area(user, "finance"))
     return t
+
+
+def _expose_offer(t: dict, finance: bool) -> None:
+    """Startgeld (#319): Preisangabe für alle, die Konfiguration mit Dolibarr-Nummern nur für Finanzen."""
+    offer = t.pop("billing", None)
+    t["offer"] = pricing.public_offer(offer) if tournament_fees.charges(t, offer) else None
+    if finance:
+        t["billing"] = offer or pricing.normalize_offer(None)
 
 
 @router.post("")
@@ -253,6 +266,8 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             doc = body.model_dump()
             doc["creation_key"] = creation_key
+            billing = await tournament_fees.billing_updates(body.model_dump(exclude_unset=True), None, me)
+            doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
             doc["slug"] = await unique_slug(db.tournaments, doc.get("slug") or doc.get("title"), fallback="turnier")
             doc["format_label"] = (doc.get("format_label") or "").strip() or None
             if doc.get("format") != "single_elim":
@@ -282,6 +297,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
             doc.pop("_id", None)
             doc.pop("creation_key", None)
             apply_competition_version_read_defaults(doc)
+            _expose_offer(doc, await user_has_area(me, "finance"))
             doc["auto_generated_bracket"] = auto_preview
             doc["idempotent_replay"] = False
             return doc
@@ -313,6 +329,11 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         "result_entry_mode", "schedule_mode",
     }
     updates = {k: v for k, v in raw_updates.items() if v is not None or k in nullable_fields}
+    billing = await tournament_fees.billing_updates(raw_updates, existing, me)
+    if billing is not None:
+        updates["billing"] = billing
+    else:
+        updates.pop("billing", None)
     slug_source = slug_source_for_update(raw_updates, existing, "title", fallback="turnier")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.tournaments, slug_source, current_id=tid, fallback="turnier")
@@ -333,6 +354,7 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)
+    _expose_offer(t, await user_has_area(me, "finance"))
     return t
 
 

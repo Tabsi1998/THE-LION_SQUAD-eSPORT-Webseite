@@ -146,6 +146,41 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- Abrechnung II (#319 Startgelder für Turniere; schließt Epic #314; PR #370).
+  `services/tournament_fees.py`: `BILLABLE_STATUSES` (approved, checked_in),
+  `billing_updates(raw, existing, me)` (403 ohne Bereich Finanzen, dazu
+  `count_substitutes`, `included_in_event`), `roster_size(reg, tournament,
+  offer)` (Solo 1; Team = Roster/Lineup ohne Ersatzspieler außer
+  `count_substitutes`, ohne Roster die `team_size` – **nie** die
+  Mitgliederzahl des Community-Teams), `charges(tournament, offer)` (bezahlt
+  und nicht `included_in_event` mit `event_id`), `freeze_price(db, reg,
+  tournament, payer=)` (nur in `BILLABLE_STATUSES`, einmal; Snapshot +
+  `billing_orders.create_order(kind="tournament")`, Quelle mit `team_id`,
+  `display_name`), `close_price(db, reg, reason)` (Aufträge stornieren,
+  `billing_status: cancelled`), `public_price(reg)` (ohne Dolibarr-Nummern,
+  mit `payer_user_id`). Modelle: `BillingConfig.count_substitutes/
+  included_in_event`, `RegistrationCreate.accept_costs/selected_positions`,
+  `TournamentCreate/Update.billing`. Routen: Anlegen/Ändern über
+  `billing_updates`, Liste/Detail/Anlegen/Ändern `_expose_offer(t, finance)`
+  (`offer` öffentlich, `billing` nur Finanzen); Anmeldung 400 ohne
+  `accept_costs` bei Kosten, Snapshot nach approved/checked_in, Admin-PUT
+  approved → `freeze_price` (Zahler = Anmelder), rejected/no_show →
+  `close_price`, DELETE → `close_price` vor dem Löschen;
+  `_public_registration` gibt `price` nur der eigenen Anmeldung.
+  `dolibarr_billing._mark_invoiced` je Art (`event_registrations` /
+  `tournament_registrations`), Rechnungstext „Startgeld <Titel> – <Team>“;
+  Finanzübersicht Quelle `{"name": "Startgeld <Titel>", "kind": "tournament"}`.
+  Web: `lib/pricing.js` `TOURNAMENT_PRICE_BASES`, `startFeeSummary`,
+  `tournamentBillingToForm`, `formToBilling` schickt die Turnier-Schalter nur
+  mit, wenn das Formular sie führt; `EventBillingSection kind="tournament"
+  hasEvent` (Titel „Startgeld“, Vorschau Team mit fünf, zwei Schalter);
+  `AdminTournamentEditPage` Abschnitt nur mit `can("finance")`, `billing`
+  im PATCH nur bei Änderung; `TournamentDetailPage` Kasten „Startgeld“,
+  Modal immer bei `offer` (Summe, wählbare Positionen, Pflichthaken
+  `accept_costs`), „Dein Startgeld“ nur an der eigenen Anmeldung. Tests
+  `test_tournament_fees_flow.py` (5), `TournamentDetailPage.test.jsx`,
+  Erweiterungen in `pricing.test.js`, `EventBillingSection.test.jsx`,
+  `AdminTournamentEditPage.test.jsx`.
 - Admin und Turniere (#203, #204, #227, #228, #235; PR #369).
   **#235** `services/matchday_schedule.py`: `schedule_writes(tournament,
   matches, proposals)` (reine Rechnung: was je Partie zu schreiben ist –
@@ -791,9 +826,12 @@ angelegt), #366 (#364 Mitgliederbereich aufgeräumt), #367 (Leistungen aus
 Dolibarr im Event auswählen). `main` steht auf `b112aea`.
 
 ### Offene PRs
+Reihenfolge: erst #369, dann #370 (#370 baut auf #369 auf).
 - #369 (Admin und Turniere – #203, #204, #227, #228, #235). Nach dem Merge
   `update.sh`; der Spieltag-Lauf trägt bestehende Liga-Partien beim ersten
   Lauf nach.
+- #370 (Abrechnung II – #319 Startgelder für Turniere). Nach dem Merge
+  `update.sh`; schließt das Epic #314.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -832,7 +870,7 @@ Dolibarr im Event auswählen). `main` steht auf `b112aea`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (33 offen nach dem Merge von #367; #203/#204/#227/#228/#235 schließt #369, neu #368)
+### Meilensteine und offene Issues (33 offen nach dem Merge von #367; #203/#204/#227/#228/#235 schließt #369, #319 und Epic #314 schließt #370, neu #368)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -844,7 +882,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
-| Abrechnung II: Turniere | #319 Startgelder, #314 Epic (schließt damit) |
+| Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #370; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
@@ -882,9 +920,9 @@ sinnvoll hältst“):
    Teil 2 in #365 (Kunden und Belege in Dolibarr; erster Durchlauf am 22.09.
    bestätigt). Rest (#320, #321) offen. Admin und Turniere – umgesetzt in
    #369 (#203/#204 berührten dieselben
-   Event-Formulare wie #318 – zusammen planen), App 0.8.0-beta.
-8. Abrechnung II, Discord II, App 0.9.0-beta, Auszeichnungen und Marke,
-   App 1.0.0.
+   Event-Formulare wie #318 – zusammen planen). Abrechnung II – umgesetzt in
+   #370 (baut auf #369 auf). App 0.8.0-beta.
+8. Discord II, App 0.9.0-beta, Auszeichnungen und Marke, App 1.0.0.
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 

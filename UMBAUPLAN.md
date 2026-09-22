@@ -469,7 +469,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. Offen: #320, #321 im Detail |
-| Abrechnung II: Turniere | #319 Startgelder für Solo- und Team-Anmeldungen; damit schließt das Epic #314 |
+| Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #370; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
@@ -601,6 +601,32 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 31 — Abrechnung II: Startgelder für Turniere
+
+### Was 31.1 gefunden hat (#319 – PR #370)
+
+**Dasselbe Preismodell, derselbe Rechnungsweg.** Ein Turnier trägt ein Angebot wie ein Event
+(Positionen, Preisbasis, Steuerprofil, Leistung aus Dolibarr); die Anmeldung friert den Preis
+ein, der Auftrag geht denselben Weg nach Dolibarr. Neu ist nur, was am Turnier anders ist – und
+das sind drei Entscheidungen, keine zweite Abrechnung.
+
+**Wer zahlt: die anmeldende Person.** Bei Teams hätte man je Spieler eine Rechnung stellen
+können; dafür bräuchte jeder Spieler ein Konto mit Kundendaten und die Teamleitung müsste warten,
+bis alle bezahlt haben. Die erste Stufe stellt eine Rechnung an die Teamleitung, die beim Anmelden
+ausdrücklich die Kostenübernahme bestätigt; Team und Roster sind Bezug auf der Rechnung. Ohne
+Haken nimmt der Server die Anmeldung nicht an – nicht das Formular allein, sonst käme die
+Bestätigung über die App oder einen Zugangslink nie an.
+
+**Was „je Person“ zählt.** Der Turnier-Roster, nie die Mitgliederliste des Community-Teams –
+ein Team mit zwölf Mitgliedern schickt fünf. Ersatzspieler zählen nur auf Wunsch. Steht bei der
+Freigabe noch kein Roster, gilt die Teamgröße; das ist ehrlich, weil das Turnier sie verlangt.
+
+**Wann bezahlt wird: mit der verbindlichen Teilnahme.** Warteliste und offene Freigabe kosten
+nichts – anders als beim Event, wo die Anmeldung selbst verbindlich ist. Die Freigabe durch die
+Turnierleitung setzt den Preis; Ablehnung, „nicht erschienen“ und Abmeldung vor dem Beleg
+schließen den Auftrag. Ein Turnier im Event mit „im Eventbeitrag enthalten“ zeigt kein Startgeld
+– sonst bekäme die Person zwei Rechnungen für denselben Abend.
 
 ## Block 30 — Admin und Turniere
 
