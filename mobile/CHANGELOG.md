@@ -3,6 +3,7 @@
 ## 0.10.0-beta - 2026-09-23
 
 - Mobile: App-Sperre: Im Profil unter dem Zahnrad „App beim Öffnen sperren“ einschalten – dann fragt die App beim Start und nach einer Minute im Hintergrund nach Fingerabdruck, Gesicht oder Gerätesperre, bevor Chats und Profil sichtbar sind. Gilt nur auf diesem Gerät; Abmelden geht immer (#217, Stufe 1).
+- Mobile: Bilder laden in passender Größe: Karten, Kacheln und Profilbilder holen die kleine Fassung statt des Originals – schneller und weniger Datenverbrauch (#219).
 
 ## 0.9.1-beta - 2026-09-23
 

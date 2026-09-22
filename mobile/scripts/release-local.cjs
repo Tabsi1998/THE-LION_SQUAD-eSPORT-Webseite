@@ -6,6 +6,7 @@
  *   npm run release:local -- --dry-run   bauen und prüfen, nichts veröffentlichen
  *   npm run release:local                bauen, prüfen und das Release anlegen
  *   npm run release:local -- --upload-only  die zuletzt gebaute APK nur an den Vereinsserver schicken
+ *   npm run release:local -- --aab       zusätzlich das App Bundle (.aab) für die Play Console bauen (#219)
  *
  * Schlüssel, Passwörter und google-services.json liegen außerhalb des Repos,
  * standardmäßig in %USERPROFILE%\.lionsapp-release (Einrichtung: RELEASES.md).
@@ -31,6 +32,8 @@ const buildsDir = path.join(mobileDir, "builds");
 const isWindows = process.platform === "win32";
 const flags = new Set(process.argv.slice(2));
 const mode = flags.has("--check") ? "check" : flags.has("--dry-run") ? "dry-run" : flags.has("--upload-only") ? "upload-only" : "release";
+// Die Play Console nimmt nur App Bundles; die APK bleibt für Sideload und den Vereinsserver (#219).
+const wantBundle = flags.has("--aab");
 const releaseDir = process.env.LIONSAPP_RELEASE_DIR || path.join(os.homedir(), ".lionsapp-release");
 const BUILD_MARKER = ".lionsapp-build";
 
@@ -383,6 +386,10 @@ function main() {
     // Mit vollem Pfad: Aus Git Bash gestartet sucht cmd.exe nicht im aktuellen
     // Ordner (NoDefaultCurrentDirectoryInExePath), "gradlew.bat" allein fehlt dann.
     run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), ["assembleRelease", "--no-daemon"], { cwd: buildAndroid, env: signingEnv });
+    if (wantBundle) {
+      step("App Bundle bauen (Play Console)");
+      run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), ["bundleRelease", "--no-daemon"], { cwd: buildAndroid, env: signingEnv });
+    }
   } finally {
     removeGeneratedPushConfig(buildMobile);
   }
@@ -412,6 +419,19 @@ function main() {
   console.log(`APK: ${apkPath}`);
   console.log(`SHA-256: ${sha256}`);
 
+  // Das Bundle ist mit demselben Schlüssel signiert (Upload-Key bei Play App Signing) und wird
+  // von Hand in die Play Console geladen - hier nur ablegen, prüfen und ans Release hängen.
+  let aabPath = "";
+  if (wantBundle) {
+    const aab = release.aabName(version, versionCode, head.slice(0, 7));
+    aabPath = path.join(buildsDir, aab);
+    fs.copyFileSync(path.join(buildAndroid, "app", "build", "outputs", "bundle", "release", "app-release.aab"), aabPath);
+    const aabSha256 = crypto.createHash("sha256").update(fs.readFileSync(aabPath)).digest("hex");
+    fs.writeFileSync(`${aabPath}.sha256`, `${aabSha256}  ${aab}\n`);
+    console.log(`AAB: ${aabPath}`);
+    console.log(`AAB SHA-256: ${aabSha256}`);
+  }
+
   if (mode === "dry-run") {
     console.log("\nProbelauf fertig. Nichts veröffentlicht.");
     return;
@@ -422,6 +442,7 @@ function main() {
   run("gh", [
     "release", "create", tag,
     apkPath, `${apkPath}.sha256`, `${apkPath}.signature.txt`,
+    ...(aabPath ? [aabPath, `${aabPath}.sha256`] : []),
     "--target", head,
     "--title", release.releaseName(version, versionCode),
     "--notes-file", notesPath,

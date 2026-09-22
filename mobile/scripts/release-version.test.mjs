@@ -12,6 +12,7 @@ import releaseVersion from "./release-version.cjs";
 const {
   EXPECTED_SIGNER_SHA256,
   PREVIOUS_SIGNER_SHA256,
+  aabName,
   apkName,
   changelogSection,
   highestBuild,
@@ -58,6 +59,7 @@ test("Kanal, Tag, Release-Name und APK-Name", () => {
   assert.equal(releaseTag("0.2.0-beta", 57), "mobile-v0.2.0-beta-build57");
   assert.equal(releaseName("0.2.0-beta", 57), "LionsAPP v0.2.0-beta (Build 57)");
   assert.equal(apkName("1.0.0", 80, "abc1234"), "LionsAPP-v1.0.0-build80-abc1234.apk");
+  assert.equal(aabName("1.0.0", 80, "abc1234"), "LionsAPP-v1.0.0-build80-abc1234.aab");
 });
 
 test("der Build-Zähler kommt aus allen App-Tags, alten und neuen", () => {

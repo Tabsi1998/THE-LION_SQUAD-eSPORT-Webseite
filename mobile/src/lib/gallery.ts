@@ -59,6 +59,8 @@ export function posterUrl(item: GalleryItem | null | undefined): string {
 export function sizedUpload(url: string | null | undefined, width: 400 | 800 | 1600): string {
   const value = String(url || "");
   if (!value || !LOCAL_UPLOAD.test(value) || !/\.(webp|jpe?g|png)(\?|#|$)/i.test(value)) return value;
+  // Trägt die Adresse schon eine Breite, bleibt sie - sonst stünde zweimal w= darin (#219).
+  if (/[?&]w=\d+/.test(value)) return value;
   const [base, hash = ""] = value.split("#");
   const joiner = base.includes("?") ? "&" : "?";
   return `${base}${joiner}w=${width}${hash ? `#${hash}` : ""}`;

@@ -171,7 +171,8 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
-- App-Sperre (#217 Stufe 1; PR #380, baut auf #379 auf; Build 69).
+- App 1.0.0 Teil 1 (#217 Stufe 1, #219 Teil 1; PR #380, baut auf #379 auf; Build 69).
+  **App-Sperre (#217):**
   `lib/appLock.ts`: `shouldRelock(hiddenAt, now)` (≥ 60 s im Hintergrund),
   `lockAvailability` über `getEnrolledLevelAsync` (NONE → nicht einschaltbar,
   SECRET → „Gerätesperre“, sonst `methodLabel` aus den Typen), `authenticate`
@@ -190,7 +191,19 @@ Seit dem 15. September gilt:
   ein natives Credential-Manager-Modul, die App-Herkunft
   `android:apk-key-hash:` im Backend und `/.well-known/assetlinks.json` auf
   der Website – Server-Teil mit dem Betreiber. Tests `appLock.test.ts` (4),
-  `AppLockProvider.test.tsx` (4).
+  `AppLockProvider.test.tsx` (4). **Bilder in passender Breite (#219):**
+  `components/MediaImage.tsx` misst sich per `onLayout` und lädt über
+  `sizedUpload` die kleinste Fassung (400/800/1600), die die Fläche in
+  Gerätepixeln füllt (`widthForLayout(layoutWidth, pixelRatio)`); `width`-Prop
+  erzwingt eine Fassung; die erste Breite zählt (kein Neuladen beim
+  Umbrechen); fremde Adressen und solche mit `w=` bleiben (`sizedUpload`
+  hängt keine zweite Breite an). Gilt damit für alle Karten, Kacheln, Avatare
+  und Kopfbilder ohne Änderung an den Aufrufern. **Release-Skript `--aab`
+  (#219):** baut zusätzlich `bundleRelease`, legt `LionsAPP-v…-build…-sha.aab`
+  + `.sha256` in `mobile/builds` ab und hängt beide ans GitHub-Release
+  (`release.aabName`); die Play Console bekommt das Bundle von Hand. Tests
+  `MediaImage.test.tsx` (4), `gallery.test.ts` (+1), `release-version.test.mjs`
+  (+1).
 - Marke (#229; PR #379, baut auf #378 auf; Build 68). **Standard-Favicon für
   hell und dunkel:** Browser ohne `prefers-color-scheme` und der Home-
   Bildschirm nehmen nur `favicon_url`; beim Verein war das die weiße
@@ -1107,7 +1120,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, Build 69 nach dem Merge; Stufe 2 Passkey-Login in der App **wartet** auf den Server-Teil mit dem Betreiber (assetlinks.json, App-Herkunft im Backend). #219 Store-Reife **wartet** auf das Play-Console-Konto des Betreibers und seine Entscheidung zu Absturzberichten (Crashlytics oder Sentry → Datenschutzerklärung); AAB-Option im Release-Skript und Bildgrößen-Prüfung lassen sich vorher machen |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, Build 69 nach dem Merge; Stufe 2 Passkey-Login in der App **wartet** auf den Server-Teil mit dem Betreiber (assetlinks.json, App-Herkunft im Backend). #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; der Rest **wartet** auf das Play-Console-Konto des Betreibers (Internal Testing, Store-Eintrag, Datensicherheits-Formular) und seine Entscheidung zu Absturzberichten (Crashlytics oder Sentry → Datenschutzerklärung) |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
@@ -1138,8 +1151,9 @@ sinnvoll hältst“):
 8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
    umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
    #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
-   App 1.0.0: #217 Stufe 1 umgesetzt in #380; Stufe 2 und #219 brauchen den
-   Betreiber (assetlinks am Server, Play-Console-Konto, Absturzberichte).
+   App 1.0.0: #217 Stufe 1 und #219 Teil 1 umgesetzt in #380; #217 Stufe 2
+   und der Rest von #219 brauchen den Betreiber (assetlinks am Server,
+   Play-Console-Konto, Absturzberichte).
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 

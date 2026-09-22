@@ -62,6 +62,11 @@ function apkName(version, versionCode, shortSha) {
   return `LionsAPP-v${version}-build${versionCode}-${shortSha}.apk`;
 }
 
+/** Das App Bundle für die Play Console (#219) - gleicher Name, andere Endung. */
+function aabName(version, versionCode, shortSha) {
+  return `LionsAPP-v${version}-build${versionCode}-${shortSha}.aab`;
+}
+
 /** Höchster Build-Zähler aus den bisherigen App-Tags, alte wie neue. */
 function highestBuild(tags) {
   let highest = 0;
@@ -142,6 +147,7 @@ module.exports = {
   EXPECTED_SIGNER_SHA256,
   PREVIOUS_SIGNER_SHA256,
   TAG_PREFIX,
+  aabName,
   apkName,
   changelogSection,
   highestBuild,
