@@ -47,6 +47,7 @@ const notificationLabels: Array<{ key: string; label: string; detail: string }> 
   { key: "birthday_greetings", label: "Geburtstag", detail: "Geburtstagsgruß vom Verein." },
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
   { key: "news_events", label: "News & Events", detail: "Vereinsnews, Events und Ankündigungen." },
+  { key: "club_internal", label: "Vereinsintern", detail: "Interne Events und News nur für Mitglieder." },
 ];
 const notificationPreferenceKey = (channel: string, topic: string) => `${channel}:${topic}`;
 

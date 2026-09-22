@@ -11,6 +11,7 @@ import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { splitOpenAndPast } from "../../lib/dashboard";
 import { formatEventType, formatTournamentFormat, placeParts } from "../../lib/format";
+import { applyScope, type ScopeFilter } from "../../lib/memberArea";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -20,7 +21,7 @@ const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "TournamentList">;
 type Filter = "all" | "events" | "tournaments" | "fastlaps";
-type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string };
+type HubBase = { id: string; title: string; date?: string | null; endDate?: string | null; status?: string; phase?: string; image?: string | null; detail?: string; visibility?: string | null };
 type HubItem =
   | (HubBase & { kind: "event"; raw: ClubEvent })
   | (HubBase & { kind: "tournament"; raw: Tournament })
@@ -33,8 +34,15 @@ const filters: Array<{ key: Filter; label: string }> = [
   { key: "fastlaps", label: "Fast Laps" },
 ];
 
+// „Verein“ zeigt nur Interne (#342) - der Schalter erscheint erst, wenn es solche gibt.
+const scopes: Array<{ key: ScopeFilter; label: string }> = [
+  { key: "all", label: "Alle" },
+  { key: "club", label: "Verein" },
+];
+
 export function TournamentsScreen({ navigation }: Props) {
   const [filter, setFilter] = useState<Filter>("all");
+  const [scope, setScope] = useState<ScopeFilter>("all");
   const [showPast, setShowPast] = useState(false);
   const [events, setEvents] = useState<ClubEvent[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -87,6 +95,7 @@ export function TournamentsScreen({ navigation }: Props) {
         phase: event.public_phase?.label,
         image: event.banner_url,
         detail: [formatEventType(event.event_type || event.type), ...placeParts(event.location, event.city)].filter(Boolean).join(" · "),
+        visibility: event.visibility,
         raw: event,
       })),
       ...tournaments.map((tournament) => ({
@@ -114,9 +123,10 @@ export function TournamentsScreen({ navigation }: Props) {
         raw: challenge,
       })),
     ];
-    const visible = mapped.filter((item) => matchesFilter(item, filter));
+    const visible = applyScope(mapped.filter((item) => matchesFilter(item, filter)), scope);
     return visible.sort((a, b) => compareByNearestDate(a.date, b.date, a.status, b.status, a.phase, b.phase));
-  }, [events, fastlaps, filter, tournaments]);
+  }, [events, fastlaps, filter, scope, tournaments]);
+  const hasInternal = useMemo(() => applyScope(events, "club").length > 0, [events]);
   // Ohne Tipp nur, was ansteht; Beendetes und Abgesagtes hinter "Vergangene
   // anzeigen" (#241). Die Zähler oben zählen dieselbe Menge wie die Liste.
   const { open: openItems, past: pastItems } = useMemo(() => splitOpenAndPast(items), [items]);
@@ -153,6 +163,7 @@ export function TournamentsScreen({ navigation }: Props) {
         {offline && !error ? <OfflineNotice detail="Events, Turniere und Fast-Laps werden aus gespeicherten Daten angezeigt." /> : null}
 
         <SegmentedTabs items={filters} value={filter} onChange={setFilter} />
+        {hasInternal ? <SegmentedTabs items={scopes} value={scope} onChange={setScope} style={styles.scopeTabs} /> : null}
 
         {filter === "all" && openItems.length ? (
           <View style={styles.stats}>
@@ -215,6 +226,7 @@ function HubContentCard({ item, onPress }: { item: HubItem; onPress: () => void 
       label={item.phase}
       status={item.status}
       detail={item.detail}
+      visibility={item.visibility}
       onPress={onPress}
     />
   );
@@ -244,6 +256,9 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 6,
+  },
+  scopeTabs: {
+    marginTop: -6,
   },
   stats: {
     flexDirection: "row",

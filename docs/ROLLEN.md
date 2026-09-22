@@ -59,6 +59,21 @@ Gewinne dieses Turniers (#288). Das braucht keinen Bereich und keine Zwei-Faktor
 - **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu
   beginnen. Ohne Haken endet die Sitzung mit dem Browser.
 
+## Wer bekommt interne Meldungen (App 0.7.0-beta)
+
+Wird ein internes Event oder eine interne News veröffentlicht, meldet der Server
+das einmal – als Push in der App und in der Glocke der Website – und nur an die,
+die den Inhalt sehen dürfen:
+
+| Sichtbarkeit | Empfänger |
+| --- | --- |
+| Nur Mitglieder | aktive Mitglieder und Ehrenmitglieder |
+| Nur intern (Vorstand) | wer die Vereinsverwaltung hat – über Rolle, Freigabe, Vorstandsposten oder Dolibarr-Funktion |
+| Öffentlich / Community | niemand über diesen Weg (dafür gibt es Newsletter und Discord) |
+
+Wer die Meldung nicht will, schaltet das Thema „Vereinsintern“ unter Profil →
+Benachrichtigungen ab. Es hängt nicht am Newsletter.
+
 ## Was nicht mehr gilt
 
 - Eine Turnierleitung darf keine News, Galerie, Sponsoren oder Partner mehr bearbeiten.

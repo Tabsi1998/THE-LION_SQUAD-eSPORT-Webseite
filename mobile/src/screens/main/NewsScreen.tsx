@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
+import { applyScope, internalLabel, type ScopeFilter } from "../../lib/memberArea";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
@@ -23,6 +24,7 @@ export function NewsScreen({ navigation }: Props) {
   const [offline, setOffline] = useState(false);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [scope, setScope] = useState<ScopeFilter>("all");
 
   const load = useCallback(async () => {
     setError("");
@@ -50,8 +52,9 @@ export function NewsScreen({ navigation }: Props) {
     return Array.from(cats).sort();
   }, [items]);
 
+  const hasInternal = useMemo(() => applyScope(items, "club").length > 0, [items]);
   const filtered = useMemo(() => {
-    let result = items;
+    let result = applyScope(items, scope);
     if (activeCategory) {
       result = result.filter((item) => item.category === activeCategory);
     }
@@ -66,7 +69,7 @@ export function NewsScreen({ navigation }: Props) {
       );
     }
     return result;
-  }, [items, activeCategory, search]);
+  }, [items, activeCategory, scope, search]);
 
   const featuredPost = useMemo(() => filtered.find((item) => item.pinned) || filtered[0] || null, [filtered]);
   const listItems = useMemo(
@@ -123,6 +126,16 @@ export function NewsScreen({ navigation }: Props) {
                 </Pressable>
               ) : null}
             </View>
+
+            {hasInternal ? (
+              <View style={styles.scopeRow} testID="news-scope">
+                {(["all", "club"] as ScopeFilter[]).map((key) => (
+                  <Pressable key={key} onPress={() => setScope(key)} accessibilityRole="button" accessibilityState={{ selected: scope === key }} style={[styles.chip, scope === key && styles.chipGold]}>
+                    <Muted style={[styles.chipText, scope === key && styles.chipTextGold]}>{key === "all" ? "Alle" : "Verein"}</Muted>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
 
             {categories.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -198,6 +211,7 @@ function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => vo
         <View style={styles.featuredBody}>
           <View style={styles.top}>
             {post.pinned ? <Muted style={styles.badgePinned}>TOP</Muted> : null}
+            {internalLabel(post) ? <Muted style={styles.badgePinned} testID="news-internal">{internalLabel(post)}</Muted> : null}
             {post.category ? <Muted style={styles.badgeCategory}>{formatNewsCategory(post.category)}</Muted> : null}
           </View>
           <Heading>{post.title}</Heading>
@@ -225,6 +239,7 @@ function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
         <View style={styles.text}>
           <View style={styles.top}>
             <Body style={styles.title}>{post.title}</Body>
+            {internalLabel(post) ? <Muted style={styles.badgePinned} testID="news-internal">{internalLabel(post)}</Muted> : null}
             {post.category ? <Muted style={styles.badgeCategory}>{formatNewsCategory(post.category)}</Muted> : null}
           </View>
           <Muted>{formatDate(post.published_at || post.created_at)}</Muted>
@@ -313,6 +328,17 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.cyan,
+  },
+  scopeRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  chipGold: {
+    backgroundColor: "rgba(255, 215, 0, 0.14)",
+    borderColor: "rgba(255, 215, 0, 0.4)",
+  },
+  chipTextGold: {
+    color: colors.gold,
   },
   resultCount: {
     color: colors.muted,

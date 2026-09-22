@@ -132,6 +132,7 @@ const ServersPage = lazy(() => import("@/pages/public/ServersPage"));
 const MembersDirectoryPage = lazy(() => import("@/pages/public/MembersDirectoryPage"));
 const MemberProfilePage = lazy(() => import("@/pages/public/MemberProfilePage"));
 const JoinMembershipPage = lazy(() => import("@/pages/public/JoinMembershipPage"));
+const MemberCardVerifyPage = lazy(() => import("@/pages/public/MemberCardVerifyPage"));
 const NewsDetailPage = lazy(() => import("@/pages/public/NewsDetailPage"));
 const GalleryPage = lazy(() => import("@/pages/public/GalleryPage"));
 const GalleryAlbumPage = lazy(() => import("@/pages/public/GalleryAlbumPage"));
@@ -194,6 +195,8 @@ function App() {
           <Route path="/members" element={<MembersDirectoryPage />} />
           <Route path="/members/:slug" element={<MemberProfilePage />} />
           <Route path="/membership/join" element={<JoinMembershipPage />} />
+          {/* Prüfseite der Mitgliedskarte (#346): öffentlich, ohne Anmeldung, zeigt nur das Nötigste */}
+          <Route path="/karte/pruefen/:token" element={<MemberCardVerifyPage />} />
           <Route path="/membership/apply" element={<MembershipApplyPage />} />
 
           {/* Public — Arena */}

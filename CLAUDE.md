@@ -146,6 +146,40 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- App 0.7.0-beta: Mitgliederbereich (#340, #339, #341, #342, #346; Build 65).
+  Server: `services/member_announcements.py` – Job `notify_due` (jede Minute)
+  meldet veröffentlichte interne News und Events **genau einmal**
+  (`members_notified_at`): `members` → aktive Mitglieder, `internal` → wer die
+  Vereinsverwaltung hat (`club_area_user_ids`: Rolle, Freigabe `areas`,
+  Vorstandsposten, Dolibarr-Funktion über `areas_for`), sonst niemand – keine
+  leere Liste fällt auf „alle“ zurück; Älteres als 24 h wird nur markiert.
+  Benachrichtigungs-Thema `club_internal` (`notification_preferences.py`,
+  Standard an, ohne Newsletter-Bindung; Web `profile/constants.js`, App
+  `ProfileScreen`). `services/member_card.py` + `routes/member_card_routes.py`:
+  `GET /api/account/member-card` (Karte mit frischem Prüfcode, 5 min,
+  `member_card_tokens` mit TTL-Index) und `GET /api/card/verify/{token}`
+  (öffentlich, 30/10 min je IP; gültig → Vorname + Nachnamen-Initial,
+  Mitgliedsart, gültig bis; sonst nur `valid: false`, ohne Grund);
+  `card_status`: aktiv/Ehrenmitglied gilt, Rückstand ist kein Austritt,
+  `membership_ends` aus Dolibarr beendet; `wallet_model` beschreibt die Karte
+  neutral für Apple/Google Wallet (Anbindung offen: Zertifikat/Issuer nötig).
+  Web: `components/tls/MemberCardPanel.jsx` (auf „Meine Mitgliedschaft“,
+  BrandedQRCode, erneuert vor Ablauf), `pages/public/MemberCardVerifyPage.jsx`
+  (`/karte/pruefen/:token`, noindex), `lib/memberCard.js`. App:
+  `lib/memberArea.ts` (Port von `frontend/src/lib/memberArea.js` +
+  `feeCard`/`linkPrompt` aus `lib/dolibarr.js`, `applyScope` Alle/Verein),
+  `lib/memberDocuments.ts` (`fetchAndOpen`: Datei mit Bearer in
+  `cacheDirectory/member-documents/`, Android-VIEW-Intent, Fehlertext je
+  Status; `registerCacheClearer` löscht den Ordner beim Abmelden; `openInvoice`
+  für Belege), `lib/memberCard.ts` (`refreshDelayMs`, 1 min vor Ablauf),
+  `lib/qr.ts` + `components/QrCode.tsx` (Matrix aus `qrcode/lib/core/qrcode`,
+  reines JS, als Strich-Views – keine SVG-Bibliothek), Screens `MemberArea`,
+  `MyMembership` (Beitrag, Zuordnung anfragen, Belege als PDF – **kein
+  Bezahlen in der App**), `MemberDocuments`, `MemberCard` im MoreStack;
+  `MoreScreen` goldene Karte für Mitglieder / „Mitglied werden“ (Web-Link)
+  sonst, Mitgliedervorteile liegen im Bereich. `ContentCard` `visibility` →
+  „Intern“/„Vorstand“ in Gold; Events-Tab und News haben den Filter „Alle /
+  Verein“ (nur wenn es Internes gibt). `Card` hat `testID`.
 - App 0.6.0-beta (#218, PR #354, Build 64): `mobile/src/lib/achievements.ts` –
   `achievementIcon` (Lucide-Name des Katalogs → Ionicon, sonst nach Kategorie,
   sonst Pokal; der Typ `IoniconName` prüft jeden Namen), `groupProgress` („3 von
@@ -608,10 +642,12 @@ braucht.
 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
 #349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
 Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
-0.6.0-beta, #355 Tagesgrenze). `main` steht auf `5621ed5`.
+0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II). `main` steht auf `5176a3e`.
 
 ### Offene PRs
-- #356 (Dolibarr II: #296, #325). Nach dem Merge `update.sh`.
+- #357 (App 0.7.0-beta: Mitgliederbereich – #340, #339, #341, #342, #346).
+  Nach dem Merge `update.sh` (Server-Teil: Meldungen, Karte, Prüfseite),
+  dann Build 65.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -624,7 +660,8 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
   APK liegt seit 16.09. auch am Vereinsserver (nach #306/#308 mit
   `-- --upload-only` nachgereicht), **Build 64** (`mobile-v0.6.0-beta-build64`,
   Commit 5621ed5, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
-  `44959a8c`; #218), am Vereinsserver abgelegt. Nächster Build ist 65.
+  `44959a8c`; #218), am Vereinsserver abgelegt. Nächster Build ist 65
+  (0.7.0-beta, nach dem Merge von #357).
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -647,7 +684,7 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (44 offen nach dem Merge von #356)
+### Meilensteine und offene Issues (39 offen nach dem Merge von #357)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -668,9 +705,9 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
-| App 0.7.0-beta | #216 Kalender, #236 Galerie |
-| App: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Mitglieder, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet). Eigene Beta, Versionsnummer beim Einplanen; Rechnungen (#296, #320, #325) und #327–#329 bringen ihren App-Teil selbst mit |
-| App 0.8.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
+| App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
+| App 0.8.0-beta | #216 Kalender, #236 Galerie |
+| App 0.9.0-beta | #239 Sticker/GIFs, #240 Freundschaftsanfragen, #245 Laufbanner |
 | App 1.0.0 | #217 Fingerabdruck/Passkey, #219 Store-Reife |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
@@ -690,12 +727,12 @@ sinnvoll hältst“):
 3. Discord I – umgesetzt in #350 (ein PR für den Meilenstein).
 4. Web: Anmeldung und Teilen – umgesetzt in #353. App 0.6.0-beta – umgesetzt in
    #354, Build 64 nach dem Merge.
-5. Dolibarr II – umgesetzt in #356. Danach App: Mitgliederbereich (#340, #339,
-   #341, #342, #346) – dann hat die App Beitragsstand und Rechnungen in einem Zug.
+5. Dolibarr II – umgesetzt in #356. App 0.7.0-beta: Mitgliederbereich (#340,
+   #339, #341, #342, #346) – umgesetzt in #357, Build 65 nach dem Merge.
 6. Web: Dynamik.
 7. Abrechnung I, danach Admin und Turniere (#203/#204 berühren dieselben
-   Event-Formulare wie #318 – zusammen planen), App 0.7.0-beta.
-8. Abrechnung II, Discord II, App 0.8.0-beta, Auszeichnungen und Marke,
+   Event-Formulare wie #318 – zusammen planen), App 0.8.0-beta.
+8. Abrechnung II, Discord II, App 0.9.0-beta, Auszeichnungen und Marke,
    App 1.0.0.
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.

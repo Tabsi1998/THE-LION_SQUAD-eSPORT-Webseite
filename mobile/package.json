@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "0.6.0-beta",
+  "version": "0.7.0-beta",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -39,6 +39,7 @@
     "expo-system-ui": "~57.0.4",
     "expo-video": "~57.0.4",
     "expo-video-thumbnails": "~57.0.2",
+    "qrcode": "1.5.4",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-keyboard-controller": "1.21.9",

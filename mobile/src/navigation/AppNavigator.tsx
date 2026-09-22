@@ -17,6 +17,10 @@ import { FastLapDetailScreen } from "../screens/main/FastLapDetailScreen";
 import { FastLapScreen } from "../screens/main/FastLapScreen";
 import { EventDetailScreen } from "../screens/main/EventDetailScreen";
 import { MoreScreen } from "../screens/main/MoreScreen";
+import { MemberAreaScreen } from "../screens/main/MemberAreaScreen";
+import { MemberCardScreen } from "../screens/main/MemberCardScreen";
+import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
+import { MyMembershipScreen } from "../screens/main/MyMembershipScreen";
 import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
 import { NewsDetailScreen } from "../screens/main/NewsDetailScreen";
 import { NewsScreen } from "../screens/main/NewsScreen";
@@ -205,6 +209,10 @@ function MoreStackScreen() {
       <MoreStack.Screen name="DirectThread" component={DirectThreadScreen} options={({ route }) => ({ title: route.params.title || "Chat" })} />
       <MoreStack.Screen name="Notifications" component={NotificationsScreen} options={{ title: "Benachrichtigungen" }} />
       <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Jahreswertung" }} />
+      <MoreStack.Screen name="MemberArea" component={MemberAreaScreen} options={{ title: "Mitgliederbereich", headerTintColor: colors.gold }} />
+      <MoreStack.Screen name="MyMembership" component={MyMembershipScreen} options={{ title: "Meine Mitgliedschaft", headerTintColor: colors.gold }} />
+      <MoreStack.Screen name="MemberDocuments" component={MemberDocumentsScreen} options={{ title: "Dokumente", headerTintColor: colors.gold }} />
+      <MoreStack.Screen name="MemberCard" component={MemberCardScreen} options={{ title: "Mitgliedskarte", headerTintColor: colors.gold }} />
     </MoreStack.Navigator>
   );
 }

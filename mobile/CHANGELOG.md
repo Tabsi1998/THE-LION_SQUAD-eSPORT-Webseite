@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0-beta - 2026-09-22
+
+- Mobile: Der Mitgliederbereich ist in der App: unter „Mehr“ steht für Vereinsmitglieder eine goldene Karte, dahinter Mitgliedschaft, Mitgliedskarte, Dokumente, Vorteile, interne Events und News sowie die Ansprechpartner aus dem Vorstand und der Vereins-Discord. Wer kein Mitglied ist, sieht „Mitglied werden“ (#340).
+- Mobile: „Meine Mitgliedschaft“ zeigt Beitragsstand, Mitgliedsnummer und Funktion aus der Mitgliederverwaltung und die eigenen Belege als PDF. Wer noch nicht zugeordnet ist, fragt die Zuordnung direkt in der App an. Bezahlt wird weiter auf der Website (#339).
+- Mobile: Vereinsdokumente öffnen sich in der App: Die Datei wird mit Anmeldung geladen, bleibt nur im privaten Speicher der App und wird beim Abmelden gelöscht. Klappt es nicht, steht der Grund beim Dokument (#341).
+- Mobile: Interne Events und News tragen ein goldenes „Intern“ (bzw. „Vorstand“); im Events-Tab und in den News gibt es den Filter „Alle / Verein“. Neue interne Inhalte melden sich als Push – nur bei denen, die sie sehen dürfen (#342).
+- Mobile: Die digitale Mitgliedskarte mit QR-Code: Ein Partner scannt sie mit der Handykamera und sieht nur „gültig“, Vorname und Mitgliedsart. Der Code erneuert sich alle paar Minuten, ein Foto davon gilt nicht (#346).
+
 ## 0.6.0-beta - 2026-09-21
 
 - Mobile: Erfolge haben echte Symbole statt eines Punkts – eines je Erfolgsgruppe, in der Farbe der erreichten Stufe (Bronze, Silber, Gold, Platin, Legendär) (#218).
