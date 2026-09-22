@@ -242,3 +242,29 @@ async def test_tax_profiles_become_net_prices_with_rates(flow, fake):
     assert lines[1]["subprice"] == 10.0 and lines[1]["tva_tx"] == 20.0 and lines[1]["fk_product"] == 17
     assert lines[2]["subprice"] == 10.0 and lines[2]["tva_tx"] == 10.0
     assert dolibarr_billing.tax_rate_for({"tax_rates": {"none": 5}}, "none") == 0.0, "ohne Steuer bleibt ohne Steuer"
+
+
+@pytest.mark.asyncio
+async def test_finance_can_pick_existing_dolibarr_services(flow, fake):
+    """Der Verein hat die Leistung „Kostenbeitrag“ schon in Dolibarr - die Website legt nichts Eigenes an, sie bietet sie an."""
+    await connect(flow)
+    fake.products[17] = {"id": 17, "ref": "KOSTENBEITRAG", "label": "Kostenbeitrag", "price": "20.00000000", "price_ttc": "20.00000000", "tva_tx": "0.000", "fk_product_type": 1, "status": 1, "description": "Kostenbeitrag Veranstaltung"}
+    fake.products[18] = {"id": 18, "ref": "SHIRT", "label": "Event-Shirt", "price": "12.50000000", "price_ttc": "15.00000000", "tva_tx": "20.000", "fk_product_type": 1, "status": 1}
+    fake.products[19] = {"id": 19, "ref": "ALT", "label": "Nicht mehr verkauft", "price": "1", "tva_tx": "0", "fk_product_type": 1, "status": 0}
+    fake.products[20] = {"id": 20, "ref": "WARE", "label": "Tasse", "price": "5", "tva_tx": "20", "fk_product_type": 0, "status": 1}
+    kassier = await person(flow, "kassier", role="club_admin")
+    flow.act_as(kassier)
+    data = (await flow.get("/api/admin/finance/dolibarr-services")).json()
+    assert data["available"] is True
+    assert data["services"] == [
+        {"id": 17, "ref": "KOSTENBEITRAG", "label": "Kostenbeitrag", "description": "Kostenbeitrag Veranstaltung", "amount_cents": 2000, "tax_rate": 0.0, "tax_profile": "none"},
+        {"id": 18, "ref": "SHIRT", "label": "Event-Shirt", "description": "", "amount_cents": 1500, "tax_rate": 20.0, "tax_profile": "standard"},
+    ], "nur verkaufbare Dienstleistungen, Bruttopreis in Cent, Steuerprofil aus dem Satz"
+    gast = await person(flow, "gast")
+    flow.act_as(gast)
+    assert (await flow.get("/api/admin/finance/dolibarr-services")).status_code == 403
+
+    # Ohne Anbindung: kein Fehler, nur „nicht verfügbar“ - das Formular nimmt dann die Nummer.
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"mode": "off"}})
+    flow.act_as(kassier)
+    assert (await flow.get("/api/admin/finance/dolibarr-services")).json() == {"available": False, "reason": "not_connected", "services": []}

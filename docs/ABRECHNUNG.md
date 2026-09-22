@@ -17,6 +17,10 @@ Seite eingerichtet sein muss. Fachlich ist das Epic #314 mit den Paketen #315–
 - **je Anmeldung** zählt einmal, egal wie viele kommen.
 - **wählbar** heißt: Die Person setzt beim Anmelden einen Haken, sonst zählt es nicht. Mindestens
   eine Position ist Pflicht.
+- **Leistung aus Dolibarr:** Habt ihr die Leistung schon in Dolibarr (z. B. „Kostenbeitrag 20,00
+  brutto“), wählt ihr sie je Position aus der Liste – Bezeichnung, Betrag, Steuer und Nummer sind
+  dann vorbelegt, und die Rechnungszeile zeigt auf diese Leistung. Die Website legt in Dolibarr
+  keine eigenen Leistungen an. Mehrere Positionen können auf verschiedene Leistungen zeigen.
 - Beträge sind ganze Cent. Es gibt keine Formeln und kein Rechnen mit Freitext.
 - Bestehende Events bleiben kostenlos, bis jemand den Haken „Teilnahme kostet etwas“ setzt.
 
