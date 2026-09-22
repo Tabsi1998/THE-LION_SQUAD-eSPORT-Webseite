@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
+import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { amountLine, dueLine, invoiceLine, outageText, splitInvoices, STATUS_TONES, summaryText } from "@/lib/invoices";
@@ -58,7 +59,7 @@ export default function MyInvoicesPage() {
         <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-6 inline-flex items-center gap-3"><Receipt className="w-7 h-7 text-[#FFD700]" /> Meine Rechnungen</h1>
 
         {error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="invoices-error">{error}</div>}
-        {!data && !error && <div className="mt-6 text-white/40 text-sm">Lade …</div>}
+        {!data && !error && <SkeletonTable rows={4} columns={4} className="mt-6" label="Lade Belege" />}
         {data && (
           <>
             <div className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5 text-sm text-white/80" data-testid="invoices-summary">{summaryText(data)}</div>

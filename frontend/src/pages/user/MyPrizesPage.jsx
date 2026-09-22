@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -67,7 +68,7 @@ export default function MyPrizesPage() {
           </div>
         )}
 
-        {loading && <div className="text-white/40">Lade…</div>}
+        {loading && <SkeletonCards count={3} image={false} label="Lade Gewinne" />}
 
         {!loading && items.length === 0 && certificates.length === 0 && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-12 text-center">

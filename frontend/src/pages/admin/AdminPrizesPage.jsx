@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
+import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays } from "lucide-react";
@@ -246,7 +247,7 @@ export default function AdminPrizesPage() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading ? (
-                <tr><td colSpan="7" className="text-center py-8 text-white/40">Lade…</td></tr>
+                <tr><td colSpan="7" className="p-3"><SkeletonLines lines={4} label="Lade Gewinne" /></td></tr>
               ) : items.length === 0 ? (
                 <tr><td colSpan="7" className="text-center py-12">
                   <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />

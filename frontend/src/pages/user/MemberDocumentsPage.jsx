@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText, Download, Pin, ArrowLeft, Search, Eye } from "lucide-react";
 import { DocumentViewer } from "@/components/tls/DocumentViewer";
+import { SkeletonList } from "@/components/tls/Skeleton";
 
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
@@ -91,7 +92,7 @@ export default function MemberDocumentsPage() {
         </div>
 
         {loading ? (
-          <div className="mt-10 text-white/40 text-sm">Lade …</div>
+          <SkeletonList rows={5} className="mt-10" label="Lade Dokumente" />
         ) : filtered.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <FileText className="w-10 h-10 mx-auto opacity-40 mb-3" />

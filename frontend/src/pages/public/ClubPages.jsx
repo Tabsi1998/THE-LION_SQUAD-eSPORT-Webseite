@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight } from "lucide-react";
@@ -47,7 +48,7 @@ export function BoardPage() {
         </p>
 
         {loading ? (
-          <div className="mt-10 text-white/40">Lade …</div>
+          <SkeletonCards count={3} image={false} className="mt-10" label="Lade Vorstand" />
         ) : positions.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             Es sind noch keine Vorstandspositionen aktiv.

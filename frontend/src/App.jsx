@@ -13,6 +13,7 @@ import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 import { AppErrorBoundary } from "@/components/tls/AppErrorBoundary";
 import { BottomNav } from "@/components/tls/BottomNav";
+import { PageTransition } from "@/components/tls/PageTransition";
 
 function RouteFallback() {
   return (
@@ -21,7 +22,7 @@ function RouteFallback() {
         <div className="absolute inset-0 rounded-full border-2 border-[#29B6E8]/20" />
         <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-[#29B6E8] animate-spin" />
       </div>
-      <span className="text-white/30 font-display tracking-[0.3em] text-xs uppercase">Lade …</span>
+      <span className="text-white/30 font-display tracking-[0.3em] text-xs uppercase">Einen Moment</span>
     </div>
   );
 }
@@ -177,6 +178,7 @@ function App() {
             <AppErrorBoundary>
             <BottomNav />
             <Suspense fallback={<RouteFallback />}>
+            <PageTransition>
             <Routes>
           {/* Public — Verein */}
           <Route path="/" element={<HomePage />} />
@@ -320,6 +322,7 @@ function App() {
           <Route path="/500" element={<ServerErrorPage />} />
           <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </PageTransition>
             </Suspense>
             </AppErrorBoundary>
           </ConfirmDialogProvider>

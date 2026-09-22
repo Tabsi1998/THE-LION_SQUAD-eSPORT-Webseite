@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { SkeletonList } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
@@ -45,7 +46,7 @@ export default function MyPenaltiesPage() {
 
         <div className="mt-8" data-testid="my-penalties-list">
           {loading ? (
-            <div className="text-white/40">Lade…</div>
+            <SkeletonList rows={3} label="Lade Strafen" />
           ) : data.items.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
               <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />

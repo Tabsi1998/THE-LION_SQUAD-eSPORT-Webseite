@@ -10,6 +10,7 @@ import { api, formatRequestError, resolveMediaUrl, suggestSlug } from "@/lib/api
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { GermanDateField } from "@/components/tls/GermanDateField";
+import { SkeletonList } from "@/components/tls/Skeleton";
 
 const emptyForm = {
   display_name: "",
@@ -126,7 +127,7 @@ export function ClubMemberProfilesAdminContent() {
       </div>
 
       {loading ? (
-        <div className="text-white/40 text-sm">Lade Mitgliederprofile...</div>
+        <SkeletonList rows={5} label="Lade Mitgliederprofile" />
       ) : filtered.length === 0 ? (
         <div className="border border-dashed border-white/15 bg-[#121212] rounded-sm p-12 text-center text-white/45">
           Noch keine redaktionellen Vereinsmitglieder angelegt.

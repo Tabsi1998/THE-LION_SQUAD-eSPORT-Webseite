@@ -3,8 +3,10 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { SkeletonDetailHeader, SkeletonTable } from "@/components/tls/Skeleton";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChangedKeys, useFlipRows } from "@/hooks/useLiveChanges";
+import { standingSignature } from "@/lib/liveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
@@ -38,11 +40,23 @@ export default function TournamentStandingsPage() {
   }, [load]);
 
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  // Kommt ein Ergebnis, gleiten die Zeilen auf ihren neuen Platz und die geänderte leuchtet kurz (#225).
+  const changed = useChangedKeys(rows, standingKey, standingSignature);
+  const registerRow = useFlipRows(rows, standingKey);
   const tournamentUrl = t ? `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "/tournaments";
   const resultPdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/standings.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
   const certificatePdfUrl = t ? `${API}/exports/tournaments/${t.slug || t.id}/certificates.pdf${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}` : "";
 
-  if (!t) return <PublicLayout><PublicLoadingState label="Lade Rangliste" /></PublicLayout>;
+  if (!t) {
+    return (
+      <PublicLayout>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+          <SkeletonDetailHeader label="Lade Rangliste" />
+          <SkeletonTable rows={8} columns={5} label="Lade Rangliste" />
+        </div>
+      </PublicLayout>
+    );
+  }
 
   return (
     <PublicLayout>
@@ -84,7 +98,13 @@ export default function TournamentStandingsPage() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {rows.map((r) => (
-                <tr key={r.registration_id} className={r.rank <= 3 ? "bg-[#29B6E8]/5" : ""}>
+                <tr
+                  key={r.registration_id}
+                  ref={registerRow(standingKey(r))}
+                  data-testid={`standing-row-${r.registration_id}`}
+                  data-changed={changed.has(standingKey(r)) ? "true" : undefined}
+                  className={`${r.rank <= 3 ? "bg-[#29B6E8]/5" : ""} ${changed.has(standingKey(r)) ? "tls-changed-row" : ""}`}
+                >
                   <td className="px-4 py-3 font-display font-bold text-[#29B6E8]">{r.rank}</td>
                   <td className="px-4 py-3 text-white">{r.display_name}</td>
                   <td className="px-4 py-3 text-right text-white/80">{r.won ?? r.wins ?? 0}</td>
@@ -108,4 +128,8 @@ export default function TournamentStandingsPage() {
       </div>
     </PublicLayout>
   );
+}
+
+function standingKey(row) {
+  return row.registration_id || row.id || row.display_name;
 }

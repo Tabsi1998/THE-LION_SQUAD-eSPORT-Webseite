@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeCard, formatDate } from "@/lib/dolibarr";
 import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
+import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet } from "lucide-react";
 
@@ -29,7 +30,7 @@ export default function MyMembershipPage() {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "users"]);
 
-  if (!data) return <PublicLayout><div className="p-20 text-center text-white/40">Lade …</div></PublicLayout>;
+  if (!data) return <PublicLayout><div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8"><SkeletonDetailHeader label="Lade Mitgliedschaft" /><SkeletonCards count={4} columns={4} image={false} label="Lade Mitgliedschaft" /></div></PublicLayout>;
 
   const m = data.membership;
   const erp = data.dolibarr;

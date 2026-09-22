@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import {
@@ -126,7 +127,7 @@ export default function AdminNavPage() {
       </div>
 
       {loading ? (
-        <div className="mt-6 text-white/50 text-sm">Lade…</div>
+        <SkeletonList rows={5} className="mt-6" label="Lade Navigation" />
       ) : (
         <div className="mt-6 space-y-2" data-testid="nav-list">
           {items.map((it, idx) => {

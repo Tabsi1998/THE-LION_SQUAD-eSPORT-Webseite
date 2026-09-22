@@ -1917,3 +1917,37 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   }
   .tls-confetti { display: none; }
 }
+
+/* Dynamik-Block (#224, #225, #226): Skelette, Änderungs-Leuchten, Seiten-Einblenden.
+   Alles endlich; mit „Bewegung reduzieren“ bleibt nur die Hervorhebung ohne Bewegung. */
+.tls-skeleton { animation: tls-skeleton-pulse 1.6s ease-in-out infinite; }
+@keyframes tls-skeleton-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+.tls-page-enter { animation: tls-page-enter 0.22s ease-out both; }
+@keyframes tls-page-enter {
+  from { opacity: 0.001; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.tls-changed { animation: tls-changed-glow 1.8s ease-out 1; }
+@keyframes tls-changed-glow {
+  0% { box-shadow: 0 0 0 2px rgba(41,182,232,0.75), 0 0 24px rgba(41,182,232,0.45); }
+  100% { box-shadow: 0 0 0 0 rgba(41,182,232,0), 0 0 0 rgba(41,182,232,0); }
+}
+.tls-changed-row { animation: tls-changed-row 1.8s ease-out 1; }
+@keyframes tls-changed-row {
+  0% { background-color: rgba(41,182,232,0.28); }
+  100% { background-color: transparent; }
+}
+.tls-changed-frame { outline: 2px solid rgba(41,182,232,0.85); outline-offset: 2px; box-shadow: 0 0 18px rgba(41,182,232,0.35); }
+.tls-new-chip {
+  display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.4rem; border-radius: 2px;
+  border: 1px solid rgba(41,182,232,0.5); background: rgba(41,182,232,0.14); color: #29B6E8;
+  font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-skeleton, .tls-page-enter, .tls-changed, .tls-changed-row { animation: none !important; }
+  .tls-changed { box-shadow: 0 0 0 2px rgba(41,182,232,0.6); }
+  .tls-changed-row { background-color: rgba(41,182,232,0.18); }
+}

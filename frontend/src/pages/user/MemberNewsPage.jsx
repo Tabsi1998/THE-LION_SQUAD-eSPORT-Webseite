@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
 
@@ -33,7 +34,7 @@ export default function MemberNewsPage() {
         </p>
 
         {loading ? (
-          <div className="mt-10 text-white/40 text-sm">Lade …</div>
+          <SkeletonCards count={3} className="mt-10" label="Lade News" />
         ) : list.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />

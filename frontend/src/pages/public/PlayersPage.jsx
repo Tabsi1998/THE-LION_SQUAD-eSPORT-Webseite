@@ -7,6 +7,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Search, Crown } from "lucide-react";
 import { AccountLevelPill, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame, useCrowns } from "@/components/tls/LevelAvatarFrame";
+import { SkeletonList } from "@/components/tls/Skeleton";
 
 const PAGE_SIZE = 48;
 
@@ -81,7 +82,7 @@ export default function PlayersPage() {
 
         <div className="mt-8">
           {loading ? (
-            <div className="text-white/40 text-sm">Lade …</div>
+            <SkeletonList rows={6} label="Lade Spieler" />
           ) : filtered.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Keine Spieler gefunden.</div>
           ) : (
