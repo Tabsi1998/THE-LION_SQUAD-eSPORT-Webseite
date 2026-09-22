@@ -25,6 +25,22 @@ export type AuthResponse = {
   token_type: "bearer";
 };
 
+// Startgeld (#319): was die Website öffentlich über den Preis sagt - keine Dolibarr-Nummern.
+export type TournamentOffer = {
+  enabled: boolean;
+  currency?: string;
+  positions: Array<{ key: string; label: string; description?: string | null; amount_cents: number; basis: string; optional?: boolean }>;
+};
+
+export type TournamentPrice = {
+  total_cents: number;
+  currency?: string;
+  billing_status?: string;
+  invoice_ref?: string | null;
+  invoice_status?: string | null;
+  payer_user_id?: string | null;
+};
+
 export type Tournament = {
   id: string;
   title: string;
@@ -63,6 +79,7 @@ export type Tournament = {
   block_club_member_registration?: boolean;
   team_mode?: string;
   team_size?: number;
+  offer?: TournamentOffer | null;
   show_chat?: boolean;
   banner_url?: string | null;
   format?: string;

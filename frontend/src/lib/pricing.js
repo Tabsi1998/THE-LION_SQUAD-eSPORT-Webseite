@@ -7,6 +7,13 @@ export const PRICE_BASES = [
   { key: "per_team", label: "je Team" },
 ];
 
+// Startgeld am Turnier (#319): dieselben Basen, aber „Person“ ist ein Spieler des Rosters.
+export const TOURNAMENT_PRICE_BASES = [
+  { key: "per_person", label: "je Spieler (Roster)" },
+  { key: "per_registration", label: "je Anmeldung" },
+  { key: "per_team", label: "je Team" },
+];
+
 export const TAX_PROFILES = [
   { key: "none", label: "Ohne Umsatzsteuer (Verein, Kleinunternehmer)" },
   { key: "standard", label: "Normalsatz" },
@@ -61,6 +68,19 @@ export function offerSummary(offer, seats = 1) {
   return parts.join(" · ");
 }
 
+/** „10,00 € je Spieler · Team mit 5 Spielern 50,00 €“ - der Satz am Turnier (Solo: nur die Summe). */
+export function startFeeSummary(offer, { teamMode = "solo", teamSize = 1 } = {}) {
+  if (!offer?.enabled) return "";
+  const required = offer.positions.filter((position) => !position.optional);
+  const perPlayer = required.some((position) => position.basis === "per_person");
+  const single = previewQuote(offer, { seats: 1 });
+  if (teamMode === "solo") return `${formatCents(single.total_cents, offer.currency)} Startgeld`;
+  const seats = Math.max(1, Number(teamSize) || 1);
+  const parts = [`${formatCents(single.total_cents, offer.currency)} ${perPlayer ? "je Spieler" : "je Team"}`];
+  if (perPlayer && seats > 1) parts.push(`Team mit ${seats} Spielern ${formatCents(previewQuote(offer, { seats }).total_cents, offer.currency)}`);
+  return parts.join(" · ");
+}
+
 /** Formular ↔ Server: Positionen mit Betrag als Text im Formular, als Cent zum Server. */
 export function emptyPosition() {
   return { key: "", label: "", description: "", amount: "", basis: "per_person", tax_profile: "none", optional: false, dolibarr_product_id: "" };
@@ -93,7 +113,22 @@ export function formToBilling(form) {
       dolibarr_product_id: position.dolibarr_product_id === "" || position.dolibarr_product_id === null ? null : Number(position.dolibarr_product_id),
     };
   });
-  return { enabled: Boolean(form.enabled), positions, invoice_timing: form.invoice_timing || "on_confirm" };
+  const billing = { enabled: Boolean(form.enabled), positions, invoice_timing: form.invoice_timing || "on_confirm" };
+  // Turnier-Schalter (#319) nur mitschicken, wenn das Formular sie führt - das Event kennt sie nicht.
+  if ("count_substitutes" in form) billing.count_substitutes = Boolean(form.count_substitutes);
+  if ("included_in_event" in form) billing.included_in_event = Boolean(form.included_in_event);
+  return billing;
+}
+
+/** Formularzustand für das Startgeld am Turnier - mit den beiden Turnier-Schaltern. */
+export function tournamentBillingToForm(billing) {
+  return {
+    enabled: Boolean(billing?.enabled),
+    positions: positionsToForm(billing),
+    invoice_timing: billing?.invoice_timing || "on_confirm",
+    count_substitutes: Boolean(billing?.count_substitutes),
+    included_in_event: Boolean(billing?.included_in_event),
+  };
 }
 
 /** Eine Leistung aus Dolibarr in die Position übernehmen: Nummer immer, der Rest als Vorbelegung. */

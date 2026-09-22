@@ -8,8 +8,10 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { TournamentFlowStepper } from "@/components/tls/TournamentFlowStepper";
+import { EventBillingSection } from "@/components/tls/EventBillingSection";
 import { formatDateTime, fromDateTimeLocal, normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
+import { billingFormError, formToBilling, tournamentBillingToForm } from "@/lib/pricing";
 import { toast } from "sonner";
 import { Zap, RefreshCw, Eye, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -1552,6 +1554,12 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
   const [events, setEvents] = useState([]);
+  // Startgeld (#319, #322): eigener Zustand wie beim Event, nur für den Bereich Finanzen sichtbar
+  // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
+  const { can } = useAuth();
+  const canFinance = typeof can === "function" && can("finance");
+  const [billingForm, setBillingForm] = useState(() => tournamentBillingToForm(tournament.billing));
+  const billingDirty = JSON.stringify(billingForm) !== JSON.stringify(tournamentBillingToForm(tournament.billing));
   const formFromTournament = (source = tournament) => ({
     title: source.title || "",
     slug: source.slug || "",
@@ -1756,10 +1764,13 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     team_size: value === "solo" ? 1 : Math.max(2, Number(current.team_size) || 2),
   }));
   const dirtyPayload = buildDirtyPayload(normalizeTournamentPayload(f), normalizeTournamentPayload(formFromTournament()));
-  const hasFormChanges = hasPayloadChanges(dirtyPayload);
+  const sendBilling = canFinance && billingDirty;
+  const hasFormChanges = hasPayloadChanges(dirtyPayload) || sendBilling;
   const save = async ({ rebuildPreview = false } = {}) => {
     try {
-      const patch = dirtyPayload;
+      const billingProblem = sendBilling ? billingFormError(billingForm) : "";
+      if (billingProblem) { toast.error(billingProblem); return; }
+      const patch = sendBilling ? { ...dirtyPayload, billing: formToBilling(billingForm) } : dirtyPayload;
       if (!hasPayloadChanges(patch)) {
         if (rebuildPreview) {
           await onRebuildFromFormat?.({ preview: true, force: true, structure: structurePayload() });
@@ -1892,6 +1903,9 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           </div>
         )}
       </div>
+      {canFinance && (
+        <EventBillingSection kind="tournament" value={billingForm} onChange={setBillingForm} canEdit={canFinance} hasEvent={Boolean(f.event_id)} />
+      )}
       <Details title="Preise">
         <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
         <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>

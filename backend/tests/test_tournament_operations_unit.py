@@ -398,12 +398,15 @@ def test_tournament_creation_persists_engine_and_ruleset_versions(monkeypatch):
     monkeypatch.setattr(tournament_crud_routes, "get_db", lambda: db)
     monkeypatch.setattr(tournament_crud_routes, "mutation_lock", _uncontended_lock)
     monkeypatch.setattr(tournament_crud_routes, "_create_initial_bracket_preview", preview)
+    # Startgeld (#319): die Antwort fragt den Bereich Finanzen ab - hier ohne echte DB.
+    monkeypatch.setattr(tournament_crud_routes, "user_has_area", AsyncMock(return_value=False))
 
     result = asyncio.run(tournament_crud_routes.create_tournament(
         TournamentCreate(title="Sommer-Cup", game_id="game-1", format="single_elim"),
         {"id": "admin-1"},
     ))
 
+    assert result["offer"] is None and "billing" not in result, "ohne Finanzen keine Konfiguration in der Antwort"
     inserted = tournaments.insert_one.await_args.args[0]
     # Neue Turniere starten im Graph-Speicher - unabhaengig vom Format.
     assert inserted["engine_version"] == "competition.graph.v1"

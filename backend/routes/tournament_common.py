@@ -466,6 +466,10 @@ def _public_registration(reg: dict, user: dict | None, is_staff: bool) -> dict:
     }
     if is_self:
         out["user_id"] = reg.get("user_id")
+        from services.tournament_fees import public_price
+        price = public_price(reg)
+        if price:
+            out["price"] = price
     return out
 
 

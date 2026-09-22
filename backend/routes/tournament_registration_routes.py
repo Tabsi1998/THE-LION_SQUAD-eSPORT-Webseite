@@ -16,6 +16,7 @@ from services.custom_bracket import BracketSchemaError, build_matches_v2_from_sc
 from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
+from services import tournament_fees
 from services.query_filters import safe_regex
 from routes.tournament_common import (
     STAFF_ROLES,
@@ -403,6 +404,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         if existing_team:
             existing_team.pop("identity_key", None)
             return {**existing_team, "auto_bracket_update": None, "idempotent_replay": True}
+    # Startgeld (#319): kostet die Teilnahme etwas, muss die anmeldende Person die Kosten ausdrücklich übernehmen.
+    fee_offer = tournament.get("billing") or {}
+    if tournament_fees.charges(tournament, fee_offer) and not body.accept_costs:
+        raise HTTPException(status_code=400, detail="Bitte bestätige, dass du das Startgeld übernimmst (Rechnung an dich).")
     game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0}) if tournament.get("game_id") else None
     game = await _enrich_game_identity(db, game)
     submitted_ids = body.player_ids or {}
@@ -439,6 +444,8 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         "display_name": (f"[{team.get('tag')}] {team.get('name')}" if team and team.get("tag") else (team.get("name") if team else None)) or me.get("display_name") or me.get("username"),
         "registration_type": "team" if team else "solo",
         "registered_by": me["id"],
+        "selected_positions": list(body.selected_positions or []),
+        "costs_accepted_by": me["id"] if body.accept_costs else None,
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
@@ -458,6 +465,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
     auto_bracket_update = None
     if reg["status"] in {"approved", "checked_in"}:
         auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+        # Verbindlich dabei: Preis einfrieren, Auftrag anlegen (#319). Warteliste zahlt beim Nachrücken.
+        snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=me)
+        if snapshot:
+            reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
     reg.pop("_id", None)
     reg.pop("identity_key", None)
     reg["auto_bracket_update"] = auto_bracket_update
@@ -672,6 +683,16 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
         tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
         if tournament:
             reg["auto_bracket_update"] = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+            # Startgeld (#319): Freigabe friert den Preis ein (Zahlungspflichtig ist, wer angemeldet hat);
+            # Ablehnung oder Nichterscheinen vor dem Beleg schließt den Auftrag.
+            if updates["status"] in tournament_fees.BILLABLE_STATUSES:
+                payer = await db.users.find_one({"id": reg.get("user_id")}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "email": 1})
+                if payer:
+                    snapshot = await tournament_fees.freeze_price(db, reg, tournament, payer=payer)
+                    if snapshot:
+                        reg["price_snapshot"], reg["billing_status"] = snapshot, "pending"
+            elif updates["status"] in tournament_fees.CLOSED_STATUSES:
+                await tournament_fees.close_price(db, reg, f"Anmeldung: {updates['status']}")
     return {**reg, "idempotent_replay": False}
 
 
@@ -768,6 +789,7 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
         })
         if legacy_blocked or v2_blocked:
             raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
+    await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
     auto_bracket_update = None
     if tournament:

@@ -1,13 +1,31 @@
 import { useEffect, useState } from "react";
 import { Plus, Trash2, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
-import { PRICE_BASES, TAX_PROFILES, applyDolibarrService, billingFormError, emptyPosition, formatCents, previewQuote, formToBilling } from "@/lib/pricing";
+import { PRICE_BASES, TAX_PROFILES, TOURNAMENT_PRICE_BASES, applyDolibarrService, billingFormError, emptyPosition, formatCents, previewQuote, formToBilling } from "@/lib/pricing";
 
 // „Kosten und Abrechnung“ am Event (#315, #318, #322): nur wer den Bereich Finanzen hat, sieht
 // und pflegt den Abschnitt. Beträge als Text („20“ oder „20,50“), typisierte Preisbasis und
 // Steuerprofil - keine Formeln. Was die Anmeldung kostet, zeigt die Vorschau rechts.
+// Mit `kind="tournament"` (#319) heißt der Abschnitt „Startgeld“, „je Person“ meint den Roster,
+// und es kommen zwei Schalter dazu: Ersatzspieler mitzählen, im Eventbeitrag enthalten.
 
-export function EventBillingSection({ value, onChange, canEdit, dolibarrConnected = false }) {
+const KINDS = {
+  event: {
+    title: "Kosten und Abrechnung", toggle: "Teilnahme kostet etwas", bases: PRICE_BASES, previewSeats: 2,
+    off: "Kostenlos. Zum Einschalten den Haken setzen – dann gibt es Positionen wie „Kostenbeitrag 20 € je Person inkl. Essen“.",
+    preview: (total) => <>Eine Person mit einer Begleitperson zahlt <strong className="text-white">{total}</strong> (nur Pflichtpositionen).</>,
+    defaultLabel: "Kostenbeitrag",
+  },
+  tournament: {
+    title: "Startgeld", toggle: "Teilnahme kostet Startgeld", bases: TOURNAMENT_PRICE_BASES, previewSeats: 5,
+    off: "Kein Startgeld. Zum Einschalten den Haken setzen – dann gibt es Positionen wie „Startgeld 10 € je Spieler“.",
+    preview: (total) => <>Ein Team mit fünf Spielern zahlt <strong className="text-white">{total}</strong> (nur Pflichtpositionen; Solo zählt als eine Person).</>,
+    defaultLabel: "Startgeld",
+  },
+};
+
+export function EventBillingSection({ value, onChange, canEdit, dolibarrConnected = false, kind = "event", hasEvent = false }) {
+  const copy = KINDS[kind] || KINDS.event;
   // Leistungen aus Dolibarr (z. B. „Kostenbeitrag 20,00 brutto“): auswählen statt Nummer tippen.
   // Die Auswahl füllt Bezeichnung, Betrag, Steuer und Nummer vor; danach lässt sich alles ändern.
   const [services, setServices] = useState(null);
@@ -24,19 +42,19 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
     set({ positions: form.positions.map((position, i) => (i === index ? applyDolibarrService(position, service) : position)) });
   };
   const error = billingFormError(form);
-  const preview = form.enabled && !error ? previewQuote({ ...formToBilling(form), currency: "EUR" }, { seats: 2 }) : null;
+  const preview = form.enabled && !error ? previewQuote({ ...formToBilling(form), currency: "EUR" }, { seats: copy.previewSeats }) : null;
 
   return (
     <section className="border border-[#FFD700]/30 rounded-sm p-4 space-y-4" data-testid="event-billing">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Kosten und Abrechnung</h3>
+        <h3 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> {copy.title}</h3>
         <label className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={Boolean(form.enabled)} onChange={(ev) => set({ enabled: ev.target.checked, positions: ev.target.checked && !form.positions.length ? [{ ...emptyPosition(), label: "Kostenbeitrag" }] : form.positions })} data-testid="event-billing-enabled" />
-          Teilnahme kostet etwas
+          <input type="checkbox" checked={Boolean(form.enabled)} onChange={(ev) => set({ enabled: ev.target.checked, positions: ev.target.checked && !form.positions.length ? [{ ...emptyPosition(), label: copy.defaultLabel }] : form.positions })} data-testid="event-billing-enabled" />
+          {copy.toggle}
         </label>
       </div>
       {!form.enabled ? (
-        <p className="text-sm text-white/55">Kostenlos. Zum Einschalten den Haken setzen – dann gibt es Positionen wie „Kostenbeitrag 20 € je Person inkl. Essen“.</p>
+        <p className="text-sm text-white/55">{copy.off}</p>
       ) : (
         <>
           <div className="space-y-3">
@@ -53,7 +71,7 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
                 <label className="md:col-span-3 text-xs">
                   <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Preisbasis</div>
                   <select value={position.basis} onChange={(ev) => setPosition(index, { basis: ev.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-                    {PRICE_BASES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+                    {copy.bases.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
                   </select>
                 </label>
                 <label className="md:col-span-3 text-xs">
@@ -104,11 +122,27 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
             <div className="text-xs text-white/55 border border-white/10 rounded-sm p-3">
               <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Vorschau</div>
               {error ? <span className="text-[#FF3B30]" data-testid="event-billing-error">{error}</span> : preview ? (
-                <span data-testid="event-billing-preview">Eine Person mit einer Begleitperson zahlt <strong className="text-white">{formatCents(preview.total_cents)}</strong> (nur Pflichtpositionen).</span>
+                <span data-testid="event-billing-preview">{copy.preview(formatCents(preview.total_cents))}</span>
               ) : null}
             </div>
           </div>
-          <p className="text-xs text-white/45">Wer sich anmeldet, sieht die Positionen und die Summe vor dem Absenden. Der Preis wird bei der verbindlichen Anmeldung eingefroren – spätere Änderungen hier betreffen nur neue Anmeldungen. Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr).</p>
+          {kind === "tournament" && (
+            <div className="grid sm:grid-cols-2 gap-3 text-sm" data-testid="tournament-billing-options">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" checked={Boolean(form.count_substitutes)} onChange={(ev) => set({ count_substitutes: ev.target.checked })} className="mt-1" data-testid="tournament-billing-substitutes" />
+                <span>Ersatzspieler zählen mit<br /><span className="text-xs text-white/45">Nur bei „je Spieler“. Ohne Haken zahlt ein Team nur für die Stammspieler.</span></span>
+              </label>
+              <label className={`flex items-start gap-2 ${hasEvent ? "" : "opacity-50"}`}>
+                <input type="checkbox" checked={Boolean(form.included_in_event)} disabled={!hasEvent} onChange={(ev) => set({ included_in_event: ev.target.checked })} className="mt-1" data-testid="tournament-billing-included" />
+                <span>Im Eventbeitrag enthalten<br /><span className="text-xs text-white/45">{hasEvent ? "Das Event stellt die Rechnung – hier entsteht keine zweite." : "Erst wählbar, wenn das Turnier an einem Event hängt."}</span></span>
+              </label>
+            </div>
+          )}
+          <p className="text-xs text-white/45">
+            {kind === "tournament"
+              ? "Wer anmeldet, übernimmt das Startgeld und bestätigt das beim Anmelden – bei Teams die Teamleitung für das ganze Team. Bezahlt wird erst mit der verbindlichen Teilnahme: Warteliste und offene Freigabe kosten nichts, Ablehnung oder Abmeldung vor dem Beleg schließt den Auftrag. Der Preis wird dabei eingefroren – spätere Änderungen hier betreffen nur neue Anmeldungen."
+              : "Wer sich anmeldet, sieht die Positionen und die Summe vor dem Absenden. Der Preis wird bei der verbindlichen Anmeldung eingefroren – spätere Änderungen hier betreffen nur neue Anmeldungen. Die Rechnung entsteht in Dolibarr, sobald der Schreibzugriff eingerichtet ist (Einstellungen → Dolibarr)."}
+          </p>
         </>
       )}
     </section>

@@ -23,6 +23,7 @@ import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
+import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -90,7 +91,7 @@ export default function TournamentDetailPage() {
     return false;
   };
 
-  const submitRegistration = async ({ playerIds = {}, teamId = null } = {}) => {
+  const submitRegistration = async ({ playerIds = {}, teamId = null, acceptCosts = false, selectedPositions = [] } = {}) => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     await runAction(async () => {
       await api.post(`/tournaments/${t.id}/register`, {
@@ -99,6 +100,9 @@ export default function TournamentDetailPage() {
         discord: user.discord_name,
         player_ids: playerIds,
         accept_rules: true, accept_privacy: true,
+        // Startgeld (#319): wer anmeldet, übernimmt es - der Server verlangt die Bestätigung.
+        accept_costs: Boolean(acceptCosts),
+        selected_positions: selectedPositions,
       }, { params: accessToken ? { access: accessToken } : undefined });
       toast.success("Erfolgreich angemeldet!");
       setRegisterModal(false);
@@ -109,7 +113,7 @@ export default function TournamentDetailPage() {
   const handleRegister = async () => {
     if (!user) { nav(`/login?next=${encodeURIComponent(`/tournaments/${slug}${accessToken ? `?access=${accessToken}` : ""}`)}`); return; }
     const needsTeam = (t.team_mode || "solo") !== "solo";
-    if (needsTeam || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
+    if (needsTeam || t.offer || (t.game?.effective_player_id_fields || t.game?.player_id_fields || []).length) {
       setRegisterModal(true);
       return;
     }
@@ -198,6 +202,36 @@ export default function TournamentDetailPage() {
               {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
             </div>
           </div>
+
+          {t.offer && (
+            <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm max-w-3xl" data-testid="tournament-offer">
+              <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Startgeld</div>
+              <div className="mt-1 text-white">{startFeeSummary(t.offer, { teamMode: t.team_mode || "solo", teamSize: t.team_size })}</div>
+              <ul className="mt-1 space-y-0.5 text-xs text-white/60">
+                {t.offer.positions.filter((position) => !position.optional).map((position) => (
+                  <li key={position.key}>{position.label}: {formatCents(position.amount_cents, t.offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : "je Anmeldung"}{position.description ? ` – ${position.description}` : ""}</li>
+                ))}
+              </ul>
+              <div className="mt-1 text-xs text-white/45">{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst mit der verbindlichen Teilnahme.</div>
+            </div>
+          )}
+
+          {myReg?.price && (
+            <div className="mt-3 text-sm max-w-3xl" data-testid="tournament-own-price">
+              <span className="text-white/65">Dein Startgeld: </span>
+              <strong className="text-white">{formatCents(myReg.price.total_cents, myReg.price.currency)}</strong>
+              <span className="text-white/45">
+                {" · "}
+                {myReg.price.billing_status === "cancelled" ? "storniert"
+                  : myReg.price.billing_status === "paid" ? `Rechnung ${myReg.price.invoice_ref || ""} bezahlt – danke!`
+                    : myReg.price.invoice_ref && myReg.price.invoice_status !== "draft" ? `Rechnung ${myReg.price.invoice_ref} offen – du findest sie unter „Meine Rechnungen“`
+                      : "die Rechnung kommt in dein Konto unter „Meine Rechnungen“"}
+              </span>
+            </div>
+          )}
+          {myReg && !myReg.price && t.offer && myReg.user_id === user?.id && ["pending", "waitlist"].includes(myReg.status) && (
+            <div className="mt-3 text-xs text-white/45 max-w-3xl" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</div>
+          )}
 
           <div className="mt-8 flex flex-wrap gap-3">
             {canSelfRegister && !myReg && (
@@ -520,10 +554,16 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
   };
   const [playerIds, setPlayerIds] = useState(initial);
   const [teamId, setTeamId] = useState(manageableTeams[0]?.id || "");
+  // Startgeld (#319): Summe vor dem Absenden, wählbare Positionen als Haken, Kostenübernahme als Pflicht.
+  const offer = tournament.offer || null;
+  const [acceptCosts, setAcceptCosts] = useState(false);
+  const [selectedPositions, setSelectedPositions] = useState([]);
+  const seats = needsTeam ? Math.max(1, Number(tournament.team_size) || 1) : 1;
+  const quote = offer ? previewQuote(offer, { seats, selected: selectedPositions }) : null;
   const set = (key, value) => setPlayerIds((cur) => ({ ...cur, [key]: value }));
   const submit = (e) => {
     e.preventDefault();
-    onSubmit({ playerIds, teamId: needsTeam ? teamId : null });
+    onSubmit({ playerIds, teamId: needsTeam ? teamId : null, acceptCosts, selectedPositions });
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -534,7 +574,9 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
             <p className="text-xs text-white/50 mt-1">
               {needsTeam
                 ? "Wähle das Team aus, das du als Leader oder Co-Leader anmelden möchtest."
-                : `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`}
+                : fields.length
+                  ? `${gameLabel(game)} benötigt Spieler-IDs${sourceSlug !== game.slug ? ` aus ${game.identity_game_name || "dem Hauptspiel"}` : ""}.`
+                  : "Bitte bestätige das Startgeld, dann bist du dabei."}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-white/45 hover:text-white"><X className="w-5 h-5" /></button>
@@ -567,11 +609,39 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
             />
           </label>
         ))}
+        {offer && (
+          <div className="border border-[#FFD700]/40 rounded-sm p-3 space-y-2" data-testid="tournament-register-costs">
+            <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Startgeld</div>
+            {offer.positions.some((position) => position.optional) && (
+              <div className="space-y-1">
+                {offer.positions.filter((position) => position.optional).map((position) => (
+                  <label key={position.key} className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={selectedPositions.includes(position.key)} onChange={(e) => setSelectedPositions((current) => (e.target.checked ? [...current, position.key] : current.filter((key) => key !== position.key)))} data-testid={`tournament-offer-option-${position.key}`} />
+                    <span>{position.label} <span className="text-white/50">{formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : "je Anmeldung"}</span></span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {quote && !quote.free && (
+              <div className="flex items-baseline justify-between gap-3 text-sm" data-testid="tournament-quote">
+                <span className="text-white/65">{needsTeam ? `Summe für ein Team mit ${seats} Spielern` : "Summe"}</span>
+                <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+              </div>
+            )}
+            {needsTeam && offer.positions.some((position) => position.basis === "per_person") && (
+              <div className="text-xs text-white/45">Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</div>
+            )}
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" checked={acceptCosts} onChange={(e) => setAcceptCosts(e.target.checked)} className="mt-1" data-testid="tournament-accept-costs" />
+              <span>{needsTeam ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}<br /><span className="text-xs text-white/45">Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto unter „Meine Rechnungen“.</span></span>
+            </label>
+          </div>
+        )}
         {error && <AuthFormAlert id="tournament-registration-error">{error}</AuthFormAlert>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={loading || (needsTeam && !teamId)} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
-            {loading ? "Sendet…" : "Anmelden"}
+          <button disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)} data-testid="tournament-register-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+            {loading ? "Sendet…" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </div>
       </form>

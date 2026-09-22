@@ -13,6 +13,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from "../../lib/format";
 import { getRegistrationState } from "../../lib/registration";
+import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
@@ -33,6 +34,9 @@ type BracketPayload = {
 type RegistrationPayload = {
   player_ids?: Record<string, string>;
   team_id?: string | null;
+  // Startgeld (#319): wer anmeldet, übernimmt es - der Server verlangt die Bestätigung.
+  accept_costs?: boolean;
+  selected_positions?: string[];
 };
 
 const tabs: Array<{ key: TabKey; label: string }> = [
@@ -150,6 +154,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         player_ids: payload.player_ids || {},
         accept_rules: true,
         accept_privacy: true,
+        accept_costs: Boolean(payload.accept_costs),
+        selected_positions: payload.selected_positions || [],
       });
       setRegisterModal(false);
       await load();
@@ -162,7 +168,7 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
 
   const startRegistration = useCallback(() => {
     if (!tournament || busy) return;
-    if (isTeamTournament || gameFields.length) {
+    if (isTeamTournament || gameFields.length || tournament.offer) {
       setRegisterModal(true);
       return;
     }
@@ -281,11 +287,22 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
                   <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
                 ) : null}
+                {tournament.offer ? (
+                  <View style={styles.feeBox} testID="tournament-offer">
+                    <Muted style={styles.feeLabel}>Startgeld</Muted>
+                    <Body style={styles.strong}>{startFeeSummary(tournament.offer, tournament.team_mode || "solo", tournament.team_size || 1)}</Body>
+                    <Muted>{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst mit der verbindlichen Teilnahme.</Muted>
+                  </View>
+                ) : null}
                 {guest ? (
                   <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
                 ) : registered ? (
                   <>
                     <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
+                    {ownRegistration?.price ? <Muted testID="tournament-own-price">{ownPriceLine(ownRegistration.price)}</Muted> : null}
+                    {!ownRegistration?.price && tournament.offer && ownRegistration?.user_id === user?.id && ["pending", "waitlist"].includes(String(ownRegistration?.status || "")) ? (
+                      <Muted>Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</Muted>
+                    ) : null}
                     {canCheckIn ? <Button label={busy ? "Check-in läuft ..." : "Jetzt einchecken"} onPress={checkIn} disabled={busy} /> : null}
                     {canSelfUnregister ? (
                       <Button label={busy ? "Wird abgemeldet ..." : "Vom Turnier abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
@@ -462,15 +479,24 @@ function RegistrationModal({
   }), [gameSlug, sourceSlug, user?.game_ids]);
   const [playerIds, setPlayerIds] = useState<Record<string, string>>(initialIds);
   const [teamId, setTeamId] = useState(teams[0]?.id || "");
+  // Startgeld (#319): Summe vor dem Absenden, wählbare Positionen, Kostenübernahme als Pflicht.
+  const offer = tournament.offer || null;
+  const [acceptCosts, setAcceptCosts] = useState(false);
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const seats = isTeamTournament ? Math.max(1, Number(tournament.team_size) || 1) : 1;
+  const total = offer ? quoteTotal(offer, seats, selectedPositions) : 0;
+  const currency = offer?.currency || "EUR";
 
   useEffect(() => {
     if (!visible) return;
     setPlayerIds(initialIds);
     setTeamId(teams[0]?.id || "");
+    setAcceptCosts(false);
+    setSelectedPositions([]);
   }, [initialIds, teams, visible]);
 
   const missingRequired = fields.some((field) => field.required !== false && !String(playerIds[field.key] || "").trim());
-  const canSubmit = !busy && (!isTeamTournament || Boolean(teamId)) && !missingRequired;
+  const canSubmit = !busy && (!isTeamTournament || Boolean(teamId)) && !missingRequired && (!offer || acceptCosts);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -480,7 +506,7 @@ function RegistrationModal({
             <View style={styles.modalHead}>
               <View style={styles.flex}>
                 <Heading>Turnier-Anmeldung</Heading>
-                <Muted>{isTeamTournament ? "Wähle dein verwaltbares Team aus." : `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benötigt diese Angaben.`}</Muted>
+                <Muted>{isTeamTournament ? "Wähle dein verwaltbares Team aus." : fields.length ? `${tournament.game?.display_name || tournament.game?.name || "Dieses Spiel"} benötigt diese Angaben.` : "Bitte bestätige das Startgeld, dann bist du dabei."}</Muted>
               </View>
               <Pressable onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
                 <Body style={styles.closeText}>x</Body>
@@ -519,12 +545,59 @@ function RegistrationModal({
               </View>
             ) : null}
 
+            {offer ? (
+              <View style={[styles.formGroup, styles.feeBox]} testID="tournament-register-costs">
+                <Muted style={styles.feeLabel}>Startgeld</Muted>
+                {offer.positions.filter((position) => position.optional).map((position) => {
+                  const chosen = selectedPositions.includes(position.key);
+                  return (
+                    <Pressable
+                      key={position.key}
+                      onPress={() => setSelectedPositions((current) => (chosen ? current.filter((key) => key !== position.key) : [...current, position.key]))}
+                      style={styles.checkRow}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: chosen }}
+                      testID={`tournament-offer-option-${position.key}`}
+                    >
+                      <View style={[styles.checkbox, chosen && styles.checkboxActive]} />
+                      <Body style={styles.flex}>{position.label} <Muted>{formatCents(position.amount_cents, currency)} {basisLabel(position.basis)}</Muted></Body>
+                    </Pressable>
+                  );
+                })}
+                <View style={styles.feeTotalRow}>
+                  <Muted>{isTeamTournament ? `Summe für ein Team mit ${seats} Spielern` : "Summe"}</Muted>
+                  <Body style={styles.strong} testID="tournament-quote">{formatCents(total, currency)}</Body>
+                </View>
+                {isTeamTournament && offer.positions.some((position) => position.basis === "per_person") ? (
+                  <Muted>Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</Muted>
+                ) : null}
+                <Pressable
+                  onPress={() => setAcceptCosts((current) => !current)}
+                  style={styles.checkRow}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: acceptCosts }}
+                  testID="tournament-accept-costs"
+                >
+                  <View style={[styles.checkbox, acceptCosts && styles.checkboxActive]} />
+                  <View style={styles.flex}>
+                    <Body>{isTeamTournament ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}</Body>
+                    <Muted>Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto.</Muted>
+                  </View>
+                </Pressable>
+              </View>
+            ) : null}
+
             <Muted>Mit der Anmeldung akzeptierst du die Turnierregeln und die Datenschutzhinweise.</Muted>
             {missingRequired ? <Muted style={styles.errorText}>Bitte alle Pflicht-IDs ausfüllen.</Muted> : null}
 
             <View style={styles.formActions}>
               <Button label="Abbrechen" variant="secondary" onPress={onClose} disabled={busy} />
-              <Button label={busy ? "Sendet ..." : "Anmelden"} onPress={() => onSubmit({ team_id: isTeamTournament ? teamId : null, player_ids: playerIds })} disabled={!canSubmit} />
+              <Button
+                label={busy ? "Sendet ..." : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Anmelden"}
+                onPress={() => onSubmit({ team_id: isTeamTournament ? teamId : null, player_ids: playerIds, accept_costs: acceptCosts, selected_positions: selectedPositions })}
+                disabled={!canSubmit}
+                testID="tournament-register-submit"
+              />
             </View>
           </ScrollView>
         </View>
@@ -1117,6 +1190,44 @@ const styles = StyleSheet.create({
     color: colors.cyan,
     fontWeight: "900",
     textTransform: "uppercase",
+  },
+  feeBox: {
+    backgroundColor: "rgba(255,215,0,0.06)",
+    borderColor: "rgba(255,215,0,0.35)",
+    borderRadius: 7,
+    borderWidth: 1,
+    gap: 6,
+    padding: 11,
+  },
+  feeLabel: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  feeTotalRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  checkRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 10,
+  },
+  checkbox: {
+    borderColor: colors.border,
+    borderRadius: 4,
+    borderWidth: 2,
+    height: 18,
+    marginTop: 2,
+    width: 18,
+  },
+  checkboxActive: {
+    backgroundColor: colors.gold,
+    borderColor: colors.gold,
   },
   modalBackdrop: {
     backgroundColor: "rgba(0,0,0,0.78)",

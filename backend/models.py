@@ -312,6 +312,9 @@ class BillingConfig(BaseModel):
     enabled: bool = False
     positions: List[BillingPosition] = []
     invoice_timing: Literal["on_confirm", "manual"] = "on_confirm"
+    # Turniere (#319): zählen Ersatzspieler bei „je Person“? Ist das Startgeld im Eventbeitrag enthalten?
+    count_substitutes: bool = False
+    included_in_event: bool = False
 
 
 class EventLocation(BaseModel):
@@ -473,6 +476,7 @@ class TournamentCreate(BaseModel):
     team_mode: TeamMode = "solo"
     team_size: int = 1
     substitutes_allowed: bool = False
+    billing: Optional[BillingConfig] = None
     max_participants: int = 32
     min_participants: int = 2
     registration_enabled: bool = True
@@ -537,6 +541,7 @@ class TournamentUpdate(BaseModel):
     team_mode: Optional[TeamMode] = None
     team_size: Optional[int] = None
     substitutes_allowed: Optional[bool] = None
+    billing: Optional[BillingConfig] = None
     max_participants: Optional[int] = None
     min_participants: Optional[int] = None
     registration_enabled: Optional[bool] = None
@@ -591,6 +596,9 @@ class RegistrationCreate(BaseModel):
     notes: Optional[str] = None
     accept_rules: bool = Field(..., description="Must be explicitly true")
     accept_privacy: bool = Field(..., description="Must be explicitly true")
+    # Startgeld (#319): die anmeldende Person übernimmt die Kosten - bei Teams die Teamleitung.
+    accept_costs: bool = False
+    selected_positions: List[str] = []
 
 
 class RegistrationUpdate(BaseModel):
