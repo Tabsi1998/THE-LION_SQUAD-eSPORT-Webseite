@@ -35,7 +35,14 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
           {terms?.complete ? "vollständig" : "unvollständig – Belege bleiben Entwurf"}
         </span>
       </div>
-      <p className="text-xs text-white/55">Stehen an jedem Beleg, den die Website anlegt. Die Listen kommen aus Dolibarr; fehlt eine Liste, darf der Website-Benutzer sie nicht lesen – dann die Nummer aus Dolibarr eintragen (Adresszeile des Eintrags, „id=…“).</p>
+      <p className="text-xs text-white/55">Stehen an jedem Beleg, den die Website anlegt. Die Listen kommen aus Dolibarr.</p>
+      {options?.available && options.accounts === null && (
+        <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 text-xs space-y-1.5" data-testid="invoice-terms-accounts-help">
+          <div className="font-bold text-[#FFD700]">Die Kontenliste ist nicht lesbar – dem Website-Benutzer fehlt in Dolibarr das Recht „Bankkonten einsehen“.</div>
+          <div className="text-white/70"><strong>Weg 1 (empfohlen):</strong> Dolibarr → Start → Benutzer &amp; Gruppen → Website-Benutzer → Reiter „Rechte“ → Modul „Banken/Kassen“ → „Bankkonten einsehen“ anhaken. Danach diese Seite neu laden – das Konto steht dann zur Auswahl.</div>
+          <div className="text-white/70"><strong>Weg 2 (Nummer von Hand):</strong> Dolibarr → Bank/Kasse → Konten → das Girokonto anklicken. In der Adresszeile des Browsers steht „card.php?id=<strong>3</strong>“ – diese Zahl unten eintragen.</div>
+        </div>
+      )}
       <div className="grid sm:grid-cols-3 gap-3">
         {FIELDS.map((field) => {
           const list = options?.[field.list];
