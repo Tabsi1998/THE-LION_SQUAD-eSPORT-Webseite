@@ -9,7 +9,7 @@ checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
 
 
-@pytest.mark.parametrize("problem", [None, "immutable_worker", "different_worker", "cached_html", "old_route", "missing_asset"])
+@pytest.mark.parametrize("problem", [None, "immutable_worker", "different_worker", "cached_html", "old_route", "missing_asset", "mjs_octet_stream", "chunk_not_immutable"])
 def test_release_check_detects_real_update_failure_modes(monkeypatch, problem):
     version = "a" * 20
 
@@ -29,7 +29,13 @@ def test_release_check_detects_real_update_failure_modes(monkeypatch, problem):
         elif path.startswith("/assets/"):
             if problem != "missing_asset":
                 headers["Content-Type"] = "application/javascript"
-                body = "export const ready=true;"
+                headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                # Der Einstieg lädt einen Chunk nach, der Chunk nennt den Worker (#361).
+                body = 'import("./viewer-Ab12Cd34.js");' if path == "/assets/index-new.js" else 'const w=`/assets/pdf.worker.min-Ef56Gh78.mjs`;'
+            if path.endswith(".mjs") and problem == "mjs_octet_stream":
+                headers["Content-Type"] = "application/octet-stream"
+            if path == "/assets/viewer-Ab12Cd34.js" and problem == "chunk_not_immutable":
+                headers["Cache-Control"] = "no-store"
         elif path == "/verify-email":
             if problem == "cached_html":
                 headers["Cache-Control"] = "public, max-age=3600"

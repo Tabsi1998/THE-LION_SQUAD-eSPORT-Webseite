@@ -12,6 +12,12 @@ def fetch(base, path):
         return response.headers, response.read(2_000_000).decode("utf-8")
 
 
+def header_line(headers, name):
+    """Alle Werte einer Kopfzeile, kommagetrennt - nginx darf Cache-Control mehrfach schicken."""
+    values = headers.get_all(name) if hasattr(headers, "get_all") else [headers.get(name)]
+    return ", ".join(value for value in (values or []) if value)
+
+
 def check(base):
     parsed = urlsplit(base)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
@@ -54,7 +60,7 @@ def check(base):
         if asset.endswith((".js", ".mjs")):
             if "javascript" not in content_type:
                 raise ValueError(f"{asset}: served as {content_type or 'unknown'} instead of JavaScript")
-            if "immutable" not in ", ".join(headers.get_all("Cache-Control") or []).lower():
+            if "immutable" not in header_line(headers, "Cache-Control").lower():
                 raise ValueError(f"{asset}: application asset must be cached immutable")
             # Vite schreibt Nachlade-Pfade relativ (`./chunk.js`) und Worker-Adressen absolut (`/assets/x.mjs`);
             # nur Namen mit Vite-Hash zählen - `./pdf.worker.mjs` in pdf.js ist ein interner Ersatzname, keine Datei.
