@@ -172,8 +172,10 @@ Seit dem 15. September gilt:
   `SkeletonLines/Cards/List/Table/DetailHeader/Page` (role=status, aria-busy,
   Label) – **neuer Ladezustand = Skelett in der Form des Inhalts, kein
   „Lade …“**; `PublicLoadingState` bleibt für die Seiten, die es schon hatten.
-  `components/tls/PageTransition.jsx` um die Routen: Einblenden über
-  `element.animate` beim Pfadwechsel, ohne Neuaufbau der Seite. CSS in
+  `components/tls/PageTransition.jsx` um die Routen: blendet beim Pfadwechsel
+  `#main-content` über `element.animate` ein (nur Opazität), ohne Neuaufbau
+  und **ohne eigenes DOM-Element** – ein Rahmen-`div` verschob die
+  Nachrichten-Seite um einen Pixel (e2e messages.spec). CSS in
   `index.css` unter „Dynamik-Block“; `prefers-reduced-motion` schaltet alle
   Animationen ab, Hervorhebungen bleiben.
 - App 0.7.0-beta: Mitgliederbereich (#340, #339, #341, #342, #346; Build 65).
