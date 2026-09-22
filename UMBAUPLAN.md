@@ -663,10 +663,12 @@ alle drei Wochen aufs Handy schaut, fühlt sich das an wie „die Seite vergisst
 Tage gleitend mit Haken (Standard an), ohne Haken bis zum Schließen des Browsers. Niemand wird
 durch die Umstellung abgemeldet: Sitzungen ohne Kennzeichen gelten als „bleiben“.
 
-**Eine Sicherheitsgrenze bleibt, wie sie ist.** Ein Test hält fest, dass ein Konto mit
+**Eine Sicherheitsgrenze blieb zunächst, wie sie war.** Ein Test hielt fest, dass ein Konto mit
 Zwei-Faktor auch nach dem Passkey-Login den Code eingibt. Ein Passkey mit Gerätesperre wäre als
 zweiter Faktor vertretbar – aber das entscheidet der Betreiber, nicht ein Komfort-PR (Frage an
-#348).
+#348). Am 22.09. entschieden (#358, Variante B): Der Passkey zählt als zweiter Faktor, weil der
+Server die Gerätesperre ohnehin verlangt – nach dem Passkey kein Code mehr, die Sitzung ist
+bestätigt, auch für Adminbereiche; die Code-Einrichtung bleibt dort Pflicht als Rückweg (#359).
 
 **Gar keine Vorschau sieht kaputt aus.** Für alles Nicht-Öffentliche bekam WhatsApp ein 404. Der
 Schutz dahinter war richtig; die Lösung ist eine neutrale Karte, die nichts verrät – und ein

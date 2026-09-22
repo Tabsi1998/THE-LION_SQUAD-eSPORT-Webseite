@@ -642,12 +642,13 @@ braucht.
 (Dependabot), #337 (#310 Livestreams), #338 (Dolibarr I), #344 (#343 Doku),
 #349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
 Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
-0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II). `main` steht auf `5176a3e`.
+0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II), #357 (App 0.7.0-beta:
+Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver). `main`
+steht auf `770aaec`.
 
 ### Offene PRs
-- #357 (App 0.7.0-beta: Mitgliederbereich – #340, #339, #341, #342, #346).
-  Nach dem Merge `update.sh` (Server-Teil: Meldungen, Karte, Prüfseite),
-  dann Build 65.
+- #359 (#358 Passkey zählt als zweiter Faktor, Variante B). Nach dem Merge
+  `update.sh`.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -660,8 +661,10 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
   APK liegt seit 16.09. auch am Vereinsserver (nach #306/#308 mit
   `-- --upload-only` nachgereicht), **Build 64** (`mobile-v0.6.0-beta-build64`,
   Commit 5621ed5, am 22.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
-  `44959a8c`; #218), am Vereinsserver abgelegt. Nächster Build ist 65
-  (0.7.0-beta, nach dem Merge von #357).
+  `44959a8c`; #218), am Vereinsserver abgelegt, **Build 65**
+  (`mobile-v0.7.0-beta-build65`, Commit 770aaec, am 22.09. vom Haupt-PC
+  gebaut, APK-SHA-256 beginnt mit `02de39d5`; #340, #339, #341, #342, #346),
+  am Vereinsserver abgelegt. Nächster Build ist 66.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -684,7 +687,7 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (39 offen nach dem Merge von #357)
+### Meilensteine und offene Issues (40 offen nach dem Merge von #357, davon #358 entschieden)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -700,7 +703,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
-| Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
+| Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
