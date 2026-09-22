@@ -35,6 +35,7 @@ const SCHEDULE_SOURCE_LABELS = {
   accepted: "vereinbart",
   home: "Heimrecht",
   default: "Standardzeit",
+  manual: "von der Turnierleitung",
 };
 
 function stationLabel(match) {
@@ -259,8 +260,9 @@ export default function TournamentSchedulePage() {
 function MatchCard({ match, resolved, changed = false }) {
   // Der berechnete Termin geht vor: bei Spielwochen steht er auch dann fest,
   // wenn noch niemand etwas vereinbart hat, weil dann die Standardzeit gilt.
+  // Seit #235 steht der geltende Termin samt Quelle auch in der Partie selbst.
   const scheduledAt = resolved?.scheduled_at || match.scheduled_at;
-  const sourceLabel = SCHEDULE_SOURCE_LABELS[resolved?.schedule_source];
+  const sourceLabel = SCHEDULE_SOURCE_LABELS[match.schedule_source === "manual" ? "manual" : resolved?.schedule_source || match.schedule_source];
   return (
     <Link
       to={`/matches/${match.id}`}

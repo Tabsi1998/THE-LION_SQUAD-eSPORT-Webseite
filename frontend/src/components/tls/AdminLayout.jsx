@@ -10,7 +10,7 @@ import {
   Award, Inbox, UserCheck, Medal,
   FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
   Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker,
-  Smartphone, Link2, Wallet,
+  Smartphone, Link2, Wallet, BookOpen,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -40,6 +40,7 @@ const ADMIN_GROUPS = [
     label: "eSports",
     items: [
       { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments", "moderation"], staff: true },
+      { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
       { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments", "moderation"], staff: true },
       { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy, areas: ["tournaments"] },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
@@ -99,6 +100,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
+  "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge"],
   "/admin/seasons": ["wertung", "jahreswertung", "circuit"],
   "/admin/games": ["spiele", "games"],

@@ -226,6 +226,8 @@ export type ClubEvent = {
   status?: string;
   // public | community | members | internal - der Server liefert nur, was die Person sehen darf (#342)
   visibility?: string | null;
+  // Mehrere Standorte (#203); ein Event mit einem Ort hat genau einen Eintrag aus den Feldern oben.
+  locations?: EventLocation[];
   banner_url?: string | null;
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   has_registration?: boolean;
@@ -236,6 +238,18 @@ export type ClubEvent = {
   max_companions_per_registration?: number | null;
   own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number; seat_count?: number } | null;
   content_embeds?: ContentEmbed[];
+};
+
+export type EventLocation = {
+  key?: string;
+  name?: string | null;
+  address_line?: string | null;
+  map_query?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  door_time?: string | null;
+  max_participants?: number | null;
+  note?: string | null;
 };
 
 export type NewsPost = {

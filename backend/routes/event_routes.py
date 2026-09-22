@@ -15,7 +15,7 @@ from services.competition_standings import standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, pricing
+from services import billing_orders, event_locations, pricing
 from services.permissions import user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
@@ -635,6 +635,9 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     event["content_embeds"] = await resolve_content_embeds(db, event.get("program"), user)
     await _decorate_event(event, include_sponsors=True)
     await _attach_event_registration_view(event, user)
+    # Standorte (#203): immer als Liste, auch für Events, die nur die alten Felder haben.
+    event["locations"] = [event_locations.with_map(place) for place in event_locations.event_locations(event)]
+    event["map_query"] = event_locations.map_query(event_locations.primary_from_event(event) or (event["locations"][0] if event["locations"] else None))
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
@@ -895,6 +898,19 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
     return _public_event_registration(updated, is_staff=True)
 
 
+def _apply_locations(target: dict, raw: dict) -> None:
+    """Standorte (#203): prüfen, ordnen, den ersten in die bisherigen Felder spiegeln."""
+    if "locations" not in raw:
+        target.pop("locations", None)
+        return
+    try:
+        places = event_locations.normalize_locations(raw.get("locations") or [])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    target["locations"] = places
+    event_locations.mirror_primary(places, target)
+
+
 async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict | None:
     """Kosten pflegt nur, wer den Bereich Finanzen hat (#322). Ohne Angabe bleibt alles wie es ist."""
     if "billing" not in raw:
@@ -914,6 +930,7 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     doc = body.model_dump()
     billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
+    _apply_locations(doc, body.model_dump(exclude_unset=True))
     doc["slug"] = await unique_slug(db.events, doc.get("slug") or doc.get("name"), fallback="event")
     doc["id"] = new_id()
     if not doc.get("status"):
@@ -962,6 +979,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         updates["billing"] = billing
     else:
         updates.pop("billing", None)
+    _apply_locations(updates, raw)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")

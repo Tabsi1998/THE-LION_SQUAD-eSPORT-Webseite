@@ -146,6 +146,44 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- Admin und Turniere (#203, #204, #227, #228, #235; PR #369).
+  **#235** `services/matchday_schedule.py`: `schedule_writes(tournament,
+  matches, proposals)` (reine Rechnung: was je Partie zu schreiben ist –
+  `scheduled_at`, `schedule_source` accepted/home/default,
+  `schedule_written_at`, Status pending/ready → scheduled; nie bei
+  `schedule_source == "manual"` oder `FROZEN_MATCH_STATUSES`),
+  `persist_matchday_schedule(db, tournament)`,
+  `persist_all_matchday_schedules(db)` (Job `matchday_schedule` alle 15 min,
+  nur Liga/Round Robin/Gruppen, laufende Status). `match_routes`: Annahme
+  schreibt `schedule_source: accepted`; Ablehnung ruft
+  `_rewrite_matchday_schedule`; Admin-`PUT /matches/{id}` mit `scheduled_at`
+  setzt `schedule_source: manual` (leer → Regel gilt wieder). Erinnerungen,
+  Stationen, TV lesen `scheduled_at` – kennen jetzt den geltenden Termin.
+  Web `TournamentSchedulePage` zeigt die Quelle auch aus der Partie („von der
+  Turnierleitung“). **#203/#204** `services/event_locations.py`:
+  `normalize_locations` (Name oder Adresse Pflicht, ≤12, Schlüssel eindeutig),
+  `event_locations(event)` (Liste; ohne `locations` genau einer aus den alten
+  Feldern – **keine Migration**), `mirror_primary` (erster Standort → alte
+  Felder, damit Listen/App weiterlesen), `map_query` (**nur Adresse**, Name
+  als Rückfall), `with_map`. Modell `EventLocation`, `EventCreate/Update
+  .locations`; Detailsicht `event.locations` (+`address_line`, `map_query`)
+  und `event.map_query`; SEO `_event_places` (Liste bei mehreren). Web:
+  `components/tls/EventLocationsSection.jsx` (hinzufügen/sortieren/entfernen,
+  `locationsToForm`/`formToLocations`/`locationsFormError`), Admin-Formular
+  blendet die Ortsfelder bei ≥1 Standort aus, „Ort“ heißt „Veranstaltungsort
+  (Name, optional)“; `EventDetailPage` zeigt bei >1 Standort Karten je
+  Standort mit eigener Karte, sonst wie bisher; Karte aus `map_query`. App
+  `EventDetailScreen` Karte „Standorte“ (Typ `EventLocation`). **#227**
+  `services/daily_center.py`: `task_counts` (reported_results =
+  `waiting_result` beider Match-Sammlungen, moderation_reports `user_reports`
+  open, contact_messages new, schedule_deadlines proposed ≤24 h),
+  `today_items` (Matches/Check-ins (`check_in_from`)/Events des **Wiener**
+  Tags, `club_day_window`); Dashboard liefert `daily_tasks` + `today`, die
+  Startseite zeigt vier neue Aufgaben-Karten und die Liste „Termine heute“.
+  **#228** `lib/tournamentGuide.js` (`GUIDE_STEPS` mit `fields`,
+  `GUIDE_GAME_TYPES` mit `format`, `GUIDE_FORMATS`) + `AdminTournamentGuidePage`
+  (`/admin/tournament-guide`, Bereich tournaments, Adminmenü-Eintrag 40);
+  Schritt 2 „Voreinstellung übernehmen“ = #368.
 - Abrechnung I, Teil 1 (#315, #318, Grundlagen für #316/#317/#322; PR #363).
   `services/pricing.py`: Cent-Beträge (`cents_from_amount`, nie float),
   `normalize_offer` (typisierte Positionen: `basis` per_registration/
@@ -747,12 +785,15 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
 (#358 Passkey als zweiter Faktor), #360 (Web: Dynamik), #362 (#361
 PDF-Worker als JavaScript – nginx kannte .mjs nicht), #363 (Abrechnung I,
-Teil 1), #365 (Abrechnung I, Teil 2 – erster echter Durchlauf am 22.09.
-bestätigt: Beleg als Entwurf sauber angelegt), #366 (#364 Mitgliederbereich
-aufgeräumt). `main` steht auf `b38f97d`.
+Teil 1), #365 (Abrechnung I, Teil 2 – Schreibzugriff beim Betreiber
+eingeschaltet, erster Durchlauf am 22.09. bestätigt: Beleg als Entwurf sauber
+angelegt), #366 (#364 Mitgliederbereich aufgeräumt), #367 (Leistungen aus
+Dolibarr im Event auswählen). `main` steht auf `b112aea`.
 
 ### Offene PRs
-- #367 (Leistungen aus Dolibarr im Event auswählen). Nach dem Merge `update.sh`.
+- #369 (Admin und Turniere – #203, #204, #227, #228, #235). Nach dem Merge
+  `update.sh`; der Spieltag-Lauf trägt bestehende Liga-Partien beim ersten
+  Lauf nach.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -791,7 +832,7 @@ aufgeräumt). `main` steht auf `b38f97d`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (31 offen nach dem Merge von #366)
+### Meilensteine und offene Issues (33 offen nach dem Merge von #367; #203/#204/#227/#228/#235 schließt #369, neu #368)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -809,7 +850,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
-| Admin und Turniere | #203, #204, #227, #228, #235 |
+| Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) offen |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
@@ -838,9 +879,9 @@ sinnvoll hältst“):
    #339, #341, #342, #346) – umgesetzt in #357, Build 65 nach dem Merge.
 6. Web: Dynamik – umgesetzt in #360.
 7. Abrechnung I – Teil 1 in #363 (Modell, Events, Aufträge, Finanzen),
-   Teil 2 in #365 (Kunden und Belege in Dolibarr). Rest (#320, #321) nach
-   dem ersten echten Durchlauf beim Betreiber. Danach Admin und Turniere
-   (#203/#204 berühren dieselben
+   Teil 2 in #365 (Kunden und Belege in Dolibarr; erster Durchlauf am 22.09.
+   bestätigt). Rest (#320, #321) offen. Admin und Turniere – umgesetzt in
+   #369 (#203/#204 berührten dieselben
    Event-Formulare wie #318 – zusammen planen), App 0.8.0-beta.
 8. Abrechnung II, Discord II, App 0.9.0-beta, Auszeichnungen und Marke,
    App 1.0.0.

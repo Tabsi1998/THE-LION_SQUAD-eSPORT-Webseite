@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock } from "lucide-react";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -76,6 +76,13 @@ export default function AdminDashboardPage() {
   const pendingPrizes = Number(data?.prize_pickups?.pending || 0);
   const readyPrizes = Number(data?.prize_pickups?.ready || 0);
   const pendingRegistrations = Number(data?.tournament_registrations?.pending || 0);
+  // Tageszentrale erweitert (#227): was bisher auf anderen Seiten lag.
+  const daily = data?.daily_tasks || {};
+  const reportedResults = Number(daily.reported_results || 0);
+  const moderationReports = Number(daily.moderation_reports || 0);
+  const contactMessages = Number(daily.contact_messages || 0);
+  const scheduleDeadlines = Number(daily.schedule_deadlines || 0);
+  const today = Array.isArray(data?.today) ? data.today : [];
   const taskItems = [
     {
       label: "Setup prüfen",
@@ -92,6 +99,36 @@ export default function AdminDashboardPage() {
       to: "/admin/tournaments?status=live",
       icon: AlertTriangle,
       tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Gemeldete Ergebnisse",
+      detail: `${reportedResults} warten auf Bestätigung`,
+      to: "/admin/tournaments?status=live",
+      icon: ClipboardCheck,
+      tone: reportedResults > 0 ? "#FFD700" : "#00FF88",
+      key: "reported-results",
+    },
+    {
+      label: "Terminvorschläge",
+      detail: `${scheduleDeadlines} Fristen laufen in 24 Stunden ab`,
+      to: "/admin/tournaments?status=live",
+      icon: Clock,
+      tone: scheduleDeadlines > 0 ? "#FFD700" : "#00FF88",
+      key: "schedule-deadlines",
+    },
+    {
+      label: "Moderation",
+      detail: `${moderationReports} offene Meldungen`,
+      to: "/admin/moderation",
+      icon: MessageCircleWarning,
+      tone: moderationReports > 0 ? "#FF3B30" : "#00FF88",
+    },
+    {
+      label: "Kontaktanfragen",
+      detail: `${contactMessages} neu`,
+      to: "/admin/contact",
+      icon: Mail,
+      tone: contactMessages > 0 ? "#FFD700" : "#00FF88",
     },
     {
       label: "Mitgliedsanträge",
@@ -181,6 +218,10 @@ export default function AdminDashboardPage() {
     },
   ];
   const taskIsActive = (item) => {
+    if (item.key === "reported-results") return reportedResults > 0;
+    if (item.key === "schedule-deadlines") return scheduleDeadlines > 0;
+    if (item.to === "/admin/moderation") return moderationReports > 0;
+    if (item.to === "/admin/contact") return contactMessages > 0;
     if (item.to === "/setup") return Boolean(setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100));
     if (item.to === "/admin/tournaments?status=live") return Number(data?.open_disputes || 0) > 0;
     if (item.to === "/admin/membership-applications?status=pending") return pendingApplications > 0;
@@ -275,7 +316,7 @@ export default function AdminDashboardPage() {
         {activeTaskItems.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
             {activeTaskItems.map((item) => (
-              <Link key={item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group">
+              <Link key={item.key || item.label} to={item.to} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 hover:border-[#29B6E8]/50 transition group" data-testid={`dashboard-task-${item.key || item.label}`}>
                 <div className="flex items-center justify-between gap-3">
                   <item.icon className="w-4 h-4" style={{ color: item.tone }} />
                   <span className="text-[#29B6E8] group-hover:translate-x-0.5 transition-transform">→</span>
@@ -291,6 +332,26 @@ export default function AdminDashboardPage() {
             <span className="text-sm text-white/70">Nichts offen. Keine Konflikte, Anträge, Gewinne oder Fehler warten gerade auf dich.</span>
           </div>
         )}
+        {/* Termine heute (#227): Matches, Check-ins und Events des Vereinstags als Liste, nicht nur die Zahl. */}
+        <div className="mt-5 border-t border-white/10 pt-4" data-testid="dashboard-today">
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 mb-2">Termine heute</div>
+          {today.length ? (
+            <ul className="divide-y divide-white/5">
+              {today.map((item, index) => (
+                <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 text-sm">
+                  <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? new Date(item.at).toLocaleTimeString("de-DE", { timeStyle: "short" }) : "–"}</span>
+                  <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
+                    {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
+                  </span>
+                  <Link to={item.url} className="min-w-0 flex-1 truncate text-white hover:text-[#29B6E8]">{item.title}</Link>
+                  {item.detail && <span className="text-xs text-white/40 shrink-0">{item.detail}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-white/45">Heute steht nichts an – keine Matches, Check-ins oder Events.</p>
+          )}
+        </div>
         {secondaryTaskItems.length > 0 && (
           <details className="mt-4 border-t border-white/10 pt-4 group">
             <summary className="cursor-pointer list-none text-[10px] font-bold uppercase tracking-[0.25em] text-white/45 hover:text-white inline-flex items-center gap-2">

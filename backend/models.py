@@ -314,6 +314,21 @@ class BillingConfig(BaseModel):
     invoice_timing: Literal["on_confirm", "manual"] = "on_confirm"
 
 
+class EventLocation(BaseModel):
+    """Ein Standort eines Events (#203): Name optional, Adresse, eigene Zeiten, Platzzahl als Hinweis."""
+    key: Optional[str] = Field(default=None, max_length=40)
+    name: Optional[str] = Field(default=None, max_length=120)
+    address: Optional[str] = Field(default=None, max_length=120)
+    postal_code: Optional[str] = Field(default=None, max_length=20)
+    city: Optional[str] = Field(default=None, max_length=120)
+    country: Optional[str] = Field(default=None, max_length=120)
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    door_time: Optional[datetime] = None
+    max_participants: Optional[int] = Field(default=None, ge=0)
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
 class EventCreate(BaseModel):
     name: str
     slug: Optional[str] = None
@@ -356,6 +371,8 @@ class EventCreate(BaseModel):
     stream_platform: Optional[str] = None
     stream_url: Optional[str] = None
     billing: Optional[BillingConfig] = None
+    # Mehrere Standorte (#203); leer = ein Standort aus den Feldern oben.
+    locations: Optional[List[EventLocation]] = None
 
 
 class EventUpdate(BaseModel):
@@ -398,6 +415,7 @@ class EventUpdate(BaseModel):
     stream_url: Optional[str] = None
     status: Optional[EventStatus] = None
     billing: Optional[BillingConfig] = None
+    locations: Optional[List[EventLocation]] = None
 
 
 EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]

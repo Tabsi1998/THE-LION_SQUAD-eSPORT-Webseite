@@ -196,6 +196,23 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
+        {(event.locations?.length || 0) > 1 ? (
+          <Card style={styles.card} testID="event-locations">
+            <Heading>Standorte</Heading>
+            {event.locations!.map((place, index) => (
+              <Pressable key={place.key || index} onPress={() => openMap(place.map_query)} disabled={!place.map_query} accessibilityRole="button" style={styles.place}>
+                <Muted style={styles.placeIndex}>Standort {index + 1}</Muted>
+                {place.name ? <Body style={styles.placeName}>{place.name}</Body> : null}
+                {place.start_date ? <Muted>{formatDateTime(place.start_date)}{place.end_date ? ` – ${formatDateTime(place.end_date)}` : ""}</Muted> : null}
+                {place.address_line ? <Muted>{place.address_line}</Muted> : null}
+                {place.max_participants != null ? <Muted>{place.max_participants} Plätze</Muted> : null}
+                {place.note ? <Muted>{place.note}</Muted> : null}
+                {place.map_query ? <Muted style={styles.placeLink}>Karte öffnen</Muted> : null}
+              </Pressable>
+            ))}
+          </Card>
+        ) : null}
+
         {hasRegistration ? (
           <Card style={styles.card}>
             <Heading>{event.registration_url ? "Registrierung" : "Anmeldung"}</Heading>
@@ -364,6 +381,12 @@ function clampNumber(value: string, min: number, max: number) {
   return Math.min(max, Math.max(min, parsed));
 }
 
+/** Karte im System öffnen - mit der Adresse, nicht mit dem Namen des Orts (#204). */
+function openMap(query?: string | null) {
+  if (!query) return;
+  Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`).catch(() => {});
+}
+
 function openSponsor(sponsor: { url?: string | null; link?: string | null }) {
   const raw = String(sponsor.url || sponsor.link || "").trim();
   if (!raw) return;
@@ -399,6 +422,24 @@ const styles = StyleSheet.create({
   card: {
     gap: 12,
     marginHorizontal: 18,
+  },
+  place: {
+    borderLeftColor: "rgba(159, 122, 234, 0.6)",
+    borderLeftWidth: 2,
+    gap: 2,
+    paddingLeft: 10,
+  },
+  placeIndex: {
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  placeName: {
+    fontWeight: "900",
+  },
+  placeLink: {
+    color: colors.cyan,
+    fontWeight: "800",
   },
   pill: {
     backgroundColor: "rgba(41, 182, 232, 0.12)",

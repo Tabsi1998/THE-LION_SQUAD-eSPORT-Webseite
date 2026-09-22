@@ -311,3 +311,68 @@ def current_matchday_number(plan: dict, now: datetime | None = None) -> int | No
     if first and moment < first:
         return matchdays[0]["number"]
     return matchdays[-1]["number"]
+
+
+# ---------------------------------------------------------------- Den geltenden Termin schreiben (#235)
+#
+# Bis hierher wurde der Termin nur beim Anzeigen berechnet. Erinnerungen, Stationen und die
+# TV-Anzeigen lesen aber `scheduled_at` aus der Partie - sie kannten den geltenden Termin nicht.
+# Entscheidung vom 15.09.: Ja, schreiben - mit der Quelle daneben, damit ein Admin sieht, warum
+# die Partie dort steht. Ein von der Turnierleitung gesetzter Termin (`schedule_source`
+# "manual") wird nie überschrieben; erledigte oder laufende Partien auch nicht.
+
+SCHEDULE_SOURCES = ("accepted", "home", "default", "manual")
+FROZEN_MATCH_STATUSES = frozenset({"running", "in_progress", "waiting_result", "completed", "archived", "forfeit", "bye", "no_show"})
+
+
+def schedule_writes(tournament: dict, matches, proposals=None) -> list[dict]:
+    """Was je Partie zu schreiben ist - reine Rechnung, ohne Datenbank, deshalb testbar."""
+    plan = build_matchday_plan(tournament, matches, proposals)
+    if not plan.get("applies"):
+        return []
+    by_id = {(match or {}).get("id"): match for match in matches or []}
+    writes = []
+    for matchday in plan["matchdays"]:
+        for entry in matchday["matches"]:
+            match = by_id.get(entry["match_id"]) or {}
+            if not entry.get("scheduled_at"):
+                continue
+            if match.get("schedule_source") == "manual" or match.get("status") in FROZEN_MATCH_STATUSES:
+                continue
+            resolved = _parse(entry["scheduled_at"])
+            current = _parse(match.get("scheduled_at"))
+            if current == resolved and match.get("schedule_source") == entry["schedule_source"]:
+                continue
+            update = {
+                "scheduled_at": resolved.isoformat(),
+                "schedule_source": entry["schedule_source"],
+                "schedule_written_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if match.get("status") in {"pending", "ready"}:
+                update["status"] = "scheduled"
+            writes.append({"match_id": entry["match_id"], "matchday": matchday["number"], "update": update})
+    return writes
+
+
+async def persist_matchday_schedule(db, tournament: dict) -> dict:
+    """Den geltenden Termin aller Spieltag-Partien eines Turniers nachtragen."""
+    if not plays_in_matchdays(tournament):
+        return {"applies": False, "written": 0}
+    tid = tournament["id"]
+    matches = await db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(3000)
+    proposals = await db.match_schedule_proposals.find({"tournament_id": tid}, {"_id": 0, "match_collection": 0}).to_list(3000)
+    writes = schedule_writes(tournament, matches, proposals)
+    for write in writes:
+        await db.matches_v2.update_one({"id": write["match_id"]}, {"$set": {**write["update"], "updated_at": datetime.now(timezone.utc).isoformat()}})
+    return {"applies": True, "written": len(writes)}
+
+
+async def persist_all_matchday_schedules(db, limit: int = 50) -> dict:
+    """Der Scheduler-Lauf: alle laufenden Ligen, Round Robins und Gruppen - auch abgelaufene Fristen."""
+    counts = {"tournaments": 0, "written": 0}
+    query = {"format": {"$in": sorted(MATCHDAY_FORMATS)}, "status": {"$nin": ["draft", "completed", "results_published", "archived", "cancelled"]}}
+    async for tournament in db.tournaments.find(query, {"_id": 0}).limit(limit):
+        result = await persist_matchday_schedule(db, tournament)
+        counts["tournaments"] += 1
+        counts["written"] += result["written"]
+    return counts

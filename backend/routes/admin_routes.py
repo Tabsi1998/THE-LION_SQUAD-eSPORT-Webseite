@@ -159,6 +159,14 @@ async def dashboard(me: dict = Depends(require_any_admin())):
     }
     today_matches = await count_matches_by_status(db, {"ready", "in_progress"})
     open_disputes = await count_matches_by_status(db, {"disputed"})
+    # Tageszentrale (#227): gemeldete Ergebnisse, Meldungen, Kontakt, verfallende Terminvorschläge, Termine heute.
+    try:
+        from services.daily_center import task_counts, today_items
+        daily_tasks = await task_counts(db)
+        today = await today_items(db)
+    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+        logger.warning("daily center failed", exc_info=True)
+        daily_tasks, today = {}, []
     try:
         ops = await ops_summary(db)
     except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
@@ -191,6 +199,8 @@ async def dashboard(me: dict = Depends(require_any_admin())):
         "membership_applications": membership_applications,
         "prize_pickups": prize_pickups,
         "tournament_registrations": tournament_registrations,
+        "daily_tasks": daily_tasks,
+        "today": today,
         "recent_audit_logs": await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20),
     }
 

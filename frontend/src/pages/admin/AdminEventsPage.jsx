@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { EventBillingSection } from "@/components/tls/EventBillingSection";
+import { EventLocationsSection, formToLocations, locationsFormError, locationsToForm } from "@/components/tls/EventLocationsSection";
 import { useAuth } from "@/context/AuthContext";
 import { billingFormError, formToBilling, positionsToForm } from "@/lib/pricing";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -325,6 +326,11 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
   const billingDirty = JSON.stringify(billingForm) !== JSON.stringify({
     enabled: Boolean(event?.billing?.enabled), positions: positionsToForm(event?.billing), invoice_timing: event?.billing?.invoice_timing || "on_confirm",
   });
+  // Standorte (#203): eigener Zustand; die Liste wird nur gesendet, wenn sie sich geändert hat.
+  // Bei mehreren Standorten sind die Ortsfelder oben ausgeblendet - der Server spiegelt den ersten hinein.
+  const [locationsForm, setLocationsForm] = useState(() => locationsToForm(event?.locations));
+  const locationsDirty = JSON.stringify(locationsForm) !== JSON.stringify(locationsToForm(event?.locations));
+  const usesLocationList = locationsForm.length > 0;
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -470,10 +476,16 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
       toast.error(billingProblem);
       return;
     }
+    const locationsProblem = locationsDirty ? locationsFormError(locationsForm) : "";
+    if (locationsProblem) {
+      toast.error(locationsProblem);
+      return;
+    }
     setSaving(true);
     try {
       const payload = normalizeEventPayload(form);
       if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
+      if (locationsDirty) payload.locations = formToLocations(locationsForm);
       let savedEvent;
       if (isNew) {
         const { data } = await api.post("/events", payload);
@@ -481,6 +493,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
       } else {
         const patch = buildDirtyPayload(payload, originalEventPayload());
         if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
+        if (locationsDirty) patch.locations = formToLocations(locationsForm);
         const relatedChanged = tournaments.some((t) => relatedTournamentIds.includes(t.id) !== (t.event_id === event.id))
           || f1Challenges.some((c) => relatedF1Ids.includes(c.id) !== (c.event_id === event.id));
         if (!hasPayloadChanges(patch) && !relatedChanged) {
@@ -544,6 +557,7 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
           <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/55">
             Für neue Inhalte reicht normalerweise <span className="text-white font-semibold">Entwurf</span> oder <span className="text-white font-semibold">Angekündigt</span>. Anmeldung, Live und Beendet werden über die Datumsfelder automatisch berechnet.
           </div>
+          <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />
           {form.has_registration && !form.registration_url && (
             <EventBillingSection value={billingForm} onChange={setBillingForm} canEdit={canFinance} dolibarrConnected={Boolean(meta?.dolibarr_connected)} />
           )}
@@ -557,11 +571,12 @@ function EventModal({ event, meta, sponsors = [], tournaments = [], f1Challenges
             <Field label="Ende"><input type="datetime-local" value={form.end_date} onChange={(e) => set("end_date", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Einlass / Türöffnung"><input type="datetime-local" value={form.door_time} onChange={(e) => set("door_time", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
             <Field label="Max. Teilnehmer"><input type="number" value={form.max_participants} onChange={(e) => set("max_participants", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Ort"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Innsbruck" /></Field>
-            <Field label="Adresse"><Input value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" /></Field>
-            <Field label="PLZ"><Input value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" /></Field>
-            <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" /></Field>
-            <Field label="Land"><Input value={form.country} onChange={(v) => set("country", v)} placeholder="Österreich" /></Field>
+            {/* „Ort“ hieß bisher zweideutig; es ist der Name des Veranstaltungsorts. Die Karte sucht die Adresse (#204). */}
+            {!usesLocationList && <Field label="Veranstaltungsort (Name, optional)"><Input value={form.location} onChange={(v) => set("location", v)} placeholder="Vereinsheim, Gemeindesaal Telfs" testId="event-location-name" /></Field>}
+            {!usesLocationList && <Field label="Adresse"><Input value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" /></Field>}
+            {!usesLocationList && <Field label="PLZ"><Input value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" /></Field>}
+            {!usesLocationList && <Field label="Stadt"><Input value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" /></Field>}
+            {!usesLocationList && <Field label="Land"><Input value={form.country} onChange={(v) => set("country", v)} placeholder="Österreich" /></Field>}
             <Field label="Veranstalter"><Input value={form.organizer_name} onChange={(v) => set("organizer_name", v)} placeholder="THE LION SQUAD oder extern" /></Field>
             <Field label="Veranstalter-Link"><Input value={form.organizer_url} onChange={(v) => set("organizer_url", v)} placeholder="https://…" /></Field>
             <Field label="Banner-Bild"><ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="event-banner" variant="wide" allowLibrary /></Field>

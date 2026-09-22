@@ -475,7 +475,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
-| Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
+| Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 offen |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
@@ -601,6 +601,40 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 30 — Admin und Turniere
+
+### Was 30.1 gefunden hat (#203, #204, #227, #228, #235 – PR #369)
+
+**Der geltende Termin stand nirgends.** Bei Ligen mit Spielwochen rechnete die Plattform beim
+Anzeigen aus, welcher Termin gilt – vereinbart, Heimrecht, Standardzeit –, schrieb ihn aber nicht
+in die Partie. Erinnerungen, Stationen und TV-Anzeigen lesen aber genau dieses Feld. Jetzt schreibt
+ein Lauf alle 15 Minuten den geltenden Termin samt Quelle in jede Spieltag-Partie; eine Annahme
+schreibt sofort. Ein von der Turnierleitung gesetzter Termin trägt die Quelle „manual“ und wird
+nie überschrieben; erledigte und laufende Partien auch nicht. Beim ersten Lauf nach dem Update
+werden bestehende Partien nachgetragen.
+
+**Ein Event, viele Orte – ohne Migration.** Ein Vereinsausflug hat Treffpunkt, Halle und Lokal,
+jeder mit eigener Zeit und Adresse. Statt die bisherigen Felder umzubauen, gibt es eine
+Standortliste; ein Event ohne Liste ist ein Event mit genau einem Standort aus den alten Feldern,
+und der erste Standort einer Liste wird in die alten Felder gespiegelt, damit Listen, Erinnerungen
+und die App weiter dieselben Felder lesen. Die Anmeldung bleibt je Event – ein Limit je Standort
+wäre ein zweites Anmeldesystem, das kein Event heute braucht.
+
+**„Ort“ war zweideutig.** Das Feld hieß „Ort“ und stand neben „Stadt“, deshalb stand zweimal
+„Telfs“ drin. Es heißt jetzt „Veranstaltungsort (Name, optional)“, und die Karte sucht nur nach
+der Adresse – „Vereinsheim, Telfs“ ließ die Kartensuche danebenliegen.
+
+**Die Tageszentrale kannte nur Konflikte.** Gemeldete Ergebnisse, die auf Bestätigung warten,
+Moderationsmeldungen, Kontaktanfragen und verfallende Terminvorschläge lagen auf anderen Seiten
+ohne Zähler; „Spiele heute“ war nur eine Zahl. Jetzt sind es Aufgaben-Karten nach demselben
+Muster, und „Termine heute“ ist eine Liste – nach dem Wiener Tag, nicht dem UTC-Tag des Servers
+(die Falle aus #355).
+
+**Der Leitfaden hängt an den Feldern.** Drei Teile – Ablauf unabhängig vom Spiel, Turnierformen
+mit Teamgröße und Serie, welches Format wofür – als Text im Code, damit er zu den Feldern passt;
+jede Empfehlung nennt ihre Felder. Der Knopf „Diese Voreinstellung übernehmen“ ist Schritt 2
+(#368), damit der Leitfaden nicht Dokumentation neben der Software bleibt, sondern der Weg hinein.
 
 ## Block 29 — Abrechnung I, Teil 1: Preis, Buchung, Aufträge
 
