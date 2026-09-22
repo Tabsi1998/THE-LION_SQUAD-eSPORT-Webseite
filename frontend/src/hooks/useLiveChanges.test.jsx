@@ -36,9 +36,9 @@ test("beim ersten Stand ist nichts neu; eine Änderung leuchtet und erlischt wie
 
 test("Zeilen gleiten auf den neuen Platz - nicht mit „Bewegung reduzieren“", () => {
   const animate = vi.fn();
-  Element.prototype.animate = animate;
+  window.Element.prototype.animate = animate;
   let top = 0;
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
+  vi.spyOn(window.Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
     // jede Zeile hat eine andere Höhe je Reihenfolge im DOM
     const index = [...this.parentNode.children].indexOf(this);
     return { top: index * 40 + top, left: 0, width: 100, height: 40 };

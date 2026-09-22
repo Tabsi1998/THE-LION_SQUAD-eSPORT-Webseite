@@ -31,7 +31,7 @@ function Page({ to }) {
 
 test("der Seitenwechsel blendet ein - nicht beim ersten Aufbau, nicht mit Bewegung reduzieren", () => {
   const animate = vi.fn();
-  Element.prototype.animate = animate;
+  window.Element.prototype.animate = animate;
   render(
     <MemoryRouter initialEntries={["/a"]}>
       <PageTransition>
@@ -50,5 +50,5 @@ test("der Seitenwechsel blendet ein - nicht beim ersten Aufbau, nicht mit Bewegu
   fireEvent.click(screen.getByText("weiter"));
   expect(animate).toHaveBeenCalledTimes(1);
   delete window.matchMedia;
-  delete Element.prototype.animate;
+  delete window.Element.prototype.animate;
 });

@@ -37,9 +37,9 @@ const renderPage = () => render(
 
 test("Skelett beim Laden, danach nichts hervorgehoben; eine Änderung leuchtet und gleitet", async () => {
   const animate = vi.fn();
-  Element.prototype.animate = animate;
+  window.Element.prototype.animate = animate;
   // jsdom kennt keine Lage; jede Zeile bekommt eine nach ihrer Reihenfolge im DOM.
-  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
+  vi.spyOn(window.Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
     const index = this.parentNode ? [...this.parentNode.children].indexOf(this) : 0;
     return { top: index * 40, left: 0, width: 100, height: 40 };
   });
@@ -57,5 +57,5 @@ test("Skelett beim Laden, danach nichts hervorgehoben; eine Änderung leuchtet u
   expect(screen.getByTestId("standing-row-r-Anna")).toHaveAttribute("data-changed", "true");
   expect(screen.getByTestId("standing-row-r-Cem")).not.toHaveAttribute("data-changed");
   expect(animate).toHaveBeenCalled();
-  delete Element.prototype.animate;
+  delete window.Element.prototype.animate;
 });
