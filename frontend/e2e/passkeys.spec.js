@@ -45,7 +45,10 @@ async function openLogin(page, baseURL) {
   if (await consent.count()) await consent.click();
 }
 
-test("native browser passkey login continues into the existing admin MFA flow", async ({ page, context, browserName, baseURL }) => {
+// Der Server antwortet in beiden Fällen gemockt mit „Code nötig“ - das ist nur das sichtbare
+// Zeichen, dass die Anmeldung beim Server ankam. Seit #358 gibt der echte Server nach einem
+// Passkey keinen Code mehr auf; die Seite versteht beide Antworten.
+test("native browser passkey login reaches the server and follows its answer", async ({ page, context, browserName, baseURL }) => {
   test.skip(browserName !== "chromium", "The virtual WebAuthn authenticator requires Chromium CDP.");
   const { session, authenticatorId, identifier } = await virtualPasskey(page, context);
   const seen = [];
@@ -63,7 +66,7 @@ test("native browser passkey login continues into the existing admin MFA flow", 
   await session.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId });
 });
 
-test("the browser offers saved passkeys by itself and the sign-in continues into MFA", async ({ page, context, browserName, baseURL }) => {
+test("the browser offers saved passkeys by itself and the sign-in follows the server's answer", async ({ page, context, browserName, baseURL }) => {
   test.skip(browserName !== "chromium", "The virtual WebAuthn authenticator requires Chromium CDP.");
   const { session, authenticatorId, identifier } = await virtualPasskey(page, context);
   const seen = [];

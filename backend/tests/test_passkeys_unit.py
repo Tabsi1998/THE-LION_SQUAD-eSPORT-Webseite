@@ -70,7 +70,6 @@ def setup(monkeypatch):
     monkeypatch.setattr(routes, "_attach_membership", AsyncMock())
     issue = AsyncMock()
     monkeypatch.setattr(routes, "_issue_session", issue)
-    monkeypatch.setattr(routes, "_create_mfa_login_challenge", AsyncMock(return_value={"mfa_required": True}))
     request = SimpleNamespace(headers={"origin": "https://club.example"}, cookies={})
     return db, user, request, issue
 
@@ -133,7 +132,7 @@ def test_real_cryptographic_enrollment_login_and_replay_rejection(setup):
     asyncio.run(scenario())
 
 
-@pytest.mark.parametrize("problem", ["wrong_origin", "missing_uv", "wrong_signature", "wrong_challenge", "wrong_handle", "expired", "missing_cookie", "banned", "unverified", "admin_mfa"])
+@pytest.mark.parametrize("problem", ["wrong_origin", "missing_uv", "wrong_signature", "wrong_challenge", "wrong_handle", "expired", "missing_cookie", "banned", "unverified"])
 def test_passkey_login_security_boundaries(setup, problem):
     async def scenario():
         db, _user, request, issue = setup
@@ -156,13 +155,30 @@ def test_passkey_login_security_boundaries(setup, problem):
             db.users.rows[0]["is_banned"] = True
         if problem == "unverified":
             db.users.rows[0]["email_verified"] = False
-        if problem == "admin_mfa":
-            db.users.rows[0].update(role="superadmin", mfa_enabled=True)
-            assert await routes.login_verify(routes.CredentialResponse(credential=credential), request, Response()) == {"mfa_required": True}
-        else:
-            with pytest.raises(HTTPException):
-                await routes.login_verify(routes.CredentialResponse(credential=credential), request, Response())
+        with pytest.raises(HTTPException):
+            await routes.login_verify(routes.CredentialResponse(credential=credential), request, Response())
         issue.assert_not_awaited()
+    asyncio.run(scenario())
+
+
+def test_passkey_with_device_lock_counts_as_second_factor(setup):
+    """Entscheidung des Betreibers (#358, Variante B): Nach dem Passkey kein Code mehr - die
+    Gerätesperre ist der zweite Faktor. Die Sitzung ist bestätigt, auch für Adminbereiche.
+    Ohne Gerätesperre (missing_uv oben) gibt es weiterhin gar keine Anmeldung."""
+    async def scenario():
+        db, _user, request, issue = setup
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        await enroll(setup, private_key)
+        # Erst nach dem Einrichten Admin mit Zwei-Faktor - das Einrichten selbst verlangt die bestätigte Sitzung.
+        db.users.rows[0].update(role="superadmin", mfa_enabled=True)
+        response = Response()
+        options = await routes.login_options(request, response)
+        bind_cookie(request, response, "login")
+        credential = authentication_credential(options, private_key)
+        result = await routes.login_verify(routes.CredentialResponse(credential=credential), request, Response())
+        assert "mfa_required" not in result and result["id"] == "user-1"
+        issue.assert_awaited_once()
+        assert issue.await_args.kwargs["mfa_verified"] is True
     asyncio.run(scenario())
 
 

@@ -53,7 +53,12 @@ Gewinne dieses Turniers (#288). Das braucht keinen Bereich und keine Zwei-Faktor
 - **Pflicht** ist Zwei-Faktor für jeden Adminbereich außer Moderation – egal, ob der Bereich aus
   der Rolle, einer Freigabe, einem Vorstandsposten oder einer Dolibarr-Funktion kommt.
 - **Freiwillig** kann ihn jedes Konto einrichten (Profil → Sicherheit). Wer ihn eingerichtet hat,
-  wird beim Anmelden nach dem Code gefragt – auch nach einem Passkey-Login.
+  wird beim Anmelden mit Passwort nach dem Code gefragt.
+- **Passkey zählt als zweiter Faktor** (Entscheidung vom 22.09., #358): Ein Passkey-Login verlangt
+  immer die Gerätesperre (Fingerabdruck, Gesicht oder Geräte-PIN) – Gerät plus Sperre sind zwei
+  Faktoren, so wie bei Google, Apple und GitHub. Nach dem Passkey kommt deshalb kein Code mehr, und
+  die Sitzung gilt als bestätigt, auch für Adminbereiche. Die Einrichtung des Codes bleibt für
+  Adminbereiche Pflicht (Rückweg, wenn das Gerät weg ist).
 - Wer einen Adminbereich betritt und noch keinen hat, landet unter Profil → Sicherheit mit der
   Erklärung, warum.
 - **Angemeldet bleiben** (Haken im Login, Standard an): 90 Tage, die mit jeder Nutzung neu

@@ -25,7 +25,7 @@ from auth import get_current_user, hash_token, verify_password
 from database import get_db
 from models import now_utc
 from routes.auth_routes import (
-    _attach_membership, _create_mfa_login_challenge, _current_session_family,
+    _attach_membership, _current_session_family,
     _eligible_session_user, _issue_session, _public_user, _requires_admin_mfa,
     _security_audit,
 )
@@ -234,12 +234,11 @@ async def login_verify(body: CredentialResponse, request: Request, response: Res
     if user.get("email_verified") is not True:
         raise HTTPException(403, "Bitte zuerst deine E-Mail-Adresse bestätigen.")
     await _security_audit(db, user["id"], "auth.passkey.login", request)
-    # Wer Zwei-Faktor eingerichtet hat, gibt den Code auch nach dem Passkey ein. Diese Grenze
-    # ist bewusst gesetzt (test_passkey_login_security_boundaries) und bleibt, bis der Betreiber
-    # anders entscheidet.
-    if _requires_admin_mfa(user):
-        return await _create_mfa_login_challenge(db, user, request, "web", remember=body.remember)
-    await _issue_session(db, response, user, request, remember=body.remember)
+    # Ein Passkey mit Gerätesperre zählt als zweiter Faktor (Entscheidung des Betreibers, #358):
+    # Der Server verlangt die Gerätesperre (`require_user_verification`), also hat die Person
+    # Gerät und Fingerabdruck/Gesicht/PIN vorgezeigt. Die Sitzung ist damit bestätigt - auch für
+    # Adminbereiche. Der Code aus der Authenticator-App bleibt dem Passwort-Login vorbehalten.
+    await _issue_session(db, response, user, request, mfa_verified=True, remember=body.remember)
     public = _public_user(user)
     await _attach_membership(public)
     return public
