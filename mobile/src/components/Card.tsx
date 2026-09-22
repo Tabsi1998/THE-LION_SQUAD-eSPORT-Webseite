@@ -2,8 +2,8 @@ import React from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { colors, radius } from "../theme";
 
-export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, style, testID }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; testID?: string }) {
+  return <View style={[styles.card, style]} testID={testID}>{children}</View>;
 }
 
 const styles = StyleSheet.create({

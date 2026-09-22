@@ -457,11 +457,11 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.4.0-beta | Seiten aufräumen II: #241 Events-Tab, #242 Mehr/Gaming, #243 eigene Seiten, #244 Sponsoren, #248 Startseite II (#264; Build 61 noch nicht gebaut) |
 | App 0.5.0-beta | Tester-Komfort: #249 „Was ist neu“, #250 Update aus der App, #251 In-App-Banner, #277 Nickname-Feld weg – umgesetzt in #304, Build 63 nach Merge und Server-Update |
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
-| App 0.7.0-beta | #216 Kalender (14.6), #236 Galerie |
-| App 0.8.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner |
+| App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
+| App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie (bis 22.09. „0.7.0-beta“) |
+| App 0.9.0-beta | #240 Freunde, #239 Tastatur-Sticker, #245 Laufbanner (bis 22.09. „0.8.0-beta“) |
 | App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
-| App: Mitgliederbereich | Dazu seit 21.09. #346 digitale Mitgliedskarte mit QR-Code, Wallet vorbereitet. Wunsch des Betreibers vom 21.09.: #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand, #341 Vereinsdokumente, #342 interne Events und News mit Empfängerprüfung. Eigene Beta nach Dolibarr II |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
@@ -601,6 +601,50 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 27 — App 0.7.0-beta: Mitgliederbereich
+
+### Was 27.1 gefunden hat (#340, #339, #341, #342, #346 – PR #357)
+
+**Die App kannte den Verein nur als „Mitgliedervorteile“.** Alles, was der Mitgliederbereich der
+Website seit Block 23 zeigt – interne Events, interne News, Dokumente, Ansprechpartner, der
+eigene Beitragsstand aus Dolibarr –, fehlte im Handy. Jetzt steht unter „Mehr“ für Mitglieder
+eine goldene Karte, dahinter derselbe Aufbau wie im Web; wer kein Mitglied ist, sieht „Mitglied
+werden“ mit dem Weg auf die Website. Die Auswahl (was ist intern, wer steht im Vorstand) ist
+derselbe Code wie im Web, nur nach TypeScript übertragen und getestet – der Server filtert, die
+App sortiert.
+
+**Dokumente sind persönlich.** Ein Statut oder Protokoll darf nicht im Downloads-Ordner oder in
+der Galerie landen, wo es das nächste Backup oder eine Foto-App mitnimmt. Die App lädt die Datei
+mit Anmeldung in ihren privaten Cache, öffnet sie über den PDF-Betrachter des Geräts und löscht
+den Ordner, sobald jemand sich abmeldet oder das Konto wechselt – derselbe Mechanismus wie bei
+Chat-Bildern. Klappt es nicht, steht der Grund beim Dokument (kein Zugriff, Datei fehlt, Server
+antwortet nicht) statt eines stummen Nichts.
+
+**Belege ja, bezahlen nein.** „Meine Mitgliedschaft“ zeigt Beitrag, Nummer, Funktion und die
+eigenen Belege als PDF – aber kein „Bezahlen“: Der Zahlungslink führt auf eine fremde Seite
+(Stripe, PayPal), das gehört in den Browser, nicht in eine WebView. Der Hinweis sagt, wo es geht.
+
+**Interne Meldungen gingen bisher nirgendwohin.** Wurde ein internes Event angelegt, erfuhr das
+kein Mitglied, außer es schaute nach. Ein Job meldet jetzt jedes veröffentlichte interne Stück
+genau einmal – Push in der App, Glocke im Web – und zwar **nur** an die, die es sehen dürfen:
+`members` an aktive Mitglieder, `internal` an die Vereinsverwaltung (Rolle, Freigabe,
+Vorstandsposten oder Dolibarr-Funktion – dieselbe Regel wie der Wächter). Öffentliches hat
+Newsletter und Discord und läuft hier nicht. Eine leere Empfängerliste bleibt leer; es gibt
+keinen Rückfall auf „alle“. Damit die Meldung nicht am Newsletter-Haken hängt, hat sie ein
+eigenes Thema „Vereinsintern“ (Standard an). Was älter als einen Tag ist, wird beim ersten Lauf
+nur markiert – sonst hätte das Update jedes interne Event von 2024 nachgemeldet.
+
+**Die Mitgliedskarte verrät nichts.** Der QR-Code trägt weder Name noch Nummer, nur eine
+Adresse mit einem Zufallscode, der fünf Minuten gilt und sich vor Ablauf von selbst erneuert.
+Wer ihn scannt, sieht: gültig, Vorname mit Initial, Mitgliedsart, gültig bis – oder „nicht
+gültig“, ohne Grund. Ein abfotografierter Code ist nach fünf Minuten wertlos, ein Austritt in
+Dolibarr macht auch einen frischen Code sofort ungültig; ein offener Beitrag ist kein Austritt.
+Apple und Google Wallet sind vorbereitet (neutrales Kartenmodell), brauchen aber ein Zertifikat
+bzw. Issuer-Konto – das ist eine Entscheidung des Betreibers, keine Codefrage.
+
+**Nummerierung.** Das Paket kam vor Kalender und Galerie an die Reihe und bekam die 0.7.0-beta;
+die beiden folgenden App-Meilensteine sind um eins gerückt.
 
 ## Block 26 — Anmeldung und Teilen
 

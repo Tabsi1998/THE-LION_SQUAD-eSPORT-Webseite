@@ -23,7 +23,14 @@ async def user_can_see(user: dict | None, visibility: str | None) -> bool:
     if not user:
         return False
     if visibility == "internal":
-        return user.get("role") in INTERNAL_ROLES
+        # „Nur intern“ heißt Vereinsverwaltung - nach Bereich (#287), nicht nach Rolle: auch ein
+        # Vorstandsposten, eine Freigabe oder eine Dolibarr-Funktion lesen es. Dieselbe Regel
+        # bestimmt, wer die Meldung dazu bekommt (member_announcements).
+        if user.get("role") in INTERNAL_ROLES:
+            return True
+        from services.permissions import areas_for
+
+        return "club" in await areas_for(user)
     if visibility == "community":
         return True  # any logged-in user passes
     if visibility == "members":

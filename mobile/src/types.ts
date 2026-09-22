@@ -224,6 +224,8 @@ export type ClubEvent = {
   city?: string | null;
   country?: string | null;
   status?: string;
+  // public | community | members | internal - der Server liefert nur, was die Person sehen darf (#342)
+  visibility?: string | null;
   banner_url?: string | null;
   public_phase?: { countdown_kind?: string | null; label?: string; state?: string; target_at?: string | null };
   has_registration?: boolean;
@@ -245,6 +247,7 @@ export type NewsPost = {
   content?: string;
   body?: string;
   category?: string;
+  visibility?: string | null;
   banner_url?: string | null;
   published_at?: string | null;
   created_at?: string | null;

@@ -295,6 +295,9 @@ async def init_indexes():
     await db.dolibarr_links.create_index("member_key", unique=True, sparse=True)
     await db.dolibarr_links.create_index("status")
     await db.dolibarr_pending.create_index("key", unique=True)
+    # Prüfcodes der Mitgliedskarte (#346): fünf Minuten, dann weg.
+    await db.member_card_tokens.create_index("token", unique=True)
+    await db.member_card_tokens.create_index("expires_at", expireAfterSeconds=0)
     # Letzter verlässlicher Stand der eigenen Rechnungen (#296) - für den Ausfall, nie für PDFs.
     await db.dolibarr_invoice_cache.create_index("user_id", unique=True)
     await db.dolibarr_invoice_cache.create_index("expires_at", expireAfterSeconds=0)

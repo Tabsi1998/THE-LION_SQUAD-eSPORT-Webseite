@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { formatDate } from "../lib/format";
+import { internalLabel } from "../lib/memberArea";
 import { colors } from "../theme";
 import { Body, Muted } from "./Text";
 import { MediaImage } from "./MediaImage";
@@ -11,7 +12,8 @@ export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournamen
 
 // Die ganze Karte ist tippbar; einen zweiten Knopf "Details" darunter gibt
 // es nicht mehr (#248). `secondaryLabel` ist ein zweiter Status, etwa die
-// eigene Anmeldung.
+// eigene Anmeldung. `visibility` members/internal zeigt „Intern“ bzw.
+// „Vorstand“ in Gold - so erkennt man Vereinsinhalte in der Liste (#342).
 export function ContentCard({
   compact = false,
   date,
@@ -25,6 +27,7 @@ export function ContentCard({
   secondaryLabel,
   status,
   title,
+  visibility,
 }: {
   compact?: boolean;
   date?: string | null;
@@ -38,9 +41,11 @@ export function ContentCard({
   secondaryLabel?: string | null;
   status?: string | null;
   title?: string | null;
+  visibility?: string | null;
 }) {
   const accent = accentForKind(kind);
   const body = stripText(description || detail || "");
+  const internal = internalLabel({ visibility });
   const content = (
     <>
       <MediaImage
@@ -52,6 +57,7 @@ export function ContentCard({
         <View style={styles.kindRow}>
           <Ionicons name={iconForKind(kind)} color={accent} size={13} />
           <Muted style={[styles.kind, { color: accent }]}>{labelForKind(kind)}</Muted>
+          {internal ? <Muted style={styles.internal} testID="content-internal">{internal}</Muted> : null}
         </View>
         <Body numberOfLines={compact ? 2 : 3} style={styles.title}>{title || labelForKind(kind)}</Body>
         <View style={styles.metaRow}>
@@ -140,6 +146,19 @@ const styles = StyleSheet.create({
   kind: {
     fontSize: 11,
     fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  internal: {
+    backgroundColor: "rgba(255, 215, 0, 0.14)",
+    borderColor: "rgba(255, 215, 0, 0.4)",
+    borderRadius: 4,
+    borderWidth: 1,
+    color: colors.gold,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 14,
+    marginLeft: 4,
+    paddingHorizontal: 5,
     textTransform: "uppercase",
   },
   metaRow: {

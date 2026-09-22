@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { API_BASE_URL } from "../../config";
 import { api } from "../../lib/api";
 import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
@@ -26,10 +27,12 @@ type Entry = {
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
   screen?: "NewsList" | "DirectMessages" | "Notifications" | "SeasonPass";
   ownPublicProfile?: boolean;
-  membersOnly?: boolean;
 };
 
 type SocialLink = { platform?: string; label?: string; url?: string; enabled?: boolean };
+
+// Wer noch nicht Mitglied ist, landet auf der Beitrittsseite der Website (#340).
+export const JOIN_URL = `${API_BASE_URL}/membership/join`;
 
 const GROUPS: Array<{ title: string; entries: Entry[] }> = [
   {
@@ -49,10 +52,10 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
     ],
   },
   {
+    // Mitgliedervorteile liegen jetzt im Mitgliederbereich (#340).
     title: "Verein",
     entries: [
       { title: "News", icon: "newspaper-outline", screen: "NewsList" },
-      { title: "Mitgliedervorteile", icon: "star-outline", section: "benefits", membersOnly: true },
       { title: "Referenzen", icon: "medal-outline", section: "references" },
       { title: "Sponsoren", icon: "ribbon-outline", section: "sponsors" },
       { title: "Partner", icon: "link-outline", section: "partners" },
@@ -121,14 +124,44 @@ export function MoreScreen({ navigation }: Props) {
           <Title>Mehr</Title>
         </View>
 
+        {user && !isGuestUser(user) ? (
+          user.is_club_member ? (
+            <Pressable
+              onPress={() => navigation.navigate("MemberArea")}
+              accessibilityRole="button"
+              testID="more-member-area"
+              style={({ pressed }) => [styles.memberCard, pressed && styles.pressed]}
+            >
+              <View style={styles.memberIcon}><Ionicons name="ribbon-outline" color={colors.gold} size={22} /></View>
+              <View style={styles.memberText}>
+                <Body style={styles.memberTitle}>Mitgliederbereich</Body>
+                <Muted>Mitgliedschaft, Karte, Dokumente, interne Events und News</Muted>
+              </View>
+              <Ionicons name="chevron-forward" color={colors.gold} size={16} />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={() => { Linking.openURL(JOIN_URL).catch(() => {}); }}
+              accessibilityRole="link"
+              testID="more-join"
+              style={({ pressed }) => [styles.joinCard, pressed && styles.pressed]}
+            >
+              <Ionicons name="ribbon-outline" color={colors.muted} size={22} />
+              <View style={styles.memberText}>
+                <Body style={styles.memberTitle}>Mitglied werden</Body>
+                <Muted>Vereinsmitglieder sehen hier ihren Mitgliederbereich.</Muted>
+              </View>
+              <Ionicons name="open-outline" color={colors.muted} size={16} />
+            </Pressable>
+          )
+        ) : null}
+
         {GROUPS.map((group) => {
-          const entries = group.entries.filter((entry) => !entry.membersOnly || user?.is_club_member);
-          if (!entries.length) return null;
           return (
             <View key={group.title} style={styles.group}>
               <Heading>{group.title}</Heading>
               <Card style={styles.list}>
-                {entries.map((entry, index) => (
+                {group.entries.map((entry, index) => (
                   <Pressable
                     key={entry.title}
                     onPress={() => open(entry)}
@@ -202,6 +235,41 @@ const styles = StyleSheet.create({
   },
   group: {
     gap: 10,
+  },
+  memberCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 215, 0, 0.07)",
+    borderColor: "rgba(255, 215, 0, 0.45)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  joinCard: {
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  memberIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(255, 215, 0, 0.14)",
+    borderRadius: 8,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  memberText: {
+    flex: 1,
+    gap: 2,
+  },
+  memberTitle: {
+    fontWeight: "900",
   },
   list: {
     gap: 0,

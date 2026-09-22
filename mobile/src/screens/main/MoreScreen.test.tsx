@@ -10,7 +10,8 @@ const mockGet = jest.fn();
 jest.mock("../../lib/api", () => ({
   api: { get: (...args: unknown[]) => mockGet(...args) },
 }));
-jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "tabsi", is_club_member: true } }) }));
+const mockUser = { id: "u-1", username: "tabsi", is_club_member: true };
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: mockUser }) }));
 jest.mock("../../live", () => ({ isGuestUser: () => false }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 const mockOpenWhatsNew = jest.fn();
@@ -46,19 +47,38 @@ test("die Vereinskanäle kommen aus den Einstellungen, abgeschaltete fehlen", as
   expect(openUrl).toHaveBeenCalledWith("https://discord.com/invite/thelionsquadesports");
 });
 
-test("Zeilen statt Karten: jedes Ziel einmal, Mitgliedervorteile nur für Mitglieder", async () => {
+test("Zeilen statt Karten: jedes Ziel einmal; Mitglieder sehen die goldene Karte zum Mitgliederbereich", async () => {
   await render(<MoreScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(mockGet).toHaveBeenCalled());
 
-  for (const title of ["Nachrichten", "Benachrichtigungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Mitgliedervorteile", "Sponsoren", "Partner"]) {
+  for (const title of ["Nachrichten", "Benachrichtigungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Sponsoren", "Partner"]) {
     expect(screen.getAllByText(title)).toHaveLength(1);
   }
+  // Mitgliedervorteile liegen im Mitgliederbereich (#340).
+  expect(screen.queryByText("Mitgliedervorteile")).toBeNull();
+  await fireEvent.press(screen.getByTestId("more-member-area"));
+  expect(navigate).toHaveBeenCalledWith("MemberArea");
+  expect(screen.queryByTestId("more-join")).toBeNull();
   expect(screen.queryByText("Bereich öffnen")).toBeNull();
   // Fast Laps haben den Events-Tab und den Schnellzugriff auf der Startseite (#242).
   expect(screen.queryByText("Fast Laps")).toBeNull();
 
   await fireEvent.press(screen.getByText("Sponsoren"));
   expect(navigate).toHaveBeenCalledWith("InfoCenter", { section: "sponsors" });
+});
+
+test("wer kein Mitglied ist, sieht „Mitglied werden“ mit Link zur Beitrittsseite", async () => {
+  mockUser.is_club_member = false;
+  const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  try {
+    await render(<MoreScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+    expect(screen.queryByTestId("more-member-area")).toBeNull();
+    await fireEvent.press(screen.getByTestId("more-join"));
+    expect(openUrl).toHaveBeenCalledWith(expect.stringMatching(/\/membership\/join$/));
+  } finally {
+    mockUser.is_club_member = true;
+  }
 });
 
 test("Symbole je Kanal, Unbekanntes als Link", () => {

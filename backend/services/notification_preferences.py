@@ -47,6 +47,14 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "default": False,
         "requires_newsletter_consent": True,
     },
+    # Vereinsintern (#342): interne Events und News für Mitglieder bzw. den Vorstand. Das ist
+    # Vereinsbetrieb, kein Newsletter - deshalb standardmäßig an und ohne Newsletter-Zustimmung;
+    # wer es nicht will, schaltet es in den Einstellungen ab.
+    "club_internal": {
+        "label": "Vereinsintern",
+        "description": "Interne Events und News, die nur Mitglieder sehen.",
+        "default": True,
+    },
 }
 
 DELIVERY_CHANNEL_PREFERENCES = {
@@ -125,6 +133,11 @@ NOTIFICATION_KIND_CATEGORY = {
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",
     "news_mention": "news_events",
+    # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
+    "news_member": "club_internal",
+    "news_board": "club_internal",
+    "event_member": "club_internal",
+    "event_board": "club_internal",
     "membership_update": "membership_updates",
 }
 

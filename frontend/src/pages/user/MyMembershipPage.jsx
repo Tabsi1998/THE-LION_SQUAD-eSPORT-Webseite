@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeCard, formatDate } from "@/lib/dolibarr";
+import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet } from "lucide-react";
 
@@ -70,6 +71,9 @@ export default function MyMembershipPage() {
           <Stat icon={m?.show_member_number_publicly ? Eye : EyeOff} label="Nummer öffentlich" value={m?.show_member_number_publicly ? "Ja" : "Nein"} />
           <Stat icon={FileText} label="Mitgliedsart" value={m?.membership_type ? TYPE_LABELS[m.membership_type] : "—"} />
         </div>
+
+        {/* Digitale Mitgliedskarte (#346): nur für aktive Mitglieder, der Server entscheidet */}
+        {(m?.member_status === "active" || m?.member_status === "honorary") && <MemberCardPanel />}
 
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (

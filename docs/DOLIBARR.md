@@ -128,6 +128,28 @@ Website.
 - Voraussetzung im Modul: `GET /vereine/members/{id}/invoices` und `…/pdf`
   (Vereine ab 0.3). Der Website-Benutzer braucht dafür keine Rechnungsrechte.
 
+## Mitgliedskarte (App 0.7.0-beta)
+
+Aktive Mitglieder sehen unter **Meine Mitgliedschaft** (Web) und in der LionsAPP
+unter **Mehr → Mitgliederbereich → Mitgliedskarte** eine digitale Karte mit
+QR-Code. Ein Partner (Shop, Lokal, Einlass) scannt den Code mit der Handykamera
+und landet auf `lionsquad.at/karte/pruefen/…` – ohne Anmeldung.
+
+- **Was der Partner sieht:** gültig oder nicht, Vorname mit Anfangsbuchstaben des
+  Nachnamens, Mitgliedsart, gültig bis. Keine Nummer, keine E-Mail, kein
+  Beitragsstand. Warum eine Karte nicht gilt, sagt die Seite nicht.
+- **Warum ein Foto nichts nützt:** Der Code gilt fünf Minuten und erneuert sich
+  von selbst. Ein Screenshot von gestern zeigt „nicht gültig“.
+- **Wann die Karte gilt:** solange die Mitgliedschaft aktiv ist (aktiv oder
+  Ehrenmitglied). Ein offener Beitrag beendet sie nicht; ein in Dolibarr
+  eingetragener Austritt beendet sie mit dem letzten Tag. „Gültig bis“ zeigt
+  das Austrittsdatum, sonst „bezahlt bis“, sonst „solange die Mitgliedschaft
+  besteht“.
+- **Wallet:** Apple Wallet und Google Wallet sind vorbereitet (die Karte hat
+  ein neutrales Modell mit Feldern, Farben und Barcode), brauchen aber ein
+  Apple-Entwicklerkonto mit Pass-Zertifikat bzw. ein Google-Wallet-Issuer-Konto.
+  Ohne diese Konten gibt es die Karte in App und Web – das reicht zum Vorzeigen.
+
 ## Im Betrieb
 
 - **Abgleich:** alle 10 Minuten das Geänderte, einmal am Tag alles. *Jetzt
