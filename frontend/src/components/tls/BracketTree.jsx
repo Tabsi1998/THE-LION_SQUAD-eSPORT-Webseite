@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { createContext, useContext, useMemo } from "react";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
 
@@ -7,7 +7,17 @@ import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/
  * matchdays, and multiplayer heats.
  * `data` is the response from /api/tournaments/:id/bracket.
  */
-export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick }) {
+const EMPTY_SET = new Set();
+
+// Zuletzt geänderte Matches (#225) bekommen einen Rahmen. Über einen Kontext, damit die
+// Kennung nicht durch Stufe → Abschnitt → Runde → Knoten gereicht werden muss.
+const ChangedMatchesContext = createContext(EMPTY_SET);
+
+function useMatchChanged(matchId) {
+  return useContext(ChangedMatchesContext).has(matchId);
+}
+
+export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET }) {
   const { matches_v2 = [], stages = [], registrations = [] } = data || {};
   const podiumMap = useMemo(() => buildPodiumMap(matches_v2), [matches_v2]);
   const regMap = useMemo(() => {
@@ -17,15 +27,17 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   }, [registrations]);
 
   return (
-    <StageBracketTree
-      stages={stages}
-      matches={matches_v2}
-      regMap={regMap}
-      podiumMap={podiumMap}
-      compact={compact}
-      viewMode={viewMode}
-      onMatchClick={onMatchClick}
-    />
+    <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
+      <StageBracketTree
+        stages={stages}
+        matches={matches_v2}
+        regMap={regMap}
+        podiumMap={podiumMap}
+        compact={compact}
+        viewMode={viewMode}
+        onMatchClick={onMatchClick}
+      />
+    </ChangedMatchesContext.Provider>
   );
 }
 
@@ -212,13 +224,15 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
     slots.push({ slot: slots.length + 1, registration_id: null, status: "empty" });
   }
   const nodePodium = topPodiumRank(slots.map((slot) => slot.registration_id), podiumMap);
+  const changed = useMatchChanged(match.id);
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
       data-testid={`bracket-match-v2-${match.id}`}
-      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group`}
+      data-changed={changed ? "true" : undefined}
+      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group ${changed ? "tls-changed-frame" : ""}`}
     >
       {slots.map((slot, index) => {
         const reg = regMap.get(slot.registration_id);
@@ -249,12 +263,14 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
 function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const resultMap = new Map((match.results || []).map((r) => [r.registration_id, r]));
   const nodePodium = topPodiumRank((match.slots || []).map((slot) => slot.registration_id), podiumMap);
+  const changed = useMatchChanged(match.id);
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
       data-testid={`bracket-heat-${match.id}`}
-      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A]`}
+      data-changed={changed ? "true" : undefined}
+      className={`tls-bracket-node relative text-left rounded-sm overflow-hidden border ${podiumBorderClass(nodePodium)} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A] ${changed ? "tls-changed-frame" : ""}`}
     >
       <div className={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 flex items-center justify-between gap-2`}>
         <div>

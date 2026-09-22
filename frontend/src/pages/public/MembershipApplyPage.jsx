@@ -12,6 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
+import { SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
 import { Crown, FileText, Mail } from "lucide-react";
 
@@ -96,7 +97,7 @@ export default function MembershipApplyPage() {
         <p className="mt-3 text-white/60 max-w-2xl">Werde offiziell Teil von THE LION SQUAD — eSPORTS. Stimmrecht bei Generalversammlungen, Member-Bereiche, Vereinslogo auf deinem Trikot. Eine Bewerbung pro User.</p>
 
         {loading ? (
-          <div className="mt-8 text-white/40 text-sm">Lade …</div>
+          <SkeletonLines lines={4} className="mt-8" label="Lade Antrag" />
         ) : existing && existing.status === "pending" ? (
           <StatusCard testId="apply-pending" icon={Mail} color="#29B6E8" title="Bewerbung eingegangen" body={`Eingereicht am ${new Date(existing.created_at).toLocaleDateString("de-DE")}. Du erhältst eine E-Mail sobald entschieden wurde.`} />
         ) : existing && existing.status === "approved" ? (

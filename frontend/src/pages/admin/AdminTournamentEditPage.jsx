@@ -15,6 +15,7 @@ import { Zap, RefreshCw, Eye, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
+import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { RULE_PRESETS, ruleModeSummary, rulePresetKey, rulePresetWarnings } from "@/lib/tournamentRulePresets";
 import {
@@ -590,7 +591,7 @@ export default function AdminTournamentEditPage() {
     <AdminLayout>
       {loadError
         ? <div className="p-10 text-[#FF3B30]" data-testid="admin-tr-load-error">{loadError}</div>
-        : <div className="p-10 text-white/40">Lade…</div>}
+        : <div className="p-10"><SkeletonDetailHeader label="Lade Turnier" /></div>}
     </AdminLayout>
   );
   const canRecordResults = ["live", "paused"].includes(t.status);

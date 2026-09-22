@@ -146,6 +146,36 @@ Seit dem 15. September gilt:
   lokal, Worker per `?url`, nachgeladen beim Öffnen; `open`-Prop für Tests);
   `MemberDocumentsPage` öffnet PDFs darin. **Neues Dokument in der Website =
   DocumentViewer mit API-Pfad, nie ein fremder Betrachter, nie eine freie URL.**
+- Web: Dynamik (#224, #225, #226; PR #360). `lib/liveChanges.js` (ohne React):
+  `changedKeys`/`movedKeys` (Vergleich zweier Stände nach Schlüssel und
+  Signatur), `timelineSignature`/`liveCountLine` (Startseite),
+  `formatCountdown` („in 3 Tagen, 14 Stunden“, tickt jede Minute, unter einer
+  Stunde alle 15 s), `nextCountdownTarget`, `standingSignature`,
+  `matchResultSignature`, `describeResult` („Ergebnis eingetragen: A 2:1 B“),
+  `freshResults`. `hooks/useLiveChanges.js`: `useReducedMotion`/
+  `prefersReducedMotion`, `useChangedKeys(items, keyOf, signatureOf, {holdMs})`
+  (Menge der seit dem letzten Stand geänderten Schlüssel, 6 s; der erste Stand
+  zählt nie), `useFlipRows(items, keyOf)` (FLIP über `element.animate`, nichts
+  mit Bewegung reduzieren), `useCountdown(targetMs)`. Server:
+  `home_routes._attach_live_counts` hängt je Karte `live_counts` an
+  (Turnier: `registered`/`capacity`/`running_matches` aus
+  `tournament_registrations` approved+checked_in und `matches_v2`
+  running/in_progress; Event mit Anmeldung: `registered`/`capacity`; Fast Lap:
+  `participants` = Fahrer mit gültiger Zeit ohne Vereinsreferenz) – ein
+  Aggregat je Sammlung, dieselbe Karte in „heute“ und „bald“ bekommt beide.
+  Web: `HomePage` NextUp mit Countdown (`home-countdown`), Zahlenzeile
+  (`home-live-counts`), `tls-changed` + Chip „Neu“ (`data-changed`);
+  `TournamentStandingsPage` Zeilen mit `useFlipRows` + `tls-changed-row`;
+  `BracketTree` Prop `changedMatchIds` (Set) → Kontext → `tls-changed-frame`
+  am Knoten; `TournamentSchedulePage` Chip „gerade eingetragen“ + `toast` je
+  frischem Ergebnis (höchstens drei je Stand). `components/tls/Skeleton.jsx`:
+  `SkeletonLines/Cards/List/Table/DetailHeader/Page` (role=status, aria-busy,
+  Label) – **neuer Ladezustand = Skelett in der Form des Inhalts, kein
+  „Lade …“**; `PublicLoadingState` bleibt für die Seiten, die es schon hatten.
+  `components/tls/PageTransition.jsx` um die Routen: Einblenden über
+  `element.animate` beim Pfadwechsel, ohne Neuaufbau der Seite. CSS in
+  `index.css` unter „Dynamik-Block“; `prefers-reduced-motion` schaltet alle
+  Animationen ab, Hervorhebungen bleiben.
 - App 0.7.0-beta: Mitgliederbereich (#340, #339, #341, #342, #346; Build 65).
   Server: `services/member_announcements.py` – Job `notify_due` (jede Minute)
   meldet veröffentlichte interne News und Events **genau einmal**
@@ -643,12 +673,12 @@ braucht.
 #349 (#345 Dolibarr einrichten), #350 (Discord I), #352 (#351
 Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 0.6.0-beta, #355 Tagesgrenze), #356 (Dolibarr II), #357 (App 0.7.0-beta:
-Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver). `main`
-steht auf `770aaec`.
+Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
+(#358 Passkey als zweiter Faktor). `main` steht auf `dce836e`.
 
 ### Offene PRs
-- #359 (#358 Passkey zählt als zweiter Faktor, Variante B). Nach dem Merge
-  `update.sh`.
+- #360 (Web: Dynamik – #224, #225, #226). Nach dem Merge `update.sh` (die
+  Live-Zahlen kommen vom Server).
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -687,7 +717,7 @@ steht auf `770aaec`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (40 offen nach dem Merge von #357, davon #358 entschieden)
+### Meilensteine und offene Issues (36 offen nach dem Merge von #360)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -704,7 +734,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), #302 Discord-Bot – der Bot braucht #260 |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
-| Web: Dynamik | #224 Startseite, #225 Turnierseiten, #226 Übergänge/Skelette |
+| Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | #229, #230 |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
@@ -732,7 +762,7 @@ sinnvoll hältst“):
    #354, Build 64 nach dem Merge.
 5. Dolibarr II – umgesetzt in #356. App 0.7.0-beta: Mitgliederbereich (#340,
    #339, #341, #342, #346) – umgesetzt in #357, Build 65 nach dem Merge.
-6. Web: Dynamik.
+6. Web: Dynamik – umgesetzt in #360.
 7. Abrechnung I, danach Admin und Turniere (#203/#204 berühren dieselben
    Event-Formulare wie #318 – zusammen planen), App 0.8.0-beta.
 8. Abrechnung II, Discord II, App 0.9.0-beta, Auszeichnungen und Marke,

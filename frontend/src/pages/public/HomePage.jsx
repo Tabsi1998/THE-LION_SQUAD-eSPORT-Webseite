@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
@@ -12,7 +12,10 @@ import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio } from "lucide-react";
+import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
+import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
+import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -30,7 +33,8 @@ export default function HomePage() {
 
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
   useHomeStructuredData(state);
-  const timeline = state ? buildHomeTimeline(state).slice(0, 5) : [];
+  // Ein Stand, eine Liste: sonst sähe der Änderungsvergleich in NextUp bei jedem Tick neue Objekte.
+  const timeline = useMemo(() => (state ? buildHomeTimeline(state).slice(0, 5) : []), [state]);
   const primaryNews = state?.featured_news?.[0] || state?.news?.[0] || null;
   const newsItems = homeNews(state, primaryNews?.id).slice(0, 3);
   const isEmptyHome = state && !state.has_live && !timeline.length && !primaryNews && !newsItems.length;
@@ -82,6 +86,15 @@ export default function HomePage() {
 
       <LiveStreamSlider />
       <SponsorTicker placement="home" spotlight />
+
+      {!state && (
+        <section className="border-b border-white/10 bg-[#080808]/35">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 space-y-8">
+            <SkeletonDetailHeader label="Lade Startseite" />
+            <SkeletonCards count={3} label="Lade Termine" />
+          </div>
+        </section>
+      )}
 
       {state && (primaryNews || timeline.length > 0) && (
         <section className="border-b border-white/10 bg-[#080808]/35">
@@ -212,7 +225,13 @@ function FeaturedNews({ news }) {
   );
 }
 
+// Countdown zum nächsten Termin und Live-Zahlen je Karte (#224). Kommt über den Strom eine
+// Änderung für eine Karte, leuchtet sie kurz und trägt ein paar Sekunden „Neu“ - beim ersten
+// Laden nicht. Mit „Bewegung reduzieren“ bleibt das Leuchten aus, das Kennzeichen nicht.
 function NextUp({ items }) {
+  const changed = useChangedKeys(items, timelineKey, timelineSignature);
+  const target = nextCountdownTarget(items);
+  const countdown = useCountdown(target?.targetMs || null);
   if (!items.length) return (
     <div className="border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0">
       <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>
@@ -226,21 +245,42 @@ function NextUp({ items }) {
         <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
         <Link to="/events" className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
       </div>
+      {target && countdown && (
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0" data-testid="home-countdown">
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-white/40"><Timer className="w-3 h-3" /> {target.item.label}</span>
+          <span className="font-heading text-xl md:text-2xl font-black uppercase text-white tabular-nums">{countdown}</span>
+        </div>
+      )}
       <div className="mt-4 space-y-3">
-        {items.map((item) => (
-          <Link key={`${item.kind}-${item.id}`} to={item.url} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition min-w-0">
-            <div className="flex items-center gap-3 min-w-0 w-full">
-              <KindIcon kind={item.kind} />
-              <div className="min-w-0 flex-1">
-                <div className="font-heading font-bold leading-tight line-clamp-2">{item.label}</div>
+        {items.map((item) => {
+          const key = timelineKey(item);
+          const isChanged = changed.has(key);
+          const counts = liveCountLine(item);
+          return (
+            <Link
+              key={key}
+              to={item.url}
+              data-testid={`home-next-${item.kind}-${item.slug || item.id}`}
+              data-changed={isChanged ? "true" : undefined}
+              className={`flex flex-col sm:flex-row sm:items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm p-3 bg-black/20 transition min-w-0 ${isChanged ? "tls-changed" : ""}`}
+            >
+              <div className="flex items-center gap-3 min-w-0 w-full">
+                <KindIcon kind={item.kind} />
+                <div className="min-w-0 flex-1">
+                  <div className="font-heading font-bold leading-tight line-clamp-2 flex items-center gap-2 flex-wrap">
+                    <span>{item.label}</span>
+                    {isChanged && <span className="tls-new-chip" data-testid="home-next-new">Neu</span>}
+                  </div>
+                  {counts && <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/55 tabular-nums" data-testid="home-live-counts"><Users className="w-3 h-3" /> {counts}</div>}
+                </div>
               </div>
-            </div>
-            <div className="w-full sm:w-auto sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-              {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
-              {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full" />}
-            </div>
-          </Link>
-        ))}
+              <div className="w-full sm:w-auto sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
+                {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+                {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full" />}
+              </div>
+            </Link>
+          );
+        })}
       </div>
     </div>
   );
@@ -301,6 +341,10 @@ function NewsCard({ news, featured = false }) {
       </div>
     </Link>
   );
+}
+
+function timelineKey(item) {
+  return `${item.kind}-${item.id || item.slug}`;
 }
 
 function KindIcon({ kind }) {

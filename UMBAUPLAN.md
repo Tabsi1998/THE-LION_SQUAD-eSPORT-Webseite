@@ -474,7 +474,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord, Twitch, Steam), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
-| Web: Dynamik | Block 20: #224, #225, #226 |
+| Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 |
 | Auszeichnungen und Marke | Block 17 und 18: #229, #230 |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
@@ -601,6 +601,35 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 28 — Web: Dynamik
+
+### Was 28.1 gefunden hat (#224, #225, #226 – PR #360)
+
+**Die Seiten waren live, sahen aber still aus.** Seit dem Änderungsstrom (Block 15) laden
+Startseite, Rangliste, Turnierbaum und Spielplan bei jeder Änderung von selbst nach – nur merkte
+das niemand: Eine Zeile sprang, ein Match trug plötzlich ein Ergebnis, eine Karte stand da wie
+vorher. Jetzt vergleicht jede Seite den neuen Stand mit dem alten (nach Schlüssel und einer
+Signatur dessen, was man sieht) und zeigt den Unterschied ein paar Sekunden: Karten leuchten und
+tragen „Neu“, Zeilen der Rangliste gleiten auf ihren neuen Platz, das geänderte Match im Baum
+bekommt einen Rahmen, im Spielplan steht „gerade eingetragen“ und unten ein Hinweis mit dem
+Ergebnis – auch für Zuschauer. Der erste Stand zählt nie als Änderung; ein Neuladen ohne
+Unterschied macht nichts neu.
+
+**Zahlen statt Adjektive.** Die Karten auf der Startseite sagen jetzt „12 von 16 angemeldet“
+oder „3 Matches laufen“; der Server hängt die Zahlen je Karte an (ein Aggregat je Sammlung, nicht
+eine Abfrage je Karte). Dazu ein Countdown in Worten zum nächsten Termin, der noch nicht läuft.
+
+**Keine Dauer-Animation.** Alles ist endlich (ein Leuchten, ein Gleiten, ein Einblenden) und
+über die Web-Animations-API, nicht über Klassen, die ein Neuaufbau bräuchte. „Bewegung
+reduzieren“ des Systems schaltet jede Bewegung ab; die Hervorhebung bleibt, sonst sähe man mit der
+Einstellung gar nichts mehr.
+
+**„Lade …“ an 21 Stellen.** Ein Satz Skelette in der Form des späteren Inhalts (Zeilen, Karten,
+Liste, Tabelle, Detailkopf) ersetzt die Texte auf den Seiten für Mitglieder und Besucher und in
+den wichtigsten Admin-Listen; Knöpfe, die während einer Aktion „Lade …“ sagen, bleiben. Der
+Seitenwechsel blendet kurz ein, ohne die Seite neu aufzubauen – ein Wechsel von `/news/a` nach
+`/news/b` verliert also nichts.
 
 ## Block 27 — App 0.7.0-beta: Mitgliederbereich
 

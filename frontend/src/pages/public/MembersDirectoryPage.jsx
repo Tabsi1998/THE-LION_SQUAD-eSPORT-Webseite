@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { SkeletonList } from "@/components/tls/Skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -52,7 +53,7 @@ export default function MembersDirectoryPage() {
         </div>
 
         {loading ? (
-          <div className="text-white/40 text-sm">Lade …</div>
+          <SkeletonList rows={6} label="Lade Mitglieder" />
         ) : members.length === 0 ? (
           <div className="border border-dashed border-white/15 rounded-sm p-10 text-center text-white/50">
             <UsersIcon className="w-8 h-8 mx-auto opacity-40 mb-3" />

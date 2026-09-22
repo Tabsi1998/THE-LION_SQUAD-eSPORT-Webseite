@@ -4,9 +4,11 @@ import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChangedKeys } from "@/hooks/useLiveChanges";
+import { matchResultSignature } from "@/lib/liveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
@@ -38,8 +40,19 @@ export default function TournamentBracketPage() {
   }, [load]);
 
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 7000 });
+  // Das zuletzt geänderte Match bekommt für einige Sekunden einen Rahmen (#225).
+  const changedMatches = useChangedKeys(data?.matches_v2, (match) => match.id, matchResultSignature);
 
-  if (!data) return <PublicLayout><PublicLoadingState label="Lade Turnierbaum" /></PublicLayout>;
+  if (!data) {
+    return (
+      <PublicLayout>
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+          <SkeletonDetailHeader label="Lade Turnierbaum" />
+          <SkeletonCards count={4} columns={4} image={false} label="Lade Turnierbaum" />
+        </div>
+      </PublicLayout>
+    );
+  }
   const t = data.tournament;
   const tournamentUrl = `/tournaments/${t.slug || t.id}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
 
@@ -75,7 +88,7 @@ export default function TournamentBracketPage() {
             <div className="text-white/50 font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>
         ) : (
-          <BracketTree data={data} />
+          <BracketTree data={data} changedMatchIds={changedMatches} />
         )}
       </div>
     </PublicLayout>

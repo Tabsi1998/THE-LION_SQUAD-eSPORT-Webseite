@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
-import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
+import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { api } from "@/lib/api";
+import { describeResult, freshResults, matchResultSignature } from "@/lib/liveChanges";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
@@ -80,6 +83,21 @@ export default function TournamentSchedulePage() {
   }, [load]);
   useLiveRefresh(load, ["tournaments", "matches", "matches-v2"], { fallbackMs: 7000 });
 
+  // Frisch eingetragene Ergebnisse tragen kurz „gerade eingetragen“, und unten steht ein
+  // Hinweis mit dem Ergebnis - auch für Zuschauer (#225). Beim ersten Laden nichts davon.
+  const allMatches = useMemo(() => [...(data?.matches_v2 || []), ...(data?.matches || [])], [data]);
+  const changedMatches = useChangedKeys(allMatches, (match) => match.id, matchResultSignature);
+  const previousMatches = useRef(null);
+  useEffect(() => {
+    const before = previousMatches.current;
+    previousMatches.current = allMatches;
+    if (!before || !data) return;
+    const registrations = Object.fromEntries((data.registrations || []).map((r) => [r.id, r]));
+    for (const match of freshResults(before, allMatches).slice(0, 3)) {
+      toast(describeResult(match, registrations), { id: `result-${match.id}`, duration: 6000 });
+    }
+  }, [allMatches, data]);
+
   const groups = useMemo(() => {
     const tournament = data?.tournament || {};
     const registrations = Object.fromEntries((data?.registrations || []).map((r) => [r.id, r]));
@@ -144,7 +162,16 @@ export default function TournamentSchedulePage() {
   });
   useCanonicalSlugRedirect(slug, tournament.slug, "/tournaments", "/matches");
 
-  if (!data) return <PublicLayout><PublicLoadingState label="Lade Spielplan" /></PublicLayout>;
+  if (!data) {
+    return (
+      <PublicLayout>
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-8">
+          <SkeletonDetailHeader label="Lade Spielplan" />
+          <SkeletonCards count={6} columns={3} image={false} label="Lade Spielplan" />
+        </section>
+      </PublicLayout>
+    );
+  }
 
   return (
     <PublicLayout>
@@ -200,7 +227,7 @@ export default function TournamentSchedulePage() {
 
             <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="matchday-matches">
               {weekMatches.map((match) => (
-                <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} />
+                <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} changed={changedMatches.has(match.id)} />
               ))}
               {weekMatches.length === 0 && (
                 <div className="md:col-span-2 xl:col-span-3 border border-dashed border-white/15 rounded-sm p-8 text-center text-white/45">
@@ -216,7 +243,7 @@ export default function TournamentSchedulePage() {
                 <h2 className="font-heading text-2xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> {group.label}</h2>
                 <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {group.matches.map((match) => (
-                    <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} />
+                    <MatchCard key={match.id} match={match} resolved={resolvedByMatch[match.id]} changed={changedMatches.has(match.id)} />
                   ))}
                 </div>
               </section>
@@ -229,19 +256,27 @@ export default function TournamentSchedulePage() {
   );
 }
 
-function MatchCard({ match, resolved }) {
+function MatchCard({ match, resolved, changed = false }) {
   // Der berechnete Termin geht vor: bei Spielwochen steht er auch dann fest,
   // wenn noch niemand etwas vereinbart hat, weil dann die Standardzeit gilt.
   const scheduledAt = resolved?.scheduled_at || match.scheduled_at;
   const sourceLabel = SCHEDULE_SOURCE_LABELS[resolved?.schedule_source];
   return (
-    <Link to={`/matches/${match.id}`} className="border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition">
+    <Link
+      to={`/matches/${match.id}`}
+      data-testid={`schedule-match-${match.id}`}
+      data-changed={changed ? "true" : undefined}
+      className={`border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition ${changed ? "tls-changed" : ""}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-widest text-white/40">{formatMatchKind(match)} {match.match_key || ""}</div>
           <div className="mt-1 font-heading font-bold uppercase line-clamp-2">{match.labels.join(" vs. ")}</div>
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold shrink-0">{formatMatchStatus(match.schedule_status || match.status)}</span>
+        <span className="flex flex-col items-end gap-1 shrink-0">
+          <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{formatMatchStatus(match.schedule_status || match.status)}</span>
+          {changed && <span className="tls-new-chip" data-testid={`schedule-fresh-${match.id}`}>gerade eingetragen</span>}
+        </span>
       </div>
       <div className="mt-3 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span className="text-sm text-white/55">{formatDateTime(scheduledAt)}</span>

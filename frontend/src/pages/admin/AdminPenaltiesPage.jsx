@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, RefreshCw } from "lucide-react";
 
@@ -80,7 +81,7 @@ export default function AdminPenaltiesPage() {
 
       <div className="mt-6 space-y-3" data-testid="pen-list">
         {loading ? (
-          <div className="text-white/40">Lade…</div>
+          <SkeletonList rows={4} label="Lade Strafen" />
         ) : data.items.length === 0 ? (
           <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
             Keine Strafen für diesen Filter.

@@ -10,6 +10,7 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { appendEmbedToken } from "@/components/tls/RichContent";
+import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
@@ -811,7 +812,7 @@ function EventRegistrationsModal({ event, onClose, onChanged }) {
                     <tr><td colSpan="5" className="py-10 text-center text-white/40">Noch keine Anmeldungen</td></tr>
                   )}
                   {loading && (
-                    <tr><td colSpan="5" className="py-10 text-center text-white/40">Lade Anmeldungen...</td></tr>
+                    <tr><td colSpan="5" className="p-3"><SkeletonLines lines={3} label="Lade Anmeldungen" /></td></tr>
                   )}
                 </tbody>
               </table>

@@ -6,6 +6,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
+import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
@@ -136,9 +137,11 @@ export default function AchievementsShowcasePage() {
             <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Bestenliste</h2>
           </div>
 
-          {leaderboard.length === 0 ? (
+          {leaderboard.length === 0 && loading ? (
+            <SkeletonTable rows={5} columns={4} label="Lade Bestenliste" />
+          ) : leaderboard.length === 0 ? (
             <div className="border border-dashed border-white/10 rounded-sm p-10 text-center text-white/45">
-              {loading ? "Lade Bestenliste …" : "Noch keine Platzierungen – sei der Erste und schalte Achievements frei!"}
+              Noch keine Platzierungen – sei der Erste und schalte Achievements frei!
             </div>
           ) : (
             <>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Gift, ExternalLink } from "lucide-react";
 
@@ -26,7 +27,7 @@ export default function MemberBenefitsPage() {
 
         <div className="mt-10">
           {loading ? (
-            <div className="text-white/40 text-sm">Lade …</div>
+            <SkeletonCards count={3} image={false} label="Lade Vorteile" />
           ) : benefits.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
               <Gift className="w-10 h-10 mx-auto opacity-40 mb-4" />

@@ -13,6 +13,7 @@ import { Plus, Trash2, Tv, Pencil, X as XIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 
 const F1_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -195,7 +196,7 @@ export default function AdminF1EditPage() {
     }
   };
 
-  if (!challenge) return <AdminLayout><div className="p-10 text-white/40">Lade…</div></AdminLayout>;
+  if (!challenge) return <AdminLayout><div className="p-10"><SkeletonDetailHeader label="Lade Challenge" /></div></AdminLayout>;
 
   return (
     <AdminLayout>

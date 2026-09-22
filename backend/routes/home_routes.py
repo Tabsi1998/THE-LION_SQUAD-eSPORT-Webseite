@@ -114,6 +114,58 @@ async def _attach_events_to_challenges(challenges: list[dict]) -> list[dict]:
     return challenges
 
 
+# Live-Zahlen je Karte (#224): Anmeldungen, laufende Matches, Fahrer. Ein Zähler je Sammlung
+# über alle Karten - nicht eine Abfrage je Karte. Zuschauer kommen vom Stream-Slider selbst.
+RUNNING_MATCH_STATUSES = ("running", "in_progress")
+ACTIVE_TOURNAMENT_REGISTRATIONS = ("approved", "checked_in")
+ACTIVE_EVENT_REGISTRATIONS = ("registered", "checked_in")
+
+
+async def _count_by(collection, field: str, ids: list[str], extra: dict | None = None) -> dict[str, int]:
+    if not ids:
+        return {}
+    match = {field: {"$in": ids}, **(extra or {})}
+    counts: dict[str, int] = {}
+    async for row in collection.aggregate([{"$match": match}, {"$group": {"_id": f"${field}", "n": {"$sum": 1}}}]):
+        counts[row["_id"]] = int(row["n"])
+    return counts
+
+
+def _rows_by_id(groups, kind: str) -> dict[str, list[dict]]:
+    """Dieselbe Karte kann in „heute“ und „bald“ liegen - als zwei Objekte. Beide bekommen die Zahl."""
+    rows: dict[str, list[dict]] = {}
+    for group in groups:
+        for row in group.get(kind, []):
+            rows.setdefault(row["id"], []).append(row)
+    return rows
+
+
+async def _attach_live_counts(db, *groups: dict) -> None:
+    tournaments = _rows_by_id(groups, "tournaments")
+    events = _rows_by_id(groups, "events")
+    challenges = _rows_by_id(groups, "challenges")
+    t_regs = await _count_by(db.tournament_registrations, "tournament_id", list(tournaments), {"status": {"$in": list(ACTIVE_TOURNAMENT_REGISTRATIONS)}})
+    t_running = await _count_by(db.matches_v2, "tournament_id", list(tournaments), {"status": {"$in": list(RUNNING_MATCH_STATUSES)}})
+    e_regs = await _count_by(db.event_registrations, "event_id", list(events), {"status": {"$in": list(ACTIVE_EVENT_REGISTRATIONS)}})
+    for tid, rows in tournaments.items():
+        for row in rows:
+            row["live_counts"] = {"registered": t_regs.get(tid, 0), "capacity": row.get("max_participants") or None, "running_matches": t_running.get(tid, 0)}
+    for eid, rows in events.items():
+        for row in rows:
+            if row.get("has_registration"):
+                row["live_counts"] = {"registered": e_regs.get(eid, 0), "capacity": row.get("max_participants") or None}
+    if challenges:
+        # Fahrer je Challenge: wie f1_routes zählt, nur für alle Karten auf einmal.
+        official = {"challenge_id": {"$in": list(challenges)}, "is_invalid": {"$ne": True},
+                    "$or": [{"score_scope": {"$exists": False}}, {"score_scope": {"$ne": "club_reference"}}]}
+        drivers: dict[str, set] = {}
+        async for lap in db.f1_lap_times.find(official, {"_id": 0, "challenge_id": 1, "user_id": 1}):
+            drivers.setdefault(lap["challenge_id"], set()).add(lap.get("user_id"))
+        for cid, rows in challenges.items():
+            for row in rows:
+                row["live_counts"] = {"participants": len(drivers.get(cid, set()))}
+
+
 @router.get("/state")
 async def home_state(user: dict | None = Depends(get_optional_user)):
     db = get_db()
@@ -227,6 +279,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "fastlaps": len(upcoming["challenges"]),
     }
 
+    await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
     return {
         "has_live": has_live,
