@@ -17,7 +17,8 @@ test("ein mehrtägiger Termin steht an jedem Tag, offene Enden werden gekappt", 
   const map = itemsByDay([
     { id: "lan", kind: "event", title: "LAN", start: "2026-10-02T18:00:00+02:00", end: "2026-10-04T12:00:00+02:00" },
     { id: "cup", kind: "tournament", title: "Cup", start: "2026-10-03T10:00:00+02:00" },
-    { id: "endlos", kind: "fastlap", title: "Saison", start: "2026-10-01T00:00:00+02:00", end: "2027-06-01T00:00:00+02:00" },
+    // Mittag statt Mitternacht: der Test läuft in der CI in UTC, und 00:00+02:00 ist dort noch der Vortag.
+    { id: "endlos", kind: "fastlap", title: "Saison", start: "2026-10-01T12:00:00+02:00", end: "2027-06-01T12:00:00+02:00" },
     { id: "kaputt", kind: "event", title: "?", start: "kein Datum" },
   ]);
   expect(map.get("2026-10-02")?.map((item) => item.id)).toEqual(["endlos", "lan"]);
