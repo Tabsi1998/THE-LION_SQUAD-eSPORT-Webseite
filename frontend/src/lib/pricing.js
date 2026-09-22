@@ -96,6 +96,19 @@ export function formToBilling(form) {
   return { enabled: Boolean(form.enabled), positions, invoice_timing: form.invoice_timing || "on_confirm" };
 }
 
+/** Eine Leistung aus Dolibarr in die Position übernehmen: Nummer immer, der Rest als Vorbelegung. */
+export function applyDolibarrService(position, service) {
+  if (!service) return { ...position, dolibarr_product_id: "" };
+  return {
+    ...position,
+    dolibarr_product_id: String(service.id),
+    label: service.label || position.label,
+    description: position.description || service.description || "",
+    amount: inputFromCents(service.amount_cents),
+    tax_profile: service.tax_profile || position.tax_profile || "none",
+  };
+}
+
 /** Was im Formular noch nicht stimmt - bevor der Server es sagt. */
 export function billingFormError(form) {
   if (!form.enabled) return "";

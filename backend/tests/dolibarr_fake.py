@@ -175,6 +175,10 @@ class FakeDolibarr:
         if match and method == "GET":
             row = self.core_members.get(int(match.group(1)))
             return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/products" and method == "GET":
+            assert params.get("mode") == "2", "nur Dienstleistungen, keine Waren"
+            rows = [r for r in self.products.values() if str(r.get("fk_product_type", 1)) == "1"]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         match = re.fullmatch(r"/products/(\d+)", path)
         if match and method == "GET":
             row = self.products.get(int(match.group(1)))

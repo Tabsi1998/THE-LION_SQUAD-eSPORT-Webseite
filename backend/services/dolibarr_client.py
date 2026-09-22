@@ -287,6 +287,16 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    async def services(self, *, limit: int = 100) -> list[dict]:
+        """Verkaufbare Leistungen (Dienstleistungen) - zum Auswählen im Event, statt Nummern zu tippen."""
+        try:
+            data = await self._get("/products", {"mode": 2, "sortfield": "t.label", "sortorder": "ASC", "limit": int(limit)})
+        except DolibarrError as exc:
+            if exc.kind == "not_found":   # leere Liste
+                return []
+            raise
+        return data if isinstance(data, list) else []
+
     async def invoice(self, invoice_id: int) -> dict:
         data = await self._get(f"/invoices/{int(invoice_id)}")
         if not isinstance(data, dict) or "id" not in data:

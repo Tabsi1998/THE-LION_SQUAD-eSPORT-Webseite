@@ -208,7 +208,13 @@ Seit dem 15. September gilt:
   `pay`, `posts`) – Formen wie Dolibarrs REST-API 22–24, kein Modulvertrag.
   Web: Finanzübersicht mit Zuordnen/Trotzdem neu anlegen/Erneut versuchen und
   Tabelle „Angelegte Rechnungen“; Dolibarr-Panel mit den beiden Haken;
-  Anmeldung zeigt Rechnungsnummer und „bezahlt“.
+  Anmeldung zeigt Rechnungsnummer und „bezahlt“. Nachtrag (PR #367, Wunsch
+  vom 22.09.): Leistungen aus Dolibarr auswählen statt Nummer tippen –
+  `client.services()` (`GET /products?mode=2`), `dolibarr_billing.service_view`
+  (Bruttopreis in Cent, Steuerprofil aus `tva_tx`, unverkäufliche raus),
+  `GET /api/admin/finance/dolibarr-services` (Finanzen; ohne Anbindung
+  `available: false`), `pricing.applyDolibarrService` + Auswahlliste je
+  Position in `EventBillingSection` (Rückfall: Nummernfeld).
 - Web: Dynamik (#224, #225, #226; PR #360). `lib/liveChanges.js` (ohne React):
   `changedKeys`/`movedKeys` (Vergleich zweier Stände nach Schlüssel und
   Signatur), `timelineSignature`/`liveCountLine` (Startseite),
@@ -741,12 +747,12 @@ Compose-Override, andere Sitzung), #353 (Anmeldung und Teilen), #354 (App
 Mitgliederbereich, Build 65 am 22.09. gebaut und am Vereinsserver), #359
 (#358 Passkey als zweiter Faktor), #360 (Web: Dynamik), #362 (#361
 PDF-Worker als JavaScript – nginx kannte .mjs nicht), #363 (Abrechnung I,
-Teil 1), #365 (Abrechnung I, Teil 2 – Schreibzugriff beim Betreiber
-eingeschaltet, erster echter Durchlauf steht aus). `main` steht auf `fc454a5`.
+Teil 1), #365 (Abrechnung I, Teil 2 – erster echter Durchlauf am 22.09.
+bestätigt: Beleg als Entwurf sauber angelegt), #366 (#364 Mitgliederbereich
+aufgeräumt). `main` steht auf `b38f97d`.
 
 ### Offene PRs
-- #366 (#364 Mitgliederbereich Web aufräumen). Nach dem Merge `update.sh`
-  (nginx-Weiterleitung `/mitgliederbereich`).
+- #367 (Leistungen aus Dolibarr im Event auswählen). Nach dem Merge `update.sh`.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -785,7 +791,7 @@ eingeschaltet, erster echter Durchlauf steht aus). `main` steht auf `fc454a5`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (32 offen nach dem Merge von #365; #364 schließt #366)
+### Meilensteine und offene Issues (31 offen nach dem Merge von #366)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an

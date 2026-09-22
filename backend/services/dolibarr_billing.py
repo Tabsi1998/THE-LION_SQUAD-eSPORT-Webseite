@@ -83,6 +83,35 @@ def invoice_payload(order: dict, socid: int, settings: dict, *, source_name: str
     }
 
 
+# ---------------------------------------------------------------- Leistungen aus Dolibarr
+
+def service_view(product: dict) -> dict | None:
+    """Was das Event-Formular von einer Dolibarr-Leistung braucht: Nummer, Name, Bruttopreis in Cent, Steuerprofil."""
+    try:
+        product_id = int(product.get("id"))
+    except (TypeError, ValueError):
+        return None
+    status = product.get("status")
+    if product_id < 1 or (status is not None and str(status) == "0"):
+        return None   # nicht verkaufbar
+    rate = float(product.get("tva_tx") or 0)
+    ttc = product.get("price_ttc")
+    if ttc in (None, ""):
+        ht = float(product.get("price") or 0)
+        ttc = ht * (1 + rate / 100)
+    cents = int(round(float(ttc) * 100))
+    profile = "none" if rate == 0 else next((name for name, value in DEFAULT_TAX_RATES.items() if name != "none" and abs(value - rate) < 0.01), "standard")
+    return {
+        "id": product_id,
+        "ref": str(product.get("ref") or ""),
+        "label": str(product.get("label") or product.get("ref") or f"Leistung {product_id}"),
+        "description": str(product.get("description") or "").strip()[:500],
+        "amount_cents": max(0, cents),
+        "tax_rate": rate,
+        "tax_profile": profile,
+    }
+
+
 # ---------------------------------------------------------------- Geschäftspartner
 
 async def customer_for_user(db, settings: dict, user_id: str) -> dict | None:

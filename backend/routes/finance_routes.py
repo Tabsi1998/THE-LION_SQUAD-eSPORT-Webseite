@@ -13,7 +13,7 @@ from models import new_id, now_utc
 from pydantic import BaseModel, Field
 
 from services import billing_orders, pricing
-from services.dolibarr_billing import assign_thirdparty
+from services.dolibarr_billing import assign_thirdparty, service_view
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings, write_capable
 
 router = APIRouter(prefix="/api/admin/finance", tags=["finance"])
@@ -46,6 +46,22 @@ async def finance_overview(me: dict = Depends(require_area("finance"))):
         "tax_profiles": pricing.TAX_PROFILES,
         "price_bases": pricing.PRICE_BASE_LABELS,
     }
+
+
+@router.get("/dolibarr-services")
+async def dolibarr_services(me: dict = Depends(require_area("finance"))):
+    """Leistungen aus Dolibarr für die Auswahl im Event (z. B. „Kostenbeitrag 20,00 brutto“)."""
+    db = get_db()
+    settings = await load_settings(db)
+    if settings.get("mode") == "off":
+        return {"available": False, "reason": "not_connected", "services": []}
+    try:
+        client = DolibarrClient(settings)
+        rows = await client.services()
+    except DolibarrError as exc:
+        return {"available": False, "reason": exc.kind, "reason_text": exc.text, "services": []}
+    services = [view for view in (service_view(row) for row in rows) if view]
+    return {"available": True, "services": services}
 
 
 @router.post("/orders/{order_id}/release")

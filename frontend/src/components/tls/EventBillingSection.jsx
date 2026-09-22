@@ -1,15 +1,28 @@
+import { useEffect, useState } from "react";
 import { Plus, Trash2, Wallet } from "lucide-react";
-import { PRICE_BASES, TAX_PROFILES, billingFormError, emptyPosition, formatCents, previewQuote, formToBilling } from "@/lib/pricing";
+import { api } from "@/lib/api";
+import { PRICE_BASES, TAX_PROFILES, applyDolibarrService, billingFormError, emptyPosition, formatCents, previewQuote, formToBilling } from "@/lib/pricing";
 
 // „Kosten und Abrechnung“ am Event (#315, #318, #322): nur wer den Bereich Finanzen hat, sieht
 // und pflegt den Abschnitt. Beträge als Text („20“ oder „20,50“), typisierte Preisbasis und
 // Steuerprofil - keine Formeln. Was die Anmeldung kostet, zeigt die Vorschau rechts.
 
 export function EventBillingSection({ value, onChange, canEdit, dolibarrConnected = false }) {
+  // Leistungen aus Dolibarr (z. B. „Kostenbeitrag 20,00 brutto“): auswählen statt Nummer tippen.
+  // Die Auswahl füllt Bezeichnung, Betrag, Steuer und Nummer vor; danach lässt sich alles ändern.
+  const [services, setServices] = useState(null);
+  useEffect(() => {
+    if (!canEdit) return;
+    api.get("/admin/finance/dolibarr-services").then(({ data }) => setServices(data)).catch(() => setServices({ available: false, services: [] }));
+  }, [canEdit]);
   if (!canEdit) return null;
   const form = value || { enabled: false, positions: [], invoice_timing: "on_confirm" };
   const set = (patch) => onChange({ ...form, ...patch });
   const setPosition = (index, patch) => set({ positions: form.positions.map((position, i) => (i === index ? { ...position, ...patch } : position)) });
+  const pickService = (index, serviceId) => {
+    const service = (services?.services || []).find((item) => String(item.id) === String(serviceId));
+    set({ positions: form.positions.map((position, i) => (i === index ? applyDolibarrService(position, service) : position)) });
+  };
   const error = billingFormError(form);
   const preview = form.enabled && !error ? previewQuote({ ...formToBilling(form), currency: "EUR" }, { seats: 2 }) : null;
 
@@ -54,8 +67,17 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
                   <input value={position.description} onChange={(ev) => setPosition(index, { description: ev.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="Essen und Getränke inklusive" />
                 </label>
                 <label className="md:col-span-3 text-xs">
-                  <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Dolibarr-Leistung (Nr.)</div>
-                  <input value={position.dolibarr_product_id} onChange={(ev) => setPosition(index, { dolibarr_product_id: ev.target.value })} inputMode="numeric" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder={dolibarrConnected ? "optional" : "erst mit Dolibarr"} />
+                  <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Leistung aus Dolibarr</div>
+                  {services?.available && services.services.length ? (
+                    <select value={position.dolibarr_product_id || ""} onChange={(ev) => pickService(index, ev.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid={`event-billing-service-${index}`}>
+                      <option value="">– keine (eigene Position) –</option>
+                      {services.services.map((service) => (
+                        <option key={service.id} value={service.id}>{service.label} · {formatCents(service.amount_cents)}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={position.dolibarr_product_id} onChange={(ev) => setPosition(index, { dolibarr_product_id: ev.target.value })} inputMode="numeric" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder={dolibarrConnected || services?.available ? "Nr. (optional)" : "erst mit Dolibarr"} />
+                  )}
                 </label>
                 <div className="md:col-span-3 flex items-end justify-between gap-2 text-xs">
                   <label className="inline-flex items-center gap-2 pb-2">
