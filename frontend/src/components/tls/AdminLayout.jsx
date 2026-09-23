@@ -14,12 +14,26 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// Sidebar-Gruppen für bessere Übersicht
-const ADMIN_GROUPS = [
+// Sidebar-Gruppen (#408): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
+// Kontakt-Inbox), Mitglieder, Finanzen als eigene Gruppe, eSports, Content (mit Downloads & QR),
+// System. Rechte bleiben je Eintrag wie vorher - nur die Einordnung ändert sich, Links bleiben.
+export const ADMIN_GROUPS = [
   {
     label: "Übersicht",
     items: [
       { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, areas: ["tournaments", "content", "club", "system"] },
+    ],
+  },
+  {
+    label: "Verein",
+    items: [
+      // Vereinsdaten sind der Reiter „Rechtliches“ der Einstellungen (Stammdaten, Dolibarr-Schalter, Rechtstexte).
+      { to: "/admin/settings?tab=legal", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
+      { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
+      { to: "/admin/sponsors", label: "Sponsoren", icon: Star, areas: ["content"] },
+      { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
+      { to: "/admin/references", label: "Referenzen", icon: Medal, areas: ["content"] },
+      { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, areas: ["club"] },
     ],
   },
   {
@@ -31,9 +45,13 @@ const ADMIN_GROUPS = [
       { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
       { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
-      { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
-      { to: "/admin/dolibarr", label: "Dolibarr", icon: Link2, areas: ["club", "system"] },
-      { to: "/admin/finance", label: "Finanzen", icon: Wallet, areas: ["finance"] },
+    ],
+  },
+  {
+    label: "Finanzen",
+    items: [
+      { to: "/admin/finance", label: "Finanzübersicht", icon: Wallet, areas: ["finance"] },
+      { to: "/admin/dolibarr", label: "Dolibarr-Anbindung", icon: Link2, areas: ["club", "system"] },
     ],
   },
   {
@@ -61,21 +79,12 @@ const ADMIN_GROUPS = [
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
       { to: "/admin/achievements", label: "Achievements", icon: Medal, areas: ["content"] },
       { to: "/admin/stickers", label: "Sticker", icon: Sticker, areas: ["content"] },
-    ],
-  },
-  {
-    label: "Verein",
-    items: [
-      { to: "/admin/sponsors", label: "Sponsoren", icon: Star, areas: ["content"] },
-      { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
-      { to: "/admin/references", label: "Referenzen", icon: Medal, areas: ["content"] },
-      { to: "/admin/contact", label: "Kontakt-Inbox", icon: Inbox, areas: ["club"] },
+      { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode, areas: ["tournaments", "content", "club", "system"] },
     ],
   },
   {
     label: "System",
     items: [
-      { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode, areas: ["tournaments", "content", "club", "system"] },
       { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, areas: ["system"] },
       { to: "/admin/logs", label: "Logs", icon: Activity, areas: ["system"] },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, areas: ["system"] },
@@ -126,6 +135,9 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],
   "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
+  "/admin/settings?tab=legal": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal"],
+  "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
+  "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };
 
 function normalizeSearch(value) {

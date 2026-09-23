@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-// Das Adminmenü führt 35 Einträge in 6 Gruppen. Offen ergab das eine 1689 px
+// Das Adminmenü führt 41 Einträge in 7 Gruppen (seit #408). Offen ergab das eine 1689 px
 // hohe Liste, von der bei 1440x900 zwölf Einträge gleichzeitig sichtbar waren -
 // und wer auf einer Seite weit unten stand, sah im Menü nicht, wo er ist: die
 // Liste blieb oben stehen.
@@ -89,8 +89,8 @@ test.describe("Adminmenü", () => {
     }
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
     // 36 seit "Betrieb" unter System (#233), 37 seit "App-Versionen" (#250), 38 seit "Dolibarr" (#295),
-    // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228).
-    expect((await navMetrics(page)).entries).toBe(40);
+    // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228), 41 seit "Vereinsdaten" (#408).
+    expect((await navMetrics(page)).entries).toBe(41);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {
