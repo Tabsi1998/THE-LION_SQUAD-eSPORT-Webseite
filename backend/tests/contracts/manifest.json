@@ -20,7 +20,8 @@
       "/vereine/consents",
       "/vereine/applications",
       "/vereine/applications/{external_id}",
-      "/vereine/applications/{external_id}/withdraw"
+      "/vereine/applications/{external_id}/withdraw",
+      "/vereine/members/{id}/consents"
     ],
     "core_paths": [
       "/status"
