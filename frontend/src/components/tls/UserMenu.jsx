@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown, Crown, LayoutDashboard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
+import { accountLinksFor } from "@/pages/user/profile/constants";
 
 // Das Benutzermenü im Kopf (#282): ein Knopf mit Avatar und Name, dahinter
 // Dashboard, Mein Profil, Nachrichten, Mitgliederbereich (Mitglieder), Admin
@@ -85,6 +86,12 @@ export function UserMenu() {
           <Link to="/dashboard" role="menuitem" onClick={close} data-testid="nav-dashboard" className={itemClass}><LayoutDashboard className="w-3.5 h-3.5" /> Dashboard</Link>
           <Link to="/profile" role="menuitem" onClick={close} data-testid="nav-profile" className={itemClass}><Settings className="w-3.5 h-3.5" /> Mein Profil</Link>
           <Link to="/messages" role="menuitem" onClick={close} data-testid="nav-messages-menu" className={itemClass}><MessageSquare className="w-3.5 h-3.5" /> Nachrichten</Link>
+          {/* Mein Konto: Rechnungen, Mitgliedschaft, Strafen, Gewinne, Benachrichtigungen, Hilfe - sonst fand man sie nicht. */}
+          <div className="px-3 pt-2 pb-1 border-t border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/35">Mein Konto</div>
+          {accountLinksFor(isClubMember).map((link) => (
+            <Link key={link.key} to={link.to} role="menuitem" onClick={close} data-testid={`nav-account-${link.key}`} className={itemClass}><link.icon className="w-3.5 h-3.5" /> {link.label}</Link>
+          ))}
+          <div className="border-t border-white/10" />
           {isClubMember ? (
             <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={memberClass}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
           ) : null}
