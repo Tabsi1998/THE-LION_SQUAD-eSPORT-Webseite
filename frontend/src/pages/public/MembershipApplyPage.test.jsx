@@ -81,6 +81,7 @@ test("mit Dolibarr: Formular aus der Mitgliederverwaltung, Prüfung in Worten, A
   expect(url).toBe("/membership/apply");
   expect(payload).toEqual(expect.objectContaining({ type_id: 3, firstname: "Amelie", lastname: "Beispiel", address: "Hauptplatz 1", zip: "6020", town: "Innsbruck", country_code: "AT", fields: { gamertag: "Ami" }, consents: [{ code: "fotos", version: 2 }] }));
   expect(payload.motivation).toBeNull();
+  expect(payload.notes).toBeNull();
   expect(await screen.findByTestId("apply-pending")).toHaveTextContent("Antrag eingegangen");
   expect(screen.getByTestId("apply-withdraw")).toBeInTheDocument();
 });

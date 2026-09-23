@@ -124,7 +124,7 @@ export default function MembershipApplyPage() {
       accept_statutes: form.accept_statutes, accept_privacy: form.accept_privacy, type_id: form.type_id,
       firstname: form.firstname.trim(), lastname: form.lastname.trim(), phone: form.phone.trim() || null, birth: form.birth || null,
       address: form.address.trim() || null, zip: form.zip.trim() || null, town: form.town.trim() || null, country_code: form.country_code,
-      motivation: form.motivation.trim() || null,
+      motivation: null, notes: form.motivation.trim() || null,
       fields: Object.fromEntries(Object.entries(form.fields).filter(([, value]) => String(value || "").trim())),
       consents: (setup.consents || []).filter((consent) => form.consents[consent.code]).map((consent) => ({ code: consent.code, version: consent.version })),
     };

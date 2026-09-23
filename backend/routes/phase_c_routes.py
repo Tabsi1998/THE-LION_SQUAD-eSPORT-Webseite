@@ -83,8 +83,13 @@ class ApplyBody(BaseModel):
     @field_validator("motivation")
     @classmethod
     def clean_motivation(cls, value: Optional[str]):
-        cleaned = str(value or "").strip()
-        return cleaned or None
+        # Weggelassen ist erlaubt (Antrag über Dolibarr); wer etwas schreibt, schreibt mindestens 20 Zeichen.
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if len(cleaned) < 20:
+            raise ValueError("Motivation muss mindestens 20 Zeichen enthalten")
+        return cleaned
 
     @field_validator("notes")
     @classmethod
@@ -225,7 +230,8 @@ async def _apply_via_dolibarr(db, client, body: ApplyBody, me: dict) -> dict:
     app_id = new_id()
     doc = {
         "id": app_id, "user_id": me["id"], "external_id": dolibarr_applications.external_id_for(app_id), "source": "dolibarr",
-        "motivation": body.motivation, "contribution_pref": None, "notes": body.notes, "type_id": body.type_id,
+        # Die Nachricht an den Verein kommt als `notes` (frei, ohne Mindestlänge) und geht als Notiz nach Dolibarr.
+        "motivation": body.notes or body.motivation, "contribution_pref": None, "notes": None, "type_id": body.type_id,
         "type_label": next((fee["label"] for fee in bundle["fees"] if fee["id"] == body.type_id), None),
         "person": person, "fields": {code: str(value).strip() for code, value in body.fields.items() if str(value).strip()}, "consents": consents,
         "status": "submitting", "created_at": now_utc().isoformat(), "decided_at": None, "decided_by": None, "decision_note": None, "dolibarr": {"attempts": 0},
