@@ -216,6 +216,106 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Wortfilter für Chats und Profile (#417; PR #453; Backend + Web + App;
+  `update.sh`, App-Änderung mit dem nächsten Build). `services/word_filter.py`:
+  `settings.word_filter` (`enabled`, `entries` [{id, term, action hold|flag,
+  note}]), `normalize`/`compact` (Kleinschreibung, Umlaute → ae/oe/ue/ss,
+  NFKD, Leetspeak `_LEET`), `find_matches` (≥ `COMPACT_MIN` 5 Zeichen auch am
+  Stück ohne Trennzeichen, Mehrwort nur am Stück, kurze nur als ganzes Wort),
+  `verdict_for`, `check_text`, `screen_message(db, doc, kind, context)` (setzt
+  `doc.moderation.state` held|flagged, legt `moderation_items` an: kind,
+  collection, ref_id, user_id, excerpt, matched, action, state pending|flagged,
+  context), `screen_field` (hold → 400 + Item rejected, flag → Item flagged),
+  `visible_to(message, viewer_id)` (held/rejected nur Autor),
+  `public_moderation` (nur state nach außen), `review(db, item, decision
+  release|reject|noted)` (schreibt moderation.state in die Chat-Collection;
+  reject → `moderation_strikes` {user_id, source word_filter, kind, ref_id,
+  item_id, moderator_id, note} als Grundlage für #416), `export_entries`/
+  `import_entries`. `moderation_routes`: `GET/PUT /api/moderation/word-filter`,
+  `POST/PATCH/DELETE …/word-filter/entries[/{id}]`, `GET …/word-filter/export`,
+  `POST …/word-filter/import` ({entries, replace}), `GET /api/moderation/items?
+  state=`, `PATCH /api/moderation/items/{id}` ({decision, note};
+  `_after_message_decision`: release → publish_user_change + DM-Benachrichtigung,
+  reject → Benachrichtigung kind `moderation` an den Absender); Audit
+  `word_filter.*`, `moderation_item.*`. Prüfung in `message_routes`
+  (`send_direct_message`; `list_conversations`/`get_direct_thread` filtern mit
+  `visible_to`; `_public_message` → `public_moderation`), `team_routes`
+  (`post_team_chat`, `list_team_chat`, `create_team`/`update_team` Name+Tag),
+  `tournament_chat_routes`, `match_routes` (`post_match_chat`,
+  `list_match_chat`), `user_routes.update_me` (bio, display_name),
+  `auth_routes.register` (username). Web `AdminModerationPage` (Reiter
+  `moderation-tab-reports|items|filter`; `ItemsTab` `moderation-item-*`,
+  `item-release-*`/`item-reject-*`/`item-noted-*`; `WordFilterTab`
+  `word-filter-enabled`, `word-filter-form`/`-term`/`-action`/`-note`/`-add`,
+  `word-filter-entry-*`, `word-filter-export`/`-import`/`-import-replace`),
+  `ModerationStateBadge` (`moderation-state`, `MODERATION_STATE_TEXT`) in
+  `ConversationView`, `TeamsPage`, `TournamentDetailPage`, `MatchPage`. App:
+  `ChatMessage.moderation`, `ChatThreadView` Blase `chat-moderation-{id}`.
+  Tests `test_word_filter_flow.py` (3), `AdminModerationPage.test.jsx` (3),
+  `ModerationStateBadge.test.jsx` (1), `ChatThreadView.test.tsx` (+1).
+- Meine Einwilligungen aus Dolibarr (#329 Teil 1; PR #452; Backend + Web;
+  `update.sh`). Manifest `used_paths` + `/vereine/members/{id}/consents`.
+  Client `member_consents(member_id)`, `decide_consent(member_id, payload)`
+  (`_send`, keine Wiederholung). `membership_routes`: `CONSENT_FORM_NAME`,
+  `ConsentDecisionBody` (code, decision given|withdrawn, version),
+  `_consent_context` (mode live + `verified_link` → sonst reason
+  not_connected/not_linked/<kind>), `_consent_view` (+ `text` nur bei
+  `can_give`, `text_changed`), `_consent_list` (Stand + Texte aus
+  `consent_texts`), `GET /api/membership/me/consents` ({available, as_of,
+  consents} bzw. {available False, reason}), `POST /api/membership/me/consents`
+  (409 ohne Kontext, 400 ohne Fassung beim Zustimmen, Auftrag in
+  `consent_decisions` mit `reference web-c-<id>` und status sent/recorded/
+  duplicate/failed, Dolibarr 400 → 400 „Text geändert“, 409 → 409 „späterer
+  Widerruf“, sonst 503 „nichts geändert“; Audit `consent.given|withdrawn` nur
+  mit code/version/reference; Antwort mit frischer Liste). Fake:
+  `member_consents`, `consent_references`, `_consent_rows`,
+  `_consent_decision` (Fassung, reference einmal, Widerruf neuer als
+  Zustimmung → 409). Web `MyMembershipPage.ConsentsCard` (nur
+  `led_by_dolibarr`; testids `membership-consents-card`, `consent-{code}`,
+  `consent-state-*`, `consent-changed-*`, `consent-open-*`, `consent-text-*`,
+  `consent-give-*`, `consent-withdraw-*`; `CONSENT_STATE`). Tests
+  `test_member_consents_flow.py` (2), `MyMembershipPage.test.jsx` (+1). Teil 2
+  (Kontaktänderung, Austritt, Mandat) wartet auf dolibarr-vereine#164/#125.
+- Beitrittsantrag über Dolibarr (#328; PR #450; Backend + Web; `update.sh`).
+  Vertrag `tests/contracts/vereine-openapi.json` auf Modul 0.8.0-beta
+  (`c6a5b28`), Manifest `used_paths` + applicationform/membershipfees/
+  consents/applications(+state, withdraw). Client `application_form()`,
+  `membership_fees()`, `consent_texts()`, `submit_application()` (`_send`,
+  keine Wiederholung), `application_state()`, `withdraw_application()`.
+  `services/dolibarr_applications.py`: `coupled(settings)` (mode live +
+  `applications_enabled`), `external_id_for` (`web-<id>`), `form_bundle`
+  (fees nur natural/both, `public_fee` mit `period_label`),
+  `validate_submission` (dieselbe Liste wie Dolibarr, in Worten),
+  `build_payload` (consents mit granted_at/form/reference, nie IP), `submit`
+  (bad_request/conflict/forbidden → `failed`; sonst `submitting` mit
+  `next_try_at` aus `RETRY_DELAYS`, `RETRY_MAX` 24), `refresh` (gedrosselt
+  `CHECK_INTERVAL_SECONDS` 120; accepted → `verify_link(source=
+  "application")` + `queue_member`; Mail `membership_approve`/`_reject` genau
+  einmal, `notified_at`), `withdraw`, `refresh_due` (Job im
+  `dolibarr_sync`-Wrapper, alle 10 min), `own_view`, `admin_view`
+  (`member_url` = base_url + `/adherents/card.php?rowid=`). `phase_c_routes`:
+  `ApplyBody` (Motivation optional, aber wenn gesetzt ≥ 20 Zeichen;
+  `type_id`, Person, `fields`, `consents`; die freie Nachricht des
+  Dolibarr-Wegs kommt als `notes`), `GET /membership/apply/form`, `POST
+  /membership/apply` (coupled `_apply_via_dolibarr`: Konto frisch lesen
+  `_account`, 422 mit Problemen, Doc erst lokal `status submitting`, dann
+  senden; 502 bei `failed`), `POST /membership/apply/withdraw`, `GET
+  /membership/apply/me` (submitting → senden, pending → nachlesen),
+  Verwaltung: `admin_view`, `person` gestrichen, PATCH 409 bei `external_id`.
+  `dolibarr_routes`: `applications_enabled` + `applications_coupled`. Fake:
+  `application_form`, `membership_fees`, `consent_texts`, `applications`
+  (POST mit Prüfung wie das Modul, duplicate, 409 bei anderem Inhalt),
+  `decide(external_id, status, reason)`, `request_schema`, `_json_post`. Web
+  `MembershipApplyPage` neu (`apply-fees`/`apply-fee-*`, `apply-<feld>`,
+  `apply-field-*`, `apply-consent-*`, `apply-submitting`/`-pending`/
+  `-approved`/`-rejected`/`-failed`/`-withdrawn`/`-unavailable`,
+  `apply-withdraw`, `apply-renew`; Exporte `feeLine`, `formatMoney`,
+  `splitDisplayName`; ohne Antwort von `/apply/form` bleibt der
+  Website-Antrag), `AdminMembershipApplicationsPage` (Reiter withdrawn/
+  submitting, `app-dolibarr-*`, Sheet-Hinweis), `AdminDolibarrPage`
+  (`dolibarr-applications-enabled`). Tests
+  `test_dolibarr_applications_flow.py` (3), `MembershipApplyPage.test.jsx`
+  (4). Nicht drin: Unterschrift, juristische Personen, Antrags-PDF (#324/#325).
 - Mitgliederverzeichnis per Opt-in (#410; PR #449; Backend + Web; `update.sh`).
   `membership_routes`: `GET/PUT /api/membership/me/directory`
   (`DirectoryEntryUpdate` listed/gamertag/bio/games/platforms; Konto wird
@@ -314,7 +414,8 @@ Seit dem 15. September gilt:
   `reference-detail-entries`), `MemberProfilePage.MemberReferenceCard` zeigt
   `member_entry`. Tests `test_references_entries_flow.py` (4),
   `ReferencesPage.test.jsx` (2), `AdminReferencesPage.test.jsx` (3).
-- Admin-Formulare und Seitenblatt (#434, #435; PRs #438, #440, #441, #442;
+- Admin-Formulare und Seitenblatt (#434, #435; PRs #438, #440, #441, #442, #454
+  – Medien-Detail als `AdminSheet` xl mit Aktionen in `footer`, `media-sheet*`;
   nur Web). Ein Rahmen für Anlegen und Bearbeiten:
   `components/tls/AdminForm.jsx` (`AdminFormPage` = Kopf mit Zurück-Link,
   `FormColumns` = Inhalt links und Seitenleiste 20–24 rem rechts ab 1280 px,
@@ -1609,12 +1710,12 @@ Breiten), #444 (Doku-Stand) und #445 (#409 Referenzen mit Einträgen;
 echten Daten; `update.sh`), #447 (#405 Sponsoren und Partner aus Dolibarr
 als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
-Mitgliederverzeichnis per Opt-in; `update.sh`). `main` steht auf `cee4153`.
+Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
+Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web). `main` steht auf `41d0252`.
 
 ### Offene PRs
-- #450 (#328 Beitrittsantrag über Dolibarr; Backend + Web; `update.sh`; Vertrag
-  des Vereinsmoduls auf 0.8.0-beta; Entwurf bis zum lokalen Check, dann
-  bereit; Doku folgt im nächsten Doku-Stand). **Regel seit 23.09. abends:**
+- Derzeit keiner. **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1700,6 +1801,14 @@ Mitgliederverzeichnis per Opt-in; `update.sh`). `main` steht auf `cee4153`.
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #450, #452, #453 (23.09.): `update.sh`. Beitrittsantrag über Dolibarr: in
+  Dolibarr dem Website-API-Benutzer das Recht „Beitrittsanträge über die API
+  anlegen“ geben (deckt auch die Einwilligungen), unter Einrichtung › Vereine ›
+  Mitgliedsantrag die Pflichtfelder prüfen, dann in Finanzen → Dolibarr-
+  Anbindung → Verbindung den Haken „Beitrittsanträge nach Dolibarr senden“
+  setzen (nur im Modus Live wirksam). Wortfilter: Admin → Moderation →
+  Wortfilter füllen und einschalten (ab Werk aus); App-Build für die
+  Chat-Anzeige „wird geprüft“.
 - Nach #447, #448, #449 (23.09.): `update.sh`. Dann: Admin → Verein → Über uns
   einmal ansehen (Standard = der alte Text; Gründungsjahr, Zweck und
   „gemeinnützig“ eintragen oder „Vereinsdaten aus Dolibarr“ einschalten).
