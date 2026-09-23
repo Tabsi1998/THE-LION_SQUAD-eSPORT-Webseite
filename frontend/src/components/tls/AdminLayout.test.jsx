@@ -13,8 +13,8 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
   expect(ADMIN_GROUPS.map((entry) => entry.label)).toEqual(["Übersicht", "Verein", "Mitglieder", "Finanzen", "eSports", "Content", "System"]);
 });
 
-test("Verein bündelt Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen und Kontakt-Inbox", () => {
-  expect(group("Verein").items.map((item) => item.label)).toEqual(["Vereinsdaten", "Vorstand", "Sponsoren", "Partner", "Referenzen", "Kontakt-Inbox"]);
+test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Referenzen und Kontakt-Inbox", () => {
+  expect(group("Verein").items.map((item) => item.label)).toEqual(["Vereinsdaten", "Über uns", "Vorstand", "Sponsoren", "Partner", "Referenzen", "Kontakt-Inbox"]);
   expect(group("Verein").items[0].to).toBe("/admin/settings?tab=legal");
   expect(group("Verein").items[0].areas).toEqual(["system"]);
 });

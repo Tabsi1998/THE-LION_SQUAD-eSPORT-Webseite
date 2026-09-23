@@ -89,8 +89,9 @@ test.describe("Adminmenü", () => {
     }
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
     // 36 seit "Betrieb" unter System (#233), 37 seit "App-Versionen" (#250), 38 seit "Dolibarr" (#295),
-    // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228), 41 seit "Vereinsdaten" (#408).
-    expect((await navMetrics(page)).entries).toBe(41);
+    // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228), 41 seit "Vereinsdaten" (#408),
+    // 42 seit "Über uns" (#406).
+    expect((await navMetrics(page)).entries).toBe(42);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

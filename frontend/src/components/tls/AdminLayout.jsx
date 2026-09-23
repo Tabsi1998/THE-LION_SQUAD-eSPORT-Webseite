@@ -29,6 +29,8 @@ export const ADMIN_GROUPS = [
     items: [
       // Vereinsdaten sind der Reiter „Rechtliches“ der Einstellungen (Stammdaten, Dolibarr-Schalter, Rechtstexte).
       { to: "/admin/settings?tab=legal", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
+      // Über uns (#406): die Leitbild-Texte der Seite „Über den Verein“; Zahlen, Spiele, Vorstand kommen aus den Daten.
+      { to: "/admin/about", label: "Über uns", icon: BookOpen, areas: ["content"] },
       { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
       { to: "/admin/sponsors", label: "Sponsoren", icon: Star, areas: ["content"] },
       { to: "/admin/partners", label: "Partner", icon: Handshake, areas: ["content"] },
@@ -108,6 +110,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/documents": ["dateien", "downloads"],
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
+  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge"],
