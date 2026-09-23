@@ -3,7 +3,7 @@
 
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null, logout: () => {} }) }));
 
-const { ADMIN_GROUPS } = await import("./AdminLayout");
+const { ADMIN_GROUPS, navGroupsFor } = await import("./AdminLayout");
 
 function group(label) {
   return ADMIN_GROUPS.find((entry) => entry.label === label);
@@ -20,7 +20,7 @@ test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Ref
 });
 
 test("Finanzen sind eine eigene Gruppe; Downloads & QR liegen bei Content; Rechte bleiben je Eintrag", () => {
-  expect(group("Finanzen").items.map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"], ["Dolibarr-Anbindung", "/admin/dolibarr"]]);
+  expect(group("Finanzen").items.filter((item) => !item.searchOnly).map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"], ["Dolibarr-Anbindung", "/admin/dolibarr"]]);
   expect(group("Finanzen").items[0].areas).toEqual(["finance"]);
   expect(group("Content").items.some((item) => item.to === "/admin/downloads")).toBe(true);
   expect(group("System").items.some((item) => item.to === "/admin/downloads")).toBe(false);
@@ -29,3 +29,28 @@ test("Finanzen sind eine eigene Gruppe; Downloads & QR liegen bei Content; Recht
   const routes = ADMIN_GROUPS.flatMap((entry) => entry.items.map((item) => item.to));
   expect(new Set(routes).size).toBe(routes.length);
 });
+
+// Wegweiser: Reiter der Einstellungen und der Dolibarr-Seite sind nur über die Suche sichtbar -
+// „Steam“ führt zu „Login & Konten“, „Wortfilter“ zur Moderation, ohne dass das Menü länger wird.
+const SYSTEM_USER = { role: "superadmin" };
+
+test("ohne Suche bleiben die Wegweiser-Einträge unsichtbar", () => {
+  const items = navGroupsFor(SYSTEM_USER, "").flatMap((entry) => entry.items);
+  expect(items.some((item) => item.searchOnly)).toBe(false);
+  expect(items.map((item) => item.to)).toContain("/admin/settings");
+});
+
+test("die Suche findet Reiter: Steam → Login & Konten, Analytics → SEO, Steuersätze → Dolibarr-Verbindung, Wortfilter → Moderation", () => {
+  const find = (query) => navGroupsFor(SYSTEM_USER, query).flatMap((entry) => entry.items).map((item) => item.to);
+  expect(find("steam")).toContain("/admin/settings?tab=auth");
+  expect(find("google analytics")).toContain("/admin/settings?tab=seo");
+  expect(find("Steuersätze")).toContain("/admin/dolibarr?tab=connection");
+  expect(find("wortfilter")).toContain("/admin/moderation");
+  expect(find("vereinsdaten aus dolibarr")).toContain("/admin/settings?tab=legal");
+});
+
+test("Wegweiser respektieren die Bereiche: die Turnierleitung sieht keine Einstellungen", () => {
+  const items = navGroupsFor({ role: "tournament_admin" }, "steam").flatMap((entry) => entry.items);
+  expect(items.some((item) => item.to.startsWith("/admin/settings"))).toBe(false);
+});
+
