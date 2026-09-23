@@ -461,6 +461,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
 | App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45), Build 76; offen (14.8): Store-Eintrag, geschlossener Test, 1.0.0 |
+| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); offen: #401 Turnierseite + #399 Turnierbaum (warten auf Antworten des Betreibers), #403 Footer + #407 Startseite, #400 QR mit Löwe, #408 Adminmenü, #409 Referenzen |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -601,6 +602,24 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 46 — Web: Design II, Teil 1: Kalender auf der Website
+
+### Was 46.1 gefunden hat (#402 – PR #413)
+
+**Die App hatte einen Kalender, die Website nicht.** Seit #216 zeigt die App einen Monat mit
+Punkten je Tag; die Website hatte nur die Event-Liste und je Termin zwei Knöpfe „In meinen
+Kalender“. Wer wissen wollte, was diesen Monat los ist, musste Events, Turniere und Fast Lap
+einzeln durchgehen. Jetzt stellt der Server die Termine einmal zusammen (`/api/calendar`) – Events,
+Turniere samt Anmeldeschluss als eigener Eintrag, Fast-Lap-Challenges –, und die Website zeigt
+denselben Monat wie die App: Punkte je Art, goldener Rahmen bei eigener Anmeldung, die Termine des
+angetippten Tags darunter, rechts „Als Nächstes“. Vereinstermine erscheinen nach dem Login, weil
+der Server dieselbe Sichtbarkeitsregel anwendet wie überall (#342).
+
+**Abo statt Einzel-Download.** Ein Kalender, den man abonniert, bleibt von selbst aktuell. Der Feed
+`/api/calendar/feed.ics` ist bewusst die anonyme Sicht – keine Vereinstermine, keine
+Personendaten, kein „angemeldet“ –, damit die Adresse ohne Bedenken weitergegeben werden kann. Ein
+persönlicher Feed mit Schlüssel bleibt „später“ (#216).
 
 ## Block 45 — App 1.0.0, Teil 4: Events in der App wie im Web
 

@@ -17,6 +17,7 @@ export const NAV_STRUCTURE = [
   { to: "/", label: "Home", end: true },
   { to: "/news", label: "News" },
   { to: "/events", label: "Events" },
+  { to: "/calendar", label: "Kalender" },
   {
     label: "Verein",
     children: [
