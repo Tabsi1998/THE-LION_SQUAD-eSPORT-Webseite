@@ -11,6 +11,7 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", formatMemberSince: () => "1.1.2023" }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { display_name: "Paula" } }) }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
+vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () => true }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -80,6 +81,42 @@ test("aktive Mitglieder tragen sich ins Verzeichnis ein und pflegen ihren Eintra
   await user.click(screen.getByTestId("membership-directory-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenLastCalledWith("/membership/me/directory", { gamertag: "PaulaGG", games: ["F1 25", "Rocket League"], platforms: ["PC"], bio: "" }));
   expect(toastMock.success).toHaveBeenCalledWith("Eintrag gespeichert.");
+});
+
+test("Einwilligungen aus der Mitgliederverwaltung: Stand, Zustimmen nur nach dem Lesen, Widerruf sofort (#329)", async () => {
+  const user = userEvent.setup();
+  const me = { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: true, as_of: "2026-09-21T10:00:00+00:00", stale: false, functions: [], fee: { required: false, status: "not_required" }, link: { status: "verified" } } };
+  let consents = [
+    { code: "fotos", label: "Fotos auf der Website", state: "given", version: 1, current_version: 2, moment: "2026-01-10T10:00:00+01:00", can_give: true, can_withdraw: true, text: "Fotos von Veranstaltungen dürfen erscheinen.", text_changed: true },
+    { code: "newsletter", label: "Newsletter", state: "none", version: 0, current_version: 1, moment: null, can_give: true, can_withdraw: false, text: "Ich möchte den Newsletter bekommen.", text_changed: false },
+  ];
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/consents" ? { available: true, consents } : url === "/membership/me/directory" ? { eligible: false } : me }));
+  apiMock.put.mockResolvedValue({ data: { eligible: false } });
+  apiMock.post.mockImplementation(async (url, body) => {
+    consents = consents.map((row) => (row.code === body.code ? { ...row, state: body.decision, version: body.decision === "given" ? body.version : row.version, can_give: body.decision !== "given", can_withdraw: body.decision === "given", text_changed: false } : row));
+    return { data: { ok: true, result: { code: body.code, state: body.decision, version: body.version || 0, recorded: true }, consents } };
+  });
+  renderPage();
+  const card = await screen.findByTestId("membership-consents-card");
+  expect(card).toHaveTextContent("Meine Einwilligungen");
+  expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Zugestimmt");
+  expect(screen.getByTestId("consent-changed-fotos")).toBeInTheDocument();
+  expect(screen.getByTestId("consent-state-newsletter")).toHaveTextContent("Noch nicht entschieden");
+  expect(screen.queryByTestId("consent-give-newsletter")).toBeNull();
+
+  await user.click(screen.getByTestId("consent-open-newsletter"));
+  expect(screen.getByTestId("consent-text-newsletter")).toHaveTextContent("Ich möchte den Newsletter bekommen.");
+  await user.click(screen.getByTestId("consent-give-newsletter"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/consents", { code: "newsletter", decision: "given", version: 1 }));
+  expect(await screen.findByTestId("consent-withdraw-newsletter")).toBeInTheDocument();
+  expect(screen.getByTestId("consent-state-newsletter")).toHaveTextContent("Zugestimmt");
+
+  await user.click(screen.getByTestId("consent-withdraw-fotos"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith("/membership/me/consents", { code: "fotos", decision: "withdrawn" }));
+  expect(await screen.findByText("Widerruf gespeichert.", { exact: false }).catch(() => null) || screen.getByTestId("consent-state-fotos")).toBeTruthy();
+  expect(screen.getByTestId("consent-state-fotos")).toHaveTextContent("Widerrufen");
+  expect(screen.queryByTestId("consent-changed-fotos")).toBeNull();
+  expect(toastMock.success).toHaveBeenCalledWith("Widerruf gespeichert.");
 });
 
 test("ein gesperrter Eintrag zeigt nur den Hinweis", async () => {
