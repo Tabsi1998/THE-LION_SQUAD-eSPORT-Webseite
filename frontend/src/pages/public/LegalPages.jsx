@@ -407,7 +407,7 @@ export function PrivacyPage() {
       </Section>
 
       {/* Konto löschen (#390): öffentlich lesbar, weil Google Play einen Link dorthin verlangt. */}
-      <Section title="Konto löschen" id="konto-loeschen">
+      <Section title="Konto löschen" id="account-deletion">
         <p>
           Du kannst dein Konto jederzeit selbst löschen – in der LionsAPP unter Profil → Einstellungen
           (Zahnrad) → „Konto löschen“, oder auf der Website nach der Anmeldung unter{" "}

@@ -221,7 +221,8 @@ Seit dem 15. September gilt:
   Web-Link). App `ProfileScreen`: `deleteAccount` (zwei `Alert.alert`, dann
   `POST /dsgvo/anonymize-me` + `logout`), `ActionRow` „Konto löschen“ unter
   „Abmelden“ in der Einstellungen-Ansicht. Web `LegalPages`: `Section` mit
-  `id`, Abschnitt „Konto löschen“ (`/privacy#konto-loeschen`) vor
+  `id`, Abschnitt „Konto löschen“ (`/privacy#account-deletion` – der Anker
+  bleibt ASCII, weil der Umlaut-Test Transliterationen im Quelltext meldet) vor
   „Betroffenenrechte“ – der Link fürs Datensicherheits-Formular. Version
   0.15.0-beta, Build 75 = Bundle für den geschlossenen Test.
 - Auszeichnungen im eigenen Reiter (#230 Nachtrag; PR #389, baut auf #388 auf;
