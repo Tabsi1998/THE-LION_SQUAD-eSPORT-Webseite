@@ -72,7 +72,8 @@ test("403, 404 and 500 views explain recovery and stay out of search indexes", a
     await page.goto(entry.path);
     await expect(page.getByTestId(`error-title-${entry.code}`)).toHaveText(entry.title);
     await expect(page.getByTestId("error-home-btn")).toHaveAttribute("href", "/");
-    await expect(page.getByRole("link", { name: "Turniere" })).toHaveAttribute("href", "/tournaments");
+    // Nur die Kachel der Fehlerseite - der Footer hat seit #403 ebenfalls einen Link „Turniere“.
+    await expect(page.locator("#main-content").getByRole("link", { name: "Turniere" })).toHaveAttribute("href", "/tournaments");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", "noindex, nofollow");
     await expect(page).toHaveTitle(new RegExp(`^${entry.code} .+THE LION SQUAD$`));
   }
@@ -333,13 +334,15 @@ test("contact and legal pages share one configured public data source", async ({
 
   await page.goto("/imprint");
   await expect(page.getByRole("heading", { name: "Impressum" })).toBeVisible();
-  await expect(page.locator('a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
+  // Im Seiteninhalt - der Footer zeigt die Kontaktadresse seit #403 ebenfalls.
+  await expect(page.locator('#main-content a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
   await expect(page.locator('a[href="mailto:datenschutz@lionsquad.at"]')).toBeVisible();
   await expect(page.getByText("Stand: 12.08.2026")).toBeVisible();
 
   await page.goto("/privacy");
   await expect(page.getByRole("heading", { name: "Datenschutzerklärung" })).toBeVisible();
-  await expect(page.locator('a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
+  // Im Seiteninhalt - der Footer zeigt die Kontaktadresse seit #403 ebenfalls.
+  await expect(page.locator('#main-content a[href="mailto:kontakt@lionsquad.at"]')).toBeVisible();
   await expect(page.locator('a[href="mailto:datenschutz@lionsquad.at"]').first()).toBeVisible();
   await expect(page.locator("body")).not.toContainText(/noch im adminbereich zu hinterlegen|image:\s*null|example\.(com|test)/i);
 });

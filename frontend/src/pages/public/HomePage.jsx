@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
+import { getCachedBranding } from "@/lib/brandingEvents";
+import { boardContacts } from "@/lib/memberArea";
+import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { MascotBadge } from "@/components/tls/Logo";
@@ -15,12 +18,20 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users, MessageCircle, Smartphone } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
+// Startseite (#407): Community zuerst - der Verein lebt von Leuten, die mitspielen und sich
+// einbringen; Mitglied wird man nicht per Klick. Deshalb führt der Hero zur Community und zu den
+// Turnieren, „Mitglied werden“ steht leise darunter. Zahlen und Ansprechpartner kommen aus echten
+// Daten (`club_numbers`, `/board`), nie aus Platzhaltern.
+
 export default function HomePage() {
   const [state, setState] = useState(null);
+  const [board, setBoard] = useState([]);
+  const { isClubMember } = useAuth() || {};
+  const discordUrl = String(getCachedBranding()?.discord_invite_url || "").trim();
   useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
   const load = useCallback(() => {
@@ -29,6 +40,7 @@ export default function HomePage() {
 
   useEffect(() => {
     load();
+    api.get("/board?active_only=true").then(({ data }) => setBoard(boardContacts(data, 4))).catch(() => setBoard([]));
   }, [load]);
 
   useApiInvalidation(load, ["home", "tournaments", "events", "news", "f1", "sponsors", "settings"]);
@@ -62,17 +74,29 @@ export default function HomePage() {
               <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white">
                 Ein Rudel.<br /><span className="tls-gradient-text">Eine Familie.</span>
               </h1>
-              <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed">
-                Vereinsplattform, Turnierarena, Fast-Lap-Championship und Mitgliederportal — alles unter einem Dach. Bei uns geht es nicht nur ums Zocken, sondern um Gemeinschaft, Spaß und Zusammenhalt.
+              <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">
+                Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link to="/about" data-testid="hero-cta-about" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
-                  Über den Verein <ArrowRight className="w-4 h-4" />
+                <Link to="/community" data-testid="hero-cta-community" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
+                  <Users className="w-4 h-4" /> Community <ArrowRight className="w-4 h-4" />
                 </Link>
-                <Link to="/events" data-testid="hero-cta-events" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Calendar className="w-4 h-4" /> Termine
+                <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                  <Trophy className="w-4 h-4" /> Turniere
                 </Link>
+                {discordUrl && (
+                  <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="hero-cta-discord" className="inline-flex items-center gap-2 px-6 py-3 border border-[#5865F2]/50 text-[#8b95ff] hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
+                    <MessageCircle className="w-4 h-4" /> Discord
+                  </a>
+                )}
               </div>
+              <p className="mt-5 text-sm text-white/45" data-testid="hero-join">
+                {isClubMember ? (
+                  <Link to="/members/area" className="text-[#FFD700] hover:underline">Zum Mitgliederbereich</Link>
+                ) : (
+                  <>Mitglied wird, wer sich einbringt — <Link to="/membership/join" className="text-[#FFD700] hover:underline">so läuft das bei uns</Link>.</>
+                )}
+              </p>
             </div>
             <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative">
@@ -84,6 +108,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      <ClubNumbers numbers={state?.club_numbers} />
       <LiveStreamSlider />
       <SponsorTicker placement="home" spotlight />
 
@@ -124,6 +149,22 @@ export default function HomePage() {
 
       {/* Jahreswertung widget */}
       <SeasonPassWidget />
+
+      {(board.length > 0) && (
+        <section className="border-y border-white/10 bg-[#080808]/35">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 grid lg:grid-cols-2 gap-8 min-w-0">
+            <BoardTeaser contacts={board} />
+            <AppStrip />
+          </div>
+        </section>
+      )}
+      {board.length === 0 && (
+        <section className="border-y border-white/10 bg-[#080808]/35">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
+            <AppStrip />
+          </div>
+        </section>
+      )}
 
       {newsItems.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -201,6 +242,62 @@ function useHomeStructuredData(state) {
   }, [state]);
 }
 
+// Der Verein in Zahlen (#407): nur Zähler über null, sonst gar keine Leiste.
+const NUMBER_LABELS = [["members", "Mitglieder"], ["tournaments", "Turniere"], ["events", "Events"], ["awards", "Auszeichnungen"]];
+
+function ClubNumbers({ numbers }) {
+  const items = NUMBER_LABELS.map(([key, label]) => [key, label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
+  if (!items.length) return null;
+  return (
+    <section className="border-b border-white/10 bg-[#080808]/35" data-testid="home-numbers">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        {items.map(([key, label, value]) => (
+          <div key={key} className="tls-hero-enter" data-testid={`home-number-${key}`}>
+            <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums">{value.toLocaleString("de-AT")}</div>
+            <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Ansprechpartner (#407): die freigegebenen Namen aus dem Vorstand - dieselbe Auswahl wie im
+// Mitgliederbereich; ohne besetzte Posten bleibt der Block weg.
+function BoardTeaser({ contacts }) {
+  return (
+    <div className="min-w-0" data-testid="home-board">
+      <SectionHeader icon={Users} accent="#FFD700" title="Ansprechpartner" actionLabel="Ganzer Vorstand" actionTo="/board" />
+      <div className="mt-6 grid sm:grid-cols-2 gap-3">
+        {contacts.map((contact) => (
+          <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} className="flex items-center gap-3 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] px-3 py-2 transition min-w-0">
+            {contact.avatar ? (
+              <LazyImg src={contact.avatar} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0" />
+            ) : (
+              <span className="w-10 h-10 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
+            )}
+            <span className="min-w-0">
+              <span className="block text-[10px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
+              <span className="block text-sm font-bold truncate">{contact.name}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// LionsAPP (#407): ehrlich - bis zur Veröffentlichung im Play Store gibt es keinen Knopf.
+function AppStrip() {
+  return (
+    <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-5 md:p-6 min-w-0" data-testid="home-app-strip">
+      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]"><Smartphone className="w-3.5 h-3.5" /> LionsAPP fürs Handy</div>
+      <h2 className="mt-2 font-heading text-2xl font-black uppercase">Der Verein in der Hosentasche</h2>
+      <p className="mt-2 text-sm text-white/65 max-w-xl">Termine mit Kalender, Turniere mit Anmeldung, Chat mit dem Team, Mitgliedskarte mit QR — und Push, wenn es losgeht. Bald im Play Store; den Testzugang bekommen Mitglieder vom Vorstand.</p>
+    </div>
+  );
+}
+
 function FeaturedNews({ news }) {
   return (
     <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition min-w-0">
@@ -243,7 +340,10 @@ function NextUp({ items }) {
     <div className="border border-white/10 rounded-sm bg-[#111] p-5 min-w-0">
       <div className="flex items-center justify-between gap-3 min-w-0">
         <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
-        <Link to="/events" className="shrink-0 text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
+        <div className="shrink-0 flex items-center gap-3">
+          <Link to="/calendar" data-testid="home-calendar-link" className="text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Kalender</Link>
+          <Link to="/events" className="text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
+        </div>
       </div>
       {target && countdown && (
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0" data-testid="home-countdown">

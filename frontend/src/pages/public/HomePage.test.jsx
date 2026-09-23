@@ -15,6 +15,7 @@ vi.mock("@/components/tls/SponsorTicker", () => ({ SponsorTicker: () => null }))
 vi.mock("@/components/tls/SeasonPassWidget", () => ({ SeasonPassWidget: () => null }));
 vi.mock("@/components/tls/Logo", () => ({ MascotBadge: () => null }));
 vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: () => null }));
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null, isClubMember: false }) }));
 
 const HomePage = (await import("./HomePage")).default;
 
@@ -57,6 +58,38 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
   await act(async () => { vi.advanceTimersByTime(7000); });
   await waitFor(() => expect(screen.queryByTestId("home-next-new")).not.toBeInTheDocument());
   await act(async () => { await invalidate({ resource: "tournaments" }); });
-  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(3));
+  // Nur der Startseiten-Stand zählt - der Vorstand (#407) wird einmal daneben geladen.
+  await waitFor(() => expect(apiMock.get.mock.calls.filter(([url]) => url === "/home/state")).toHaveLength(3));
   expect(screen.queryByTestId("home-next-new")).not.toBeInTheDocument();
+});
+
+// Startseite II (#407): Community zuerst im Hero, der Verein in Zahlen nur mit echten Zählern,
+// Ansprechpartner aus dem Vorstand, Kalender-Einstieg bei den Terminen.
+test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Daten", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url.startsWith("/board")) return { data: [{ id: "p1", is_active: true, display_title: "Obfrau", user: { display_name: "Obfrau Otti", slug: "otti" } }] };
+    return { data: { ...stateWith(3), club_numbers: { members: 42, tournaments: 17, events: 0, awards: 5 } } };
+  });
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+
+  expect(screen.getByTestId("hero-cta-community")).toHaveAttribute("href", "/community");
+  expect(screen.getByTestId("hero-cta-tournaments")).toHaveAttribute("href", "/tournaments");
+  expect(screen.getByTestId("hero-join")).toHaveTextContent("Mitglied wird, wer sich einbringt");
+  expect(screen.getByTestId("home-number-members")).toHaveTextContent("42");
+  expect(screen.getByTestId("home-number-awards")).toHaveTextContent("5");
+  expect(screen.queryByTestId("home-number-events")).toBeNull();
+  expect(await screen.findByTestId("home-board-p1")).toHaveTextContent("Obfrau Otti");
+  expect(screen.getByTestId("home-board-p1")).toHaveAttribute("href", "/members/otti");
+  expect(screen.getByTestId("home-calendar-link")).toHaveAttribute("href", "/calendar");
+  expect(screen.getByTestId("home-app-strip")).toHaveTextContent("Bald im Play Store");
+});
+
+test("ohne Zahlen und ohne Vorstand: keine leere Leiste, der App-Streifen bleibt", async () => {
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/board") ? { data: [] } : { data: stateWith(1) }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+  expect(screen.queryByTestId("home-numbers")).toBeNull();
+  expect(screen.queryByTestId("home-board")).toBeNull();
+  expect(screen.getByTestId("home-app-strip")).toBeInTheDocument();
 });
