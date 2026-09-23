@@ -19,6 +19,10 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 const AdminDolibarrPage = (await import("./AdminDolibarrPage")).default;
 
 const STATUS = {
+  features: [
+    { key: "club_facts", label: "Vereinsdaten und Obmann aus Dolibarr", enabled: false, state: "aus · noch nie gelesen", hint: "Impressum und Kontakt aus dem Vereinsmodul.", where: "/admin/settings?tab=legal", where_label: "Einstellungen → Rechtliches" },
+    { key: "members", label: "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", enabled: false, state: "Modus Vorschau (liest, übernimmt nichts)", hint: "", where: "/admin/dolibarr?tab=connection", where_label: "Verbindung → Modus" },
+  ],
   mode: "preview", environment: "production", instance: "verein", entity: 1, base_url: "https://erp.example.test",
   api_key_configured: true, webhook_configured: false, auto_link_verified_email: false, type_map: { 2: "ordinary" },
   website_types: ["ordinary", "youth"], links: { verified: 3 }, open_links: 1, members_led_by_dolibarr: 0, unmapped_types: 0,
@@ -178,3 +182,14 @@ test("Konditionen kommen als Listen aus Dolibarr, der Vorschlag füllt sie, und 
   await user.click(screen.getByTestId("invoice-terms-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { invoice_payment_term_id: 2, invoice_payment_mode_id: 2, invoice_bank_account_id: 1 }));
 });
+
+// Wunsch des Betreibers: an einer Stelle sehen, was Dolibarr auf der Website übernimmt und wo der Schalter liegt.
+test("der Reiter Stand zeigt je Dolibarr-Funktion, ob sie an ist und wo sie eingestellt wird", async () => {
+  renderPage();
+  const row = await screen.findByTestId("dolibarr-feature-club_facts");
+  expect(row).toHaveTextContent("Vereinsdaten und Obmann aus Dolibarr");
+  expect(row).toHaveTextContent("aus · noch nie gelesen");
+  expect(screen.getByTestId("dolibarr-feature-club_facts-where")).toHaveAttribute("href", "/admin/settings?tab=legal");
+  expect(screen.getByTestId("dolibarr-feature-members")).toHaveTextContent("Modus Vorschau");
+});
+

@@ -74,6 +74,12 @@ async def test_connection_is_system_only_and_the_key_never_comes_back(flow, fake
     status = await flow.get("/api/admin/dolibarr/status")
     assert status.json()["api_key_configured"] is True and status.json()["base_url"] == BASE_URL
     assert API_KEY not in status.text
+    # Die Übersicht „was läuft, wo es steht“: jede Funktion mit Schalterort - hier ist noch nichts an.
+    features = {row["key"]: row for row in status.json()["features"]}
+    assert set(features) == {"members", "club_facts", "sponsors", "applications", "consents", "invoices", "webhook"}
+    assert features["club_facts"]["enabled"] is False and features["club_facts"]["where"] == "/admin/settings?tab=legal"
+    assert features["members"]["state"].startswith("Modus Vorschau") and features["sponsors"]["where"] == "/admin/sponsors"
+    assert all(row["where_label"] and row["hint"] for row in features.values())
     stored = await flow.db.settings.find_one({"id": "dolibarr"})
     assert stored["api_key"].startswith("enc:v1:")
     assert await flow.db.audit_logs.count_documents({"action": "dolibarr.settings"}) == 1

@@ -50,6 +50,47 @@ def _error(exc: DolibarrError) -> HTTPException:
 
 # ---------------------------------------------------------------- Stand (Vereinsverwaltung und System)
 
+async def _features(db, settings: dict) -> list[dict]:
+    """Was Dolibarr auf der Website übernimmt - je Funktion: an oder aus, und wo der Schalter liegt.
+    Der Betreiber wollte das an einer Stelle sehen, weil die Schalter über mehrere Seiten verteilt sind."""
+    from services import club_facts, dolibarr_sponsors
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    source = await dolibarr_sponsors.load_source_settings(db)
+    facts = await club_facts.snapshot(db)
+    mode = settings.get("mode") or "off"
+    live = mode == "live"
+    connection = "/admin/dolibarr?tab=connection"
+    facts_state = "an" if branding.get("legal_from_dolibarr") else "aus"
+    if facts.get("fetched_at"):
+        facts_state += f" · Stand {str(facts['fetched_at'])[:16].replace('T', ' ')}"
+    elif mode != "off":
+        facts_state += " · noch nie gelesen (Rechtliches → „Jetzt nachlesen“)"
+    mode_state = {"live": "Modus Live", "preview": "Modus Vorschau (liest, übernimmt nichts)", "off": "aus"}.get(mode, mode)
+    return [
+        {"key": "members", "label": "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", "enabled": live, "state": mode_state,
+         "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
+        {"key": "club_facts", "label": "Vereinsdaten und Obmann aus Dolibarr", "enabled": bool(branding.get("legal_from_dolibarr")), "state": facts_state,
+         "hint": "Impressum, Kontakt, Datenschutz und „Über uns“ nehmen Name, ZVR, Anschrift, Telefon und Obmann aus dem Vereinsmodul (stündlich).",
+         "where": "/admin/settings?tab=legal", "where_label": "Einstellungen → Rechtliches"},
+        {"key": "sponsors", "label": "Sponsoren und Partner aus Dolibarr", "enabled": bool(source.get("from_dolibarr")), "state": "an" if source.get("from_dolibarr") else "aus",
+         "hint": "Geschäftspartner in den Kategorien Sponsor und Partner; Unterkategorie = Stufe, Zusatzfelder = Laufzeit. Ehemalige rutschen von selbst nach unten.",
+         "where": "/admin/sponsors", "where_label": "Verein → Sponsoren"},
+        {"key": "applications", "label": "Beitrittsanträge nach Dolibarr", "enabled": live and bool(settings.get("applications_enabled")),
+         "state": "an" if live and settings.get("applications_enabled") else ("Haken gesetzt, wirkt erst im Modus Live" if settings.get("applications_enabled") else "aus"),
+         "hint": "Braucht in Dolibarr das API-Recht „Beitrittsanträge über die API anlegen“ und die Pflichtfelder unter Einrichtung › Vereine › Mitgliedsantrag.",
+         "where": connection, "where_label": "Verbindung → Beitrittsanträge"},
+        {"key": "consents", "label": "Einwilligungen unter „Meine Mitgliedschaft“", "enabled": live, "state": "an (Modus Live)" if live else "erst im Modus Live",
+         "hint": "Läuft von selbst mit Vereinsmodul ab 0.8.0; das API-Recht für Beitrittsanträge deckt es mit ab.",
+         "where": connection, "where_label": "Verbindung → Modus"},
+        {"key": "invoices", "label": "Rechnungen und Geschäftspartner in Dolibarr anlegen", "enabled": bool(settings.get("write_enabled")), "state": "an" if settings.get("write_enabled") else "aus",
+         "hint": "Schreibzugriff einschalten; Belege werden erst mit vollständigen Konditionen und geprüften Steuersätzen von selbst freigegeben.",
+         "where": connection, "where_label": "Verbindung → Schreibzugriff"},
+        {"key": "webhook", "label": "Benachrichtigung aus Dolibarr (Webhook)", "enabled": secret_is_configured(settings.get("webhook_token")), "state": "eingerichtet" if secret_is_configured(settings.get("webhook_token")) else "aus (Abgleich alle 10 Minuten)",
+         "hint": "Optional: Dolibarr meldet Änderungen sofort, sonst holt der Abgleich alle 10 Minuten auf.",
+         "where": connection, "where_label": "Verbindung → Webhook"},
+    ]
+
+
 @admin_router.get("/status")
 async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
     db = get_db()
@@ -92,6 +133,7 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "open_links": sum(links.get(status, 0) for status in OPEN_STATUSES),
         "members_led_by_dolibarr": await db.memberships.count_documents({"source": "dolibarr"}),
         "unmapped_types": unmapped,
+        "features": await _features(db, settings),
         "policy": {
             "active": policy_active(settings), "version": policy.get("version"), "map": policy.get("map") or {},
             "approved_at": policy.get("approved_at"), "derivable_areas": list(DERIVABLE_AREAS),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { CheckCircle2, Link2, PlayCircle, RefreshCw, ShieldCheck, Unlink, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
@@ -184,6 +184,33 @@ export default function AdminDolibarrPage() {
 
       {tab === "overview" && (
         <div className="grid lg:grid-cols-2 gap-4">
+          {/* Wunsch des Betreibers: an einer Stelle sehen, welche Dolibarr-Funktion an ist und wo ihr Schalter liegt. */}
+          <div className="lg:col-span-2">
+            <Panel title="Dolibarr auf der Website – was läuft, was fehlt, wo es steht">
+              <p className="text-xs text-white/45 mb-2">Die Schalter liegen auf mehreren Seiten. Hier steht je Funktion, ob sie an ist und wo sie eingestellt wird.</p>
+              {(status?.features || []).length === 0 ? <Empty text="Noch kein Stand geladen." /> : (
+                <ul className="divide-y divide-white/5" data-testid="dolibarr-features">
+                  {status.features.map((feature) => (
+                    <li key={feature.key} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 text-sm" data-testid={`dolibarr-feature-${feature.key}`}>
+                      <span className="flex items-center gap-2 sm:w-80 shrink-0">
+                        {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] shrink-0" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0" />}
+                        <span className="font-bold">{feature.label}</span>
+                      </span>
+                      <span className="flex-1 min-w-0 text-xs text-white/60">
+                        <span className={feature.enabled ? "text-[#00FF88]" : "text-[#FFD700]"}>{feature.state}</span>
+                        {feature.hint ? <span> · {feature.hint}</span> : null}
+                      </span>
+                      {feature.where && (
+                        <Link to={feature.where} className="text-[11px] uppercase font-bold tracking-wider text-[#29B6E8] hover:text-white whitespace-nowrap shrink-0" data-testid={`dolibarr-feature-${feature.key}-where`}>
+                          {feature.where_label} →
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+          </div>
           <Panel title="Was das Vereinsmodul kann">
             <p className="text-xs text-white/45 mb-3">Modul {status?.sync?.module_version || "–"}, API-Version {status?.sync?.api_version ?? "–"}. Was fehlt, setzt die Website nicht voraus.</p>
             <ul className="space-y-1.5 text-sm">
