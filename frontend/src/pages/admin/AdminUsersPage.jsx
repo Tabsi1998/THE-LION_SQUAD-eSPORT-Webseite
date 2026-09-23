@@ -3,11 +3,13 @@ import { Link } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from "@/lib/permissions";
-import { Link as LinkIcon, Plus, Trash2, X, ShieldCheck } from "lucide-react";
+import { Link as LinkIcon, Plus, Trash2, ShieldCheck } from "lucide-react";
 
 // Rollen und Rechte (#287–#292): die Rolle ist die Grundstufe, Freigaben je
 // Bereich kommen dazu. Die Rolle team_leader gibt es nicht mehr - Teamleitung
@@ -247,55 +249,36 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435). Nach dem Anlegen zeigt das Blatt den Einladungslink und
+  // hat nur noch „Schließen“.
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">Benutzer anlegen</h2>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
+    <AdminSheet
+      title="Benutzer anlegen"
+      eyebrow="Benutzer"
+      onClose={inviteUrl ? onSaved : onClose}
+      cancelLabel={inviteUrl ? "Schließen" : "Abbrechen"}
+      onSubmit={inviteUrl ? undefined : submit}
+      saving={saving}
+      submitLabel="Anlegen & einladen"
+      submitTestId="create-user-submit"
+      testId="create-user-sheet"
+    >
+      <TextField label="Username" value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" />
+      <TextField label="Display Name" value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" />
+      <TextField label="E-Mail" type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" />
+      <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} testId="create-user-gender" />
+      <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm text-sm text-white/70">
+        Der Benutzer bekommt per E-Mail einen einmaligen Link und erstellt sein Passwort selbst.
+      </div>
+      <SelectField label="Rolle" value={form.role} onChange={(v) => set("role", v)} options={ROLE_OPTIONS.map((r) => [r, roleLabel(r)])} testId="create-user-role" />
+      <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => set("is_active", v)} testId="create-user-active" />
+      <CheckField label="Öffentliches Profil" checked={form.privacy_public_profile} onChange={(v) => set("privacy_public_profile", v)} testId="create-user-public" />
+      {inviteUrl && (
+        <div className="border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 rounded-sm" data-testid="create-user-invite">
+          <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Einladungslink</div>
+          <div className="mt-1 text-xs break-all text-white/80">{inviteUrl}</div>
         </div>
-        <div className="p-5 space-y-3">
-          <Field label="Username"><Input value={form.username} onChange={(v) => set("username", v)} required testId="create-user-username" /></Field>
-          <Field label="Display Name"><Input value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" /></Field>
-          <Field label="E-Mail"><Input type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" /></Field>
-          <Field label="Geschlecht">
-            <select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-              <option value="">Keine Angabe</option>
-              <option value="male">Männlich</option>
-              <option value="female">Weiblich</option>
-              <option value="diverse">Divers</option>
-            </select>
-          </Field>
-          <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm text-sm text-white/70">
-            Der Benutzer bekommt per E-Mail einen einmaligen Link und erstellt sein Passwort selbst.
-          </div>
-          <Field label="Rolle">
-            <select value={form.role} onChange={(e) => set("role", e.target.value)} data-testid="create-user-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-              {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
-            </select>
-          </Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.privacy_public_profile} onChange={(e) => set("privacy_public_profile", e.target.checked)} className="accent-[#29B6E8]" /> Öffentliches Profil</label>
-          {inviteUrl && (
-            <div className="border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 rounded-sm">
-              <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Einladungslink</div>
-              <div className="mt-1 text-xs break-all text-white/80">{inviteUrl}</div>
-            </div>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          <button type="button" onClick={inviteUrl ? onSaved : onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">{inviteUrl ? "Schließen" : "Abbrechen"}</button>
-          {!inviteUrl && <button disabled={saving} data-testid="create-user-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Anlegen & einladen"}</button>}
-        </div>
-      </form>
-    </div>
+      )}
+    </AdminSheet>
   );
-}
-
-function Field({ label, children }) {
-  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
-}
-
-function Input({ value, onChange, type = "text", required, testId }) {
-  return <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }

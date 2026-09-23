@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatMemberSince, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ClubMemberProfilesAdminContent } from "@/pages/admin/AdminClubMemberProfilesPage";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Crown, Search, X, Save } from "lucide-react";
+import { Crown, Search } from "lucide-react";
 
 const STATUS_LABELS = {
   none: "Kein Mitglied",
@@ -268,89 +271,26 @@ function EditModal({ entry, meta, onClose, onSave }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435); die Mitgliederliste bleibt daneben sichtbar.
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <div>
-            <h2 className="font-heading font-black uppercase">Mitgliedschaft bearbeiten</h2>
-            <div className="text-xs text-white/50">{u.display_name || u.username} · @{u.username}</div>
-          </div>
-          <button type="button" onClick={onClose} className="p-1 text-white/60 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
+    <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
+      {led && (
+        <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
+          Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle, Notiz und Sichtbarkeit der Nummer bleiben hier.
         </div>
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          {led && (
-            <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 text-xs text-white/75" data-testid="edit-led-by-dolibarr">
-              Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Rolle, Notiz und Sichtbarkeit der Nummer bleiben hier.
-            </div>
-          )}
-          <Field label="Status">
-            <select disabled={led} value={form.member_status} onChange={(e) => set("member_status", e.target.value)} data-testid="edit-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm disabled:opacity-50">
-              {meta.statuses.map((s) => <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>)}
-            </select>
-          </Field>
-          <Field label="Mitgliedsart">
-            <select disabled={led} value={form.membership_type} onChange={(e) => set("membership_type", e.target.value)} data-testid="edit-type" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm disabled:opacity-50">
-              <option value="">— wählen —</option>
-              {meta.types.map((t) => <option key={t} value={t}>{TYPE_LABELS[t] || t}</option>)}
-            </select>
-          </Field>
-          <Field label={led ? "Mitgliedsnummer (aus Dolibarr)" : "Mitgliedsnummer (leer = automatisch)"}>
-            <input disabled={led} value={form.member_number} onChange={(e) => set("member_number", e.target.value)} placeholder="z.B. TLS-2026-0007" data-testid="edit-number" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-mono" />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Mitglied seit Jahr">
-              <input
-                type="number"
-                disabled={led}
-                min="1900"
-                max={new Date().getFullYear()}
-                value={form.member_since_year}
-                onChange={(e) => set("member_since_year", e.target.value)}
-                placeholder="z.B. 2024"
-                data-testid="edit-member-since-year"
-                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm"
-              />
-            </Field>
-            <Field label="Monat optional">
-              <select
-                disabled={led}
-                value={form.member_since_month}
-                onChange={(e) => set("member_since_month", e.target.value)}
-                data-testid="edit-member-since-month"
-                className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm"
-              >
-                {MONTHS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </select>
-            </Field>
-          </div>
-          <Field label="Interne Rolle">
-            <input value={form.internal_role} onChange={(e) => set("internal_role", e.target.value)} placeholder="z.B. Vorstand, Captain, Helfer" data-testid="edit-role" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-          </Field>
-          <Field label="Interne Notizen (sieht das Mitglied nicht)">
-            <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={3} data-testid="edit-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.show_member_number_publicly} onChange={(e) => set("show_member_number_publicly", e.target.checked)} data-testid="edit-show-number" className="accent-[#FFD700]" />
-            <span>Mitgliedsnummer auf öffentlichem Profil anzeigen</span>
-          </label>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="edit-save" className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#FFD700] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#e8c200] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      {children}
-    </label>
+      )}
+      <FormGrid>
+        <SelectField label="Status" disabled={led} value={form.member_status} onChange={(v) => set("member_status", v)} options={meta.statuses.map((s) => [s, STATUS_LABELS[s] || s])} testId="edit-status" />
+        <SelectField label="Mitgliedsart" disabled={led} value={form.membership_type} onChange={(v) => set("membership_type", v)} options={[["", "— wählen —"], ...meta.types.map((t) => [t, TYPE_LABELS[t] || t])]} testId="edit-type" />
+      </FormGrid>
+      <TextField label={led ? "Mitgliedsnummer (aus Dolibarr)" : "Mitgliedsnummer (leer = automatisch)"} disabled={led} value={form.member_number} onChange={(v) => set("member_number", v)} placeholder="z.B. TLS-2026-0007" testId="edit-number" className="font-mono" />
+      <FormGrid>
+        <TextField label="Mitglied seit Jahr" type="number" disabled={led} min="1900" max={new Date().getFullYear()} value={form.member_since_year} onChange={(v) => set("member_since_year", v)} placeholder="z.B. 2024" testId="edit-member-since-year" />
+        <SelectField label="Monat optional" disabled={led} value={form.member_since_month} onChange={(v) => set("member_since_month", v)} options={MONTHS} testId="edit-member-since-month" />
+      </FormGrid>
+      <TextField label="Interne Rolle" value={form.internal_role} onChange={(v) => set("internal_role", v)} placeholder="z.B. Vorstand, Captain, Helfer" testId="edit-role" />
+      <TextAreaField label="Interne Notizen (sieht das Mitglied nicht)" value={form.notes} onChange={(v) => set("notes", v)} rows={3} testId="edit-notes" />
+      <CheckField label="Mitgliedsnummer auf öffentlichem Profil anzeigen" checked={form.show_member_number_publicly} onChange={(v) => set("show_member_number_publicly", v)} testId="edit-show-number" accent="#FFD700" />
+    </AdminSheet>
   );
 }

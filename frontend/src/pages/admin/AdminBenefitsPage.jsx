@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, FieldLabel, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Trash2, Save, Gift } from "lucide-react";
+import { Plus, Trash2, Gift } from "lucide-react";
 
 const TYPE_LABELS = {
   ordinary: "Ordentlich",
@@ -127,56 +130,31 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
       : [...form.visible_for_membership_types, t]);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isNew ? "Neuer Vorteil" : "Vorteil bearbeiten"}</h2>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white text-xl">×</button>
+    <AdminSheet title={isNew ? "Neuer Vorteil" : "Vorteil bearbeiten"} eyebrow="Mitglieder" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="benefit-save" testId="benefit-sheet">
+      <TextField label="Titel" value={form.title} onChange={(v) => set("title", v)} required testId="benefit-title" />
+      <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} rows={3} testId="benefit-desc" />
+      <FormGrid>
+        <TextField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} placeholder="Rabatt, Partner, Event…" testId="benefit-cat" />
+        <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", parseInt(v) || 0)} testId="benefit-order" />
+      </FormGrid>
+      <ImageUpload value={form.image_url} onChange={(v) => set("image_url", v)} label="Bild" testId="benefit-image" variant="wide" allowLibrary />
+      <TextField label="Link URL" value={form.link_url} onChange={(v) => set("link_url", v)} placeholder="https://…" testId="benefit-link" />
+      <FormGrid>
+        <GermanDateField id="benefit-valid-from" label="Gültig von" value={form.valid_from?.slice(0, 10) || ""} onChange={(v) => set("valid_from", v)} testId="benefit-valid-from" allowFuture />
+        <GermanDateField id="benefit-valid-until" label="Gültig bis" value={form.valid_until?.slice(0, 10) || ""} onChange={(v) => set("valid_until", v)} testId="benefit-valid-until" allowFuture />
+      </FormGrid>
+      <FieldLabel label="Sichtbar für Mitgliedsarten (leer = alle)">
+        <div className="flex flex-wrap gap-2">
+          {meta.types.map((t) => (
+            <button key={t} type="button" onClick={() => toggleType(t)} className={`text-xs px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]" : "border-white/15 text-white/50"}`}>
+              {TYPE_LABELS[t] || t}
+            </button>
+          ))}
         </div>
-        <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-          <Field label="Titel"><input value={form.title} onChange={(e) => set("title", e.target.value)} required data-testid="benefit-title" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <Field label="Beschreibung"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} data-testid="benefit-desc" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Kategorie"><input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="Rabatt, Partner, Event…" data-testid="benefit-cat" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-            <Field label="Sortierung"><input type="number" value={form.order_index} onChange={(e) => set("order_index", parseInt(e.target.value) || 0)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          </div>
-          <ImageUpload value={form.image_url} onChange={(v) => set("image_url", v)} label="Bild" testId="benefit-image" variant="wide" allowLibrary />
-          <Field label="Link URL"><input value={form.link_url} onChange={(e) => set("link_url", e.target.value)} placeholder="https://…" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Gültig von"><GermanDateField id="benefit-valid-from" value={form.valid_from?.slice(0, 10) || ""} onChange={(v) => set("valid_from", v)} testId="benefit-valid-from" allowFuture /></Field>
-            <Field label="Gültig bis"><GermanDateField id="benefit-valid-until" value={form.valid_until?.slice(0, 10) || ""} onChange={(v) => set("valid_until", v)} testId="benefit-valid-until" allowFuture /></Field>
-          </div>
-          <Field label="Sichtbar für Mitgliedsarten (leer = alle)">
-            <div className="flex flex-wrap gap-2">
-              {meta.types.map((t) => (
-                <button key={t} type="button" onClick={() => toggleType(t)} className={`text-xs px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]" : "border-white/15 text-white/50"}`}>
-                  {TYPE_LABELS[t] || t}
-                </button>
-              ))}
-            </div>
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#FFD700]" />
-            <span>Aktiv (für Mitglieder sichtbar)</span>
-          </label>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="benefit-save" className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#FFD700] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#e8c200] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      {children}
-    </label>
+      </FieldLabel>
+      <CheckField label="Aktiv (für Mitglieder sichtbar)" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" testId="benefit-active" />
+    </AdminSheet>
   );
 }

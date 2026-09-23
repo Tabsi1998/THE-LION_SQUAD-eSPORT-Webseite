@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, Edit3, Eye, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { Crown, Edit3, Eye, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -246,69 +249,39 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
     }
   };
 
+  // Seitenblatt statt 1152-px-Fenster (#435): Person, Biografie, Bilder und Anzeige als Abschnitte.
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 overflow-y-auto p-4">
-      <form onSubmit={submit} className="w-full max-w-6xl mx-auto my-4 bg-[#121212] border border-white/10 rounded-sm shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isEdit ? "Profil bearbeiten" : "Profil erstellen"}</h2>
-          <button type="button" onClick={onClose} className="p-1 text-white/60 hover:text-white" aria-label="Schließen"><X className="w-5 h-5" /></button>
+    <AdminSheet title={isEdit ? "Profil bearbeiten" : "Profil erstellen"} eyebrow="Mitgliederprofile" accent="#FFD700" size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="club-member-save" testId="club-member-sheet">
+      <FormSection title="Person" accent="#FFD700">
+        <FormGrid>
+          <TextField label="Gamertag" value={form.gamertag} onChange={(v) => set("gamertag", v)} placeholder="z.B. Tabsi98" testId="club-member-gamertag" />
+          <TextField label="Vor- und Nachname" required value={form.display_name} onChange={(v) => set("display_name", v)} placeholder="z.B. Fabian Tabelander" testId="club-member-display-name" />
+          <TextField label="Öffentlicher Realname" value={form.real_name} onChange={(v) => set("real_name", v)} placeholder="leer = Vor- und Nachname" />
+          <TextField label="URL-Slug" value={form.slug} onChange={(v) => set("slug", v)} placeholder="wird aus Gamertag erstellt" className="font-mono" />
+          <GermanDateField id="member-birth-date" label="Geburtsdatum" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="member-birth-date" />
+          <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} />
+          <SelectField label="Plattform-Konto" value={form.user_id || ""} onChange={(v) => set("user_id", v)} options={[["", "Kein Account verknüpft"], ...users.map((u) => [u.id, `${u.display_name || u.username} · @${u.username}`])]} />
+          <TextField label="Games" value={form.games} onChange={(v) => set("games", v)} placeholder="F1 25, Valorant, Rocket League" />
+          <TextField label="Plattformen" value={form.platforms} onChange={(v) => set("platforms", v)} placeholder="PC, PS5, Xbox" />
+        </FormGrid>
+        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
+          Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
-        <div className="p-5 grid lg:grid-cols-[minmax(0,1fr)_19rem] gap-5">
-          <div className="space-y-4 min-w-0">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Gamertag"><input value={form.gamertag} onChange={(e) => set("gamertag", e.target.value)} placeholder="z.B. Tabsi98" className="input" /></Field>
-              <Field label="Vor- und Nachname"><input required value={form.display_name} onChange={(e) => set("display_name", e.target.value)} placeholder="z.B. Fabian Tabelander" className="input" /></Field>
-              <Field label="Öffentlicher Realname"><input value={form.real_name} onChange={(e) => set("real_name", e.target.value)} placeholder="leer = Vor- und Nachname" className="input" /></Field>
-              <Field label="URL-Slug"><input value={form.slug} onChange={(e) => set("slug", e.target.value)} placeholder="wird aus Gamertag erstellt" className="input font-mono" /></Field>
-              <Field label="Geburtsdatum"><GermanDateField id="member-birth-date" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="member-birth-date" /></Field>
-              <Field label="Geschlecht"><select value={form.gender || ""} onChange={(e) => set("gender", e.target.value)} className="input">
-                <option value="">Keine Angabe</option>
-                <option value="male">Männlich</option>
-                <option value="female">Weiblich</option>
-                <option value="diverse">Divers</option>
-              </select></Field>
-              <Field label="Plattform-Konto"><select value={form.user_id || ""} onChange={(e) => set("user_id", e.target.value)} className="input">
-                <option value="">Kein Account verknüpft</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>{u.display_name || u.username} · @{u.username}</option>
-                ))}
-              </select></Field>
-              <Field label="Games"><input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Valorant, Rocket League" className="input" /></Field>
-              <Field label="Plattformen"><input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5, Xbox" className="input" /></Field>
-            </div>
-            <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
-              Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
-            </div>
-            <Field label="Biografie">
-              <MarkdownEditor value={form.bio} onChange={(v) => set("bio", v)} rows={8} testId="club-member-bio" />
-            </Field>
-          </div>
-          <aside className="space-y-4 min-w-0">
-            <ImageUpload value={form.photo_url} onChange={(v) => set("photo_url", v)} label="Profilbild" testId="club-member-photo" variant="wide" allowLibrary />
-            <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
-            <Field label="Sortierung"><input type="number" value={form.order_index} onChange={(e) => set("order_index", e.target.value)} className="input" /></Field>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#FFD700]" />
-              <span>Öffentlich anzeigen</span>
-            </label>
-          </aside>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#FFD700] text-black text-xs uppercase tracking-wider font-black rounded-sm hover:bg-[#e8c200] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+        <FieldLabel label="Biografie">
+          <MarkdownEditor value={form.bio} onChange={(v) => set("bio", v)} rows={8} testId="club-member-bio" />
+        </FieldLabel>
+      </FormSection>
 
-function Field({ label, children }) {
-  return (
-    <div className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      {children}
-    </div>
+      <FormSection title="Bilder und Anzeige" accent="#FFD700">
+        <FormGrid>
+          <ImageUpload value={form.photo_url} onChange={(v) => set("photo_url", v)} label="Profilbild" testId="club-member-photo" variant="wide" allowLibrary />
+          <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
+        </FormGrid>
+        <FormGrid>
+          <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
+          <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />
+        </FormGrid>
+      </FormSection>
+    </AdminSheet>
   );
 }
