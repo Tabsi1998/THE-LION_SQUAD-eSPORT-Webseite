@@ -216,6 +216,38 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Rechtliches speichern, Wegweiser in der Admin-Suche, Dolibarr-Reiter
+  verlinkbar (#326 Nachtrag, #260 Auffindbarkeit; PR #456; nur Web;
+  `update.sh`). Ursache „Haken Vereinsdaten aus Dolibarr geht nicht“: live
+  steht Analytics auf Google ohne Measurement-ID, und `saveBrand` prüfte das
+  vor jedem Speichern der Markendaten (alle Reiter) – jetzt nur, wenn
+  `analytics_provider`/`google_analytics_id` im Dirty-Payload stehen, mit
+  Reiternamen in der Meldung. `AdminLayout`: `navGroupsFor(user, query)`
+  (exportiert), Einträge mit `searchOnly: true` erscheinen nur bei Treffern
+  – je Einstellungs-Reiter `/admin/settings?tab=auth|email|smtp|newsletter|
+  queue|logs|brand|socials|seo|discord|twitch|system` und je Dolibarr-Reiter
+  `/admin/dolibarr?tab=connection|preview|links|policy`;
+  `ADMIN_SEARCH_TERMS` mit Umlauten schreiben (die Suche streicht Akzente
+  auf beiden Seiten; `germanCopy.test` verbietet ae/ue-Wörter).
+  `AdminDolibarrPage` liest `?tab=` (`useSearchParams`, Rückfall „Stand“).
+  Reiter „Login & Google“ heißt „Login & Konten“ (dort liegt
+  `PlatformLinkSettings` aus #260). Tests `AdminSettingsPage.test.jsx` (+2:
+  Haken setzen + speichern; Google ohne ID blockiert Rechtliches nicht
+  mehr), `AdminLayout.test.jsx` (+3).
+- Referenzen als Erfolgswand (#409 Design; PR #457; nur Web). `ReferencesPage`
+  neu: Hero mit Medaillenbilanz (`MedalStat` mit `useCountUp`,
+  `references-stat-gold|silver|bronze|total|podiums|games|seasons`),
+  Trophäenwand (`trophyItems`: Podest nach Medaille, dann neueste zuerst;
+  `TrophyCard` mit `game.cover_url`, `PlacementBadge`, `AvatarStack`;
+  `references-trophies`, `reference-trophy-*`), Bilanz je Spiel als Filter
+  (`groupReferences` → `GameTile`, `references-game-all|<gameId>`),
+  Zeitleiste nach Saison (`timelineGroups`: Saisons numerisch absteigend,
+  ohne Saison unter „Weitere Turniere“; `references-timeline-<season>`),
+  Chips Podest/Saison/Plattform (`references-filters`, `references-reset`),
+  `ReferenceCard`/`EntryRow` in Medaillenfarben (`MEDAL` Ring/Text/Soft/Glow).
+  Detail: Cover-Hero, `PlacementBadge xl`, `MetaList`
+  (`reference-detail-meta`), Links als Seitenleiste. Alte Testkennungen
+  bleiben. Test `ReferencesPage.test.jsx` (3; `useCountUp` gemockt).
 - Wortfilter für Chats und Profile (#417; PR #453; Backend + Web + App;
   `update.sh`, App-Änderung mit dem nächsten Build). `services/word_filter.py`:
   `settings.word_filter` (`enabled`, `entries` [{id, term, action hold|flag,
@@ -1712,10 +1744,14 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web). `main` steht auf `41d0252`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`). `main` steht auf `c7f0dbf`.
 
 ### Offene PRs
-- Derzeit keiner. **Regel seit 23.09. abends:**
+- #458 (#260 Nachtrag: Karte „Verknüpfte Konten“ mit Rahmen und offiziellem
+  Link im öffentlichen Profil, `linked_accounts` im Profil-Endpunkt, Grund
+  der Plattform bei Rückruf-Fehlern `link_error=platform_error` +
+  `link_detail`; Backend + Web; bereit, lokal grün; `update.sh`). Danach
+  App-Gegenstück #459 (App 1.0.0). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1801,6 +1837,18 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #456, #457 (24.09.): `update.sh`. Dann Einstellungen → Rechtliches →
+  Haken „Vereinsdaten aus Dolibarr übernehmen“ → „Rechtliches speichern“
+  (bisher scheiterte das Speichern an der Analytics-Prüfung; danach kommen
+  Name, ZVR, Behörde, Anschrift, Telefon, Obmann aus Dolibarr, „Über uns“
+  zieht Gründung/Zweck/gemeinnützig nach). SEO & Analytics: Measurement-ID
+  eintragen oder Analytics auf „Keine“ (heute Google ohne ID = zählt nichts).
+  Nach #458: Discord Developer Portal → App des Bots → OAuth2 → Client ID +
+  Client Secret in Einstellungen → Login & Konten speichern und dort die
+  Rückrufadresse bei Redirects eintragen; Twitch Developer Console → App →
+  OAuth Redirect URLs → `https://lionsquad.at/api/platform-links/twitch/
+  callback` (ohne Schrägstrich am Ende, Client-Typ Confidential); dann im
+  Profil verknüpfen – ein Fehler nennt jetzt den Grund der Plattform.
 - Nach #450, #452, #453 (23.09.): `update.sh`. Beitrittsantrag über Dolibarr: in
   Dolibarr dem Website-API-Benutzer das Recht „Beitrittsanträge über die API
   anlegen“ geben (deckt auch die Einwilligungen), unter Einrichtung › Vereine ›
