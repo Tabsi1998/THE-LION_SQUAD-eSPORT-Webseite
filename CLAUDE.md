@@ -216,6 +216,29 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Events in der App: Kosten und Teilnehmer (#396, #397; PR #411; Build 76).
+  Backend `event_routes._attach_event_registration_view`: `manages` = Staff-Rolle
+  oder Bereich `tournaments`/`club` (Vorstand) – sieht alle Anmeldungen mit
+  Status, Begleitpersonen, Notiz, E-Mail; Geld (`price`) nur Staff-Rolle oder
+  Bereich `finance` (`_public_event_registration(…, with_price=)`); neue
+  Felder `participant_view` (`staff`/`public`/`none`) und `can_check_in`
+  (Bereich `tournaments` – dieselbe Bedingung wie `PATCH …/registrations/{id}`).
+  `areas_for` einmal je Anfrage. App `lib/eventPrice.ts` (`eventOfferSummary`,
+  `eventBasisLabel`, `ownEventPriceLine`, `companionChangeHint`; `quoteTotal`/
+  `formatCents` aus `startFee.ts`), `types.ts` `EventRegistration`,
+  `ClubEvent.offer/registrations/participant_view/can_check_in`,
+  `EventDetailScreen`: Kostenblock `event-offer`, wählbare Positionen
+  `event-offer-option-{key}`, Summe `event-quote`, Pflichthaken
+  `event-accept-costs` (nur im Client – der Server prüft bei Events kein
+  `accept_costs`, das Web auch nicht), `POST …/registrations` mit
+  `selected_positions`, eigener Preis `event-own-price`, Teilnehmer-Karte
+  `event-participants` (Staff: ausklappbar `event-participants-toggle`,
+  `event-checkin-{id}` → `PATCH {status: checked_in}`; öffentlich: Namen wie im
+  Web), Kennzeichen „Vereinsintern“/„Vorstand“ im Kopf. Tests
+  `test_event_participants_flow.py` (2), `eventPrice.test.ts` (3),
+  `EventDetailScreen.test.tsx` (3). Turniere: die App zeigt im Reiter „Spieler“
+  bereits den Status aus `GET /tournaments/{id}/registrations` (Staff-Sicht
+  vom Server) – kein Umbau nötig. Version 0.16.0-beta.
 - Rechtliches II (#326 Teil 1; PR #398, baut auf #395 auf; kein Build).
   `services/club_facts.py` (NEU): `refresh(db, settings, client)` liest
   `client.organization()` + `client.board()` in `dolibarr_public` (`id:
@@ -1286,7 +1309,9 @@ Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
 `1bbb6b8`.
 
 ### Offene PRs
-- Derzeit keiner. Nach #398 beim Betreiber: `update.sh`, dann Einstellungen →
+- #411 (#396 + #397 Events in der App: Kosten, Teilnehmer, Check-in; Backend +
+  App; nach dem Merge `update.sh`, Build 76 baue ich vom Merge-Commit). Nach
+  #398 beim Betreiber: `update.sh`, dann Einstellungen →
   Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
   übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
   entfernen (steht jetzt fest im Abschnitt LionsAPP).

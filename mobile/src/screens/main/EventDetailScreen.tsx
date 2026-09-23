@@ -16,12 +16,14 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
+import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
 import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
+import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
-import type { ClubEvent, F1Challenge, NewsPost, Tournament } from "../../types";
+import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
 
 type Props = NativeStackScreenProps<TournamentStackParamList, "EventDetail">;
 
@@ -37,7 +39,6 @@ type EventDetail = ClubEvent & {
     spots_left?: number | null;
     max_participants?: number | null;
   };
-  registrations?: Array<{ id: string; display_name?: string; status?: string; companion_count?: number; seat_count?: number }>;
   tournaments?: Tournament[];
   f1_challenges?: F1Challenge[];
   news?: NewsPost[];
@@ -54,6 +55,12 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [error, setError] = useState("");
   const [companionCount, setCompanionCount] = useState("0");
   const [note, setNote] = useState("");
+  // Kosten (#396): wählbare Positionen und der Kostenhaken - wie beim Startgeld am Turnier.
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
+  const [acceptCosts, setAcceptCosts] = useState(false);
+  // Teilnehmer (#397): für die Verwaltung ausklappbar; wer gerade eingecheckt wird.
+  const [showParticipants, setShowParticipants] = useState(false);
+  const [checkingIn, setCheckingIn] = useState("");
   const guest = isGuestUser(user);
 
   const load = useCallback(async () => {
@@ -76,6 +83,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     setCompanionCount("0");
     setNote("");
+    setSelectedPositions([]);
+    setAcceptCosts(false);
+    setShowParticipants(false);
   }, [event?.id]);
 
   const hasRegistration = Boolean(event?.has_registration || event?.registration_url);
@@ -83,6 +93,12 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const registered = event?.own_registration && !["cancelled", "no_show"].includes(String(event.own_registration.status || ""));
   const maxCompanions = event?.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
   const companionNumber = clampNumber(companionCount, 0, maxCompanions);
+  const offer = event?.offer?.enabled ? event.offer : null;
+  const seats = 1 + companionNumber;
+  const total = offer ? quoteTotal(offer, seats, selectedPositions) : 0;
+  const currency = offer?.currency || "EUR";
+  const participants = event?.registrations || [];
+  const staffView = event?.participant_view === "staff";
 
   const openContentTarget = useCallback((target: ContentTarget) => {
     if (target.type === "event") {
@@ -113,14 +129,29 @@ export function EventDetailScreen({ navigation, route }: Props) {
     setBusy(true);
     setError("");
     try {
-      await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null });
+      await api.post(`/events/${event.id}/registrations`, { companion_count: companionNumber, note: note.trim() || null, selected_positions: selectedPositions });
       await load();
     } catch (err) {
       setError(errorMessage(err, "Event-Anmeldung konnte nicht gespeichert werden."));
     } finally {
       setBusy(false);
     }
-  }, [busy, companionNumber, event, load, note]);
+  }, [busy, companionNumber, event, load, note, selectedPositions]);
+
+  // Einchecken (#397): dieselbe Route wie die Verwaltung im Web; ob der Knopf da ist, sagt der Server.
+  const checkIn = useCallback(async (entry: EventRegistration) => {
+    if (!event || !entry.id || checkingIn) return;
+    setCheckingIn(entry.id);
+    setError("");
+    try {
+      await api.patch(`/events/${event.id}/registrations/${entry.id}`, { status: "checked_in" });
+      await load();
+    } catch (err) {
+      setError(errorMessage(err, "Check-in konnte nicht gespeichert werden."));
+    } finally {
+      setCheckingIn("");
+    }
+  }, [checkingIn, event, load]);
 
   const openExternalRegistration = useCallback(async () => {
     if (!event?.registration_url) return;
@@ -190,6 +221,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Title>{event.title || event.name || "Event"}</Title>
           <View style={styles.metaRow}>
             <Pill label={event.event_type || event.type || "Event"} />
+            {internalLabel(event) ? <Pill label={internalLabel(event) === "Vorstand" ? "Vorstand" : "Vereinsintern"} tone="gold" /> : null}
             {placeParts(event.location, event.city).length ? <Pill label={placeParts(event.location, event.city).join(", ")} tone="gold" /> : null}
             {event.has_registration ? <Pill label={registered ? "Angemeldet" : "Anmeldung"} /> : null}
           </View>
@@ -240,6 +272,17 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 {event.registration_closes_at ? `Schließt: ${formatDateTime(event.registration_closes_at)}` : ""}
               </Muted>
             ) : null}
+            {offer && !event.registration_url ? (
+              <View style={styles.feeBox} testID="event-offer">
+                <Muted style={styles.feeLabel}>Kosten</Muted>
+                <Body style={styles.strong}>{eventOfferSummary(offer, registered ? Number(event.own_registration?.seat_count || 1) : seats)}</Body>
+                {offer.positions.filter((position) => !position.optional).map((position) => (
+                  <Muted key={position.key}>
+                    {position.label}: {formatCents(position.amount_cents, currency)} {eventBasisLabel(position.basis)}{position.description ? ` – ${position.description}` : ""}
+                  </Muted>
+                ))}
+              </View>
+            ) : null}
             {event.registration_url ? (
               <Button label="Extern anmelden" onPress={openExternalRegistration} />
             ) : registered ? (
@@ -249,6 +292,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   {event.own_registration?.seat_count ? ` · ${event.own_registration.seat_count} Platz/Plätze` : ""}
                   {event.own_registration?.companion_count ? ` · ${event.own_registration.companion_count} Begleitp.` : ""}
                 </Muted>
+                {event.own_registration?.price ? (
+                  <View style={styles.feeBox} testID="event-own-price">
+                    <Body>{ownEventPriceLine(event.own_registration.price)}</Body>
+                    {event.own_registration.status === "waitlist" ? <Muted>Bezahlt wird erst, wenn du nachrückst.</Muted> : null}
+                    {event.allow_companions && companionChangeHint(event.own_registration.price) ? <Muted>{companionChangeHint(event.own_registration.price)}</Muted> : null}
+                  </View>
+                ) : event.own_registration?.status === "waitlist" && offer ? (
+                  <Muted>Bezahlt wird erst, wenn du nachrückst – dann gilt der Preis von diesem Tag.</Muted>
+                ) : null}
                 <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
               </>
             ) : guest ? (
@@ -266,6 +318,27 @@ export function EventDetailScreen({ navigation, route }: Props) {
                     <Muted>Maximal {maxCompanions} Begleitperson(en) pro Anmeldung.</Muted>
                   </>
                 ) : null}
+                {offer?.positions.some((position) => position.optional) ? (
+                  <View style={styles.optionGroup}>
+                    <Muted style={styles.feeLabel}>Zusätzlich wählbar</Muted>
+                    {offer.positions.filter((position) => position.optional).map((position) => {
+                      const chosen = selectedPositions.includes(position.key);
+                      return (
+                        <Pressable
+                          key={position.key}
+                          onPress={() => setSelectedPositions((current) => (chosen ? current.filter((key) => key !== position.key) : [...current, position.key]))}
+                          style={styles.checkRow}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: chosen }}
+                          testID={`event-offer-option-${position.key}`}
+                        >
+                          <View style={[styles.checkbox, chosen && styles.checkboxActive]} />
+                          <Body style={styles.flex}>{position.label} <Muted>{formatCents(position.amount_cents, currency)} {eventBasisLabel(position.basis)}</Muted></Body>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
                 <FormInput
                   label="Hinweis optional"
                   value={note}
@@ -276,10 +349,98 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   onChangeText={setNote}
                   placeholder="z.B. komme etwas später"
                 />
-                <Button label={busy ? "Wird angemeldet ..." : "Zum Event anmelden"} onPress={register} disabled={busy} />
+                {offer ? (
+                  <View style={styles.feeBox}>
+                    <View style={styles.feeTotalRow}>
+                      <Muted>Summe für {seats} Person{seats === 1 ? "" : "en"}</Muted>
+                      <Body style={styles.strong} testID="event-quote">{formatCents(total, currency)}</Body>
+                    </View>
+                    <Pressable
+                      onPress={() => setAcceptCosts((current) => !current)}
+                      style={styles.checkRow}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: acceptCosts }}
+                      testID="event-accept-costs"
+                    >
+                      <View style={[styles.checkbox, acceptCosts && styles.checkboxActive]} />
+                      <View style={styles.flex}>
+                        <Body>Ich übernehme die Kosten (Rechnung an mich).</Body>
+                        <Muted>Die Rechnung kommt in dein Konto unter „Meine Rechnungen“. Auf der Warteliste wird noch nichts berechnet.</Muted>
+                      </View>
+                    </Pressable>
+                  </View>
+                ) : null}
+                <Button
+                  label={busy ? "Wird angemeldet ..." : offer && total > 0 ? `Verbindlich anmelden · ${formatCents(total, currency)}` : "Zum Event anmelden"}
+                  onPress={register}
+                  disabled={busy || Boolean(offer && total > 0 && !acceptCosts)}
+                  testID="event-register-submit"
+                />
               </>
             ) : (
               <Muted>Anmeldung ist aktuell nicht offen.</Muted>
+            )}
+          </Card>
+        ) : null}
+
+        {participants.length && (staffView || event.participant_view === "public") ? (
+          <Card style={styles.card} testID="event-participants">
+            {staffView ? (
+              <>
+                <Pressable
+                  onPress={() => setShowParticipants((current) => !current)}
+                  style={styles.toggleRow}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showParticipants }}
+                  testID="event-participants-toggle"
+                >
+                  <View style={styles.flex}>
+                    <Heading>Teilnehmer ({participants.length})</Heading>
+                    <Muted>
+                      {event.registration_summary?.registered_count || 0} angemeldet
+                      {event.registration_summary?.checked_in_count ? ` · ${event.registration_summary.checked_in_count} eingecheckt` : ""}
+                      {event.registration_summary?.waitlist_count ? ` · ${event.registration_summary.waitlist_count} Warteliste` : ""}
+                      {event.registration_summary?.companion_count ? ` · ${event.registration_summary.companion_count} Begleitp.` : ""}
+                    </Muted>
+                  </View>
+                  <Ionicons name={showParticipants ? "chevron-up" : "chevron-down"} color={colors.muted} size={18} />
+                </Pressable>
+                {showParticipants ? participants.map((entry) => (
+                  <View key={entry.id} style={styles.participantRow} testID={`event-participant-${entry.id}`}>
+                    <View style={styles.participantHead}>
+                      <Body style={[styles.strong, styles.flex]}>{entry.display_name || "Teilnehmer"}</Body>
+                      <StatusBadge label={formatStatus(entry.status)} status={entry.status} />
+                    </View>
+                    <Muted>
+                      {entry.seat_count || 1} Platz/Plätze
+                      {entry.companion_count ? ` · ${entry.companion_count} Begleitp.` : ""}
+                      {entry.email ? ` · ${entry.email}` : ""}
+                    </Muted>
+                    {entry.note ? <Muted>Hinweis: {entry.note}</Muted> : null}
+                    {entry.internal_note ? <Muted>Intern: {entry.internal_note}</Muted> : null}
+                    {event.can_check_in && entry.status === "registered" && entry.id ? (
+                      <Button
+                        label={checkingIn === entry.id ? "Wird eingecheckt ..." : "Einchecken"}
+                        variant="secondary"
+                        onPress={() => checkIn(entry)}
+                        disabled={Boolean(checkingIn)}
+                        testID={`event-checkin-${entry.id}`}
+                      />
+                    ) : null}
+                  </View>
+                )) : null}
+              </>
+            ) : (
+              <>
+                <Heading>Angemeldet</Heading>
+                {participants.slice(0, 12).map((entry) => (
+                  <View key={entry.id} style={styles.participantHead}>
+                    <Body style={styles.flex}>{entry.display_name || "Teilnehmer"}</Body>
+                    <Muted>{entry.seat_count || 1} Platz/Plätze</Muted>
+                  </View>
+                ))}
+                {participants.length > 12 ? <Muted>und {participants.length - 12} weitere</Muted> : null}
+              </>
             )}
           </Card>
         ) : null}
@@ -533,5 +694,66 @@ const styles = StyleSheet.create({
   noteInput: {
     minHeight: 92,
     textAlignVertical: "top",
+  },
+  feeBox: {
+    backgroundColor: "rgba(255, 215, 0, 0.06)",
+    borderColor: "rgba(255, 215, 0, 0.35)",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  feeLabel: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  feeTotalRow: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  optionGroup: {
+    borderColor: colors.border,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  checkRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  checkbox: {
+    backgroundColor: colors.black,
+    borderColor: colors.border,
+    borderRadius: 4,
+    borderWidth: 1,
+    height: 20,
+    width: 20,
+  },
+  checkboxActive: {
+    backgroundColor: colors.cyan,
+    borderColor: colors.cyan,
+  },
+  toggleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  participantRow: {
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+    gap: 6,
+    paddingTop: 10,
+  },
+  participantHead: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
 });
