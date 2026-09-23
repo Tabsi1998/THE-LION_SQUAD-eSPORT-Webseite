@@ -225,6 +225,16 @@ class FakeDolibarr:
         if match and method == "GET":
             row = self.core_invoices.get(int(match.group(1)))
             return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/documents" and method == "GET":
+            # Dokument-API des Kerns (#320): das PDF eines freigegebenen Belegs unter <ref>/<ref>.pdf.
+            assert params.get("modulepart") == "facture", "nur Rechnungsdokumente"
+            match = re.fullmatch(r"([^/]+)/([^/]+)\.pdf", params.get("original_file", ""))
+            row = next((r for r in self.core_invoices.values() if match and match.group(1) == match.group(2) and r.get("ref") == match.group(1) and int(r.get("statut") or 0) >= 1), None)
+            if not row or row["id"] in self.pdf_failures:
+                return httpx.Response(404 if not row else 500, json={"error": {"code": 404 if not row else 500, "message": "x"}})
+            content = self.pdf_bytes(row["id"])
+            return httpx.Response(200, json={"filename": f"{row['ref']}.pdf", "content-type": "application/pdf", "filesize": len(content),
+                                             "content": __import__("base64").b64encode(content).decode(), "encoding": "base64"})
         return None
 
     def pay(self, invoice_id: int) -> None:

@@ -314,6 +314,18 @@ class DolibarrClient:
             raise
         return data if isinstance(data, list) else []
 
+    async def invoice_document(self, ref: str) -> dict:
+        """Das PDF eines Belegs über Dolibarrs Dokument-API (#320) - für Belege ohne Mitglied.
+
+        Ob der Beleg der Person gehört, hat der Aufrufer vorher entschieden; hier zählt nur die Nummer."""
+        clean = "".join(ch for ch in str(ref or "") if ch.isalnum() or ch in "._-")
+        if not clean:
+            raise DolibarrError("not_found", 404)
+        data = await self._get("/documents", {"modulepart": "facture", "original_file": f"{clean}/{clean}.pdf"})
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def create_invoice(self, payload: dict) -> int:
         data = await self._send("POST", "/invoices", payload)
         return _as_id(data)

@@ -65,6 +65,7 @@ export const NAV_USER = [
       { to: "/u/me", label: "Mein öffentliches Profil" },
       { to: "/teams", label: "Teams entdecken", divider: true },
       { to: "/my/prizes", label: "Meine Gewinne" },
+      { to: "/profile?tab=invoices", label: "Meine Rechnungen" },
       { to: "/membership/apply", label: "Mitgliedschaft beantragen" },
       { to: "/members/area", label: "Mitgliederbereich", memberOnly: true, divider: true },
       { to: "/privacy-account", label: "Datenschutz / Daten", divider: true },

@@ -131,6 +131,11 @@ export type Invoice = {
   overdue?: boolean;
   is_fee?: boolean;
   can_pay?: boolean;
+  // Quelle (#320): Beitrag, Event oder Turnier - mit dem Vorgang dahinter.
+  source?: "club" | "event" | "tournament" | "other";
+  source_label?: string;
+  booking?: { name: string; date: string; seats: number; companions: number; team: string; players: number } | null;
+  registration_id?: string;
 };
 
 export type InvoiceList = {
@@ -142,6 +147,8 @@ export type InvoiceList = {
   invoices: Invoice[];
   summary?: { count: number; open_count: number; open_total: number; overdue_count: number };
   currency?: string;
+  member?: boolean;
+  sources?: Record<string, number>;
 };
 
 export function invoiceFileName(invoice: Invoice): string {

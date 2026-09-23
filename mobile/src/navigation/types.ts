@@ -44,6 +44,8 @@ export type MoreStackParamList = {
   DirectThread: { userId: string; title?: string };
   Notifications: undefined;
   SeasonPass: undefined;
+  // Meine Rechnungen (#320): für jedes Konto, nicht nur Mitglieder.
+  MyInvoices: undefined;
   // Mitgliederbereich (#340): nur für Vereinsmitglieder sichtbar, der Server prüft jede Antwort.
   MemberArea: undefined;
   MyMembership: undefined;

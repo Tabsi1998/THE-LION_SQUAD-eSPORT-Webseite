@@ -8,10 +8,11 @@ const MEMBER_LEVELS = new Set(["members", "internal"]);
 // Die Verweiszeile des Mitgliederbereichs (#364): eine Quelle für Seite und Test.
 // Jede Adresse hat eine Route in App.jsx; die Mitgliedskarte liegt auf „Meine
 // Mitgliedschaft“ (Anker), weil sie dort mit Beitrag und Nummer zusammengehört.
+// Rechnungen stehen hier nicht: sie gehören zum Konto (Profil → Rechnungen), der
+// Mitgliederbereich bleibt Verein (#320, Entscheidung vom 23.09.).
 export const MEMBER_AREA_LINKS = [
   { to: "/members/membership", label: "Mitgliedschaft" },
   { to: "/members/membership#mitgliedskarte", label: "Mitgliedskarte" },
-  { to: "/account/invoices", label: "Rechnungen" },
   { to: "/members/benefits", label: "Vorteile" },
   { to: "/members/documents", label: "Dokumente" },
   { to: "/members/news", label: "Interne News" },

@@ -25,6 +25,7 @@ import { NotificationsTab } from "./profile/NotificationsTab";
 import { SecurityTab } from "./profile/SecurityTab";
 import { TeamsPanel } from "./profile/TeamsPanel";
 import { FriendsPanel } from "./profile/FriendsPanel";
+import { InvoicesPanel } from "./profile/InvoicesPanel";
 
 // Das Profil: Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine
 // eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
@@ -351,6 +352,7 @@ export default function ProfilePage() {
             )}
             {tab === "teams" && <TeamsPanel />}
             {tab === "friends" && <FriendsPanel onChanged={loadFriendCounts} />}
+            {tab === "invoices" && <InvoicesPanel />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab

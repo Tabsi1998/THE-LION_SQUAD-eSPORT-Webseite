@@ -171,6 +171,43 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Eigene Rechnungen für alle (#320; PR #381, baut auf #380 auf; Build 70).
+  `services/dolibarr_invoices.py`: `_access` (Einstellungen + Mitglieds-ID
+  oder None), `_order_context(db, user_id)` (eigene `billing_orders` mit
+  Beleg → Quelle event/tournament, `source_label` über
+  `dolibarr_billing.booking_facts`/`source_label`, `booking` {name, date,
+  seats, companions, team, players}, `registration_id`),
+  `view_core_invoice(raw, settings, today)` (Kern-API-Form: statut/paye/
+  remaintopay/total_ttc/type, Zeitstempel → Vereinstage, Entwurf → None, nie
+  `can_pay`), `_with_context` (ohne Vorgang: `club`, „Mitgliedsbeitrag“ bei
+  `is_fee`, sonst „Verein“), `_sources`, `_sorted`, `_pdf_payload`.
+  `list_invoices`: Mitglied → Liste des Vereinsmoduls; dazu die Einzelbelege
+  eigener Vorgänge über `client.invoice(id)` (gelöscht oder Entwurf → weg);
+  ohne beides `connected: False`; Antwort neu mit `member` und `sources`.
+  `invoice_pdf`: erst Vereinsmodul, sonst eigener Vorgang → `client.invoice`
+  + `client.invoice_document(ref)` (`GET /documents?modulepart=facture&
+  original_file=<ref>/<ref>.pdf`, Nummer bereinigt). `payment_target`: für
+  Kern-Belege 409 „bitte überweisen“. **Nie den Geschäftspartner im Ganzen
+  lesen** – eine Familie kann einen teilen. Fake: `/documents` im Kern-Teil.
+  Web `lib/invoices.js`: `sourceFilters`, `STATE_FILTERS`, `filterInvoices`,
+  `sourceLine` (nur mit Vorgang), `summaryText` ohne Zuordnung neu;
+  `MyInvoicesPage`: Filterknöpfe (`invoices-source-<k>`, `invoices-state-<k>`,
+  erst ab zwei Quellen bzw. zwei Belegen), Vorgangszeile
+  (`invoice-source-<key>`), Rückweg „Mein Profil“ für Nicht-Mitglieder;
+  MainNav „Meine Rechnungen“ für alle. App `lib/invoices.ts` (Filter,
+  `sourceLine`, `emptyText`, `payHint`), `components/InvoiceList.tsx` (eine
+  Zeile für Mitgliedschaft und Rechnungen), `screens/main/MyInvoicesScreen.tsx`
+  (Mehr → Konto → „Meine Rechnungen“, SegmentedTabs Quelle/Stand, live über
+  „account/invoices“/„membership“). **Entscheidung des Betreibers vom 23.09.:
+  Rechnungen gehören zum Konto, der Mitgliederbereich bleibt Verein.** Web:
+  Profil-Reiter „Rechnungen“ (`profile/InvoicesPanel.jsx`, `?tab=invoices`;
+  `/account/invoices` zeigt dieselbe Tafel und führt zurück ins Profil),
+  `MEMBER_AREA_LINKS` ohne „Rechnungen“, MainNav und „Meine Mitgliedschaft“
+  verweisen auf den Reiter. App: „Meine Mitgliedschaft“ zeigt nur den Stand
+  der Belege und den Knopf „Meine Rechnungen“ (`membership-invoices-link`),
+  Profil-Kachel „Rechnungen“ → More/MyInvoices. Tests `test_invoices_sources_flow.py` (4),
+  `invoices.test.js` (+1), `MyInvoicesPage.test.jsx` (+1), App
+  `invoices.test.ts` (4), `MyInvoicesScreen.test.tsx` (3).
 - App 1.0.0 Teil 1 (#217 Stufe 1, #219 Teil 1; PR #380, baut auf #379 auf; Build 69).
   **App-Sperre (#217):**
   `lib/appLock.ts`: `shouldRelock(hiddenAt, now)` (≥ 60 s im Hintergrund),
@@ -1041,8 +1078,8 @@ Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen), #377 (App
 Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
 
 ### Offene PRs
-Reihenfolge beim Mergen: erst #378, dann #379, dann #380 (jeder baut auf dem
-vorigen auf, sonst Konflikte in CLAUDE.md und UMBAUPLAN).
+Reihenfolge beim Mergen: erst #378, dann #379, dann #380, dann #381 (jeder
+baut auf dem vorigen auf, sonst Konflikte in CLAUDE.md und UMBAUPLAN).
 - #378 (#302 Discord-Bot im Backend; Token im Admin). Nach dem Merge
   `update.sh` (neue Abhängigkeit discord.py im Backend-Image), dann im Admin
   Einstellungen → Discord → „Discord-Bot“ nach der Anleitung dort einrichten.
@@ -1053,6 +1090,9 @@ vorigen auf, sonst Konflikte in CLAUDE.md und UMBAUPLAN).
 - #380 (#217 Stufe 1 App-Sperre; nur App). Nach dem Merge Build 69 vom
   Haupt-PC. Sind #379 und #380 gleichzeitig gemergt, reicht ein Build (69)
   mit beidem – Build 68 fällt dann aus.
+- #381 (#320 eigene Rechnungen für alle: Nicht-Mitglieder, Quelle je Beleg,
+  Filter; Backend + Web + App). Nach dem Merge `update.sh` und Build 70 – bzw.
+  ein Build mit allem, was bis dahin gemergt ist.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -1096,7 +1136,7 @@ vorigen auf, sonst Konflikte in CLAUDE.md und UMBAUPLAN).
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378, #229 schließt #379; #217 bleibt für Stufe 2 offen, #380 ist Stufe 1)
+### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378, #229 schließt #379; #217 bleibt für Stufe 2 offen, #380 ist Stufe 1; #320 schließt #381)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1107,7 +1147,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366 |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. Offen: #320 eigene Rechnungen im Konto für Nicht-Mitglieder, #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
+| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. #320 eigene Rechnungen für alle (Nicht-Mitglieder über die Einzelbelege ihrer Vorgänge, Quelle je Beleg, Filter, App-Bildschirm) – umgesetzt in #381. Offen: #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
@@ -1144,7 +1184,7 @@ sinnvoll hältst“):
 6. Web: Dynamik – umgesetzt in #360.
 7. Abrechnung I – Teil 1 in #363 (Modell, Events, Aufträge, Finanzen),
    Teil 2 in #365 (Kunden und Belege in Dolibarr; erster Durchlauf am 22.09.
-   bestätigt). Rest (#320, #321) offen. Admin und Turniere – umgesetzt in
+   bestätigt), #320 in #381. Rest (#321) offen. Admin und Turniere – umgesetzt in
    #369 (#203/#204 berührten dieselben
    Event-Formulare wie #318 – zusammen planen). Abrechnung II – umgesetzt in
    #371 (baut auf #369 auf). App 0.8.0-beta.

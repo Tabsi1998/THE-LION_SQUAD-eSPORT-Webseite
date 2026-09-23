@@ -351,6 +351,8 @@ export function ProfileScreen() {
           <ActionTile icon="create-outline" label="Bearbeiten" onPress={guest ? undefined : () => { setView("profile"); setTab("edit"); }} />
           <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
           <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
+          {/* Rechnungen gehören zum Konto (#320): Beitrag, Events, Turniere unter Mehr → Meine Rechnungen. */}
+          <ActionTile icon="receipt-outline" label="Rechnungen" onPress={guest ? undefined : () => navigation.navigate("More", { screen: "MyInvoices" })} />
           <ActionTile icon="settings-outline" label="Einstellungen" onPress={() => setView("settings")} />
         </View>
 
