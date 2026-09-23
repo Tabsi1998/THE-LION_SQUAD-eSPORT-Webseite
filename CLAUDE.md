@@ -216,6 +216,14 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Konto löschen in der App (#390; PR #391, baut auf #389 auf; Build 75).
+  Google-Play-Pflicht (Registrierung in der App → Löschung in der App + öffentlicher
+  Web-Link). App `ProfileScreen`: `deleteAccount` (zwei `Alert.alert`, dann
+  `POST /dsgvo/anonymize-me` + `logout`), `ActionRow` „Konto löschen“ unter
+  „Abmelden“ in der Einstellungen-Ansicht. Web `LegalPages`: `Section` mit
+  `id`, Abschnitt „Konto löschen“ (`/privacy#konto-loeschen`) vor
+  „Betroffenenrechte“ – der Link fürs Datensicherheits-Formular. Version
+  0.15.0-beta, Build 75 = Bundle für den geschlossenen Test.
 - Auszeichnungen im eigenen Reiter (#230 Nachtrag; PR #389, baut auf #388 auf;
   Build 74). Einwand des Betreibers: Referenzen (Turnier-Historie) ≠
   Auszeichnungen (Banner/Trophäen). Web `PublicProfilePage` Reiter
@@ -1235,6 +1243,10 @@ Auszeichnungen da sind). `main` steht auf `2c540e3`.
   0.14.1-beta; baut auf #388 auf – **erst #388, dann #389**). Nach dem Merge
   Build 74 vom Haupt-PC als APK **und** AAB (interner Test in der Play Console);
   `update.sh` bringt den Web-Reiter, ist aber nicht dringend.
+- #391 (#390 Konto löschen in der App + Abschnitt „Konto löschen“ in der
+  Datenschutzerklärung, App 0.15.0-beta; baut auf #389 auf – **erst #389, dann
+  #391**). Nach dem Merge `update.sh` (Web-Abschnitt) und Build 75 (APK + AAB =
+  Bundle für den geschlossenen Test).
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
