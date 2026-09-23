@@ -28,22 +28,30 @@ export function AdminFormPage({ eyebrow, accent = "#29B6E8", title, intro, backT
         {intro && <p className="mt-2 text-sm text-white/50 max-w-2xl">{intro}</p>}
         {headerExtra}
       </div>
-      {/* Ab 1280 px zwei Spalten: Inhalt links, Seitenleiste (Status, Zeiten, Vorschau) rechts.
-          Darunter eine Spalte - die Seitenleiste folgt dem Inhalt. */}
-      <div className={`grid gap-5 items-start min-w-0 ${aside ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]" : ""}`}>
-        <div className="min-w-0 space-y-5" data-testid="admin-form-main">{children}</div>
-        {aside && <aside className="min-w-0 space-y-5" data-testid="admin-form-aside">{aside}</aside>}
-      </div>
+      <FormColumns aside={aside}>{children}</FormColumns>
       {actions}
     </form>
   );
 }
 
+// Ab 1280 px zwei Spalten: Inhalt links, Seitenleiste (Status, Zeiten, Vorschau) rechts. Darunter
+// eine Spalte - die Seitenleiste folgt dem Inhalt. Auch für Seiten mit Reitern, die kein eigenes
+// <form> sind (Turnier bearbeiten, Fast Lap bearbeiten).
+export function FormColumns({ aside, children }) {
+  return (
+    <div className={`grid gap-5 items-start min-w-0 ${aside ? "xl:grid-cols-[minmax(0,1fr)_minmax(20rem,24rem)]" : ""}`}>
+      <div className="min-w-0 space-y-5" data-testid="admin-form-main">{children}</div>
+      {aside && <aside className="min-w-0 space-y-5" data-testid="admin-form-aside">{aside}</aside>}
+    </div>
+  );
+}
+
 // Speichern-Leiste: klebt am unteren Rand, solange das Formular im Bild ist - kein Scrollen bis
-// zum Knopf mehr. Abbrechen führt zurück zur Liste.
+// zum Knopf mehr. Abbrechen führt zurück zur Liste. Mit `onSubmitClick` ist der Knopf kein
+// Submit-Knopf, sondern ruft direkt die Funktion (für Seiten ohne eigenes <form>).
 const CANCEL_CLASS = "inline-flex items-center px-4 py-2.5 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm transition";
 
-export function FormActions({ accent = "#29B6E8", submitLabel = "Speichern", savingLabel = "Speichere …", saving = false, submitTestId, cancelTo, onCancel, cancelLabel = "Abbrechen", icon: Icon = Save, hint, children }) {
+export function FormActions({ accent = "#29B6E8", submitLabel = "Speichern", savingLabel = "Speichere …", saving = false, submitTestId, onSubmitClick, cancelTo, onCancel, cancelLabel = "Abbrechen", icon: Icon = Save, hint, children }) {
   return (
     <div data-testid="admin-form-actions" className="sticky bottom-0 z-20 mt-6 -mx-4 md:-mx-8 border-t border-white/10 bg-[#0A0A0A]/95 backdrop-blur px-4 md:px-8 py-3 flex flex-wrap items-center gap-3">
       {cancelTo && <Link to={cancelTo} data-testid="admin-form-cancel" className={CANCEL_CLASS}>{cancelLabel}</Link>}
@@ -51,7 +59,7 @@ export function FormActions({ accent = "#29B6E8", submitLabel = "Speichern", sav
       {hint && <span className="text-xs text-white/45">{hint}</span>}
       <div className="ml-auto flex flex-wrap items-center gap-3">
         {children}
-        <button type="submit" disabled={saving} data-testid={submitTestId} style={{ backgroundColor: accent }} className="inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
+        <button type={onSubmitClick ? "button" : "submit"} onClick={onSubmitClick} disabled={saving} data-testid={submitTestId} style={{ backgroundColor: accent }} className="inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
           {Icon && <Icon className="w-3.5 h-3.5" />} {saving ? savingLabel : submitLabel}
         </button>
       </div>

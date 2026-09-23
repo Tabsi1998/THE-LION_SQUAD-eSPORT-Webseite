@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { CheckField, TextField, SelectField as SelectInput } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -1799,168 +1801,165 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       toast.error(formatApiError(e.response?.data?.detail) || "Gewinne konnten nicht erzeugt werden.");
     }
   };
+  // Reiter „Bearbeiten“ im Formular-Rahmen (#434): links Basis, Spielweise, Struktur, Abrechnung
+  // und alles Aufklappbare, rechts Zeitplan und Anmeldung, unten die feststehende Speichern-Leiste.
   return (
-    <div className="max-w-4xl space-y-5">
-      <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Basis</div>
-        <div className="grid md:grid-cols-2 gap-3">
-          <Fld label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
-          <Fld label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
-          <SelectField label="Spiel" value={f.game_id} onChange={(v)=>set("game_id",v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />
-          <Fld label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
-          <SelectField label="Event" value={f.event_id || ""} onChange={(v)=>set("event_id",v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} />
-          <SelectField label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
-          <SelectField label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
-          <label className="flex items-center gap-2 text-sm self-end pb-2"><input type="checkbox" checked={f.is_public} onChange={(e)=>set("is_public",e.target.checked)} className="accent-[#29B6E8]"/><span>Auf Public-Seiten sichtbar, sobald nicht Entwurf</span></label>
-        </div>
-      </div>
-      <Details title="Darstellung">
-        <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
-        {/* Auszeichnungen (#230): gestaltete Gewinnerbanner für Platz 1–3; ohne Bild bekommt der Platz die feste Vorlage aus Platz, Bilanz und Turnier. */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {["1", "2", "3"].map((slot) => (
-            <ImageUpload key={slot} value={f.award_images?.[slot] || ""} onChange={(v)=>set("award_images", { ...(f.award_images || {}), [slot]: v })} label={`Gewinnerbanner Platz ${slot}`} testId={`tr-edit-award-${slot}`} variant="wide" allowLibrary />
-          ))}
-        </div>
-        <p className="text-xs text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>
-        <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
-        <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
-      </Details>
-      <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeitplan & Anmeldung</div>
-        <div className="grid md:grid-cols-2 gap-3">
-          <Fld label="Start Event/Turnier" type="datetime-local" value={f.start_date} onChange={(v)=>set("start_date",v)} testId="tr-edit-start"/>
-          <Fld label="Ende Event/Turnier" type="datetime-local" value={f.end_date} onChange={(v)=>set("end_date",v)} testId="tr-edit-end"/>
-          <Fld label="Anmeldung öffnet" type="datetime-local" value={f.registration_open_from} onChange={(v)=>set("registration_open_from",v)} testId="tr-edit-reg-from"/>
-          <Fld label="Anmeldung endet" type="datetime-local" value={f.registration_open_until} onChange={(v)=>set("registration_open_until",v)} testId="tr-edit-reg-until"/>
-          <Fld label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
-          <Fld label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
-        </div>
-        <div className="grid md:grid-cols-3 gap-3">
-          <SelectField label="Austragung" value={f.event_mode} onChange={(v)=>set("event_mode",v)} options={EVENT_MODE_OPTIONS} />
-          <SelectField label="Ergebniserfassung" value={f.result_entry_mode || ""} onChange={(v)=>set("result_entry_mode",v || "")} options={RESULT_ENTRY_MODE_OPTIONS} />
-          <SelectField label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
-        </div>
-        {MATCHDAY_FORMATS.has(f.format) && (
-          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
+    <div className="min-w-0">
+      <FormColumns
+        aside={(
+          <FormSection title="Zeitplan und Anmeldung" hint="Anmeldung und Check-in wechseln zeitgesteuert; der Live-Start bleibt bei der Turnierleitung, solange unten nichts anderes gesetzt ist.">
+            <TextField label="Start Event/Turnier" type="datetime-local" value={f.start_date} onChange={(v)=>set("start_date",v)} testId="tr-edit-start"/>
+            <TextField label="Ende Event/Turnier" type="datetime-local" value={f.end_date} onChange={(v)=>set("end_date",v)} testId="tr-edit-end"/>
+            <TextField label="Anmeldung öffnet" type="datetime-local" value={f.registration_open_from} onChange={(v)=>set("registration_open_from",v)} testId="tr-edit-reg-from"/>
+            <TextField label="Anmeldung endet" type="datetime-local" value={f.registration_open_until} onChange={(v)=>set("registration_open_until",v)} testId="tr-edit-reg-until"/>
+            <TextField label="Check-in öffnet" type="datetime-local" value={f.check_in_from} onChange={(v)=>set("check_in_from",v)} testId="tr-edit-checkin-from"/>
+            <TextField label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
+            <CheckField label="Öffentliche Anmeldung erlauben" checked={f.registration_enabled} onChange={(v)=>set("registration_enabled",v)} />
+            <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
+            <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
+            <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />
+            <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
+          </FormSection>
+        )}
+      >
+        <FormSection title="Basis">
+          <FormGrid>
+            <TextField label="Titel" value={f.title} onChange={(v)=>set("title",v)} testId="tr-edit-title"/>
+            <TextField label="Slug / URL" value={f.slug} onChange={(v)=>set("slug", slugify(v))} testId="tr-edit-slug"/>
+            <SelectInput label="Spiel" value={f.game_id} onChange={(v)=>set("game_id",v)} options={[["", "— auswählen —"], ...games.map((g) => [g.id, gameOptionLabel(g)])]} />
+            <TextField label="Plattform" value={f.platform} onChange={(v)=>set("platform",v)} testId="tr-edit-platform"/>
+            <SelectInput label="Event" value={f.event_id || ""} onChange={(v)=>set("event_id",v)} options={[["", "— keins —"], ...events.map((e) => [e.id, e.name])]} />
+            <SelectInput label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
+            <SelectInput label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
+            <CheckField label="Auf Public-Seiten sichtbar, sobald nicht Entwurf" checked={f.is_public} onChange={(v)=>set("is_public",v)} className="self-end pb-2" />
+          </FormGrid>
+        </FormSection>
+
+        <FormSection title="Spielweise" hint="Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.">
+          <RulePresetPicker form={f} onApply={applyRulePreset} />
+          <FormGrid cols={3}>
+            <SelectInput label="Austragung" value={f.event_mode} onChange={(v)=>set("event_mode",v)} options={EVENT_MODE_OPTIONS} />
+            <SelectInput label="Ergebniserfassung" value={f.result_entry_mode || ""} onChange={(v)=>set("result_entry_mode",v || "")} options={RESULT_ENTRY_MODE_OPTIONS} />
+            <SelectInput label="Terminplanung" value={f.schedule_mode || ""} onChange={(v)=>set("schedule_mode",v || "")} options={SCHEDULE_MODE_OPTIONS} />
+          </FormGrid>
+          {MATCHDAY_FORMATS.has(f.format) && (
+            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
+              <p className="text-xs text-white/55">
+                Ein Spieltag ist ein Zeitraum, kein Zeitpunkt. Beide Seiten dürfen darin Termine vorschlagen;
+                was die Gegenseite annimmt, gilt. Schlägt nur die Heimseite vor, gilt ihre Zeit. Wählt niemand,
+                greift die Standardzeit unten.
+              </p>
+              <FormGrid cols={3}>
+                <TextField label="Spieltag dauert (Tage)" type="number" min="1" max="31" value={f.matchday_days} onChange={(v)=>set("matchday_days", v)} testId="tr-edit-matchday-days" />
+                <SelectInput label="Standardtag" value={String(f.default_match_weekday ?? 6)} onChange={(v)=>set("default_match_weekday", Number(v))} options={WEEKDAY_OPTIONS} />
+                <TextField label="Standarduhrzeit" type="time" value={f.default_match_time} onChange={(v)=>set("default_match_time", v)} testId="tr-edit-matchday-time" />
+              </FormGrid>
+            </div>
+          )}
+        </FormSection>
+
+        <FormSection title="Struktur" hint="Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an.">
+          <FormGrid cols={3}>
+            <SelectInput label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} />
+            <TextField label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
+            <SelectInput label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />
+            {f.team_mode !== "solo" && <TextField label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
+            <TextField label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
+            <TextField label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
+          </FormGrid>
+          <FormSection title="Erweiterte Spieloptionen" collapsible plain>
+            <FormGrid cols={3}>
+              <SelectInput label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
+              <CheckField label="Folgerunden zufällig mischen" hint="Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt." checked={!!f.randomize_advancement_rounds} onChange={(v)=>set("randomize_advancement_rounds", v)} className="md:col-span-2" />
+              <TextField label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
+              <TextField label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
+              <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
+            </FormGrid>
+            <div className="flex flex-wrap gap-4">
+              {BRONZE_FORMATS.has(f.format) && <CheckField label="Spiel um Platz 3" checked={f.bronze_match} onChange={(v)=>set("bronze_match",v)} />}
+              <CheckField label="Ersatzspieler erlauben" checked={f.substitutes_allowed} onChange={(v)=>set("substitutes_allowed",v)} />
+            </div>
+          </FormSection>
+          {CUSTOM_BRACKET_FORMATS.has(f.format) && (
+            <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
+              <FormGrid cols={3}>
+                {f.format === "ffa_custom_bracket" && <TextField label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
+                {f.format === "ffa_custom_bracket" && <TextField label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
+              </FormGrid>
+              <label className="block">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+                <textarea value={structure.schema} onChange={(e)=>setStructureField("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="tr-edit-structure-schema" />
+              </label>
+            </div>
+          )}
+        </FormSection>
+
+        {canFinance && (
+          <EventBillingSection kind="tournament" value={billingForm} onChange={setBillingForm} canEdit={canFinance} hasEvent={Boolean(f.event_id)} />
+        )}
+
+        <FormSection title="Darstellung" collapsible>
+          <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
+          {/* Auszeichnungen (#230): gestaltete Gewinnerbanner für Platz 1–3; ohne Bild bekommt der Platz die feste Vorlage aus Platz, Bilanz und Turnier. */}
+          <FormGrid cols={3}>
+            {["1", "2", "3"].map((slot) => (
+              <ImageUpload key={slot} value={f.award_images?.[slot] || ""} onChange={(v)=>set("award_images", { ...(f.award_images || {}), [slot]: v })} label={`Gewinnerbanner Platz ${slot}`} testId={`tr-edit-award-${slot}`} variant="wide" allowLibrary />
+            ))}
+          </FormGrid>
+          <p className="text-xs text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>
+          <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
+          <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
+        </FormSection>
+
+        <FormSection title="Preise" collapsible accent="#FFD700">
+          <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
+          <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
+          <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-white/55">
-              Ein Spieltag ist ein Zeitraum, kein Zeitpunkt. Beide Seiten dürfen darin Termine vorschlagen;
-              was die Gegenseite annimmt, gilt. Schlägt nur die Heimseite vor, gilt ihre Zeit. Wählt niemand,
-              greift die Standardzeit unten.
+              Nach veröffentlichten Ergebnissen erzeugt dieser Button konkrete Einträge für die Gewinnabholung.
             </p>
-            <div className="grid md:grid-cols-3 gap-3">
-              <Fld label="Spieltag dauert (Tage)" type="number" min="1" max="31" value={f.matchday_days} onChange={(v)=>set("matchday_days", v)} testId="tr-edit-matchday-days" />
-              <SelectField label="Standardtag" value={String(f.default_match_weekday ?? 6)} onChange={(v)=>set("default_match_weekday", Number(v))} options={WEEKDAY_OPTIONS} />
-              <Fld label="Standarduhrzeit" type="time" value={f.default_match_time} onChange={(v)=>set("default_match_time", v)} testId="tr-edit-matchday-time" />
-            </div>
+            <button
+              type="button"
+              onClick={createPrizePickups}
+              disabled={!((f.prize_places || []).length)}
+              data-testid="tr-edit-create-prizes"
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Gewinne erzeugen
+            </button>
           </div>
-        )}
-        <RulePresetPicker form={f} onApply={applyRulePreset} />
-        <div className="border border-white/10 bg-black/20 rounded-sm p-3 text-xs text-white/55">
-          Vor-Ort-Turniere werden standardmäßig durch die Turnierleitung gewertet und geplant. Online-Turniere erlauben standardmäßig Ergebnisberichte beider Parteien und Terminvorschläge.
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.registration_enabled} onChange={(e)=>set("registration_enabled",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Öffentliche Anmeldung erlauben</span></label>
-          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.is_invite_only} onChange={(e)=>set("is_invite_only",e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Nur Einladung/manuelle Teilnehmer</span></label>
-          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.site_banner_enabled} onChange={(e)=>set("site_banner_enabled",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Automatisches Turnier-Hinweisbanner anzeigen</span></label>
-          <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={f.auto_start_enabled} onChange={(e)=>set("auto_start_enabled",e.target.checked)} data-testid="tr-edit-auto-start" className="accent-[#29B6E8] mt-1"/><span>Start-/Endzeit darf Turnier automatisch live/beendet schalten</span></label>
-          <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2"><input type="checkbox" checked={f.block_club_member_registration} onChange={(e)=>set("block_club_member_registration",e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten</span></label>
-        </div>
-      </div>
-      <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Struktur</div>
-        <p className="text-xs text-white/50">
-          Teilnahme legt fest, wer sich anmelden darf: Einzelspieler melden sich selbst an, bei Team meldet ein Team-Leader oder Co-Leader das Team an.
-        </p>
-        <div className="grid md:grid-cols-3 gap-3">
-          <SelectField label="Turnierstruktur" value={f.format} onChange={setFormat} options={TOURNAMENT_FORMAT_OPTIONS} />
-          <Fld label="Format-Anzeigename" value={f.format_label} onChange={(v)=>set("format_label",v)} placeholder="z.B. Gamers Heaven F1 Heat" testId="tr-edit-format-label"/>
-          <SelectField label="Teilnahme" value={f.team_mode} onChange={setTeamMode} options={TEAM_MODE_OPTIONS} />
-          {f.team_mode !== "solo" && <Fld label="Spieler pro Team" type="number" min="2" max="6" value={f.team_size} onChange={(v)=>set("team_size",v)} testId="tr-edit-team-size"/>}
-          <Fld label={f.team_mode === "solo" ? "Min Spieler" : "Min Teams"} type="number" value={f.min_participants} onChange={(v)=>set("min_participants",v)} testId="tr-edit-min"/>
-          <Fld label={f.team_mode === "solo" ? "Max Spieler" : "Max Teams"} type="number" value={f.max_participants} onChange={(v)=>set("max_participants",v)} testId="tr-edit-max"/>
-        </div>
-        <Details title="Erweiterte Spieloptionen">
-          <div className="grid md:grid-cols-3 gap-3">
-            <SelectField label="Seeding" value={f.seeding_mode} onChange={(v)=>set("seeding_mode",v)} options={SEEDING_OPTIONS} />
-            <label className="flex items-start gap-2 text-sm text-white/75 sm:col-span-2">
-              <input type="checkbox" checked={!!f.randomize_advancement_rounds} onChange={(e)=>set("randomize_advancement_rounds", e.target.checked)} className="accent-[#29B6E8] mt-1"/>
-              <span>Folgerunden zufällig mischen<br /><span className="text-xs text-white/45">Runde 1 bleibt nach Check-in fix; qualifizierte Spieler werden in die nächste Runde zufällig auf freie Zielslots verteilt.</span></span>
-            </label>
-            <Fld label="Best of" type="number" value={f.best_of} onChange={(v)=>set("best_of",v)} testId="tr-edit-bo"/>
-            <Fld label="Matchdauer Min." type="number" value={f.match_duration_minutes} onChange={(v)=>set("match_duration_minutes",v)} testId="tr-edit-duration"/>
-            <SeasonWeightField value={f.season_weight} onChange={(v)=>set("season_weight",v)} />
+        </FormSection>
+
+        <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
+          <FormGrid>
+            <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
+            <TextField label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
+            <TextField label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
+            <TextField label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
+            <SelectInput label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
+            <TextField label="Stream-URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
+            <TextField label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
+          </FormGrid>
+          <div className="flex flex-wrap gap-4">
+            <CheckField label="Twitch einbetten" checked={f.twitch_enabled} onChange={(v)=>set("twitch_enabled",v)} accent="#9146FF" />
+            <CheckField label="Live-Stream aktiv" checked={f.has_live_stream} onChange={(v)=>set("has_live_stream",v)} accent="#9146FF" />
+            <CheckField label="Chat anzeigen" checked={f.show_chat} onChange={(v)=>set("show_chat",v)} accent="#9146FF" />
           </div>
-          <div className="mt-4 flex flex-wrap gap-4">
-            {BRONZE_FORMATS.has(f.format) && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.bronze_match} onChange={(e)=>set("bronze_match",e.target.checked)} className="accent-[#29B6E8]"/><span>Spiel um Platz 3</span></label>}
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.substitutes_allowed} onChange={(e)=>set("substitutes_allowed",e.target.checked)} className="accent-[#29B6E8]"/><span>Ersatzspieler erlauben</span></label>
-          </div>
-        </Details>
-        {CUSTOM_BRACKET_FORMATS.has(f.format) && (
-          <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
-            <div className="grid md:grid-cols-3 gap-3">
-              {f.format === "ffa_custom_bracket" && <Fld label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size" />}
-              {f.format === "ffa_custom_bracket" && <Fld label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
-            </div>
-            <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
-              <textarea value={structure.schema} onChange={(e)=>setStructureField("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="tr-edit-structure-schema" />
-            </label>
-          </div>
-        )}
-      </div>
-      {canFinance && (
-        <EventBillingSection kind="tournament" value={billingForm} onChange={setBillingForm} canEdit={canFinance} hasEvent={Boolean(f.event_id)} />
-      )}
-      <Details title="Preise">
-        <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} />
-        <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-white/55">
-            Nach veröffentlichten Ergebnissen erzeugt dieser Button konkrete Einträge für die Gewinnabholung.
-          </p>
-          <button
-            type="button"
-            onClick={createPrizePickups}
-            disabled={!((f.prize_places || []).length)}
-            data-testid="tr-edit-create-prizes"
-            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Gewinne erzeugen
-          </button>
-        </div>
-      </Details>
-      <Details title="Streaming und externe Links">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-[#9146FF]">Streaming & Verweise</div>
-        <div className="grid md:grid-cols-2 gap-3">
-          <Fld label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
-          <Fld label="Discord-Verweis" value={f.discord_link} onChange={(v)=>set("discord_link",v)} testId="tr-edit-discord"/>
-          <Fld label="Alter Stream-Verweis" value={f.stream_link} onChange={(v)=>set("stream_link",v)} testId="tr-edit-stream"/>
-          <Fld label="Twitch-Kanal" value={f.twitch_channel} onChange={(v)=>set("twitch_channel",v)} testId="tr-edit-twitch"/>
-          <SelectField label="Stream-Plattform" value={f.stream_platform} onChange={(v)=>set("stream_platform",v)} options={STREAM_PLATFORM_OPTIONS} />
-          <Fld label="Stream-URL" value={f.stream_url} onChange={(v)=>set("stream_url",v)} testId="tr-edit-stream-url"/>
-          <Fld label="Stream-Titel" value={f.stream_title} onChange={(v)=>set("stream_title",v)} testId="tr-edit-stream-title"/>
-        </div>
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.twitch_enabled} onChange={(e)=>set("twitch_enabled",e.target.checked)} className="accent-[#9146FF]"/><span>Twitch einbetten</span></label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.has_live_stream} onChange={(e)=>set("has_live_stream",e.target.checked)} className="accent-[#9146FF]"/><span>Live-Stream aktiv</span></label>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.show_chat} onChange={(e)=>set("show_chat",e.target.checked)} className="accent-[#9146FF]"/><span>Chat anzeigen</span></label>
-        </div>
-      </Details>
+        </FormSection>
+      </FormColumns>
       {hasFormChanges && (
-        <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
+        <div className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
           Ungespeicherte Änderungen im Turnierformular.
         </div>
       )}
-      <div className="flex flex-wrap gap-3">
-        <button onClick={() => save()} data-testid="tr-edit-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
-        <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
+      <FormActions onSubmitClick={() => save()} submitTestId="tr-edit-save" icon={null} hint={hasFormChanges ? "Ungespeicherte Änderungen" : undefined}>
+        <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
           Speichern & Struktur anwenden
         </button>
-      </div>
+      </FormActions>
     </div>
   );
 }
@@ -2083,15 +2082,6 @@ function SeasonWeightField({ value, onChange }) {
         Das hier bestimmt Major/Normal/Mini: Die Jahreswertung nimmt Platzierungs- oder Teilnahmepunkte und multipliziert sie mit diesem Faktor. 0 bedeutet: Dieses Turnier gibt keine Jahrespunkte.
       </div>
     </label>
-  );
-}
-
-function Details({ title, children }) {
-  return (
-    <details className="border border-white/10 bg-[#121212] rounded-sm p-4 group">
-      <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{title}</summary>
-      <div className="mt-4 space-y-4">{children}</div>
-    </details>
   );
 }
 
