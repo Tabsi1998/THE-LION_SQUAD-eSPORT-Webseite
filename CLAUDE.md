@@ -1278,22 +1278,28 @@ Prüffälle, Erstattungen, Summen je Veranstaltung, Steuersätze bestätigen;
 `update.sh`, kein Build) und #389 (#230 Nachtrag: Auszeichnungen im eigenen
 Reiter; Build 74 am 23.09., erstmals auch als AAB) und #391 (#390 Konto löschen
 in der App + Abschnitt „Konto löschen“ in der Datenschutzerklärung; `update.sh`,
-Build 75 am 23.09.). `main` steht auf `495e4a3`.
+Build 75 am 23.09.), #394 (#219 Googles Play-Signaturschlüssel in assetlinks.json
+und Passkey-Login; `update.sh`), #395 (#393 Release-Doku – der Squash landete
+im gelöschten Basis-Zweig, Inhalt mit dem Doku-Stand danach nachgeholt) und
+#398 (#326 Teil 1 Rechtliches II: Vereinsdaten und Obmann aus Dolibarr,
+Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
+`1bbb6b8`.
 
 ### Offene PRs
-- #394 (#219 Play-Signaturschlüssel als zweite App-Herkunft: assetlinks.json +
-  Passkey-Login; Basis `main`). Nach dem Merge `update.sh`; kein Build.
-- #395 (#393 Release-Doku: Play-Hinweise zu Offenlegungsdatei und
-  Debug-Symbolen; baut auf #394 auf). Nur Doku.
-- #398 (#326 Teil 1 Rechtliches II: Vereinsdaten und Obmann aus Dolibarr,
-  Datenschutzerklärung aus den echten Schaltern; baut auf #395 auf – **erst
-  #394, dann #395, dann #398**). Nach dem Merge `update.sh`, dann Rechtliches →
-  „Jetzt nachlesen“ → Haken setzen; den Crashlytics-Absatz aus den
-  Zusatz-Datenschutzhinweisen entfernen (steht jetzt fest im Abschnitt LionsAPP).
+- Derzeit keiner. Nach #398 beim Betreiber: `update.sh`, dann Einstellungen →
+  Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
+  übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
+  entfernen (steht jetzt fest im Abschnitt LionsAPP).
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
-  der Baum gleich ist (23.09. dreimal so passiert).
+  der Baum gleich ist (23.09. dreimal so passiert). **Zweite Falle:** Ein
+  gestapelter PR, den der Betreiber merged, solange seine Basis noch der
+  Feature-Zweig ist, landet in diesem Zweig – und verschwindet mit dessen
+  Löschung (23.09. bei #395: 10 s nach #394 gemergt, Inhalt fehlte auf
+  `main`, mit #398 nachgeholt). Deshalb in der Merge-Meldung an den Betreiber
+  immer nur **einen** PR nennen und den nächsten erst nach dem Umsetzen auf
+  `main` freigeben.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -1378,7 +1384,7 @@ Build 75 am 23.09.). `main` steht auf `495e4a3`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (13 offen nach dem Merge von #391)
+### Meilensteine und offene Issues (20 offen nach dem Merge von #398 und dem Schließen von #393; #396, #397 im Meilenstein App 1.0.0, #399–#403 aus der Prüfrunde vom 23.09. noch ohne Meilenstein – legt der Betreiber an)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
