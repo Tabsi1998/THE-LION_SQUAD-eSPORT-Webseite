@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { BarChart3, Calculator, Info, ListChecks, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
+import { BarChart3, Calculator, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
 
 const DEFAULT_POINTS = "25,18,15,12,10,8,6,4,2,1";
 const STATUS_OPTIONS = ["draft", "active", "completed", "archived"];
@@ -356,106 +359,63 @@ function SeasonModal({ season, tournaments, challenges, onClose, onSaved }) {
     }
   };
 
+  // Seitenblatt statt 1152-px-Fenster (#435): Jahreswertung, Punkte mit der Regelübersicht,
+  // Quellen als Abschnitte; die Karten der Liste bleiben daneben sichtbar.
   return (
-    <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
-      <form onSubmit={submit} className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-6xl mx-auto my-6">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <div>
-            <h2 className="font-heading text-2xl font-black uppercase">{isNew ? "Neue Jahreswertung" : "Jahreswertung bearbeiten"}</h2>
-            <p className="text-xs text-white/45 mt-1">Alles, was die spätere Punktetabelle beeinflusst, ist hier sichtbar gebündelt.</p>
-          </div>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-5 max-h-[75vh] overflow-y-auto">
-          <div className="grid lg:grid-cols-[1fr_360px] gap-5">
-            <div className="space-y-5">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="season-name" /></Field>
-                <Field label="Slug">
-                  <Input value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="season-slug" placeholder="jahreswertung-2026" />
-                </Field>
-                <Field label="Typ">
-                  <select value={form.kind} onChange={(e) => set("kind", e.target.value)} data-testid="season-kind" className="input">
-                    <option value="season">Jahreswertung</option>
-                    <option value="circuit">Circuit</option>
-                  </select>
-                </Field>
-                {!isNew && (
-                  <Field label="Status">
-                    <select value={form.status} onChange={(e) => set("status", e.target.value)} data-testid="season-status" className="input">
-                      {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{labelStatus(s)}</option>)}
-                    </select>
-                  </Field>
-                )}
-              </div>
+    <AdminSheet title={isNew ? "Neue Jahreswertung" : "Jahreswertung bearbeiten"} eyebrow="eSports" size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="season-submit" testId="season-sheet">
+      <FormSection title="Jahreswertung" hint="Alles, was die spätere Punktetabelle beeinflusst, ist hier gebündelt.">
+        <FormGrid>
+          <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="season-name" />
+          <TextField label="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="season-slug" placeholder="jahreswertung-2026" />
+          <SelectField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} options={[["season", "Jahreswertung"], ["circuit", "Circuit"]]} testId="season-kind" />
+          {!isNew && (
+            <SelectField label="Status" value={form.status} onChange={(v) => set("status", v)} options={STATUS_OPTIONS.map((s) => [s, labelStatus(s)])} testId="season-status" />
+          )}
+        </FormGrid>
+        <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Banner" testId="season-banner" variant="wide" allowLibrary />
+        <FormGrid>
+          <GermanDateField id="season-start-date" label="Start" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="season-start-date" allowFuture />
+          <GermanDateField id="season-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="season-end-date" allowFuture />
+        </FormGrid>
+        <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="season-desc" />
+      </FormSection>
 
-              <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Banner" testId="season-banner" variant="wide" allowLibrary />
+      <FormSection title="Punkte">
+        <FormGrid>
+          <TextField label="Fallback-Punktetabelle" value={form.points_per_position} onChange={(v) => set("points_per_position", v)} testId="season-points" placeholder={DEFAULT_POINTS} hint="Wird für alte Fallback-Standings und Championship-Logik genutzt. Neue V2-Einträge nutzen die feste Formel darunter." />
+          <TextField label="Streichresultate" type="number" value={form.drop_worst} onChange={(v) => set("drop_worst", v)} testId="season-drop" hint="Die niedrigsten Wertungen pro Person werden aus dem Gesamtergebnis gestrichen." />
+        </FormGrid>
+        <RuleSummary
+          form={form}
+          fallbackPoints={fallbackPoints}
+          selectedTournaments={selectedTournaments}
+          selectedChallenges={selectedChallenges}
+        />
+      </FormSection>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Start"><GermanDateField id="season-start-date" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="season-start-date" allowFuture /></Field>
-                <Field label="Ende"><GermanDateField id="season-end-date" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="season-end-date" allowFuture /></Field>
-              </div>
-
-              <Field label="Beschreibung">
-                <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} data-testid="season-desc" className="input" />
-              </Field>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <Field label="Fallback-Punktetabelle">
-                  <Input value={form.points_per_position} onChange={(v) => set("points_per_position", v)} testId="season-points" placeholder={DEFAULT_POINTS} />
-                  <div className="text-[11px] text-white/35 mt-1.5">
-                    Wird für alte Fallback-Standings und Championship-Logik genutzt. Neue V2-Einträge nutzen die feste Formel rechts.
-                  </div>
-                </Field>
-                <Field label="Streichresultate">
-                  <Input type="number" value={form.drop_worst} onChange={(v) => set("drop_worst", v)} testId="season-drop" />
-                  <div className="text-[11px] text-white/35 mt-1.5">
-                    Die niedrigsten Wertungen pro Person werden aus dem Gesamtergebnis gestrichen.
-                  </div>
-                </Field>
-              </div>
-            </div>
-
-            <RuleSummary
-              form={form}
-              fallbackPoints={fallbackPoints}
-              selectedTournaments={selectedTournaments}
-              selectedChallenges={selectedChallenges}
-            />
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-4">
-            <SourcePicker
-              label="Turniere einbeziehen"
-              helper="Leer lassen = passende Turniere automatisch nach Zeitraum und Status einbeziehen."
-              items={tournaments}
-              selected={form.tournament_ids}
-              onToggle={(id) => toggle("tournament_ids", id)}
-              onSetSelected={(ids) => setMany("tournament_ids", ids)}
-              getLabel={(t) => t.title}
-              getMeta={(t) => sourceMeta(t, 2)}
-            />
-            <SourcePicker
-              label="Fast-Lap Challenges einbeziehen"
-              helper="Leer lassen = passende Fast-Lap Challenges automatisch nach Zeitraum und Status einbeziehen."
-              items={challenges}
-              selected={form.f1_challenge_ids}
-              onToggle={(id) => toggle("f1_challenge_ids", id)}
-              onSetSelected={(ids) => setMany("f1_challenge_ids", ids)}
-              getLabel={(c) => c.title}
-              getMeta={(c) => sourceMeta(c, 1)}
-            />
-          </div>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="season-submit" className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Speichern"}
-          </button>
-        </div>
-        <style>{`.input{ width:100%; background:#0A0A0A; border:1px solid rgba(255,255,255,0.1); padding:0.5rem 0.75rem; border-radius:2px; font-size:13px; color:#fff; }`}</style>
-      </form>
-    </div>
+      <FormSection title="Quellen" hint="Leer lassen = passende Turniere und Fast-Lap Challenges automatisch nach Zeitraum und Status einbeziehen.">
+        <SourcePicker
+          label="Turniere einbeziehen"
+          helper="Leer lassen = passende Turniere automatisch nach Zeitraum und Status einbeziehen."
+          items={tournaments}
+          selected={form.tournament_ids}
+          onToggle={(id) => toggle("tournament_ids", id)}
+          onSetSelected={(ids) => setMany("tournament_ids", ids)}
+          getLabel={(t) => t.title}
+          getMeta={(t) => sourceMeta(t, 2)}
+        />
+        <SourcePicker
+          label="Fast-Lap Challenges einbeziehen"
+          helper="Leer lassen = passende Fast-Lap Challenges automatisch nach Zeitraum und Status einbeziehen."
+          items={challenges}
+          selected={form.f1_challenge_ids}
+          onToggle={(id) => toggle("f1_challenge_ids", id)}
+          onSetSelected={(ids) => setMany("f1_challenge_ids", ids)}
+          getLabel={(c) => c.title}
+          getMeta={(c) => sourceMeta(c, 1)}
+        />
+      </FormSection>
+    </AdminSheet>
   );
 }
 
@@ -589,10 +549,3 @@ function InfoPill({ label, value, compact = false }) {
   );
 }
 
-function Field({ label, children }) {
-  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
-}
-
-function Input({ value, onChange, placeholder, testId, required, type = "text" }) {
-  return <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="input" />;
-}

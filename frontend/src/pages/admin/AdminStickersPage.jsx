@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -245,14 +247,6 @@ function StickerForm({ pack, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
-  useEffect(() => {
-    const onKey = (event) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
   const save = async (event) => {
     event.preventDefault();
     if (!form.url) {
@@ -275,39 +269,22 @@ function StickerForm({ pack, onClose, onSaved }) {
     }
   };
 
+  // Seitenblatt statt Fenster (#435); Esc und Klick daneben übernimmt das Blatt.
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button type="button" aria-label="Dialog schließen" tabIndex={-1} onClick={onClose} className="absolute inset-0 cursor-default bg-black/70" />
-      <form onSubmit={save} role="dialog" aria-modal="true" aria-label={`Sticker für ${pack.name}`} className="relative bg-[#121212] border border-white/10 rounded-sm max-w-lg w-full max-h-[calc(100vh-2rem)] overflow-y-auto p-6 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="font-heading text-xl font-bold uppercase">Sticker für {pack.name}</h3>
-          <button type="button" onClick={onClose} aria-label="Schließen" className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
-        </div>
-        <ImageUpload
-          value={form.url}
-          onChange={(value) => set("url", value)}
-          label="Bild"
-          testId="sticker-image"
-          variant="square"
-          endpoint="/uploads/image?trim_empty_borders=true"
-          mediaScope="admin"
-          allowLibrary
-        />
-        <p className="text-xs text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Name</div>
-          <input value={form.name} onChange={(event) => set("name", event.target.value)} required maxLength={60} placeholder="z. B. Brüllender Löwe" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        </label>
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Suchwörter</div>
-          <input value={form.keywords} onChange={(event) => set("keywords", event.target.value)} placeholder="löwe, brüllen, gg" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <div className="mt-1 text-[11px] text-white/40">Mit Komma trennen. Die Stickersuche im Chat findet Name und Suchwörter.</div>
-        </label>
-        <div className="flex gap-2 pt-2">
-          <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
-        </div>
-      </form>
-    </div>
+    <AdminSheet title={`Sticker für ${pack.name}`} eyebrow="Sticker" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sticker-save" testId="sticker-sheet">
+      <ImageUpload
+        value={form.url}
+        onChange={(value) => set("url", value)}
+        label="Bild"
+        testId="sticker-image"
+        variant="square"
+        endpoint="/uploads/image?trim_empty_borders=true"
+        mediaScope="admin"
+        allowLibrary
+      />
+      <p className="text-xs text-white/45">Am besten PNG oder WebP mit durchsichtigem Hintergrund, etwa 512 × 512 Pixel. Leere Ränder schneidet der Upload ab.</p>
+      <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required maxLength={60} placeholder="z. B. Brüllender Löwe" testId="sticker-name" />
+      <TextField label="Suchwörter" value={form.keywords} onChange={(v) => set("keywords", v)} placeholder="löwe, brüllen, gg" hint="Mit Komma trennen. Die Stickersuche im Chat findet Name und Suchwörter." testId="sticker-keywords" />
+    </AdminSheet>
   );
 }

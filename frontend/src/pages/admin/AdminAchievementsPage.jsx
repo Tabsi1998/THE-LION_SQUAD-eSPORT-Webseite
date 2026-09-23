@@ -7,13 +7,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, FieldLabel, INPUT_CLASS, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ACHIEVEMENT_ICON_NAMES, AchievementIcon } from "@/components/tls/AchievementIcon";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { EvaluationPanel } from "./achievements/EvaluationPanel";
 import { toast } from "sonner";
 import {
-  Plus, X, Trophy, Award, AlertOctagon,
+  Plus, Trophy, Award, AlertOctagon,
   Search, UserPlus, ShieldOff, Eye, EyeOff, Crown,
 } from "lucide-react";
 
@@ -176,35 +179,22 @@ function GroupForm({ group, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <Modal onClose={onClose} title={isNew ? "Neue Group" : "Group bearbeiten"}>
-      <form onSubmit={save} className="space-y-3">
-        <Field label="Code (slug, eindeutig)"><input required disabled={!isNew} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="group-code" className="input" /></Field>
-        <Field label="Name *"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="group-name" className="input" /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Kategorie">
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} data-testid="group-category" className="input">
-              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Sortierung"><input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })} className="input" /></Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <IconField value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
-          <Field label="Farbe"><input type="color" value={form.accent_color} onChange={(e) => setForm({ ...form, accent_color: e.target.value })} className="input h-10" /></Field>
-        </div>
-        <Field label="Beschreibung"><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" /></Field>
-        <div className="flex flex-wrap gap-4 text-sm pt-2">
-          <Check label="Öffentlich sichtbar" checked={form.public} onChange={(v) => setForm({ ...form, public: v })} testId="group-public" />
-          <Check label="Sonderauszeichnung (manuell kuratiert)" checked={form.is_special} onChange={(v) => setForm({ ...form, is_special: v })} />
-          <Check label="Negativ/Fun (bis Freischaltung geheim)" checked={form.is_negative} onChange={(v) => setForm({ ...form, is_negative: v })} testId="group-negative" />
-        </div>
-        <div className="flex justify-end gap-2 pt-3">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-white/60 hover:text-white">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="group-save" className="px-5 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs">{saving ? "Speichere…" : "Speichern"}</button>
-        </div>
-      </form>
-    </Modal>
+    <AdminSheet title={isNew ? "Neue Group" : "Group bearbeiten"} eyebrow="Auszeichnungen" accent="#FFD700" onClose={onClose} onSubmit={save} saving={saving} submitTestId="group-save" testId="group-sheet">
+      <FormGrid>
+        <TextField label="Code (slug, eindeutig)" required disabled={!isNew} value={form.code} onChange={(v) => setForm({ ...form, code: v })} testId="group-code" />
+        <TextField label="Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} testId="group-name" />
+        <SelectField label="Kategorie" value={form.category} onChange={(v) => setForm({ ...form, category: v })} options={CATEGORIES.map((c) => [c.value, c.label])} testId="group-category" />
+        <TextField label="Sortierung" type="number" value={form.sort_order} onChange={(v) => setForm({ ...form, sort_order: parseInt(v) || 0 })} />
+        <IconField value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+        <FieldLabel label="Farbe"><input type="color" value={form.accent_color} onChange={(e) => setForm({ ...form, accent_color: e.target.value })} className={`${INPUT_CLASS} h-10`} /></FieldLabel>
+      </FormGrid>
+      <TextAreaField label="Beschreibung" rows={2} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
+      <CheckField label="Öffentlich sichtbar" checked={form.public} onChange={(v) => setForm({ ...form, public: v })} testId="group-public" accent="#FFD700" />
+      <CheckField label="Sonderauszeichnung (manuell kuratiert)" checked={form.is_special} onChange={(v) => setForm({ ...form, is_special: v })} accent="#FFD700" />
+      <CheckField label="Negativ/Fun (bis Freischaltung geheim)" checked={form.is_negative} onChange={(v) => setForm({ ...form, is_negative: v })} testId="group-negative" accent="#FFD700" />
+    </AdminSheet>
   );
 }
 
@@ -249,11 +239,7 @@ function TiersTab() {
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
-        <Field label="Group">
-          <select value={groupCode} onChange={(e) => setGroupCode(e.target.value)} data-testid="tier-group-select" className="input min-w-[260px]">
-            {groups.map(g => <option key={g.code} value={g.code}>{g.name} ({g.category})</option>)}
-          </select>
-        </Field>
+        <SelectField label="Group" value={groupCode} onChange={setGroupCode} options={groups.map((g) => [g.code, `${g.name} (${g.category})`])} testId="tier-group-select" className="min-w-[260px]" />
         <button onClick={() => setCreating(true)} data-testid="tier-new-btn" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 text-xs"><Plus className="w-3.5 h-3.5" /> Neue Stufe</button>
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -337,35 +323,26 @@ function TierForm({ tier, groupCode, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <Modal onClose={onClose} title={isNew ? "Neue Stufe" : "Stufe bearbeiten"}>
-      <form onSubmit={save} className="space-y-3">
-        <Field label="Code (eindeutig)"><input required disabled={!isNew} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} data-testid="tier-code" className="input" /></Field>
-        <Field label="Name *"><input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="tier-name" className="input" /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Stufe">
-            <select value={form.level} onChange={(e) => setForm({ ...form, level: parseInt(e.target.value) })} data-testid="tier-level" className="input">
-              {Object.entries(LEVEL_NAMES).map(([k, v]) => <option key={k} value={k}>{k} · {v}</option>)}
-            </select>
-          </Field>
-          <Field label="Punkte"><input type="number" value={form.points} onChange={(e) => setForm({ ...form, points: parseInt(e.target.value) || 0 })} data-testid="tier-points" className="input" /></Field>
-        </div>
-        <Field label="Beschreibung"><textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="input" /></Field>
-        <Check label="Manuell vergeben (kein Progress-Auto-Award)" checked={form.manual_only} onChange={(v) => setForm({ ...form, manual_only: v })} testId="tier-manual" />
-        <Check label="Nur für offizielle Vereinsmitglieder markieren" checked={form.member_only} onChange={(v) => setForm({ ...form, member_only: v })} testId="tier-member-only" />
-        {!form.manual_only && (
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Condition Key"><input value={form.condition_key} onChange={(e) => setForm({ ...form, condition_key: e.target.value })} placeholder="z. B. matches_played" className="input" /></Field>
-            <Field label="Ziel"><input type="number" value={form.progress_target} onChange={(e) => setForm({ ...form, progress_target: parseInt(e.target.value) || 1 })} className="input" /></Field>
-          </div>
-        )}
-        <IconField value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
-        <div className="flex justify-end gap-2 pt-3">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-white/60 hover:text-white">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="tier-save" className="px-5 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs">{saving ? "Speichere…" : "Speichern"}</button>
-        </div>
-      </form>
-    </Modal>
+    <AdminSheet title={isNew ? "Neue Stufe" : "Stufe bearbeiten"} eyebrow="Auszeichnungen" accent="#FFD700" onClose={onClose} onSubmit={save} saving={saving} submitTestId="tier-save" testId="tier-sheet">
+      <FormGrid>
+        <TextField label="Code (eindeutig)" required disabled={!isNew} value={form.code} onChange={(v) => setForm({ ...form, code: v })} testId="tier-code" />
+        <TextField label="Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} testId="tier-name" />
+        <SelectField label="Stufe" value={String(form.level)} onChange={(v) => setForm({ ...form, level: parseInt(v) })} options={Object.entries(LEVEL_NAMES).map(([k, v]) => [k, `${k} · ${v}`])} testId="tier-level" />
+        <TextField label="Punkte" type="number" value={form.points} onChange={(v) => setForm({ ...form, points: parseInt(v) || 0 })} testId="tier-points" />
+      </FormGrid>
+      <TextAreaField label="Beschreibung" rows={2} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
+      <CheckField label="Manuell vergeben (kein Progress-Auto-Award)" checked={form.manual_only} onChange={(v) => setForm({ ...form, manual_only: v })} testId="tier-manual" accent="#FFD700" />
+      <CheckField label="Nur für offizielle Vereinsmitglieder markieren" checked={form.member_only} onChange={(v) => setForm({ ...form, member_only: v })} testId="tier-member-only" accent="#FFD700" />
+      {!form.manual_only && (
+        <FormGrid>
+          <TextField label="Condition Key" value={form.condition_key} onChange={(v) => setForm({ ...form, condition_key: v })} placeholder="z. B. matches_played" />
+          <TextField label="Ziel" type="number" value={form.progress_target} onChange={(v) => setForm({ ...form, progress_target: parseInt(v) || 1 })} />
+        </FormGrid>
+      )}
+      <IconField value={form.icon} onChange={(icon) => setForm({ ...form, icon })} />
+    </AdminSheet>
   );
 }
 
@@ -432,19 +409,21 @@ function AwardTab() {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
         <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">2 — Stufe & Notiz</div>
         {selectedUser && <div className="mb-3 text-sm"><span className="text-white/50">Empfänger:</span> <strong className="ml-2">{selectedUser.display_name || selectedUser.username}</strong></div>}
-        <Field label="Achievement-Tier">
-          <select value={tierCode} onChange={(e) => setTierCode(e.target.value)} data-testid="award-tier-select" className="input">
-            <option value="">— wählen —</option>
-            {tiers.map(t => <option key={t.code} value={t.code}>{t.member_only ? "[Verein] " : ""}{t.group_code} · {LEVEL_NAMES[t.level]} · {t.name}</option>)}
-          </select>
-        </Field>
+        <SelectField
+          label="Achievement-Tier"
+          value={tierCode}
+          onChange={setTierCode}
+          options={[["", "— wählen —"], ...tiers.map((t) => [t.code, `${t.member_only ? "[Verein] " : ""}${t.group_code} · ${LEVEL_NAMES[t.level]} · ${t.name}`])]}
+          testId="award-tier-select"
+          className="mb-3"
+        />
         {selectedTier?.member_only && (
           <div className="mb-3 border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-2 text-xs text-white/70">
             <strong className="text-[#FFD700] uppercase tracking-widest">Vereins-Achievement</strong>
             <span className="block mt-1">Kann nur aktiven oder Ehren-Mitgliedern vergeben werden.</span>
           </div>
         )}
-        <Field label="Interne Notiz (Audit-Log)"><textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} data-testid="award-note" className="input" placeholder="z. B. Gamers Heaven 2026 Teilnehmer" /></Field>
+        <TextAreaField label="Interne Notiz (Audit-Log)" rows={3} value={note} onChange={setNote} testId="award-note" placeholder="z. B. Gamers Heaven 2026 Teilnehmer" />
         <button onClick={award} disabled={busy || !selectedUser || !tierCode} data-testid="award-submit" className="w-full mt-2 px-4 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Award className="w-4 h-4" /> {busy ? "Vergebe…" : "Achievement vergeben"}
         </button>
@@ -506,47 +485,16 @@ function NegativeTab() {
 }
 
 // ---------------- helpers ----------------
-function Modal({ title, onClose, children }) {
-  return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-xl my-6 p-6">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-heading text-xl font-black uppercase">{title}</h3>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        {children}
-        <style>{`.input{ width:100%; background:#0A0A0A; border:1px solid rgba(255,255,255,0.1); padding:0.5rem 0.75rem; border-radius:2px; font-size:13px; color:#fff; }`}</style>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      {children}
-    </label>
-  );
-}
-
 function IconField({ value, onChange }) {
   return (
-    <Field label="Icon">
+    <FieldLabel label="Icon">
       <div className="flex items-center gap-2">
         <AchievementIcon name={value} fallback="trophy" className="w-5 h-5 shrink-0 text-[#FFD700]" aria-hidden="true" />
-        <select value={value} onChange={(event) => onChange(event.target.value)} className="input">
+        <select value={value} onChange={(event) => onChange(event.target.value)} className={INPUT_CLASS}>
           {ACHIEVEMENT_ICON_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </div>
-    </Field>
+    </FieldLabel>
   );
 }
 
-function Check({ label, checked, onChange, testId }) {
-  return (
-    <label className="inline-flex items-center gap-2 cursor-pointer">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} data-testid={testId} className="accent-[#FFD700]" /> {label}
-    </label>
-  );
-}

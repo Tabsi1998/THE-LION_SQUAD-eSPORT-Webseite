@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, SelectField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { TOURNAMENT_FORMAT_OPTIONS } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
-import { Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 const slugFrom = (txt) => (txt || "")
   .normalize("NFD")
@@ -220,56 +223,42 @@ function EditGameModal({ game, games, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435): die Spieleliste bleibt daneben sichtbar.
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-2xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">Spiel bearbeiten</h2>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
+    <AdminSheet title="Spiel bearbeiten" eyebrow="Spiele" size="lg" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="game-edit-save" testId="game-sheet">
+      <FormGrid>
+        <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
+        <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
+        <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
+        <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
+        <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
+        <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
+      </FormGrid>
+      {form.kind === "edition" && (
+        <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
+          <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-edit-parent" />
+          <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-edit-identity-source" />
+          <div className="md:col-span-2"><EditionPreview form={form} games={games} /></div>
+          <CheckField label="Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist." checked={form.inherit_player_ids !== false} onChange={(v) => set("inherit_player_ids", v)} className="md:col-span-2" />
         </div>
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          <div className="grid md:grid-cols-2 gap-3">
-            <Input placeholder={form.kind === "edition" ? "Versionsname, z.B. Black Ops 7" : "Name, z.B. Call of Duty"} value={form.name} onChange={(v) => { set("name", v); if (!form.slug) set("slug", slugFrom(v)); }} required testId="game-edit-name" />
-            <Input placeholder="Slug" value={form.slug} onChange={(v) => set("slug", slugFrom(v))} required testId="game-edit-slug" />
-            <Select value={form.kind} onChange={(v) => set("kind", v)} options={GAME_KIND_OPTIONS} testId="game-edit-kind" />
-            <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
-            <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
-          </div>
-          {form.kind === "edition" && (
-            <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-              <Select value={form.parent_game_id} onChange={(v) => set("parent_game_id", v)} options={[["", "Hauptspiel wählen"], ...parentOptions]} testId="game-edit-parent" />
-              <Select value={form.identity_source_game_id} onChange={(v) => set("identity_source_game_id", v)} options={[["", "ID-Quelle: automatisch Hauptspiel"], ...identityOptions]} testId="game-edit-identity-source" />
-              <div className="md:col-span-2"><EditionPreview form={form} games={games} /></div>
-              <label className="md:col-span-2 flex items-start gap-2 text-xs text-white/65">
-                <input type="checkbox" checked={form.inherit_player_ids !== false} onChange={(e) => set("inherit_player_ids", e.target.checked)} className="accent-[#29B6E8] mt-0.5" />
-                Spieler-IDs vom Hauptspiel verwenden, solange keine eigene ID-Quelle gesetzt ist.
-              </label>
-            </div>
-          )}
-          <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
-          <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" allowLibrary />
-          <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
-          <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
-          <div className="grid md:grid-cols-2 gap-3">
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_solo} onChange={(e) => set("supports_solo", e.target.checked)} className="accent-[#29B6E8]" /> Solo</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_teams} onChange={(e) => set("supports_teams", e.target.checked)} className="accent-[#29B6E8]" /> Teams</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_ffa} onChange={(e) => set("supports_ffa", e.target.checked)} className="accent-[#29B6E8]" /> Mehrspieler frei</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_time_trial} onChange={(e) => set("supports_time_trial", e.target.checked)} className="accent-[#29B6E8]" /> Zeitfahren</label>
-            <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!form.supports_grand_prix} onChange={(e) => set("supports_grand_prix", e.target.checked)} className="accent-[#29B6E8]" /> Rennserie</label>
-            <Input placeholder="Teamgröße Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
-          </div>
-          <select value={form.default_format} onChange={(e) => set("default_format", e.target.value)} data-testid="game-edit-format" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-            {TOURNAMENT_FORMAT_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={saving} data-testid="game-edit-save" className="inline-flex items-center gap-2 px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere..." : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
+      )}
+      <FormGrid>
+        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="game-edit-logo" variant="square" allowLibrary />
+        <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Cover" testId="game-edit-cover" variant="wide" allowLibrary />
+      </FormGrid>
+      <PlayerIdFieldsEditor value={form.player_id_fields} onChange={(v) => set("player_id_fields", v)} />
+      <FormGrid cols={3}>
+        <CheckField label="Solo" checked={!!form.supports_solo} onChange={(v) => set("supports_solo", v)} />
+        <CheckField label="Teams" checked={!!form.supports_teams} onChange={(v) => set("supports_teams", v)} />
+        <CheckField label="Mehrspieler frei" checked={!!form.supports_ffa} onChange={(v) => set("supports_ffa", v)} />
+        <CheckField label="Zeitfahren" checked={!!form.supports_time_trial} onChange={(v) => set("supports_time_trial", v)} />
+        <CheckField label="Rennserie" checked={!!form.supports_grand_prix} onChange={(v) => set("supports_grand_prix", v)} />
+      </FormGrid>
+      <FormGrid>
+        <Input placeholder="Teamgröße Standard" value={form.default_team_size} onChange={(v) => set("default_team_size", v)} testId="game-edit-team-size" />
+        <SelectField label="Standardformat" value={form.default_format} onChange={(v) => set("default_format", v)} options={TOURNAMENT_FORMAT_OPTIONS} testId="game-edit-format" />
+      </FormGrid>
+    </AdminSheet>
   );
 }
 

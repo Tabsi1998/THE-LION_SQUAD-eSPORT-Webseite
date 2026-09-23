@@ -22,7 +22,7 @@ export function FieldLabel({ label, required, hint, className = "", children }) 
 
 // `suggestions`: Vorschläge als Datenliste (Browser-Autovervollständigung), z.B. bekannte
 // Veranstalter bei den Referenzen.
-export function TextField({ label, value, onChange, type = "text", required, placeholder, testId, min, max, step, hint, disabled, suggestions, className = "" }) {
+export function TextField({ label, value, onChange, type = "text", required, placeholder, testId, min, max, step, maxLength, hint, disabled, suggestions, className = "" }) {
   const listId = suggestions?.length ? `${String(testId || label).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-list` : undefined;
   return (
     <label className={`block min-w-0 ${className}`}>
@@ -32,6 +32,7 @@ export function TextField({ label, value, onChange, type = "text", required, pla
         min={min}
         max={max}
         step={step}
+        maxLength={maxLength}
         list={listId}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
