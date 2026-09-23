@@ -216,6 +216,28 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Footer und Startseite (#403, #407; PR #422; kein Build). Antwort des
+  Betreibers: „Mitglied werden“ nicht groß vermarkten, Community zuerst.
+  Web `lib/siteFooter.js` (`footerColumns(settings, {isMember})` – Verein /
+  eSports / Mitmachen, Discord nur mit `discord_invite_url`, Mitglieder sehen
+  `/members/area` statt „Mitglied werden“; `contactLines(settings)` – Name,
+  Adresse, E-Mail, `ZVR …`, `any`), `PublicLayout` Footer: Sponsoren-Streifen,
+  `footer-columns`/`footer-column-{key}`, `footer-contact` (Logo, `<address>`,
+  `footer-socials`, `footer-app`), Bottom-Bar ohne Versionsnummer.
+  `HomePage`: Hero `hero-text`, `hero-cta-community` (`/community`),
+  `hero-cta-tournaments`, `hero-cta-discord` (aus `getCachedBranding()`, kein
+  Hook – `usePublicSiteSettings` würde im Test den `useApiInvalidation`-Fang
+  überschreiben), `hero-join` (Mitglied: Link Mitgliederbereich),
+  `ClubNumbers` `home-numbers`/`home-number-{key}` (nur Zähler > 0),
+  `BoardTeaser` `home-board`/`home-board-{id}` (`/board?active_only=true` →
+  `boardContacts`), `AppStrip` `home-app-strip` (kein Store-Knopf),
+  `home-calendar-link`. Backend `home_routes.home_state` `club_numbers`
+  (members active/honorary, tournaments nicht draft/cancelled + `is_public` ≠
+  False, events nicht draft/cancelled + visibility public, tournament_awards).
+  E2E `public.spec.js`: Locators auf `#main-content` eingeschränkt, weil der
+  Footer jetzt „Turniere“ und die Kontaktadresse ebenfalls zeigt. Tests
+  `test_home_numbers_flow.py` (1), `siteFooter.test.js` (2),
+  `HomePage.test.jsx` +2 (zählt nur `/home/state`-Aufrufe).
 - Melden und Blockieren in der App (#414; PR #418, baut auf #411 auf; Build
   76). Beim IARC-Fragebogen der Play Console (23.09.) aufgefallen: Google
   verlangt beides in der App. Nur App, dieselben Aufrufe wie das Web
@@ -1357,11 +1379,11 @@ Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418). `main`
 steht auf `c572c95`.
 
 ### Offene PRs
-- Derzeit keiner (Stand 23.09. abends, nach #418 und Build 76). Als Nächstes:
-  Web: Design II (#403 Footer + #407 Startseite – Antworten des Betreibers vom
-  23.09. an #399/#400/#405/#407 beachten: „Mitglied werden“ nicht groß
-  vermarkten, Community zuerst; QR-Logo kommt als PNG unter Branding →
-  „QR-Logo“), dann #400, #408, #409, #401 + #399; Play Console ruht auf Wunsch
+- #422 (#403 Footer + #407 Startseite; Backend + Web; auf `main`; nach dem
+  Merge `update.sh`). Als Nächstes: #421 (App-Update je Installationsquelle –
+  Play-Dialog statt Server-Updater, Build 77), dann Web: Design II weiter
+  (#400 QR mit dem PNG unter Branding → „QR-Logo“, #408, #409, #401 + #399
+  mit den Antworten des Betreibers vom 23.09.); Play Console ruht auf Wunsch
   des Betreibers, bis alles fertig ist; #412 (Play-Upload per API) wartet auf
   die Identitätsbestätigung des Entwicklerkontos; Moderation II (#415–#417,
   Meilenstein 28, Variante C) nach App 1.0.0. Nach #411, #413 und #398 beim
