@@ -216,6 +216,80 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Mitgliederverzeichnis per Opt-in (#410; PR #449; Backend + Web; `update.sh`).
+  `membership_routes`: `GET/PUT /api/membership/me/directory`
+  (`DirectoryEntryUpdate` listed/gamertag/bio/games/platforms; Konto wird
+  frisch gelesen `_account_for_directory`; Eintrag = `club_member_profiles`
+  mit `source: "member"`, `real_name` None, Slug aus Gamertag; 403 ohne
+  aktive Mitgliedschaft oder bei `directory_blocked`; 400 ohne Eintrag ohne
+  `listed: true`), `_own_directory_view` (eligible/listed/blocked/editorial/
+  slug/entry), `GET /api/membership/count` (members aus `memberships`,
+  listed aus aktiven Profilen), `ClubMemberProfileUpdate.directory_blocked`
+  (setzt `is_active` False), `_public_profile` ohne `age`/`level` (das Alter
+  stand als „Level“ öffentlich), mit `source`; `_admin_profile` mit `age`,
+  `directory_blocked`. `membership_service.end_self_directory_entry(user_id,
+  is_member)` aus `update_user_membership`, `dolibarr_sync.apply_summary` und
+  `end_membership_of_gone_member`. Web: `MembersDirectoryPage`
+  (`memberInitials`, Porträt-Rahmen `object-cover`, `member-card-initials-*`,
+  `members-own-entry`), `MyMembershipPage.DirectoryCard`
+  (`membership-directory-*`, `SwitchRow`), `CommunityPage`
+  (`community-explainer`, Zähler aus `/membership/count`),
+  `AdminClubMemberProfilesPage` (`club-member-self-*`, `club-member-blocked`),
+  `MemberProfilePage` ohne Level-Zeile. Tests `test_member_directory_flow.py`
+  (2), `MembersDirectoryPage.test.jsx` (3), `MyMembershipPage.test.jsx` (+2).
+  Offen: Rolle aus Dolibarr = #326 Teil 2 (Vorschlag im Issue).
+- „Über den Verein“ mit echten Daten (#406; PR #448; Backend + Web;
+  `update.sh`). `home_routes`: `_club_numbers(db)` (+ `achievements` aus
+  `user_achievements`; Startseite nutzt denselben Helfer), `_about_texts`
+  (`settings.about_page` über `ABOUT_DEFAULTS`), `_about_organization`
+  (Branding + Legal-Overlay; bei `legal_from_dolibarr` Gründung/Zweck/
+  gemeinnützig aus `dolibarr_public.state.organization`, `source`
+  dolibarr|manual), `_about_games` (Editionen zählen zum Hauptspiel;
+  Turniere `PUBLIC_TOURNAMENT_QUERY`, Referenzen aktiv), `_about_offline_events`
+  (`OFFLINE_EVENT_TYPES`, vergangen, öffentlich, mit Bild, 6). Routen
+  `GET /api/home/about`, `GET/PUT /api/home/about/admin` (content;
+  `AboutTexts`, Listen `_clean_lines`). Web `AboutPage` (Fakten
+  `about-fact-*`, `about-numbers`/`about-number-*`, `about-games`/
+  `about-game-*`, `about-board-*`, `about-offline-events`/`about-offline-event-*`,
+  `about-offline-items`, `about-pillars`, `about-purpose`; Exporte
+  `organizationFacts`, `gameLine`, `Paragraphs` mit `**fett**` und
+  Leerzeilen), `AdminAboutPage` (`/admin/about`, Verein → „Über uns“,
+  AdminFormPage mit Aside Vereinsdaten + „Was die Seite sonst zeigt“; Exporte
+  `textsToForm`, `formToPayload`), Adminmenü-Suchwort mit Umlaut. Tests
+  `test_about_page_flow.py` (2), `AboutPage.test.jsx` (3),
+  `AdminAboutPage.test.jsx` (3), `AdminLayout.test.jsx` und
+  `admin-navigation.spec.js` (42 Einträge) angepasst.
+- Sponsoren und Partner aus Dolibarr als Schalter (#405; PR #447; Backend +
+  Web; `update.sh`). `services/dolibarr_sponsors.py`: Einstellungen
+  `settings.sponsor_source` (`from_dolibarr`, `sponsor_category`,
+  `partner_category`), Stand `dolibarr_public/sponsors`; `plan()` aus
+  Kategorien (Typ Kunde, Unterkategorien = Stufe `TIER_BY_LABEL` bzw. Art)
+  und Geschäftspartnern (`company_from_row`: Laufzeit aus
+  `options_sponsor_start/_end`, `closed` bei Status 0), `apply_sponsors` /
+  `apply_partners` (Eintrag je `dolibarr_id`, Handeintrag gleichen Namens wird
+  übernommen, Link nur füllen, Gone → `contract_end` heute bzw. `is_active`
+  False + `dolibarr_gone_at`), `refresh` / `refresh_due` (im Job
+  `dolibarr_public`), `locked_fields` (`SPONSOR_LOCKED_FIELDS` name/tier/
+  Laufzeit/E-Mail/Telefon, `PARTNER_LOCKED_FIELDS` name/kind – `update_sponsor`
+  / `update_partner` streichen sie), `admin_view`. Client `categories(kind)`,
+  `thirdparties_in_category(id)` (Seiten, 404 = leer, None = forbidden →
+  Fehler). Routen `GET/PATCH /api/admin/dolibarr/sponsors`,
+  `POST …/refresh` (content/system; Einschalten liest sofort, 409 ohne
+  Anbindung). `GET /sponsors/former` (abgelaufen mit Logo).
+  `sponsor_utils.public_sponsor_view` streicht Kontakt/Notizen/Dolibarr/
+  Laufzeit (`PRIVATE_SPONSOR_FIELDS`) und liefert `since_year`/`until_year` –
+  `dedupe_public_sponsors` wendet es an (Sponsoren, Events, Partner).
+  `daily_center.sponsors_expiring` (30 Tage). Fake: `add_category`,
+  `categorize`, `GET /categories`, `GET /thirdparties?category=`. Web:
+  `DolibarrSourceBlock` (+ `useDolibarrSource`, `dolibarrLocked`; Kategorien
+  als Entwurf über dem Server-Stand, kein Effekt) auf
+  `AdminSponsorsPage`/`AdminPartnersPage` (testids `dolibarr-source-*`),
+  gesperrte Felder mit Hint, Chip `sponsor-dolibarr-{id}`;
+  `GermanDateField` `disabled`/`hint`; `SponsorsPage` „Seit … dabei“
+  (`sponsor-since-*`) und „Ehemalige Unterstützer“ (`sponsors-former`,
+  `sponsor-former-*`); Dashboard-Aufgabe `sponsors-expiring` (content).
+  Tests `test_dolibarr_sponsors_flow.py` (3), `test_sponsor_dedupe.py` (3),
+  `AdminSponsorsPage.test.jsx` (3), `SponsorsPage.test.jsx` (2).
 - Referenzen als Turnierteilnahme mit Einträgen (#409; PR #445; Backend +
   Web; `update.sh`). `models.ReferenceEntry` (`kind` team/solo, `team_name`,
   `member_profile_ids`, `lineup`, `lineup_members` eingefroren, `placement`,
@@ -1531,10 +1605,16 @@ Layout am PC), #429 (#408 Adminmenü), #430 (#399 Turnierbaum), #432
 hat den Stand nachgezogen), #441 (#435 Seitenblatt, Gruppe Verein), #442 (#435
 Seitenblatt eSports/Content/Mitglieder), #443 (#436 Playwright bei drei
 Breiten), #444 (Doku-Stand) und #445 (#409 Referenzen mit Einträgen;
-`update.sh`). `main` steht auf `4d4afa5`.
+`update.sh`), #446 (Doku-Stand nach #445), #448 (#406 „Über den Verein“ aus
+echten Daten; `update.sh`), #447 (#405 Sponsoren und Partner aus Dolibarr
+als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
+sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
+Mitgliederverzeichnis per Opt-in; `update.sh`). `main` steht auf `cee4153`.
 
 ### Offene PRs
-- Derzeit keiner. **Regel seit 23.09. abends:**
+- #450 (#328 Beitrittsantrag über Dolibarr; Backend + Web; `update.sh`; Vertrag
+  des Vereinsmoduls auf 0.8.0-beta; Entwurf bis zum lokalen Check, dann
+  bereit; Doku folgt im nächsten Doku-Stand). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1542,9 +1622,10 @@ Breiten), #444 (Doku-Stand) und #445 (#409 Referenzen mit Einträgen;
   angebunden, E-Mail-Vorlagen werden gebraucht – wartet auf die Entscheidung
   A/B des Betreibers), #401 Turnierseite (Reiter auf einer Seite, „Dein
   Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
-  dann Dolibarr III (#405 Sponsoren und Partner aus Dolibarr als Schalter –
-  Antwort des Betreibers: dort noch nicht gepflegt, aber gute Idee; #406
-  „Über uns“ mit echten Daten; #326 Teil 2; #410) und
+  dann Dolibarr III Rest (#326 Teil 2 Vorstandsseite aus Dolibarr – Vorschlag
+  im Issue, Antwort steht aus; #329 Einwilligungen, eigene Daten, Austritt
+  über `/vereine/me/consents` und `/vereine/members/{id}/consents`; #324
+  Dokumente, sobald dolibarr-vereine#157 liefert; #330 Durchläufe) und
   Moderation II (#415–#417, Meilenstein 28, Variante C) nach App 1.0.0; Play
   Console ruht auf Wunsch des Betreibers, bis alles fertig ist; #412
   (Play-Upload per API) wartet auf die Identitätsbestätigung des
@@ -1619,6 +1700,15 @@ Breiten), #444 (Doku-Stand) und #445 (#409 Referenzen mit Einträgen;
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #447, #448, #449 (23.09.): `update.sh`. Dann: Admin → Verein → Über uns
+  einmal ansehen (Standard = der alte Text; Gründungsjahr, Zweck und
+  „gemeinnützig“ eintragen oder „Vereinsdaten aus Dolibarr“ einschalten).
+  Sponsoren: erst wenn sie in Dolibarr als Geschäftspartner in den Kategorien
+  „Sponsor“/„Partner“ (Unterkategorien = Stufe/Art, Zusatzfelder
+  `sponsor_start`/`sponsor_end`) gepflegt sind, den Haken auf der
+  Sponsorenseite setzen – vorher bleibt alles Handpflege. Mitglieder
+  erfahren über „Meine Mitgliedschaft“, dass sie sich ins Verzeichnis
+  eintragen können; die alte Handliste bleibt.
 - Nach #445 (23.09.): `update.sh` (Backend: Referenzen mit Einträgen). Danach
   in Admin → Verein → Referenzen die alten Einträge einmal öffnen und
   speichern – bis dahin leitet der Server Plattform, Format, Liga und Saison
