@@ -215,6 +215,33 @@ schreibt in dieser Ausbaustufe **nichts** nach Dolibarr.
 - **Freigabe zurücknehmen:** alle Haken entfernen und freigeben.
 - In Dolibarr wird dabei nie etwas gelöscht oder geändert.
 
+## Vereinsdaten und Vorstand aus Dolibarr (Rechtliches II)
+
+Seit Vereinsmodul 0.7.0 liefert Dolibarr den Verein (`/vereine/organization`: Name, ZVR,
+Vereinsbehörde, Anschrift, Kontakt, Gründung, Zweck) und die Funktionen mit ihren heutigen
+Inhabern (`/vereine/board`; Namen nur, wo die Person der Nennung zugestimmt hat). Die Website
+liest beides stündlich und hält den Stand mit Zeitpunkt. Ein Ausfall ändert nichts: Der letzte
+Stand bleibt, der Fehler steht daneben.
+
+**Einschalten:** Admin → Einstellungen → Rechtliches → „Jetzt nachlesen“ (zeigt, was Dolibarr
+liefert), dann Haken **„Vereinsdaten aus Dolibarr übernehmen“** und speichern. Danach kommen
+Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person aus Dolibarr –
+die Felder stehen im Reiter nur lesbar da. Von Hand bleiben: Rechtsform, Sitz, Bundesland,
+inhaltlich Verantwortlicher, Datenschutz-E-Mail, Hosting, UID, Zusatztexte.
+
+**Vertretungsbefugte Person:** Die Vorstandsfunktion mit „vertritt den Verein nach außen“
+(bevorzugt Obmann/Obfrau). Liefert Dolibarr keinen Namen (keine Einwilligung), bleibt der
+Handeintrag – die Website rekonstruiert nie einen Namen aus anderen Quellen. Ist der letzte
+Stand älter als zwei Tage, hält die Website Personennamen zurück, damit ein Widerruf in
+Dolibarr zeitnah wirkt; die Vereinsdaten selbst bleiben.
+
+**Datenschutzerklärung:** `/privacy` baut ihre Abschnitte aus den Schaltern, die wirklich an
+sind (Statistik-Anbieter, Google-Login, Discord-Webhooks und -Bot, Twitch-Einbettung,
+E-Mail-Versand über Resend oder eigenen Mailserver, Dolibarr und Rechnungen, App mit Push und
+Absturzberichten). Wer einen Dienst ein- oder ausschaltet, ändert damit die Erklärung – ohne
+Text zu pflegen. Was die Website nicht kennt, gehört weiterhin in „Zusätzliche
+Datenschutzhinweise“.
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
