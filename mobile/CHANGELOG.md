@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.13.0-beta - 2026-09-23
+
+- Mobile: Absturzberichte: Stürzt die App ab, meldet sie Gerätemodell, Android-Version, App-Version und die Fehlerstelle an Firebase Crashlytics – keine Namen, keine Nachrichten, keine Inhalte. So sehen wir Fehler, bevor sich jemand beschwert (#219).
+
 ## 0.12.0-beta - 2026-09-23
 
 - Mobile: „Mit Passkey anmelden“: Wer auf lionsquad.at einen Passkey angelegt hat, meldet sich in der App mit Fingerabdruck oder Gesicht an – ohne Passwort, mit demselben Passkey wie im Browser (#217, Stufe 2).

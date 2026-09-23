@@ -67,6 +67,14 @@ jest.mock("expo-local-authentication", () => ({
   authenticateAsync: jest.fn(async () => ({ success: true })),
 }));
 
+// Absturzberichte (#219): im Test kein Firebase - die Aufrufe werden nur gezählt.
+jest.mock("@react-native-firebase/crashlytics", () => ({
+  getCrashlytics: jest.fn(() => ({ app: "test" })),
+  setCrashlyticsCollectionEnabled: jest.fn(async () => null),
+  recordError: jest.fn(),
+  log: jest.fn(),
+}));
+
 // Passkeys (#217 Stufe 2): im Test ein Gerät, das Passkeys kann und jede Anfrage unterschreibt.
 jest.mock("react-native-passkey", () => ({
   Passkey: {

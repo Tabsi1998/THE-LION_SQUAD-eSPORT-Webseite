@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), Build 71 nach dem Merge; #219 Teil 2 (14.8: Crashlytics, Play-Bundle, Store-Eintrag) folgt, das Play-Konto legt der Betreiber an |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), Build 72 nach dem Merge; Play-Bundle und Store-Eintrag (14.8), sobald das Konto da ist |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -601,6 +601,23 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 41 — App 1.0.0, Teil 3: Absturzberichte
+
+### Was 41.1 gefunden hat (#219 Teil 2 – PR #385)
+
+**Von Abstürzen erfuhr der Verein nur, wenn sich jemand meldete.** Die App schickt zwar seit #233
+abgefangene Fehler an die Website (Client-Log, abschaltbar) – aber ein echter Absturz kommt dort
+nie an, weil die App in dem Moment weg ist. Der Betreiber hat sich am 23.09. für Firebase
+Crashlytics entschieden: Firebase steckt wegen der Push-Nachrichten ohnehin in der App, es kostet
+nichts, und die Berichte kommen auch dann, wenn die App abstürzt.
+
+**So wenig wie möglich.** Gemeldet werden Gerätemodell, Android-Version, App-Version, Zeitpunkt und
+die Stelle im Programm. Nutzer werden nicht gekennzeichnet; von einem Fehlerkontext gehen nur die
+Schlüssel mit, nie die Werte – Namen, Nachrichten und Inhalte bleiben, wo sie sind. Im
+Entwicklungsmodus ist das Sammeln aus. Ein Fehler in Crashlytics selbst darf nie zum Fehler der App
+werden. Weil Google die Daten in den USA verarbeiten kann, gehört ein Absatz in die
+Datenschutzerklärung – der Vorschlag steht am Issue, einfügen tut ihn der Betreiber im Admin.
 
 ## Block 40 — App 1.0.0, Teil 2: Passkey in der App
 
