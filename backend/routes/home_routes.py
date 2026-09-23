@@ -278,6 +278,14 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "tournaments": len(upcoming["tournaments"]),
         "fastlaps": len(upcoming["challenges"]),
     }
+    # Der Verein in Zahlen (#407): echte Zähler, nur was öffentlich zählt - keine Entwürfe, keine
+    # Absagen, keine nicht-öffentlichen Turniere, keine internen Events.
+    club_numbers = {
+        "members": await db.memberships.count_documents({"member_status": {"$in": ["active", "honorary"]}}),
+        "tournaments": await db.tournaments.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}),
+        "events": await db.events.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}),
+        "awards": await db.tournament_awards.count_documents({}),
+    }
 
     await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
@@ -290,4 +298,5 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "news": visible_news,
         "featured_news": visible_news[:1],
         "stats": stats,
+        "club_numbers": club_numbers,
     }

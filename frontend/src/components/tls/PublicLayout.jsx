@@ -10,6 +10,7 @@ import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
+import { contactLines, footerColumns } from "@/lib/siteFooter";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Settings } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
@@ -57,6 +58,7 @@ export function PublicLayout({ children }) {
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const clubName = branding?.club_name || "THE LION SQUAD";
   const tagline = branding?.tagline || "eSports";
+  const footerContact = contactLines(branding);
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
   const socialLinks = getFooterSocialLinks(branding, twitchUrl);
 
@@ -174,19 +176,50 @@ export function PublicLayout({ children }) {
       <LevelUpCelebration />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
+      {/* Footer (#403): Sponsoren-Streifen, drei Spalten mit den Hauptbereichen, Kontakt aus den
+          Vereinsdaten, Bottom-Bar ohne Versionsnummer (die steht im Admin unter System). */}
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <Logo size="lg" asLink={false} />
-            <div className="flex flex-wrap gap-2 md:justify-end" data-testid="footer-socials">
-              {socialLinks.map((social, index) => (
-                <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
-                </a>
-              ))}
+          <SponsorTicker compact placement="footer" className="pb-8 border-b border-white/5" />
+          <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
+            {footerColumns(branding, { isClubMember }).map((column) => (
+              <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className="min-w-0">
+                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{column.title}</div>
+                <ul className="mt-4 space-y-2 text-sm text-white/65">
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      {link.external ? (
+                        <a href={link.href} target="_blank" rel="noreferrer" className="hover:text-white transition">{link.label}</a>
+                      ) : (
+                        <Link to={link.to} className="hover:text-white transition">{link.label}</Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+            <div className="col-span-2 md:col-span-1 min-w-0" data-testid="footer-contact">
+              <Logo size="lg" asLink={false} />
+              {footerContact.any && (
+                <address className="mt-4 not-italic text-sm text-white/65 space-y-1">
+                  {footerContact.name && <div className="font-bold text-white/85">{footerContact.name}</div>}
+                  {footerContact.address.map((line) => <div key={line}>{line}</div>)}
+                  {footerContact.email && <div><a href={`mailto:${footerContact.email}`} className="hover:text-white transition">{footerContact.email}</a></div>}
+                  {footerContact.zvr && <div className="text-white/45">{footerContact.zvr}</div>}
+                </address>
+              )}
+              <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
+                {socialLinks.map((social, index) => (
+                  <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
+                  </a>
+                ))}
+              </div>
+              <div className="mt-4 text-xs text-white/45" data-testid="footer-app">
+                <span className="font-bold text-white/65">LionsAPP</span> fürs Handy – Termine, Turniere, Chat und Mitgliedskarte. Bald im Play Store; den Testzugang bekommen Mitglieder vom Vorstand.
+              </div>
             </div>
           </div>
-          <SponsorTicker compact placement="footer" className="mt-10 pt-8 border-t border-white/5" />
         </div>
         {/* Reihe 2 — Bottom Bar */}
         <div className="border-t border-white/5">
@@ -197,7 +230,6 @@ export function PublicLayout({ children }) {
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
-              <span className="font-display tracking-widest hidden md:inline">v{import.meta.env.VITE_APP_VERSION || "2.2"}</span>
             </div>
           </div>
         </div>
