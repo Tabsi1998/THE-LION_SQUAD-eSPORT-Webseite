@@ -20,11 +20,12 @@ export function useDolibarrSource() {
 
 export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponsors" }) {
   const [busy, setBusy] = useState(false);
-  const [categories, setCategories] = useState({ sponsor_category: "", partner_category: "" });
-  useEffect(() => {
-    if (source && !source.unavailable) setCategories({ sponsor_category: source.sponsor_category || "", partner_category: source.partner_category || "" });
-  }, [source]);
+  // Die Kategorienamen kommen aus dem Server-Stand; nur eine Eingabe des Admins liegt als Entwurf
+  // darüber. So gibt es keinen Render, in dem leere Felder wie eine Änderung aussehen.
+  const [draft, setDraft] = useState(null);
   if (!source || source.unavailable) return null;
+  const categories = draft || { sponsor_category: source.sponsor_category || "", partner_category: source.partner_category || "" };
+  const setCategories = (update) => setDraft((current) => update(current || { sponsor_category: source.sponsor_category || "", partner_category: source.partner_category || "" }));
 
   const enabled = Boolean(source.from_dolibarr);
   const save = async (patch, successText) => {
@@ -32,6 +33,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
     try {
       const { data } = await api.patch("/admin/dolibarr/sponsors", patch);
       onChange?.(data.view || null);
+      setDraft(null);
       if (data.result && data.result.ok === false) toast.error(`Dolibarr nicht lesbar – alter Stand bleibt (${data.result.text || data.result.kind}).`);
       else toast.success(successText);
       if (data.result?.ok) onSynced?.();
@@ -58,7 +60,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
       setBusy(false);
     }
   };
-  const categoriesChanged = categories.sponsor_category !== (source.sponsor_category || "") || categories.partner_category !== (source.partner_category || "");
+  const categoriesChanged = draft !== null && (categories.sponsor_category !== (source.sponsor_category || "") || categories.partner_category !== (source.partner_category || ""));
   const found = source.categories || {};
   const stateOf = (key) => (found[key] ? (found[key].found ? `gefunden${found[key].sub?.length ? ` (${found[key].sub.join(", ")})` : ""}` : "nicht gefunden") : "noch nicht gelesen");
 
