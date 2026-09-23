@@ -107,8 +107,9 @@ Live-Betrieb „ehemalig“ und verliert den Mitgliederzugang.
 
 ## Eigene Rechnungen (Dolibarr II)
 
-Jedes Konto sieht unter **Konto-Menü → Meine Rechnungen** (`/account/invoices`,
-in der App unter Mehr → Konto) seine Belege aus Dolibarr: offene und überfällige
+Jedes Konto sieht unter **Profil → Rechnungen** (auch im Konto-Menü und unter
+`/account/invoices`; in der App im Profil und unter Mehr → Konto) seine Belege aus
+Dolibarr – der Mitgliederbereich bleibt Verein und verweist nur dorthin: offene und überfällige
 oben, bezahlte, Gutschriften und aufgegebene im Archiv. „Ansehen“ öffnet das PDF
 im Betrachter der Website, „Bezahlen“ führt auf Dolibarrs Zahlungsseite (Stripe,
 PayPal oder was dort eingerichtet ist) – ohne zweite Anbieter-Einrichtung auf der

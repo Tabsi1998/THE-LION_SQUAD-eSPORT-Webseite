@@ -1,4 +1,4 @@
-import { Bell, Eye, Gamepad2, Globe, Medal, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Bell, Eye, Gamepad2, Globe, Medal, Receipt, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 
 // Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
 // verlinken die Benachrichtigungen mit ?tab=notifications. Die Inbox ist seit
@@ -10,6 +10,8 @@ export const TABS = [
   { k: "teams", label: "Teams", icon: Users },
   { k: "friends", label: "Freunde", icon: UserPlus },
   { k: "achievements", label: "Achievements", icon: Medal },
+  // Rechnungen gehören zum Konto, nicht zum Vereinsbereich (#320, Entscheidung vom 23.09.).
+  { k: "invoices", label: "Rechnungen", icon: Receipt },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
   { k: "notifications", label: "Benachrichtigungen", icon: Bell },
   // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und

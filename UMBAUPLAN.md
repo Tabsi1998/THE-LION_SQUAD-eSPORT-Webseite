@@ -622,8 +622,16 @@ die Seite sagt das und verweist auf die Überweisung laut Rechnung.
 **Jeder Beleg trägt seine Quelle.** Mitgliedsbeitrag, Event oder Turnier – mit Name, Datum,
 Personen oder Team – steht am Beleg, in Web und App gleich; Filter nach Quelle und Stand gibt es
 erst, wenn es mehr als eine Quelle gibt. Der Einstieg „Meine Rechnungen“ steht jetzt im Konto-Menü
-für alle, in der App unter „Mehr → Konto“; der Mitgliederbereich behält seinen Link. Was #321
-bleibt: Teilzahlung, Korrektur, Storno und Erstattung als eigene Vorgänge.
+für alle, in der App unter „Mehr → Konto“. Was #321 bleibt: Teilzahlung, Korrektur, Storno und
+Erstattung als eigene Vorgänge.
+
+**Rechnungen gehören zum Konto, nicht zum Vereinsbereich.** So hat es der Betreiber am 23.09.
+entschieden, und es ist folgerichtig: Ein Mitglied hat Beitrags-, Event- und Turnierrechnungen
+gemischt, wer austritt, behält seine alten Belege, und Nicht-Mitglieder haben gar keinen
+Mitgliederbereich. Deshalb steht die Belegtafel jetzt im Profil (Reiter „Rechnungen“, in der App
+eine Kachel im Profil), der Mitgliederbereich verweist nur noch dorthin und bleibt Verein:
+Mitgliedschaft, Karte, Dokumente, interne News, Vorstand – und später Antrag, Einwilligungen,
+Generalversammlung.
 
 ## Block 38 — App 1.0.0, Teil 1: App-Sperre, Bildgrößen, App Bundle
 

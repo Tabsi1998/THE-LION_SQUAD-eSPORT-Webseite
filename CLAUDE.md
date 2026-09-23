@@ -198,7 +198,14 @@ Seit dem 15. September gilt:
   `sourceLine`, `emptyText`, `payHint`), `components/InvoiceList.tsx` (eine
   Zeile für Mitgliedschaft und Rechnungen), `screens/main/MyInvoicesScreen.tsx`
   (Mehr → Konto → „Meine Rechnungen“, SegmentedTabs Quelle/Stand, live über
-  „account/invoices“/„membership“). Tests `test_invoices_sources_flow.py` (4),
+  „account/invoices“/„membership“). **Entscheidung des Betreibers vom 23.09.:
+  Rechnungen gehören zum Konto, der Mitgliederbereich bleibt Verein.** Web:
+  Profil-Reiter „Rechnungen“ (`profile/InvoicesPanel.jsx`, `?tab=invoices`;
+  `/account/invoices` zeigt dieselbe Tafel und führt zurück ins Profil),
+  `MEMBER_AREA_LINKS` ohne „Rechnungen“, MainNav und „Meine Mitgliedschaft“
+  verweisen auf den Reiter. App: „Meine Mitgliedschaft“ zeigt nur den Stand
+  der Belege und den Knopf „Meine Rechnungen“ (`membership-invoices-link`),
+  Profil-Kachel „Rechnungen“ → More/MyInvoices. Tests `test_invoices_sources_flow.py` (4),
   `invoices.test.js` (+1), `MyInvoicesPage.test.jsx` (+1), App
   `invoices.test.ts` (4), `MyInvoicesScreen.test.tsx` (3).
 - App 1.0.0 Teil 1 (#217 Stufe 1, #219 Teil 1; PR #380, baut auf #379 auf; Build 69).

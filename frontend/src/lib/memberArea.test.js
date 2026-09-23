@@ -62,7 +62,7 @@ test("jede Adresse der Verweiszeile hat eine Route", async () => {
   const app = fs.readFileSync(path.resolve(process.cwd(), "src/App.jsx"), "utf-8");
   const routes = [...app.matchAll(/<Route path="([^"]+)"/g)].map((match) => match[1]);
   const { MEMBER_AREA_LINKS } = await import("./memberArea");
-  expect(MEMBER_AREA_LINKS.map((link) => link.label)).toEqual(["Mitgliedschaft", "Mitgliedskarte", "Rechnungen", "Vorteile", "Dokumente", "Interne News", "Vorstand"]);
+  expect(MEMBER_AREA_LINKS.map((link) => link.label)).toEqual(["Mitgliedschaft", "Mitgliedskarte", "Vorteile", "Dokumente", "Interne News", "Vorstand"]);
   for (const link of MEMBER_AREA_LINKS) {
     const path = link.to.split("#")[0];
     expect(routes, `${link.label} → ${link.to}`).toContain(path);

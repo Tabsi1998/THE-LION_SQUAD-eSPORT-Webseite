@@ -2,8 +2,8 @@ import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MyMembershipScreen } from "./MyMembershipScreen";
 
-// Meine Mitgliedschaft (#339): Stand aus der Mitgliederverwaltung, Belege als PDF, Zuordnung
-// anfragen. Bezahlt wird nicht in der App.
+// Meine Mitgliedschaft (#339): Stand aus der Mitgliederverwaltung, Zuordnung anfragen. Die Belege
+// selbst liegen seit #320 unter „Meine Rechnungen“ - hier nur der Stand und der Weg dorthin.
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
@@ -48,24 +48,20 @@ beforeEach(() => {
   mockOpenInvoice.mockResolvedValue(undefined);
 });
 
-test("Beitrag, Nummer, Funktion und Belege; ein Beleg öffnet sich als PDF, bezahlt wird im Web", async () => {
+test("Beitrag, Nummer, Funktion und der Stand der Belege; der Knopf führt zu „Meine Rechnungen“", async () => {
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText("Aktives Mitglied")).toBeTruthy());
 
   expect(screen.getByText("M-0007")).toBeTruthy();
-  // Beitrag „bezahlt“ und der alte Beleg „bezahlt“
-  expect(screen.getAllByText("bezahlt")).toHaveLength(2);
+  expect(screen.getByText("bezahlt")).toBeTruthy();
   expect(screen.getByText("Bezahlt bis 31.12.2026")).toBeTruthy();
   expect(screen.getByText(/Funktion: Kassier:in/)).toBeTruthy();
   expect(screen.queryByTestId("membership-link")).toBeNull();
 
   expect(screen.getByText(/1 offen/)).toBeTruthy();
-  expect(screen.getByText("Rechnung RE-2026/0007")).toBeTruthy();
-  expect(screen.queryByText(/Jetzt bezahlen/)).toBeNull();
-  expect(screen.getByText(/Bezahlen geht auf der Website/)).toBeTruthy();
-
-  await fireEvent.press(screen.getByTestId("invoice-k1"));
-  await waitFor(() => expect(mockOpenInvoice).toHaveBeenCalledWith(expect.objectContaining({ key: "k1" }), "tok-1"));
+  expect(screen.queryByText("Rechnung RE-2026/0007")).toBeNull();
+  await fireEvent.press(screen.getByTestId("membership-invoices-link"));
+  expect(navigate).toHaveBeenCalledWith("MyInvoices");
 
   await fireEvent.press(screen.getByTestId("membership-card-link"));
   expect(navigate).toHaveBeenCalledWith("MemberCard");
@@ -81,18 +77,10 @@ test("nicht zugeordnet: Zuordnung anfragen, danach „Anfrage eingegangen“", a
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("membership-link")).toBeTruthy());
   expect(screen.getByText("Keine Mitgliedschaft")).toBeTruthy();
-  expect(screen.getByText(/Belege gibt es, sobald/)).toBeTruthy();
+  expect(screen.getByTestId("membership-invoices-link")).toBeTruthy();
 
   await fireEvent.changeText(screen.getByTestId("membership-link-ref"), "M-0042");
   await fireEvent.press(screen.getByText("Zuordnung anfragen"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/dolibarr/link-request", { member_ref: "M-0042" }));
   await waitFor(() => expect(screen.getByTestId("membership-link-requested")).toBeTruthy());
-});
-
-test("Fehler beim Öffnen eines Belegs steht bei der Liste, nicht als Absturz", async () => {
-  mockOpenInvoice.mockRejectedValue(new Error("Der Server antwortet gerade nicht. Bitte später noch einmal."));
-  await render(<MyMembershipScreen navigation={navigation} route={route} />);
-  await waitFor(() => expect(screen.getByTestId("invoice-k1")).toBeTruthy());
-  await fireEvent.press(screen.getByTestId("invoice-k1"));
-  await waitFor(() => expect(screen.getByText(/Server antwortet gerade nicht/)).toBeTruthy());
 });

@@ -4,21 +4,19 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
-import { InvoiceList as InvoiceRows } from "../../components/InvoiceList";
-import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
+import { SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
-import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type DolibarrView } from "../../lib/memberArea";
-import { openInvoice, type Invoice, type InvoiceList } from "../../lib/memberDocuments";
+import type { InvoiceList } from "../../lib/memberDocuments";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
 // Meine Mitgliedschaft in der App (#339): Stand aus der Mitgliederverwaltung (Beitrag, Typ,
-// Nummer), eigene Belege als PDF - und wer noch nicht zugeordnet ist, kann es anfragen.
-// Bezahlt wird nicht in der App: Zahlungslinks öffnen fremde Seiten, das bleibt im Browser.
+// Nummer) - und wer noch nicht zugeordnet ist, kann es anfragen. Die Belege selbst stehen unter
+// „Meine Rechnungen“ (#320): Rechnungen gehören zum Konto, der Mitgliederbereich bleibt Verein.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MyMembership">;
 
@@ -29,7 +27,6 @@ type MembershipMe = {
 };
 
 export function MyMembershipScreen({ navigation }: Props) {
-  const { accessToken } = useAuth();
   const [me, setMe] = useState<MembershipMe | null>(null);
   const [invoices, setInvoices] = useState<InvoiceList | null>(null);
   const [loading, setLoading] = useState(true);
@@ -37,8 +34,6 @@ export function MyMembershipScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [memberRef, setMemberRef] = useState("");
   const [linkState, setLinkState] = useState<"idle" | "sending" | "sent">("idle");
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [openError, setOpenError] = useState("");
 
   const load = useCallback(async () => {
     setError("");
@@ -70,19 +65,6 @@ export function MyMembershipScreen({ navigation }: Props) {
     } catch (err) {
       setLinkState("idle");
       setError(errorMessage(err, "Die Anfrage ging nicht raus."));
-    }
-  };
-
-  const open = async (invoice: Invoice) => {
-    if (!accessToken) return;
-    setOpenError("");
-    setBusyKey(invoice.key);
-    try {
-      await openInvoice(invoice, accessToken);
-    } catch (err) {
-      setOpenError(errorMessage(err, "Der Beleg konnte nicht geöffnet werden."));
-    } finally {
-      setBusyKey(null);
     }
   };
 
@@ -165,31 +147,17 @@ export function MyMembershipScreen({ navigation }: Props) {
           </Card>
         ) : null}
 
-        <View style={styles.section}>
-          <Heading>Meine Belege</Heading>
-          {invoices?.connected === false ? (
-            <Muted>Belege gibt es, sobald dein Konto mit der Mitgliederverwaltung verbunden ist.</Muted>
-          ) : !invoices ? (
-            <Muted>Belege konnten nicht geladen werden.</Muted>
-          ) : (
-            <>
-              {invoices.available === false ? <OfflineNotice detail={`Die Mitgliederverwaltung antwortet gerade nicht${invoices.as_of ? ` – Stand ${formatDateTime(invoices.as_of)}` : ""}.`} /> : null}
-              {invoices.summary?.open_count ? (
-                <Muted style={styles.openSummary}>
-                  {invoices.summary.open_count} offen · {formatMoney(invoices.summary.open_total, invoices.currency)}
-                  {invoices.summary.overdue_count ? ` · ${invoices.summary.overdue_count} überfällig` : ""}
-                </Muted>
-              ) : null}
-              {openError ? <Muted style={styles.error}>{openError}</Muted> : null}
-              {invoices.invoices.length ? (
-                <InvoiceRows invoices={invoices.invoices} currency={invoices.currency} busyKey={busyKey} onOpen={open} />
-              ) : (
-                <EmptyState title="Keine Belege" detail="Sobald der Verein dir eine Rechnung stellt, erscheint sie hier." />
-              )}
-              {invoices.summary?.open_count ? <Muted>Bezahlen geht auf der Website unter „Meine Rechnungen“ – dort führt der Link direkt zum Zahlungsanbieter.</Muted> : null}
-            </>
-          )}
-        </View>
+        <Card style={styles.card} testID="membership-invoices">
+          <Heading>Belege</Heading>
+          {invoices?.summary?.open_count ? (
+            <Muted style={styles.openSummary}>
+              {invoices.summary.open_count} offen · {formatMoney(invoices.summary.open_total, invoices.currency)}
+              {invoices.summary.overdue_count ? ` · ${invoices.summary.overdue_count} überfällig` : ""}
+            </Muted>
+          ) : null}
+          <Muted>Beitrag, Events und Turniere – alle deine Rechnungen stehen gesammelt unter „Meine Rechnungen“.</Muted>
+          <Button label="Meine Rechnungen" variant="secondary" onPress={() => navigation.navigate("MyInvoices")} testID="membership-invoices-link" />
+        </Card>
       </ScrollView>
     </Screen>
   );
