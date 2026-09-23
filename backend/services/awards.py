@@ -166,6 +166,20 @@ async def rebuild_all_awards(db) -> dict:
     return {"tournaments": len(ids), "awards": total}
 
 
+async def needs_backfill(db) -> bool:
+    """Wahr, solange es Turniere mit Ergebnissen, aber noch keine einzige Auszeichnung gibt."""
+    if await db.tournament_awards.count_documents({}, limit=1):
+        return False
+    return bool(await db.tournaments.count_documents({"status": {"$in": list(AWARD_STATUSES)}}, limit=1))
+
+
+async def backfill_awards(db) -> dict | None:
+    """Der Job nach der Einführung: alte Turniere von selbst nachtragen - kein Handgriff für den Betreiber."""
+    if not await needs_backfill(db):
+        return None
+    return await rebuild_all_awards(db)
+
+
 # ---------------------------------------------------------------- Lesen
 
 async def _visible(doc: dict) -> bool:

@@ -183,7 +183,9 @@ Seit dem 15. September gilt:
   `registration_match_summary`; `tournament`, `game`, `season` (aktive),
   `team`; Upsert je (tournament_id, registration_id), Kennung bleibt bei
   Korrektur, Abgemeldete fliegen raus), `rebuild_all_awards` (Nachtragen für
-  alte Turniere), `awards_for_user` (eigene + Team-Turniere; `public_only`
+  alte Turniere), `needs_backfill`/`backfill_awards` (Scheduler-Job
+  `awards_backfill` alle 5 min: einmalig, solange keine Auszeichnung da ist –
+  kein Handgriff für den Betreiber), `awards_for_user` (eigene + Team-Turniere; `public_only`
   filtert draft/nicht öffentlich/Sichtbarkeit), `awards_for_team`,
   `feature_award_for_user` (nur eigene; `users.featured_award_id`),
   `award_view` (ohne Anmelde-/Nutzer-IDs; `image_url` aus
@@ -1172,9 +1174,8 @@ Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
   die Datenschutzerklärung einfügen (Vorschlag am Issue).
 - #386 (#230 Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und
   Teambanner in Web und App; baut auf #385 auf). Nach dem Merge `update.sh`;
-  die alten Turniere trage ich über die Website nach (`POST
-  /api/admin/awards/rebuild`), Build 73 vom Haupt-PC – bzw. ein Build mit
-  #385 zusammen.
+  die alten Turniere trägt der Job `awards_backfill` von selbst nach (alle
+  5 min, läuft leer, sobald Auszeichnungen da sind), Build 73 vom Haupt-PC.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl

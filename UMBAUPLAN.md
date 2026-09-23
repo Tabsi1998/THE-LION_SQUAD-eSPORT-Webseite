@@ -612,7 +612,8 @@ etwas Festes: Was ein Turnier vergeben hat, soll so stehen bleiben, wie es am Ta
 Veröffentlichung war – und sich nur ändern, wenn die Ergebnisse bewusst neu veröffentlicht werden.
 Deshalb hält die Website beim Veröffentlichen je Anmeldung einen Eintrag fest: Platz, Bilanz,
 Teilnehmerzahl, Turnier, Spiel, Saison, Team. Korrektur heißt erneut veröffentlichen; der Eintrag
-wird überschrieben, die Kennung bleibt, Abgemeldete fliegen raus.
+wird überschrieben, die Kennung bleibt, Abgemeldete fliegen raus. Alte Turniere trägt ein Job nach
+dem ersten Start von selbst nach – kein Handgriff, kein Knopf.
 
 **Kein Bild bei der Vergabe.** Der Betreiber hat sich am 23.09. gegen einen Vorlagen-Editor und
 gegen erzeugte Dateien entschieden: Das Banner entsteht beim Ansehen aus den Daten – Web und App

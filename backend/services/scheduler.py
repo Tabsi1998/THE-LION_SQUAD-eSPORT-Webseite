@@ -214,6 +214,16 @@ async def _safe_achievement_sweep():
         _log_task_failure("achievement_sweep", exc)
 
 
+async def _safe_awards_backfill():
+    """Auszeichnungen (#230): alte Turniere einmalig nachtragen, solange noch keine da sind."""
+    try:
+        from database import get_db
+        from services.awards import backfill_awards
+        await backfill_awards(get_db())
+    except Exception as exc:
+        _log_task_failure("awards_backfill", exc)
+
+
 async def _safe_dolibarr_sync():
     try:
         from services.dolibarr_sync import run_sync
@@ -442,6 +452,9 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
+                  max_instances=1, coalesce=True)
+    # Auszeichnungen (#230): nach der Einführung die alten Turniere nachtragen - läuft leer, sobald welche da sind.
+    sched.add_job(_single_replica("awards_backfill", _safe_awards_backfill, lease_seconds=600.0), IntervalTrigger(minutes=5), id="awards_backfill",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("dolibarr_pending", _safe_dolibarr_pending), IntervalTrigger(seconds=30), id="dolibarr_pending",
                   max_instances=1, coalesce=True)

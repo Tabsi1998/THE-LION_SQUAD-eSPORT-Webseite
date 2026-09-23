@@ -118,6 +118,18 @@ async def test_admin_saves_award_images_only_for_the_first_three(flow):
 
 
 @pytest.mark.asyncio
+async def test_backfill_runs_once_and_then_stays_quiet(flow):
+    paula = await flow.add_user(role="player", name="paula")
+    assert await awards.needs_backfill(flow.db) is False, "ohne Turniere gibt es nichts nachzutragen"
+    await seed_tournament(flow, "t1")
+    await flow.db.tournament_registrations.insert_one({"id": "r1", "tournament_id": "t1", "user_id": paula["id"], "status": "approved", "final_position": 1})
+    assert await awards.needs_backfill(flow.db) is True
+    assert await awards.backfill_awards(flow.db) == {"tournaments": 1, "awards": 1}
+    assert await awards.needs_backfill(flow.db) is False
+    assert await awards.backfill_awards(flow.db) is None, "läuft leer, sobald Auszeichnungen da sind"
+
+
+@pytest.mark.asyncio
 async def test_team_awards_and_the_team_banner_are_for_the_leadership(flow):
     leader = await flow.add_user(role="player", name="leader")
     member = await flow.add_user(role="player", name="member")
