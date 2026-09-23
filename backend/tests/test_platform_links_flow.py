@@ -34,6 +34,7 @@ class FakePlatforms:
         self.twitch_user = {"id": "44556677", "login": "paulaplays", "display_name": "PaulaPlays"}
         self.steam_valid = True
         self.steam_name = "Paula auf Steam"
+        self.app_redirects = ["http://localhost:3000/api/platform-links/discord/callback"]
 
     def transport(self):
         return httpx.MockTransport(self.handle)
@@ -43,6 +44,14 @@ class FakePlatforms:
         body = request.content.decode("utf-8") if request.content else ""
         form = {k: v[0] for k, v in parse_qs(body).items()}
         self.calls.append((request.method, url, form or dict(request.url.params)))
+        if url == platform_links.DISCORD_TOKEN and form.get("grant_type") == "client_credentials":
+            import base64
+            expected = "Basic " + base64.b64encode(b"discord-app:discord-geheim").decode()
+            return httpx.Response(200, json={"access_token": "cc"}) if request.headers.get("Authorization") == expected else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.DISCORD_APP_ME:
+            if request.headers.get("Authorization") != "Bot bot-token":
+                return httpx.Response(401, json={"message": "401: Unauthorized"})
+            return httpx.Response(200, json={"id": "discord-app", "redirect_uris": self.app_redirects})
         if url == platform_links.DISCORD_TOKEN:
             assert form.get("grant_type") == "authorization_code" and form.get("client_secret") == "discord-geheim"
             return httpx.Response(200, json={"access_token": "d-token"}) if form.get("code") == "gut" else httpx.Response(400, json={"error": "invalid_grant"})
@@ -50,6 +59,8 @@ class FakePlatforms:
             assert request.headers.get("Authorization") == "Bearer d-token"
             return httpx.Response(200, json=self.discord_user)
         if url == platform_links.TWITCH_TOKEN:
+            if form.get("grant_type") == "client_credentials":
+                return httpx.Response(200, json={"access_token": "app-token"}) if form.get("client_secret") == "twitch-geheim" else httpx.Response(403, json={"message": "invalid client"})
             assert form.get("client_secret") == "twitch-geheim"
             return httpx.Response(200, json={"access_token": "t-token"})
         if url == platform_links.TWITCH_USERS:
@@ -271,3 +282,37 @@ async def test_settings_hide_the_secrets_and_export_and_anonymize_carry_the_link
     assert await flow.db.platform_links.count_documents({"user_id": paula["id"]}) == 0
     user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
     assert "platform_verified" not in user and user["discord_name"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_check_names_what_is_missing(flow, fake):
+    """„Discord prüfen“ im Admin: Client ID/Secret, Zugehörigkeit zur Bot-App und Rückrufadresse - je mit Ergebnis."""
+    chef = await flow.add_user(role="superadmin", name="chef")
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    assert (await flow.post("/api/settings/platform-links/discord/check")).status_code == 403
+
+    flow.act_as(chef)
+    missing = (await flow.post("/api/settings/platform-links/discord/check")).json()
+    assert missing["ok"] is False and missing["checks"][0]["key"] == "credentials" and missing["checks"][0]["state"] == "fail"
+    assert missing["redirect_uri"] == "http://localhost:3000/api/platform-links/discord/callback"
+
+    await configure(flow)
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {"id": "discord", "bot_token": encrypt_secret("bot-token")}}, upsert=True)
+    good = (await flow.post("/api/settings/platform-links/discord/check")).json()
+    assert good["ok"] is True and [c["state"] for c in good["checks"]] == ["ok", "ok", "ok"]
+
+    fake.app_redirects = ["https://falsch.example/callback"]
+    bad_redirect = (await flow.post("/api/settings/platform-links/discord/check")).json()
+    assert bad_redirect["ok"] is False and bad_redirect["checks"][-1]["key"] == "redirect" and "OAuth2 → Redirects" in bad_redirect["checks"][-1]["text"]
+
+    await configure(flow, discord_client_secret=encrypt_secret("falsch"))
+    bad_secret = (await flow.post("/api/settings/platform-links/discord/check")).json()
+    assert bad_secret["checks"][0]["state"] == "fail" and "invalid_client" in bad_secret["checks"][0]["text"]
+
+    twitch = (await flow.post("/api/settings/platform-links/twitch/check")).json()
+    assert twitch["ok"] is True and twitch["checks"][0]["state"] == "ok" and twitch["checks"][1]["state"] == "warn" and "OAuth Redirect URLs" in twitch["checks"][1]["text"]
+    steam = (await flow.post("/api/settings/platform-links/steam/check")).json()
+    assert steam["ok"] is True and steam["checks"][1]["state"] == "warn"
+    assert await flow.db.audit_logs.count_documents({"action": "platform_link.checked"}) == 6
+

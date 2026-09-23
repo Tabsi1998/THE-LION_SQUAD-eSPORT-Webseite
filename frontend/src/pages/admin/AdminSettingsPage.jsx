@@ -13,6 +13,7 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, SystemCard } from "./settings/fields";
 import { TwitchTab } from "./settings/TwitchTab";
 import { PlatformLinkSettings } from "./settings/PlatformLinkSettings";
+import { SetupGuide } from "@/components/tls/SetupGuide";
 import { DiscordBotPanel } from "./settings/DiscordBotPanel";
 import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
@@ -1035,6 +1036,7 @@ export default function AdminSettingsPage() {
             <p>Steuere zentral, wie sich Nutzer anmelden und registrieren. Google wird direkt über ein Google-Cloud-Projekt des Vereins angebunden; ein Client Secret ist für die Anmeldung nicht erforderlich.</p>
           </div>
           <PlatformLinkSettings brand={brand} setBrandField={setBrandField} saving={savingPlatformApps} onSave={savePlatformApps} onClearSecret={clearBrandSecret} />
+          <SetupGuide guideKey="google_login" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <div className="flex items-center justify-between gap-4">
               <div>
@@ -1098,6 +1100,7 @@ export default function AdminSettingsPage() {
 
       {tab === "email" && (
         <div className="max-w-2xl space-y-4">
+          <SetupGuide guideKey="resend" />
           {emailNotConfigured && (
             <div data-testid="email-not-configured" className="flex items-start gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4">
               <AlertTriangle className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
@@ -1151,6 +1154,7 @@ export default function AdminSettingsPage() {
 
       {tab === "smtp" && (
         <div className="max-w-2xl space-y-4">
+          <SetupGuide guideKey="smtp" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <div className="flex items-center justify-between">
               <div className="font-heading font-bold uppercase">Eigener SMTP-Server</div>
@@ -1614,6 +1618,8 @@ export default function AdminSettingsPage() {
 
       {tab === "discord" && (
         <div className="max-w-4xl space-y-4">
+          <SetupGuide guideKey="discord_webhooks" />
+          <SetupGuide guideKey="discord_bot" />
           {discordNotConfigured && (
             <div className="flex items-start gap-3 border border-[#5865F2]/30 bg-[#5865F2]/10 rounded-sm p-4">
               <MessageSquare className="w-5 h-5 text-[#5865F2] shrink-0 mt-0.5" />
@@ -1726,6 +1732,8 @@ export default function AdminSettingsPage() {
       )}
 
       {tab === "twitch" && (
+        <div className="space-y-4">
+          <SetupGuide guideKey="twitch" />
         <TwitchTab
           brand={brand}
           setBrandField={setBrandField}
@@ -1736,10 +1744,12 @@ export default function AdminSettingsPage() {
           onRefresh={refreshTwitch}
           onClearSecret={() => clearTwitchSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))}
         />
+        </div>
       )}
 
       {tab === "brand" && (
         <div className="max-w-7xl space-y-4">
+          <SetupGuide guideKey="play_store" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <BrandField label="Vereinsname" value={brand.club_name} onChange={(v) => setBrandField("club_name", v)} testId="brand-club-name" />
             <BrandField label="Tagline" value={brand.tagline} onChange={(v) => setBrandField("tagline", v)} testId="brand-tagline" />
@@ -1936,6 +1946,8 @@ export default function AdminSettingsPage() {
 
       {tab === "seo" && (
         <div className="max-w-7xl space-y-4">
+          <SetupGuide guideKey="analytics" />
+          <SetupGuide guideKey="search_console" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
             <div>
               <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Indexierung</span>

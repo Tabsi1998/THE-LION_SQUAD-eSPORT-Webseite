@@ -32,6 +32,9 @@ test("verknüpfte Konten: Rahmen, Anzeigename, Datum und offizieller Link je Pla
   expect(screen.getByTestId("linked-account-discord-verified")).toBeInTheDocument();
   const steam = screen.getByTestId("linked-account-steam");
   expect(steam).toHaveAttribute("href", "https://steamcommunity.com/profiles/76561198000000001");
-  // Gleicher Name und Kennung: die Kennung steht nicht doppelt.
+  // Ohne Steam-Schlüssel ist der Name die ID: dann „Steam-Profil“ groß, die ID klein - nicht doppelt.
+  expect(steam).toHaveTextContent("Steam-Profil");
+  expect(steam).toHaveTextContent("Steam · 76561198000000001 · seit 23.09.2026");
   expect(steam).not.toHaveTextContent("76561198000000001 · 76561198000000001");
+  expect(steam.style.getPropertyValue("--social-color")).toBe("#66C0F4");
 });

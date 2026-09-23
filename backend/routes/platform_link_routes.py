@@ -10,7 +10,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from auth import get_current_user
+from auth import get_current_user, require_club_admin
 from database import get_db
 from models import new_id, now_utc
 from services import platform_links
@@ -84,6 +84,25 @@ async def platform_link_callback(platform: str, request: Request):
         return RedirectResponse(platform_links.callback_target(error=exc.code, detail=detail), status_code=302)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})
     return RedirectResponse(platform_links.callback_target(linked=platform), status_code=302)
+
+
+@router.post("/settings/platform-links/{platform}/check")
+async def check_platform_link(platform: str, me: dict = Depends(require_club_admin())):
+    """Für den Admin: passen Client ID, Secret und Rückrufadresse? Discord verrät seine Redirects über den Bot-Token."""
+    platform = _platform(platform)
+    db = get_db()
+    if not platform_links.public_base_url():
+        raise HTTPException(503, "Die öffentliche Adresse der Website ist nicht gesetzt (PUBLIC_BACKEND_URL oder FRONTEND_URL).")
+    branding = await _branding(db)
+    bot_token = None
+    if platform == "discord":
+        discord = await db.settings.find_one({"id": "discord"}, {"_id": 0, "bot_token": 1}) or {}
+        if discord.get("bot_token"):
+            from services.secret_store import decrypt_secret
+            bot_token = decrypt_secret(discord["bot_token"])
+    result = await platform_links.check_provider(platform, branding, bot_token=bot_token)
+    await _audit(db, me["id"], "platform_link.checked", platform, {"ok": result["ok"], "states": [c["state"] for c in result["checks"]]})
+    return result
 
 
 @router.delete("/me/platform-links/{platform}")
