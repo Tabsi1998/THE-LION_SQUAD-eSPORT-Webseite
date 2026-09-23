@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -623,114 +625,88 @@ function ChallengeSettingsForm({ challenge, onSaved }) {
       setCreatingPrizes(false);
     }
   };
+  // Einstellungen im Formular-Rahmen (#434): links Challenge, Strecke und Regeln, Preise; rechts
+  // Veröffentlichung, Zeitplan, Teilnahme und Jahreswertung; unten die feststehende Speichern-Leiste.
   return (
-    <div className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
-      <div className="font-heading font-bold uppercase">Challenge Einstellungen</div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <SmallField label="Titel" value={form.title} onChange={(v)=>set("title", v)} />
-        <SmallField label="Plattform" value={form.platform} onChange={(v)=>set("platform", v)} />
-      </div>
-      {events.length > 0 && (
-        <SmallSelect
-          label="Zugehöriges Event"
-          value={form.event_id || ""}
-          onChange={(v) => set("event_id", v)}
-          options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]}
-        />
-      )}
-      <SmallSelect
-        label="Sichtbarkeit"
-        value={form.visibility}
-        onChange={(v) => set("visibility", v)}
-        options={[
-          ["public", "Öffentlich"],
-          ["community", "Nur registrierte Community"],
-          ["members", "Nur Vereinsmitglieder"],
-          ["internal", "Nur intern"],
-        ]}
-      />
-      <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" allowLibrary />
-      <div className="grid md:grid-cols-2 gap-4">
-        <SmallField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} />
-        <SmallField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} />
-        {form.registration_enabled && <SmallField label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />}
-        {form.registration_enabled && <SmallField label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />}
-      </div>
-      <div className="grid md:grid-cols-2 gap-4">
-        <SmallField label="Fahrzeug" value={form.vehicle} onChange={(v)=>set("vehicle", v)} />
-        <SmallField label="Wetter" value={form.weather} onChange={(v)=>set("weather", v)} />
-        <SmallField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
-        <SmallField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
-      </div>
-      <FastLapSeasonWeightField value={form.season_weight} onChange={(v)=>set("season_weight", v)} />
-      <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
-      {challenge.status === "results_published" && (
-        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gewinnabholung</div>
-            <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
-          </div>
-          <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">
-            {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
-          </button>
-        </div>
-      )}
-      <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
-      <div className="grid sm:grid-cols-2 gap-3">
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.registration_enabled} onChange={(e)=>set("registration_enabled", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Online-Einreichung öffentlich anzeigen</span></label>
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.unlimited_attempts} onChange={(e)=>set("unlimited_attempts", e.target.checked)} className="accent-[#29B6E8] mt-1"/><span>Unbegrenzte Versuche</span></label>
-        <label className="flex items-start gap-2 text-sm text-white/75"><input type="checkbox" checked={form.site_banner_enabled} onChange={(e)=>set("site_banner_enabled", e.target.checked)} className="accent-[#FFD700] mt-1"/><span>Automatisches Fast-Lap-Hinweisbanner anzeigen</span></label>
-      </div>
-      <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 space-y-3">
-        <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Teilnahme & Vereins-Referenzzeiten</div>
-          <div className="text-xs text-white/50 mt-1">Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.</div>
-        </div>
-        <label className="flex items-start gap-2 text-sm text-white/75">
-          <input
-            type="checkbox"
-            checked={form.block_club_member_results}
-            onChange={(e)=>{
-              const checked = e.target.checked;
-              setForm((f) => ({ ...f, block_club_member_results: checked, allow_club_reference_times: checked ? true : f.allow_club_reference_times }));
-            }}
-            className="accent-[#29B6E8] mt-1"
-          />
-          <span><strong className="text-white">Vereinsmitglieder aus offizieller Wertung ausschließen</strong><br /><span className="text-xs text-white/50">Sie erscheinen nicht in Rangliste, Jahrespunkten oder Achievements dieser Challenge.</span></span>
-        </label>
-        <label className="flex items-start gap-2 text-sm text-white/75">
-          <input
-            type="checkbox"
-            checked={form.allow_club_reference_times}
-            disabled={form.block_club_member_results}
-            onChange={(e)=>set("allow_club_reference_times", e.target.checked)}
-            className="accent-[#29B6E8] mt-1 disabled:opacity-50"
-          />
-          <span><strong className="text-white">Vereins-Referenzzeiten erlauben</strong><br /><span className="text-xs text-white/50">Separater Bereich außer Wertung als Motivation/Zielzeit.</span></span>
-        </label>
-        <label className="flex items-start gap-2 text-sm text-white/75">
-          <input
-            type="checkbox"
-            checked={form.show_club_reference_times}
-            disabled={!form.allow_club_reference_times}
-            onChange={(e)=>set("show_club_reference_times", e.target.checked)}
-            className="accent-[#29B6E8] mt-1 disabled:opacity-50"
-          />
-          <span><strong className="text-white">Referenzzeiten öffentlich anzeigen</strong><br /><span className="text-xs text-white/50">Wenn aus, bleiben Referenzzeiten nur im Admin sichtbar.</span></span>
-        </label>
-      </div>
-      {!form.unlimited_attempts && <SmallField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} />}
-      <button type="button" onClick={save} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Speichern</button>
-    </div>
-  );
-}
+    <div className="mb-6 min-w-0" data-testid="f1-edit-settings">
+      <FormColumns
+        aside={(
+          <>
+            <FormSection title="Veröffentlichung und Zeitplan" hint="Live und Beendet werden anhand von Start/Ende automatisch geschaltet.">
+              {events.length > 0 && (
+                <SelectField label="Zugehöriges Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— kein Event —"], ...events.map((e) => [e.id, e.name])]} testId="f1-edit-event" />
+              )}
+              <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Nur registrierte Community"], ["members", "Nur Vereinsmitglieder"], ["internal", "Nur intern"]]} testId="f1-edit-visibility" />
+              <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} testId="f1-edit-start" />
+              <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} testId="f1-edit-end" />
+              <CheckField label="Online-Einreichung öffentlich anzeigen" checked={form.registration_enabled} onChange={(v)=>set("registration_enabled", v)} testId="f1-edit-reg-enabled" />
+              {form.registration_enabled && <TextField label="Online-Einreichung öffnet" type="datetime-local" value={form.registration_open_from} onChange={(v)=>set("registration_open_from", v)} />}
+              {form.registration_enabled && <TextField label="Online-Einreichung endet" type="datetime-local" value={form.registration_open_until} onChange={(v)=>set("registration_open_until", v)} />}
+              <CheckField label="Automatisches Fast-Lap-Hinweisbanner anzeigen" checked={form.site_banner_enabled} onChange={(v)=>set("site_banner_enabled", v)} accent="#FFD700" />
+            </FormSection>
+            <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent="#FFD700" hint="Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.">
+              <CheckField
+                label="Vereinsmitglieder aus offizieller Wertung ausschließen"
+                hint="Sie erscheinen nicht in Rangliste, Jahrespunkten oder Achievements dieser Challenge."
+                checked={form.block_club_member_results}
+                onChange={(checked) => setForm((f) => ({ ...f, block_club_member_results: checked, allow_club_reference_times: checked ? true : f.allow_club_reference_times }))}
+              />
+              <CheckField
+                label="Vereins-Referenzzeiten erlauben"
+                hint="Separater Bereich außer Wertung als Motivation/Zielzeit."
+                checked={form.allow_club_reference_times}
+                disabled={form.block_club_member_results}
+                onChange={(v)=>set("allow_club_reference_times", v)}
+              />
+              <CheckField
+                label="Referenzzeiten öffentlich anzeigen"
+                hint="Wenn aus, bleiben Referenzzeiten nur im Admin sichtbar."
+                checked={form.show_club_reference_times}
+                disabled={!form.allow_club_reference_times}
+                onChange={(v)=>set("show_club_reference_times", v)}
+              />
+            </FormSection>
+            <FastLapSeasonWeightField value={form.season_weight} onChange={(v)=>set("season_weight", v)} />
+          </>
+        )}
+      >
+        <FormSection title="Die Challenge">
+          <FormGrid>
+            <TextField label="Titel" value={form.title} onChange={(v)=>set("title", v)} testId="f1-edit-title" />
+            <TextField label="Plattform" value={form.platform} onChange={(v)=>set("platform", v)} />
+          </FormGrid>
+          <FieldLabel label="Beschreibung">
+            <MarkdownEditor value={form.description} onChange={(v)=>set("description", v)} rows={5} testId="f1-edit-description" placeholder="Beschreibung" />
+          </FieldLabel>
+          <ImageUpload value={form.banner_url} onChange={(v)=>set("banner_url", v)} label="Challenge-Banner" testId="f1-edit-banner-upload" variant="wide" allowLibrary />
+        </FormSection>
 
-function SmallField({ label, value, onChange, type = "text" }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
+        <FormSection title="Strecke und Regeln" hint="Was die Teilnehmer wissen müssen, um vergleichbare Zeiten zu fahren.">
+          <FormGrid cols={4}>
+            <TextField label="Fahrzeug" value={form.vehicle} onChange={(v)=>set("vehicle", v)} />
+            <TextField label="Wetter" value={form.weather} onChange={(v)=>set("weather", v)} />
+            <TextField label="Fahrhilfen" value={form.assists_allowed} onChange={(v)=>set("assists_allowed", v)} />
+            <TextField label="Controller-Typ" value={form.controller_type} onChange={(v)=>set("controller_type", v)} />
+          </FormGrid>
+          <CheckField label="Unbegrenzte Versuche" checked={form.unlimited_attempts} onChange={(v)=>set("unlimited_attempts", v)} />
+          {!form.unlimited_attempts && <TextField label="Max Versuche" type="number" value={form.max_attempts} onChange={(v)=>set("max_attempts", Number(v))} className="md:max-w-xs" />}
+        </FormSection>
+
+        <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
+        {challenge.status === "results_published" && (
+          <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gewinnabholung</div>
+              <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
+            </div>
+            <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">
+              {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
+            </button>
+          </div>
+        )}
+      </FormColumns>
+      <FormActions onSubmitClick={save} submitTestId="f1-edit-save" icon={null} />
+    </div>
   );
 }
 
@@ -794,17 +770,6 @@ function FastLapPrizeEditor({ value, onChange }) {
       ))}
       {prizes.length === 0 && <div className="text-xs text-white/40">Noch keine Preise hinterlegt.</div>}
     </div>
-  );
-}
-
-function SmallSelect({ label, value, onChange, options }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <select value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-    </label>
   );
 }
 
