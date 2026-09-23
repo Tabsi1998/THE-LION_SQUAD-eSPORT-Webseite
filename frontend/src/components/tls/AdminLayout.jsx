@@ -110,7 +110,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/documents": ["dateien", "downloads"],
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
-  "/admin/about": ["ueber uns", "verein", "leitbild", "werte", "texte", "about"],
+  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge"],
