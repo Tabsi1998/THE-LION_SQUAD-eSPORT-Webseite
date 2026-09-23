@@ -216,6 +216,32 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Kalender auf der Website (#402; PR #413, baut auf #411 auf; kein Build).
+  `services/calendar_items.py` (NEU): `collect(db, user)` – Events, Turniere
+  (`is_public` ≠ False; Anmeldeschluss als eigener Eintrag `marker:
+  registration_close`, id `{id}-anmeldeschluss`) und Fast-Lap-Challenges ohne
+  Entwürfe, je Eintrag `id/kind/slug/title/start/end/status/phase/location/
+  path/visibility/mine`; Sichtbarkeit über `user_can_see`, `mine` aus
+  `event_registrations` (registered/checked_in/waitlist) und
+  `tournament_registrations` (`user_id`, nicht cancelled/rejected/withdrawn/
+  no_show); `ics_feed(items, origin=)` (RFC-5545-Faltung bei 75 Byte, ohne
+  Ende zwei Stunden, `STATUS:CANCELLED`, `X-WR-CALNAME`). Routen
+  `routes/calendar_routes.py`: `GET /api/calendar` (`items`, `signed_in`,
+  `feed_path`), `GET /api/calendar/feed.ics` (immer anonyme Sicht, `text/
+  calendar`, Cache 10 min, Origin via `seo_render_routes.public_origin`).
+  Sitemap `+/calendar`. Web: `lib/calendar.js` (Port von
+  `mobile/src/lib/calendar.ts` + `upcomingItems`, `filterKinds`, `feedUrls`
+  https/webcal, `KIND_COLORS` event #9F7AEA / tournament #FFD700 / fastlap
+  #29B6E8), `pages/public/CalendarPage.jsx` (`/calendar`: Raster
+  `calendar-grid`, `calendar-prev/next/title`, `calendar-day-{key}`,
+  `calendar-dot-{key}-{kind}`, Art-Filter `calendar-kind-{kind}` (letzte
+  bleibt), Tagesliste `calendar-day-items`/`calendar-day-empty`,
+  `calendar-item-{kind}-{id}`, „Als Nächstes“ `calendar-upcoming`, Abo
+  `calendar-subscribe` mit `calendar-feed-url`/`-copy`/`calendar-webcal`,
+  Login-Hinweis `calendar-login-hint` nur ohne `signed_in`), Menü „Kalender“
+  nach Events (`MainNav`), Events-Seite Knopf `events-tab-calendar`. Tests
+  `test_calendar_flow.py` (4), `calendar.test.js` (4),
+  `CalendarPage.test.jsx` (2). Startseite „Diesen Monat“ kommt mit #407.
 - Events in der App: Kosten und Teilnehmer (#396, #397; PR #411; Build 76).
   Backend `event_routes._attach_event_registration_view`: `manages` = Staff-Rolle
   oder Bereich `tournaments`/`club` (Vorstand) – sieht alle Anmeldungen mit
@@ -1310,8 +1336,12 @@ Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
 
 ### Offene PRs
 - #411 (#396 + #397 Events in der App: Kosten, Teilnehmer, Check-in; Backend +
-  App; nach dem Merge `update.sh`, Build 76 baue ich vom Merge-Commit). Nach
-  #398 beim Betreiber: `update.sh`, dann Einstellungen →
+  App; nach dem Merge `update.sh`, Build 76 baue ich vom Merge-Commit). #413
+  (#402 Kalender auf der Website; Backend + Web; Entwurf, gestapelt auf #411 –
+  nach dem Merge von #411 auf `main` umsetzen und freigeben; `update.sh`).
+  Reihenfolge: #411 → #413. Danach #414 (Melden/Blockieren in der App –
+  Google-Pflicht vor dem geschlossenen Test, aufgefallen beim IARC-Fragebogen
+  am 23.09.). Nach #398 beim Betreiber: `update.sh`, dann Einstellungen →
   Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
   übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
   entfernen (steht jetzt fest im Abschnitt LionsAPP).

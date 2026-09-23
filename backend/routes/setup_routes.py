@@ -281,7 +281,7 @@ TOURNAMENT_SITEMAP_PATHS = [
     ("standings", "0.65"),
 ]
 STATIC_SITEMAP_PATHS = [
-    "/", "/about", "/news", "/events", "/esports", "/tournaments", "/fastlap",
+    "/", "/about", "/news", "/events", "/calendar", "/esports", "/tournaments", "/fastlap",
     "/teams", "/servers", "/members", "/membership/join",
     "/sponsors", "/partners", "/contact", "/board", "/values", "/galerie", "/references",
 ]

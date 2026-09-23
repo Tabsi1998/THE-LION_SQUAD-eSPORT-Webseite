@@ -59,6 +59,7 @@ const EsportsOverviewPage = lazy(() => import("@/pages/public/EsportsOverviewPag
 const F1ListPage = lazy(() => import("@/pages/public/F1ListPage"));
 const F1DetailPage = lazy(() => import("@/pages/public/F1DetailPage"));
 const EventsPage = lazy(() => import("@/pages/public/EventsPage"));
+const CalendarPage = lazy(() => import("@/pages/public/CalendarPage"));
 const EventDetailPage = lazy(() => import("@/pages/public/EventDetailPage"));
 const EventLivePage = lazy(() => import("@/pages/public/EventLivePage"));
 const TeamsPage = lazy(() => import("@/pages/public/TeamsPage"));
@@ -216,6 +217,7 @@ function App() {
           <Route path="/events" element={<EventsPage />} />
           <Route path="/events/:slug" element={<EventDetailPage />} />
           <Route path="/events/:slug/live" element={<EventLivePage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:id" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />

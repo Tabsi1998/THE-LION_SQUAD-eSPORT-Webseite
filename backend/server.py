@@ -63,6 +63,7 @@ from routes.notification_routes import router as notification_router
 from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
+from routes.calendar_routes import router as calendar_router
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
 from routes.contact_board_routes import contact_router, board_router
@@ -276,6 +277,7 @@ app.include_router(seo_render_router)
 app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)
+app.include_router(calendar_router)
 app.include_router(prize_router)
 app.include_router(setup_router)
 app.include_router(sitemap_router)
