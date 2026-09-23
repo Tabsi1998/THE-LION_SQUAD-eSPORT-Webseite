@@ -151,7 +151,7 @@
       "post": {
         "operationId": "postApplication",
         "summary": "Beitrittsantrag von einer Website: ein Mitglied im Entwurf mit seinen Einwilligungen",
-        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Nochmals mit derselben external_id geschickt, antwortet es mit dem beim ersten Mal angelegten Mitglied und duplicate true.",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Nochmals mit derselben external_id geschickt, antwortet es mit dem beim ersten Mal angelegten Mitglied und duplicate true. Dieselbe external_id mit anderem Inhalt wird mit 409 abgelehnt, damit nichts stillschweigend überschrieben wird.",
         "requestBody": {
           "required": true,
           "content": {
@@ -180,6 +180,9 @@
             "$ref": "#/components/responses/Error"
           },
           "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           },
           "500": {
@@ -682,6 +685,646 @@
           ],
           [
             "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/consents": {
+      "get": {
+        "operationId": "getMemberConsents",
+        "summary": "Einwilligungen eines Mitglieds mit Stand und aktueller Textversion",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stand je Zweck",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberConsent"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      },
+      "post": {
+        "operationId": "postMemberConsent",
+        "summary": "Einwilligung erteilen oder widerrufen",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Zustimmen geht nur mit der aktuellen Textversion; widerrufen geht immer, auch wenn es inzwischen eine neue Fassung gibt (Art. 7 Abs. 3 DSGVO). Eine Zustimmung, die älter ist als ein bereits gespeicherter Widerruf, wird mit 409 abgelehnt.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsentDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Was gespeichert wurde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentDecisionResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/applications/{external_id}": {
+      "get": {
+        "operationId": "getApplication",
+        "summary": "Stand eines Beitrittsantrags",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Interne Anmerkungen sind nie enthalten.",
+        "parameters": [
+          {
+            "name": "external_id",
+            "in": "path",
+            "required": true,
+            "description": "Kennung des Antrags auf der Website",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stand des Antrags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationState"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/applications/{external_id}/withdraw": {
+      "post": {
+        "operationId": "postApplicationWithdraw",
+        "summary": "Beitrittsantrag zurückziehen",
+        "description": "Braucht das Recht, den Verein zu lesen, und das Recht, Beitrittsanträge anzulegen. Geht nur, solange der Verein nicht entschieden hat; ein aufgenommener Antrag endet über den Austritt des Mitglieds, nicht hier.",
+        "parameters": [
+          {
+            "name": "external_id",
+            "in": "path",
+            "required": true,
+            "description": "Kennung des Antrags auf der Website",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Der Antrag ist zurückgezogen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationWithdrawResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/changes": {
+      "get": {
+        "operationId": "getChanges",
+        "summary": "Änderungen seit einem Cursor, als Änderungsnachweis",
+        "description": "Sagt nur, dass sich etwas geändert hat, nie was: Objektart, ID, Revision, Änderungsart und Zeitpunkt. Keine Namen, Beträge, Rechnungsinhalte, Unterschriften oder Stimmen. Die aktuellen Daten liest der Client über die fachlichen Endpunkte, die selbst entscheiden, was er sehen darf. Einträge der letzten Sekunden werden zurückgehalten, damit eine noch offene Transaktion nicht hinter einen bestätigten Cursor rutscht. Liegt der Cursor vor der Aufbewahrung, antwortet der Feed mit resync_required und ohne Ereignisse.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "Stand des Lesers; leer beginnt am Anfang",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Ereignisse je Seite, 100 ohne Angabe",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "required": false,
+            "description": "Objektarten mit Komma getrennt; leer für alle",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eine Seite des Änderungsfeeds",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeFeed"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:sync:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/changes/snapshot": {
+      "get": {
+        "operationId": "getChangesSnapshot",
+        "summary": "Welche Objekte es gerade gibt, für den Vollabgleich",
+        "description": "Eine Seite führt die IDs einer Objektart auf, sonst nichts. Erst die letzte Seite setzt complete auf true; nur dann darf ein Client aus fehlenden IDs schließen, dass es die Objekte nicht mehr gibt. Ein abgebrochener Abgleich ist kein Beweis für Löschungen. Der mitgelieferte Cursor ist der Stand zu Beginn des Abgleichs, damit der Client danach lückenlos im Feed weiterliest.",
+        "parameters": [
+          {
+            "name": "object_type",
+            "in": "query",
+            "required": false,
+            "description": "Objektart: membership, function, fee, application oder consent",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "membership",
+                "function",
+                "fee",
+                "application",
+                "consent"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "description": "Weiter nach dieser ID, 0 zum Beginnen",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Objekte je Seite, 100 ohne Angabe",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eine Seite des Vollabgleichs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:sync:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/identities/claim": {
+      "post": {
+        "operationId": "postIdentityClaim",
+        "summary": "Bindung einlösen: Kennung plus einmaliger Code",
+        "description": "Die Anwendung schickt die Kennung, unter der sie die Person führt, und den einmaligen Code, den der Verein dieser Person gegeben hat. Der Code gilt eine Stunde, verfällt beim ersten Einlösen und ist bei einer anderen Anwendung wertlos. Eine E-Mail-Adresse oder Mitgliedsnummer genügt nie: sie findet Kandidaten, sie beweist nichts.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "Der einmalige Code der Einladung",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die entstandene Bindung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/identities/me": {
+      "get": {
+        "operationId": "getIdentityMe",
+        "summary": "Für wen die Anwendung gerade handelt",
+        "description": "Die Bindung dieser Kennung bei dieser Anwendung: Objekt, Fähigkeiten und Nachweis. Sonst nichts.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Bindung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/consents": {
+      "get": {
+        "operationId": "getMyConsents",
+        "summary": "Eigene Einwilligungen der gebundenen Person",
+        "description": "Nur die eigenen Einwilligungen, und nur wenn der Verein die Fähigkeit consents für diese Bindung eingeschaltet hat. Eine Bindung, die nur einen Antrag trägt, hat kein Mitglied und bekommt hier nichts.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Einwilligungen der Person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberConsent"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/application": {
+      "get": {
+        "operationId": "getMyApplication",
+        "summary": "Eigener Beitrittsantrag der gebundenen Person",
+        "description": "Ein Antragsteller ist noch niemandes Mitglied. Das hier ist das Einzige, was so eine Bindung öffnet: der Stand des eigenen Antrags, nie die Daten eines Mitglieds.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stand des eigenen Antrags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyApplication"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/applicationform": {
+      "get": {
+        "operationId": "getApplicationForm",
+        "summary": "Welche Felder der Antrag verlangt",
+        "description": "Damit eine Website genau das fragt, was der gedruckte Antrag des Vereins fragt: welche Felder Pflicht sind und welche eigenen Felder der Verein hat. Ein Antrag ohne Pflichtfeld wird mit derselben Liste abgewiesen.",
+        "responses": {
+          "200": {
+            "description": "Die Felder des Antrags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationForm"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:application:write"
           ]
         ]
       }
@@ -1300,6 +1943,30 @@
               "payment_url": {
                 "type": "string",
                 "description": "Dolibarrs Online-Zahlungsseite für den Beitrag; leer, außer der Beitrag ist fällig, das Mitglied zahlt selbst und ein Online-Zahlungsdienst ist eingerichtet"
+              },
+              "mandate": {
+                "type": "object",
+                "description": "Stand des SEPA-Mandats des Zahlers. Nie Kontodaten",
+                "required": [
+                  "status",
+                  "signed_on"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "none",
+                      "valid",
+                      "expired"
+                    ],
+                    "description": "off: Dolibarrs Lastschrift-Modul ist aus; none: kein Mandat; valid: gültig; expired: 36 Monate kein Einzug"
+                  },
+                  "signed_on": {
+                    "type": "string",
+                    "description": "Tag der Unterschrift, sonst leer"
+                  }
+                }
               }
             }
           },
@@ -1497,8 +2164,32 @@
                 },
                 "version": {
                   "type": "integer"
+                },
+                "granted_at": {
+                  "type": "string",
+                  "description": "Zeitpunkt der Zustimmung auf der Website, ISO 8601 (z. B. 2026-09-22T19:30:00). Nachweis nach Art. 7 Abs. 1 DSGVO"
+                },
+                "form": {
+                  "type": "string",
+                  "description": "Formular oder Seite, auf der zugestimmt wurde, höchstens 128 Zeichen"
+                },
+                "reference": {
+                  "type": "string",
+                  "description": "Kennung des Vorgangs auf der Website, höchstens 64 Zeichen. Keine IP-Adresse"
                 }
               }
+            }
+          },
+          "signature": {
+            "type": "string",
+            "description": "Am Bildschirm gezeichnete Unterschrift als PNG, base64 kodiert, höchstens 200000 Bytes. Sie erscheint im Antrags-PDF. Einfache elektronische Signatur (Art. 25 eIDAS), keine qualifizierte"
+          },
+          "fields": {
+            "type": "object",
+            "description": "Eigene Felder des Vereins, etwa ein Gamertag: Kürzel => Wert. Welche es gibt und welche Pflicht sind, sagt GET /vereine/applicationform; ein Feld, das der Antrag nicht kennt, wird abgewiesen.",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 255
             }
           }
         }
@@ -1534,6 +2225,14 @@
           "duplicate": {
             "type": "boolean",
             "description": "true, wenn ein Antrag mit dieser external_id schon eingegangen ist; nichts Neues wurde angelegt"
+          },
+          "document": {
+            "type": "boolean",
+            "description": "Ob der Mitgliedsantrag als PDF bei den Dokumenten des Mitglieds abgelegt wurde"
+          },
+          "application_status": {
+            "type": "string",
+            "description": "Stand des Antrags: received, in_review, accepted, rejected oder withdrawn"
           }
         }
       },
@@ -1734,6 +2433,433 @@
           "fee": {
             "type": "boolean",
             "description": "Eine Beitragsrechnung: mit einer Beitragsperiode verknüpft, aus einem Beitragslauf oder von der Mitgliedskarte"
+          }
+        }
+      },
+      "MemberConsent": {
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "state",
+          "version",
+          "current_version",
+          "can_give",
+          "can_withdraw"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Kennung des Zwecks"
+          },
+          "label": {
+            "type": "string",
+            "description": "Kurzname des Zwecks"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "given",
+              "withdrawn"
+            ],
+            "description": "Stand des Mitglieds zu diesem Zweck"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Version, der das Mitglied zugestimmt hat; 0, wenn noch nie"
+          },
+          "current_version": {
+            "type": "integer",
+            "description": "Aktuelle Version des Textes; 0, wenn der Zweck nicht mehr aktiv ist"
+          },
+          "moment": {
+            "type": "string",
+            "description": "Zeitpunkt der letzten Entscheidung"
+          },
+          "can_give": {
+            "type": "boolean",
+            "description": "Ob jetzt zugestimmt werden kann (aktiver Text, noch nicht in der aktuellen Version erteilt)"
+          },
+          "can_withdraw": {
+            "type": "boolean",
+            "description": "Ob jetzt widerrufen werden kann"
+          }
+        }
+      },
+      "ConsentDecision": {
+        "type": "object",
+        "required": [
+          "code",
+          "decision"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Kennung des Zwecks"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "given",
+              "withdrawn"
+            ],
+            "description": "Zustimmen oder widerrufen"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Bei given: die Version des Textes, die gezeigt wurde. Eine ältere Version wird mit 400 abgelehnt"
+          },
+          "granted_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Entscheidung, ISO 8601"
+          },
+          "form": {
+            "type": "string",
+            "description": "Formular oder Seite, auf der entschieden wurde"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Kennung des Vorgangs. Derselbe Auftrag nochmals geschickt wird nur einmal gespeichert"
+          }
+        }
+      },
+      "ConsentDecisionResult": {
+        "type": "object",
+        "required": [
+          "code",
+          "state",
+          "version",
+          "recorded"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "given",
+              "withdrawn"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "recorded": {
+            "type": "boolean",
+            "description": "False, wenn derselbe Auftrag schon gespeichert war"
+          }
+        }
+      },
+      "ApplicationState": {
+        "type": "object",
+        "required": [
+          "external_id",
+          "status",
+          "received_at"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "in_review",
+              "accepted",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "received_at": {
+            "type": "string",
+            "description": "Wann der Antrag hereinkam"
+          },
+          "decided_at": {
+            "type": "string",
+            "description": "Wann entschieden wurde, sonst leer"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Bei einer Ablehnung: der Grund, der für die Person bestimmt ist. Nie interne Anmerkungen"
+          },
+          "member_id": {
+            "type": "integer",
+            "description": "Nach der Aufnahme die bestätigte Mitglieds-ID, sonst 0"
+          },
+          "member_ref": {
+            "type": "string",
+            "description": "Nach der Aufnahme die Mitgliedsnummer, sonst leer"
+          }
+        }
+      },
+      "ApplicationWithdrawResult": {
+        "type": "object",
+        "required": [
+          "external_id",
+          "status",
+          "changed"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "withdrawn"
+            ]
+          },
+          "changed": {
+            "type": "boolean",
+            "description": "False, wenn der Antrag schon zurückgezogen war"
+          }
+        }
+      },
+      "ChangeEvent": {
+        "type": "object",
+        "description": "Ein Änderungsvermerk. Er nennt nie den Inhalt der Änderung.",
+        "required": [
+          "event_id",
+          "object_type",
+          "object_id",
+          "revision",
+          "change",
+          "occurred_at"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "description": "Bleibt bei Wiederholung derselben Änderung gleich"
+          },
+          "object_type": {
+            "type": "string",
+            "enum": [
+              "membership",
+              "function",
+              "fee",
+              "application",
+              "consent"
+            ]
+          },
+          "object_id": {
+            "type": "integer"
+          },
+          "revision": {
+            "type": "integer",
+            "description": "Wievielte Änderung dieses Objekts"
+          },
+          "change": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "deleted",
+              "unlinked",
+              "revoked"
+            ]
+          },
+          "occurred_at": {
+            "$ref": "#/components/schemas/Moment"
+          }
+        }
+      },
+      "ChangeFeed": {
+        "type": "object",
+        "required": [
+          "events",
+          "next_cursor",
+          "resync_required",
+          "has_more",
+          "retention_days"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChangeEvent"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "description": "Undurchsichtig; unverändert zurückgeben"
+          },
+          "resync_required": {
+            "type": "boolean",
+            "description": "true: Cursor zu alt oder unbekannt, Vollabgleich nötig"
+          },
+          "has_more": {
+            "type": "boolean",
+            "description": "Es warten weitere Seiten"
+          },
+          "retention_days": {
+            "type": "integer",
+            "description": "So lange wird ein Eintrag aufbewahrt"
+          }
+        }
+      },
+      "ChangeSnapshot": {
+        "type": "object",
+        "required": [
+          "object_type",
+          "objects",
+          "next_after",
+          "complete",
+          "cursor"
+        ],
+        "properties": {
+          "object_type": {
+            "type": "string"
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "object_type",
+                "object_id"
+              ],
+              "properties": {
+                "object_type": {
+                  "type": "string"
+                },
+                "object_id": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "next_after": {
+            "type": "integer",
+            "description": "Nächster Aufruf mit after = diesem Wert"
+          },
+          "complete": {
+            "type": "boolean",
+            "description": "true nur auf der letzten Seite; vorher nichts löschen"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Stand zu Beginn des Abgleichs, für das Weiterlesen im Feed"
+          }
+        }
+      },
+      "Identity": {
+        "type": "object",
+        "description": "Eine Bindung: für wen die Anwendung handeln darf und was sie dabei darf.",
+        "required": [
+          "subject",
+          "capabilities",
+          "proof",
+          "linked_at"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "member_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Das Mitglied, an das gebunden ist; null bei einem Antragsteller"
+          },
+          "application_id": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Der Antrag, an den gebunden ist; null bei einem Mitglied"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "consents",
+                "applications",
+                "documents",
+                "votes"
+              ]
+            }
+          },
+          "proof": {
+            "type": "string",
+            "enum": [
+              "invitation",
+              "admin",
+              "rule"
+            ]
+          },
+          "linked_at": {
+            "$ref": "#/components/schemas/Moment"
+          }
+        }
+      },
+      "MyApplication": {
+        "type": "object",
+        "required": [
+          "application_id",
+          "status"
+        ],
+        "properties": {
+          "application_id": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": "string",
+            "description": "Wann entschieden wurde, sonst leer"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ApplicationForm": {
+        "type": "object",
+        "required": [
+          "required",
+          "fields"
+        ],
+        "properties": {
+          "required": {
+            "type": "array",
+            "description": "Pflichtfelder, die ein Web-Antrag mitschicken muss",
+            "items": {
+              "type": "string",
+              "enum": [
+                "lastname",
+                "firstname",
+                "address",
+                "zip",
+                "town",
+                "birth",
+                "phone",
+                "email"
+              ]
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "label",
+                "required"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            }
           }
         }
       }

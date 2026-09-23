@@ -2,8 +2,8 @@
   "comment": "Festgehaltener API-Vertrag der Dolibarr-Module, gegen den die Website-Tests pruefen (#330). Die Module pruefen ihre echten Antworten in Dolibarr 22, 23 und 24 selbst gegen dieselbe Datei.",
   "vereine": {
     "repository": "Tabsi1998/dolibarr-vereine",
-    "module_version": "0.5.12-beta",
-    "commit": "d181d96",
+    "module_version": "0.8.0-beta",
+    "commit": "c6a5b28",
     "api_version": 1,
     "openapi": "vereine-openapi.json",
     "used_paths": [
@@ -14,9 +14,17 @@
       "/vereine/members/{id}/invoices",
       "/vereine/members/{id}/invoices/{invoice}/pdf",
       "/vereine/organization",
-      "/vereine/board"
+      "/vereine/board",
+      "/vereine/applicationform",
+      "/vereine/membershipfees",
+      "/vereine/consents",
+      "/vereine/applications",
+      "/vereine/applications/{external_id}",
+      "/vereine/applications/{external_id}/withdraw"
     ],
-    "core_paths": ["/status"],
+    "core_paths": [
+      "/status"
+    ],
     "waiting_for": {
       "verified_identities": "dolibarr-vereine#153",
       "change_feed": "dolibarr-vereine#154",

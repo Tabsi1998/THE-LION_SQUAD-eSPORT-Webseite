@@ -461,6 +461,14 @@ export default function AdminDolibarrPage() {
                   <div className="text-xs text-white/45">Nur bei genau einem Treffer und wenn das Mitglied noch keinem Konto gehört. Aus heißt: Jede Zuordnung bestätigt die Vereinsverwaltung.</div>
                 </div>
               </div>
+              {/* Beitrittsanträge nach Dolibarr (#328): nur im Modus Live wirksam; aus = Antrag und Entscheidung bleiben auf der Website. */}
+              <div className="mt-4 flex items-start gap-3 text-sm">
+                <input type="checkbox" id="dolibarr-applications" checked={!!status?.applications_enabled} disabled={!!busy} onChange={(e) => saveSettings({ applications_enabled: e.target.checked }, e.target.checked ? "Beitrittsanträge gehen nach Dolibarr." : "Beitrittsanträge bleiben auf der Website.")} className="mt-1 accent-[#29B6E8]" data-testid="dolibarr-applications-enabled" />
+                <div>
+                  <label htmlFor="dolibarr-applications" className="font-bold">Beitrittsanträge nach Dolibarr senden</label>
+                  <div className="text-xs text-white/45">„Mitglied werden“ fragt dann die Pflichtfelder, Mitgliedsarten und Einwilligungstexte aus Dolibarr ab und legt den Antrag dort als Mitglied im Entwurf an. Aufgenommen oder abgelehnt wird nur in Dolibarr; die Website zeigt den Stand und schaltet das Konto bei der Aufnahme frei. Wirkt nur im Modus „Live“{status?.mode !== "live" ? " – der steht gerade nicht" : ""}. Der API-Benutzer braucht das Recht „Beitrittsanträge über die API anlegen“.</div>
+                </div>
+              </div>
             </Panel>
             <Panel title="Benachrichtigung aus Dolibarr (Webhook)">
               <p className="text-xs text-white/45 mb-3">Optional. Dolibarr meldet, dass sich ein Mitglied geändert hat; die Website liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
