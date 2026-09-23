@@ -1,4 +1,8 @@
-import { Link2 } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Link2, ShieldQuestion, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatRequestError } from "@/lib/api";
+import { SetupGuide } from "@/components/tls/SetupGuide";
 
 // Plattform-Konten verknüpfen (#260): die Discord-App und der optionale Steam-Schlüssel. Twitch
 // nutzt die Helix-App aus dem Twitch-Reiter. Die Rückrufadressen stehen hier zum Kopieren – die
@@ -22,8 +26,43 @@ function SecretInput({ label, value, masked, onChange, onClear, testId, placehol
   );
 }
 
+const CHECK_ICON = { ok: [CheckCircle2, "text-[#00FF88]"], fail: [XCircle, "text-[#FF3B30]"], warn: [ShieldQuestion, "text-[#FFD700]"] };
+
+// „Discord prüfen“ usw.: der Server testet Client ID und Secret gegen die Plattform und liest bei
+// Discord die Rückrufadressen der App - so steht hier, was fehlt, statt im Profil nur „geht nicht“.
+function CheckResult({ platform, result }) {
+  if (!result) return null;
+  return (
+    <ul className="mt-2 space-y-1 text-xs" data-testid={`platform-check-result-${platform}`}>
+      {result.checks.map((check) => {
+        const [Icon, tone] = CHECK_ICON[check.state] || CHECK_ICON.warn;
+        return (
+          <li key={check.key} className="flex items-start gap-2" data-testid={`platform-check-${platform}-${check.key}`}>
+            <Icon className={`w-4 h-4 shrink-0 ${tone}`} />
+            <span className="text-white/75"><span className={`font-bold ${tone}`}>{check.state === "ok" ? "passt" : check.state === "fail" ? "fehlt" : "Hinweis"}</span> · {check.text}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function PlatformLinkSettings({ brand, setBrandField, saving, onSave, onClearSecret }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const [checks, setChecks] = useState({});
+  const [checking, setChecking] = useState("");
+  const runCheck = async (platform) => {
+    setChecking(platform);
+    try {
+      const { data } = await api.post(`/settings/platform-links/${platform}/check`);
+      setChecks((current) => ({ ...current, [platform]: data }));
+      if (data?.ok) toast.success(`${PLATFORMS.find((p) => p.key === platform)?.label || platform}: alles passt.`);
+    } catch (error) {
+      toast.error(formatRequestError(error, "Die Prüfung hat nicht geklappt."));
+    } finally {
+      setChecking("");
+    }
+  };
   const discordReady = Boolean(brand.discord_client_id && (brand.discord_client_secret || brand.discord_client_secret_masked));
   const twitchReady = Boolean(brand.twitch_client_id && (brand.twitch_client_secret || brand.twitch_client_secret_masked));
   return (
@@ -52,6 +91,18 @@ export function PlatformLinkSettings({ brand, setBrandField, saving, onSave, onC
         <SecretInput label="Discord Client Secret" value={brand.discord_client_secret} masked={brand.discord_client_secret_masked} onChange={(v) => setBrandField("discord_client_secret", v)} onClear={() => onClearSecret("discord_client_secret")} testId="discord-client-secret" placeholder="Client Secret eintragen" />
         <SecretInput label="Steam Web-API-Schlüssel (optional)" value={brand.steam_api_key} masked={brand.steam_api_key_masked} onChange={(v) => setBrandField("steam_api_key", v)} onClear={() => onClearSecret("steam_api_key")} testId="steam-api-key" placeholder="nur für den Anzeigenamen; ohne bleibt die SteamID" />
       </div>
+      <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="platform-link-checks">
+        <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">Einrichtung prüfen</div>
+        <p className="text-xs text-white/45">Fragt die Plattform, ob Client ID und Secret passen; bei Discord auch, ob die Rückrufadresse in der App steht (über den Bot-Token).</p>
+        <div className="flex flex-wrap gap-2">
+          {PLATFORMS.map((platform) => (
+            <button key={platform.key} type="button" onClick={() => runCheck(platform.key)} disabled={!!checking} data-testid={`platform-check-${platform.key}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8] disabled:opacity-40">
+              {checking === platform.key ? "Prüfe …" : `${platform.label} prüfen`}
+            </button>
+          ))}
+        </div>
+        {PLATFORMS.map((platform) => <CheckResult key={platform.key} platform={platform.key} result={checks[platform.key]} />)}
+      </div>
       <div className="border border-white/10 rounded-sm p-3 text-xs space-y-1.5" data-testid="platform-link-redirects">
         <div className="font-bold uppercase tracking-wider text-white/60">Rückrufadressen – in die Entwickler-Konsole eintragen</div>
         {PLATFORMS.map((platform) => (
@@ -62,6 +113,11 @@ export function PlatformLinkSettings({ brand, setBrandField, saving, onSave, onC
         ))}
       </div>
       <button type="button" onClick={onSave} disabled={saving} data-testid="platform-link-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
+      <div className="space-y-2">
+        <SetupGuide guideKey="discord_app" />
+        <SetupGuide guideKey="twitch" />
+        <SetupGuide guideKey="steam" />
+      </div>
     </div>
   );
 }

@@ -42,3 +42,11 @@ test("jede Plattform hat Symbol, Bezeichnung und Feldschluessel", () => {
   }
   expect(new Set(SOCIAL_PLATFORMS.map((p) => p.k)).size).toBe(SOCIAL_PLATFORMS.length);
 });
+
+// Gespeicherte ganze Adressen (vor der Bereinigung eingetragen) dürfen die Vorschau nicht doppelt einpacken.
+test("socialProfileUrl macht aus einer gespeicherten Adresse den richtigen Vorschau-Link", () => {
+  expect(socialProfileUrl("youtube_handle", "https://www.youtube.com/@Tabsi.98")).toBe("https://www.youtube.com/@Tabsi.98");
+  expect(socialProfileUrl("instagram_handle", "https://www.instagram.com/tabsi.98")).toBe("https://instagram.com/tabsi.98");
+  expect(socialProfileUrl("twitch_handle", "@tabsi98")).toBe("https://www.twitch.tv/tabsi98");
+});
+

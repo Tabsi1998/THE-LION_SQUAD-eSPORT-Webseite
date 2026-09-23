@@ -48,6 +48,7 @@ PLATFORMS = {
 DISCORD_AUTHORIZE = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN = "https://discord.com/api/oauth2/token"
 DISCORD_ME = "https://discord.com/api/users/@me"
+DISCORD_APP_ME = "https://discord.com/api/v10/applications/@me"
 TWITCH_AUTHORIZE = "https://id.twitch.tv/oauth2/authorize"
 TWITCH_TOKEN = "https://id.twitch.tv/oauth2/token"
 TWITCH_USERS = "https://api.twitch.tv/helix/users"
@@ -231,6 +232,80 @@ async def _steam_identity(branding: dict, query: dict) -> dict:
             if players:
                 display = str(players[0].get("personaname") or steam_id)
     return {"external_id": steam_id, "handle": steam_id, "display_name": display}
+
+
+# ---------------------------------------------------------------- Einrichtung prüfen (Admin)
+
+def _check(key: str, state: str, text: str) -> dict:
+    return {"key": key, "state": state, "text": text}
+
+
+async def check_provider(platform: str, branding: dict, *, bot_token: str | None = None) -> dict:
+    """Ohne Anmeldung einer Person prüfen, was an der Einrichtung fehlt: passen Client ID und Secret
+    (client_credentials), kennt die Discord-App die Rückrufadresse (über den Bot-Token lesbar)?
+    Twitch verrät seine Redirect-Liste nicht - dort bleibt nur der Hinweis."""
+    if platform not in PLATFORMS:
+        raise LinkError("unknown")
+    redirect = redirect_uri(platform)
+    checks: list[dict] = []
+    try:
+        if platform == "discord":
+            client_id, secret = branding.get("discord_client_id"), branding.get("discord_client_secret")
+            if not client_id or not secret:
+                checks.append(_check("credentials", "fail", "Client ID oder Client Secret fehlt – beides aus dem Developer Portal (OAuth2) eintragen und speichern."))
+            else:
+                async with _client() as client:
+                    token = await client.post(DISCORD_TOKEN, data={"grant_type": "client_credentials", "scope": "identify"}, auth=(str(client_id), decrypt_secret(secret)), headers={"Accept": "application/json"})
+                if token.status_code == 200 and (token.json() or {}).get("access_token"):
+                    checks.append(_check("credentials", "ok", "Client ID und Client Secret passen zusammen."))
+                else:
+                    reason = (token.json() or {}).get("error_description") or (token.json() or {}).get("error") or f"HTTP {token.status_code}"
+                    checks.append(_check("credentials", "fail", f"Discord lehnt Client ID oder Secret ab ({reason}). Im Developer Portal → OAuth2 „Reset Secret“, das neue Secret hier eintragen."))
+            if bot_token:
+                async with _client() as client:
+                    app = await client.get(DISCORD_APP_ME, headers={"Authorization": f"Bot {bot_token}"})
+                if app.status_code == 200:
+                    data = app.json() or {}
+                    app_id = str(data.get("id") or "")
+                    uris = [str(u) for u in (data.get("redirect_uris") or [])]
+                    if client_id and app_id and app_id != str(client_id):
+                        checks.append(_check("app", "warn", f"Die Client ID gehört nicht zur Bot-App (deren ID ist {app_id}). Am einfachsten: Client ID und Secret der Bot-App verwenden – dann prüft sich auch die Rückrufadresse."))
+                    else:
+                        checks.append(_check("app", "ok", "Client ID gehört zur Bot-App."))
+                        if redirect in uris:
+                            checks.append(_check("redirect", "ok", "Rückrufadresse ist in der App eingetragen."))
+                        else:
+                            checks.append(_check("redirect", "fail", f"Rückrufadresse fehlt in der App: {redirect} unter OAuth2 → Redirects hinzufügen und „Save Changes“ klicken."))
+                else:
+                    checks.append(_check("app", "warn", f"Discord nimmt den Bot-Token nicht an (HTTP {app.status_code}) – die Rückrufadresse {redirect} bitte von Hand unter OAuth2 → Redirects prüfen."))
+            else:
+                checks.append(_check("redirect", "warn", f"Kein Bot-Token hinterlegt (Einstellungen → Discord) – die Rückrufadresse lässt sich nicht automatisch prüfen: {redirect} muss unter OAuth2 → Redirects stehen."))
+        elif platform == "twitch":
+            client_id, secret = branding.get("twitch_client_id"), branding.get("twitch_client_secret")
+            if not client_id or not secret:
+                checks.append(_check("credentials", "fail", "Client ID oder Client Secret fehlt – beides aus der Twitch Developer Console eintragen (Reiter Twitch) und speichern."))
+            else:
+                async with _client() as client:
+                    token = await client.post(TWITCH_TOKEN, data={"client_id": str(client_id), "client_secret": decrypt_secret(secret), "grant_type": "client_credentials"})
+                if token.status_code == 200 and (token.json() or {}).get("access_token"):
+                    checks.append(_check("credentials", "ok", "Client ID und Client Secret passen zusammen."))
+                else:
+                    reason = (token.json() or {}).get("message") or f"HTTP {token.status_code}"
+                    checks.append(_check("credentials", "fail", f"Twitch lehnt Client ID oder Secret ab ({reason}). In der Developer Console → Manage → „New Secret“, das neue Secret hier eintragen."))
+            checks.append(_check("redirect", "warn", f"Twitch bestätigt Redirects nicht per API: {redirect} muss in der Developer Console unter „OAuth Redirect URLs“ stehen (genau so, ohne Schrägstrich am Ende), Client Type „Confidential“."))
+        else:
+            checks.append(_check("credentials", "ok", "Steam braucht keine App – die Verknüpfung läuft über OpenID."))
+            key = branding.get("steam_api_key")
+            if key:
+                async with _client() as client:
+                    summary = await client.get(STEAM_SUMMARY, params={"key": decrypt_secret(key), "steamids": "76561197960287930"})
+                checks.append(_check("api_key", "ok", "Steam-API-Schlüssel gültig – Anzeigenamen kommen mit.") if summary.status_code == 200 else _check("api_key", "fail", f"Steam nimmt den API-Schlüssel nicht an (HTTP {summary.status_code}) – neu erzeugen und hier eintragen."))
+            else:
+                checks.append(_check("api_key", "warn", "Ohne Steam-API-Schlüssel zeigt das Profil die 17-stellige ID statt des Anzeigenamens (optional)."))
+    except httpx.HTTPError as exc:
+        logger.warning("[platform-links] Prüfung %s: %s", platform, exc)
+        checks.append(_check("network", "fail", f"{PLATFORMS[platform]['label']} ist gerade nicht erreichbar ({type(exc).__name__}) – später noch einmal prüfen."))
+    return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
 
 
 # ---------------------------------------------------------------- Speichern

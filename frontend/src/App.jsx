@@ -104,6 +104,7 @@ const AdminDolibarrPage = lazy(() => import("@/pages/admin/AdminDolibarrPage"));
 const AdminFinancePage = lazy(() => import("@/pages/admin/AdminFinancePage"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
 const AdminModerationPage = lazy(() => import("@/pages/admin/AdminModerationPage"));
+const AdminSetupPage = lazy(() => import("@/pages/admin/AdminSetupPage"));
 const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
 const AdminMobilePushPage = lazy(() => import("@/pages/admin/AdminMobilePushPage"));
 const AdminAppReleasesPage = lazy(() => import("@/pages/admin/AdminAppReleasesPage"));
@@ -288,6 +289,7 @@ function App() {
           <Route path="/admin/finance" element={<ProtectedRoute requireArea={["finance"]}><AdminFinancePage /></ProtectedRoute>} />
           <Route path="/admin/audit" element={<ProtectedRoute requireArea="system"><AdminAuditPage /></ProtectedRoute>} />
           <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
+          <Route path="/admin/setup" element={<ProtectedRoute requireArea={["system"]}><AdminSetupPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-logs" element={<ProtectedRoute requireArea="system"><AdminMobileLogsPage /></ProtectedRoute>} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireArea="system"><AdminMobilePushPage /></ProtectedRoute>} />
           <Route path="/admin/app-releases" element={<ProtectedRoute requireArea="system"><AdminAppReleasesPage /></ProtectedRoute>} />

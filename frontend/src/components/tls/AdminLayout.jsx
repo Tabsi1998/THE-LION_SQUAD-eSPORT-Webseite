@@ -99,6 +99,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
+      { to: "/admin/setup", label: "Einrichtung", icon: BookOpen, areas: ["system"] },
       // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
       // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
       { to: "/admin/settings?tab=auth", label: "Einstellungen: Login & Konten", icon: SettingsIcon, areas: ["system"], searchOnly: true },
@@ -157,6 +158,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],
   "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
+  "/admin/setup": ["einrichtung", "anleitung", "anleitungen", "setup", "einrichten", "discord app", "twitch app", "google login", "resend", "smtp", "analytics", "search console", "play store", "schritt für schritt", "howto", "how to"],
   "/admin/settings?tab=legal": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
   "/admin/settings?tab=auth": ["login", "anmeldung", "google", "passkey", "passkeys", "fingerabdruck", "registrierung", "zwei-faktor", "2fa", "steam", "discord app", "twitch app", "plattform-konten", "konten verknuepfen", "konten verknüpfen", "verknuepfung", "verknüpfung", "oauth", "rueckruf", "rückruf", "callback", "steam api key", "client id"],
   "/admin/settings?tab=email": ["resend", "absender", "api key", "mail", "e-mail", "versand"],

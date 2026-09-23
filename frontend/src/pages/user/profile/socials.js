@@ -67,9 +67,13 @@ export function normalizeSocialInput(key, raw) {
 
 export function socialProfileUrl(key, value) {
   const platform = platformByKey(key);
-  const handle = String(value ?? "").trim();
-  if (!platform || !handle) return "";
-  if (platform.website) return /^[a-z]+:\/\//i.test(handle) ? handle : `https://${handle}`;
+  const raw = String(value ?? "").trim();
+  if (!platform || !raw) return "";
+  if (platform.website) return /^[a-z]+:\/\//i.test(raw) ? raw : `https://${raw}`;
   if (!platform.url) return "";
+  // Ein gespeicherter Wert kann noch eine ganze Adresse sein (alte Eingaben): erst zum Nutzernamen
+  // machen, sonst wird die Adresse in die Vorschau hineingepackt („…/@https%3A%2F%2F…“).
+  const handle = normalizeSocialInput(key, raw);
+  if (!handle) return "";
   return platform.url(encodeURIComponent(handle));
 }
