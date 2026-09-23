@@ -461,7 +461,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
 | App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
-| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum in PR #430; offen: #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
+| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum (Linien, Knoten, Durchgänge, Runde für Runde am Handy, „Dein nächstes Spiel“, Setzplätze leer) – umgesetzt in #430 (Block 46.7); #431 Startseite III (Knopfleiste über den Sponsoren, Vorstand unter den News, Benutzermenü Gold/Rot) – umgesetzt in #433 (Block 46.8); offen: #409 Referenzen (Datenmodell Teilnahme mit Team- oder Einzeleinträgen), #401 Turnierseite (Antwort zu Reitern steht aus) |
+| Admin II: Formulare, CMS, E-Mail-Vorlagen | Prüfrunde vom 23.09. (Meilenstein 29): #434 ein Formular-Rahmen (Editor-Seite mit Seitenleiste und fester Speichern-Leiste; Turnier, Fast Lap, Event, News) – umgesetzt in #438 und #440 (Block 47.1); #435 kleine Formulare als Seitenblatt – Gruppe Verein in #441 (Block 47.2), eSports/Content/Mitglieder in #442; #436 Playwright bei drei Breiten in #443; offen: #437 Web-CMS (Befund in Block 47.3, Entscheidung A/B des Betreibers) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -678,6 +679,65 @@ Vorstand und Finanzen unter „Mitglieder“, die Vereinsdaten als sechster Reit
 Einstellungen“. Jetzt bündelt „Verein“ Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen
 und die Kontakt-Inbox; „Finanzen“ ist eine eigene Gruppe; „Downloads & QR“ liegt bei Content.
 Rechte je Eintrag und alle Links bleiben unverändert – nur die Einordnung ändert sich.
+
+### Was 46.7 gefunden hat (#399 – PR #430)
+
+**Der Turnierbaum war eine Liste von Spalten.** Runden standen nebeneinander ohne
+Verbindungslinien – wer gegen wen weiterspielt, musste man aus Kürzeln wie „WA1“ raten; viel
+Leerraum, kleine Schrift, Mehrspieler-Durchgänge als Listen mit „Platz 1–4“, obwohl noch niemand
+gespielt hatte; am Handy eine Einspaltenliste ohne Zusammenhang. Jetzt: Knoten mit gemessenen
+SVG-Klammern zur nächsten Runde (gemessen, nicht berechnet – Knoten sind unterschiedlich hoch),
+Sieger fett in Akzentfarbe, leerer Setzplatz „—“ statt „WA2“, Durchgänge als Karten („Durchgang A
+· 4 Spieler · 2 kommen weiter“, vor dem Spiel ohne Platz-Beschriftung), je Block ein Satz zum
+Fluss der Sieger- und Verliererrunde. Am Handy eine Runde auf einmal mit Vorige/Nächste, oben
+„Dein nächstes Spiel“ mit Gegner, Uhrzeit und Station – Angemeldete starten bei ihrer Runde.
+
+### Was 46.8 gefunden hat (#431 – PR #433)
+
+**Kleinigkeiten, die den ersten Eindruck machen.** Discord und LionsAPP gehören als schmaler
+Streifen über die Sponsoren-Logos, nicht in die Kontaktspalte; der Kasten „Der Verein in der
+Hosentasche“ ist damit doppelt und fällt weg; die Ansprechpartner wirken neben dem Kasten klein
+und stehen jetzt größer als eigener Abschnitt unter den aktuellen News; der gelbe Hero-Link „Zum
+Mitgliederbereich“ ist überflüssig, weil der Weg im Benutzermenü steht. Dort waren Gold, Blau und
+Rot im Browser weiß – die Grundklasse `text-white/80` hatte die Akzentfarbe überstimmt.
+
+## Block 47 — Admin II: ein Rahmen für alle Formulare
+
+### Was 47.1 gefunden hat (#434 – PRs #438, #440)
+
+**Jedes Anlegen sah anders aus.** Turnier als 768-px-Spalte auf dem breiten Monitor, Fast Lap als
+672-px-Spalte mit allem untereinander, Event als Fenster in der Bildschirmmitte, News als
+1024-px-Fenster mit Checkliste – dazu 22 weitere Admin-Seiten mit je eigenem Fenster. Am PC blieb
+die Hälfte des Bildschirms leer und man scrollte ewig, am Handy waren die Fenster kaum bedienbar.
+Jetzt gibt es einen Rahmen: eine Editor-Seite mit Kopf und Zurück, ab 1280 px zwei Spalten
+(Inhalt links, Status/Zeiten/Vorschau rechts), darunter eine Spalte, unten eine feststehende
+Leiste mit Abbrechen und Speichern. Felder, Beschriftungen, Pflichtstern und Abstände kommen aus
+einer Quelle. Turnier neu, Fast Lap neu, Turnier bearbeiten und Fast Lap bearbeiten nutzen den
+Rahmen; Event und News sind eigene Seiten mit URL statt Fenster – Zurück im Browser funktioniert,
+alte Links leiten weiter. **Nebenfund:** GitHub mergte den gestapelten Teil II neun Sekunden nach
+Teil I in den toten Basiszweig; #440 hat den Stand nachgezogen.
+
+### Was 47.2 gefunden hat (#435 – PRs #441, #442)
+
+**Für vier Felder ist eine Editor-Seite zu viel – ein Fenster in der Mitte aber am Handy
+unbedienbar.** Die kleinen Formulare öffnen sich jetzt als Seitenblatt von rechts über der Liste:
+am PC 36–56 rem breit, die Liste bleibt daneben sichtbar; am Handy Vollbild; Esc und ein Klick
+daneben schließen; unten dieselbe Leiste wie in der Editor-Seite. 21 Formulare auf 16 Seiten sind
+umgestellt (Verein, eSports, Content, Mitglieder), die Jahreswertung und das Mitgliederprofil waren
+vorher 1152-px-Fenster. Nebenbefund: die Auswahllisten in „Stufen“ und „Manuell vergeben“ hingen
+an einer CSS-Regel, die nur existierte, solange ein Fenster offen war. Nicht umgestellt: die
+Medien-Detailansicht (Vorschau, kein Formular) und das CMS (#437).
+
+### Was 47.3 gefunden hat (#437 – Befund Web-CMS, noch keine Umsetzung)
+
+**Der Reiter „Seiten“ tut nichts.** Die vier „System“-Seiten in der Datenbank sind Platzhalter
+aus der Erstinstallation; die echten Seiten kommen woanders her (Über uns und Werte aus dem Code,
+Impressum und Datenschutz aus den Vereinsdaten). Die öffentliche Anzeige ist an keine Route
+angebunden – was man dort schreibt, sieht niemand. Die E-Mail-Vorlagen dagegen werden gebraucht
+(Bewerbung angenommen/abgelehnt, Kontakt-Autoantwort, Admin-Hinweis), liegen aber unter „Content“
+und brauchen den Bereich „System“. Vorschlag A: Seiten-Reiter weg, Vorlagen als eigene Seite unter
+System mit allen Vereins-Mails, Vorschau und Testversand. Alternative B: freie Seiten wirklich
+anbinden. Entscheidung des Betreibers steht aus.
 
 ## Block 45 — App 1.0.0, Teil 4: Events in der App wie im Web
 
