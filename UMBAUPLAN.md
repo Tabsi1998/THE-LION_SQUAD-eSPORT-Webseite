@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45), Build 76; offen (14.8): Store-Eintrag, geschlossener Test, 1.0.0 |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
 | Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); offen: #401 Turnierseite + #399 Turnierbaum (warten auf Antworten des Betreibers), #403 Footer + #407 Startseite, #400 QR mit Löwe, #408 Adminmenü, #409 Referenzen |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
@@ -640,6 +640,20 @@ selbst, wer die Liste sieht (`participant_view`) und wer einchecken darf (`can_c
 Bedingung wie der Check-in-Aufruf), und die App richtet sich danach. Geld sehen nur Finanzen und
 die Staff-Rollen wie bisher; der Vorstand sieht Teilnehmer, aber keine Beträge. Öffentliche
 Teilnehmerlisten bleiben Namen mit Plätzen – die App zeigte auch die bisher nicht.
+
+### Was 45.2 gefunden hat (#414 – PR #418)
+
+**Melden und Blockieren gab es nur auf der Website.** Beim Ausfüllen der Inhaltseinstufung in der
+Play Console fragte Google, ob Nutzer *in der App* andere blockieren und Inhalte melden können –
+und verlangt es bei Chats. Die App hatte Direktnachrichten, Team- und Turnier-Chat, aber keinen
+der beiden Knöpfe; die Antworten mussten ehrlich „Nein“ lauten. Jetzt sitzen sie dort, wo man sie
+sucht: im Menü der Direktnachricht, durch langes Drücken auf eine fremde Nachricht in jedem Chat,
+unter „Mehr“ im Profil einer Person, und die blockierten Personen stehen unter Privatsphäre. Es
+sind dieselben Aufrufe wie im Web – die Moderation sieht App und Website in einer Liste.
+
+**Was der Betreiber daraus machte:** die Frage nach automatischer Erkennung von Nacktheit und
+Gewalt, Verwarnungen mit Stufen und einem Wortfilter – Meilenstein „Moderation II“ (#415–#417),
+Entscheidung C: selbst gehostet als Standard, Cloud-Dienst als Schalter.
 
 ## Block 44 — Rechtliches II: Vereinsdaten aus Dolibarr, Datenschutz aus den Schaltern
 

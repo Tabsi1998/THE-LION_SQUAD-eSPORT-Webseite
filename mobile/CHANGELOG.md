@@ -4,6 +4,7 @@
 
 - Mobile: Kostenpflichtige Events lassen sich in der App anmelden wie im Web – Preis je Person oder je Anmeldung, wählbare Zusätze, Summe mit Begleitpersonen, Kostenhaken als Pflicht; an der eigenen Anmeldung stehen Betrag und Zahlungsstand. Vorher antwortete der Server mit 400, weil die App die Positionen nicht schickte (#396).
 - Mobile: Wer Turniere leitet oder im Vorstand ist, sieht bei Events die angemeldeten Teilnehmer ausklappbar mit Status, Begleitpersonen, Hinweis und E-Mail; die Turnierleitung checkt direkt ein. Öffentliche Teilnehmerlisten zeigen wie im Web nur Namen. Vereinsinterne Events tragen im Detail das Kennzeichen (#397).
+- Mobile: Melden und Blockieren wie auf der Website – in Direktnachrichten über das Menü oben rechts, in jedem Chat durch langes Drücken auf eine Nachricht, im Profil einer Person über „Mehr“; blockierte Benutzer stehen unter Profil → Privatsphäre und lassen sich dort freigeben. Google verlangt das in der App, sobald Nutzer miteinander schreiben können (#414).
 
 ## 0.15.0-beta - 2026-09-23
 

@@ -216,6 +216,25 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Melden und Blockieren in der App (#414; PR #418, baut auf #411 auf; Build
+  76). Beim IARC-Fragebogen der Play Console (23.09.) aufgefallen: Google
+  verlangt beides in der App. Nur App, dieselben Aufrufe wie das Web
+  (`/api/moderation/reports`, `/api/moderation/blocks/{id}`).
+  `lib/moderation.ts` (`REPORT_CATEGORIES`, `reportPayload` – im Gruppenchat
+  Text in `details`, `message_id` nur bei Direktnachrichten, `sendReport`,
+  `blockUser`, `unblockUser`, `listBlocked`, `senderOf`),
+  `components/ReportSheet.tsx` (Modal, `report-category-{key}`,
+  `report-details`, `report-submit`), `components/BlockedUsersCard.tsx`
+  (`blocked-users`, `blocked-user-release-{id}`). `ChatThreadView` neu:
+  `onReportMessage` (langer Druck auf fremde Bubbles, `chat-message-{id}`),
+  `onData`, `refreshToken`. `DirectThreadScreen`: `headerRight`-Menü
+  `direct-thread-menu` (melden / blockieren / aufheben, `blocked_by_me` aus der
+  Thread-Antwort), `TeamChatScreen`/`TournamentChatScreen`: langer Druck →
+  `ReportSheet`, `PublicProfileScreen`: Knopf `profile-more` (Stand aus
+  `listBlocked`), `ProfileScreen`: `BlockedUsersCard` unter Privatsphäre. Tests
+  `moderation.test.ts` (3), `ReportSheet.test.tsx` (3),
+  `BlockedUsersCard.test.tsx` (2), `ChatThreadView.test.tsx` +1. Danach beim
+  Betreiber: Inhaltseinstufung „Blockieren/Melden“ auf Ja.
 - Kalender auf der Website (#402; PR #413, baut auf #411 auf; kein Build).
   `services/calendar_items.py` (NEU): `collect(db, user)` – Events, Turniere
   (`is_public` ≠ False; Anmeldeschluss als eigener Eintrag `marker:
@@ -1335,13 +1354,11 @@ Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
 `1bbb6b8`.
 
 ### Offene PRs
-- #411 (#396 + #397 Events in der App: Kosten, Teilnehmer, Check-in; Backend +
-  App; nach dem Merge `update.sh`, Build 76 baue ich vom Merge-Commit). #413
-  (#402 Kalender auf der Website; Backend + Web; Entwurf, gestapelt auf #411 –
-  nach dem Merge von #411 auf `main` umsetzen und freigeben; `update.sh`).
-  Reihenfolge: #411 → #413. Danach #414 (Melden/Blockieren in der App –
-  Google-Pflicht vor dem geschlossenen Test, aufgefallen beim IARC-Fragebogen
-  am 23.09.). Nach #398 beim Betreiber: `update.sh`, dann Einstellungen →
+- #418 (#414 Melden/Blockieren in der App; nur App; auf `main`, bereit).
+  Build 76 baue ich, sobald #418 gemergt ist (0.16.0-beta = #411 + #418).
+  Play Console ruht auf Wunsch des Betreibers (23.09.), bis alles fertig ist;
+  #412 (Play-Upload per API) wartet auf die Identitätsbestätigung des
+  Entwicklerkontos. Nach #411, #413 und #398 beim Betreiber: `update.sh`, dann Einstellungen →
   Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
   übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
   entfernen (steht jetzt fest im Abschnitt LionsAPP).

@@ -36,6 +36,12 @@ type Props = {
   canSend?: (data: unknown) => boolean;
   mentionSearchUrl?: string;
   onOpenProfile?: (username: string) => void;
+  /** Lange auf eine fremde Nachricht drücken: melden (#414). */
+  onReportMessage?: (message: ChatMessage) => void;
+  /** Die ganze Antwort des Servers - für Direktnachrichten mit Gegenüber und Blockier-Stand. */
+  onData?: (data: unknown) => void;
+  /** Ändert sich der Wert, lädt der Chat neu - etwa nach Blockieren oder Freigeben. */
+  refreshToken?: number;
 };
 
 // Außerhalb der Komponente, damit sie über alle Renderdurchläufe dieselben
@@ -55,6 +61,9 @@ export function ChatThreadView({
   canSend = alwaysAllowed,
   mentionSearchUrl,
   onOpenProfile,
+  onReportMessage,
+  onData,
+  refreshToken = 0,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
@@ -81,6 +90,7 @@ export function ChatThreadView({
       const { data } = await api.get(listUrl);
       setMessages(extractMessages(data));
       setAllowed(canSend(data));
+      onData?.(data);
       if (!didInitialScroll.current || nearBottomRef.current) {
         scrollToLatest(false);
         didInitialScroll.current = true;
@@ -91,11 +101,11 @@ export function ChatThreadView({
     } finally {
       setLoading(false);
     }
-  }, [canSend, extractMessages, listUrl, lockedDetail, scrollToLatest]);
+  }, [canSend, extractMessages, listUrl, lockedDetail, onData, scrollToLatest]);
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, refreshToken]);
   // /messages/direct/... -> messages, /teams/.../chat -> teams, /tournaments/.../chat -> tournaments
   const liveResources = useMemo(() => [resourceFromPath(listUrl)], [listUrl]);
   useLiveRefresh(load, liveResources, { fallbackMs: 7000 });
@@ -216,6 +226,7 @@ export function ChatThreadView({
             message={message}
             grouped={continuesMessageGroup(messages[index - 1], message)}
             onOpenProfile={onOpenProfile}
+            onReport={onReportMessage}
             own={message.user_id === currentUserId || message.sender_id === currentUserId}
           />
         )) : <EmptyState title={emptyTitle} detail={allowed ? "Schreibe die erste Nachricht." : lockedDetail || error} />}
@@ -266,20 +277,30 @@ export function ChatThreadView({
   );
 }
 
-function MessageBubble({ message, own, grouped, onOpenProfile }: {
+function MessageBubble({ message, own, grouped, onOpenProfile, onReport }: {
   message: ChatMessage;
   own: boolean;
   /** Folgt kurz auf eine Nachricht desselben Absenders: kein eigener Kopf. */
   grouped: boolean;
   onOpenProfile?: (username: string) => void;
+  onReport?: (message: ChatMessage) => void;
 }) {
   const author = message.author || message.sender;
   const name = own ? "Du" : author?.display_name || author?.username || "Spieler";
   const openContent = useCallback((target: ContentTarget) => {
     if (target.type === "profile" && onOpenProfile) onOpenProfile(target.id);
   }, [onOpenProfile]);
+  // Fremde Nachrichten lassen sich mit langem Druck melden (#414); eigene nicht.
+  const reportable = Boolean(onReport && !own);
   return (
-    <View style={[styles.bubble, own && styles.bubbleOwn, grouped && styles.bubbleGrouped]}>
+    <Pressable
+      onLongPress={reportable ? () => onReport?.(message) : undefined}
+      delayLongPress={350}
+      disabled={!reportable}
+      accessibilityHint={reportable ? "Lange drücken, um die Nachricht zu melden" : undefined}
+      style={[styles.bubble, own && styles.bubbleOwn, grouped && styles.bubbleGrouped]}
+      testID={`chat-message-${message.id}`}
+    >
       {grouped ? null : (
         <View style={styles.bubbleHead}>
           <Body
@@ -300,7 +321,7 @@ function MessageBubble({ message, own, grouped, onOpenProfile }: {
       ) : null}
       <MessageAttachments attachments={message.attachments} />
       <MessageSticker sticker={message.sticker} />
-    </View>
+    </Pressable>
   );
 }
 
