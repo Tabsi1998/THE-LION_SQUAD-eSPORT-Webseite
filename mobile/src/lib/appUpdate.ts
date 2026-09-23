@@ -25,7 +25,26 @@ export type AppVersionInfo = {
   update_available: boolean;
   mandatory: boolean;
   next_check_after?: string;
+  /** Ob der Betreiber die Server-APK noch anbietet (#421); fehlt der Wert, gilt ja. */
+  server_updater_enabled?: boolean;
+  play_store_url?: string | null;
 };
+
+// Woher die App kommt (#421): über Google Play signiert Google - eine Server-APK lässt sich
+// darüber nicht installieren. Deshalb bekommen Play-Installationen Googles Update-Dialog, die
+// Server-APK bleibt für Sideload und den Notfall.
+export type InstallSource = "play" | "sideload" | "unknown";
+export type UpdatePath = "play" | "server";
+
+export const PLAY_STORE_URL = "market://details?id=at.lionsquad.app";
+export const PLAY_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app";
+
+/** Welchen Weg der Banner zeigt: Play, sobald die App von dort kommt oder der Server-Updater aus ist. */
+export function updatePath(source: InstallSource, info: AppVersionInfo | null | undefined): UpdatePath {
+  if (source === "play") return "play";
+  if (info?.server_updater_enabled === false) return "play";
+  return "server";
+}
 
 export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 export const SNOOZE_KEY = "tls.mobile.updateSnoozedBuild";

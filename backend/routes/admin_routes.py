@@ -17,7 +17,7 @@ from services.ops_monitor import errors_overview, ops_summary, set_error_resolve
 from services.ops_alerts import alert_red_checks
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
-from services.app_releases import delete_release, list_releases, public_release, store_release, update_release, upload_token_matches, upload_token_problem, upload_token_status
+from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 logger = logging.getLogger("tls.admin")
@@ -770,6 +770,26 @@ async def admin_app_releases(me: dict = Depends(require_club_admin())):
 async def admin_app_release_status(me: dict = Depends(require_club_admin())):
     """Ob das Release-Skript hochladen kann: Token am Server ja/nein (#307)."""
     return {"upload_token": upload_token_status()}
+
+
+class AppReleaseSettingsUpdate(BaseModel):
+    server_updater_enabled: bool
+
+
+@router.get("/app-releases/settings")
+async def admin_app_release_settings(me: dict = Depends(require_club_admin())):
+    """Server-Updater an/aus (#421) - vor der {build}-Route, damit „settings“ keine Buildnummer ist."""
+    return await updater_settings(get_db())
+
+
+@router.patch("/app-releases/settings")
+async def admin_app_release_settings_update(body: AppReleaseSettingsUpdate, me: dict = Depends(require_club_admin())):
+    result = await set_updater_settings(get_db(), server_updater_enabled=body.server_updater_enabled, by=me["id"])
+    await get_db().audit_logs.insert_one({
+        "id": new_id(), "action": "app_release.settings", "actor": me["id"],
+        "target": "server_updater", "details": result, "created_at": now_utc().isoformat(),
+    })
+    return result
 
 
 @router.post("/app-releases")

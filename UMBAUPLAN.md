@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
 | Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); offen: #400 QR mit dem bestehenden Löwen-PNG, #408 Adminmenü, #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
@@ -671,6 +671,17 @@ sind dieselben Aufrufe wie im Web – die Moderation sieht App und Website in ei
 **Was der Betreiber daraus machte:** die Frage nach automatischer Erkennung von Nacktheit und
 Gewalt, Verwarnungen mit Stufen und einem Wortfilter – Meilenstein „Moderation II“ (#415–#417),
 Entscheidung C: selbst gehostet als Standard, Cloud-Dienst als Schalter.
+
+### Was 45.3 gefunden hat (#421 – PR #423)
+
+**Zwei Signaturen, ein Updater.** Seit die App über Google Play kommt, signiert Google sie mit
+seinem Schlüssel; die APK vom Vereinsserver trägt den Upload-Schlüssel. Der Update-Banner aus
+#250 hätte auf einem Play-Handy die Server-APK geladen und wäre am Installer gescheitert – „App
+nicht installiert“, ohne Grund. Jetzt fragt die App den Play-Dienst: Kennt er die App, kommt
+Googles eigener Update-Dialog (sofort bei Pflicht-Updates), der Banner führt in den Play Store,
+und die Server-APK wird gar nicht erst geladen. Kennt Play die App nicht (Sideload), bleibt der
+bisherige Weg. Ein Schalter unter App-Versionen stellt die Server-APK ab, sobald die App
+öffentlich ist – Wunsch des Betreibers: dann nur noch Play.
 
 ## Block 44 — Rechtliches II: Vereinsdaten aus Dolibarr, Datenschutz aus den Schaltern
 

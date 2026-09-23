@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "0.16.0-beta",
+  "version": "0.17.0-beta",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -34,6 +34,7 @@
     "expo-font": "~57.0.4",
     "expo-haptics": "~57.0.3",
     "expo-image-picker": "~57.0.19",
+    "expo-in-app-updates": "^0.12.0",
     "expo-intent-launcher": "~57.0.1",
     "expo-local-authentication": "~57.0.3",
     "expo-notifications": "~57.0.20",

@@ -216,6 +216,28 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- App-Update je Installationsquelle (#421; PR #423; Build 77). Play
+  signiert mit eigenem Schlüssel – die Server-APK lässt sich über eine
+  Play-Installation nicht installieren. App: `expo-in-app-updates` (0.12,
+  Play Core), `lib/installSource.ts` (`detectInstallSource()` → `source`
+  play/sideload/unknown aus `checkForUpdate()`: Antwort = play, Fehler =
+  sideload, kein Android/kein Modul = unknown; `startPlayUpdate(immediate)`;
+  `require` statt `import()`, weil Jest dynamische Importe nicht lädt),
+  `lib/appUpdate.ts` (`updatePath(source, info)`: play bleibt play, sonst
+  server – außer `server_updater_enabled === false`; `PLAY_STORE_URL`
+  market://, `PLAY_STORE_WEB_URL`), `AppUpdateBanner` `path="play"`
+  (`app-update-play`: „Update starten“ → `onStartPlayUpdate(mandatory)`,
+  Rückfall `openPlayStore()`; kein Download), `AppUpdateProvider`: Quelle
+  einmal je Sitzung (nicht in `__DEV__`), Googles Dialog von selbst, wenn Play
+  ein Update kennt (sofort bei Pflicht + `immediateAllowed`). Backend
+  `app_releases.updater_settings/set_updater_settings` (`settings` id
+  `app_releases`, `server_updater_enabled` Standard true),
+  `/mobile/app-version` + `server_updater_enabled`, `play_store_url`;
+  Admin `GET/PATCH /api/admin/app-releases/settings` (vor `{build}`),
+  `AdminAppReleasesPage` Schalter `app-release-server-updater-toggle`. Tests
+  `test_app_releases_flow.py` +1, `installSource.test.ts` (3),
+  `appUpdate.test.ts` +1, `AppUpdateBanner.test.tsx` +1,
+  `AdminAppReleasesPage.test.jsx` +1. Version 0.17.0-beta.
 - Footer und Startseite (#403, #407; PR #422; kein Build). Antwort des
   Betreibers: „Mitglied werden“ nicht groß vermarkten, Community zuerst.
   Web `lib/siteFooter.js` (`footerColumns(settings, {isMember})` – Verein /
@@ -1379,11 +1401,11 @@ Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418). `main`
 steht auf `c572c95`.
 
 ### Offene PRs
-- #422 (#403 Footer + #407 Startseite; Backend + Web; auf `main`; nach dem
-  Merge `update.sh`). Als Nächstes: #421 (App-Update je Installationsquelle –
-  Play-Dialog statt Server-Updater, Build 77), dann Web: Design II weiter
-  (#400 QR mit dem PNG unter Branding → „QR-Logo“, #408, #409, #401 + #399
-  mit den Antworten des Betreibers vom 23.09.); Play Console ruht auf Wunsch
+- #423 (#421 App-Update je Installationsquelle; Backend + Web-Admin + App;
+  auf `main` nach #422; Build 77 nach dem Merge, `update.sh`). Danach Web:
+  Design II weiter (#400 QR mit dem PNG unter
+  Branding → „QR-Logo“, #408, #409, #401 + #399 mit den Antworten des
+  Betreibers vom 23.09.); Play Console ruht auf Wunsch
   des Betreibers, bis alles fertig ist; #412 (Play-Upload per API) wartet auf
   die Identitätsbestätigung des Entwicklerkontos; Moderation II (#415–#417,
   Meilenstein 28, Variante C) nach App 1.0.0. Nach #411, #413 und #398 beim

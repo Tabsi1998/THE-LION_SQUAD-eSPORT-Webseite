@@ -165,7 +165,8 @@ Neueste oben.
 - `0.14.0-beta`: Build 73, Auszeichnungen – Gewinnerbanner und Trophäen im Profil (Meilenstein Auszeichnungen und Marke, #230)
 - `0.14.1-beta`: Build 74, Auszeichnungen im eigenen Reiter statt unter Referenzen (#230 Nachtrag); erster Build, der auch als App-Bundle (AAB) für den internen Test in der Play Console gebaut wird
 - `0.15.0-beta`: Build 75, „Konto löschen“ in der App (Google-Play-Pflicht vor dem geschlossenen Test, #390)
-- `0.16.0-beta`: Build 76, kostenpflichtige Events in der App und Teilnehmer für Verwaltung und Vorstand (Meilenstein App 1.0.0, #396, #397)
+- `0.16.0-beta`: Build 76, kostenpflichtige Events in der App, Teilnehmer für Verwaltung und Vorstand, Melden und Blockieren (Meilenstein App 1.0.0, #396, #397, #414)
+- `0.17.0-beta`: Build 77, Updates je nach Herkunft – Play-Installationen bekommen Googles Update-Dialog, Server-APK nur für Sideload (Meilenstein App 1.0.0, #421)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

@@ -18,7 +18,9 @@ from services.match_overview import operational_match_overviews, own_match_overv
 from services.profile_references import personal_profile_references
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
-from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision
+from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision, updater_settings
+
+PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app"
 
 router = APIRouter(prefix="/api/mobile", tags=["mobile"])
 
@@ -679,12 +681,18 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
 @router.get("/app-version")
 async def app_version(build: int | None = None, user: dict = Depends(get_current_user)):
     """Das aktuelle Release und ob diese App-Installation ein Update braucht."""
-    current = await current_release(get_db())
+    db = get_db()
+    current = await current_release(db)
     decision = update_decision(build, current)
+    settings = await updater_settings(db)
     return {
         "current": public_release(current),
         "own_build": int(build or 0) or None,
         "next_check_after": next_check_after(),
+        # Play-Installationen nehmen Googles Dialog; ob die Server-APK überhaupt angeboten wird,
+        # entscheidet der Betreiber (#421).
+        "server_updater_enabled": settings["server_updater_enabled"],
+        "play_store_url": PLAY_STORE_URL,
         **decision,
     }
 

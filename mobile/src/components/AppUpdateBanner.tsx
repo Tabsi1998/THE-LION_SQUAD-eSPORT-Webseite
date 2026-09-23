@@ -1,16 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme";
-import { downloadUrl, progressShare, releaseSizeLabel, releaseTitle, verifyDownload, type AppRelease } from "../lib/appUpdate";
+import { PLAY_STORE_URL, PLAY_STORE_WEB_URL, downloadUrl, progressShare, releaseSizeLabel, releaseTitle, verifyDownload, type AppRelease, type UpdatePath } from "../lib/appUpdate";
 import { errorMessage } from "../lib/api";
 import { Body, Muted } from "./Text";
 
 // Update aus der App (#250): Banner mit „Was ist neu“, „Herunterladen“ und
 // „Später“. Der Download läuft mit der Anmeldung der App in den Cache, wird
 // auf Größe und Prüfsumme geprüft und dann dem Android-Installer übergeben.
-// Unter min_build ist der Banner nicht wegdrückbar.
+// Unter min_build ist der Banner nicht wegdrückbar. Kommt die App von Google
+// Play (#421), gibt es keinen Download: „Update starten“ öffnet Googles Dialog,
+// „Play Store“ die Store-Seite.
 
 type Props = {
   release: AppRelease;
@@ -18,7 +20,20 @@ type Props = {
   token: string | null;
   onLater: () => void;
   onWhatsNew: () => void;
+  /** "server" = APK vom Vereinsserver (Standard), "play" = Google Play (#421). */
+  path?: UpdatePath;
+  /** Googles Dialog starten; liefert, ob er aufging. Ohne Funktion nur der Store-Link. */
+  onStartPlayUpdate?: (immediate: boolean) => Promise<boolean>;
 };
+
+/** Store-Seite öffnen: erst die Play-App, sonst der Browser. */
+export async function openPlayStore(open: (url: string) => Promise<unknown> = (url) => Linking.openURL(url)) {
+  try {
+    await open(PLAY_STORE_URL);
+  } catch {
+    await open(PLAY_STORE_WEB_URL).catch(() => {});
+  }
+}
 
 type Phase = { name: "idle" } | { name: "downloading"; share: number } | { name: "installing" } | { name: "error"; text: string };
 
@@ -51,10 +66,22 @@ export const defaultInstaller: Installer = async (uri) => {
   });
 };
 
-export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew, downloader = defaultDownloader, installer = defaultInstaller }: Props & { downloader?: Downloader; installer?: Installer }) {
+export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew, path = "server", onStartPlayUpdate, downloader = defaultDownloader, installer = defaultInstaller }: Props & { downloader?: Downloader; installer?: Installer }) {
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const android = Platform.OS === "android";
+  const viaPlay = path === "play";
+
+  const startPlay = useCallback(async () => {
+    if (!onStartPlayUpdate) {
+      await openPlayStore();
+      return;
+    }
+    setPhase({ name: "installing" });
+    const started = await onStartPlayUpdate(mandatory);
+    setPhase({ name: "idle" });
+    if (!started) await openPlayStore();
+  }, [mandatory, onStartPlayUpdate]);
 
   const start = useCallback(async () => {
     setPhase({ name: "downloading", share: 0 });
@@ -81,10 +108,13 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
   return (
     <View style={[styles.banner, { bottom: insets.bottom + 72 }]} testID="app-update-banner">
       <View style={styles.head}>
-        <Ionicons name="cloud-download-outline" size={20} color={colors.cyan} />
+        <Ionicons name={viaPlay ? "logo-google-playstore" : "cloud-download-outline"} size={20} color={colors.cyan} />
         <View style={styles.headText}>
           <Body style={styles.title}>{releaseTitle(release)}</Body>
-          <Muted>{mandatory ? "Dieses Update ist Pflicht." : "Ein Update ist bereit."}{release.size ? ` · ${releaseSizeLabel(release.size)}` : ""}</Muted>
+          <Muted>
+            {mandatory ? "Dieses Update ist Pflicht." : "Ein Update ist bereit."}
+            {viaPlay ? " Es kommt über den Play Store." : release.size ? ` · ${releaseSizeLabel(release.size)}` : ""}
+          </Muted>
         </View>
       </View>
       {phase.name === "downloading" ? (
@@ -92,14 +122,19 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
           <View style={[styles.progressFill, { width: `${Math.round(phase.share * 100)}%` }]} />
         </View>
       ) : null}
-      {phase.name === "installing" ? <Muted>Installer wird geöffnet …</Muted> : null}
+      {phase.name === "installing" ? <Muted>{viaPlay ? "Play Store wird geöffnet …" : "Installer wird geöffnet …"}</Muted> : null}
       {phase.name === "error" ? <Muted style={styles.error} testID="app-update-error">{phase.text}</Muted> : null}
       {!android ? <Muted>Auf iOS kommt das Update später über TestFlight.</Muted> : null}
       <View style={styles.actions}>
         <Pressable onPress={onWhatsNew} accessibilityRole="button" testID="app-update-whats-new" style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
           <Muted style={styles.secondaryText}>Was ist neu</Muted>
         </Pressable>
-        {android ? (
+        {android && viaPlay ? (
+          <Pressable onPress={() => { void startPlay(); }} disabled={busy} accessibilityRole="button" testID="app-update-play" style={({ pressed }) => [styles.primary, (pressed || busy) && styles.pressed]}>
+            <Body style={styles.primaryText}>{busy ? "Öffnet …" : onStartPlayUpdate ? "Update starten" : "Play Store öffnen"}</Body>
+          </Pressable>
+        ) : null}
+        {android && !viaPlay ? (
           <Pressable onPress={start} disabled={busy} accessibilityRole="button" testID="app-update-download" style={({ pressed }) => [styles.primary, (pressed || busy) && styles.pressed]}>
             <Body style={styles.primaryText}>{phase.name === "error" ? "Nochmal" : busy ? "Lädt …" : "Herunterladen"}</Body>
           </Pressable>
