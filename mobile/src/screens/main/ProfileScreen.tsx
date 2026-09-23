@@ -24,7 +24,7 @@ import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
-type TabKey = "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
+type TabKey = "overview" | "references" | "awards" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
 type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 
 // Reiter nur für Inhalt. Bearbeiten erreicht man über die Aktionszeile,
@@ -33,6 +33,8 @@ type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 const tabs: Array<{ key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: "overview", label: "Übersicht", icon: "person-circle-outline" },
   { key: "references", label: "Referenzen", icon: "ribbon-outline" },
+  // Auszeichnungen (#230, Nachtrag): Banner und Trophäen sind keine Referenzen - eigener Reiter.
+  { key: "awards", label: "Auszeichnungen", icon: "medal-outline" },
   { key: "prizes", label: "Gewinne", icon: "gift-outline" },
   { key: "achievements", label: "Erfolge", icon: "trophy-outline" },
 ];
@@ -456,9 +458,24 @@ export function ProfileScreen() {
                 <Stat label="Fast Laps" value={String(references.stats.fastlaps)} tone="gold" />
               </View>
             </Card>
+            {references.items.length ? (
+              references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
+            ) : (
+              <Card style={styles.card}>
+                <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
+              </Card>
+            )}
+          </>
+        ) : null}
+
+        {!profileLoading && activeTab === "awards" ? (
+          <>
+            <Card style={styles.card}>
+              <Heading>Meine Auszeichnungen</Heading>
+              <Muted>Gewinnerbanner und Trophäen aus Turnieren des Vereins. Eine davon kannst du als Profilbanner wählen.</Muted>
+            </Card>
             {awards.awards.length ? (
               <View style={styles.awardList} testID="profile-awards">
-                <Heading>Auszeichnungen</Heading>
                 {sortAwards(awards.awards).map((award) => (
                   <AwardCard
                     key={award.id}
@@ -473,12 +490,9 @@ export function ProfileScreen() {
                   />
                 ))}
               </View>
-            ) : null}
-            {references.items.length ? (
-              references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
             ) : (
               <Card style={styles.card}>
-                <EmptyState icon="ribbon-outline" title="Noch keine Referenzen" detail="Sobald du Turniere spielst oder Fast-Lap-Zeiten eingetragen werden, erscheint deine Historie hier." />
+                <EmptyState icon="medal-outline" title="Noch keine Auszeichnungen" detail="Sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht – Platz 1 bis 3 als Trophäe, alle anderen als Teilnahme-Banner." />
               </Card>
             )}
           </>

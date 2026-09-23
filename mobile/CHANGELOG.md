@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.1-beta - 2026-09-23
+
+- Mobile: Auszeichnungen haben im Profil einen eigenen Reiter – Referenzen sind die Turnier-Historie, Auszeichnungen die Banner und Trophäen; vorher standen beide unter „Referenzen“ (#230).
+
 ## 0.14.0-beta - 2026-09-23
 
 - Mobile: Auszeichnungen: Gewinnerbanner und Trophäen aus Turnieren stehen im Profil unter „Referenzen“ – Platz mit Gold, Silber oder Bronze, Bilanz, Turnier und Saison; eine davon lässt sich als Profilbanner wählen. Öffentliche Profile zeigen die Auszeichnungen aus öffentlichen Turnieren (#230).
