@@ -472,7 +472,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Statuten warten auf dolibarr-vereine#158. #324 Dokumente (wartet auf #157), #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – mit Vereinsmodul 0.7.0 baubar |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – PR #450 (Block 48.4); #324 Dokumente (wartet auf #157), #329 Einwilligungen, eigene Daten, Austritt – mit Vereinsmodul 0.8.0 baubar |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
@@ -713,6 +713,55 @@ Saison. Alte Referenzen bleiben lesbar (ein Eintrag, Felder aus dem Titel abgele
 beim ersten Speichern fest; die alten Felder bleiben als Spiegel des besten Eintrags, damit
 Startseite, SEO, Sitemap und Profilsuche nichts merken. Das Mitgliederprofil zählt die eigenen
 Einträge – ein Einzelstarter seine Platzierung, ein Teammitglied die seines Teams.
+
+## Block 48 — Dolibarr III: Sponsoren, Über uns, Verzeichnis, Antrag
+
+### Was 48.1 gefunden hat (#405 – PR #447)
+
+**Sponsoren standen zweimal, und die öffentliche Liste gab zu viel her.** Sponsoren und Partner waren
+eine Handliste neben den Geschäftspartnern in Dolibarr, ein ausgelaufener Sponsor blieb sichtbar, bis
+ihn jemand löschte – und `/api/sponsors` lieferte Ansprechpartner, Kontakt-E-Mail, Telefon und interne
+Notizen an jeden Besucher. Jetzt gibt es einen Schalter auf der Sponsorenseite: mit ihm liest die
+Website die Kategorien „Sponsor“ und „Partner“ (Unterkategorien = Stufe bzw. Art, Laufzeit aus zwei
+Zusatzfeldern), führt Name, Stufe, Laufzeit und Kontakt aus Dolibarr und lässt Logo, Link,
+Platzierungen und Texte auf der Website; wer aus der Kategorie fällt, wird zum ehemaligen
+Unterstützer statt zu verschwinden. Öffentlich sind nur noch Name, Logo, Link, Stufe, Platzierungen
+und die Jahre. Der Betreiber pflegt Sponsoren in Dolibarr noch nicht – der Schalter bleibt aus, bis
+die Kategorien stehen.
+
+### Was 48.2 gefunden hat (#406 – PR #448)
+
+**„Über den Verein“ war reiner Code.** Texte, Werte, Spieleliste und Offline-Aktivitäten standen fest,
+ohne Zahl, ohne Datum, ohne Bezug zu dem, was die Website sonst weiß. Jetzt kommen Gründung, Zweck und
+„gemeinnützig“ aus Dolibarr (über den Schalter der Vereinsdaten) oder aus Handfeldern, die Zahlen werden
+gezählt (derselbe Zähler wie die Startseite, plus Auszeichnungen), die Spiele kommen aus der Verwaltung
+mit Turnieren je Spiel (Editionen zählen zum Hauptspiel), die Ansprechpartner aus dem Vorstand, „Auch
+offline“ aus den letzten Vereinsevents mit Bild – und die Leitbild-Texte pflegt die Redaktion unter
+Admin → Verein → Über uns. Die Texte liegen in den Einstellungen, nicht in den CMS-Seiten, damit die
+Seite unabhängig von der Entscheidung zu #437 funktioniert. Nebenbefund: die Turnierseite kennt keinen
+Spiel-Filter per URL, die Spiele-Kacheln verlinken auf die Turnierliste bzw. die eSports-Übersicht.
+
+### Was 48.3 gefunden hat (#410 – PR #449)
+
+**Das Verzeichnis war eine Handliste neben Dolibarr, und das Alter stand öffentlich als „Level“.**
+`level` wurde aus dem Geburtsdatum gerechnet und auf jeder Karte und Profilseite gezeigt. Jetzt ist das
+Alter nur noch in der Verwaltung sichtbar. Wer laut Mitgliederverwaltung aktives Mitglied ist, trägt
+sich unter „Meine Mitgliedschaft“ selbst ein (Gamertag, Spiele, Plattformen, Bio; Name und Foto vom
+Konto), die Verwaltung kann sperren, und endet die Mitgliedschaft – durch den Vorstand oder durch
+Dolibarr – geht der Eintrag offline. Die Community-Seite erklärt Accounts und Mitglieder und zählt aus
+der Mitgliederverwaltung. Notiert, nicht geändert: Legt die Verwaltung ein Profil mit verknüpftem Konto
+an, aktiviert das ohne Dolibarr still die Mitgliedschaft (`_activate_linked_membership`).
+
+### Was 48.4 gefunden hat (#328 – PR #450)
+
+**Der Vertrag der Website hing bei 0.5.12-beta, das Modul ist bei 0.8.0-beta**, und Website und
+Dolibarr entschieden Anträge unabhängig voneinander. Mit dem Schalter „Beitrittsanträge nach Dolibarr
+senden“ fragt „Mitglied werden“ die Pflichtfelder, eigenen Felder, Mitgliedsarten mit Beitrag und die
+Einwilligungstexte aus Dolibarr ab, schickt den Antrag als Mitglied im Entwurf (feste `external_id`,
+ein zweites Senden legt nie ein zweites Mitglied an), zeigt den Stand und bindet bei der Aufnahme
+genau dieses Konto. Ein technischer Fehler ist „wird übermittelt“ mit Wiederholung, ein fachliches
+Nein „neu stellen“. Identitäten, Änderungsfeed und signierte Webhooks des Moduls sind im Vertrag da,
+die Website nutzt sie noch nicht.
 
 ## Block 47 — Admin II: ein Rahmen für alle Formulare
 
