@@ -1165,13 +1165,11 @@ Marke: Standard-Favicon, Markenbilder in der App), #380 (#217 Stufe 1
 App-Sperre, #219 Teil 1 Bildgrößen und AAB), #381 (#320 eigene Rechnungen für
 alle, Rechnungen im Profil) – alle vier am 23.09. gemergt, `update.sh` und
 Build 70 danach. Dann #383 (Doku-Stand nach #381) und #384 (#217 Stufe 2
-Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
-`b5d5fd3`.
+Passkey in der App; `update.sh`, Build 71 am 23.09.) und #385 (#219 Teil 2
+Absturzberichte über Crashlytics; nur App, Build 72 am 23.09.). `main` steht
+auf `7dbebf8`.
 
 ### Offene PRs
-- #385 (#219 Teil 2 Absturzberichte über Crashlytics; nur App). Nach dem
-  Merge Build 72 vom Haupt-PC; kein `update.sh` nötig. Vorher den Absatz für
-  die Datenschutzerklärung einfügen (Vorschlag am Issue).
 - #386 (#230 Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und
   Teambanner in Web und App; baut auf #385 auf). Nach dem Merge `update.sh`;
   die alten Turniere trägt der Job `awards_backfill` von selbst nach (alle
@@ -1206,7 +1204,10 @@ Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
   und 69 sind ausgefallen, weil #379–#381 zusammen gemergt wurden), am
   Vereinsserver abgelegt, **Build 71** (`mobile-v0.12.0-beta-build71`, Commit
   b5d5fd3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `f40d4b20`;
-  #217 Stufe 2), am Vereinsserver abgelegt. Nächster Build ist 72.
+  #217 Stufe 2), am Vereinsserver abgelegt, **Build 72**
+  (`mobile-v0.13.0-beta-build72`, Commit 7dbebf8, am 23.09. vom Haupt-PC
+  gebaut, APK-SHA-256 beginnt mit `02e19223`; #219 Teil 2 Absturzberichte),
+  am Vereinsserver abgelegt. Nächster Build ist 73.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1258,7 +1259,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385 (Build 72 nach dem Merge; Absatz für die Datenschutzerklärung als Vorschlag am Issue); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung als Vorschlag am Issue, noch einzufügen); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
