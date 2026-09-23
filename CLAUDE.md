@@ -1233,21 +1233,15 @@ Absturzberichte über Crashlytics; nur App, Build 72 am 23.09.) und #386 (#230
 Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und Teambanner in Web und
 App; `update.sh`, Build 73 am 23.09.; die alten Turniere trägt der Job
 `awards_backfill` von selbst nach – alle 5 min, läuft leer, sobald
-Auszeichnungen da sind). `main` steht auf `2c540e3`.
+Auszeichnungen da sind), #388 (#321 + #322 Abrechnung fertig: Zahlungsstand,
+Prüffälle, Erstattungen, Summen je Veranstaltung, Steuersätze bestätigen;
+`update.sh`, kein Build) und #389 (#230 Nachtrag: Auszeichnungen im eigenen
+Reiter; Build 74 am 23.09., erstmals auch als AAB) und #391 (#390 Konto löschen
+in der App + Abschnitt „Konto löschen“ in der Datenschutzerklärung; `update.sh`,
+Build 75 am 23.09.). `main` steht auf `495e4a3`.
 
 ### Offene PRs
-- #388 (#321 + #322 Abrechnung fertig: Zahlungsstand, Prüffälle, Erstattungen,
-  Finanzübersicht mit Summen, Steuersätze bestätigen; baut auf #387 auf). Nach dem
-  Merge `update.sh`; kein Build. Danach Admin → Dolibarr → „Steuersätze geprüft“
-  anhaken, wenn „gleich freigeben“ je gewünscht ist.
-- #389 (#230 Nachtrag: Auszeichnungen im eigenen Reiter, Web + App
-  0.14.1-beta; baut auf #388 auf – **erst #388, dann #389**). Nach dem Merge
-  Build 74 vom Haupt-PC als APK **und** AAB (interner Test in der Play Console);
-  `update.sh` bringt den Web-Reiter, ist aber nicht dringend.
-- #391 (#390 Konto löschen in der App + Abschnitt „Konto löschen“ in der
-  Datenschutzerklärung, App 0.15.0-beta; baut auf #389 auf – **erst #389, dann
-  #391**). Nach dem Merge `update.sh` (Web-Abschnitt) und Build 75 (APK + AAB =
-  Bundle für den geschlossenen Test).
+- Derzeit keiner.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1283,8 +1277,16 @@ Auszeichnungen da sind). `main` steht auf `2c540e3`.
   gebaut, APK-SHA-256 beginnt mit `02e19223`; #219 Teil 2 Absturzberichte),
   am Vereinsserver abgelegt, **Build 73** (`mobile-v0.14.0-beta-build73`,
   Commit 2c540e3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
-  `c1720f6c`; #230 Auszeichnungen), am Vereinsserver abgelegt. Nächster Build
-  ist 74.
+  `c1720f6c`; #230 Auszeichnungen), am Vereinsserver abgelegt, **Build 74**
+  (`mobile-v0.14.1-beta-build74`, Commit fa80be8, am 23.09. vom Haupt-PC
+  gebaut, APK-SHA-256 beginnt mit `c012d680`, erstmals auch als AAB –
+  SHA-256 beginnt mit `ff90b730`, am GitHub-Release und auf dem Desktop des
+  Betreibers für den internen Play-Test; #230 Nachtrag), am Vereinsserver
+  abgelegt, **Build 75** (`mobile-v0.15.0-beta-build75`, Commit 495e4a3, am
+  23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `71f5da5d`, AAB-SHA-256
+  beginnt mit `4cbc150b`, AAB auch auf dem Desktop des Betreibers; #390 Konto
+  löschen – das Bundle für den geschlossenen Play-Test), am Vereinsserver
+  abgelegt. Nächster Build ist 76.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1307,6 +1309,15 @@ Auszeichnungen da sind). `main` steht auf `2c540e3`.
   Google-Play-Konto anlegen und die Store-Texte an #219 bestätigen; für #231
   am Server `bash scripts/tournament-dryrun.sh` laufen lassen und die
   Zähl-Zeilen schicken.
+- Play Console (23.09.): Beim ersten AAB-Upload „App-Signatur durch Google
+  Play“ annehmen und den **SHA-256 des App-Signaturschlüssels** (Einrichtung →
+  App-Signatur) schicken – er kommt zusätzlich in
+  `frontend/public/.well-known/assetlinks.json` und in `DEFAULT_APK_KEY_HASHES`
+  (`backend/routes/passkey_routes.py`), sonst gehen Passkeys in der
+  Play-Version nicht. Testkonto `playtest` (normales Konto, keine Zwei-Faktor,
+  kein Mitglied) anlegen und nur in der Play Console eintragen. „App
+  einrichten“ nach der Liste vom 23.09.; Datensicherheit → Lösch-Link
+  `https://lionsquad.at/privacy#account-deletion` (ab #391).
 - Server: `docker-compose.override.yml` mit dem Host-Eintrag für
   `erp.lionsquad.at` ist seit 21.09. angelegt (#351) – Dolibarr ist wieder
   erreichbar; `update.sh` fasst die Datei nie an.
@@ -1318,7 +1329,7 @@ Auszeichnungen da sind). `main` steht auf `2c540e3`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (15 offen nach dem Merge von #386)
+### Meilensteine und offene Issues (13 offen nach dem Merge von #391)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1342,7 +1353,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung als Vorschlag am Issue, noch einzufügen); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. Offen in #219: Google-Signaturschlüssel in assetlinks/Passkeys eintragen, Store-Eintrag, geschlossener Test, 1.0.0 |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
