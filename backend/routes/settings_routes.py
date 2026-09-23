@@ -102,6 +102,9 @@ class BrandingSettings(BaseModel):
     privacy_extra: Optional[str] = None
     terms_of_use: Optional[str] = None
     discord_invite_url: Optional[str] = None
+    # Play-Store-Link (#425): leer, bis der Eintrag öffentlich ist - erst dann zeigt die Website den
+    # offiziellen Badge (Googles Regel: nur mit Link zum erreichbaren Eintrag).
+    play_store_url: Optional[str] = None
     twitch_channel: Optional[str] = None
     analytics_provider: Optional[Literal["", "google", "plausible"]] = None
     google_analytics_id: Optional[str] = None
@@ -610,6 +613,7 @@ async def public_settings(response: Response):
         "timezone": b.get("timezone") or "Europe/Vienna",
         **legal_settings,
         "discord_invite_url": b.get("discord_invite_url") or "https://discord.com/invite/thelionsquadesports",
+        "play_store_url": (b.get("play_store_url") or "").strip(),
         "twitch_channel": b.get("twitch_channel") or "the_lion_squad_esports",
         "whatsapp_channel_url": b.get("whatsapp_channel_url") or "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
         "analytics_provider": b.get("analytics_provider") or "",

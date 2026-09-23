@@ -10,9 +10,9 @@ import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
-import { contactLines, footerColumns } from "@/lib/siteFooter";
+import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Settings } from "lucide-react";
+import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Settings, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
@@ -59,6 +59,7 @@ export function PublicLayout({ children }) {
   const clubName = branding?.club_name || "THE LION SQUAD";
   const tagline = branding?.tagline || "eSports";
   const footerContact = contactLines(branding);
+  const footerCta = footerButtons(branding);
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
   const socialLinks = getFooterSocialLinks(branding, twitchUrl);
 
@@ -215,8 +216,22 @@ export function PublicLayout({ children }) {
                   </a>
                 ))}
               </div>
-              <div className="mt-4 text-xs text-white/45" data-testid="footer-app">
-                <span className="font-bold text-white/65">LionsAPP</span> fürs Handy – Termine, Turniere, Chat und Mitgliedskarte. Bald im Play Store; den Testzugang bekommen Mitglieder vom Vorstand.
+              {/* Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge (erst mit Link). */}
+              <div className="mt-5 flex flex-wrap items-center gap-3" data-testid="footer-buttons">
+                {footerCta.discord && (
+                  <a href={footerCta.discord} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
+                  </a>
+                )}
+                {footerCta.playStoreUrl ? (
+                  <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex">
+                    <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-11 w-auto" />
+                  </a>
+                ) : (
+                  <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                    <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
+                  </span>
+                )}
               </div>
             </div>
           </div>

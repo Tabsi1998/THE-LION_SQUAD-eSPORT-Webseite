@@ -256,7 +256,7 @@ export default function AdminSettingsPage() {
     content_responsible: "", phone: "", privacy_contact_email: "", hosting_provider: "", hosting_country: "Oesterreich/EU",
     vat_number: "", tournament_terms_url: "", paid_tournaments_enabled: false,
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "", terms_of_use: "",
-    discord_invite_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
+    discord_invite_url: "", play_store_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     discord_client_id: "", discord_client_secret: "", discord_client_secret_masked: "", steam_api_key: "", steam_api_key_masked: "",
     whatsapp_channel_url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
     social_links: defaultSocialLinks(),
@@ -1760,6 +1760,8 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
             </div>
+            {/* Play-Store-Link (#425): erst eintragen, wenn der Eintrag öffentlich ist - dann zeigen Footer und Startseite den offiziellen Badge. */}
+            <BrandField label="Play-Store-Link (LionsAPP)" value={brand.play_store_url} onChange={(v) => setBrandField("play_store_url", v)} placeholder="https://play.google.com/store/apps/details?id=at.lionsquad.app" hint="leer lassen, bis die App öffentlich ist" testId="brand-play-store-url" />
             <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 text-xs text-white/60 flex flex-col md:flex-row md:items-center gap-3" data-testid="brand-favicon-universal">
               <div className="flex-1">
                 <div className="font-bold text-white/80 uppercase tracking-wider">Standard-Favicon für hell und dunkel</div>

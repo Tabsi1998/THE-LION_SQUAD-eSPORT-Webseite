@@ -5,6 +5,8 @@ import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
 import { getCachedBranding } from "@/lib/brandingEvents";
 import { boardContacts } from "@/lib/memberArea";
+import { PLAY_BADGE_SRC, footerButtons } from "@/lib/siteFooter";
+import { useCountUp } from "@/hooks/useCountUp";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
@@ -18,7 +20,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users, MessageCircle, Smartphone } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users, Smartphone } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -31,7 +33,6 @@ export default function HomePage() {
   const [state, setState] = useState(null);
   const [board, setBoard] = useState([]);
   const { isClubMember } = useAuth() || {};
-  const discordUrl = String(getCachedBranding()?.discord_invite_url || "").trim();
   useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
   const load = useCallback(() => {
@@ -77,20 +78,8 @@ export default function HomePage() {
               <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">
                 Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link to="/community" data-testid="hero-cta-community" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] hover:shadow-[0_0_24px_rgba(41,182,232,0.6)] transition-all">
-                  <Users className="w-4 h-4" /> Community <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link to="/tournaments" data-testid="hero-cta-tournaments" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                  <Trophy className="w-4 h-4" /> Turniere
-                </Link>
-                {discordUrl && (
-                  <a href={discordUrl} target="_blank" rel="noreferrer" data-testid="hero-cta-discord" className="inline-flex items-center gap-2 px-6 py-3 border border-[#5865F2]/50 text-[#8b95ff] hover:text-white font-bold uppercase tracking-wider rounded-sm transition-all">
-                    <MessageCircle className="w-4 h-4" /> Discord
-                  </a>
-                )}
-              </div>
-              <p className="mt-5 text-sm text-white/45" data-testid="hero-join">
+              {/* Keine Knöpfe im Hero (#425): Discord und Play stehen im Footer, Turniere bei den Terminen. */}
+              <p className="mt-6 text-sm text-white/45" data-testid="hero-join">
                 {isClubMember ? (
                   <Link to="/members/area" className="text-[#FFD700] hover:underline">Zum Mitgliederbereich</Link>
                 ) : (
@@ -242,8 +231,9 @@ function useHomeStructuredData(state) {
   }, [state]);
 }
 
-// Der Verein in Zahlen (#407): nur Zähler über null, sonst gar keine Leiste.
-const NUMBER_LABELS = [["members", "Mitglieder"], ["tournaments", "Turniere"], ["events", "Events"], ["awards", "Auszeichnungen"]];
+// Der Verein in Zahlen (#407, #425): nur Zähler über null, sonst gar keine Leiste. „Turnier-
+// teilnahmen“ sind die Referenzen; die Zahlen zählen hoch, sobald der Block sichtbar wird.
+const NUMBER_LABELS = [["members", "Mitglieder"], ["tournaments", "Veranstaltete Turniere"], ["events", "Veranstaltete Events"], ["participations", "Turnierteilnahmen"]];
 
 function ClubNumbers({ numbers }) {
   const items = NUMBER_LABELS.map(([key, label]) => [key, label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
@@ -251,14 +241,19 @@ function ClubNumbers({ numbers }) {
   return (
     <section className="border-b border-white/10 bg-[#080808]/35" data-testid="home-numbers">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-        {items.map(([key, label, value]) => (
-          <div key={key} className="tls-hero-enter" data-testid={`home-number-${key}`}>
-            <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums">{value.toLocaleString("de-AT")}</div>
-            <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
-          </div>
-        ))}
+        {items.map(([key, label, value]) => <NumberTile key={key} id={key} label={label} value={value} />)}
       </div>
     </section>
+  );
+}
+
+function NumberTile({ id, label, value }) {
+  const [shown, ref] = useCountUp(value);
+  return (
+    <div ref={ref} className="tls-hero-enter" data-testid={`home-number-${id}`}>
+      <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums" aria-label={`${value.toLocaleString("de-AT")} ${label}`}>{shown.toLocaleString("de-AT")}</div>
+      <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
+    </div>
   );
 }
 
@@ -287,13 +282,26 @@ function BoardTeaser({ contacts }) {
   );
 }
 
-// LionsAPP (#407): ehrlich - bis zur Veröffentlichung im Play Store gibt es keinen Knopf.
+// LionsAPP (#407, #425): der offizielle Play-Badge, sobald der Eintrag öffentlich ist (Play-Store-
+// Link im Branding); vorher ehrlich „bald bei Google Play“.
 function AppStrip() {
+  const buttons = footerButtons(getCachedBranding() || {});
   return (
     <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-5 md:p-6 min-w-0" data-testid="home-app-strip">
       <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]"><Smartphone className="w-3.5 h-3.5" /> LionsAPP fürs Handy</div>
       <h2 className="mt-2 font-heading text-2xl font-black uppercase">Der Verein in der Hosentasche</h2>
-      <p className="mt-2 text-sm text-white/65 max-w-xl">Termine mit Kalender, Turniere mit Anmeldung, Chat mit dem Team, Mitgliedskarte mit QR — und Push, wenn es losgeht. Bald im Play Store; den Testzugang bekommen Mitglieder vom Vorstand.</p>
+      <p className="mt-2 text-sm text-white/65 max-w-xl">Termine mit Kalender, Turniere mit Anmeldung, Chat mit dem Team, Mitgliedskarte mit QR — und Push, wenn es losgeht.</p>
+      <div className="mt-4">
+        {buttons.playStoreUrl ? (
+          <a href={buttons.playStoreUrl} target="_blank" rel="noreferrer" data-testid="home-play-badge" className="inline-flex">
+            <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-12 w-auto" />
+          </a>
+        ) : (
+          <span data-testid="home-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+            <Smartphone className="w-4 h-4" /> {buttons.playSoonLabel}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

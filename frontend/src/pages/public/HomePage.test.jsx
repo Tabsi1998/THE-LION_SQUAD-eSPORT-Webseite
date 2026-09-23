@@ -68,21 +68,25 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
 test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Daten", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/board")) return { data: [{ id: "p1", is_active: true, display_title: "Obfrau", user: { display_name: "Obfrau Otti", slug: "otti" } }] };
-    return { data: { ...stateWith(3), club_numbers: { members: 42, tournaments: 17, events: 0, awards: 5 } } };
+    return { data: { ...stateWith(3), club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5 } } };
   });
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");
 
-  expect(screen.getByTestId("hero-cta-community")).toHaveAttribute("href", "/community");
-  expect(screen.getByTestId("hero-cta-tournaments")).toHaveAttribute("href", "/tournaments");
+  // Keine Knöpfe im Hero (#425) - nur die leise Zeile.
+  expect(screen.queryByTestId("hero-cta-community")).toBeNull();
+  expect(screen.queryByTestId("hero-cta-tournaments")).toBeNull();
   expect(screen.getByTestId("hero-join")).toHaveTextContent("Mitglied wird, wer sich einbringt");
+  // Ohne matchMedia (jsdom) steht sofort der Endwert.
   expect(screen.getByTestId("home-number-members")).toHaveTextContent("42");
-  expect(screen.getByTestId("home-number-awards")).toHaveTextContent("5");
+  expect(screen.getByTestId("home-number-tournaments")).toHaveTextContent("Veranstaltete Turniere");
+  expect(screen.getByTestId("home-number-participations")).toHaveTextContent("5");
+  expect(screen.getByTestId("home-number-participations")).toHaveTextContent("Turnierteilnahmen");
   expect(screen.queryByTestId("home-number-events")).toBeNull();
   expect(await screen.findByTestId("home-board-p1")).toHaveTextContent("Obfrau Otti");
   expect(screen.getByTestId("home-board-p1")).toHaveAttribute("href", "/members/otti");
   expect(screen.getByTestId("home-calendar-link")).toHaveAttribute("href", "/calendar");
-  expect(screen.getByTestId("home-app-strip")).toHaveTextContent("Bald im Play Store");
+  expect(screen.getByTestId("home-play-soon")).toHaveTextContent("bald bei Google Play");
 });
 
 test("ohne Zahlen und ohne Vorstand: keine leere Leiste, der App-Streifen bleibt", async () => {

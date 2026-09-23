@@ -1,4 +1,4 @@
-import { contactLines, footerColumns } from "./siteFooter";
+import { contactLines, footerButtons, footerColumns } from "./siteFooter";
 
 // Footer (#403): Spalten aus festen Wegen plus Discord, wenn ein Link gepflegt ist; der
 // Kontaktblock zeigt nur, was da ist.
@@ -19,4 +19,13 @@ test("Kontaktblock aus den öffentlichen Vereinsdaten - leer bleibt leer", () =>
     .toEqual({ name: "THE LION SQUAD - eSPORTS", address: ["Teststraße 1", "6410 Telfs"], email: "office@example.test", zvr: "ZVR 123456789", any: true });
   expect(contactLines({ club_name: "THE LION SQUAD", city: "Telfs" })).toEqual({ name: "THE LION SQUAD", address: ["Telfs"], email: null, zvr: null, any: true });
   expect(contactLines({}).any).toBe(false);
+});
+
+test("Knopfleiste (#425): Discord nur mit Link, der Play-Badge erst mit Play-Store-Link", () => {
+  expect(footerButtons({})).toEqual({ discord: null, playStoreUrl: null, playSoonLabel: "LionsAPP – bald bei Google Play" });
+  const both = footerButtons({ discord_invite_url: "https://discord.com/invite/lions", play_store_url: "https://play.google.com/store/apps/details?id=at.lionsquad.app" });
+  expect(both.discord).toBe("https://discord.com/invite/lions");
+  expect(both.playStoreUrl).toBe("https://play.google.com/store/apps/details?id=at.lionsquad.app");
+  expect(footerButtons({ play_store_url: "javascript:alert(1)" }).playStoreUrl).toBeNull();
+  expect(footerButtons({ play_store_url: "https://example.test/app" }).playStoreUrl).toBeNull();
 });
