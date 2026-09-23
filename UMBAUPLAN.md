@@ -474,7 +474,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), Teil 2 (Kontaktänderung, Austritt, Mandat) wartet auf dolibarr-vereine#164/#125; #324 Dokumente (wartet auf #157) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; offen: #459 App-Karte |
+| Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – PR #463 (Block 49.2); offen: #415 Bildprüfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
@@ -743,6 +744,20 @@ derselben App wie der Bot) fehlt; Twitch braucht die Rückrufadresse in der Deve
 Jetzt: Karte „Verknüpfte Konten“ im öffentlichen Profil mit Rahmen in Plattformfarbe, Anzeigename,
 Datum und offizieller Adresse; im eigenen Profil „verknüpft als … seit …“; ein Rückruf-Fehler nennt
 den Grund der Plattform (`redirect_mismatch` …) im Hinweis und im Log. App-Gegenstück: #459.
+
+### Was 50.3 gefunden hat (Dolibarr-Übersicht – PR #461)
+
+**Die Dolibarr-Schalter lagen auf drei Seiten, und niemand sah, was an ist.** Der Stand-Reiter der
+Dolibarr-Seite zeigt jetzt je Funktion (Mitgliedschaft, Vereinsdaten, Sponsoren, Beitrittsanträge,
+Einwilligungen, Rechnungen, Webhook), ob sie läuft, was fehlt und wo der Schalter liegt; das
+Dashboard zeigt, ob Discord- und Twitch-App für die Konto-Verknüpfung eingerichtet sind.
+
+### Was 50.4 gefunden hat (Profil-Sichtbarkeit – PR #462)
+
+**Die Stufen „Community“, „Verein“, „Nur Admins“ und „Privat“ galten wie „nicht öffentlich“.**
+Der Betreiber sah sein verifiziertes Steam-Konto im öffentlichen Profil nicht. Der Server
+bestimmt jetzt je Aufruf, wer schaut (eingeloggt, Mitglied, Admin-Team, die Person selbst), und
+jedes Feld folgt seiner Stufe – samt Häkchen und der Karte „Verknüpfte Konten“.
 
 ## Block 49 — Moderation II, Teil 1: Wortfilter
 
