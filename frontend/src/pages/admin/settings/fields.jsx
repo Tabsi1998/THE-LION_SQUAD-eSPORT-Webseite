@@ -1,11 +1,12 @@
 // Bausteine der Einstellungsseite, die mehr als ein Reiter braucht (#223:
 // die große Seite wird beim Anfassen Reiter für Reiter zerlegt).
 
-export function BrandField({ label, value, onChange, testId, placeholder = "" }) {
+export function BrandField({ label, value, onChange, testId, placeholder = "", disabled = false, hint = "" }) {
+  // `disabled` mit `hint`: das Feld führt eine andere Quelle (z. B. Dolibarr, #326) - der Wert steht nur lesbar da.
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}{hint ? <span className="ml-2 normal-case tracking-normal text-[#29B6E8]">{hint}</span> : null}</div>
+      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} disabled={disabled} data-testid={testId} className={`w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm ${disabled ? "opacity-60 cursor-not-allowed" : ""}`} />
     </label>
   );
 }

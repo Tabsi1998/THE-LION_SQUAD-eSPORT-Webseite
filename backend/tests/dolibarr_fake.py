@@ -123,6 +123,18 @@ class FakeDolibarr:
         self.payment_types = [{"id": 2, "code": "VIR", "label": "Banküberweisung"}, {"id": 4, "code": "LIQ", "label": "Bar"}, {"id": 6, "code": "CB", "label": "Kreditkarte"}]
         self.bank_accounts: list[dict] = [{"id": 1, "ref": "GIRO", "label": "Girokonto", "bank": "Raiffeisen"}]
         self.bank_readable = True
+        # Vereinsdaten und Vorstand (#326) - Testwerte, keine echten Personen.
+        self.organization = {
+            "country_profile": "AT", "country_profile_complete": True, "name": "Testverein Löwen", "register": {"kind": "ZVR", "number": "123456789", "court": ""},
+            "authority": "Bezirkshauptmannschaft Testbezirk", "address": {"street": "Teststraße 1", "zip": "6410", "town": "Testdorf", "country_code": "AT"},
+            "email": "office@runtime-verein.test", "phone": "+43 5262 0", "url": "https://runtime-verein.test", "founded": "2019-03-01",
+            "nonprofit": True, "purpose": "Förderung des eSports", "fiscal_year_start_month": 1,
+        }
+        self.board = [
+            {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
+            {"code": "kassier", "label": "Kassier:in", "board": True, "represents": False, "auditor": False, "holders": [{"name": None, "since": "2024-04-01"}]},
+            {"code": "rechnungspruefung", "label": "Rechnungsprüfer:in", "board": False, "represents": False, "auditor": True, "holders": []},
+        ]
 
     def add(self, summary: dict, email: str | None = None) -> dict:
         self.members[summary["id"]] = summary
@@ -298,6 +310,11 @@ class FakeDolibarr:
         if path == "/status":
             # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
             return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})
+        if path == "/vereine/organization":
+            # Der Verein fürs Impressum (#326); die Form ist der Vertrag des Moduls.
+            return self._json("/vereine/organization", self.organization)
+        if path == "/vereine/board":
+            return self._json("/vereine/board", self.board)
         if path == "/vereine/status":
             return self._json("/vereine/status", {
                 "module_version": self.module_version, "api_version": 1, "country_profile": "AT",

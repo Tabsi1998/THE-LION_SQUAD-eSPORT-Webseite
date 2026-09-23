@@ -470,7 +470,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Statuten warten auf dolibarr-vereine#158. #324 Dokumente (wartet auf #157), #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – mit Vereinsmodul 0.7.0 baubar |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
@@ -601,6 +601,32 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 44 — Rechtliches II: Vereinsdaten aus Dolibarr, Datenschutz aus den Schaltern
+
+### Was 44.1 gefunden hat (#326 Teil 1 – PR #398)
+
+**Dieselben Daten an zwei Stellen.** Vereinsname, ZVR, Anschrift, Vereinsbehörde und Obmann
+standen im Reiter „Rechtliches“ der Website und noch einmal in Dolibarr – wer den Obmann
+wechselt, muss an beides denken. Seit Vereinsmodul 0.7.0 liefert Dolibarr `organization` und
+`board`; ein Haken im Reiter „Rechtliches“ macht Dolibarr zur führenden Stelle für genau diese
+Felder, die dann nur lesbar dastehen. Redaktionelles (Datenschutz-E-Mail, inhaltlich
+Verantwortlicher, Hosting, UID, Zusatztexte) bleibt bewusst von Hand – Rechtstexte werden nicht
+aus Stammdaten erzeugt. Ein Ausfall lässt den letzten Stand mit Zeitpunkt stehen; die Website
+zeigt nie „andere“ Vereinsdaten, nur weil Dolibarr gerade nicht antwortet.
+
+**Namen nur mit Einwilligung.** Der Vorstand kommt mit `null`, wo jemand der Nennung nicht
+zugestimmt hat. Dann bleibt der Handeintrag; die Website rekonstruiert keinen Namen aus
+Mitgliederdaten oder alten Ständen. Personennamen aus einem Stand älter als zwei Tage hält sie
+zurück, damit ein Widerruf zeitnah wirkt.
+
+**Die Datenschutzerklärung sagte, was möglich wäre – nicht, was läuft.** „Wenn Discord-Webhooks
+aktiviert sind …“, „Statistikdienste wie Google Analytics oder Plausible werden nur verwendet,
+wenn …“. Jetzt liest die Website die echten Schalter (Statistik-Anbieter, Google-Login,
+Discord-Webhooks und -Bot, Twitch, E-Mail-Versand, Dolibarr, Rechnungen, App) und zeigt nur die
+Abschnitte, die zutreffen – mit Empfänger, Zweck und Rechtsgrundlage; die Empfängerliste entsteht
+aus denselben Fakten. Wer einen Dienst ein- oder ausschaltet, ändert damit die Erklärung. Nach
+außen gehen nur Ja/Nein und Anbieternamen, nie Schlüssel.
 
 ## Block 43 — Abrechnung fertig: Zahlungsstand, Prüffälle, Erstattungen
 

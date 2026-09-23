@@ -3,6 +3,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
+import { analyticsText, emailProviderText, hostingText, normalizeFacts, privacySections } from "@/lib/privacyFacts";
 
 function formatLegalDate(value) {
   if (!value) return "";
@@ -226,6 +227,11 @@ export function PrivacyPage() {
   const contactEmail = branding.contact_email;
   const privacyEmail = branding.privacy_contact_email || contactEmail;
   const lines = addressLines(branding);
+  // Rechtliches II: die Abschnitte kommen aus den Schaltern, die wirklich an sind - keine Möglichkeitsform.
+  const facts = normalizeFacts(branding.privacy_facts);
+  const sections = privacySections(facts);
+  const shows = (key) => sections.includes(key);
+  const legalSource = branding.legal_source || {};
 
   return (
     <LegalArticle
@@ -329,17 +335,61 @@ export function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="E-Mail, SMTP und Discord">
-        <p>
-          Für Systemmails, Passwort-Reset, Mitgliedschaftsinformationen, Kontaktantworten und
-          Benachrichtigungen können eigene SMTP-Server oder E-Mail-Dienstleister eingesetzt werden.
-          Dabei werden Empfängeradresse, Betreff, Inhalt, Versandstatus und technische Versanddaten
-          verarbeitet.
+      <Section title="Konto und Anmeldung">
+        <p data-testid="privacy-account">
+          Die Anmeldung läuft mit Benutzername und Passwort (Passwörter nur als Hash gespeichert),
+          auf Wunsch mit einem <strong>Passkey</strong> (WebAuthn): Der Schlüssel bleibt auf deinem
+          Gerät oder in deinem Passwort-Manager, die Website speichert nur den öffentlichen Teil und
+          eine Kennung – kein Dritter ist beteiligt. Die optionale Zwei-Faktor-Anmeldung nutzt eine
+          Authenticator-App auf deinem Gerät.
+          {facts.google_login ? (
+            <span data-testid="privacy-google-login">
+              {" "}Zusätzlich bieten wir <strong>„Mit Google anmelden“</strong> an (Google Ireland Ltd.).
+              Dabei erhalten wir von Google nur E-Mail-Adresse, Name und eine Konto-Kennung, um dein
+              Konto zuzuordnen; Google erfährt, dass du dich bei uns anmeldest. Rechtsgrundlage ist die
+              Erfüllung des Nutzungsverhältnisses (Art. 6 Abs. 1 lit. b DSGVO); die Verknüpfung lässt sich
+              im Profil trennen.
+            </span>
+          ) : (
+            <span data-testid="privacy-no-google-login"> Eine Anmeldung über Google oder andere Anbieter bieten wir nicht an.</span>
+          )}
         </p>
-        <p>
-          Wenn Discord-Webhooks aktiviert sind, können Ereignisse wie Turniere, Spiele,
-          Achievements oder Tests in einen konfigurierten Discord-Kanal übermittelt werden.
+      </Section>
+
+      <Section title="E-Mail-Versand">
+        <p data-testid="privacy-email">
+          Systemmails (Bestätigung, Passwort-Reset, Mitgliedschaft, Turnier- und Vereinsnachrichten)
+          enthalten Empfängeradresse, Betreff und Inhalt; Versandzeitpunkt und -status werden für die
+          Fehlersuche kurz protokolliert. {emailProviderText(facts.email_provider)}
         </p>
+      </Section>
+
+      {shows("discord") && (
+        <Section title="Discord">
+          {facts.discord.webhooks && (
+            <p data-testid="privacy-discord-webhooks">
+              Ereignisse des Vereins – neue Turniere, Events, News, Ergebnisse und Erfolge – werden
+              automatisch in Kanäle unseres Discord-Servers gepostet (Discord Inc., USA;
+              EU-Standardvertragsklauseln). Dabei gehen nur die auf der Website ohnehin öffentlichen
+              Angaben mit: Anzeigenamen, Teamnamen, Ergebnisse, Bilder der Beiträge. Interne
+              Vereinsinhalte werden nur in interne Kanäle gepostet.
+            </p>
+          )}
+          {facts.discord.bot && (
+            <p data-testid="privacy-discord-bot">
+              Auf unserem Discord-Server läuft der Vereins-Bot. Er zählt für Mitglieder, die ihr
+              Discord-Konto im Profil verknüpft haben, die <strong>Anzahl</strong> ihrer Nachrichten
+              (nie den Inhalt – der Bot hat kein Recht, Nachrichten zu lesen), gleicht die Rollen
+              „Mitglied“, „Vorstand“ und „Turnierleitung“ mit dem Vereinsstand ab und beantwortet
+              Befehle wie „nächstes Event“. Nicht verknüpfte Konten werden ignoriert. Grundlage ist unser
+              berechtigtes Interesse an einer gepflegten Community (Art. 6 Abs. 1 lit. f DSGVO); die
+              Verknüpfung lässt sich jederzeit im Profil trennen.
+            </p>
+          )}
+        </Section>
+      )}
+
+      <Section title="Verknüpfte Plattform-Konten">
         <p data-testid="privacy-platform-links">
           Wer im Profil ein Discord-, Twitch- oder Steam-Konto verknüpft, meldet sich dafür bei der
           jeweiligen Plattform an. Die Website erhält dabei nur die Kennung und den Nutzer- bzw.
@@ -350,10 +400,48 @@ export function PrivacyPage() {
         </p>
       </Section>
 
+      {shows("dolibarr") && (
+        <Section title="Mitgliederverwaltung">
+          <p data-testid="privacy-dolibarr">
+            Mitgliedschaft, Beiträge, Funktionen und Vereinsdokumente verwalten wir in unserer eigenen
+            Vereinsverwaltung (Dolibarr) auf einem System des Vereins – kein Dritter. Die Website liest
+            daraus nur, was sie für den Mitgliederbereich braucht (Mitgliedsstand, Beitragsstand, eigene
+            Belege, freigegebene Dokumente), und nur für die angemeldete Person selbst.
+            {facts.dolibarr_billing && (
+              <span data-testid="privacy-dolibarr-billing">
+                {" "}Für kostenpflichtige Events und Startgelder legt die Website dort Rechnungen an (Name,
+                E-Mail, Vorgang, Betrag); Belege bleiben nach dem Steuerrecht sieben Jahre in der
+                Buchhaltung, auch nach einer Kontolöschung.
+              </span>
+            )}
+            {legalSource.dolibarr && (
+              <span data-testid="privacy-legal-source"> Auch Vereinsname, Anschrift, ZVR und vertretungsbefugte Person im Impressum kommen aus dieser Vereinsverwaltung.</span>
+            )}
+          </p>
+        </Section>
+      )}
+
+      <Section title="LionsAPP">
+        <p data-testid="privacy-app">
+          Die LionsAPP (Android) nutzt dasselbe Konto wie die Website und verarbeitet dieselben Daten.
+          Zusätzlich: <strong>Push-Nachrichten</strong> laufen über Firebase Cloud Messaging (Google
+          Ireland Ltd.); dafür speichern wir ein Geräte-Token, das du in den Einstellungen der App
+          jederzeit abschalten kannst. <strong>Absturzberichte</strong> gehen an Firebase Crashlytics
+          (Google Ireland Ltd.): Gerätemodell, Android-Version, App-Version, Zeitpunkt und die Stelle
+          im Programm – keine Namen, keine Nachrichten, keine Inhalte; Löschung nach 90 Tagen; Google
+          kann die Daten in den USA verarbeiten (EU-Standardvertragsklauseln, Art. 46 DSGVO);
+          Grundlage ist unser berechtigtes Interesse an einer stabilen App (Art. 6 Abs. 1 lit. f
+          DSGVO). Die optionale App-Sperre (Fingerabdruck, Gesicht, Gerätecode) prüft das Gerät
+          selbst – biometrische Daten verlassen es nie. Das Konto lässt sich in der App löschen (siehe
+          unten).
+        </p>
+      </Section>
+
       <Section title="Hosting, Logs und Backups">
         <p>
           Die Plattform verarbeitet Daten auf den eingesetzten Servern, Datenbanken und
           Backup-Speichern. Technische Logs dienen Sicherheit, Fehleranalyse und Betrieb.
+          {hostingText(facts.hosting) ? ` ${hostingText(facts.hosting)}` : ""}
         </p>
         <InfoList items={[
           ["Hosting / Betrieb", branding.hosting_provider],
@@ -361,29 +449,34 @@ export function PrivacyPage() {
         ]} />
       </Section>
 
-      <Section title="Cookies und lokale Speicherung">
+      <Section title="Cookies, Statistik und lokale Speicherung">
         <p>
           Die Plattform verwendet technisch notwendige Cookies und lokale Speichermechanismen für
           Login, Session, Refresh-Token, CSRF-Schutz und grundlegende Bedienfunktionen. Ohne diese
           Funktionen sind geschützte Bereiche nicht nutzbar. Tracking- oder Marketing-Cookies sind
           für den Betrieb dieser Plattform nicht erforderlich.
         </p>
-        <p>
-          Statistikdienste wie Google Analytics oder Plausible werden nur verwendet, wenn sie im
-          Adminbereich aktiviert und von Besuchern im Cookie-/Consent-Dialog erlaubt wurden.
-        </p>
+        <p data-testid="privacy-analytics">{analyticsText(facts.analytics)}</p>
       </Section>
 
       <Section title="Empfänger und Auftragsverarbeiter">
+        <p>Daten erhalten nur die Stellen, die für den Betrieb nötig sind – und nur im nötigen Umfang. Stand heute:</p>
+        <ul className="list-disc pl-5 space-y-1" data-testid="privacy-recipients">
+          <li>Hosting und Datenbank: {hostingText(facts.hosting) || "eingesetzte Server und Backup-Speicher des Vereins"}</li>
+          {facts.email_provider === "resend" && <li>E-Mail-Versand: Resend, Inc. (Auftragsverarbeiter)</li>}
+          {facts.email_provider === "smtp" && <li>E-Mail-Versand: eigener Mailserver des Vereins</li>}
+          <li>Push-Nachrichten und Absturzberichte der App: Google Ireland Ltd. (Firebase, Auftragsverarbeiter)</li>
+          {facts.google_login && <li>Anmeldung mit Google: Google Ireland Ltd.</li>}
+          {facts.analytics === "google" && <li>Statistik: Google Ireland Ltd. (Google Analytics, nur mit Einwilligung)</li>}
+          {facts.analytics === "plausible" && <li>Statistik: Plausible Insights OÜ (ohne Cookies)</li>}
+          {(facts.discord.webhooks || facts.discord.bot) && <li>Discord Inc.: Vereinsserver (Meldungen, Bot)</li>}
+          {facts.twitch_embed && <li>Twitch (Amazon): eingebetteter Stream, erst nach Zustimmung zu externen Medien</li>}
+          {facts.dolibarr && <li>Vereinsverwaltung Dolibarr: eigenes System des Vereins, kein Dritter</li>}
+        </ul>
         <p>
-          Daten können an technische Dienstleister weitergegeben werden, soweit dies für Hosting,
-          Datenbankbetrieb, E-Mail-Versand, Backups, Sicherheit, Wartung oder Support erforderlich
-          ist. Eine Weitergabe erfolgt nur im erforderlichen Umfang.
-        </p>
-        <p>
-          Bei extern eingebundenen Diensten wie Discord, Twitch, YouTube oder ähnlichen Plattformen
-          gelten zusätzlich die Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte
-          geöffnet oder eingebunden werden.
+          Bei extern eingebundenen Diensten wie Discord, Twitch oder YouTube gelten zusätzlich die
+          Datenschutzbedingungen der jeweiligen Anbieter, sobald deren Inhalte geöffnet werden; eingebettete
+          Player laden erst nach deiner Zustimmung zu externen Medien.
         </p>
       </Section>
 

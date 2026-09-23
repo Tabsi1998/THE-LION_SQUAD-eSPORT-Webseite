@@ -95,6 +95,9 @@ class BrandingSettings(BaseModel):
     vat_number: Optional[str] = None
     tournament_terms_url: Optional[str] = None
     paid_tournaments_enabled: Optional[bool] = None
+    # Vereinsdaten aus Dolibarr (#326): Name, ZVR, Behörde, Anschrift, Telefon und die vertretungsbefugte
+    # Person kommen aus dem Vereinsmodul; von Hand gepflegte Werte bleiben Rückfall.
+    legal_from_dolibarr: Optional[bool] = None
     legal_extra: Optional[str] = None
     privacy_extra: Optional[str] = None
     terms_of_use: Optional[str] = None
@@ -579,9 +582,15 @@ async def public_settings(response: Response):
     tagline = b.get("tagline", "eSports Verein")
     if str(tagline).strip().lower() == "esports arena":
         tagline = "eSports Verein"
-    legal_settings = build_public_legal_settings(b)
+    # Vereinsdaten aus Dolibarr (#326) liegen über den Handfeldern, wenn der Schalter gesetzt ist;
+    # die Datenschutzerklärung baut sich aus den Schaltern, die wirklich an sind (privacy_facts).
+    from services import club_facts, privacy_facts
+    overlay, legal_source = await club_facts.public_legal_source(db, b)
+    legal_settings = build_public_legal_settings(b, overlay)
     legal_settings.pop("contact_ready", None)
     legal_settings.pop("missing_legal_fields", None)
+    legal_settings["legal_source"] = legal_source
+    legal_settings["privacy_facts"] = await privacy_facts.privacy_facts(db)
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,

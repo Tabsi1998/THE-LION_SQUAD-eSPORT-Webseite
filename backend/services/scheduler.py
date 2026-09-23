@@ -177,6 +177,17 @@ async def _safe_discord_bot_roles():
         _log_task_failure("discord_bot_roles", exc)
 
 
+async def _safe_dolibarr_public():
+    """Vereinsdaten und Vorstand aus Dolibarr (#326): stündlich nachlesen, alter Stand bleibt bei Fehlern."""
+    try:
+        from services.club_facts import refresh_due
+        res = await refresh_due()
+        if res.get("ok"):
+            logger.info(f"[scheduler] dolibarr_public {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_public", exc)
+
+
 async def _safe_billing_reconcile():
     """Täglicher Abgleich (#321): jeden Beleg neu lesen, auch bezahlte."""
     try:
@@ -461,6 +472,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_reconcile", _safe_billing_reconcile, lease_seconds=600.0), IntervalTrigger(hours=24), id="billing_reconcile",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("dolibarr_public", _safe_dolibarr_public, lease_seconds=300.0), IntervalTrigger(hours=1), id="dolibarr_public",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)

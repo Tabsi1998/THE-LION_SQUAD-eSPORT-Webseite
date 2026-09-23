@@ -216,6 +216,36 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Rechtliches II (#326 Teil 1; PR #398, baut auf #395 auf; kein Build).
+  `services/club_facts.py` (NEU): `refresh(db, settings, client)` liest
+  `client.organization()` + `client.board()` in `dolibarr_public` (`id:
+  state`, `fetched_at`; Fehler nur als `error/error_text/error_at` daneben,
+  Daten bleiben), `refresh_due` (Job `dolibarr_public` stündlich, Lease 300),
+  `legal_overlay(org, board, fetched_at=)` (OVERLAY_FIELDS: legal_name,
+  zvr_number, register_authority, street_address, postal_code, city, country,
+  phone, representative_name/role – Obmann/Obfrau = Vorstandsfunktion mit
+  `represents`, bevorzugt `REPRESENTATIVE_CODES`; `null`-Name → kein Overlay;
+  `names_withheld` ab `NAME_MAX_AGE_HOURS` 48), `board_public`,
+  `organization_public`, `public_legal_source(db, branding)` (leer ohne
+  `legal_from_dolibarr`), `admin_view`. `public_site_settings.build_public_legal_settings(branding,
+  overlay=)` – Overlay gewinnt, Leerwerte nie. `services/privacy_facts.py`
+  (NEU): `facts_from(branding, auth, discord, email, dolibarr)` → analytics,
+  google_login, passkeys, discord{webhooks,bot}, twitch_embed, email_provider
+  (smtp/resend/none), dolibarr, dolibarr_billing, app{push,crash_reports,
+  app_lock}, hosting – nie Geheimnisse. `/settings/public` liefert
+  `legal_source` + `privacy_facts`; `BrandingSettings.legal_from_dolibarr`.
+  Routen `GET/POST /api/admin/dolibarr/public[/refresh]` (club/system).
+  Client `organization()`, `board()`; Fähigkeit `organization`; Fake
+  `organization`/`board` (Vertrag), Manifest `used_paths` +2. Web:
+  `lib/privacyFacts.js` (`normalizeFacts`, `privacySections`,
+  `emailProviderText`, `analyticsText`, `hostingText`), `LegalPages`
+  PrivacyPage-Abschnitte aus den Fakten (`privacy-*` testids), `Section` mit
+  `id`; `AdminSettingsPage` Reiter Rechtliches: Block `legal-dolibarr`
+  (Haken `legal-from-dolibarr`, Stand, `legal-dolibarr-refresh`), Felder aus
+  Dolibarr `disabled` + Hint (`BrandField` kann `disabled`/`hint`). Tests
+  `test_club_facts_flow.py` (5), `privacyFacts.test.js` (3),
+  `LegalPages.test.jsx` (3). Statuten (#326 Rest) warten auf
+  dolibarr-vereine#158.
 - Play-Signaturschlüssel als zweite App-Herkunft (#219; PR #394, baut auf #392
   auf; kein Build). Google Play signiert die App seit dem ersten Upload am
   23.09. mit eigenem Schlüssel (Play App Signing, SHA-256 `1D:10:7A:DD…BA:26`,
@@ -1252,8 +1282,14 @@ Build 75 am 23.09.). `main` steht auf `495e4a3`.
 
 ### Offene PRs
 - #394 (#219 Play-Signaturschlüssel als zweite App-Herkunft: assetlinks.json +
-  Passkey-Login; baut auf #392 auf – **erst #392, dann #394**). Nach dem Merge
-  `update.sh`; kein Build.
+  Passkey-Login; Basis `main`). Nach dem Merge `update.sh`; kein Build.
+- #395 (#393 Release-Doku: Play-Hinweise zu Offenlegungsdatei und
+  Debug-Symbolen; baut auf #394 auf). Nur Doku.
+- #398 (#326 Teil 1 Rechtliches II: Vereinsdaten und Obmann aus Dolibarr,
+  Datenschutzerklärung aus den echten Schaltern; baut auf #395 auf – **erst
+  #394, dann #395, dann #398**). Nach dem Merge `update.sh`, dann Rechtliches →
+  „Jetzt nachlesen“ → Haken setzen; den Crashlytics-Absatz aus den
+  Zusatz-Datenschutzhinweisen entfernen (steht jetzt fest im Abschnitt LionsAPP).
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1355,7 +1391,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. #320 eigene Rechnungen für alle (Nicht-Mitglieder über die Einzelbelege ihrer Vorgänge, Quelle je Beleg, Filter, App-Bildschirm) – umgesetzt in #381. #321 Zahlungsstand im Detail, Prüffälle (Storno/Änderung nach dem Beleg, Überzahlung, Abweichung, verschwundener Beleg), Erstattungen mit Nachweis und #322 Rest (Filter, Summen je Veranstaltung, Zeitleiste, CSV, Steuersätze bestätigen, Runbook, Aufbewahrung) – umgesetzt in #388. Der Meilenstein ist durch |
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand aus Dolibarr – Teil 1 in #398 (Rechtliches II: Impressum/Kontakt/Datenschutz aus `/vereine/organization` + `/vereine/board`, Datenschutzerklärung aus den echten Schaltern); Rest (Statuten, öffentliche Vorstandsseite) wartet auf dolibarr-vereine#158. #324 Dokumente, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe – das Vereinsmodul 0.7.0 (23.09.) liefert Antrag, Einwilligungen und Antragsstand über die API; Dokumente (#157) noch nicht |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot (im Backend, Token im Admin; zählt Nachrichten verknüpfter Konten, gleicht die drei Rollen ab, vier Slash-Befehle) – umgesetzt in #378. Der Betreiber richtet den Bot nach dem Merge im Admin ein |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
@@ -1400,8 +1436,12 @@ sinnvoll hältst“):
    App 1.0.0: #217 Stufe 1 und #219 Teil 1 in #380, #217 Stufe 2 in #384;
    #219 Teil 2 Crashlytics in #385; Play-Bundle und Store-Eintrag, sobald das
    Play-Konto da ist (Texte als Vorschlag an #219).
-9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
-   ausliefert.
+9. Dolibarr III: #326 Teil 1 (Vereinsdaten/Vorstand, Rechtliches II) in
+   #398; Statuten und Dokumente, sobald dolibarr-vereine#157/#158 liefern;
+   #328/#329 sind mit Vereinsmodul 0.7.0 baubar (Antrag, Einwilligungen,
+   Antragsstand über die API). Danach die Prüfrunde vom 23.09. (Turnierbaum,
+   QR-Code, Turnierseite, Kalender im Web, Vereins-Reiter, Footer, lionsquad.at
+   lesend) → Issues und Meilensteine.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
