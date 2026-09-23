@@ -472,7 +472,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), danach #302 Discord-Bot für Aktivitätszähler, Rollenabgleich und Befehle – der Bot braucht die Verknüpfung |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
@@ -601,6 +601,36 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 36 — Discord II, Teil 2: Der Bot
+
+### Was 36.1 gefunden hat (#302 – PR #378)
+
+**Ein Bot ist ein Prozess, der immer läuft – und der Betreiber will keinen zweiten Server pflegen.**
+Die naheliegende Lösung wäre ein eigener Container mit eigenem Token in der `.env`. Der Betreiber
+hat sich am 22.09. für das Gegenteil entschieden: Der Bot läuft als Hintergrundaufgabe im
+Backend, der Token liegt verschlüsselt in den Einstellungen und wird im Admin eingetragen wie das
+Twitch-Secret. Eine Änderung startet den Bot neu, „Bot verbinden“ aus hält ihn an; `update.sh`
+bleibt der einzige Weg auf den Server, und die `.env` bleibt, wie sie ist.
+
+**Zählen heißt zählen, nicht lesen.** Für die Erfolge „Discord-Aktiv“ reicht die Zahl der
+Nachrichten. Der Bot bekommt deshalb das Recht, Nachrichten zu lesen, erst gar nicht (Message
+Content Intent aus); er merkt sich je verknüpftem Konto einen Zähler und einen Tageswert. Wer sein
+Konto nicht verknüpft hat, existiert für den Bot nicht – das ist die Verbindung zu Block 34, und
+sie ist auch die Datenschutzgrenze: Ohne eigene Anmeldung bei Discord wird nichts zugeordnet.
+
+**Der Bot fasst nur seine drei Rollen an.** Mitglied, Vorstand, Turnierleitung kommen aus der
+Website (Beitragsstand und Bereiche); alles andere im Discord – Moderatoren, Spiel-Rollen,
+Farben – bleibt unberührt, auch beim Entfernen. Der Abgleich ist idempotent und läuft alle zehn
+Minuten, damit ein Austritt oder ein neuer Vorstandsposten nicht Tage im Discord nachhängt. Fehlt
+eine Rolle im Discord oder steht die Bot-Rolle zu weit unten, sagt der Stand-Kasten das, statt
+still nichts zu tun.
+
+**Befehle antworten mit dem, was die Website ohnehin öffentlich zeigt.** `/naechstes-event` und
+`/turniere` nennen nur öffentliche Termine; `/meine-erfolge` und `/status` antworten nur dem, der
+fragt, und nur mit verknüpftem Konto beziehungsweise Vorstandsrecht. Die reine Logik – welche
+Rollen, was zählt, welcher Text – liegt ohne die Discord-Bibliothek in Funktionen und ist ohne
+Netz getestet; die Bibliothek ist eine dünne Schale darum.
 
 ## Block 35 — App 0.9.0-beta: Freunde und Laufbanner
 

@@ -89,6 +89,39 @@ Was die Website erhält: Kennung und Nutzer-/Anzeigename des Kontos (Steam: Stea
 Zeitpunkt – keine Passwörter, keine Freundeslisten, keine Nachrichten. Trennen geht jederzeit im
 Profil; der Text bleibt, das Häkchen nicht. Ein Konto kann nur an einem Profil hängen.
 
+## Der Bot
+
+Der Bot läuft **im Backend** mit – kein eigener Container, nichts in der `.env`. Alles, was er
+braucht, steht unter Admin → Einstellungen → Discord → „Discord-Bot“. Er tut drei Dinge, und
+jedes nur für Konten, die im Profil verknüpft sind (Abschnitt oben):
+
+- **Zählen:** Jede Nachricht eines verknüpften Mitglieds zählt eins hoch (für die Erfolge
+  „Discord-Aktiv“). Gezählt wird die Zahl, nie der Inhalt – der Bot hat kein Recht, Nachrichten
+  zu lesen. Nicht verknüpfte Konten und andere Bots zählen nicht.
+- **Rollen:** Aktives Mitglied ↔ Rolle „Mitglied“, Vorstand ↔ „Vorstand“, Turnierleitung ↔
+  „Turnierleitung“. Der Abgleich läuft alle zehn Minuten und auf Knopfdruck („Rollen jetzt
+  abgleichen“). Der Bot fasst **nur diese drei Rollen** an – andere Rollen bleiben, wie sie sind.
+  Die Namen lassen sich in den Einstellungen ändern; fehlt eine Rolle im Discord, steht das dort.
+- **Befehle:** `/naechstes-event`, `/turniere` (offene Anmeldungen), `/meine-erfolge` (nur
+  verknüpft, Antwort nur für einen selbst), `/status` (nur Vorstand, Antwort nur für einen selbst).
+
+### Einrichten (einmalig, im Admin beschrieben)
+
+1. discord.com/developers → dieselbe App wie fürs Konto-Verknüpfen → **Bot** → „Reset Token“ →
+   Token unter „Bot-Token“ eintragen und speichern. Der Token wird verschlüsselt abgelegt und nie
+   wieder angezeigt; leer lassen heißt behalten. Nur der Superadmin kann ihn entfernen.
+2. Dort unter „Privileged Gateway Intents“ den **Server Members Intent** einschalten (für den
+   Rollenabgleich). „Message Content“ bleibt aus.
+3. OAuth2 → URL Generator: Scopes `bot` + `applications.commands`, Recht „Manage Roles“ – mit
+   der Adresse den Bot auf den Server holen. Im Discord die Bot-Rolle in der Rollenliste **über**
+   Mitglied/Vorstand/Turnierleitung ziehen, sonst darf er sie nicht vergeben.
+4. „Bot verbinden“ anhaken. Der Stand (online/aus, Servername, letzte Aktion, letzter Fehler)
+   steht direkt darunter. Die Server-ID ist nur nötig, wenn der Bot auf mehreren Servern ist.
+
+Jede Änderung an Token, Server-ID, Rollen oder Zählschalter startet den Bot neu; „Bot verbinden“
+aus hält ihn an. Ist der Bot aus, laufen Webhooks, Meldungen und Konto-Verknüpfung unverändert
+weiter – er ist eine Ergänzung, keine Voraussetzung.
+
 ## Für die Entwicklung
 
 - `backend/discord_service.py`: `TARGETS`, `EVENTS`, `resolve_target`,
@@ -99,6 +132,13 @@ Profil; der Text bleibt, das Häkchen nicht. Ein Konto kann nur an einem Profil 
   Minute), `news_message`, `event_message`, `preview`, `notify_board`.
 - `backend/services/achievement_queue.py`: `request_evaluation`,
   `process_queue`, `sweep`, `note_award`, `flush_awards`.
+- `backend/services/discord_bot.py`: reine Logik oben (`bot_settings`,
+  `desired_roles`, `role_diff`, `counted_user`, Befehlstexte), Daten
+  (`linked_discord_ids`, `count_message`, `wanted_roles_by_user`,
+  `record_state`/`read_state`), `BotRunner` (`start_if_enabled`, `stop`,
+  `apply_settings`, `status`, `sync_roles`) um discord.py. Routen
+  `routes/discord_bot_routes.py` (`/api/settings/discord/bot/status|sync|restart`),
+  Job `discord_bot_roles` alle zehn Minuten, Start im Lifespan.
 - **Neues Ereignis:** in `EVENTS` eintragen (Ziel, Beschriftung, Standard
   **aus**), über `send_event` senden, und ein Test, dass es mit privater
   Sichtbarkeit nicht an ein öffentliches Ziel geht.

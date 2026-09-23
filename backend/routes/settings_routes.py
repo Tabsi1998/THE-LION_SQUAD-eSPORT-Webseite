@@ -1,5 +1,6 @@
 """Admin settings: email, SMTP, branding, socials, legal texts, banners, Discord and auth."""
 
+import logging
 import os
 from fastapi import Query, APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel, EmailStr
@@ -237,6 +238,13 @@ class DiscordSettings(BaseModel):
     targets: Optional[dict[str, dict]] = None
     # Schalter je Ereignis; die Schlüssel stehen in discord_service.EVENTS.
     events: Optional[dict[str, bool]] = None
+    # Discord-Bot (#302): Token verschlüsselt (leer lassen = behalten), Schalter, Server, Rollennamen.
+    bot_token: Optional[str] = None
+    clear_bot_token: Optional[bool] = None
+    bot_enabled: Optional[bool] = None
+    bot_guild_id: Optional[str] = None
+    bot_roles: Optional[dict[str, str]] = None
+    bot_count_messages: Optional[bool] = None
 
 
 class AmpSettings(BaseModel):
@@ -1158,6 +1166,11 @@ async def get_discord(me: dict = Depends(require_club_admin())):
         for key, spec in EVENTS.items()
     ]
     s["target_status"] = await target_status(db)
+    # Discord-Bot (#302): Stand ohne Token.
+    from services import discord_bot
+    s["bot"] = {**discord_bot.bot_settings(s), **await discord_bot.read_state(db), **discord_bot.bot.status()}
+    for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
+        s.pop(key, None)
     last = await db.email_logs.find_one(
         {"channel": "discord"},
         {"_id": 0, "status": 1, "error": 1, "event_key": 1, "created_at": 1},
@@ -1193,6 +1206,27 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
     for key in ("username", "avatar_url"):
         if key in updates and isinstance(updates[key], str):
             updates[key] = updates[key].strip()
+    # Discord-Bot (#302): Token nur, wenn neu eingetippt; Rollennamen nur die drei bekannten.
+    from services.discord_bot import ROLE_KEYS
+    if updates.pop("clear_bot_token", False):
+        unset["bot_token"] = ""
+    if "bot_token" in updates:
+        token = str(updates.pop("bot_token") or "").strip()
+        if token:
+            if len(token) < 40 or " " in token:
+                raise HTTPException(400, "Das sieht nicht nach einem Bot-Token aus (Developer Portal → Bot → Reset Token).")
+            updates["bot_token"] = encrypt_secret(token)
+    if "bot_guild_id" in updates:
+        guild_id = str(updates["bot_guild_id"] or "").strip()
+        if guild_id and not guild_id.isdigit():
+            raise HTTPException(400, "Die Server-ID ist eine Zahl (Discord: Server → Rechtsklick → ID kopieren, Entwicklermodus).")
+        updates["bot_guild_id"] = guild_id
+    if "bot_roles" in updates:
+        roles = updates.pop("bot_roles") or {}
+        for key, value in roles.items():
+            if key not in ROLE_KEYS:
+                raise HTTPException(400, f"Unbekannte Rolle: {key}")
+            updates[f"bot_roles.{key}"] = str(value or "").strip()[:100]
     current = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
     from discord_service import EVENTS, EXTRA_TARGETS, event_field
     incoming_targets = updates.pop("targets", None)
@@ -1221,6 +1255,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             flat_current[f"targets.{name}.{field}"] = value
     for key, value in (current.get("events") or {}).items():
         flat_current[f"events.{key}"] = value
+    for key, value in (current.get("bot_roles") or {}).items():
+        flat_current[f"bot_roles.{key}"] = value
     current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
@@ -1233,6 +1269,13 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         {"id": "discord"}, op, upsert=True,
     )
     await _audit_settings_change(db, "settings.discord.update", "discord", me["id"], changed_fields)
+    # Bot-Einstellungen geändert (#302): neu verbinden oder anhalten - ohne Neustart des Servers.
+    if any(field.startswith("bot_") for field in changed_fields):
+        try:
+            from services.discord_bot import bot as discord_bot
+            await discord_bot.apply_settings()
+        except Exception as exc:
+            logging.getLogger("tls.discord.bot").warning("[discord-bot] Neustart nach Einstellung: %s", exc)
     return {"ok": True, "changed": True}
 
 

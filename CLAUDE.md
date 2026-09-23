@@ -171,6 +171,36 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Discord-Bot (#302, Discord II Teil 2; PR #378). Läuft
+  **im Backend** als Task (Entscheidung des Betreibers vom 22.09.: Token im
+  Admin, kein Container, nichts in der `.env`). `services/discord_bot.py`:
+  reine Logik (`bot_settings` mit Vorgaben Mitglied/Vorstand/Turnierleitung,
+  `desired_roles(areas, is_member)`, `role_diff` nur über `ROLE_KEYS`,
+  `counted_user` (kein Bot, nur verknüpft), `next_event_text`,
+  `open_tournaments_text`, `achievements_text`, `status_text`), Daten
+  (`linked_discord_ids` aus `platform_links`, `count_message` =
+  `discord_messages_count` +1, Tageszähler `discord_activity` (nie Inhalt) und
+  `request_evaluation` für „Discord-Aktiv“, `wanted_roles_by_user` über
+  `areas_for` + `is_active_member`, Stand in `settings.discord_bot_state`),
+  `BotRunner` (`bot`): `start_if_enabled` (Fingerabdruck aus Token/Server/
+  Schalter, sonst kein Neustart), `stop`, `apply_settings`, `status`, `_run`
+  (discord.py, Intents members an, message_content aus; Slash-Befehle
+  `/naechstes-event`, `/turniere`, `/meine-erfolge` ephemeral,
+  `/status` nur Bereich club/system), `sync_roles` (idempotent, nur die drei
+  Rollen, `missing_roles` in den Stand). Einstellungen in `settings.discord`:
+  `bot_token` (verschlüsselt, ≥ 40 Zeichen, nie in GET; `clear_bot_token`
+  nur System), `bot_enabled`, `bot_guild_id` (Ziffern), `bot_roles`
+  (Teilmenge member/board/tournament), `bot_count_messages`; GET liefert
+  `bot` = Einstellungen + Stand + Laufzeit; jede `bot_*`-Änderung ruft
+  `bot.apply_settings()`. Routen `routes/discord_bot_routes.py`
+  (`GET /api/settings/discord/bot/status` club/system, `POST …/sync`,
+  `POST …/restart` System). Lifespan startet den Bot mit dem Scheduler; Job
+  `discord_bot_roles` alle 10 min (nur wenn verbunden). Admin
+  `settings/DiscordBotPanel.jsx` (Anleitung solange kein Token, Speichern
+  schickt nur Getipptes, „Bot verbinden“ eigener Schalter, „Rollen jetzt
+  abgleichen“ nur online, Stand-Kasten). Abhängigkeiten `discord.py==2.7.1`,
+  `aiohttp==3.14.3`. Tests `test_discord_bot_unit.py` (4),
+  `test_discord_bot_settings_flow.py` (3), `DiscordBotPanel.test.jsx` (2).
 - Plattform-Konten verknüpfen (#260, Discord II Teil 1; PR #376).
   `services/platform_links.py`: `PLATFORMS` (discord → `discord_name` +
   `discord_id`, twitch → `twitch_handle`, steam → `steam_id`; `delivers` =
@@ -951,13 +981,14 @@ trägt bestehende Liga-Partien beim ersten Lauf nach `update.sh` nach), #371
 Rechnungskonditionen und lesbare Belege), #373 (Nachtrag: deutsche
 Konditionstexte, Anleitung zur Kontonummer), #374 (App 0.8.0-beta – Kalender,
 Galerie; Build 66 am 22.09. gebaut und am Vereinsserver), #375 (#368
-Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen). `main` steht
-auf `a4c77db`.
+Leitfaden Schritt 2), #376 (#260 Plattform-Konten verknüpfen), #377 (App
+0.9.0-beta – #240 Freunde, #245 Laufbanner; `update.sh` für Backend/Admin,
+Build 67 vom Haupt-PC). `main` steht auf `1d02528`.
 
 ### Offene PRs
-- #377 (App 0.9.0-beta – #240 Freunde, #245 Laufbanner; Backend + Admin-
-  Häkchen). Nach dem Merge `update.sh` (Backend/Admin) und Build 67 vom
-  Haupt-PC (`npm run release:local`).
+- #378 (#302 Discord-Bot im Backend; Token im Admin). Nach dem Merge
+  `update.sh` (neue Abhängigkeit discord.py im Backend-Image), dann im Admin
+  Einstellungen → Discord → „Discord-Bot“ nach der Anleitung dort einrichten.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
@@ -999,7 +1030,7 @@ auf `a4c77db`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (22 offen nach dem Merge von #376; #240/#245 schließt #377)
+### Meilensteine und offene Issues (20 offen nach dem Merge von #377; #302 schließt #378)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1014,7 +1045,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot folgt (braucht #260 und den Bot-Token vom Betreiber) |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot (im Backend, Token im Admin; zählt Nachrichten verknüpfter Konten, gleicht die drei Rollen ab, vier Slash-Befehle) – umgesetzt in #378. Der Betreiber richtet den Bot nach dem Merge im Admin ein |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
@@ -1051,7 +1082,9 @@ sinnvoll hältst“):
    #369 (#203/#204 berührten dieselben
    Event-Formulare wie #318 – zusammen planen). Abrechnung II – umgesetzt in
    #371 (baut auf #369 auf). App 0.8.0-beta.
-8. Discord II, App 0.9.0-beta, Auszeichnungen und Marke, App 1.0.0.
+8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
+   umgesetzt in #377, Build 67 nach dem Merge. Offen: Auszeichnungen und
+   Marke, App 1.0.0.
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 

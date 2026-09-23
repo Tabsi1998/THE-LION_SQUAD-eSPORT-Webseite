@@ -13,6 +13,7 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, SystemCard } from "./settings/fields";
 import { TwitchTab } from "./settings/TwitchTab";
 import { PlatformLinkSettings } from "./settings/PlatformLinkSettings";
+import { DiscordBotPanel } from "./settings/DiscordBotPanel";
 import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
 import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
@@ -1630,6 +1631,7 @@ export default function AdminSettingsPage() {
             </div>
           </div>
           <DiscordTargets />
+          <DiscordBotPanel canSystem={user?.role === "superadmin"} />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
               <div>
