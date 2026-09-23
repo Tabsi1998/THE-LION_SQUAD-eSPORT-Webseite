@@ -15,9 +15,15 @@ vi.mock("@/components/tls/SponsorTicker", () => ({ SponsorTicker: () => null }))
 vi.mock("@/components/tls/SeasonPassWidget", () => ({ SeasonPassWidget: () => null }));
 vi.mock("@/components/tls/Logo", () => ({ MascotBadge: () => null }));
 vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: () => null }));
-vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: null, isClubMember: false }) }));
+const authState = { user: null, isClubMember: false };
+vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
 const HomePage = (await import("./HomePage")).default;
+
+const NEWS = [
+  { id: "n1", slug: "cup-abgesagt", title: "Cup abgesagt", category: "announcement", excerpt: "Zu wenige Anmeldungen.", published_at: "2026-09-20T10:00:00Z" },
+  { id: "n2", slug: "smash-anmeldung", title: "Smash-Anmeldung offen", category: "announcement", published_at: "2026-09-19T10:00:00Z" },
+];
 
 function stateWith(registered, status = "registration_open") {
   return {
@@ -35,6 +41,8 @@ beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   vi.setSystemTime(new Date("2026-09-22T10:00:00Z"));
   invalidate = null;
+  authState.user = null;
+  authState.isClubMember = false;
 });
 afterEach(() => vi.useRealTimers());
 
@@ -63,12 +71,13 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
   expect(screen.queryByTestId("home-next-new")).not.toBeInTheDocument();
 });
 
-// Startseite II (#407): Community zuerst im Hero, der Verein in Zahlen nur mit echten Zählern,
-// Ansprechpartner aus dem Vorstand, Kalender-Einstieg bei den Terminen.
+// Startseite II und III (#407, #425, #431): Community zuerst im Hero, der Verein in Zahlen nur mit
+// echten Zählern, Ansprechpartner aus dem Vorstand unter den News, Kalender-Einstieg bei den
+// Terminen; der App-Kasten ist weg (Discord und LionsAPP stehen im Footer).
 test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Daten", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/board")) return { data: [{ id: "p1", is_active: true, display_title: "Obfrau", user: { display_name: "Obfrau Otti", slug: "otti" } }] };
-    return { data: { ...stateWith(3), club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5 } } };
+    return { data: { ...stateWith(3), news: NEWS, club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5 } } };
   });
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");
@@ -86,14 +95,29 @@ test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Da
   expect(await screen.findByTestId("home-board-p1")).toHaveTextContent("Obfrau Otti");
   expect(screen.getByTestId("home-board-p1")).toHaveAttribute("href", "/members/otti");
   expect(screen.getByTestId("home-calendar-link")).toHaveAttribute("href", "/calendar");
-  expect(screen.getByTestId("home-play-soon")).toHaveTextContent("bald bei Google Play");
+  // Die Ansprechpartner stehen unter den aktuellen News (#431), der App-Kasten gibt es nicht mehr.
+  const newsCard = screen.getByTestId("home-news-smash-anmeldung");
+  const board = screen.getByTestId("home-board");
+  expect(newsCard.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.queryByTestId("home-app-strip")).toBeNull();
+  expect(screen.queryByTestId("home-play-soon")).toBeNull();
 });
 
-test("ohne Zahlen und ohne Vorstand: keine leere Leiste, der App-Streifen bleibt", async () => {
+test("ohne Zahlen und ohne Vorstand: keine leere Leiste und kein leerer Block", async () => {
   apiMock.get.mockImplementation(async (url) => (url.startsWith("/board") ? { data: [] } : { data: stateWith(1) }));
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");
   expect(screen.queryByTestId("home-numbers")).toBeNull();
   expect(screen.queryByTestId("home-board")).toBeNull();
-  expect(screen.getByTestId("home-app-strip")).toBeInTheDocument();
+  expect(screen.queryByTestId("home-app-strip")).toBeNull();
+});
+
+test("Mitglieder sehen im Hero keine Zeile - der Mitgliederbereich steht im Benutzermenü", async () => {
+  authState.user = { id: "u1", username: "lion" };
+  authState.isClubMember = true;
+  apiMock.get.mockImplementation(async (url) => (url.startsWith("/board") ? { data: [] } : { data: stateWith(1) }));
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  await screen.findByTestId("home-next-tournament-cup");
+  expect(screen.queryByTestId("hero-join")).toBeNull();
+  expect(screen.queryByText("Zum Mitgliederbereich")).toBeNull();
 });
