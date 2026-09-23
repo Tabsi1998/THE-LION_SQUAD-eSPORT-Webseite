@@ -1350,15 +1350,22 @@ Build 75 am 23.09.), #394 (#219 Googles Play-Signaturschlüssel in assetlinks.js
 und Passkey-Login; `update.sh`), #395 (#393 Release-Doku – der Squash landete
 im gelöschten Basis-Zweig, Inhalt mit dem Doku-Stand danach nachgeholt) und
 #398 (#326 Teil 1 Rechtliches II: Vereinsdaten und Obmann aus Dolibarr,
-Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
-`1bbb6b8`.
+Datenschutzerklärung aus den echten Schaltern; `update.sh`), #404 (Doku-Stand),
+#411 (#396 + #397 Events in der App: Kosten, Teilnehmer, Check-in; `update.sh`),
+#413 (#402 Kalender auf der Website mit Abo-Feed; `update.sh`) und #418 (#414
+Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418). `main`
+steht auf `c572c95`.
 
 ### Offene PRs
-- #418 (#414 Melden/Blockieren in der App; nur App; auf `main`, bereit).
-  Build 76 baue ich, sobald #418 gemergt ist (0.16.0-beta = #411 + #418).
-  Play Console ruht auf Wunsch des Betreibers (23.09.), bis alles fertig ist;
-  #412 (Play-Upload per API) wartet auf die Identitätsbestätigung des
-  Entwicklerkontos. Nach #411, #413 und #398 beim Betreiber: `update.sh`, dann Einstellungen →
+- Derzeit keiner (Stand 23.09. abends, nach #418 und Build 76). Als Nächstes:
+  Web: Design II (#403 Footer + #407 Startseite – Antworten des Betreibers vom
+  23.09. an #399/#400/#405/#407 beachten: „Mitglied werden“ nicht groß
+  vermarkten, Community zuerst; QR-Logo kommt als PNG unter Branding →
+  „QR-Logo“), dann #400, #408, #409, #401 + #399; Play Console ruht auf Wunsch
+  des Betreibers, bis alles fertig ist; #412 (Play-Upload per API) wartet auf
+  die Identitätsbestätigung des Entwicklerkontos; Moderation II (#415–#417,
+  Meilenstein 28, Variante C) nach App 1.0.0. Nach #411, #413 und #398 beim
+  Betreiber: `update.sh`, dann Einstellungen →
   Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
   übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
   entfernen (steht jetzt fest im Abschnitt LionsAPP).
@@ -1412,7 +1419,12 @@ Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
   23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `71f5da5d`, AAB-SHA-256
   beginnt mit `4cbc150b`, AAB auch auf dem Desktop des Betreibers; #390 Konto
   löschen – das Bundle für den geschlossenen Play-Test), am Vereinsserver
-  abgelegt. Nächster Build ist 76.
+  abgelegt, **Build 76** (`mobile-v0.16.0-beta-build76`, Commit c572c95, am
+  23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `4dd72f5b`, AAB-SHA-256
+  beginnt mit `1272baeb`, AAB auf dem Desktop des Betreibers; #396/#397 Events
+  in der App + #414 Melden/Blockieren – das Bundle, mit dem die
+  Inhaltseinstufung auf „Blockieren/Melden = Ja“ gestellt werden kann), am
+  Vereinsserver abgelegt. Nächster Build ist 77.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1440,11 +1452,16 @@ Datenschutzerklärung aus den echten Schaltern; `update.sh`). `main` steht auf
   (`1D:10:7A:DD…BA:26`, Seite „Mit Google Play geschützt“ → „Play
   App-Signatur verwalten“) ist mit #394 in `assetlinks.json` und
   `DEFAULT_APK_KEY_HASHES` eingetragen – nach `update.sh` gehen Passkeys auch
-  in der Play-Version. Noch offen beim Betreiber: Testkonto `playtest`
-  (normales Konto, keine Zwei-Faktor, kein Mitglied) anlegen und nur in der
-  Play Console eintragen; „App einrichten“ nach der Liste vom 23.09.
-  (Datensicherheit → Lösch-Link `https://lionsquad.at/privacy#account-deletion`);
-  Screenshots vom Handy; Tester-Liste und Beitrittslink.
+  in der Play-Version. Noch offen beim Betreiber: Build 76 (AAB auf dem
+  Desktop) in den internen Test laden, danach Inhaltseinstufung „Blockieren“
+  und „Melden“ auf Ja; Testkonto `playtest` (normales Konto, keine
+  Zwei-Faktor, **aktives Mitglied**, damit die Prüfer den Mitgliederbereich
+  sehen) anlegen und unter App-Zugriff eintragen (Text auf Englisch, siehe
+  Chat vom 23.09.); „App einrichten“ nach der Tabelle vom 23.09. abends
+  (Anzeigen Nein, IARC „Alle anderen App-Typen“, Zielgruppe 13+, Datensicherheit
+  → Lösch-Link `https://lionsquad.at/privacy#account-deletion`, Kategorie
+  Sport); Screenshots vom Handy; Tester-Liste und Beitrittslink. Die Seite
+  „API-Zugriff“ erscheint erst nach der Identitätsbestätigung (#412).
 - Server: `docker-compose.override.yml` mit dem Host-Eintrag für
   `erp.lionsquad.at` ist seit 21.09. angelegt (#351) – Dolibarr ist wieder
   erreichbar; `update.sh` fasst die Datei nie an.
