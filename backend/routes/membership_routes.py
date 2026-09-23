@@ -294,13 +294,25 @@ async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
         references = _sort_references(await _enrich_references(refs_raw))[:30]
     else:
         references = []
+    # Je Teilnahme zählt der Eintrag, in dem diese Person steht (#409): ein Einzelstarter hat
+    # seine eigene Platzierung, ein Teammitglied die seines Teams.
     placements = []
+    solo = team = 0
     for ref in references:
-        try:
-            if ref.get("placement"):
-                placements.append(int(ref["placement"]))
-        except (TypeError, ValueError):
-            continue
+        entries = ref.get("entries") or []
+        mine = [row for row in entries if profile_id in (row.get("member_profile_ids") or [])] or entries[:1]
+        # Für die Karte zählt der beste eigene Eintrag; in die Bilanz gehen alle eigenen Einträge.
+        ref["member_entry"] = min(mine, key=lambda row: int(row.get("placement") or 10**6)) if mine else None
+        for entry in mine:
+            if entry.get("kind") == "solo":
+                solo += 1
+            else:
+                team += 1
+            try:
+                if entry.get("placement"):
+                    placements.append(int(entry["placement"]))
+            except (TypeError, ValueError):
+                continue
     item["references"] = references
     item["reference_stats"] = {
         "total": len(references),
@@ -308,8 +320,8 @@ async def _attach_reference_stats(db, item: dict, profile_id: str) -> dict:
         "silver": sum(1 for place in placements if place == 2),
         "bronze": sum(1 for place in placements if place == 3),
         "podiums": sum(1 for place in placements if place <= 3),
-        "solo": sum(1 for ref in references if len(ref.get("lineup_members") or []) <= 1),
-        "team": sum(1 for ref in references if len(ref.get("lineup_members") or []) > 1),
+        "solo": solo,
+        "team": team,
     }
     return item
 

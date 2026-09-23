@@ -150,16 +150,19 @@ function ReferenceStat({ label, value, color = "#FFFFFF", small = false }) {
 }
 
 function MemberReferenceCard({ item }) {
-  const members = item.lineup_members || [];
-  const otherLineup = (item.lineup || []).filter(Boolean);
+  // Der eigene Eintrag der Teilnahme (#409): ein Einzelstarter zeigt seine Platzierung, ein
+  // Teammitglied die seines Teams - nicht die beste Platzierung der ganzen Teilnahme.
+  const entry = item.member_entry || (item.entries || [])[0] || item;
+  const members = entry.lineup_members || [];
+  const otherLineup = (entry.lineup || []).filter(Boolean);
   return (
-    <Link to={`/references/${item.id}`} className="h-full block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition">
+    <Link to={`/references/${item.id}`} className="h-full block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition" data-testid={`member-reference-${item.id}`}>
       <div className="p-4 flex gap-4">
-        <div className={`w-14 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(item)}`}>
-          {item.placement ? (
+        <div className={`w-14 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(entry)}`}>
+          {entry.placement ? (
             <>
               <Medal className="w-4 h-4 mb-1" />
-              <span className="font-display text-xl font-black tabular-nums">{item.placement}.</span>
+              <span className="font-display text-xl font-black tabular-nums">{entry.placement}.</span>
             </>
           ) : (
             <>
@@ -173,8 +176,8 @@ function MemberReferenceCard({ item }) {
             <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{gameLabel(item.game) || item.game_name || "Extern"}</span>
             {formatDate(item.start_date) && <span className="text-[10px] uppercase tracking-widest text-white/35">{formatDate(item.start_date)}</span>}
           </div>
-          <div className="mt-2 font-heading text-base font-black uppercase leading-tight break-words">{item.title}</div>
-          <div className="mt-1 text-xs text-white/55 truncate">{item.team_name || item.organizer || "THE LION SQUAD"}</div>
+          <div className="mt-2 font-heading text-base font-black uppercase leading-tight break-words">{item.display_title || item.title}</div>
+          <div className="mt-1 text-xs text-white/55 truncate">{entry.kind === "solo" ? "Einzelstarter" : (entry.team_name || "THE LION SQUAD")}{item.organizer ? ` · ${item.organizer}` : ""}</div>
           {(members.length > 0 || otherLineup.length > 0) && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {members.slice(0, 5).map((member) => (

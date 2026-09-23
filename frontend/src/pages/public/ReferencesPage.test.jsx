@@ -1,0 +1,75 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+
+// Referenzen (#409): drei Zahlen statt acht, Chips aus Feldern statt aus dem Titel, Einträge mit
+// eigener Platzierung in Podest-Optik, Filter nach Saison; Podest zählt je Eintrag.
+
+const apiMock = { get: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
+vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
+vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
+vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
+
+const ReferencesPage = (await import("./ReferencesPage")).default;
+
+const ITEMS = [
+  {
+    id: "r1", title: "Winter Cup", display_title: "Winter Cup", organizer: "ESL", league: "Liga X", season: "Season 3", format: "HC",
+    platforms: ["PS"], reference_meta: { platforms: [{ key: "PS", label: "PlayStation" }] }, status: "completed",
+    game_id: "g1", game: { id: "g1", name: "Call of Duty" }, best_placement: 1, medal: "gold",
+    entries: [
+      { id: "e1", kind: "solo", placement: 1, medal: "gold", lineup_members: [{ profile_id: "p1", display_name: "Anni", profile_url: "/members/anni" }], lineup: [] },
+      { id: "e2", kind: "solo", placement: 4, medal: null, participant_count: 32, lineup_members: [{ profile_id: "p2", display_name: "Benny" }], lineup: [] },
+    ],
+  },
+  {
+    id: "r2", title: "Herbst Cup", display_title: "Herbst Cup", season: "Season 2", platforms: ["PC"], reference_meta: { platforms: [] }, status: "planned",
+    game_id: "g2", game: { id: "g2", name: "Rocket League" }, best_placement: null, medal: null,
+    entries: [{ id: "e3", kind: "team", team_name: "LION A", placement: null, lineup_members: [{ profile_id: "p1", display_name: "Anni" }, { profile_id: "p2", display_name: "Benny" }], lineup: ["Gast"] }],
+  },
+];
+const SUMMARY = { total: 2, entries: 3, podiums: 1, gold: 1, games: 2, seasons: ["Season 2", "Season 3"] };
+
+beforeEach(() => {
+  apiMock.get.mockResolvedValue({ data: { items: ITEMS, summary: SUMMARY } });
+});
+
+test("drei Zahlen, Chips aus den Feldern, Einträge mit eigener Platzierung und Profil-Link", async () => {
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-card-r1")).toBeInTheDocument();
+  expect(screen.getByTestId("references-stat-total")).toHaveTextContent("2");
+  expect(screen.getByTestId("references-stat-podiums")).toHaveTextContent("1");
+  expect(screen.getByTestId("references-stat-gold")).toHaveTextContent("1");
+
+  const chips = screen.getByTestId("reference-chips-r1");
+  expect(chips).toHaveTextContent("PlayStation");
+  expect(chips).toHaveTextContent("HC");
+  expect(chips).toHaveTextContent("Liga X");
+  expect(chips).toHaveTextContent("Season 3");
+
+  const gold = screen.getByTestId("reference-entry-e1");
+  expect(gold).toHaveTextContent("1.");
+  expect(gold).toHaveTextContent("Einzel");
+  expect(gold.querySelector('a[href="/members/anni"]')).toBeInTheDocument();
+  expect(screen.getByTestId("reference-entry-e2")).toHaveTextContent("4.");
+  expect(screen.getByTestId("reference-entry-e2")).toHaveTextContent("von 32");
+
+  const team = screen.getByTestId("reference-entry-e3");
+  expect(team).toHaveTextContent("Team");
+  expect(team).toHaveTextContent("LION A");
+  expect(team).toHaveTextContent("Dabei");
+  expect(team).toHaveTextContent("Gast");
+});
+
+test("Saison-Filter und Podest-Filter wirken je Teilnahme bzw. je Eintrag", async () => {
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  await screen.findByTestId("reference-card-r1");
+  fireEvent.click(screen.getByTestId("references-season-Season 2"));
+  expect(screen.queryByTestId("reference-card-r1")).toBeNull();
+  expect(screen.getByTestId("reference-card-r2")).toBeInTheDocument();
+
+  fireEvent.click(screen.getByText("Alle Saisons"));
+  fireEvent.click(screen.getByText("Podest"));
+  expect(screen.getByTestId("reference-card-r1")).toBeInTheDocument();
+  expect(screen.queryByTestId("reference-card-r2")).toBeNull();
+});
