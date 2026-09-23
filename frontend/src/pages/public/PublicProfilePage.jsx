@@ -492,6 +492,7 @@ export default function PublicProfilePage() {
           {[
             ["overview", "Übersicht"],
             ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
+            ["awards", `Auszeichnungen (${(profile.awards || []).length})`],
             ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
             ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
             ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
@@ -615,34 +616,40 @@ export default function PublicProfilePage() {
           </div>
         )}
 
+        {/* Auszeichnungen (#230, eigener Reiter seit dem Nachtrag): Banner und Trophäen aus veröffentlichten Turnieren -
+            keine Referenzen (die sind die Turnier-Historie). Das eigene Profil kann eines als Profilbanner wählen. */}
+        {tab === "awards" && (
+          <div className="space-y-3" data-testid="public-profile-awards">
+            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
+            {(profile.awards || []).length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {profile.awards.map((award) => (
+                  <AwardBanner
+                    key={award.id}
+                    award={award}
+                    linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
+                    action={isOwnProfile ? (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.preventDefault(); featureAward(profile.featured_award?.id === award.id ? null : award.id); }}
+                        data-testid={`award-feature-${award.id}`}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${profile.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
+                      >
+                        {profile.featured_award?.id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}
+                      </button>
+                    ) : null}
+                  />
+                ))}
+              </div>
+            ) : (
+              <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
+            )}
+          </div>
+        )}
+
         {tab === "references" && !isPrivate && (
           <div className="space-y-6">
             <ReferenceStatsPanel stats={referenceStats} />
-            {/* Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren; das eigene Profil kann eines als Profilbanner wählen. */}
-            {(profile.awards || []).length > 0 && (
-              <div className="space-y-3" data-testid="public-profile-awards">
-                <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {profile.awards.map((award) => (
-                    <AwardBanner
-                      key={award.id}
-                      award={award}
-                      linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
-                      action={isOwnProfile ? (
-                        <button
-                          type="button"
-                          onClick={(event) => { event.preventDefault(); featureAward(profile.featured_award?.id === award.id ? null : award.id); }}
-                          data-testid={`award-feature-${award.id}`}
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${profile.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
-                        >
-                          {profile.featured_award?.id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}
-                        </button>
-                      ) : null}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
             {referenceItems.length ? (
               <div className="grid gap-3" data-testid="public-profile-references">
                 {referenceItems.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}

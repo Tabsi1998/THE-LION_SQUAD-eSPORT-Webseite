@@ -653,8 +653,13 @@ Darstellung); sie liegen hinter dem Text und wandern bei einer Korrektur mit dem
 Profilkopf; der Server nimmt nur eigene an. Öffentlich sichtbar sind nur Auszeichnungen aus
 öffentlichen Turnieren – interne Turniere bleiben im eigenen Profil. Teams wählen ihr Teambanner
 über die Teamleitung; Außenstehende sehen auf der Team-Seite nur Auszeichnungen aus öffentlichen
-Turnieren, Mitglieder alle. Die App zeigt dieselben Karten: im eigenen Profil unter „Referenzen“
-mit „Als Profilbanner“, im öffentlichen Profil das gewählte Banner über dem Kopf.
+Turnieren, Mitglieder alle. Die App zeigt dieselben Karten: im eigenen Profil mit „Als
+Profilbanner“, im öffentlichen Profil das gewählte Banner über dem Kopf.
+
+**Nachtrag (23.09., Einwand des Betreibers): Auszeichnungen sind keine Referenzen.** Referenzen
+sind die Turnier-Historie einer Person (und, unter „Verein“, die externen Turniere des Vereins);
+Auszeichnungen sind Banner und Trophäen. Die erste Fassung hatte beides im Reiter „Referenzen“ –
+jetzt haben die Auszeichnungen im Web und in der App einen eigenen Reiter (Build 74).
 
 ## Block 41 — App 1.0.0, Teil 3: Absturzberichte
 
