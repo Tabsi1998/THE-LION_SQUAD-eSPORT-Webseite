@@ -8,8 +8,9 @@ import { feeCard, formatDate } from "@/lib/dolibarr";
 import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { SwitchRow } from "@/pages/user/profile/SwitchRow";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
-import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users } from "lucide-react";
+import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -99,6 +100,8 @@ export default function MyMembershipPage() {
             </div>
           </div>
         )}
+        {/* Meine Einwilligungen (#329, Teil 1): der Stand aus der Mitgliederverwaltung, nur mit bestätigter Zuordnung */}
+        {erp?.led_by_dolibarr && <ConsentsCard />}
         {erp?.connected && !erp.led_by_dolibarr && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
             <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
@@ -145,6 +148,85 @@ export default function MyMembershipPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+const CONSENT_STATE = {
+  given: (row) => `Zugestimmt${row.moment ? ` am ${formatDate(row.moment)}` : ""} (Fassung ${row.version})`,
+  withdrawn: (row) => `Widerrufen${row.moment ? ` am ${formatDate(row.moment)}` : ""}`,
+  none: () => "Noch nicht entschieden",
+};
+
+// Meine Einwilligungen (#329, Teil 1): je Zweck der Stand, der in der Mitgliederverwaltung steht.
+// Zustimmen nur nach dem Lesen der aktuellen Fassung (die Fassung geht mit), Widerrufen jederzeit -
+// auch wenn es inzwischen einen neuen Text gibt. Nichts davon ist Pflicht für die Mitgliedschaft.
+function ConsentsCard() {
+  const [state, setState] = useState(null);
+  const [open, setOpen] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
+  const load = useCallback(() => {
+    api.get("/membership/me/consents").then(({ data }) => {
+      setState(data && data.available === true && Array.isArray(data.consents) ? data : null);
+    }).catch(() => setState(null));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!state) return null;
+
+  const decide = async (row, decision) => {
+    if (decision === "withdrawn" && !await confirm({ title: `„${row.label}“ widerrufen?`, description: "Der Widerruf gilt sofort in der Mitgliederverwaltung. Du kannst später wieder zustimmen.", confirmLabel: "Widerrufen" })) return;
+    setBusy(true);
+    try {
+      const body = decision === "given" ? { code: row.code, decision, version: row.current_version } : { code: row.code, decision };
+      const { data } = await api.post("/membership/me/consents", body);
+      if (Array.isArray(data?.consents)) setState((current) => ({ ...current, consents: data.consents }));
+      else load();
+      setOpen(null);
+      toast.success(decision === "given" ? "Zustimmung gespeichert." : "Widerruf gespeichert.");
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+      if (err?.response?.status === 400) load();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-consents-card">
+      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#FFD700]" /> Meine Einwilligungen</h2>
+      <p className="mt-1 text-xs text-white/45">Freiwillig und jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
+      <div className="mt-4 space-y-3">
+        {state.consents.map((row) => (
+          <div key={row.code} className="border border-white/10 rounded-sm p-3" data-testid={`consent-${row.code}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="font-bold text-white">{row.label}</div>
+                <div className={`text-xs ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
+                {row.text_changed && <div className="mt-1 text-xs text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Der Text wurde seitdem geändert – bitte die neue Fassung lesen.</div>}
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                {row.can_give && open !== row.code && (
+                  <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">{row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
+                )}
+                {row.can_withdraw && (
+                  <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Widerrufen</button>
+                )}
+              </div>
+            </div>
+            {open === row.code && (
+              <div className="mt-3 border-t border-white/10 pt-3" data-testid={`consent-text-${row.code}`}>
+                <p className="text-sm text-white/75 whitespace-pre-wrap">{row.text}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Ich stimme zu</button>
+                  <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm text-xs font-bold uppercase tracking-wider">Abbrechen</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {!state.consents.length && <div className="text-sm text-white/45">Der Verein hat derzeit keine Einwilligungstexte hinterlegt.</div>}
+      </div>
+    </div>
   );
 }
 

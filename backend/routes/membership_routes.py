@@ -16,7 +16,8 @@ from models import (
     MembershipUpdate, MemberBenefitCreate, MemberBenefitUpdate, now_utc, new_id,
 )
 from services.notification_preferences import send_user_template
-from services.dolibarr_client import load_settings as load_dolibarr_settings
+from typing import Literal
+from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS
 from services.dolibarr_sync import try_auto_link
@@ -444,6 +445,107 @@ async def membership_meta():
         "statuses": sorted(VALID_STATUSES),
         "types": sorted(VALID_TYPES),
     }
+
+
+# ---------- Meine Einwilligungen (#329, Teil 1) ----------
+# Die Einwilligungen eines Mitglieds führt Dolibarr; die Website zeigt den Stand, der dort steht,
+# und schickt jede Entscheidung dorthin - mit fester Vorgangskennung, damit ein zweites Senden
+# nichts doppelt speichert. Zustimmen nur mit der Textfassung, die die Person gesehen hat;
+# Widerrufen immer, auch wenn es inzwischen eine neue Fassung gibt. Ohne bestätigte Zuordnung
+# oder ohne Anbindung gibt es hier nichts - und keinen lokalen zweiten Stand.
+
+CONSENT_FORM_NAME = "Website: Meine Mitgliedschaft"
+
+
+class ConsentDecisionBody(BaseModel):
+    code: str
+    decision: Literal["given", "withdrawn"]
+    version: int | None = None
+
+
+async def _consent_context(db, user: dict):
+    """Anbindung live und Zuordnung bestätigt - sonst der Grund, warum es hier nichts gibt."""
+    settings = await load_dolibarr_settings(db)
+    if settings["mode"] != "live":
+        return settings, None, None, "not_connected"
+    link = await verified_link(db, settings, user["id"])
+    if not link:
+        return settings, None, None, "not_linked"
+    try:
+        client = DolibarrClient(settings)
+    except DolibarrError as exc:
+        return settings, link, None, exc.kind
+    return settings, link, client, None
+
+
+def _consent_view(row: dict, texts: dict[str, dict]) -> dict:
+    code = str(row.get("code") or "")
+    text = texts.get(code) or {}
+    return {
+        "code": code, "label": row.get("label") or text.get("label") or code, "state": row.get("state") or "none",
+        "version": int(row.get("version") or 0), "current_version": int(row.get("current_version") or 0), "moment": row.get("moment") or None,
+        "can_give": bool(row.get("can_give")), "can_withdraw": bool(row.get("can_withdraw")),
+        # Der aktuelle Text nur dort, wo eine Zustimmung möglich ist - genau die Fassung, die zurückgeschickt wird.
+        "text": text.get("text") if row.get("can_give") else None,
+        "text_changed": bool(row.get("state") == "given" and int(row.get("version") or 0) < int(row.get("current_version") or 0)),
+    }
+
+
+async def _consent_list(client: DolibarrClient, member_id: int) -> list[dict]:
+    rows = await client.member_consents(member_id)
+    texts = {str(t.get("code") or ""): t for t in await client.consent_texts()}
+    return [_consent_view(row, texts) for row in rows if row.get("code")]
+
+
+@router.get("/me/consents")
+async def my_consents(user: dict = Depends(get_current_user)):
+    db = get_db()
+    settings, link, client, reason = await _consent_context(db, user)
+    if reason:
+        return {"available": False, "reason": reason}
+    try:
+        consents = await _consent_list(client, link["member_id"])
+    except DolibarrError as exc:
+        return {"available": False, "reason": exc.kind, "text": exc.text}
+    return {"available": True, "as_of": now_utc().isoformat(), "consents": consents}
+
+
+@router.post("/me/consents")
+async def decide_my_consent(body: ConsentDecisionBody, user: dict = Depends(get_current_user)):
+    db = get_db()
+    settings, link, client, reason = await _consent_context(db, user)
+    if reason:
+        raise HTTPException(409, "Deine Einwilligungen führt die Mitgliederverwaltung - dafür braucht dein Konto eine bestätigte Zuordnung.")
+    code = body.code.strip()[:32]
+    if not code:
+        raise HTTPException(400, "Zweck fehlt.")
+    if body.decision == "given" and not body.version:
+        raise HTTPException(400, "Zum Zustimmen gehört die Fassung des Textes, die dir gezeigt wurde.")
+    now = now_utc().isoformat()
+    record = {
+        "id": new_id(), "user_id": user["id"], "member_id": int(link["member_id"]), "code": code, "decision": body.decision,
+        "version": body.version if body.decision == "given" else None, "reference": f"web-c-{new_id()}", "created_at": now, "status": "sent",
+    }
+    await db.consent_decisions.insert_one(record)
+    payload = {"code": code, "decision": body.decision, "granted_at": now, "form": CONSENT_FORM_NAME, "reference": record["reference"]}
+    if body.decision == "given":
+        payload["version"] = int(body.version)
+    try:
+        result = await client.decide_consent(link["member_id"], payload)
+    except DolibarrError as exc:
+        await db.consent_decisions.update_one({"id": record["id"]}, {"$set": {"status": "failed", "error": exc.kind}})
+        if exc.kind == "bad_request":
+            raise HTTPException(400, "Der Text hat sich inzwischen geändert - bitte die Seite neu laden und noch einmal lesen.")
+        if exc.kind == "conflict":
+            raise HTTPException(409, "Ein späterer Widerruf bleibt bestehen - die Zustimmung wurde nicht gespeichert.")
+        raise HTTPException(503, f"Mitgliederverwaltung nicht erreichbar - nichts geändert ({exc.text}).")
+    await db.consent_decisions.update_one({"id": record["id"]}, {"$set": {"status": "recorded" if result.get("recorded") else "duplicate", "result_state": result.get("state")}})
+    await _audit(user["id"], f"consent.{body.decision}", user["id"], {"code": code, "version": result.get("version"), "reference": record["reference"]})
+    try:
+        consents = await _consent_list(client, link["member_id"])
+    except DolibarrError:
+        consents = None
+    return {"ok": True, "result": {"code": result.get("code"), "state": result.get("state"), "version": result.get("version"), "recorded": bool(result.get("recorded"))}, "consents": consents}
 
 
 # ---------- Self ----------

@@ -462,6 +462,22 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Einwilligungen (#329)
+    async def member_consents(self, member_id: int) -> list[dict]:
+        """Der Stand je Zweck für dieses Mitglied - mit erteilter und aktueller Textversion."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/consents")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def decide_consent(self, member_id: int, payload: dict) -> dict:
+        """Zustimmen oder widerrufen - ohne Wiederholung durch den Client; die `reference` macht den
+        Auftrag wiederholbar, falls der Aufrufer es noch einmal versucht."""
+        data = await self._send("POST", f"/vereine/members/{int(member_id)}/consents", payload)
+        if not isinstance(data, dict) or "state" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def organization(self) -> dict:
         """Der Verein für Impressum und Vereinsseite (#326): Name, ZVR, Behörde, Anschrift, Kontakt, Gründung, Zweck."""
         data = await self._get("/vereine/organization")

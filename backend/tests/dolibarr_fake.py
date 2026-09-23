@@ -157,6 +157,9 @@ class FakeDolibarr:
                                 membership_fee(3, "Jugend", amount=20.0, description="Bis 18"), membership_fee(4, "Firma", amount=200.0, for_whom="legal")]
         self.consent_texts = [{"code": "fotos", "label": "Fotos auf der Website", "version": 2, "text": "Fotos von Veranstaltungen dürfen auf der Website erscheinen."}]
         self.applications: dict[str, dict] = {}
+        # Einwilligungen je Mitglied (#329): Zweck -> Stand; Aufträge je reference nur einmal.
+        self.member_consents: dict[int, dict[str, dict]] = {}
+        self.consent_references: set[str] = set()
 
     def decide(self, external_id: str, status: str, reason: str = "") -> dict:
         """Der Verein entscheidet in Dolibarr: aufgenommen wird das Entwurfsmitglied aktiv."""
@@ -196,6 +199,43 @@ class FakeDolibarr:
     def _json_post(self, template: str, payload) -> httpx.Response:
         validate(payload, OPENAPI["paths"][template]["post"]["responses"]["200"]["content"]["application/json"]["schema"])
         return httpx.Response(200, json=payload)
+
+    def _consent_rows(self, member_id: int) -> list[dict]:
+        rows = []
+        state = self.member_consents.get(member_id, {})
+        for text in self.consent_texts:
+            own = state.get(text["code"], {"state": "none", "version": 0, "moment": ""})
+            rows.append({
+                "code": text["code"], "label": text["label"], "state": own["state"], "version": own["version"], "current_version": text["version"],
+                "moment": own.get("moment") or "", "can_give": own["state"] != "given" or own["version"] < text["version"], "can_withdraw": own["state"] == "given",
+            })
+        return rows
+
+    def _consent_decision(self, member_id: int, body: dict) -> httpx.Response:
+        """Wie das Modul: Zustimmen nur mit der gezeigten Version, Widerruf immer, reference nur einmal,
+        eine Zustimmung vor einem gespeicherten Widerruf bleibt abgewiesen."""
+        validate(body, request_schema("/vereine/members/{id}/consents"))
+        if member_id not in self.members:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        text = next((t for t in self.consent_texts if t["code"] == body.get("code")), None)
+        if not text:
+            return httpx.Response(400, json={"error": {"code": 400, "message": "unknown purpose"}})
+        own = self.member_consents.setdefault(member_id, {}).get(body["code"], {"state": "none", "version": 0, "moment": ""})
+        reference = body.get("reference")
+        if reference and reference in self.consent_references:
+            return self._json_post("/vereine/members/{id}/consents", {"code": body["code"], "state": own["state"] if own["state"] != "none" else body["decision"], "version": own["version"], "recorded": False})
+        if body["decision"] == "given":
+            if body.get("version") != text["version"]:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "consent version outdated"}})
+            if own["state"] == "withdrawn" and body.get("granted_at") and body["granted_at"] < own.get("moment", ""):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "withdrawal is newer"}})
+            own = {"state": "given", "version": text["version"], "moment": body.get("granted_at") or "2026-09-23T10:00:00+02:00"}
+        else:
+            own = {"state": "withdrawn", "version": own["version"], "moment": body.get("granted_at") or "2026-09-23T10:00:00+02:00"}
+        self.member_consents[member_id][body["code"]] = own
+        if reference:
+            self.consent_references.add(reference)
+        return self._json_post("/vereine/members/{id}/consents", {"code": body["code"], "state": own["state"], "version": own["version"], "recorded": True})
 
     def _application(self, body: dict) -> httpx.Response:
         """POST /vereine/applications wie das Modul: Pflichtfelder aus dem Formular, bekannte Felder,
@@ -409,6 +449,14 @@ class FakeDolibarr:
         if path == "/status":
             # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
             return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})
+        match = re.fullmatch(r"/vereine/members/(\d+)/consents", path)
+        if match and request.method == "GET":
+            member_id = int(match.group(1))
+            if member_id not in self.members:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            return self._json("/vereine/members/{id}/consents", self._consent_rows(member_id))
+        if match and request.method == "POST":
+            return self._consent_decision(int(match.group(1)), json.loads(request.content.decode("utf-8")))
         if path == "/vereine/applicationform":
             return self._json("/vereine/applicationform", self.application_form)
         if path == "/vereine/membershipfees":
