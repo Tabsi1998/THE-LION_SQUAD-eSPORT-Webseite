@@ -216,6 +216,15 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Auszeichnungen im eigenen Reiter (#230 Nachtrag; PR #389, baut auf #388 auf;
+  Build 74). Einwand des Betreibers: Referenzen (Turnier-Historie) ≠
+  Auszeichnungen (Banner/Trophäen). Web `PublicProfilePage` Reiter
+  `profile-tab-awards` mit Block `public-profile-awards` und Leerzustand
+  (Referenzen-Reiter ohne Auszeichnungen); App `ProfileScreen` `TabKey` `awards`,
+  Reiter „Auszeichnungen“ (medal-outline) zwischen Referenzen und Gewinnen,
+  `profile-awards` dort. Version 0.14.1-beta, Build 74 – der erste Build auch
+  als App-Bundle (`npm run release:local -- --aab`, `AAB:`/`AAB SHA-256:` im
+  Log) für den internen Test in der Play Console.
 - Auszeichnungen (#230; PR #386, baut auf #385 auf; Build 73).
   Entscheidungen des Betreibers vom 23.09. („passt“): Vergabe speichert
   Daten, Bilder entstehen beim Ansehen; Platz 1–3 mit hochgeladenem Bild je
@@ -1222,6 +1231,10 @@ Auszeichnungen da sind). `main` steht auf `2c540e3`.
   Finanzübersicht mit Summen, Steuersätze bestätigen; baut auf #387 auf). Nach dem
   Merge `update.sh`; kein Build. Danach Admin → Dolibarr → „Steuersätze geprüft“
   anhaken, wenn „gleich freigeben“ je gewünscht ist.
+- #389 (#230 Nachtrag: Auszeichnungen im eigenen Reiter, Web + App
+  0.14.1-beta; baut auf #388 auf – **erst #388, dann #389**). Nach dem Merge
+  Build 74 vom Haupt-PC als APK **und** AAB (interner Test in der Play Console);
+  `update.sh` bringt den Web-Reiter, ist aber nicht dringend.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
