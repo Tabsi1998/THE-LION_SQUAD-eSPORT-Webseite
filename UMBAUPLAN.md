@@ -468,7 +468,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
 | Dolibarr I: Anbindung und Mitgliedschaft | Hieß bis 21.09. „Mitgliederbereich II: Dolibarr“. Block 24: #295 Mitgliedschaft und Beitragsstand automatisch, #297 Vereinsrechte aus Funktionen – umgesetzt in #338, zusammen mit dem ersten Teil von #316 (Adapter, Konto-Zuordnung) und #330 (Vertragstests, Vorschau, Anleitung) |
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). Offen: #321 im Detail |
+| Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten, Vorstand und Statuten, #328 Beitrittsantrag, #329 Einwilligungen, eigene Daten, Austritt – wartet auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
@@ -601,6 +601,34 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 43 — Abrechnung fertig: Zahlungsstand, Prüffälle, Erstattungen
+
+### Was 43.1 gefunden hat (#321, #322 – PR #388)
+
+**Nach dem Beleg war die Website blind.** Sie las „bezahlt oder offen“ – eine Teilzahlung, eine
+Überzahlung, eine Gutschrift oder ein in Dolibarr gelöschter Beleg sah aus wie „offen“. Wer eine
+Anmeldung stornierte, deren Rechnung schon da war, schloss nur den Auftrag ohne Beleg; der Beleg
+blieb unbemerkt stehen. Eine Änderung der Begleitpersonen nach dem Beleg tat nichts. Die Regel
+aus #321 ist einfach: Dolibarr ist führend für Beleg und Geld, die Website für die Buchung –
+also liest sie genau und schreibt nach dem Beleg nie mehr. Zahlungen und Gutschriften werden
+mitgelesen; „bezahlt“ ist die Summe der Zahlungen, eine Gutschrift ist kein Geld. Bezahlte Belege
+liest nur der tägliche Abgleich neu, offene alle zehn Minuten.
+
+**Prüffall statt Automatik.** Alles, was Buchung und Beleg auseinanderzieht, wird ein Fall mit
+„was ihr tut“: Storno mit Beleg, Änderung nach dem Beleg (alt und neu), Überzahlung, Zahlung auf
+eine stornierte Buchung, abweichender Betrag oder Empfänger, verschwundener Beleg. Erledigt wird
+mit Grund – oder von selbst, wenn der Abgleich sieht, dass Dolibarr den Fall gelöst hat. Der
+eingefrorene Preis am Auftrag geht nie mit dem Betrag aus Dolibarr mit (ein Fehler, den der erste
+Testlauf gefunden hat: der Abgleich überschrieb `total_cents`, jetzt heißt der Wert aus Dolibarr
+`remote_total_cents`).
+
+**Gutschrift ist nicht Erstattung.** Die Gutschrift gleicht in Dolibarr den Beleg aus; erstattet ist,
+was zurücküberwiesen wurde – das hält die Finanzverwaltung am Auftrag fest, mit Tag, Referenz und
+Grund, nie mehr als bezahlt abzüglich erstattet. Die Finanzübersicht bekam Filter, Summen je
+Veranstaltung, eine Zeitleiste je Auftrag und einen CSV-Export ohne Bankdaten. „Rechnungen gleich
+freigeben“ verlangt jetzt zusätzlich bestätigte Steuersätze – kein stiller Automatismus mehr. Bei
+Kontolöschung bleibt der Auftrag mit Betrag und Belegnummer, ohne Name und E-Mail.
 
 ## Block 42 — Auszeichnungen: Vergabe, Trophäen, Profil- und Teambanner
 

@@ -25,7 +25,7 @@ test("der Export enthält nur Kassier-Spalten, keine Bankdaten oder Schlüssel",
   const csv = toCsv([{ invoice_ref: "FA2609-0001", source: { name: "Weihnachtsfeier" }, person: "=Paula", total_cents: 4000, currency: "EUR",
     payment_label: "teilweise bezahlt", paid_cents: 1000, credited_cents: 0, refunded_cents: 0, booking_state: "cancelled", synced_at: "2026-09-23T10:00:00+00:00",
     thirdparty_id: 42, invoice_id: 7, api_key: "geheim" }]);
-  const [head, row] = csv.replace("﻿", "").trim().split("\r\n");
+  const [head, row] = csv.replace(String.fromCharCode(0xfeff), "").trim().split("\r\n");
   expect(head).toBe("Rechnung;Angebot;Person;Betrag;Zahlungsstand;Bezahlt;Gutgeschrieben;Erstattet;Buchung;Stand");
   expect(row).toBe("FA2609-0001;Weihnachtsfeier;'=Paula;40,00 €;teilweise bezahlt;10,00 €;0,00 €;0,00 €;storniert;2026-09-23T10:00:00+00:00");
   expect(csv).not.toContain("geheim");

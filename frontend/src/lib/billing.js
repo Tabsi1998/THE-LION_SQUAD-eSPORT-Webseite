@@ -65,11 +65,13 @@ const CSV_COLUMNS = [
   ["Stand", (row) => row.synced_at || ""],
 ];
 
+const BOM = String.fromCharCode(0xfeff);
+
 // Nur, was der Kassier braucht - keine Adressen, keine Bankdaten, keine Dolibarr-Schlüssel.
 export function toCsv(rows) {
   const lines = [CSV_COLUMNS.map(([label]) => csvCell(label)).join(";")];
   for (const row of rows || []) lines.push(CSV_COLUMNS.map(([, pick]) => csvCell(pick(row))).join(";"));
-  return `﻿${lines.join("\r\n")}\r\n`;
+  return `${BOM}${lines.join("\r\n")}\r\n`;
 }
 
 export function csvFilename(now = new Date()) {
