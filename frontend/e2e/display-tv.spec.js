@@ -169,10 +169,9 @@ async function expectBrandedQrVisible(page) {
   const qr = page.getByTestId("branded-qr-code").first();
   await expect(qr).toBeVisible();
   await expect(qr.locator("svg")).toBeVisible();
-  await expect(qr.locator("img")).toBeVisible();
-  await expect.poll(async () => qr.locator("img").evaluate((img) => img.complete && img.naturalWidth > 0)).toBeTruthy();
-  const mask = await qr.locator("svg").evaluate((svg) => getComputedStyle(svg).maskImage || getComputedStyle(svg).webkitMaskImage || "");
-  expect(mask).toContain("radial-gradient");
+  // Löwe auf der Platte (#400): das Logo sitzt als <image> im SVG, die Module sind Rechtecke.
+  await expect(qr.locator("svg image").first()).toHaveAttribute("href", /.+/);
+  expect(await qr.locator("svg rect").count()).toBeGreaterThan(20);
 }
 
 async function expectTvPageStable(page, path, headingText) {
