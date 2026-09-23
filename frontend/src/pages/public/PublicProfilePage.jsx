@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SeasonHighlightCard } from "@/components/tls/SeasonHighlightCard";
+import { AwardBanner } from "@/components/tls/AwardBanner";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -289,6 +290,17 @@ export default function PublicProfilePage() {
   const referenceStats = profileReferences.stats || {};
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
   const isOwnProfile = user?.id === profile.id;
+  // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu.
+  const featureAward = async (awardId) => {
+    try {
+      if (awardId) await api.post(`/me/awards/${awardId}/feature`);
+      else await api.delete("/me/awards/feature");
+      toast.success(awardId ? "Als Profilbanner gesetzt." : "Profilbanner entfernt.");
+      load();
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    }
+  };
 
   const updateFriendship = async (action) => {
     if (!user) {
@@ -340,6 +352,12 @@ export default function PublicProfilePage() {
       )}
       {/* Hero */}
       <div className="relative border-b border-white/10 overflow-hidden">
+        {/* Auszeichnung als Profilbanner (#230): das gewählte Banner liegt über dem Kopf, das eigene Bild bleibt dahinter. */}
+        {profile.featured_award && (
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6" data-testid="profile-featured-award">
+            <AwardBanner award={profile.featured_award} size="hero" linkTo={profile.featured_award.tournament?.slug ? `/tournaments/${profile.featured_award.tournament.slug}` : null} />
+          </div>
+        )}
         {profile.banner_url && (
           <img
             src={resolveMediaUrl(profile.banner_url)}
@@ -600,6 +618,31 @@ export default function PublicProfilePage() {
         {tab === "references" && !isPrivate && (
           <div className="space-y-6">
             <ReferenceStatsPanel stats={referenceStats} />
+            {/* Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren; das eigene Profil kann eines als Profilbanner wählen. */}
+            {(profile.awards || []).length > 0 && (
+              <div className="space-y-3" data-testid="public-profile-awards">
+                <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {profile.awards.map((award) => (
+                    <AwardBanner
+                      key={award.id}
+                      award={award}
+                      linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
+                      action={isOwnProfile ? (
+                        <button
+                          type="button"
+                          onClick={(event) => { event.preventDefault(); featureAward(profile.featured_award?.id === award.id ? null : award.id); }}
+                          data-testid={`award-feature-${award.id}`}
+                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${profile.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
+                        >
+                          {profile.featured_award?.id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}
+                        </button>
+                      ) : null}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
             {referenceItems.length ? (
               <div className="grid gap-3" data-testid="public-profile-references">
                 {referenceItems.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
