@@ -171,6 +171,22 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Absturzberichte (#219 Teil 2; PR #385; Build 72). Entscheidung des
+  Betreibers vom 23.09.: Firebase Crashlytics (Firebase war für Push schon
+  drin). `@react-native-firebase/app` + `/crashlytics` 26.4.0 mit ihren
+  Expo-Plugins in `app.json` (Google-Services- und Crashlytics-Gradle-Plugin;
+  `google-services.json` legt das Release-Skript vor `prebuild` ab).
+  `lib/crashReports.ts`: `installCrashReporting(isDev)` (Sammeln nur im
+  Release, `__DEV__` aus), `recordError(error, source, context)` (vom Kontext
+  nur die Schlüssel, nie Werte; Fehler in Crashlytics selbst bleiben stumm),
+  `crashReportsEnabled`. Eingehängt in `logMobileError` (Fehlergrenze und
+  abgefangene Fehler) – unabhängig vom Client-Log-Schalter; native und
+  unbehandelte JS-Abstürze fängt Crashlytics selbst. Keine Nutzerkennung, keine
+  Namen. Der Absatz für die Datenschutzerklärung steht als Vorschlag am Issue
+  (Admin → Branding → Datenschutzerklärung). Jest-Mock in `jest.setup.js`,
+  Tests `crashReports.test.ts` (3). Play-Bundle (`--aab`) und Store-Eintrag
+  folgen, sobald das Play-Konto da ist (Texte und Datensicherheits-Formular
+  als Vorschlag an #219).
 - Passkey-Login in der App (#217 Stufe 2; PR #384; Build 71).
   Derselbe Passkey wie auf der Website; Android nennt als Herkunft nicht die
   Adresse, sondern den SHA-256 des Signaturschlüssels. Backend
@@ -1102,12 +1118,14 @@ Build 67 vom Haupt-PC), #378 (#302 Discord-Bot im Backend), #379 (#229
 Marke: Standard-Favicon, Markenbilder in der App), #380 (#217 Stufe 1
 App-Sperre, #219 Teil 1 Bildgrößen und AAB), #381 (#320 eigene Rechnungen für
 alle, Rechnungen im Profil) – alle vier am 23.09. gemergt, `update.sh` und
-Build 70 danach. `main` steht auf `340fadf`.
+Build 70 danach. Dann #383 (Doku-Stand nach #381) und #384 (#217 Stufe 2
+Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
+`b5d5fd3`.
 
 ### Offene PRs
-- #384 (#217 Stufe 2 Passkey-Login in der App; Backend + Web-Datei + App).
-  Nach dem Merge `update.sh` (die `assetlinks.json` kommt
-  mit der Website) und Build 71 vom Haupt-PC.
+- #385 (#219 Teil 2 Absturzberichte über Crashlytics; nur App). Nach dem
+  Merge Build 72 vom Haupt-PC; kein `update.sh` nötig. Vorher den Absatz für
+  die Datenschutzerklärung einfügen (Vorschlag am Issue).
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1136,7 +1154,9 @@ Build 70 danach. `main` steht auf `340fadf`.
   Commit 340fadf, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
   `d7de350c`; #229 App-Teil, #217 Stufe 1, #219 Teil 1, #320 – die Builds 68
   und 69 sind ausgefallen, weil #379–#381 zusammen gemergt wurden), am
-  Vereinsserver abgelegt. Nächster Build ist 71.
+  Vereinsserver abgelegt, **Build 71** (`mobile-v0.12.0-beta-build71`, Commit
+  b5d5fd3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `f40d4b20`;
+  #217 Stufe 2), am Vereinsserver abgelegt. Nächster Build ist 72.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1164,7 +1184,7 @@ Build 70 danach. `main` steht auf `340fadf`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (17 offen nach dem Merge von #381; #217 bleibt für Stufe 2 offen)
+### Meilensteine und offene Issues (16 offen nach dem Merge von #384)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1188,7 +1208,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, Build 71 nach dem Merge. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics (+ Absatz in der Datenschutzerklärung) – Teil 2 folgt als eigener Schritt |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385 (Build 72 nach dem Merge; Absatz für die Datenschutzerklärung als Vorschlag am Issue); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
@@ -1220,8 +1240,8 @@ sinnvoll hältst“):
    umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
    #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
    App 1.0.0: #217 Stufe 1 und #219 Teil 1 in #380, #217 Stufe 2 in #384;
-   #219 Teil 2 (Crashlytics, Play-Bundle, Store-Eintrag) als Nächstes – die
-   Entscheidungen vom 23.09. liegen vor, das Play-Konto legt der Betreiber an.
+   #219 Teil 2 Crashlytics in #385; Play-Bundle und Store-Eintrag, sobald das
+   Play-Konto da ist (Texte als Vorschlag an #219).
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 

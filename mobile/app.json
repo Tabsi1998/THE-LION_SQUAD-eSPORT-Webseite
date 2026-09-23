@@ -2,13 +2,13 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "0.12.0-beta",
+    "version": "0.13.0-beta",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "71",
+      "buildNumber": "72",
       "bundleIdentifier": "at.lionsquad.app",
       "associatedDomains": ["webcredentials:lionsquad.at"],
       "infoPlist": {
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 71,
+      "versionCode": 72,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -48,6 +48,8 @@
           "backgroundColor": "#0A0A0A"
         }
       ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/crashlytics",
       "expo-secure-store",
       [
         "expo-local-authentication",

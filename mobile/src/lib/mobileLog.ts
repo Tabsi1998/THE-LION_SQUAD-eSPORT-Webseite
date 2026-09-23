@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { api } from "./api";
+import { recordError } from "./crashReports";
 
 type MobileLogLevel = "debug" | "info" | "warn" | "error" | "fatal";
 
@@ -130,6 +131,8 @@ export function sendMobileLog(level: MobileLogLevel, message: string, options: M
 }
 
 export function logMobileError(error: unknown, source = "app", context?: Record<string, unknown>) {
+  // Absturzberichte (#219): abgefangene Fehler gehen auch an Crashlytics - unabhängig vom Client-Log-Schalter.
+  recordError(error, source, context);
   const message = error instanceof Error ? error.message : describeArg(error);
   sendMobileLog("error", message || "Unbekannter App-Fehler", { error, source, context });
 }
