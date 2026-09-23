@@ -20,6 +20,8 @@ export default function TournamentBracketPage() {
   const [searchParams] = useSearchParams();
   const accessToken = searchParams.get("access") || "";
   const [data, setData] = useState(null);
+  // Eigene Anmeldung (#399): „Dein nächstes Spiel“ und der Ring um die eigenen Knoten.
+  const [mineId, setMineId] = useState(null);
   const tournament = data?.tournament;
   const seoDescription = seoTextPreview(tournament?.description, "Live-Turnierbaum von THE LION SQUAD eSports mit Runden, Matches und Ergebnissen.");
   useDocumentTitle(`${tournament?.title || "Turnier"} Turnierbaum`, seoDescription, {
@@ -32,6 +34,7 @@ export default function TournamentBracketPage() {
     const accessConfig = { params: accessToken ? { access: accessToken } : undefined };
     const { data: t } = await api.get(`/tournaments/${slug}`, accessConfig);
     const { data: br } = await api.get(`/tournaments/${t.id}/bracket`, accessConfig);
+    setMineId(t?.my_registration?.id || null);
     setData(br);
   }, [slug, accessToken]);
 
@@ -88,7 +91,7 @@ export default function TournamentBracketPage() {
             <div className="text-white/50 font-display tracking-widest">TURNIERBAUM WURDE NOCH NICHT GENERIERT</div>
           </div>
         ) : (
-          <BracketTree data={data} changedMatchIds={changedMatches} />
+          <BracketTree data={data} changedMatchIds={changedMatches} mineId={mineId} />
         )}
       </div>
     </PublicLayout>
