@@ -275,6 +275,26 @@ class DolibarrClient:
         data = await self._send("POST", "/thirdparties", payload)
         return _as_id(data)
 
+    async def categories(self, kind: str = "customer") -> list[dict]:
+        """Kategorien eines Typs (Kunde = Geschäftspartner) als flache Liste mit `fk_parent` - für
+        Sponsoren und Partner (#405): Kategorie „Sponsor“, Unterkategorien = Stufe."""
+        rows = await self._rows("/categories", {"type": kind, "sortfield": "t.label", "sortorder": "ASC", "limit": 200})
+        if rows is None:
+            raise DolibarrError("forbidden", 403)
+        return rows
+
+    async def thirdparties_in_category(self, category_id: int) -> list[dict]:
+        """Alle Geschäftspartner einer Kategorie, seitenweise; Dolibarr antwortet 404 auf eine leere Liste."""
+        rows: list[dict] = []
+        for page in range(20):
+            chunk = await self._rows("/thirdparties", {"category": int(category_id), "sortfield": "t.rowid", "sortorder": "ASC", "limit": PAGE_LIMIT, "page": page})
+            if chunk is None:
+                raise DolibarrError("forbidden", 403)
+            rows.extend(chunk)
+            if len(chunk) < PAGE_LIMIT:
+                break
+        return rows
+
     async def core_member(self, member_id: int) -> dict:
         """Das Mitglied aus Dolibarrs Mitgliedermodul - wegen `fk_soc`, dem verknüpften Geschäftspartner."""
         data = await self._get(f"/members/{int(member_id)}")

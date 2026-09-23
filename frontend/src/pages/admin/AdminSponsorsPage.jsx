@@ -5,6 +5,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
+import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -68,6 +69,8 @@ export default function AdminSponsorsPage() {
   const [clearingMissing, setClearingMissing] = useState(false);
   const [imageAudit, setImageAudit] = useState(null);
   const confirm = useConfirm();
+  // Sponsoren aus Dolibarr (#405): Schalter, Stand und welche Felder Dolibarr führt.
+  const [dolibarrSource, setDolibarrSource] = useDolibarrSource();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/sponsors/admin");
@@ -159,6 +162,8 @@ export default function AdminSponsorsPage() {
         </div>
       </div>
 
+      <DolibarrSourceBlock source={dolibarrSource} onChange={setDolibarrSource} onSynced={load} kind="sponsors" />
+
       {imageAudit?.summary && (
         <div className="mb-6 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-3">Bildprüfung</div>
@@ -207,6 +212,7 @@ export default function AdminSponsorsPage() {
                     {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
                     {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
                     {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
+                    {s.source === "dolibarr" && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
                   </div>
                 </div>
               </div>
@@ -234,6 +240,7 @@ export default function AdminSponsorsPage() {
         <SponsorForm
           sponsor={editing || null}
           events={events}
+          locked={dolibarrLocked(dolibarrSource, editing, dolibarrSource?.locked?.sponsors || [])}
           onClose={() => { setEditing(null); setCreating(false); }}
           onSaved={() => { setEditing(null); setCreating(false); load(); }}
         />
@@ -242,7 +249,7 @@ export default function AdminSponsorsPage() {
   );
 }
 
-function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
+function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSaved }) {
   const initialTier = sponsor?.tier && ["main","platinum","gold","silver","bronze"].includes(sponsor.tier) ? sponsor.tier : "bronze";
   const initialDefaults = TIER_DEFAULTS[initialTier] || TIER_DEFAULTS.bronze;
   const [form, setForm] = useState({
@@ -295,18 +302,26 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Aus Dolibarr geführte Felder (#405) sind gesperrt und sagen es; der Server ignoriert sie ohnehin.
+  const lock = (field) => (locked.has(field) ? { disabled: true, hint: "aus Dolibarr" } : {});
+
   // Seitenblatt statt Fenster (#435): Sponsor, Vertrag und Kontakt, Sichtbarkeit, Texte als
   // Abschnitte; die Karten der Liste bleiben daneben sichtbar.
   return (
     <AdminSheet title={sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"} eyebrow="Verein" size="lg" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sponsor-save" testId="sponsor-sheet">
+      {locked.size > 0 && (
+        <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="sponsor-locked-hint">
+          Dieser Sponsor kommt aus Dolibarr: Name, Stufe, Laufzeit, E-Mail und Telefon werden dort gepflegt. Logo, Link, Platzierungen, Reihenfolge, Ansprechpartner und Texte bleiben hier.
+        </p>
+      )}
       <FormSection title="Sponsor">
         <FormGrid>
-          <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" />
+          <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" {...lock("name")} />
           <TextField label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
         </FormGrid>
         <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
         <FormGrid>
-          <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" />
+          <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
           <TextField label="Reihenfolge" type="number" value={form.order_index ?? 0} onChange={(v) => set("order_index", parseInt(v, 10) || 0)} testId="sponsor-order" />
         </FormGrid>
       </FormSection>
@@ -314,13 +329,13 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
       <FormSection title="Vertrag und Kontakt" hint="Vertragsstatus und Laufzeit entscheiden, ob der Sponsor öffentlich ausgespielt wird.">
         <FormGrid cols={3}>
           <SelectField label="Vertragsstatus" value={form.contract_status} onChange={(v) => set("contract_status", v)} options={CONTRACT_STATUSES.map((status) => [status, CONTRACT_LABELS[status]])} testId="sponsor-contract-status" />
-          <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture />
-          <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture />
+          <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture {...lock("contract_start")} />
+          <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture {...lock("contract_end")} />
         </FormGrid>
         <FormGrid cols={3}>
           <TextField label="Ansprechpartner" value={form.contact_name} onChange={(v) => set("contact_name", v)} testId="sponsor-contact-name" />
-          <TextField label="Kontakt E-Mail" type="email" value={form.contact_email} onChange={(v) => set("contact_email", v)} testId="sponsor-contact-email" />
-          <TextField label="Telefon" value={form.contact_phone} onChange={(v) => set("contact_phone", v)} testId="sponsor-contact-phone" />
+          <TextField label="Kontakt E-Mail" type="email" value={form.contact_email} onChange={(v) => set("contact_email", v)} testId="sponsor-contact-email" {...lock("contact_email")} />
+          <TextField label="Telefon" value={form.contact_phone} onChange={(v) => set("contact_phone", v)} testId="sponsor-contact-phone" {...lock("contact_phone")} />
         </FormGrid>
       </FormSection>
 

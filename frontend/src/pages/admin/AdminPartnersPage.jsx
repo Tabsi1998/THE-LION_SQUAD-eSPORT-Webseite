@@ -4,6 +4,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -24,6 +25,8 @@ export default function AdminPartnersPage() {
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
   const confirm = useConfirm();
+  // Partner aus Dolibarr (#405): derselbe Schalter wie bei den Sponsoren.
+  const [dolibarrSource, setDolibarrSource] = useDolibarrSource();
 
   const load = useCallback(async () => {
     const { data } = await api.get("/partners/admin");
@@ -53,6 +56,8 @@ export default function AdminPartnersPage() {
         </button>
       </div>
 
+      <DolibarrSourceBlock source={dolibarrSource} onChange={setDolibarrSource} onSynced={load} kind="partners" />
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {list.map((p) => (
           <div key={p.id} className="border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -69,6 +74,7 @@ export default function AdminPartnersPage() {
                   <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{p.kind || "Partner"}</div>
                   <div className="font-heading text-lg font-bold truncate">{p.name}</div>
                   {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Inaktiv</div>}
+                  {p.source === "dolibarr" && <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 font-bold" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
@@ -83,13 +89,14 @@ export default function AdminPartnersPage() {
         {list.length === 0 && <div className="col-span-full text-center py-16 text-white/40 font-display tracking-widest">NOCH KEINE PARTNER</div>}
       </div>
 
-      {editing && <PartnerForm partner={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <PartnerForm partner={editing} locked={dolibarrLocked(dolibarrSource, editing, dolibarrSource?.locked?.partners || [])} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
 
-function PartnerForm({ partner, onClose, onSaved }) {
+function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
   const isNew = !partner.id;
+  const lock = (field) => (locked.has(field) ? { disabled: true, hint: "aus Dolibarr" } : {});
   const [form, setForm] = useState({ ...emptyPartner, ...partner });
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -112,11 +119,11 @@ function PartnerForm({ partner, onClose, onSaved }) {
   // Seitenblatt statt Fenster (#435): die Liste bleibt daneben sichtbar.
   return (
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
-      <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" />
+      <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
       <TextField label="Link" value={form.link} onChange={(v) => set("link", v)} placeholder="https://…" testId="partner-link" />
       <FormGrid>
-        <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" />
+        <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" {...lock("kind")} />
         <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="partner-order" />
       </FormGrid>
       <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" />

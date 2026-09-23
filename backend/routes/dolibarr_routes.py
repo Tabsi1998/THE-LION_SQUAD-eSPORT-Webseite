@@ -125,6 +125,70 @@ async def dolibarr_public_refresh(me: dict = Depends(require_area("club", "syste
     return {**result, "view": await club_facts.admin_view(db, branding)}
 
 
+# ---------------------------------------------------------------- Sponsoren und Partner (#405)
+
+class SponsorSourceUpdate(BaseModel):
+    from_dolibarr: bool | None = None
+    sponsor_category: str | None = Field(None, max_length=80)
+    partner_category: str | None = Field(None, max_length=80)
+
+
+@admin_router.get("/sponsors")
+async def dolibarr_sponsors(me: dict = Depends(require_area("content", "system"))):
+    """Für den Block „Aus Dolibarr“ auf den Sponsoren- und Partnerseiten: Schalter, Kategorien, Stand, Fehler."""
+    from services import dolibarr_sponsors
+    return await dolibarr_sponsors.admin_view(get_db())
+
+
+@admin_router.patch("/sponsors")
+async def update_sponsor_source(body: SponsorSourceUpdate, me: dict = Depends(require_area("content", "system"))):
+    """Schalter und Kategorienamen. Einschalten liest sofort nach, damit die Listen nicht eine Stunde leer bleiben."""
+    from services import dolibarr_sponsors
+    db = get_db()
+    current = await dolibarr_sponsors.load_source_settings(db)
+    updates = {key: value for key, value in body.model_dump(exclude_unset=True).items() if value is not None}
+    for key in ("sponsor_category", "partner_category"):
+        if key in updates and not str(updates[key]).strip():
+            raise HTTPException(422, "Der Kategoriename darf nicht leer sein.")
+    merged = dolibarr_sponsors.normalize_settings({**current, **updates})
+    if merged["from_dolibarr"] and not current["from_dolibarr"]:
+        settings = await load_settings(db)
+        if settings.get("mode") == "off":
+            raise HTTPException(409, "Dolibarr ist nicht angebunden (Finanzen → Dolibarr-Anbindung).")
+    await db.settings.update_one({"id": dolibarr_sponsors.SETTINGS_ID}, {"$set": {"id": dolibarr_sponsors.SETTINGS_ID, **merged}}, upsert=True)
+    changed = sorted(key for key in merged if merged[key] != current[key])
+    if changed:
+        await _audit(me.get("id"), "dolibarr.sponsor_source", dolibarr_sponsors.SETTINGS_ID, {"changed": changed, "from_dolibarr": merged["from_dolibarr"]})
+    result = None
+    if merged["from_dolibarr"] and changed:
+        settings = await load_settings(db)
+        if settings.get("mode") != "off":
+            try:
+                result = await dolibarr_sponsors.refresh(db, DolibarrClient(settings), source=merged)
+            except DolibarrError as exc:
+                result = {"ok": False, "kind": exc.kind, "text": exc.text}
+    return {"ok": True, "result": result, "view": await dolibarr_sponsors.admin_view(db)}
+
+
+@admin_router.post("/sponsors/refresh")
+async def dolibarr_sponsors_refresh(me: dict = Depends(require_area("content", "system"))):
+    """Jetzt nachlesen statt beim stündlichen Job - nur lesen aus Dolibarr, schreiben nur in die eigenen Listen."""
+    from services import dolibarr_sponsors
+    db = get_db()
+    source = await dolibarr_sponsors.load_source_settings(db)
+    if not source["from_dolibarr"]:
+        raise HTTPException(409, "Der Schalter „Sponsoren und Partner aus Dolibarr“ ist aus.")
+    settings = await load_settings(db)
+    if settings.get("mode") == "off":
+        raise HTTPException(409, "Dolibarr ist nicht angebunden.")
+    try:
+        client = DolibarrClient(settings)
+    except DolibarrError as exc:
+        raise HTTPException(503, f"Dolibarr: {exc.text}")
+    result = await dolibarr_sponsors.refresh(db, client, source=source)
+    return {**result, "view": await dolibarr_sponsors.admin_view(db)}
+
+
 # ---------------------------------------------------------------- Verbindung (System)
 
 class DolibarrSettingsUpdate(BaseModel):

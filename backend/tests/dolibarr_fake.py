@@ -112,6 +112,9 @@ class FakeDolibarr:
         # Kern-API für die Abrechnung (#316, #317): Geschäftspartner, Belege, Mitglieder (fk_soc),
         # Leistungen. Formen wie Dolibarrs eigene REST-API (22-24); kein Vertrag des Vereinsmoduls.
         self.thirdparties: dict[int, dict] = {}
+        # Kategorien der Geschäftspartner (#405): Sponsor/Partner mit Unterkategorien; Zuordnung je Firma.
+        self.categories: list[dict] = []
+        self.thirdparty_categories: dict[int, set[int]] = {}
         self.core_members: dict[int, dict] = {}
         self.products: dict[int, dict] = {}
         self.core_invoices: dict[int, dict] = {}
@@ -165,6 +168,16 @@ class FakeDolibarr:
         self.thirdparties[row["id"]] = row
         return row
 
+    def add_category(self, label: str, *, parent: int | None = None, kind: str = "customer") -> dict:
+        """Wie Dolibarrs `/categories`: Kennungen als Text, `fk_parent` 0 für Oberkategorien, Typ Kunde = 2."""
+        self.next_id += 1
+        row = {"id": str(self.next_id), "label": label, "fk_parent": str(parent or 0), "type": {"customer": "2", "supplier": "1", "member": "3"}.get(kind, "2"), "description": ""}
+        self.categories.append(row)
+        return row
+
+    def categorize(self, thirdparty_id: int, *categories: int) -> None:
+        self.thirdparty_categories.setdefault(int(thirdparty_id), set()).update(int(c) for c in categories)
+
     def add_core_member(self, member_id: int, fk_soc: int | None = None) -> dict:
         row = {"id": member_id, "fk_soc": fk_soc}
         self.core_members[member_id] = row
@@ -176,6 +189,17 @@ class FakeDolibarr:
         if method == "POST":
             self.posts.append((path, body))
             assert request.headers.get("DOLAPIKEY") == self.write_key, "Schreiben nur mit dem Schreib-Schlüssel"
+        if path == "/categories" and method == "GET":
+            wanted = {"customer": "2", "supplier": "1", "member": "3"}.get(params.get("type", "customer"), "2")
+            rows = [c for c in self.categories if c["type"] == wanted]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        if path == "/thirdparties" and method == "GET" and params.get("category"):
+            # Wie Dolibarr: nur genau diese Kategorie (keine Unterkategorien), Kennungen als Text, 404 bei leer.
+            wanted = int(params["category"])
+            page, limit = int(params.get("page", 0)), int(params.get("limit", 100))
+            rows = [{**r, "id": str(r["id"])} for _id, r in sorted(self.thirdparties.items()) if wanted in self.thirdparty_categories.get(_id, set())]
+            rows = rows[page * limit:(page + 1) * limit]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         if path == "/thirdparties" and method == "GET":
             match = re.search(r"t\.email:=:'([^']*)'", params.get("sqlfilters", ""))
             rows = [r for r in self.thirdparties.values() if match and r.get("email", "").lower() == match.group(1).lower()]

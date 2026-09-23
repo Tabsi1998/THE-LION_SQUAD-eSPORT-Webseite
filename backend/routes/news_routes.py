@@ -8,7 +8,7 @@ from database import get_db
 from auth import require_admin, get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
-from services.sponsor_utils import dedupe_public_sponsors
+from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -713,6 +713,17 @@ async def list_sponsors(placement: Optional[str] = None):
     return dedupe_public_sponsors(sp)
 
 
+@router.get("/sponsors/former")
+async def list_former_sponsors():
+    """Ehemalige Unterstützer (#405): abgelaufene Sponsoren mit Logo bleiben auf der Sponsorenseite
+    sichtbar - mit den Jahren, statt still zu verschwinden."""
+    db = get_db()
+    rows = await db.sponsors.find({"is_active": {"$ne": False}, "logo_url": {"$nin": [None, ""]}}, {"_id": 0}).to_list(500)
+    former = [row for row in (_sponsor_defaults(r) for r in rows) if row["effective_status"] == "expired"]
+    former.sort(key=lambda s: (s.get("contract_end") or "", s.get("name") or ""), reverse=True)
+    return dedupe_public_sponsors(former)
+
+
 @router.get("/sponsors/admin")
 async def admin_list_sponsors(me: dict = Depends(require_area("content"))):
     db = get_db()
@@ -746,12 +757,17 @@ async def update_sponsor(sid: str, body: SponsorUpdate, me: dict = Depends(requi
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if not updates:
-        return {"ok": True}
-    updates["updated_at"] = now_utc().isoformat()
-    res = await db.sponsors.update_one({"id": sid}, {"$set": updates})
-    if res.matched_count == 0:
+    # Aus Dolibarr geführte Felder (#405) bleiben, wie Dolibarr sie liefert - der Rest ist Handpflege.
+    from services import dolibarr_sponsors
+    current = await db.sponsors.find_one({"id": sid}, {"_id": 0})
+    if current is None:
         raise HTTPException(404, "Sponsor nicht gefunden.")
+    for field in await dolibarr_sponsors.locked_fields(db, current, dolibarr_sponsors.SPONSOR_LOCKED_FIELDS):
+        updates.pop(field, None)
+    if not updates:
+        return _sponsor_defaults(current)
+    updates["updated_at"] = now_utc().isoformat()
+    await db.sponsors.update_one({"id": sid}, {"$set": updates})
     saved = await db.sponsors.find_one({"id": sid}, {"_id": 0})
     return _sponsor_defaults(saved) if saved else {"ok": True}
 
@@ -1219,7 +1235,7 @@ async def list_partners():
     db = get_db()
     partners = await db.partners.find({"is_active": {"$ne": False}}, {"_id": 0}).to_list(500)
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
-    return partners
+    return [public_sponsor_view(p) for p in partners]
 
 
 @router.get("/partners/admin")
@@ -1249,12 +1265,16 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
     nullable_fields = {"logo_url", "link", "description"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if not updates:
-        return {"ok": True}
-    updates["updated_at"] = now_utc().isoformat()
-    res = await db.partners.update_one({"id": pid}, {"$set": updates})
-    if res.matched_count == 0:
+    from services import dolibarr_sponsors
+    current = await db.partners.find_one({"id": pid}, {"_id": 0})
+    if current is None:
         raise HTTPException(404, "Partner nicht gefunden.")
+    for field in await dolibarr_sponsors.locked_fields(db, current, dolibarr_sponsors.PARTNER_LOCKED_FIELDS):
+        updates.pop(field, None)
+    if not updates:
+        return current
+    updates["updated_at"] = now_utc().isoformat()
+    await db.partners.update_one({"id": pid}, {"$set": updates})
     return await db.partners.find_one({"id": pid}, {"_id": 0})
 
 

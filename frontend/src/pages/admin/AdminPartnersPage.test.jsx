@@ -15,7 +15,11 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 const AdminPartnersPage = (await import("./AdminPartnersPage")).default;
 
 beforeEach(() => {
-  apiMock.get.mockResolvedValue({ data: [{ id: "p1", name: "Gamers Heaven", kind: "Messe", is_active: true }] });
+  apiMock.get.mockImplementation(async (url) => {
+    // Sponsoren und Partner aus Dolibarr (#405): der Block über der Liste fragt den Schalter ab.
+    if (url === "/admin/dolibarr/sponsors") return { data: { from_dolibarr: false, connected: false } };
+    return { data: [{ id: "p1", name: "Gamers Heaven", kind: "Messe", is_active: true }] };
+  });
   apiMock.post.mockReset();
   apiMock.post.mockResolvedValue({ data: { id: "p2" } });
 });
@@ -33,7 +37,7 @@ test("Neuer Partner öffnet das Seitenblatt, Speichern legt an und schließt es"
 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/partners", expect.objectContaining({ name: "IT-Tabelander", kind: "Community", is_active: true })));
   await waitFor(() => expect(screen.queryByTestId("partner-sheet")).toBeNull());
-  expect(apiMock.get).toHaveBeenCalledTimes(2);
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/partners/admin")).toHaveLength(2);
 });
 
 test("Bearbeiten öffnet das Blatt mit den Werten des Partners", async () => {

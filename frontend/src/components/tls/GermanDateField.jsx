@@ -29,6 +29,8 @@ export function GermanDateField({
   maxYear = null,
   allowFuture = false,
   testId,
+  disabled = false,
+  hint,
 }) {
   const [open, setOpen] = useState(false);
   const selected = parseIso(value);
@@ -78,15 +80,16 @@ export function GermanDateField({
           </span>
         </label>
       )}
-      <Popover open={open} onOpenChange={handleOpen}>
+      <Popover open={open && !disabled} onOpenChange={(next) => { if (!disabled) handleOpen(next); }}>
         <PopoverTrigger asChild>
           <button
             id={id}
             type="button"
             data-testid={testId}
+            disabled={disabled}
             aria-invalid={!!error}
             aria-describedby={describedBy}
-            className={`w-full bg-[#0A0A0A] border px-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none ${
+            className={`w-full bg-[#0A0A0A] border px-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${
               error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
             }`}
           >
@@ -94,7 +97,7 @@ export function GermanDateField({
               {value ? formatGermanDate(value) : "Datum wählen"}
             </span>
             <span className="flex items-center gap-1.5 shrink-0">
-              {value && (
+              {value && !disabled && (
                 <span
                   role="button"
                   tabIndex={0}
@@ -200,6 +203,7 @@ export function GermanDateField({
           </div>
         </PopoverContent>
       </Popover>
+      {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
       {description && <div id={`${id}-description`} className="mt-1 text-[10px] text-white/45">{description}</div>}
       {error && <div id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#FF8A80]">{error}</div>}
     </div>

@@ -34,8 +34,11 @@ const tierLogo = {
 export default function SponsorsPage() {
   useDocumentTitle("Sponsoren", "Sponsoren, Hauptsponsoren und Unterstützer von THE LION SQUAD eSports, Turnieren, Events und Vereinsarbeit in Tirol.");
   const [list, setList] = useState([]);
+  const [former, setFormer] = useState([]);
   const load = useCallback(() => {
     api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});
+    // Ehemalige Unterstützer (#405): abgelaufene Sponsoren mit Logo bleiben mit ihren Jahren sichtbar.
+    api.get("/sponsors/former").then(({ data }) => setFormer(Array.isArray(data) ? data : [])).catch(() => setFormer([]));
   }, []);
 
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function SponsorsPage() {
                     rel="noreferrer"
                     aria-label={s.name}
                     data-testid={`sponsor-${s.id}`}
-                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex items-center justify-center ${tierCard[t] || tierCard.bronze}`}
+                    className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex flex-col items-center justify-center gap-2 ${tierCard[t] || tierCard.bronze}`}
                   >
                     <div className={`${tierLogo[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
@@ -101,12 +104,36 @@ export default function SponsorsPage() {
                         <span className="sr-only">{s.name}</span>
                       )}
                     </div>
+                    {s.since_year && ["main", "platinum", "gold"].includes(t) && (
+                      <span className="text-[10px] uppercase tracking-widest font-bold text-white/40" data-testid={`sponsor-since-${s.id}`}>Seit {s.since_year} dabei</span>
+                    )}
                   </a>
                 ))}
               </div>
             </div>
           ) : null)}
         </div>
+
+        {former.length > 0 && (
+          <div className="mt-16 border-t border-white/10 pt-10" data-testid="sponsors-former">
+            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/45">DANKE</span>
+            <h2 className="mt-2 font-heading text-2xl font-black uppercase">Ehemalige Unterstützer</h2>
+            <p className="mt-2 text-sm text-white/55 max-w-2xl">Sie haben den Verein ein Stück des Weges begleitet – ohne sie stünden wir nicht da, wo wir heute sind.</p>
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {former.map((s) => (
+                <a key={s.id} href={s.link || undefined} target={s.link ? "_blank" : undefined} rel="noreferrer" aria-label={s.name} data-testid={`sponsor-former-${s.id}`}
+                  className="border border-white/10 rounded-sm bg-[#0C0C0C] p-3 flex flex-col items-center gap-2 opacity-70 hover:opacity-100 transition">
+                  <div className="h-16 w-full flex items-center justify-center overflow-hidden grayscale">
+                    <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
+                  </div>
+                  <span className="text-[10px] uppercase tracking-widest font-bold text-white/40 tabular-nums">
+                    {s.since_year && s.until_year && s.since_year !== s.until_year ? `${s.since_year}–${s.until_year}` : s.until_year || s.since_year || ""}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     </PublicLayout>
   );
