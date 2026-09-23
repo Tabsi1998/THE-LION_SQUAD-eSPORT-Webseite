@@ -33,6 +33,19 @@ def derived_user_type(user: dict, membership: dict | None) -> str:
     return "community_user"
 
 
+async def end_self_directory_entry(user_id: str, is_member: bool) -> None:
+    """Mitgliederverzeichnis per Opt-in (#410): ein Eintrag, den das Mitglied selbst angelegt hat,
+    gilt nur, solange die Mitgliedschaft läuft - endet sie (Vorstand oder Dolibarr), geht er offline.
+    Redaktionell angelegte Profile bleiben Sache der Vereinsverwaltung."""
+    if is_member:
+        return
+    db = get_db()
+    await db.club_member_profiles.update_many(
+        {"user_id": user_id, "source": "member", "is_active": {"$ne": False}},
+        {"$set": {"is_active": False, "updated_at": now_utc().isoformat(), "deactivated_reason": "membership_ended"}},
+    )
+
+
 async def get_membership(user_id: str) -> dict | None:
     db = get_db()
     return await db.memberships.find_one({"user_id": user_id}, {"_id": 0})

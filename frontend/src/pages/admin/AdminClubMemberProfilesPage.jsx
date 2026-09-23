@@ -31,6 +31,7 @@ const emptyForm = {
   platforms: "",
   order_index: 0,
   is_active: true,
+  directory_blocked: false,
 };
 
 function listToText(values) {
@@ -62,6 +63,7 @@ function toForm(profile) {
     platforms: listToText(profile.platforms),
     order_index: profile.order_index || 0,
     is_active: profile.is_active !== false,
+    directory_blocked: !!profile.directory_blocked,
   };
 }
 
@@ -158,6 +160,9 @@ export function ClubMemberProfilesAdminContent() {
                     {profile.linked_account && (
                       <p className="text-[10px] text-white/35 truncate">@{profile.linked_account.username}</p>
                     )}
+                    {/* Verzeichnis per Opt-in (#410): vom Mitglied selbst angelegt, ggf. gesperrt */}
+                    {profile.source === "member" && <p className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
+                    {profile.directory_blocked && <p className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
                   <span className="text-[10px] text-white/40 font-mono">#{profile.order_index || 0}</span>
                 </div>
@@ -223,6 +228,7 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
     platforms: textToList(source.platforms),
     order_index: Number(source.order_index) || 0,
     is_active: !!source.is_active,
+    directory_blocked: !!source.directory_blocked,
   });
 
   const submit = async (e) => {
@@ -281,6 +287,7 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
           <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
           <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />
         </FormGrid>
+        <CheckField label="Für das Mitglied sperren" checked={form.directory_blocked} onChange={(v) => set("directory_blocked", v)} accent="#FF3B30" testId="club-member-blocked" hint="Der Eintrag geht offline, und das Mitglied kann ihn unter „Meine Mitgliedschaft“ nicht wieder einschalten, bis die Sperre weg ist." />
       </FormSection>
     </AdminSheet>
   );

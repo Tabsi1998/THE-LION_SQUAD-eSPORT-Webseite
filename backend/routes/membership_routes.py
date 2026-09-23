@@ -8,7 +8,7 @@ from auth import get_current_user, require_club_admin, get_optional_user, requir
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
     is_active_member, derived_user_type, VALID_STATUSES, VALID_TYPES,
-    ACTIVE_STATUSES,
+    ACTIVE_STATUSES, end_self_directory_entry,
 )
 from services.visibility import user_can_see
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify
@@ -58,6 +58,18 @@ class ClubMemberProfileUpdate(BaseModel):
     user_id: str | None = None
     order_index: int | None = None
     is_active: bool | None = None
+    # Verzeichnis per Opt-in (#410): die Verwaltung kann einen Eintrag sperren - das Mitglied kann ihn
+    # dann nicht wieder einschalten, bis die Sperre weg ist.
+    directory_blocked: bool | None = None
+
+
+class DirectoryEntryUpdate(BaseModel):
+    """Was ein Mitglied an seinem eigenen Verzeichnis-Eintrag pflegt (#410)."""
+    listed: bool | None = None
+    gamertag: str | None = None
+    bio: str | None = None
+    games: list[str] | None = None
+    platforms: list[str] | None = None
 
 
 # ---------- Helpers ----------
@@ -185,10 +197,10 @@ def _public_profile(doc: dict, detail: bool = False, board_title: str | None = N
         "cover_url": doc.get("cover_url"),
         "games": doc.get("games") or [],
         "platforms": doc.get("platforms") or [],
-        "age": _age_from_birth_date(doc.get("birth_date")),
-        "level": _age_from_birth_date(doc.get("birth_date")),
+        # Das Alter war als „Level“ öffentlich (#410) - es bleibt jetzt in der Verwaltung.
         "gender": doc.get("gender"),
         "order_index": doc.get("order_index") or 0,
+        "source": doc.get("source") or "editorial",
     }
     if detail:
         out["bio"] = doc.get("bio") or ""
@@ -199,8 +211,10 @@ def _admin_profile(doc: dict) -> dict:
     out = _public_profile(doc, detail=True)
     out.update({
         "birth_date": doc.get("birth_date"),
+        "age": _age_from_birth_date(doc.get("birth_date")),
         "user_id": doc.get("user_id"),
         "is_active": doc.get("is_active", True),
+        "directory_blocked": bool(doc.get("directory_blocked")),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
     })
@@ -538,6 +552,8 @@ async def update_user_membership(
         raise HTTPException(400, str(e))
 
     await _audit(me["id"], "membership.update", user_id, payload)
+    # Endet die Mitgliedschaft, geht ein selbst angelegter Verzeichnis-Eintrag offline (#410).
+    await end_self_directory_entry(user_id, m.get("member_status") in ACTIVE_STATUSES)
 
     # Fire emails based on transitions
     new_status = payload.get("member_status")
@@ -758,6 +774,9 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["gender"] = _clean_gender(update.get("gender"))
     if "user_id" in update:
         update["user_id"] = await _normalize_linked_user_id(db, update.get("user_id"), profile_id)
+    if update.get("directory_blocked"):
+        # Sperren heißt: sofort offline, und das Mitglied kann es nicht selbst zurückdrehen.
+        update["is_active"] = False
     if not update:
         raise HTTPException(400, "Keine Änderungen.")
     update["updated_at"] = now_utc().isoformat()
@@ -777,6 +796,112 @@ async def admin_delete_member_profile(profile_id: str, me: dict = Depends(requir
         raise HTTPException(404, "Mitgliedsprofil nicht gefunden.")
     await _audit(me["id"], "club_member_profile.delete", profile_id)
     return {"ok": True}
+
+
+# ---------- Mitgliederverzeichnis per Opt-in (#410) ----------
+# Wer laut Mitgliederverwaltung aktives Mitglied ist, entscheidet selbst, ob er im Verzeichnis steht,
+# und pflegt dort Gamertag, Spiele, Plattformen und eine kurze Bio. Der Eintrag ist ein normales
+# Mitgliederprofil (`club_member_profiles`, `source: "member"`) - Verzeichnis, Profilseite, Vorstands-
+# titel und Referenzen funktionieren damit wie bei redaktionellen Profilen. Die Verwaltung kann
+# sperren; endet die Mitgliedschaft, geht der Eintrag offline.
+
+def _own_directory_view(profile: dict | None, membership: dict | None, user: dict) -> dict:
+    listed = bool(profile) and profile.get("is_active") is not False
+    return {
+        "eligible": is_active_member(membership),
+        "listed": listed,
+        "blocked": bool(profile and profile.get("directory_blocked")),
+        "editorial": bool(profile and (profile.get("source") or "editorial") != "member"),
+        "slug": profile.get("slug") if profile else None,
+        "entry": {
+            "display_name": (profile or {}).get("display_name") or user.get("display_name") or user.get("username"),
+            "gamertag": (profile or {}).get("gamertag") or user.get("username"),
+            "photo_url": (profile or {}).get("photo_url") or user.get("avatar_url"),
+            "bio": (profile or {}).get("bio") or "",
+            "games": (profile or {}).get("games") if profile else (user.get("favorite_games") or []),
+            "platforms": (profile or {}).get("platforms") if profile else (user.get("main_platforms") or []),
+        },
+    }
+
+
+async def _account_for_directory(db, user: dict) -> dict:
+    """Name, Foto, Spiele und Plattformen so, wie sie jetzt am Konto stehen - nicht aus der Sitzung."""
+    fresh = await db.users.find_one({"id": user["id"]}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "favorite_games": 1, "main_platforms": 1, "gender": 1})
+    return fresh or user
+
+
+@router.get("/me/directory")
+async def my_directory_entry(me: dict = Depends(get_current_user)):
+    db = get_db()
+    user = await _account_for_directory(db, me)
+    membership = await get_membership(user["id"])
+    profile = await db.club_member_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    return _own_directory_view(profile, membership, user)
+
+
+@router.put("/me/directory")
+async def update_my_directory_entry(body: DirectoryEntryUpdate, me: dict = Depends(get_current_user)):
+    db = get_db()
+    user = await _account_for_directory(db, me)
+    membership = await get_membership(user["id"])
+    if not is_active_member(membership):
+        raise HTTPException(403, "Ins Mitgliederverzeichnis können sich nur aktive Vereinsmitglieder eintragen.")
+    profile = await db.club_member_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    if profile and profile.get("directory_blocked"):
+        raise HTTPException(403, "Dein Eintrag ist von der Vereinsverwaltung gesperrt - bitte beim Vorstand melden.")
+    raw = body.model_dump(exclude_unset=True)
+    listed = raw.pop("listed", None)
+    fields: dict = {}
+    if "gamertag" in raw:
+        fields["gamertag"] = _clean_name(raw.get("gamertag"), 40) or None
+    if "bio" in raw:
+        fields["bio"] = str(raw.get("bio") or "").strip()[:2000]
+    if "games" in raw:
+        fields["games"] = _clean_list(raw.get("games"))
+    if "platforms" in raw:
+        fields["platforms"] = _clean_list(raw.get("platforms"))
+    now = now_utc().isoformat()
+    if profile is None:
+        if listed is not True:
+            raise HTTPException(400, "Zuerst „Im Mitgliederverzeichnis zeigen“ einschalten.")
+        name = str(user.get("display_name") or user.get("username") or "Mitglied").strip()
+        gamertag = fields.get("gamertag") or _clean_name(user.get("username"), 40)
+        doc = {
+            "id": new_id(), "display_name": name, "gamertag": gamertag, "real_name": None,
+            "slug": await _unique_profile_slug(db, gamertag or name),
+            "role_title": None, "photo_url": user.get("avatar_url") or None, "cover_url": None,
+            "bio": fields.get("bio", ""), "birth_date": None, "gender": _clean_gender(user.get("gender")),
+            "games": fields.get("games", _clean_list(user.get("favorite_games"))),
+            "platforms": fields.get("platforms", _clean_list(user.get("main_platforms"))),
+            "user_id": user["id"], "order_index": 0, "is_active": True, "source": "member",
+            "created_at": now, "created_by": user["id"], "updated_at": now,
+        }
+        await db.club_member_profiles.insert_one(doc)
+        doc.pop("_id", None)
+        await _audit(user["id"], "club_member_profile.self_create", doc["id"], {"display_name": name})
+        profile = doc
+    else:
+        update = dict(fields)
+        if listed is not None:
+            update["is_active"] = bool(listed)
+        if not update:
+            raise HTTPException(400, "Keine Änderungen.")
+        update["updated_at"] = now
+        await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
+        await _audit(user["id"], "club_member_profile.self_update", profile["id"], update)
+        profile = await db.club_member_profiles.find_one({"id": profile["id"]}, {"_id": 0})
+    return _own_directory_view(profile, membership, user)
+
+
+@router.get("/count")
+async def membership_count():
+    """Öffentlich: wie viele Mitglieder der Verein laut Mitgliederverwaltung hat und wie viele im
+    Verzeichnis stehen - für die Community-Seite statt einer Zählung der Handliste."""
+    db = get_db()
+    return {
+        "members": await db.memberships.count_documents({"member_status": {"$in": list(ACTIVE_STATUSES)}}),
+        "listed": await db.club_member_profiles.count_documents({"is_active": {"$ne": False}}),
+    }
 
 
 # ---------- Public members directory ----------

@@ -7,8 +7,9 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { feeCard, formatDate } from "@/lib/dolibarr";
 import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
+import { SwitchRow } from "@/pages/user/profile/SwitchRow";
 import { toast } from "sonner";
-import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet } from "lucide-react";
+import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users } from "lucide-react";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -76,6 +77,9 @@ export default function MyMembershipPage() {
         {/* Digitale Mitgliedskarte (#346): nur für aktive Mitglieder, der Server entscheidet */}
         {(m?.member_status === "active" || m?.member_status === "honorary") && <MemberCardPanel />}
 
+        {/* Mitgliederverzeichnis per Opt-in (#410): der Server sagt, ob die Person eintragen darf */}
+        {(m?.member_status === "active" || m?.member_status === "honorary") && <DirectoryCard />}
+
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (
           <div className={`mt-6 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
@@ -141,6 +145,95 @@ export default function MyMembershipPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+function toDirectoryForm(entry) {
+  return { gamertag: entry?.gamertag || "", games: (entry?.games || []).join(", "), platforms: (entry?.platforms || []).join(", "), bio: entry?.bio || "" };
+}
+
+function splitList(value) {
+  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+}
+
+// Der eigene Eintrag im Mitgliederverzeichnis (#410): einschalten, Gamertag, Spiele, Plattformen
+// und eine kurze Bio pflegen; Name und Foto kommen vom Konto. Gesperrt heißt: nur der Vorstand
+// kann das aufheben.
+function DirectoryCard() {
+  const [entry, setEntry] = useState(null);
+  const [form, setForm] = useState(toDirectoryForm(null));
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    api.get("/membership/me/directory").then(({ data }) => {
+      if (data && typeof data.eligible === "boolean") { setEntry(data); setForm(toDirectoryForm(data.entry)); }
+    }).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!entry?.eligible) return null;
+
+  const save = async (patch, successText) => {
+    setBusy(true);
+    try {
+      const { data } = await api.put("/membership/me/directory", patch);
+      setEntry(data);
+      setForm(toDirectoryForm(data.entry));
+      toast.success(successText);
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Speichern hat nicht geklappt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const set = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const submit = (e) => {
+    e.preventDefault();
+    save({ gamertag: form.gamertag, games: splitList(form.games), platforms: splitList(form.platforms), bio: form.bio }, "Eintrag gespeichert.");
+  };
+  const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-white text-sm focus:outline-none";
+
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-directory-card">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Mitgliederverzeichnis</h2>
+        {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="text-xs uppercase tracking-wider font-bold text-[#FFD700]">Meinen Eintrag ansehen</Link>}
+      </div>
+      {entry.blocked ? (
+        <p className="mt-3 text-sm text-[#FFD700]" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>
+      ) : (
+        <div className="mt-3">
+          <SwitchRow
+            label="Im Mitgliederverzeichnis zeigen"
+            description="Auf der öffentlichen Seite „Vereinsmitglieder“ mit Gamertag, Foto, Spielen und Plattformen. Du kannst das jederzeit wieder ausschalten."
+            checked={entry.listed}
+            onCheckedChange={(next) => save({ listed: next }, next ? "Du stehst jetzt im Mitgliederverzeichnis." : "Dein Eintrag ist nicht mehr öffentlich.")}
+            disabled={busy}
+            testId="membership-directory-switch"
+          />
+        </div>
+      )}
+      {entry.listed && !entry.blocked && (
+        <form onSubmit={submit} className="mt-4 space-y-3" data-testid="membership-directory-form">
+          <div className="grid sm:grid-cols-3 gap-3">
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Gamertag
+              <input value={form.gamertag} onChange={(e) => set("gamertag", e.target.value)} maxLength={40} data-testid="membership-directory-gamertag" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
+            </label>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Spiele
+              <input value={form.games} onChange={(e) => set("games", e.target.value)} placeholder="F1 25, Rocket League" data-testid="membership-directory-games" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
+            </label>
+            <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Plattformen
+              <input value={form.platforms} onChange={(e) => set("platforms", e.target.value)} placeholder="PC, PS5" data-testid="membership-directory-platforms" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
+            </label>
+          </div>
+          <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Kurze Bio
+            <textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} rows={3} maxLength={2000} data-testid="membership-directory-bio" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
+          </label>
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="submit" disabled={busy} data-testid="membership-directory-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Eintrag speichern</button>
+            <span className="text-xs text-white/45">{entry.editorial ? "Name, Foto und Funktion pflegt die Vereinsverwaltung an deinem Profil." : "Name und Foto kommen von deinem Konto (Profil bearbeiten)."}</span>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

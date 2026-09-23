@@ -62,7 +62,6 @@ export default function MemberProfilePage() {
               </div>
               <aside className="space-y-4">
                 <InfoPanel title="Profil">
-                  {(profile.level || profile.age) && <InfoLine label="Level" value={`Level ${profile.level || profile.age}`} />}
                   <InfoChips icon={Gamepad2} label="Games" values={profile.games} />
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
                   <LinkedAccountCard account={profile.linked_account} />
@@ -297,15 +296,6 @@ function InfoPanel({ title, children }) {
         <Crown className="w-4 h-4 text-[#FFD700]" /> {title}
       </div>
       <div className="mt-4 space-y-4">{children}</div>
-    </div>
-  );
-}
-
-function InfoLine({ label, value }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-      <div className="mt-1 text-white/85 font-bold">{value}</div>
     </div>
   );
 }
