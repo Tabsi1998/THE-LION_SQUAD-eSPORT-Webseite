@@ -23,6 +23,13 @@ module.exports = {
       padding: {
         'safe-bottom': 'env(safe-area-inset-bottom)',
       },
+      // Layout am PC (#426): der Seiten-Container (`max-w-7xl`, 49 Stellen) war 80rem = 1280 px -
+      // auf einem breiten Monitor blieb die Hälfte leer. 112rem = 1792 px nutzt die Breite; Handy
+      // und Tablet ändert das nicht (dort greift die Viewport-Breite). Lesetexte halten ihre eigene
+      // Lesebreite (max-w-3xl/4xl) innerhalb des Containers.
+      maxWidth: {
+        '7xl': '112rem',
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
