@@ -54,7 +54,7 @@ async def test_counts_and_today_list(flow):
     await flow.db.events.insert_one({"id": "e4", "slug": "vorbei", "name": "Gestern ohne Ende", "status": "scheduled", "start_date": (start - timedelta(hours=5)).isoformat()})
 
     counts = await task_counts(flow.db, now)
-    assert counts == {"reported_results": 2, "moderation_reports": 1, "contact_messages": 1, "schedule_deadlines": 1, "billing_cases": 0}
+    assert counts == {"reported_results": 2, "moderation_reports": 1, "contact_messages": 1, "schedule_deadlines": 1, "billing_cases": 0, "sponsors_expiring": 0}
 
     today = await today_items(flow.db, now)
     assert [item["title"] for item in today] == ["Mehrtägig", "Herbst-Cup – A1", "LAN heute", "Check-in: Liga", "Herbst-Cup – A2"]
