@@ -216,6 +216,30 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Referenzen als Turnierteilnahme mit Einträgen (#409; PR #445; Backend +
+  Web; `update.sh`). `models.ReferenceEntry` (`kind` team/solo, `team_name`,
+  `member_profile_ids`, `lineup`, `lineup_members` eingefroren, `placement`,
+  `placement_label`, `participant_count`, `team_count`); Referenz-Felder
+  `platforms`, `format`, `league`, `season`, `entries`. `news_routes`:
+  `_reference_entries` (alte Referenz ohne `entries` = ein Eintrag),
+  `_derive_title_fields` (Plattform/Format/Liga/Saison/`display_title` aus
+  `[PS] HC | Liga X | Cup`, nur solange die Felder leer sind),
+  `_mirror_entries` (beste Platzierung, erstes Team, alle Spieler in die
+  alten Felder – Startseite `club_numbers`, SEO, Sitemap und
+  `membership_routes._attach_reference_stats` lesen weiter dort),
+  `_freeze_reference_members` je Eintrag (auch für alte Clients mit einer
+  Platzierung), `_reference_summary` zählt Podest/Gold je Eintrag (+
+  `entries`, `seasons`), Helfer `formats`/`leagues`/`seasons`.
+  Mitgliederprofil: `member_entry` (bester eigener Eintrag), Bilanz über alle
+  eigenen Einträge. Web `AdminReferencesPage` (Seitenblatt: Turnier /
+  Einträge mit `EntryEditor` + `MemberPicker single` / Rahmen / Texte;
+  `referenceToForm` nimmt `display_title`; mindestens ein Eintrag),
+  `ReferencesPage` (drei Zahlen `references-stat-*`, Filter
+  Status/Spiel/Plattform/Saison `references-season-*`, `reference-card-*`,
+  `reference-chips-*`, `reference-entry-*` mit Podest-Optik, Detail
+  `reference-detail-entries`), `MemberProfilePage.MemberReferenceCard` zeigt
+  `member_entry`. Tests `test_references_entries_flow.py` (4),
+  `ReferencesPage.test.jsx` (2), `AdminReferencesPage.test.jsx` (3).
 - Admin-Formulare und Seitenblatt (#434, #435; PRs #438, #440, #441, #442;
   nur Web). Ein Rahmen für Anlegen und Bearbeiten:
   `components/tls/AdminForm.jsx` (`AdminFormPage` = Kopf mit Zurück-Link,
@@ -1504,13 +1528,13 @@ Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418), #420
 Layout am PC), #429 (#408 Adminmenü), #430 (#399 Turnierbaum), #432
 (Doku-Stand), #433 (#431 Startseite III), #438 (#434 Admin-Formulare I), #440
 (#434 Teil II – der Squash von #439 war in den toten Basiszweig gegangen, #440
-hat den Stand nachgezogen) und #441 (#435 Seitenblatt, Gruppe Verein). `main`
-steht auf `75283c8`.
+hat den Stand nachgezogen), #441 (#435 Seitenblatt, Gruppe Verein), #442 (#435
+Seitenblatt eSports/Content/Mitglieder), #443 (#436 Playwright bei drei
+Breiten), #444 (Doku-Stand) und #445 (#409 Referenzen mit Einträgen;
+`update.sh`). `main` steht auf `4d4afa5`.
 
 ### Offene PRs
-- #442 (#435 Seitenblatt für eSports, Content und Mitglieder; nur Web;
-  bereit, auf `main`) und #443 (#436 Playwright bei 1920/1024/390 px;
-  Entwurf bis zum lokalen Check). **Regel seit 23.09. abends:**
+- Derzeit keiner. **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1518,8 +1542,9 @@ steht auf `75283c8`.
   angebunden, E-Mail-Vorlagen werden gebraucht – wartet auf die Entscheidung
   A/B des Betreibers), #401 Turnierseite (Reiter auf einer Seite, „Dein
   Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
-  #409 Referenzen-Rework (Datenmodell: Teilnahme mit Einträgen Team/Einzel,
-  Kommentar an #409), dann Dolibarr III (#405, #406, #326 Teil 2, #410) und
+  dann Dolibarr III (#405 Sponsoren und Partner aus Dolibarr als Schalter –
+  Antwort des Betreibers: dort noch nicht gepflegt, aber gute Idee; #406
+  „Über uns“ mit echten Daten; #326 Teil 2; #410) und
   Moderation II (#415–#417, Meilenstein 28, Variante C) nach App 1.0.0; Play
   Console ruht auf Wunsch des Betreibers, bis alles fertig ist; #412
   (Play-Upload per API) wartet auf die Identitätsbestätigung des
@@ -1594,6 +1619,10 @@ steht auf `75283c8`.
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #445 (23.09.): `update.sh` (Backend: Referenzen mit Einträgen). Danach
+  in Admin → Verein → Referenzen die alten Einträge einmal öffnen und
+  speichern – bis dahin leitet der Server Plattform, Format, Liga und Saison
+  aus dem Titel ab, danach stehen sie fest in den Feldern.
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
   brauchen auch für Mitglieder, Dokumente und Einstellungen eine bestätigte
   Zwei-Faktor-Anmeldung; eine Turnierleitung sieht News, Galerie und
