@@ -461,7 +461,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
 | App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
-| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); offen: #400 QR mit dem bestehenden Löwen-PNG, #408 Adminmenü, #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
+| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); offen: #408 Adminmenü, #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -637,6 +637,20 @@ gepflegt ist), „Mitglied wird, wer sich einbringt“ steht leise darunter. Zah
 Turniere, Events, Auszeichnungen) kommen aus echten Zählern und erscheinen nur, wenn sie über null
 liegen; Ansprechpartner aus dem Vorstand nur, wenn Posten besetzt sind. Der App-Streifen bleibt
 ehrlich: kein Store-Knopf, solange die App nicht öffentlich ist.
+
+### Was 46.3 gefunden hat (#400 – PR #424)
+
+**Der Löwe klebte auf dem Code.** `BrandedQRCode` legte ein rundes weißes Feld über die Mitte und
+skalierte das Raster-Maskottchen um 12 % hoch – bei 82 bis 116 px unscharf, mit hartem Ring. Der
+Betreiber wollte kein neues Logo, sondern sein bestehendes (PNG unter Branding → „QR-Logo“, das
+Feld gab es bereits). Jetzt zeichnet die Website den Code selbst aus der Modulmatrix: abgerundete
+Module, Suchmuster in der Akzentfarbe, eine abgerundete Platte mit Ruhezone, das Logo scharf
+darauf. Fehlerkorrektur H, Platte höchstens 24 % der Kante – weit unter dem, was H verkraftet.
+Dieselbe Komponente an allen Stellen (TV-Ansichten, Mitgliedskarte, Downloads), nur die Größe
+ändert sich.
+
+**Drucken ohne Umweg.** Unter Downloads & QR gibt es je Ziel PNG (1024 px) und SVG mit
+eingebettetem Logo, dazu die festen Ziele „Website“ und „Kalender“ für Flyer und Plakate.
 
 ## Block 45 — App 1.0.0, Teil 4: Events in der App wie im Web
 

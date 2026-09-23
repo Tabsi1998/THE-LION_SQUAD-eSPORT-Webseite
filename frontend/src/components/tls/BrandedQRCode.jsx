@@ -1,65 +1,65 @@
-import { QRCodeSVG } from "qrcode.react";
+import { useMemo } from "react";
 import { resolveMediaUrl } from "@/lib/api";
 import { TLS_MASCOT, useBrandingAssets } from "@/components/tls/Logo";
+import { finderParts, qrModel } from "@/lib/qrDesign";
+
+// QR-Code mit Löwe (#400): eine Komponente für TV-Ansichten, Mitgliedskarte und Downloads. Das
+// Logo kommt aus Branding → „QR-Logo“ (PNG, transparent), sonst Maskottchen/Logo; es sitzt scharf
+// auf einer abgerundeten Platte mit Ruhezone statt hochskaliert in einem harten Ring. Module
+// abgerundet, Suchmuster in der Akzentfarbe, Fehlerkorrektur H.
+
+export function qrLogoHref(branding) {
+  return resolveMediaUrl(branding?.qr_logo_url || branding?.mascot_url || branding?.favicon_dark_url || branding?.logo_dark_url || branding?.logo_url || TLS_MASCOT);
+}
 
 export function BrandedQRCode({
   value,
   size = 116,
   bgColor = "#ffffff",
   fgColor = "#0A0A0A",
+  accent = null,
   className = "",
-  logoRatio = 0.25,
+  logoRatio = 0.22,
+  withLogo = true,
 }) {
   const branding = useBrandingAssets();
-  const logo = resolveMediaUrl(branding.qr_logo_url || branding.mascot_url || branding.favicon_dark_url || branding.logo_dark_url || branding.logo_url || TLS_MASCOT);
-  const badgeSize = Math.max(22, Math.round(size * logoRatio));
-  const logoSize = Math.round(badgeSize * 0.76);
-  const ringSize = Math.max(1, Math.round(size * 0.011));
-  const cutoutRadius = Math.round(badgeSize / 2 + ringSize + Math.max(1, size * 0.006));
-  const qrCutoutMask = `radial-gradient(circle ${cutoutRadius}px at 50% 50%, transparent 0 ${cutoutRadius}px, #000 ${cutoutRadius + 1}px)`;
+  const logo = qrLogoHref(branding);
+  const accentColor = accent || branding?.primary_color || fgColor;
+  const model = useMemo(
+    () => qrModel({ value, size, logoRatio, fgColor, bgColor, accent: accentColor, withLogo }),
+    [accentColor, bgColor, fgColor, logoRatio, size, value, withLogo],
+  );
 
   return (
     <span
-      className={`relative inline-block overflow-hidden align-middle ${className}`}
-      style={{ width: size, height: size, backgroundColor: bgColor }}
+      className={`inline-block align-middle leading-none ${className}`}
+      style={{ width: size, height: size }}
       aria-label="QR-Code"
       data-testid="branded-qr-code"
     >
-      <QRCodeSVG
-        value={value || "https://lionsquad.at"}
-        size={size}
-        bgColor="transparent"
-        fgColor={fgColor}
-        level="H"
-        marginSize={0}
-        className="block h-full w-full"
-        style={{
-          WebkitMaskImage: qrCutoutMask,
-          maskImage: qrCutoutMask,
-          WebkitMaskRepeat: "no-repeat",
-          maskRepeat: "no-repeat",
-          WebkitMaskSize: "100% 100%",
-          maskSize: "100% 100%",
-        }}
-      />
-      <span
-        aria-hidden="true"
-        className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
-        style={{
-          width: badgeSize,
-          height: badgeSize,
-          backgroundColor: bgColor,
-          boxShadow: `0 0 0 ${ringSize}px ${fgColor}, 0 0 0 ${ringSize + 1}px ${bgColor}`,
-        }}
-      >
-        <img
-          src={logo}
-          alt=""
-          draggable="false"
-          className="block object-contain"
-          style={{ width: logoSize, height: logoSize, transform: "scale(1.12)" }}
-        />
-      </span>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-hidden="true"
+      className="block h-full w-full"
+    >
+      <rect width={size} height={size} rx={model.frameRadius} fill={model.colors.bg} />
+      <g fill={model.colors.fg}>
+        {model.modules.map((m) => <rect key={`${m.x}-${m.y}`} x={m.x} y={m.y} width={model.moduleSize} height={model.moduleSize} rx={model.moduleRadius} />)}
+      </g>
+      {model.finders.map((finder, index) => finderParts(model, finder).map((part, partIndex) => (
+        <rect key={`f${index}-${partIndex}`} x={part.x} y={part.y} width={part.size} height={part.size} rx={part.radius} fill={part.fill} />
+      )))}
+      {model.plate ? (
+        <>
+          <rect x={model.plate.x} y={model.plate.y} width={model.plate.size} height={model.plate.size} rx={model.plate.radius} fill={model.colors.bg} />
+          <image href={logo} x={model.logo.x} y={model.logo.y} width={model.logo.size} height={model.logo.size} preserveAspectRatio="xMidYMid meet" data-testid="branded-qr-logo" />
+        </>
+      ) : null}
+    </svg>
     </span>
   );
 }

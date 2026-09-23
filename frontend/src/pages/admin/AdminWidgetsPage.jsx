@@ -3,8 +3,10 @@ import { API, API_BASE, api } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
-import { CalendarDays, Copy, Eye, Flag, Image as ImageIcon, Monitor, Printer, QrCode, Radio, Trophy } from "lucide-react";
+import { BrandedQRCode, qrLogoHref } from "@/components/tls/BrandedQRCode";
+import { useBrandingAssets } from "@/components/tls/Logo";
+import { downloadQrPng, downloadQrSvg } from "@/lib/qrExport";
+import { CalendarDays, Copy, Download, Eye, Flag, Globe, Image as ImageIcon, Monitor, Printer, QrCode, Radio, Trophy } from "lucide-react";
 
 function safeWidgetUrl({ type, id, track, base }) {
   if (!id || !/^[A-Za-z0-9_-]+$/.test(String(id))) return "";
@@ -247,6 +249,9 @@ function buildQrLinks({ event, stations, matches, albums, base }) {
   const eventPath = `/events/${event.slug || event.id}`;
   const eventAlbums = (albums || []).filter((album) => album.event_id === event.id && album.slug);
   const rows = [
+    // Feste Ziele (#400): Website und Kalender für Flyer und Plakate, unabhängig vom Event.
+    { kind: "site", id: "website", label: "Website", description: "Startseite des Vereins", icon: Globe, path: "/" },
+    { kind: "site", id: "calendar", label: "Kalender", description: "Alle Termine mit Abo", icon: CalendarDays, path: "/calendar" },
     { kind: "event", id: "details", label: "Eventdetails", description: event.name, icon: CalendarDays, path: eventPath },
     { kind: "event", id: "live", label: "Event Live", description: "Zeitplan, Matches und Ergebnisse", icon: Radio, path: `${eventPath}/live` },
     { kind: "event", id: "display", label: "Event Display", description: "TV-Ansicht für Beamer und Screens", icon: Monitor, path: `/display/event/${event.id}` },
@@ -296,6 +301,7 @@ function buildQrLinks({ event, stations, matches, albums, base }) {
 
 function QrCard({ item }) {
   const Icon = item.icon || QrCode;
+  const branding = useBrandingAssets();
   const pdfUrl = `${API}/exports/qr/sign.pdf?${new URLSearchParams({
     url: item.url,
     title: item.description || item.label,
@@ -305,6 +311,22 @@ function QrCard({ item }) {
   const copyUrl = async () => {
     await navigator.clipboard.writeText(item.url);
     toast.success("QR-Link kopiert.");
+  };
+  // Druckversion (#400): PNG mit 1024 px und SVG - dieselbe Geometrie wie die Vorschau, Logo eingebettet.
+  const exportOptions = { value: item.url, title: item.description || item.label, logoHref: qrLogoHref(branding), accent: branding?.primary_color || null };
+  const exportPng = async () => {
+    try {
+      await downloadQrPng(exportOptions);
+    } catch (err) {
+      toast.error(err?.message || "PNG konnte nicht erzeugt werden.");
+    }
+  };
+  const exportSvg = async () => {
+    try {
+      await downloadQrSvg(exportOptions);
+    } catch {
+      toast.error("SVG konnte nicht erzeugt werden.");
+    }
   };
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4 min-w-0 print:bg-white print:text-black print:border-black">
@@ -324,6 +346,12 @@ function QrCard({ item }) {
           <a href={pdfUrl} target="_blank" rel="noreferrer" className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-[10px] uppercase tracking-wider font-bold hover:bg-[#FFD700]/10 print:hidden">
             <Printer className="w-3 h-3" /> PDF
           </a>
+          <button type="button" onClick={exportPng} data-testid={`qr-png-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white print:hidden">
+            <Download className="w-3 h-3" /> PNG
+          </button>
+          <button type="button" onClick={exportSvg} data-testid={`qr-svg-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white print:hidden">
+            <Download className="w-3 h-3" /> SVG
+          </button>
         </div>
       </div>
     </div>

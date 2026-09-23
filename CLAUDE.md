@@ -216,6 +216,25 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- QR-Code mit Löwe (#400; PR #424; kein Build). Antwort des Betreibers: das
+  bestehende Logo als PNG unter Branding → „QR-Logo“ (`qr_logo_url`, gab es
+  schon; Uploader nimmt kein SVG), eine Komponente für alle Stellen,
+  Druckversion. Web: neue Abhängigkeit `qrcode` (node-qrcode, liefert die
+  Modulmatrix; `qrcode.react` bleibt für die Zwei-Faktor-Einrichtung).
+  `lib/qrDesign.js` (`qrMatrix` Stufe H, `isFinderCell`, `qrModel({value,
+  size, logoRatio ≤ MAX_LOGO_RATIO 0.24, quietZone, fgColor, bgColor, accent,
+  withLogo})` → Module ohne Suchmuster und ohne Fläche unter der Platte,
+  drei Suchmuster, Platte + Logo-Rechteck; `finderParts` (Rahmen/Ring/Kern in
+  der Akzentfarbe), `qrSvgMarkup(model, {logoHref, title})` für die Datei,
+  `qrFileName`), `components/tls/BrandedQRCode.jsx` (jetzt eigenes SVG:
+  abgerundete Module, Suchmuster in `primary_color`, Platte mit Ruhezone,
+  `<image>` `branded-qr-logo`; `qrLogoHref(branding)`; Props wie vorher +
+  `accent`, `withLogo`; testid `branded-qr-code` bleibt), `lib/qrExport.js`
+  (`inlineImage` → Daten-URL, `buildQrSvg` 1024 px, `downloadQrSvg`,
+  `downloadQrPng` über Canvas im Browser), `AdminWidgetsPage` QrCard: Knöpfe
+  PNG/SVG (`qr-png-{kind}-{id}`, `qr-svg-…`) neben dem PDF-Schild, feste
+  Ziele „Website“ und „Kalender“ oben in der Liste. Tests `qrDesign.test.js`
+  (3), `qrExport.test.js` (2), `BrandedQRCode.test.jsx` (2).
 - App-Update je Installationsquelle (#421; PR #423; Build 77). Play
   signiert mit eigenem Schlüssel – die Server-APK lässt sich über eine
   Play-Installation nicht installieren. App: `expo-in-app-updates` (0.12,
@@ -1401,11 +1420,13 @@ Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418). `main`
 steht auf `c572c95`.
 
 ### Offene PRs
-- #423 (#421 App-Update je Installationsquelle; Backend + Web-Admin + App;
-  auf `main` nach #422; Build 77 nach dem Merge, `update.sh`). Danach Web:
-  Design II weiter (#400 QR mit dem PNG unter
-  Branding → „QR-Logo“, #408, #409, #401 + #399 mit den Antworten des
-  Betreibers vom 23.09.); Play Console ruht auf Wunsch
+- #424 (#400 QR mit Löwe; nur Web; auf `main` nach #423). **Neue Regel
+  (23.09. abends):** Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht
+  mehr an – die Doku (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt
+  gebündelt im Doku-Stand-PR nach dem Merge; so gibt es die Konflikte
+  zwischen parallelen PRs nicht mehr. Danach Web: Design II weiter (#425
+  Startseite II, #408, #409, #401 + #399 mit den Antworten des Betreibers vom
+  23.09.); Play Console ruht auf Wunsch
   des Betreibers, bis alles fertig ist; #412 (Play-Upload per API) wartet auf
   die Identitätsbestätigung des Entwicklerkontos; Moderation II (#415–#417,
   Meilenstein 28, Variante C) nach App 1.0.0. Nach #411, #413 und #398 beim
