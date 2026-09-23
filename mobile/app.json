@@ -2,14 +2,15 @@
   "expo": {
     "name": "LionsAPP",
     "slug": "lionsapp",
-    "version": "0.11.0-beta",
+    "version": "0.12.0-beta",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "70",
+      "buildNumber": "71",
       "bundleIdentifier": "at.lionsquad.app",
+      "associatedDomains": ["webcredentials:lionsquad.at"],
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false
@@ -18,7 +19,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 70,
+      "versionCode": 71,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

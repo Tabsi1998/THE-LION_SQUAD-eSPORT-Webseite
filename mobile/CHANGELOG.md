@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.0-beta - 2026-09-23
+
+- Mobile: „Mit Passkey anmelden“: Wer auf lionsquad.at einen Passkey angelegt hat, meldet sich in der App mit Fingerabdruck oder Gesicht an – ohne Passwort, mit demselben Passkey wie im Browser (#217, Stufe 2).
+
 ## 0.11.0-beta - 2026-09-23
 
 - Mobile: „Meine Rechnungen“ unter Mehr → Konto – für alle, nicht nur Mitglieder: Event- und Turnierrechnungen mit ihrem Vorgang (Event, Datum, Personen oder Team), Filter nach Quelle und Stand, PDF per Tipp. Wer nicht Mitglied ist, bezahlt per Überweisung laut Rechnung (#320).

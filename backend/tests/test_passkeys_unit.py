@@ -56,6 +56,11 @@ class Documents:
 
 @pytest.fixture
 def setup(monkeypatch):
+    return make_setup(monkeypatch)
+
+
+def make_setup(monkeypatch):
+    """Der Kern der Fixture als Funktion - auch die App-Tests (test_passkeys_mobile_unit) bauen darauf."""
     monkeypatch.setenv("FRONTEND_URL", "https://club.example")
     monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("PASSKEY_ENABLED", "true")

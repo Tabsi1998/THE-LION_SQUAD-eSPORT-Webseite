@@ -26,12 +26,28 @@ from database import get_db
 from models import now_utc
 from routes.auth_routes import (
     _attach_membership, _current_session_family,
-    _eligible_session_user, _issue_session, _public_user, _requires_admin_mfa,
+    _eligible_session_user, _issue_mobile_session, _issue_session, _public_user, _requires_admin_mfa,
     _security_audit,
 )
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/auth/passkeys", tags=["passkeys"])
+
+# App-Herkunft (#217 Stufe 2): Android nennt statt einer https-Adresse den SHA-256 des
+# Signaturschlüssels der App (base64url, ohne Füllzeichen). Der Schlüssel seit Build 57 ist der
+# Standard; weitere Hashes (etwa ein Debug-Zertifikat auf einem Testserver) kommen über die
+# Umgebung, mit oder ohne Doppelpunkte. (Der Fingerabdruck ist öffentlich - er steht in jeder
+# Release-Notiz; die Doppelpunkte sind die Schreibweise der Android-Werkzeuge.)
+DEFAULT_APK_KEY_HASHES = "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98"
+
+
+def mobile_origins() -> list[str]:
+    origins = []
+    for item in os.environ.get("PASSKEY_APK_KEY_HASHES", DEFAULT_APK_KEY_HASHES).split(","):
+        clean = item.strip().lower().replace(":", "")
+        if re.fullmatch(r"[0-9a-f]{64}", clean):
+            origins.append("android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(clean)))
+    return origins
 
 
 class PasswordProof(BaseModel):
@@ -46,6 +62,11 @@ class CredentialResponse(BaseModel):
     credential: dict
     # „Angemeldet bleiben“ (#348) - nur beim Anmelden von Belang.
     remember: bool = True
+
+
+class MobileCredentialResponse(CredentialResponse):
+    # Die App hat keinen Cookie: das Ticket aus `mobile/login/options` kommt mit der Antwort zurück.
+    ticket: str = Field(min_length=20, max_length=200)
 
 
 def passkey_configuration():
@@ -129,7 +150,8 @@ async def _consume(db, request, response, config, kind, **binding):
 
 @router.get("/status")
 async def status():
-    return {"enabled": bool(passkey_configuration())}
+    enabled = bool(passkey_configuration())
+    return {"enabled": enabled, "app": enabled and bool(mobile_origins())}
 
 
 @router.get("")
@@ -205,20 +227,16 @@ async def login_options(request: Request, response: Response):
     return json.loads(options_to_json(options))
 
 
-@router.post("/login/verify")
-async def login_verify(body: CredentialResponse, request: Request, response: Response):
-    config = _config(request)
-    db = get_db()
-    await enforce_rate_limit(request, "passkey:login-verify", limit=30, window_seconds=900)
+async def _verified_login_user(db, body: CredentialResponse, challenge: dict, rp_id: str, expected_origin) -> dict:
+    """Die Unterschrift prüfen - Website (eine Herkunft) und App (Signaturschlüssel) gleich."""
     identifier = _credential_id(body)
-    challenge = await _consume(db, request, response, config, "login")
-    key = await db.passkeys.find_one({"_id": identifier, "rp_id": config["rp_id"]})
+    key = await db.passkeys.find_one({"_id": identifier, "rp_id": rp_id})
     if not key:
         raise HTTPException(401, "Passkey-Anmeldung fehlgeschlagen.")
     try:
         verified = await run_in_threadpool(verify_authentication_response, credential=body.credential,
-            expected_challenge=base64url_to_bytes(challenge["challenge"]), expected_rp_id=config["rp_id"],
-            expected_origin=config["origin"], credential_public_key=base64url_to_bytes(key["public_key"]),
+            expected_challenge=base64url_to_bytes(challenge["challenge"]), expected_rp_id=rp_id,
+            expected_origin=expected_origin, credential_public_key=base64url_to_bytes(key["public_key"]),
             credential_current_sign_count=key["sign_count"], require_user_verification=True)
         handle = body.credential.get("response", {}).get("userHandle")
         if handle and base64url_to_bytes(handle) != key["user_id"].encode():
@@ -233,6 +251,17 @@ async def login_verify(body: CredentialResponse, request: Request, response: Res
     user = _eligible_session_user(await db.users.find_one({"id": key["user_id"]}))
     if user.get("email_verified") is not True:
         raise HTTPException(403, "Bitte zuerst deine E-Mail-Adresse bestätigen.")
+    return user
+
+
+@router.post("/login/verify")
+async def login_verify(body: CredentialResponse, request: Request, response: Response):
+    config = _config(request)
+    db = get_db()
+    await enforce_rate_limit(request, "passkey:login-verify", limit=30, window_seconds=900)
+    _credential_id(body)
+    challenge = await _consume(db, request, response, config, "login")
+    user = await _verified_login_user(db, body, challenge, config["rp_id"], config["origin"])
     await _security_audit(db, user["id"], "auth.passkey.login", request)
     # Ein Passkey mit Gerätesperre zählt als zweiter Faktor (Entscheidung des Betreibers, #358):
     # Der Server verlangt die Gerätesperre (`require_user_verification`), also hat die Person
@@ -242,6 +271,50 @@ async def login_verify(body: CredentialResponse, request: Request, response: Res
     public = _public_user(user)
     await _attach_membership(public)
     return public
+
+
+def _mobile_config():
+    config = passkey_configuration()
+    if not config or not mobile_origins():
+        raise HTTPException(503, "Passkeys sind für die App derzeit nicht verfügbar.")
+    return config
+
+
+@router.post("/mobile/login/options")
+async def mobile_login_options(request: Request):
+    """Passkey-Anmeldung aus der App (#217 Stufe 2) mit denselben Passkeys wie auf der Website.
+
+    Die App hat keinen Cookie: sie bekommt ein Ticket und gibt es mit der Antwort zurück."""
+    config = _mobile_config()
+    await enforce_rate_limit(request, "passkey:login-options", limit=30, window_seconds=900)
+    options = generate_authentication_options(rp_id=config["rp_id"], user_verification=UserVerificationRequirement.REQUIRED)
+    ticket = secrets.token_urlsafe(32)
+    await get_db().passkey_challenges.insert_one({
+        "_id": hash_token(ticket), "kind": "mobile-login", "challenge": bytes_to_base64url(options.challenge),
+        "origin": "app", "rp_id": config["rp_id"], "expires_at": now_utc() + timedelta(minutes=5),
+    })
+    return {"ticket": ticket, "options": json.loads(options_to_json(options))}
+
+
+@router.post("/mobile/login/verify")
+async def mobile_login_verify(body: MobileCredentialResponse, request: Request):
+    """Wie `login/verify`, nur ist die erwartete Herkunft der Signaturschlüssel der App und die
+    Antwort eine App-Sitzung (Zugangs- und Erneuerungstoken) statt eines Cookies."""
+    config = _mobile_config()
+    db = get_db()
+    await enforce_rate_limit(request, "passkey:login-verify", limit=30, window_seconds=900)
+    challenge = await db.passkey_challenges.find_one_and_delete({
+        "_id": hash_token(body.ticket), "kind": "mobile-login", "expires_at": {"$gt": now_utc()}, "rp_id": config["rp_id"],
+    })
+    if not challenge:
+        raise HTTPException(401, "Passkey-Anfrage abgelaufen oder bereits verwendet. Bitte erneut starten.")
+    user = await _verified_login_user(db, body, challenge, config["rp_id"], mobile_origins())
+    await _security_audit(db, user["id"], "auth.passkey.login", request)
+    # Gerätesperre vorgezeigt (require_user_verification) - wie im Web zählt das als zweiter Faktor (#358).
+    access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)
+    public = _public_user(user)
+    await _attach_membership(public)
+    return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 
 @router.post("/{credential_id}/remove")

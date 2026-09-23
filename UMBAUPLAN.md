@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) wartet auf den Server-Teil; der Rest von #219 (14.8) wartet auf das Play-Console-Konto |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), Build 71 nach dem Merge; #219 Teil 2 (14.8: Crashlytics, Play-Bundle, Store-Eintrag) folgt, das Play-Konto legt der Betreiber an |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -601,6 +601,29 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 40 — App 1.0.0, Teil 2: Passkey in der App
+
+### Was 40.1 gefunden hat (#217 Stufe 2 – PR #384)
+
+**Die Passkeys gab es schon – nur die App wusste nichts davon.** Seit #353 legt man auf der Website
+Passkeys an; im Handy landen sie im Google Passwort-Manager. Die App fragte trotzdem nach E-Mail
+und Passwort. Der Passkey-Weg der Website läuft über einen Cookie und die Herkunft
+`https://lionsquad.at` – beides hat eine App nicht. Android nennt als Herkunft stattdessen den Hash
+des Schlüssels, mit dem die App signiert ist, und die Website muss diesem Schlüssel per
+`/.well-known/assetlinks.json` bestätigen, dass die App zu ihr gehört. Erst dann gibt der
+Passwort-Manager den Passkey an die App heraus.
+
+**Ein Ticket statt eines Cookies, sonst derselbe Weg.** Die App holt die Aufgabe mit einem Ticket,
+das Gerät unterschreibt nach Fingerabdruck oder Gesicht, der Server prüft dieselbe Unterschrift wie
+im Web – nur mit dem App-Schlüssel als erwarteter Herkunft – und gibt eine App-Sitzung zurück.
+Eine App-Unterschrift taugt nicht für den Web-Weg und umgekehrt; das Ticket gilt einmal und fünf
+Minuten. Der Signaturschlüssel ist seit Build 57 fest, die Datei auf der Website kommt mit dem
+Web-Image – kein Handgriff für den Betreiber.
+
+**Was bewusst nicht drin ist:** Passkeys anlegen bleibt auf der Website (Profil → Sicherheit),
+damit es eine Stelle gibt, an der man sie verwaltet und entfernt. Auf Geräten vor Android 9 gibt
+es keinen Credential Manager – dort fehlt der Knopf, statt einen Fehler zu zeigen.
 
 ## Block 39 — Abrechnung I, Teil 3: Eigene Rechnungen für alle
 

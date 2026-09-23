@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, configureAuthBridge } from "../lib/api";
 import { clearAllCache } from "../lib/cache";
+import { signInWithPasskey } from "../lib/passkeys";
 import { isGuestUser, liveGuestUser } from "../live";
 import { unregisterPushToken } from "../notifications/PushService";
 import type { AuthResponse, User } from "../types";
@@ -36,6 +37,7 @@ type AuthContextValue = {
   completeMfa: (ticket: string, code: string, remember?: boolean) => Promise<void>;
   continueAsGuest: () => Promise<void>;
   register: (payload: RegisterPayload) => Promise<RegistrationResponse>;
+  loginWithPasskey: (remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
 };
@@ -165,6 +167,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [persistSession]
   );
 
+  // Passkey-Anmeldung (#217 Stufe 2): derselbe Passkey wie auf der Website, Gerätesperre statt Passwort.
+  const loginWithPasskey = useCallback(async (remember = true) => {
+    const session = await signInWithPasskey(remember);
+    await persistSession(session, remember);
+  }, [persistSession]);
+
   const continueAsGuest = useCallback(async () => {
     setUser(liveGuestUser);
     activeUserIdRef.current = liveGuestUser.id;
@@ -205,8 +213,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession, refreshToken, user]);
 
   const value = useMemo(
-    () => ({ user, accessToken, refreshToken, rememberSession, loading, login, completeMfa, continueAsGuest, register, logout, refreshMe }),
-    [accessToken, completeMfa, continueAsGuest, loading, login, logout, refreshMe, refreshToken, register, rememberSession, user]
+    () => ({ user, accessToken, refreshToken, rememberSession, loading, login, loginWithPasskey, completeMfa, continueAsGuest, register, logout, refreshMe }),
+    [accessToken, completeMfa, continueAsGuest, loading, login, loginWithPasskey, logout, refreshMe, refreshToken, register, rememberSession, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

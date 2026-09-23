@@ -9,7 +9,7 @@ checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
 
 
-@pytest.mark.parametrize("problem", [None, "immutable_worker", "different_worker", "cached_html", "old_route", "missing_asset", "mjs_octet_stream", "chunk_not_immutable"])
+@pytest.mark.parametrize("problem", [None, "immutable_worker", "different_worker", "cached_html", "old_route", "missing_asset", "mjs_octet_stream", "chunk_not_immutable", "assetlinks_html"])
 def test_release_check_detects_real_update_failure_modes(monkeypatch, problem):
     version = "a" * 20
 
@@ -19,6 +19,11 @@ def test_release_check_detects_real_update_failure_modes(monkeypatch, problem):
         if path == "/version.json":
             headers["Content-Type"] = "application/json"
             body = json.dumps({"version": version})
+        elif path == "/.well-known/assetlinks.json":
+            # Passkeys in der App (#217): die Datei muss als JSON kommen, nicht als SPA-Seite.
+            if problem != "assetlinks_html":
+                headers["Content-Type"] = "application/json"
+                body = json.dumps([{"target": {"namespace": "android_app", "package_name": "at.lionsquad.app"}}])
         elif path == "/service-worker.js":
             headers["Content-Type"] = "application/javascript"
             body = f'const version="{version}";'
