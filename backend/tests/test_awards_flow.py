@@ -115,3 +115,41 @@ async def test_admin_saves_award_images_only_for_the_first_three(flow):
     assert saved.status_code == 200, saved.text
     row = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0, "award_images": 1})
     assert row["award_images"] == {"1": "/api/static/uploads/gold.png"}
+
+
+@pytest.mark.asyncio
+async def test_team_awards_and_the_team_banner_are_for_the_leadership(flow):
+    leader = await flow.add_user(role="player", name="leader")
+    member = await flow.add_user(role="player", name="member")
+    stranger = await flow.add_user(role="player", name="stranger")
+    await flow.db.teams.insert_one({"id": "tm1", "name": "Team Lions", "tag": "LION", "leader_id": leader["id"], "co_leader_ids": [],
+                                    "member_ids": [leader["id"], member["id"]], "is_public": True, "created_at": "2026-01-01T00:00:00+00:00"})
+    await flow.db.team_members.insert_many([{"team_id": "tm1", "user_id": leader["id"], "role": "leader"}, {"team_id": "tm1", "user_id": member["id"], "role": "member"}])
+    await seed_tournament(flow, "t1")
+    await seed_tournament(flow, "t2", visibility="members")
+    await flow.db.tournament_registrations.insert_many([
+        {"id": "r1", "tournament_id": "t1", "team_id": "tm1", "status": "approved", "final_position": 2},
+        {"id": "r2", "tournament_id": "t2", "team_id": "tm1", "status": "approved", "final_position": 1},
+    ])
+    await awards.rebuild_all_awards(flow.db)
+
+    public = (await flow.get("/api/teams/tm1")).json()
+    assert [award["tournament"]["id"] for award in public["awards"]] == ["t1"] and public["awards"][0]["team"]["name"] == "Team Lions"
+    assert public["featured_award"] is None
+
+    flow.act_as(member)
+    inside = (await flow.get("/api/teams/tm1")).json()
+    assert {award["tournament"]["id"] for award in inside["awards"]} == {"t1", "t2"}, "Mitglieder sehen auch das interne Turnier"
+    # Die Team-Auszeichnung zählt auch im eigenen Profil des Mitglieds.
+    assert {award["tournament"]["id"] for award in (await flow.get("/api/me/awards")).json()["awards"]} == {"t1", "t2"}
+    chosen = next(award for award in inside["awards"] if award["tournament"]["id"] == "t1")
+    assert (await flow.post(f"/api/teams/tm1/awards/{chosen['id']}/feature")).status_code == 403, "ein Mitglied ohne Leitung wählt nicht"
+
+    flow.act_as(leader)
+    assert (await flow.post(f"/api/teams/tm1/awards/{chosen['id']}/feature")).json()["featured_award"]["id"] == chosen["id"]
+    assert (await flow.get("/api/teams/tm1")).json()["featured_award"]["rank_label"] == "2. Platz"
+    assert (await flow.post("/api/teams/tm1/awards/fremd/feature")).status_code == 404
+    flow.act_as(stranger)
+    assert (await flow.post(f"/api/teams/tm1/awards/{chosen['id']}/feature")).status_code == 403
+    flow.act_as(leader)
+    assert (await flow.client.delete("/api/teams/tm1/awards/feature")).json()["featured_award"] is None

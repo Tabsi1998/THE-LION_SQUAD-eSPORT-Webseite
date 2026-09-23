@@ -5,6 +5,7 @@ import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
+import { AwardCard } from "../../components/AwardCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
@@ -16,6 +17,7 @@ import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { AchievementGroupCard } from "../../components/AchievementGroupCard";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
 import { type AchievementGroup, achievementIcon } from "../../lib/achievements";
+import { sortAwards, type Award } from "../../lib/awards";
 import { API_BASE_URL } from "../../config";
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
@@ -72,6 +74,23 @@ export function ProfileScreen() {
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
   const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
+  // Auszeichnungen (#230): eigene Banner und Trophäen, eine davon als Profilbanner - der Server prüft, dass sie die eigene ist.
+  const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null }>({ awards: [] });
+  const loadAwards = useCallback(() => {
+    api.get<{ awards: Award[]; featured_award_id?: string | null }>("/me/awards").then(({ data }) => setAwards(data)).catch(() => {});
+  }, []);
+  useEffect(() => {
+    loadAwards();
+  }, [loadAwards]);
+  const featureAward = async (id: string | null) => {
+    try {
+      if (id) await api.post(`/me/awards/${id}/feature`);
+      else await api.delete("/me/awards/feature");
+      loadAwards();
+    } catch {
+      // bleibt, wie es war
+    }
+  };
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
@@ -437,6 +456,24 @@ export function ProfileScreen() {
                 <Stat label="Fast Laps" value={String(references.stats.fastlaps)} tone="gold" />
               </View>
             </Card>
+            {awards.awards.length ? (
+              <View style={styles.awardList} testID="profile-awards">
+                <Heading>Auszeichnungen</Heading>
+                {sortAwards(awards.awards).map((award) => (
+                  <AwardCard
+                    key={award.id}
+                    award={award}
+                    featured={awards.featured_award_id === award.id}
+                    onPress={() => { const target = award.tournament?.slug || award.tournament?.id; if (target) navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target } }); }}
+                    action={
+                      <Pressable onPress={() => featureAward(awards.featured_award_id === award.id ? null : award.id)} accessibilityRole="button" testID={`award-feature-${award.id}`} style={styles.awardAction}>
+                        <Muted style={styles.awardActionText}>{awards.featured_award_id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}</Muted>
+                      </Pressable>
+                    }
+                  />
+                ))}
+              </View>
+            ) : null}
             {references.items.length ? (
               references.items.map((item) => <ReferenceCard key={item.id} item={item} onOpen={openReference} />)
             ) : (
@@ -812,6 +849,21 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  awardList: {
+    gap: 10,
+  },
+  awardAction: {
+    borderColor: colors.border,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  awardActionText: {
+    fontSize: 10,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
   content: {
     padding: 18,
     gap: 16,

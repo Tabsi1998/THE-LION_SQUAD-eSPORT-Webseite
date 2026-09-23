@@ -215,3 +215,16 @@ async def feature_award_for_user(db, user_id: str, award_id: str | None) -> dict
         return chosen
     await db.users.update_one({"id": user_id}, {"$unset": {"featured_award_id": ""}})
     return None
+
+
+async def feature_award_for_team(db, team_id: str, award_id: str | None) -> dict | None:
+    """Teambanner wählen - nur eine Auszeichnung dieses Teams; None löscht die Wahl."""
+    if award_id:
+        awards = await awards_for_team(db, team_id, public_only=False)
+        chosen = next((award for award in awards if award["id"] == award_id), None)
+        if not chosen:
+            return None
+        await db.teams.update_one({"id": team_id}, {"$set": {"featured_award_id": award_id}})
+        return chosen
+    await db.teams.update_one({"id": team_id}, {"$unset": {"featured_award_id": ""}})
+    return None

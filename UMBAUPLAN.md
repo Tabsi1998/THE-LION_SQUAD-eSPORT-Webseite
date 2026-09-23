@@ -44,7 +44,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
-| 18 | **Auszeichnungen: Banner und Trophäen** | Teil 1 in #386 (Block 42); Teams und App folgen | — |
+| 18 | **Auszeichnungen: Banner und Trophäen** | umgesetzt in #386 (Block 42) | — |
 | 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283, #284 umgesetzt) | #267, #275, #276, #278, #279, #280, #281, #285, #294, #298 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
@@ -476,7 +476,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
-| Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; Teil 1 in #386 (Block 42), Teil 2 (Teams, App) folgt |
+| Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; umgesetzt in #386 (Block 42) |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
 ## Block 22 — Tempo und Betrieb
@@ -602,7 +602,7 @@ Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Be
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
 
-## Block 42 — Auszeichnungen, Teil 1: Vergabe, Trophäen, Profilbanner
+## Block 42 — Auszeichnungen: Vergabe, Trophäen, Profil- und Teambanner
 
 ### Was 42.1 gefunden hat (#230 – PR #386)
 
@@ -622,8 +622,10 @@ Darstellung); sie liegen hinter dem Text und wandern bei einer Korrektur mit dem
 
 **Eine Auszeichnung als Profilbanner.** Wer will, wählt eine eigene Auszeichnung als Banner im
 Profilkopf; der Server nimmt nur eigene an. Öffentlich sichtbar sind nur Auszeichnungen aus
-öffentlichen Turnieren – interne Turniere bleiben im eigenen Profil. Was noch fehlt (Teil 2): die
-Team-Seite mit Team-Bannern und die App.
+öffentlichen Turnieren – interne Turniere bleiben im eigenen Profil. Teams wählen ihr Teambanner
+über die Teamleitung; Außenstehende sehen auf der Team-Seite nur Auszeichnungen aus öffentlichen
+Turnieren, Mitglieder alle. Die App zeigt dieselben Karten: im eigenen Profil unter „Referenzen“
+mit „Als Profilbanner“, im öffentlichen Profil das gewählte Banner über dem Kopf.
 
 ## Block 41 — App 1.0.0, Teil 3: Absturzberichte
 
