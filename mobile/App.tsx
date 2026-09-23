@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "./src/auth/AuthContext";
+import { BrandingProvider } from "./src/branding/BrandingProvider";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { installMobileLogHandlers } from "./src/lib/mobileLog";
 import { AppNavigator } from "./src/navigation/AppNavigator";
@@ -18,12 +19,14 @@ export default function App() {
         <AppErrorBoundary>
           <AuthProvider>
             <LiveChangesProvider>
-              <NotificationProvider>
-                <AppUpdateProvider>
-                  <StatusBar style="light" />
-                  <AppNavigator />
-                </AppUpdateProvider>
-              </NotificationProvider>
+              <BrandingProvider>
+                <NotificationProvider>
+                  <AppUpdateProvider>
+                    <StatusBar style="light" />
+                    <AppNavigator />
+                  </AppUpdateProvider>
+                </NotificationProvider>
+              </BrandingProvider>
             </LiveChangesProvider>
           </AuthProvider>
         </AppErrorBoundary>

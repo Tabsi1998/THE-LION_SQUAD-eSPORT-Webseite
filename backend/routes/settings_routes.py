@@ -1035,6 +1035,40 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     return _hide_branding_secrets(saved) if saved else {"ok": True}
 
 
+@settings_router.post("/branding/favicon/universal")
+async def generate_universal_favicon(me: dict = Depends(require_club_admin())):
+    """Standard-Favicon, das auf hell und dunkel trägt (#229): das weiße Logo auf einem Kreis in der Akzentfarbe.
+
+    Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen nur den Standard; beim Verein
+    war das die weiße Fassung. Erzeugt wird aus der dunklen Fassung (Favicon dunkel, Maskottchen,
+    dunkles Logo), abgelegt wie ein Upload und als ``favicon_url`` gespeichert."""
+    from services import brand_favicon
+    from services.image_variants import schedule_variants
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    source = brand_favicon.pick_source(branding)
+    path = brand_favicon.asset_path(source)
+    if path is None:
+        raise HTTPException(400, "Kein Bild für den Kreis gefunden – bitte zuerst ein Favicon für den dunklen Modus oder ein Maskottchen hochladen.")
+    try:
+        data = brand_favicon.universal_favicon_png(path.read_bytes(), branding.get("primary_color"))
+    except Exception as exc:
+        raise HTTPException(400, f"Das Bild ließ sich nicht lesen: {exc}")
+    url, stored = brand_favicon.store_png(data)
+    schedule_variants(stored)
+    stamp = now_utc().isoformat()
+    await db.media_uploads.insert_one({
+        "id": new_id(), "filename": stored.name, "url": url, "size": len(data), "original_size": len(data),
+        "width": brand_favicon.SIZE, "height": brand_favicon.SIZE, "original_width": brand_favicon.SIZE, "original_height": brand_favicon.SIZE,
+        "original_filename": "favicon-universal.png", "mime": "image/png", "ext": "png", "media_type": "image",
+        "owner_id": me.get("id"), "owner_role": me.get("role"), "media_scope": "branding",
+        "created_at": stamp, "updated_at": stamp,
+    })
+    await db.settings.update_one({"id": "branding"}, {"$set": {"favicon_url": url, "updated_at": stamp}, "$setOnInsert": {"id": "branding"}}, upsert=True)
+    await _audit_settings_change(db, "settings.branding.update", "branding", me["id"], ["favicon_url"])
+    return {"favicon_url": url, "source": source, "color": branding.get("primary_color") or "#29B6E8"}
+
+
 @settings_router.get("/auth")
 async def get_auth_settings(response: Response, me: dict = Depends(require_super())):
     """Central login & Google configuration for the admin area."""

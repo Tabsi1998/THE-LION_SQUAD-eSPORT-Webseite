@@ -298,6 +298,7 @@ export default function AdminSettingsPage() {
   const [savingDiscord, setSavingDiscord] = useState(false);
   const [savingTwitch, setSavingTwitch] = useState(false);
   const [savingPlatformApps, setSavingPlatformApps] = useState(false);
+  const [generatingFavicon, setGeneratingFavicon] = useState(false);
   const [refreshingTwitch, setRefreshingTwitch] = useState(false);
   const [submittingIndexNow, setSubmittingIndexNow] = useState(false);
   const [indexNowResult, setIndexNowResult] = useState(null);
@@ -675,6 +676,21 @@ export default function AdminSettingsPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setSavingPlatformApps(false); }
+  };
+  // #229: Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen nur den Standard-Favicon.
+  // Ist der die Fassung für dunkel (weiß), ist er auf hellen Tableisten unsichtbar - der Server baut
+  // eine Fassung, die überall trägt: weißes Logo auf einem Kreis in der Akzentfarbe.
+  const faviconDarkOnly = !!brand.favicon_url && [brand.favicon_dark_url, brand.mascot_url, brand.logo_dark_url].includes(brand.favicon_url);
+  const generateUniversalFavicon = async () => {
+    if (generatingFavicon) return;
+    setGeneratingFavicon(true);
+    try {
+      const { data } = await api.post("/settings/branding/favicon/universal");
+      setBrand((prev) => ({ ...prev, favicon_url: data.favicon_url }));
+      originalBrandRef.current = { ...originalBrandRef.current, favicon_url: data.favicon_url };
+      toast.success("Standard-Favicon erzeugt und gespeichert.");
+    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
+    finally { setGeneratingFavicon(false); }
   };
   const clearBrandSecret = async (field) => {
     if (!await confirm({ title: "Gespeichertes entfernen?", description: "Das gespeicherte Geheimnis wird gelöscht; die Verknüpfung über diese Plattform geht dann nicht mehr, bis ein neues eingetragen ist.", confirmLabel: "Entfernen" })) return;
@@ -1721,6 +1737,20 @@ export default function AdminSettingsPage() {
               <ImageUpload value={brand.favicon_url} onChange={(v) => setBrandField("favicon_url", v)} label="Standard-Favicon" testId="brand-favicon" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_light_url} onChange={(v) => setBrandField("favicon_light_url", v)} label="Favicon für hellen Modus" testId="brand-favicon-light" variant="square" allowLibrary />
               <ImageUpload value={brand.favicon_dark_url} onChange={(v) => setBrandField("favicon_dark_url", v)} label="Favicon für dunklen Modus" testId="brand-favicon-dark" variant="square" allowLibrary />
+            </div>
+            <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 text-xs text-white/60 flex flex-col md:flex-row md:items-center gap-3" data-testid="brand-favicon-universal">
+              <div className="flex-1">
+                <div className="font-bold text-white/80 uppercase tracking-wider">Standard-Favicon für hell und dunkel</div>
+                <p className="mt-1">
+                  Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen den Standard-Favicon.{" "}
+                  {faviconDarkOnly
+                    ? <span className="text-[#FFD700]" data-testid="brand-favicon-dark-only">Deiner ist die Fassung für dunkel – auf hellen Tableisten unsichtbar.</span>
+                    : "Erzeugt wird das weiße Logo (Favicon dunkel, sonst Maskottchen) auf einem Kreis in der Akzentfarbe."}
+                </p>
+              </div>
+              <button type="button" onClick={generateUniversalFavicon} disabled={generatingFavicon} data-testid="brand-favicon-generate" className="px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50 whitespace-nowrap">
+                {generatingFavicon ? "Erzeuge..." : "Aus Logo und Akzentfarbe erzeugen"}
+              </button>
             </div>
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
               Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das QR-Logo in der Mitte, mit Maskottchen als Fallback.

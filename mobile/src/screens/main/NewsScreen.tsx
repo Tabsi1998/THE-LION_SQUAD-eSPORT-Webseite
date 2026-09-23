@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useBranding } from "../../branding/BrandingProvider";
 import { Card } from "../../components/Card";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -17,6 +18,7 @@ import type { NewsPost } from "../../types";
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsList">;
 
 export function NewsScreen({ navigation }: Props) {
+  const { clubName } = useBranding();
   const [items, setItems] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -97,7 +99,7 @@ export function NewsScreen({ navigation }: Props) {
                 <Ionicons name="newspaper-outline" color={colors.black} size={20} />
               </View>
               <View style={styles.headerText}>
-                <Muted style={styles.eyebrow}>THE LION SQUAD</Muted>
+                <Muted style={styles.eyebrow}>{clubName}</Muted>
                 <Title>News</Title>
               </View>
             </View>
