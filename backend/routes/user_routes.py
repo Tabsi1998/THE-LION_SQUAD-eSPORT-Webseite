@@ -116,16 +116,43 @@ def _visibility_aliases(key: str) -> list[str]:
     return list(dict.fromkeys(aliases))
 
 
-def _field_visible(user: dict, key: str, profile_public: bool) -> bool:
+async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
+    """Wer da schaut - für die Stufen „Community“ (eingeloggt), „Verein“ (Mitglied oder Admin-Team),
+    „Nur Admins“ (Admin-Team) und „Privat“ (nur die Person selbst). Einmal je Aufruf berechnet."""
+    if not viewer:
+        return {"self": False, "logged_in": False, "member": False, "admin": False}
+    from services.membership_service import get_membership, is_active_member
+    from services.permissions import areas_for
+    from services.visibility import ADMIN_ROLES
+    areas = await areas_for(viewer)
+    admin = viewer.get("role") in ADMIN_ROLES or any(area in areas for area in ("tournaments", "content", "club", "finance", "system", "moderation"))
+    member = bool(viewer.get("is_club_member")) or is_active_member(await get_membership(viewer["id"]))
+    return {"self": viewer.get("id") == target_id, "logged_in": True, "member": member or admin, "admin": admin}
+
+
+def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
+    """Die Stufe eines Felds gegen den Betrachter: public → alle, community → eingeloggt, members →
+    Vereinsmitglieder und Admin-Team, admins → Admin-Team, private → nur die Person selbst."""
     if not profile_public:
         return False
+    ctx = ctx or {}
+    if ctx.get("self"):
+        return True
     visibility_map = user.get("profile_visibility") or {}
     visibility = next((visibility_map[a] for a in _visibility_aliases(key) if a in visibility_map), "public")
-    return visibility == "public"
+    if visibility == "public":
+        return True
+    if visibility == "community":
+        return bool(ctx.get("logged_in"))
+    if visibility == "members":
+        return bool(ctx.get("member"))
+    if visibility == "admins":
+        return bool(ctx.get("admin"))
+    return False
 
 
-def _visible_field(user: dict, key: str, profile_public: bool):
-    if not _field_visible(user, key, profile_public):
+def _visible_field(user: dict, key: str, profile_public: bool, ctx: dict | None = None):
+    if not _field_visible(user, key, profile_public, ctx):
         return None
     source_key = {
         "discord": "discord_name",
@@ -536,6 +563,8 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
     if not u or u.get("is_active") is False or u.get("is_banned") is True:
         raise HTTPException(status_code=404, detail="Spieler nicht gefunden")
     public = bool(u.get("privacy_public_profile"))
+    # Die Stufen Community/Verein/Nur Admins/Privat gelten je Betrachter - nicht nur „öffentlich oder nichts“.
+    ctx = await _viewer_context(db, viewer, u["id"])
     # Membership data
     membership = await db.memberships.find_one({"user_id": u["id"]}, {"_id": 0})
     is_member = bool(membership and membership.get("member_status") in ("active", "honorary"))
@@ -557,35 +586,35 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "avatar_url": u.get("avatar_url"), "banner_url": u.get("banner_url"),
         "bio": u.get("bio") if public else None,
         "role": u.get("role"), "created_at": u.get("created_at"),
-        "birth_date": _visible_field(u, "birth_date", public),
-        "country": _visible_field(u, "country", public),
-        "city": _visible_field(u, "city", public),
-        "discord_name": _visible_field(u, "discord", public),
-        "twitch_handle": _visible_field(u, "twitch", public),
-        "youtube_handle": _visible_field(u, "youtube", public),
-        "instagram_handle": _visible_field(u, "instagram", public),
-        "x_handle": _visible_field(u, "x", public),
-        "steam_id": _visible_field(u, "steam", public),
-        "epic_id": _visible_field(u, "epic", public),
-        "psn_id": _visible_field(u, "psn", public),
-        "xbox_id": _visible_field(u, "xbox", public),
-        "nintendo_fc": _visible_field(u, "nintendo", public),
-        "ea_id": _visible_field(u, "ea", public),
-        "riot_id": _visible_field(u, "riot", public),
-        "battlenet_id": _visible_field(u, "battlenet", public),
-        "main_platform": _visible_field(u, "main_platform", public),
-        "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public) else [],
-        "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public) else [],
-        "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public),
-        "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public) else [],
-        "website": _visible_field(u, "website", public),
+        "birth_date": _visible_field(u, "birth_date", public, ctx),
+        "country": _visible_field(u, "country", public, ctx),
+        "city": _visible_field(u, "city", public, ctx),
+        "discord_name": _visible_field(u, "discord", public, ctx),
+        "twitch_handle": _visible_field(u, "twitch", public, ctx),
+        "youtube_handle": _visible_field(u, "youtube", public, ctx),
+        "instagram_handle": _visible_field(u, "instagram", public, ctx),
+        "x_handle": _visible_field(u, "x", public, ctx),
+        "steam_id": _visible_field(u, "steam", public, ctx),
+        "epic_id": _visible_field(u, "epic", public, ctx),
+        "psn_id": _visible_field(u, "psn", public, ctx),
+        "xbox_id": _visible_field(u, "xbox", public, ctx),
+        "nintendo_fc": _visible_field(u, "nintendo", public, ctx),
+        "ea_id": _visible_field(u, "ea", public, ctx),
+        "riot_id": _visible_field(u, "riot", public, ctx),
+        "battlenet_id": _visible_field(u, "battlenet", public, ctx),
+        "main_platform": _visible_field(u, "main_platform", public, ctx),
+        "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public, ctx) else [],
+        "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public, ctx) else [],
+        "gaming_subscriptions": _visible_field(u, "gaming_subscriptions", public, ctx),
+        "favorite_games": (u.get("favorite_games") or []) if _field_visible(u, "favorite_games", public, ctx) else [],
+        "website": _visible_field(u, "website", public, ctx),
         "show_twitch_embed": bool(u.get("show_twitch_embed")) if public else False,
         "privacy_public_profile": public,
         "is_club_member": is_member,
         "user_type": "club_member" if is_member else "community_user",
         "membership": public_member,
         # Verknüpfte Konten (#260): das Häkchen, nie die Plattform-Kennung.
-        "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, {"discord": "discord", "twitch": "twitch", "steam": "steam"}[p], public)],
+        "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, {"discord": "discord", "twitch": "twitch", "steam": "steam"}[p], public, ctx)],
     }
     # Die verknüpften Konten mit offizieller Adresse - nur die Plattformen, deren Feld sichtbar ist.
     from services.platform_links import linked_accounts
