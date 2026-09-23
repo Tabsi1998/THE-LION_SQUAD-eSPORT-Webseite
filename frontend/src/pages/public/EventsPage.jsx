@@ -107,7 +107,7 @@ export default function EventsPage() {
             className="mt-10"
           />
         ) : (
-          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-5 min-w-0">
+          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 min-w-0">
             {filtered.map((e) => <EventCard key={e.id} e={e} meta={meta} />)}
           </div>
         )}

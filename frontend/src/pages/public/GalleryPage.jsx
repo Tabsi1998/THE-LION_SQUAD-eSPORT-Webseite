@@ -51,7 +51,7 @@ export default function GalleryPage() {
             className="mt-10"
           />
         ) : (
-          <div className="mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+          <div className="mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-5">
             {albums.map((a) => <AlbumCard key={a.id} a={a} />)}
           </div>
         )}

@@ -61,7 +61,7 @@ export default function MembersDirectoryPage() {
             <div className="text-sm mt-2">Sobald Admins Vereinsmitglieder freigeben, erscheinen sie hier.</div>
           </div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16 pt-8 min-w-0">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-x-8 gap-y-16 pt-8 min-w-0">
             {members.map((m) => (
               <Link
                 key={m.slug}

@@ -13,8 +13,8 @@ const tierGrid = {
   main: "md:grid-cols-1",
   platinum: "md:grid-cols-2",
   gold: "sm:grid-cols-2 md:grid-cols-3",
-  silver: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4",
-  bronze: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5",
+  silver: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5",
+  bronze: "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-6",
 };
 const tierCard = {
   main: "p-9 min-h-72 border-[#29B6E8]/25 bg-[#071114]",

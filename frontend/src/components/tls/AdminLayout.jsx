@@ -404,7 +404,7 @@ export function AdminLayout({ children }) {
           <Logo size="sm" />
           <div className="w-9" />
         </div>
-        <main id="main-content" tabIndex={-1} className="p-4 md:p-8 max-w-[1400px]">{children}</main>
+        <main id="main-content" tabIndex={-1} className="p-4 md:p-8 max-w-[1800px]">{children}</main>
       </div>
     </div>
   );

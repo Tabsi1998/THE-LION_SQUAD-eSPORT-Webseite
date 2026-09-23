@@ -86,7 +86,7 @@ export default function PlayersPage() {
           ) : filtered.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Keine Spieler gefunden.</div>
           ) : (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filtered.map((p) => {
                 const isMember = memberUsernames.has(p.username);
                 const accountLevel = p.achievement_level?.level || 1;

@@ -151,7 +151,7 @@ export default function NewsPage() {
             )}
             <div>
               {pinned.length > 0 && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">Aktuell</div>}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                 {rest.map((n) => <NewsCard key={n.id} n={n} />)}
               </div>
             </div>
