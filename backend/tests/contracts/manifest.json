@@ -12,7 +12,9 @@
       "/vereine/members/{id}/summary",
       "/vereine/members/lookup",
       "/vereine/members/{id}/invoices",
-      "/vereine/members/{id}/invoices/{invoice}/pdf"
+      "/vereine/members/{id}/invoices/{invoice}/pdf",
+      "/vereine/organization",
+      "/vereine/board"
     ],
     "core_paths": ["/status"],
     "waiting_for": {

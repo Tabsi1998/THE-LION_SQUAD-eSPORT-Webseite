@@ -97,6 +97,34 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
     }
 
 
+# ---------------------------------------------------------------- Vereinsdaten und Vorstand (#326)
+
+@admin_router.get("/public")
+async def dolibarr_public(me: dict = Depends(require_area("club", "system"))):
+    """Für den Reiter Rechtliches: was Dolibarr über den Verein und den Vorstand liefert, Stand und Fehler."""
+    from services import club_facts
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    return await club_facts.admin_view(db, branding)
+
+
+@admin_router.post("/public/refresh")
+async def dolibarr_public_refresh(me: dict = Depends(require_area("club", "system"))):
+    """Jetzt nachlesen statt beim stündlichen Job - nur lesen."""
+    from services import club_facts
+    db = get_db()
+    settings = await load_settings(db)
+    if settings.get("mode") == "off":
+        raise HTTPException(409, "Dolibarr ist nicht angebunden.")
+    try:
+        client = DolibarrClient(settings)
+    except DolibarrError as exc:
+        raise HTTPException(503, f"Dolibarr: {exc.text}")
+    result = await club_facts.refresh(db, settings, client)
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    return {**result, "view": await club_facts.admin_view(db, branding)}
+
+
 # ---------------------------------------------------------------- Verbindung (System)
 
 class DolibarrSettingsUpdate(BaseModel):

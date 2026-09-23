@@ -107,13 +107,16 @@ def _merge_unique_text(*values: Any) -> str:
     return "\n\n".join(blocks)
 
 
-def build_public_legal_settings(branding: dict[str, Any] | None) -> dict[str, Any]:
+def build_public_legal_settings(branding: dict[str, Any] | None, overlay: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build the sole public contact/legal contract from the branding document.
 
     Old imprint/privacy free-text fields are retained as additional content, but
     folded into one output field each so they can never be rendered twice.
+
+    ``overlay`` carries the values Dolibarr leads on (#326, ``services.club_facts``):
+    they win over the hand-kept fields, empty values never do.
     """
-    source = branding or {}
+    source = {**(branding or {}), **{key: value for key, value in (overlay or {}).items() if value}}
     contact_email = public_email(source.get("contact_email"))
     privacy_contact_email = public_email(source.get("privacy_contact_email")) or contact_email
     representative_name = public_text(source.get("representative_name"))

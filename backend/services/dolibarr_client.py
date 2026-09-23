@@ -72,6 +72,7 @@ CAPABILITIES_V1 = {
     "member_functions": True,
     "member_invoices": True,
     "board": True,
+    "organization": True,
     "membership_fees": True,
     "webhook_member_changed": True,
     "verified_identities": False,   # dolibarr-vereine#153
@@ -398,6 +399,20 @@ class DolibarrClient:
             # 401/403 beweisen, dass die API da ist.
             return "vereine_missing" if exc.kind in ("unauthorized", "forbidden") else "api_missing"
         return "vereine_missing"
+
+    async def organization(self) -> dict:
+        """Der Verein für Impressum und Vereinsseite (#326): Name, ZVR, Behörde, Anschrift, Kontakt, Gründung, Zweck."""
+        data = await self._get("/vereine/organization")
+        if not isinstance(data, dict) or "name" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def board(self) -> list[dict]:
+        """Funktionen mit heutigen Inhabern; Namen nur, wo die Website sie zeigen darf (sonst null)."""
+        data = await self._get("/vereine/board")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
 
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
