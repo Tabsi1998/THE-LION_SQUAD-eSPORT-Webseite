@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Trash2, Upload, Pencil, X as XIcon } from "lucide-react";
+import { Plus, Trash2, Upload, Pencil } from "lucide-react";
 
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
@@ -292,120 +295,75 @@ function SponsorForm({ sponsor, events = [], onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435): Sponsor, Vertrag und Kontakt, Sichtbarkeit, Texte als
+  // Abschnitte; die Karten der Liste bleiben daneben sichtbar.
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm max-w-2xl w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-heading text-xl font-bold uppercase">{sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"}</h3>
-          <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
-        </div>
-        <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" />
+    <AdminSheet title={sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"} eyebrow="Verein" size="lg" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sponsor-save" testId="sponsor-sheet">
+      <FormSection title="Sponsor">
+        <FormGrid>
+          <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="sponsor-name" />
+          <TextField label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
+        </FormGrid>
         <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
-        <Field label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Tier</div>
-            <select value={form.tier} onChange={(e) => setTier(e.target.value)} data-testid="sponsor-tier" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-              {TIERS.map((t) => <option key={t} value={t}>{TIER_LABELS[t]}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Reihenfolge</div>
-            <input type="number" value={form.order_index ?? 0} onChange={(e) => set("order_index", parseInt(e.target.value, 10) || 0)} data-testid="sponsor-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          </label>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Vertragsstatus</div>
-            <select value={form.contract_status} onChange={(e) => set("contract_status", e.target.value)} data-testid="sponsor-contract-status" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              {CONTRACT_STATUSES.map((status) => <option key={status} value={status}>{CONTRACT_LABELS[status]}</option>)}
-            </select>
-          </label>
+        <FormGrid>
+          <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" />
+          <TextField label="Reihenfolge" type="number" value={form.order_index ?? 0} onChange={(v) => set("order_index", parseInt(v, 10) || 0)} testId="sponsor-order" />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Vertrag und Kontakt" hint="Vertragsstatus und Laufzeit entscheiden, ob der Sponsor öffentlich ausgespielt wird.">
+        <FormGrid cols={3}>
+          <SelectField label="Vertragsstatus" value={form.contract_status} onChange={(v) => set("contract_status", v)} options={CONTRACT_STATUSES.map((status) => [status, CONTRACT_LABELS[status]])} testId="sponsor-contract-status" />
           <GermanDateField id="sponsor-contract-start" label="Start" value={(form.contract_start || "").slice(0, 10)} onChange={(v) => set("contract_start", v)} testId="sponsor-contract-start" allowFuture />
           <GermanDateField id="sponsor-contract-end" label="Ende" value={(form.contract_end || "").slice(0, 10)} onChange={(v) => set("contract_end", v)} testId="sponsor-contract-end" allowFuture />
+        </FormGrid>
+        <FormGrid cols={3}>
+          <TextField label="Ansprechpartner" value={form.contact_name} onChange={(v) => set("contact_name", v)} testId="sponsor-contact-name" />
+          <TextField label="Kontakt E-Mail" type="email" value={form.contact_email} onChange={(v) => set("contact_email", v)} testId="sponsor-contact-email" />
+          <TextField label="Telefon" value={form.contact_phone} onChange={(v) => set("contact_phone", v)} testId="sponsor-contact-phone" />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Sichtbarkeit" hint="Haken entscheiden live. Tier-Standard ist nur eine schnelle Vorlage.">
+        <div className="flex justify-end">
+          <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
+            Tier-Standard
+          </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Field label="Ansprechpartner" value={form.contact_name} onChange={(v) => set("contact_name", v)} testId="sponsor-contact-name" />
-          <Field label="Kontakt E-Mail" type="email" value={form.contact_email} onChange={(v) => set("contact_email", v)} testId="sponsor-contact-email" />
-          <Field label="Telefon" value={form.contact_phone} onChange={(v) => set("contact_phone", v)} testId="sponsor-contact-phone" />
-        </div>
-        <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sichtbarkeit</div>
-              <p className="text-[10px] text-white/40 mt-1">Haken entscheiden live. Tier-Standard ist nur eine schnelle Vorlage.</p>
-            </div>
-            <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
-              Tier-Standard
-            </button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} data-testid="sponsor-active" className="accent-[#29B6E8]" />
-            Aktiv
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_home === true} onChange={(e) => setPlacement("show_on_home", e.target.checked)} data-testid="sponsor-show-home" className="accent-[#29B6E8]" />
-            Auf Home
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_footer === true} onChange={(e) => setPlacement("show_on_footer", e.target.checked)} data-testid="sponsor-show-footer" className="accent-[#29B6E8]" />
-            Im Footer
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_events === true} onChange={(e) => setPlacement("show_on_events", e.target.checked)} data-testid="sponsor-show-events" className="accent-[#FFD700]" />
-            Events
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_tv === true} onChange={(e) => setPlacement("show_on_tv", e.target.checked)} data-testid="sponsor-show-tv" className="accent-[#9F7AEA]" />
-            TV / Anzeige
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_on_pdf === true} onChange={(e) => setPlacement("show_on_pdf", e.target.checked)} data-testid="sponsor-show-pdf" className="accent-[#29B6E8]" />
-            PDFs
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.show_in_emails === true} onChange={(e) => setPlacement("show_in_emails", e.target.checked)} data-testid="sponsor-show-emails" className="accent-[#18C29C]" />
-            E-Mails
-          </label>
-          </div>
-        </div>
+        <FormGrid cols={3}>
+          <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
+          <CheckField label="Auf Home" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
+          <CheckField label="Im Footer" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
+          <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent="#FFD700" />
+          <CheckField label="TV / Anzeige" checked={form.show_on_tv === true} onChange={(v) => setPlacement("show_on_tv", v)} testId="sponsor-show-tv" accent="#9F7AEA" />
+          <CheckField label="PDFs" checked={form.show_on_pdf === true} onChange={(v) => setPlacement("show_on_pdf", v)} testId="sponsor-show-pdf" />
+          <CheckField label="E-Mails" checked={form.show_in_emails === true} onChange={(v) => setPlacement("show_in_emails", v)} testId="sponsor-show-emails" accent="#18C29C" />
+        </FormGrid>
         {events.length > 0 && (
           <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]">
             <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Nur bestimmte Events</div>
             <div className="max-h-28 overflow-y-auto space-y-1">
               {events.map((ev) => (
-                <label key={ev.id} className="flex items-center gap-2 text-xs text-white/70">
-                  <input
-                    type="checkbox"
-                    checked={(form.event_ids || []).includes(ev.id)}
-                    onChange={(e) => set("event_ids", e.target.checked ? [...(form.event_ids || []), ev.id] : (form.event_ids || []).filter((id) => id !== ev.id))}
-                    className="accent-[#FFD700]"
-                  />
-                  {ev.name}
-                </label>
+                <CheckField
+                  key={ev.id}
+                  label={ev.name}
+                  checked={(form.event_ids || []).includes(ev.id)}
+                  onChange={(checked) => set("event_ids", checked ? [...(form.event_ids || []), ev.id] : (form.event_ids || []).filter((id) => id !== ev.id))}
+                  accent="#FFD700"
+                />
               ))}
             </div>
             <p className="mt-2 text-[10px] text-white/40">Nur relevant, wenn „Events” aktiv ist. Leer lassen = bei allen eigenen Events erlaubt.</p>
           </div>
         )}
         <SponsorPlacementPreview sponsor={form} />
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
-          <textarea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} data-testid="sponsor-description" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        </label>
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Interne Notizen</div>
-          <textarea rows={2} value={form.internal_notes} onChange={(e) => set("internal_notes", e.target.value)} data-testid="sponsor-internal-notes" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        </label>
-        <div className="flex gap-2 pt-2">
-          <button type="submit" disabled={saving} data-testid="sponsor-save" className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
-            {saving ? "Speichere…" : "Speichern"}
-          </button>
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
-        </div>
-      </form>
-    </div>
+      </FormSection>
+
+      <FormSection title="Texte">
+        <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} rows={2} testId="sponsor-description" />
+        <TextAreaField label="Interne Notizen" value={form.internal_notes} onChange={(v) => set("internal_notes", v)} rows={2} testId="sponsor-internal-notes" />
+      </FormSection>
+    </AdminSheet>
   );
 }
 
@@ -437,11 +395,3 @@ function SponsorPlacementPreview({ sponsor }) {
   );
 }
 
-function Field({ label, value, onChange, required, placeholder, testId, type = "text" }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
-  );
-}

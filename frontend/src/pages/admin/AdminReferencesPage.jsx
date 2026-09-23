@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
-import { ExternalLink, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Save, Trash2 } from "lucide-react";
 
 const emptyReference = {
   title: "",
@@ -382,71 +385,68 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
     }
   };
 
+  // Seitenblatt statt Fenster (#435): Turnier, Aufstellung, Ergebnis und Rahmen, Texte als
+  // Abschnitte - breit genug für vier Felder nebeneinander, die Liste bleibt daneben sichtbar.
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-heading text-xl font-bold uppercase">{isNew ? "Neue Referenz" : "Referenz bearbeiten"}</h3>
-          <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
-        </div>
-        <Field label="Titel" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required />
+    <AdminSheet title={isNew ? "Neue Referenz" : "Referenz bearbeiten"} eyebrow="Verein" size="xl" onClose={onClose} onSubmit={save} saving={saving} submitTestId="reference-save" testId="reference-sheet">
+      <FormSection title="Turnier">
+        <TextField label="Titel" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" />
         <TitleHelper
           platforms={suggestions.platformTags}
           segments={suggestions.titleSegments}
           onPlatform={(tag) => set("title", upsertLeadingTag(form.title, tag))}
           onSegment={(segment) => set("title", appendTitleSegment(form.title, segment))}
         />
-        <div className="grid md:grid-cols-2 gap-3">
-          <Field label="Veranstalter / Liga" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} />
-          <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spiel</div>
-            <select value={form.game_id || ""} onChange={(e) => set("game_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-              <option value="">— Spiel wählen —</option>
-              {games.map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
-            </select>
-          </label>
-          <Field label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} />
-          <Field label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} suggestions={suggestions.teamNames} />
-        </div>
+        <FormGrid>
+          <TextField label="Veranstalter / Liga" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} testId="reference-organizer" />
+          <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...games.map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />
+          <TextField label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} testId="reference-game-name" />
+          <TextField label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} suggestions={suggestions.teamNames} testId="reference-team-name" />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Aufstellung">
         <MemberPicker
           profiles={memberProfiles}
           selectedIds={form.member_profile_ids || []}
           frozenMembers={form.lineup_members || []}
           onToggle={toggleMember}
         />
-        <Field label="Weitere externe Spieler / alter Lineup-Text" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" />
-        <div className="grid md:grid-cols-4 gap-3">
-          <Field label="Platz" type="number" value={form.placement} onChange={(v) => set("placement", v)} />
-          <Field label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} />
-          <Field label="Teilnehmer" type="number" value={form.participant_count} onChange={(v) => set("participant_count", v)} />
-          <Field label="Teams" type="number" value={form.team_count} onChange={(v) => set("team_count", v)} />
-        </div>
-        <div className="grid md:grid-cols-4 gap-3">
+        <TextField label="Weitere externe Spieler / alter Lineup-Text" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" testId="reference-lineup" />
+      </FormSection>
+
+      <FormSection title="Ergebnis und Rahmen">
+        <FormGrid cols={4}>
+          <TextField label="Platz" type="number" value={form.placement} onChange={(v) => set("placement", v)} testId="reference-placement" />
+          <TextField label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId="reference-placement-label" />
+          <TextField label="Teilnehmer" type="number" value={form.participant_count} onChange={(v) => set("participant_count", v)} testId="reference-participants" />
+          <TextField label="Teams" type="number" value={form.team_count} onChange={(v) => set("team_count", v)} testId="reference-teams" />
+        </FormGrid>
+        <FormGrid cols={4}>
           <GermanDateField id="reference-start-date" label="Start" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="reference-start-date" allowFuture />
           <GermanDateField id="reference-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="reference-end-date" allowFuture />
-          <Field label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} />
-          <Select label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} />
-        </div>
-        <div className="grid md:grid-cols-2 gap-3">
-          <Field label="Turnier-Webseite" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." />
-          <Field label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." />
-          <Field label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." />
-          <Field label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." />
-        </div>
-        <div className="grid md:grid-cols-4 gap-3">
-          <Select label="Status" value={form.status || "completed"} onChange={(v) => set("status", v)} options={STATUS_OPTIONS} />
-          <Select label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} />
-          <Field label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
-          <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" /> Aktiv</label>
-        </div>
-        <TextArea label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} />
-        <TextArea label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} />
-        <div className="flex gap-2 pt-2">
-          <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
-        </div>
-      </form>
-    </div>
+          <TextField label="Ort" value={form.location} onChange={(v) => set("location", v)} suggestions={suggestions.locations} testId="reference-location" />
+          <SelectField label="Modus" value={form.mode} onChange={(v) => set("mode", v)} options={MODE_OPTIONS} testId="reference-mode" />
+        </FormGrid>
+        <FormGrid>
+          <TextField label="Turnier-Webseite" value={form.external_url} onChange={(v) => set("external_url", v)} placeholder="https://..." />
+          <TextField label="Bracket / Tabelle" value={form.bracket_url} onChange={(v) => set("bracket_url", v)} placeholder="https://..." />
+          <TextField label="Match-Webseite" value={form.match_url} onChange={(v) => set("match_url", v)} placeholder="https://..." />
+          <TextField label="Ergebnis-Link" value={form.result_url} onChange={(v) => set("result_url", v)} placeholder="https://..." />
+        </FormGrid>
+        <FormGrid cols={4}>
+          <SelectField label="Status" value={form.status || "completed"} onChange={(v) => set("status", v)} options={STATUS_OPTIONS} testId="reference-status" />
+          <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={VISIBILITY_OPTIONS} testId="reference-visibility" />
+          <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} testId="reference-order" />
+          <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="reference-active" className="self-end pb-2" />
+        </FormGrid>
+      </FormSection>
+
+      <FormSection title="Texte">
+        <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="reference-description" />
+        <TextAreaField label="Highlights / Notizen" value={form.highlights} onChange={(v) => set("highlights", v)} testId="reference-highlights" />
+      </FormSection>
+    </AdminSheet>
   );
 }
 
@@ -525,37 +525,3 @@ function ChipGroup({ label, values, onPick }) {
   );
 }
 
-function Field({ label, value, onChange, required, placeholder, type = "text", suggestions = [] }) {
-  const datalistId = suggestions.length > 0 ? `ref-field-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}` : undefined;
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input list={datalistId} type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-      {datalistId && (
-        <datalist id={datalistId}>
-          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
-        </datalist>
-      )}
-    </label>
-  );
-}
-
-function Select({ label, value, onChange, options }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
-        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-      </select>
-    </label>
-  );
-}
-
-function TextArea({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <textarea rows={3} value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
-  );
-}

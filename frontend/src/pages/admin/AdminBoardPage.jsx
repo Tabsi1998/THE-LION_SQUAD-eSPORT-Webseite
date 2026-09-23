@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Crown, Save, X, EyeOff, Eye, GripVertical } from "lucide-react";
+import { Plus, Crown, EyeOff, Eye, GripVertical } from "lucide-react";
 
 export default function AdminBoardPage() {
   const [positions, setPositions] = useState([]);
@@ -141,46 +144,16 @@ function BoardForm({ position, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-center justify-center p-4 overflow-y-auto">
-      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-lg my-6 p-6 space-y-4">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-heading text-xl font-black uppercase">{isNew ? "Neue Position" : "Position bearbeiten"}</h3>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <Field label="Bezeichnung (männlich) *" value={form.title_male} onChange={(v) => setForm({ ...form, title_male: v })} testId="board-title-m" required />
-        <Field label="Bezeichnung (weiblich, optional)" value={form.title_female || ""} onChange={(v) => setForm({ ...form, title_female: v })} testId="board-title-f" />
-        <Field label="Beschreibung (optional)" value={form.description || ""} onChange={(v) => setForm({ ...form, description: v })} testId="board-desc" multiline />
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.allow_deputy} onChange={(e) => setForm({ ...form, allow_deputy: e.target.checked })} data-testid="board-allow-deputy" className="accent-[#FFD700]" />
-            Stellvertreter erlaubt
-          </label>
-          <label className="inline-flex items-center gap-2">
-            <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} data-testid="board-active" className="accent-[#FFD700]" />
-            Aktiv
-          </label>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-white/60 hover:text-white">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="board-save" className="px-5 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, testId, required, multiline }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      {multiline ? (
-        <textarea value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-      ) : (
-        <input value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-      )}
-    </label>
+    <AdminSheet title={isNew ? "Neue Position" : "Position bearbeiten"} eyebrow="Vorstand" accent="#FFD700" onClose={onClose} onSubmit={save} saving={saving} submitTestId="board-save" testId="board-sheet">
+      <TextField label="Bezeichnung (männlich)" value={form.title_male} onChange={(v) => setForm({ ...form, title_male: v })} testId="board-title-m" required />
+      <TextField label="Bezeichnung (weiblich, optional)" value={form.title_female || ""} onChange={(v) => setForm({ ...form, title_female: v })} testId="board-title-f" />
+      <TextAreaField label="Beschreibung (optional)" value={form.description || ""} onChange={(v) => setForm({ ...form, description: v })} testId="board-desc" />
+      <FormGrid>
+        <CheckField label="Stellvertreter erlaubt" checked={form.allow_deputy} onChange={(v) => setForm({ ...form, allow_deputy: v })} testId="board-allow-deputy" accent="#FFD700" />
+        <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} testId="board-active" accent="#FFD700" />
+      </FormGrid>
+    </AdminSheet>
   );
 }

@@ -20,7 +20,10 @@ export function FieldLabel({ label, required, hint, className = "", children }) 
   );
 }
 
-export function TextField({ label, value, onChange, type = "text", required, placeholder, testId, min, max, step, hint, disabled, className = "" }) {
+// `suggestions`: Vorschläge als Datenliste (Browser-Autovervollständigung), z.B. bekannte
+// Veranstalter bei den Referenzen.
+export function TextField({ label, value, onChange, type = "text", required, placeholder, testId, min, max, step, hint, disabled, suggestions, className = "" }) {
+  const listId = suggestions?.length ? `${String(testId || label).toLowerCase().replace(/[^a-z0-9]+/g, "-")}-list` : undefined;
   return (
     <label className={`block min-w-0 ${className}`}>
       <div className={LABEL_CLASS}>{label}{required && <RequiredMark />}</div>
@@ -29,6 +32,7 @@ export function TextField({ label, value, onChange, type = "text", required, pla
         min={min}
         max={max}
         step={step}
+        list={listId}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         required={required}
@@ -37,6 +41,21 @@ export function TextField({ label, value, onChange, type = "text", required, pla
         data-testid={testId}
         className={INPUT_CLASS}
       />
+      {listId && (
+        <datalist id={listId}>
+          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+        </datalist>
+      )}
+      {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
+    </label>
+  );
+}
+
+export function TextAreaField({ label, value, onChange, rows = 3, required, placeholder, testId, hint, className = "" }) {
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <div className={LABEL_CLASS}>{label}{required && <RequiredMark />}</div>
+      <textarea rows={rows} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} data-testid={testId} className={`${INPUT_CLASS} text-sm`} />
       {hint && <div className="mt-1 text-xs text-white/45">{hint}</div>}
     </label>
   );
