@@ -628,6 +628,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
     f1_bests = []
     teams = []
     references = empty_profile_references()
+    awards = []
     stats = {"tournaments": 0, "wins": 0, "top3": 0, "matches_played": 0, "matches_won": 0,
              "fast_laps": 0, "pole_positions": 0, "badges": len(badges), "points": total_points,
              "level": achievement_level["level"],
@@ -635,6 +636,9 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
              "twitch_stream_minutes": int(u.get("twitch_stream_minutes") or 0)}
     if public:
         references = await personal_profile_references(u, public_only=True)
+        # Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren, nur öffentliche.
+        from services.awards import awards_for_user
+        awards = await awards_for_user(db, user_id, public_only=True)
         regs = await db.tournament_registrations.find({"user_id": user_id}, {"_id": 0}).to_list(200)
         t_ids = list({r["tournament_id"] for r in regs})
         tournaments_raw = await db.tournaments.find(
@@ -747,6 +751,8 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "f1_bests": f1_bests,
         "teams": teams,
         "references": references,
+        "awards": awards,
+        "featured_award": next((award for award in awards if award["id"] == u.get("featured_award_id")), None),
         "socials": socials,
     }
 

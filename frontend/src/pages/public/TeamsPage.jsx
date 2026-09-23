@@ -18,6 +18,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
 import { Copy, Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
+import { AwardBanner } from "@/components/tls/AwardBanner";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" };
 
@@ -158,6 +159,15 @@ function TeamDetail({ id }) {
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
   const canEdit = !!user && (team.can_manage || team.leader_id === user.id || team.co_leader_ids?.includes(user.id) || isAdmin);
+  // Teambanner (#230): eine Auszeichnung des Teams im Kopf; nur die Teamleitung wählt, der Server prüft.
+  const featureTeamAward = async (awardId) => {
+    try {
+      if (awardId) await api.post(`/teams/${team.id}/awards/${awardId}/feature`);
+      else await api.delete(`/teams/${team.id}/awards/feature`);
+      toast.success(awardId ? "Als Teambanner gesetzt." : "Teambanner entfernt.");
+      load();
+    } catch { toast.error("Das hat nicht geklappt."); }
+  };
 
   const runAction = async (task, fallback) => {
     setActionError("");
@@ -249,6 +259,11 @@ function TeamDetail({ id }) {
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/65 via-[#0A0A0A]/82 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
+          {team.featured_award && (
+            <div className="mt-4" data-testid="team-featured-award">
+              <AwardBanner award={team.featured_award} size="hero" linkTo={team.featured_award.tournament?.slug ? `/tournaments/${team.featured_award.tournament.slug}` : null} />
+            </div>
+          )}
           <div className="mt-5 flex flex-col md:flex-row gap-6 md:items-center">
             {levelInfo ? (
               <LevelAvatarFrame level={levelInfo.level} crown={levelInfo.crown || null} team testId="team-detail-frame" className="w-28 h-28 shrink-0 mt-8 md:mt-4">
@@ -289,6 +304,30 @@ function TeamDetail({ id }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           {levelInfo && <TeamLevelPanel info={levelInfo} />}
+          {(team.awards || []).length > 0 && (
+            <section data-testid="team-awards">
+              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {team.awards.map((award) => (
+                  <AwardBanner
+                    key={award.id}
+                    award={award}
+                    linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null}
+                    action={canEdit ? (
+                      <button
+                        type="button"
+                        onClick={(event) => { event.preventDefault(); featureTeamAward(team.featured_award?.id === award.id ? null : award.id); }}
+                        data-testid={`team-award-feature-${award.id}`}
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 border rounded-sm ${team.featured_award?.id === award.id ? "border-[#FFD700]/60 text-[#FFD700]" : "border-white/20 text-white/60 hover:text-white"}`}
+                      >
+                        {team.featured_award?.id === award.id ? "Teambanner ✓" : "Als Teambanner"}
+                      </button>
+                    ) : null}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           <section>
             <div className="mb-4">
               <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder</h2>

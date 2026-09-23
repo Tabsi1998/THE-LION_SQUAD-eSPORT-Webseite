@@ -317,6 +317,9 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
     raw_updates = body.model_dump(exclude_unset=True)
     if "format_label" in raw_updates:
         raw_updates["format_label"] = (raw_updates.get("format_label") or "").strip() or None
+    if "award_images" in raw_updates:
+        from services.awards import clean_award_images
+        raw_updates["award_images"] = clean_award_images(raw_updates.get("award_images"))
     effective_format = raw_updates.get("format", existing.get("format"))
     if effective_format != "single_elim":
         raw_updates["bronze_match"] = False

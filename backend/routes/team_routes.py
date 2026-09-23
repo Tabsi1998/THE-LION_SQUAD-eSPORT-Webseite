@@ -328,7 +328,42 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     if team.get("is_public") is False and not (_is_member(team, user) or _is_staff(user)):
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
-    return _team_response(team, user)
+    out = _team_response(team, user)
+    # Auszeichnungen (#230): Team-Banner und -Trophäen; Außenstehende sehen nur öffentliche Turniere.
+    from services.awards import awards_for_team
+    insider = bool(user and (_is_member(team, user) or _can_manage(team, user) or _is_staff(user)))
+    out["awards"] = await awards_for_team(db, team_id, public_only=not insider)
+    out["featured_award"] = next((award for award in out["awards"] if award["id"] == team.get("featured_award_id")), None)
+    return out
+
+
+@router.post("/{team_id}/awards/{award_id}/feature")
+async def feature_team_award(team_id: str, award_id: str, me: dict = Depends(get_current_user)):
+    """Eine Auszeichnung des Teams als Teambanner zeigen - Leader und Co-Leader."""
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Nur die Teamleitung wählt das Teambanner.")
+    from services.awards import feature_award_for_team
+    chosen = await feature_award_for_team(db, team_id, award_id)
+    if not chosen:
+        raise HTTPException(status_code=404, detail="Auszeichnung nicht gefunden.")
+    return {"ok": True, "featured_award": chosen}
+
+
+@router.delete("/{team_id}/awards/feature")
+async def unfeature_team_award(team_id: str, me: dict = Depends(get_current_user)):
+    db = get_db()
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
+    if not team:
+        raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if not _can_manage(team, me):
+        raise HTTPException(status_code=403, detail="Nur die Teamleitung wählt das Teambanner.")
+    from services.awards import feature_award_for_team
+    await feature_award_for_team(db, team_id, None)
+    return {"ok": True, "featured_award": None}
 
 
 @router.get("/{team_id}/chat")

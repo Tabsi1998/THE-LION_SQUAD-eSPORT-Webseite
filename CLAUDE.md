@@ -171,6 +171,52 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Auszeichnungen (#230; PR #386, baut auf #385 auf; Build 73).
+  Entscheidungen des Betreibers vom 23.09. („passt“): Vergabe speichert
+  Daten, Bilder entstehen beim Ansehen; Platz 1–3 mit hochgeladenem Bild je
+  Turnier; Korrektur = erneut veröffentlichen. `services/awards.py`:
+  `record_tournament_awards(db, tid)` (beim `results_published`-Hook in
+  `tournament_lifecycle_routes`; je Anmeldung approved/checked_in ein
+  Eintrag in `tournament_awards` mit `rank` aus Anmeldung
+  (`final_position`/`rank`/`placement`) sonst `placements_for_structure`,
+  sonst Tabellenstand; `matches` {played, won} aus
+  `registration_match_summary`; `tournament`, `game`, `season` (aktive),
+  `team`; Upsert je (tournament_id, registration_id), Kennung bleibt bei
+  Korrektur, Abgemeldete fliegen raus), `rebuild_all_awards` (Nachtragen für
+  alte Turniere), `needs_backfill`/`backfill_awards` (Scheduler-Job
+  `awards_backfill` alle 5 min: einmalig, solange keine Auszeichnung da ist –
+  kein Handgriff für den Betreiber), `awards_for_user` (eigene + Team-Turniere; `public_only`
+  filtert draft/nicht öffentlich/Sichtbarkeit), `awards_for_team`,
+  `feature_award_for_user` (nur eigene; `users.featured_award_id`),
+  `award_view` (ohne Anmelde-/Nutzer-IDs; `image_url` aus
+  `tournaments.award_images[str(rank)]` nur für Platz 1–3), reine Helfer
+  `award_kind` (trophy/banner), `rank_label`, `record_line`,
+  `clean_award_images` (nur Slots „1“–„3“). Routen
+  `routes/award_routes.py`: `GET /api/me/awards`, `POST /api/me/awards/{id}/
+  feature`, `DELETE /api/me/awards/feature`, `POST /api/admin/awards/rebuild`
+  (Bereich tournaments). Öffentliches Profil liefert `awards` (nur
+  öffentliche) und `featured_award`. Turnier-Modelle mit `award_images`
+  (Update bereinigt über `clean_award_images`). Web
+  `components/tls/AwardBanner.jsx` (aus Daten: Platz, Gold/Silber/Bronze,
+  Turnier, Spiel, Tag, Teilnehmer, Saison, Bilanz; Bild dahinter; `awardDay`,
+  `awardLines`, `awardTone`), `PublicProfilePage`: gewähltes Banner im Kopf
+  (`profile-featured-award`), Abschnitt „Auszeichnungen“ im Reiter Referenzen
+  (`public-profile-awards`, eigenes Profil: `award-feature-<id>`), Admin →
+  Turnier → Darstellung: „Gewinnerbanner Platz 1–3“ (`tr-edit-award-<n>`).
+  Teams: `GET /api/teams/{id}` mit `awards` (Außenstehende nur öffentliche
+  Turniere, Mitglieder/Leitung alle) und `featured_award`;
+  `POST /api/teams/{id}/awards/{award_id}/feature` und `DELETE
+  …/awards/feature` (`_can_manage`); `feature_award_for_team`
+  (`teams.featured_award_id`). `TeamsPage`: Teambanner im Kopf
+  (`team-featured-award`), Abschnitt „Auszeichnungen“ (`team-awards`,
+  Teamleitung: `team-award-feature-<id>`). App: `lib/awards.ts` (`Award`,
+  `awardTone`, `awardDay`, `awardLines`, `sortAwards` – Trophäen zuerst),
+  `components/AwardCard.tsx` (Bild dahinter, Aktion daneben, `featured`),
+  `PublicProfileScreen` (gewähltes Banner über dem Kopf, „Auszeichnungen“ in
+  der Übersicht, Tippen → Turnier), `ProfileScreen` Reiter Referenzen
+  (`/me/awards`, „Als Profilbanner“ = `award-feature-<id>`). Tests
+  `test_awards_flow.py` (5), `AwardBanner.test.jsx` (2), App
+  `awards.test.ts` (3), `AwardCard.test.tsx` (2).
 - Absturzberichte (#219 Teil 2; PR #385; Build 72). Entscheidung des
   Betreibers vom 23.09.: Firebase Crashlytics (Firebase war für Push schon
   drin). `@react-native-firebase/app` + `/crashlytics` 26.4.0 mit ihren
@@ -1119,13 +1165,15 @@ Marke: Standard-Favicon, Markenbilder in der App), #380 (#217 Stufe 1
 App-Sperre, #219 Teil 1 Bildgrößen und AAB), #381 (#320 eigene Rechnungen für
 alle, Rechnungen im Profil) – alle vier am 23.09. gemergt, `update.sh` und
 Build 70 danach. Dann #383 (Doku-Stand nach #381) und #384 (#217 Stufe 2
-Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
-`b5d5fd3`.
+Passkey in der App; `update.sh`, Build 71 am 23.09.) und #385 (#219 Teil 2
+Absturzberichte über Crashlytics; nur App, Build 72 am 23.09.). `main` steht
+auf `7dbebf8`.
 
 ### Offene PRs
-- #385 (#219 Teil 2 Absturzberichte über Crashlytics; nur App). Nach dem
-  Merge Build 72 vom Haupt-PC; kein `update.sh` nötig. Vorher den Absatz für
-  die Datenschutzerklärung einfügen (Vorschlag am Issue).
+- #386 (#230 Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und
+  Teambanner in Web und App; baut auf #385 auf). Nach dem Merge `update.sh`;
+  die alten Turniere trägt der Job `awards_backfill` von selbst nach (alle
+  5 min, läuft leer, sobald Auszeichnungen da sind), Build 73 vom Haupt-PC.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1156,7 +1204,10 @@ Passkey in der App; `update.sh`, Build 71 am 23.09.). `main` steht auf
   und 69 sind ausgefallen, weil #379–#381 zusammen gemergt wurden), am
   Vereinsserver abgelegt, **Build 71** (`mobile-v0.12.0-beta-build71`, Commit
   b5d5fd3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `f40d4b20`;
-  #217 Stufe 2), am Vereinsserver abgelegt. Nächster Build ist 72.
+  #217 Stufe 2), am Vereinsserver abgelegt, **Build 72**
+  (`mobile-v0.13.0-beta-build72`, Commit 7dbebf8, am 23.09. vom Haupt-PC
+  gebaut, APK-SHA-256 beginnt mit `02e19223`; #219 Teil 2 Absturzberichte),
+  am Vereinsserver abgelegt. Nächster Build ist 73.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1203,12 +1254,12 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
-| Auszeichnungen und Marke | #229 Standard-Favicon für hell und dunkel (im Admin erzeugt) und Markenbilder/Vereinsname in der App – umgesetzt in #379, im Build 70 vom 23.09. #230 Gewinnerbanner und Trophäen – **wartet** auf drei Entscheidungen des Betreibers (Vorlagensystem oder fertige Bilder; Bilder bei der Vergabe oder beim Ansehen; was bei korrigierten Ergebnissen gilt), Vorschlag steht als Kommentar an #230 |
+| Auszeichnungen und Marke | #229 Standard-Favicon für hell und dunkel (im Admin erzeugt) und Markenbilder/Vereinsname in der App – umgesetzt in #379, im Build 70 vom 23.09. #230 Gewinnerbanner und Trophäen – Entscheidungen am 23.09. bestätigt („passt“: Daten bei der Vergabe, Bild beim Ansehen, Bilder für Platz 1–3 je Turnier hochladen, Korrektur = erneut veröffentlichen). umgesetzt in #386 (Web, Teams, App), Build 73 nach dem Merge |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385 (Build 72 nach dem Merge; Absatz für die Datenschutzerklärung als Vorschlag am Issue); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung als Vorschlag am Issue, noch einzufügen); Play-Bundle und Store-Eintrag, sobald das Konto da ist |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
@@ -1238,7 +1289,7 @@ sinnvoll hältst“):
    #371 (baut auf #369 auf). App 0.8.0-beta.
 8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
    umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
-   #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
+   #229 umgesetzt in #379; #230 in #386. Der Meilenstein ist damit durch.
    App 1.0.0: #217 Stufe 1 und #219 Teil 1 in #380, #217 Stufe 2 in #384;
    #219 Teil 2 Crashlytics in #385; Play-Bundle und Store-Eintrag, sobald das
    Play-Konto da ist (Texte als Vorschlag an #219).

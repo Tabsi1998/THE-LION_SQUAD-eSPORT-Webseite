@@ -1632,6 +1632,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     prize_pool: tournament.prize_pool || "",
     prize_places: tournament.prize_places || [],
     banner_url: tournament.banner_url || "",
+    award_images: tournament.award_images || {},
     stream_link: tournament.stream_link || "",
     discord_link: tournament.discord_link || "",
     location: tournament.location || "",
@@ -1815,6 +1816,13 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
       </div>
       <Details title="Darstellung">
         <ImageUpload value={f.banner_url} onChange={(v)=>set("banner_url",v)} label="Turnier-Banner" testId="tr-edit-banner-upload" variant="wide" allowLibrary />
+        {/* Auszeichnungen (#230): gestaltete Gewinnerbanner für Platz 1–3; ohne Bild bekommt der Platz die feste Vorlage aus Platz, Bilanz und Turnier. */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {["1", "2", "3"].map((slot) => (
+            <ImageUpload key={slot} value={f.award_images?.[slot] || ""} onChange={(v)=>set("award_images", { ...(f.award_images || {}), [slot]: v })} label={`Gewinnerbanner Platz ${slot}`} testId={`tr-edit-award-${slot}`} variant="wide" allowLibrary />
+          ))}
+        </div>
+        <p className="text-xs text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>
         <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
         <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
       </Details>

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0-beta - 2026-09-23
+
+- Mobile: Auszeichnungen: Gewinnerbanner und Trophäen aus Turnieren stehen im Profil unter „Referenzen“ – Platz mit Gold, Silber oder Bronze, Bilanz, Turnier und Saison; eine davon lässt sich als Profilbanner wählen. Öffentliche Profile zeigen die Auszeichnungen aus öffentlichen Turnieren (#230).
+
 ## 0.13.0-beta - 2026-09-23
 
 - Mobile: Absturzberichte: Stürzt die App ab, meldet sie Gerätemodell, Android-Version, App-Version und die Fehlerstelle an Firebase Crashlytics – keine Namen, keine Nachrichten, keine Inhalte. So sehen wir Fehler, bevor sich jemand beschwert (#219).

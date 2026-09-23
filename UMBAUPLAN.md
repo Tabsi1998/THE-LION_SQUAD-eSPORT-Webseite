@@ -44,7 +44,7 @@ Ein grüner Block unten heißt **umgesetzt**. Was du selbst prüfen musst, steht
 | 15 | Abschluss: Abfrage-Intervalle im Web weg, große Dateien nebenbei teilen | #221 umgesetzt, #223 offen | #261 |
 | 16 | **Turnier-Leitfaden im Adminbereich** | offen (#228) | — |
 | 17 | **Markenbilder hell und dunkel überall richtig** | teilweise (#229) | #193, #195 |
-| 18 | **Auszeichnungen: Banner und Trophäen** | offen (#230) | — |
+| 18 | **Auszeichnungen: Banner und Trophäen** | umgesetzt in #386 (Block 42) | — |
 | 19 | **Web-Profil: Aufbau, Nachrichten, Dashboard** | umgesetzt: Profil I (#253, #257, #258) und Profil II (#254, #255, #256, #259); Nachtrag Kopfzeile und Mitgliederbereich (#282, #283, #284 umgesetzt) | #267, #275, #276, #278, #279, #280, #281, #285, #294, #298 |
 | 20 | **Dynamik im Web: Startseite, Turnierseiten, Ladezustände** | offen (#224, #225, #226) | — |
 | 21 | **Admin-Tageszentrale erweitern** | offen (#227) | — |
@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), Build 72 nach dem Merge; Play-Bundle und Store-Eintrag (14.8), sobald das Konto da ist |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play-Bundle und Store-Eintrag (14.8), sobald das Konto da ist |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -476,7 +476,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
-| Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – wartet auf die drei Entscheidungen aus Block 18 (Kommentar an #230) |
+| Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; umgesetzt in #386 (Block 42) |
 | Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 
 ## Block 22 — Tempo und Betrieb
@@ -601,6 +601,32 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 42 — Auszeichnungen: Vergabe, Trophäen, Profil- und Teambanner
+
+### Was 42.1 gefunden hat (#230 – PR #386)
+
+**Die Platzierungen gab es schon – als Zahl in einer Liste.** Die „Referenzen“ im Profil rechnen
+den Platz bei jedem Aufruf neu aus Anmeldungen und Spielplan. Für Banner und Trophäen braucht es
+etwas Festes: Was ein Turnier vergeben hat, soll so stehen bleiben, wie es am Tag der
+Veröffentlichung war – und sich nur ändern, wenn die Ergebnisse bewusst neu veröffentlicht werden.
+Deshalb hält die Website beim Veröffentlichen je Anmeldung einen Eintrag fest: Platz, Bilanz,
+Teilnehmerzahl, Turnier, Spiel, Saison, Team. Korrektur heißt erneut veröffentlichen; der Eintrag
+wird überschrieben, die Kennung bleibt, Abgemeldete fliegen raus. Alte Turniere trägt ein Job nach
+dem ersten Start von selbst nach – kein Handgriff, kein Knopf.
+
+**Kein Bild bei der Vergabe.** Der Betreiber hat sich am 23.09. gegen einen Vorlagen-Editor und
+gegen erzeugte Dateien entschieden: Das Banner entsteht beim Ansehen aus den Daten – Web und App
+zeichnen dieselbe Karte, ein geändertes Logo oder eine neue Gestaltung gilt sofort für alle alten
+Banner. Für Platz 1 bis 3 lädt der Verein je Turnier fertige Bilder hoch (Admin → Turnier →
+Darstellung); sie liegen hinter dem Text und wandern bei einer Korrektur mit dem Platz.
+
+**Eine Auszeichnung als Profilbanner.** Wer will, wählt eine eigene Auszeichnung als Banner im
+Profilkopf; der Server nimmt nur eigene an. Öffentlich sichtbar sind nur Auszeichnungen aus
+öffentlichen Turnieren – interne Turniere bleiben im eigenen Profil. Teams wählen ihr Teambanner
+über die Teamleitung; Außenstehende sehen auf der Team-Seite nur Auszeichnungen aus öffentlichen
+Turnieren, Mitglieder alle. Die App zeigt dieselben Karten: im eigenen Profil unter „Referenzen“
+mit „Als Profilbanner“, im öffentlichen Profil das gewählte Banner über dem Kopf.
 
 ## Block 41 — App 1.0.0, Teil 3: Absturzberichte
 

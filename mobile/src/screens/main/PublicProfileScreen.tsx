@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { AwardCard } from "../../components/AwardCard";
 import { Card } from "../../components/Card";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
@@ -11,6 +12,7 @@ import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
+import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -25,6 +27,9 @@ type PublicProfilePayload = {
   display_name?: string | null;
   avatar_url?: string | null;
   banner_url?: string | null;
+  // Auszeichnungen (#230): nur aus öffentlichen Turnieren; das gewählte Banner steht im Kopf.
+  awards?: Award[];
+  featured_award?: Award | null;
   bio?: string | null;
   role?: string | null;
   created_at?: string | null;
@@ -139,12 +144,23 @@ export function PublicProfileScreen({ navigation, route }: Props) {
     );
   }
 
+  // Auszeichnung antippen (#230): zum Turnier.
+  const openAward = (award: Award) => {
+    const target = award.tournament?.slug || award.tournament?.id;
+    if (target) navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target } });
+  };
+
   return (
     <Screen padded={false}>
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
+        {profile.featured_award ? (
+          <View style={styles.featured} testID="profile-featured-award">
+            <AwardCard award={profile.featured_award} featured onPress={() => openAward(profile.featured_award as Award)} />
+          </View>
+        ) : null}
         <View style={styles.hero}>
           <MediaImage
             uri={profile.banner_url}
@@ -194,6 +210,13 @@ export function PublicProfileScreen({ navigation, route }: Props) {
                 <Stat label="Fast Laps" value={stats.fast_laps ?? profile.f1_bests?.length ?? 0} />
               </View>
             </Card>
+
+            {(profile.awards || []).length ? (
+              <Card style={styles.card} testID="public-profile-awards">
+                <Heading>Auszeichnungen</Heading>
+                {sortAwards(profile.awards).slice(0, 6).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
+              </Card>
+            ) : null}
 
             <InfoGrid
               title="Öffentliche Infos"
@@ -520,6 +543,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     overflow: "hidden",
+  },
+  featured: {
+    marginBottom: 4,
   },
   banner: {
     borderWidth: 0,

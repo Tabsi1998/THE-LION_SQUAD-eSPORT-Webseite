@@ -302,6 +302,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                         num_participants=num_participants, weight=weight,
                     )
             await on_tournament_completed(tid, placements)
+            # Auszeichnungen (#230): je Anmeldung Platz und Bilanz festhalten - bei erneutem Veröffentlichen neu.
+            try:
+                from services.awards import record_tournament_awards
+                await record_tournament_awards(db, tid)
+            except Exception as exc2:
+                import logging
+                logging.getLogger("tls.awards").warning(f"record awards: {exc2}")
             # Phase 9: Auto-create prize pickups
             try:
                 from services.prize_service import auto_create_for_tournament

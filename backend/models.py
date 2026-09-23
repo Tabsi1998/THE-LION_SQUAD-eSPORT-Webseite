@@ -501,6 +501,8 @@ class TournamentCreate(BaseModel):
     discord_link: Optional[str] = None
     location: Optional[str] = None
     banner_url: Optional[str] = None
+    # Auszeichnungen (#230): gestaltete Bilder für Platz 1 bis 3 ({"1": url, ...}); ohne Bild gilt die feste Vorlage.
+    award_images: Optional[dict] = None
     seeding_mode: Literal["manual", "random", "ranking"] = "random"
     randomize_advancement_rounds: bool = False
     # Phase 5: unified stream-per-object
@@ -566,6 +568,7 @@ class TournamentUpdate(BaseModel):
     discord_link: Optional[str] = None
     location: Optional[str] = None
     banner_url: Optional[str] = None
+    award_images: Optional[dict] = None
     seeding_mode: Optional[Literal["manual", "random", "ranking"]] = None
     randomize_advancement_rounds: Optional[bool] = None
     has_live_stream: Optional[bool] = None
