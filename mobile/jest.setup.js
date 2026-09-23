@@ -67,6 +67,15 @@ jest.mock("expo-local-authentication", () => ({
   authenticateAsync: jest.fn(async () => ({ success: true })),
 }));
 
+// Passkeys (#217 Stufe 2): im Test ein Gerät, das Passkeys kann und jede Anfrage unterschreibt.
+jest.mock("react-native-passkey", () => ({
+  Passkey: {
+    isSupported: jest.fn(() => true),
+    get: jest.fn(async () => ({ id: "cred-1", rawId: "cred-1", type: "public-key", response: { clientDataJSON: "c", authenticatorData: "a", signature: "s", userHandle: "u" } })),
+    create: jest.fn(async () => ({ id: "cred-1", rawId: "cred-1", type: "public-key", response: { clientDataJSON: "c", attestationObject: "o" } })),
+  },
+}));
+
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),

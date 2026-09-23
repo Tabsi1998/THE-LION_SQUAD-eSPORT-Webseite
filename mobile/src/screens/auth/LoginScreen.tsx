@@ -9,13 +9,14 @@ import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
+import { passkeyError, passkeysSupported } from "../../lib/passkeys";
 import type { AuthStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
 type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
 
 export function LoginScreen({ navigation }: Props) {
-  const { login, completeMfa, continueAsGuest, rememberSession } = useAuth();
+  const { login, loginWithPasskey, completeMfa, continueAsGuest, rememberSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(rememberSession);
@@ -36,6 +37,19 @@ export function LoginScreen({ navigation }: Props) {
       }
     } catch (err) {
       setError(errorMessage(err, "Login fehlgeschlagen."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Passkey (#217 Stufe 2): derselbe Passkey wie auf der Website - Fingerabdruck oder Gesicht statt Passwort.
+  async function passkeyLogin() {
+    setSubmitting(true);
+    setError("");
+    try {
+      await loginWithPasskey(remember);
+    } catch (err) {
+      setError(passkeyError(err));
     } finally {
       setSubmitting(false);
     }
@@ -105,6 +119,9 @@ export function LoginScreen({ navigation }: Props) {
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button label={submitting ? "Anmelden ..." : mfaTicket ? "MFA bestätigen" : "Anmelden"} onPress={submit} disabled={submitting} />
+          {!mfaTicket && passkeysSupported() ? (
+            <Button label="Mit Passkey anmelden" variant="secondary" onPress={passkeyLogin} disabled={submitting} />
+          ) : null}
           <Button
             label="Live-Daten ansehen"
             variant="secondary"

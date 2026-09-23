@@ -34,6 +34,11 @@ def check(base):
             raise ValueError("Service worker/version manifest must use Cache-Control: no-store")
     if version not in worker or "javascript" not in worker_headers.get("Content-Type", ""):
         raise ValueError("Service worker does not match release manifest")
+    # Passkeys in der App (#217): Android holt diese Datei, bevor der Passwort-Manager der App
+    # einen Passkey gibt. Kommt sie als HTML (SPA-Rückfall) oder gar nicht, geht der Login still nicht.
+    links_headers, links = fetch(base, "/.well-known/assetlinks.json")
+    if "json" not in links_headers.get("Content-Type", "") or "at.lionsquad.app" not in links:
+        raise ValueError("assetlinks.json for the app is missing or not served as JSON")
     root_assets = None
     for path in ("/", "/login", "/verify-email", "/dashboard"):
         headers, html = fetch(base, path)

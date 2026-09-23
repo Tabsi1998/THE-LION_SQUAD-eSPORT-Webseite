@@ -147,6 +147,7 @@ Neueste oben.
 - `0.9.1-beta`: Build 68, Logo, Maskottchen und Vereinsname aus den Einstellungen (Meilenstein Auszeichnungen und Marke)
 - `0.10.0-beta`: Build 69, App-Sperre mit Fingerabdruck, Gesicht oder Gerätesperre, Bilder in passender Größe, Release-Skript mit `--aab` (Meilenstein App 1.0.0, Teil 1)
 - `0.11.0-beta`: Build 70, Meine Rechnungen für alle mit Quelle und Filtern (Meilenstein Abrechnung I)
+- `0.12.0-beta`: Build 71, Passkey-Anmeldung in der App mit dem Passkey der Website (Meilenstein App 1.0.0, #217 Stufe 2)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

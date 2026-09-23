@@ -171,6 +171,29 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Passkey-Login in der App (#217 Stufe 2; PR #384; Build 71).
+  Derselbe Passkey wie auf der Website; Android nennt als Herkunft nicht die
+  Adresse, sondern den SHA-256 des Signaturschlüssels. Backend
+  `passkey_routes.py`: `DEFAULT_APK_KEY_HASHES` (Schlüssel seit Build 57),
+  `mobile_origins()` (auch `PASSKEY_APK_KEY_HASHES`, kommagetrennt, mit oder
+  ohne Doppelpunkte → `android:apk-key-hash:<base64url>`),
+  `_verified_login_user` (gemeinsame Prüfung für Web und App),
+  `POST /api/auth/passkeys/mobile/login/options` (Ticket statt Cookie, `kind:
+  mobile-login`) und `…/mobile/login/verify` (`MobileCredentialResponse` mit
+  `ticket`; erwartete Herkunft = App-Schlüssel; Antwort App-Sitzung über
+  `_issue_mobile_session(mfa_verified=True)` – Gerätesperre zählt wie im Web
+  als zweiter Faktor, #358); `status` liefert `app`. Website:
+  `frontend/public/.well-known/assetlinks.json` (Paket `at.lionsquad.app`,
+  Fingerabdruck des Upload-Schlüssels, `get_login_creds`) – kommt mit dem
+  Web-Image, kein Handgriff; `scripts/check-web-update.py` prüft, dass nginx
+  sie als JSON liefert. App: `react-native-passkey` 3.6.2 (Android Credential
+  Manager, API 28+; darunter `isSupported` false und kein Knopf),
+  `lib/passkeys.ts` (`signInWithPasskey`, `credentialPayload`,
+  `passkeyError`), `AuthContext.loginWithPasskey`, LoginScreen „Mit Passkey
+  anmelden“; `ios.associatedDomains` `webcredentials:lionsquad.at`
+  vorbereitet. Registrieren geht weiter nur auf der Website (Profil →
+  Sicherheit). Tests `test_passkeys_mobile_unit.py` (10), App
+  `passkeys.test.ts` (3), `LoginScreen.test.tsx` (2).
 - Eigene Rechnungen für alle (#320; PR #381, baut auf #380 auf; Build 70).
   `services/dolibarr_invoices.py`: `_access` (Einstellungen + Mitglieds-ID
   oder None), `_order_context(db, user_id)` (eigene `billing_orders` mit
@@ -1082,7 +1105,10 @@ alle, Rechnungen im Profil) – alle vier am 23.09. gemergt, `update.sh` und
 Build 70 danach. `main` steht auf `340fadf`.
 
 ### Offene PRs
-- keine (Stand 23.09., nach dem Merge von #381). Gestapelte PRs: nach jedem
+- #384 (#217 Stufe 2 Passkey-Login in der App; Backend + Web-Datei + App).
+  Nach dem Merge `update.sh` (die `assetlinks.json` kommt
+  mit der Website) und Build 71 vom Haupt-PC.
+- Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
   der Baum gleich ist (23.09. dreimal so passiert).
@@ -1162,7 +1188,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App **wartet** auf den Server-Teil mit dem Betreiber (assetlinks.json, App-Herkunft im Backend). #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; der Rest **wartet** auf das Play-Console-Konto des Betreibers (Internal Testing, Store-Eintrag, Datensicherheits-Formular) und seine Entscheidung zu Absturzberichten (Crashlytics oder Sentry → Datenschutzerklärung) |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, Build 71 nach dem Merge. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics (+ Absatz in der Datenschutzerklärung) – Teil 2 folgt als eigener Schritt |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
@@ -1193,9 +1219,9 @@ sinnvoll hältst“):
 8. Discord II – umgesetzt in #376 (#260) und #378 (#302). App 0.9.0-beta –
    umgesetzt in #377, Build 67 am 23.09. gebaut. Auszeichnungen und Marke:
    #229 umgesetzt in #379; #230 wartet auf die Entscheidungen des Betreibers.
-   App 1.0.0: #217 Stufe 1 und #219 Teil 1 umgesetzt in #380; #217 Stufe 2
-   und der Rest von #219 brauchen den Betreiber (assetlinks am Server,
-   Play-Console-Konto, Absturzberichte).
+   App 1.0.0: #217 Stufe 1 und #219 Teil 1 in #380, #217 Stufe 2 in #384;
+   #219 Teil 2 (Crashlytics, Play-Bundle, Store-Eintrag) als Nächstes – die
+   Entscheidungen vom 23.09. liegen vor, das Play-Konto legt der Betreiber an.
 9. Dolibarr III, sobald das Vereinsmodul v0.7 und die Dokument-API
    ausliefert.
 
