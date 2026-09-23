@@ -86,6 +86,19 @@ Das Skript geht so vor:
 3. Es erzeugt das Android-Projekt (`expo prebuild`) und baut mit Gradle die APK.
 4. Es prüft die Signatur: kein Debug-Zertifikat, das erwartete Zertifikat. Dann berechnet es SHA-256.
 5. Es legt das GitHub-Release an, mit APK, Prüfsumme, Signaturangaben und dem Changelog-Abschnitt.
+6. Mit `--aab` baut es zusätzlich das App Bundle für die Play Console (`bundleRelease`), legt es mit
+   Prüfsumme in `builds/` ab und hängt es ans Release. Das Bundle ist mit dem Upload-Schlüssel
+   signiert; Google signiert es beim Ausliefern mit dem App-Signaturschlüssel (Play App Signing) –
+   dessen SHA-256 steht deshalb zusätzlich in `assetlinks.json` und beim Passkey-Login (#394).
+
+**Hinweise der Play Console beim Hochladen (#393):** „Mit diesem App Bundle ist keine
+Offenlegungsdatei verknüpft“ ist reine Information – die App wird nicht verschleiert
+(`enableMinifyInReleaseBuilds` ist aus, es gibt keine R8-Mapping-Datei, Absturzberichte sind
+ohne Zuordnung lesbar). Die nativen Debug-Symbole (`BUNDLE-METADATA/…debugsymbols`) stecken
+schon im Bundle; ein getrenntes Hochladen ist nicht nötig. Beides geprüft am 23.09. an Build 75.
+Sollte die App einmal verkleinert werden (R8 an), muss `mapping.txt` aus
+`app/build/outputs/mapping/release/` mit ans Release und in die Play Console – dann dieses
+Skript erweitern.
 
 Passwörter bekommt Gradle nur über Umgebungsvariablen. Die Push-Datei wird nach dem Build aus `mobile/` entfernt, auch wenn der Build abbricht. `android/` und `builds/` sind von Git ausgeschlossen.
 
