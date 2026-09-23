@@ -1293,7 +1293,13 @@ Build 75 am 23.09.). `main` steht auf `495e4a3`.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
-  der Baum gleich ist (23.09. dreimal so passiert).
+  der Baum gleich ist (23.09. dreimal so passiert). **Zweite Falle:** Ein
+  gestapelter PR, den der Betreiber merged, solange seine Basis noch der
+  Feature-Zweig ist, landet in diesem Zweig – und verschwindet mit dessen
+  Löschung (23.09. bei #395: 10 s nach #394 gemergt, Inhalt fehlte auf
+  `main`, mit #398 nachgeholt). Deshalb in der Merge-Meldung an den Betreiber
+  immer nur **einen** PR nennen und den nächsten erst nach dem Umsetzen auf
+  `main` freigeben.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
