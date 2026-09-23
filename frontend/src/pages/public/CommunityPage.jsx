@@ -25,6 +25,7 @@ export default function CommunityPage() {
   const [clubMembers, setClubMembers] = useState([]);
   const [servers, setServers] = useState([]);
   const [serverSummary, setServerSummary] = useState({});
+  const [memberCount, setMemberCount] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,7 +35,9 @@ export default function CommunityPage() {
       api.get("/teams?limit=24"),
       api.get("/membership/profiles"),
       api.get("/game-servers"),
-    ]).then(([u, t, m, s]) => {
+      // Zähler aus der Mitgliederverwaltung (#410), nicht aus der Liste derer, die sich zeigen.
+      api.get("/membership/count"),
+    ]).then(([u, t, m, s, c]) => {
       if (u.status === "fulfilled") setPlayers(u.value.data || []);
       if (t.status === "fulfilled") setTeams(t.value.data || []);
       if (m.status === "fulfilled") setClubMembers(m.value.data || []);
@@ -42,23 +45,24 @@ export default function CommunityPage() {
         setServers(s.value.data?.items || []);
         setServerSummary(s.value.data?.summary || {});
       }
+      if (c.status === "fulfilled" && typeof c.value.data?.members === "number") setMemberCount(c.value.data.members);
     }).finally(() => setLoading(false));
   }, []);
 
   const stats = useMemo(() => [
     { label: "Öffentliche Accounts", value: players.length, icon: Users },
     { label: "Teams", value: teams.length, icon: Shield },
-    { label: "Vereinsmitglieder", value: clubMembers.length, icon: Crown },
+    { label: "Vereinsmitglieder", value: memberCount ?? clubMembers.length, icon: Crown },
     { label: "Server online", value: serverSummary.online || 0, icon: Server },
-  ], [players.length, teams.length, clubMembers.length, serverSummary.online]);
+  ], [players.length, teams.length, clubMembers.length, memberCount, serverSummary.online]);
 
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
         <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Accounts, Teams & Verein</h1>
-        <p className="mt-4 text-white/60 max-w-3xl">
-          Öffentliche Profile aller Community-Accounts, Teamseiten und die separat gepflegten offiziellen Vereinsmitglieder an einem Ort.
+        <p className="mt-4 text-white/60 max-w-3xl" data-testid="community-explainer">
+          <span className="text-white">Community-Accounts</span> hat jeder mit Website-Konto und öffentlichem Profil. <span className="text-white">Vereinsmitglieder</span> sind die eingetragenen Mitglieder laut Mitgliederverwaltung – im Verzeichnis stehen die, die das wollen.
         </p>
 
         <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">

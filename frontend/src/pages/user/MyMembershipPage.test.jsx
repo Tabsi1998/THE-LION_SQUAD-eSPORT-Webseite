@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // „Meine Mitgliedschaft“ (#295): Beitragskarte aus der Mitgliederverwaltung – und
 // für ein Konto ohne Zuordnung der Weg, sie beim Vorstand anzufragen.
 
-const apiMock = { get: vi.fn(), post: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
 
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler", formatMemberSince: () => "1.1.2023" }));
@@ -51,6 +51,44 @@ test("ohne Zuordnung lässt sie sich anfragen – bestätigt wird sie vom Vorsta
   await user.type(screen.getByTestId("membership-link-ref"), " 12 ");
   await user.click(screen.getByTestId("membership-link-request"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/dolibarr/link-request", { member_ref: "12" }));
+});
+
+test("aktive Mitglieder tragen sich ins Verzeichnis ein und pflegen ihren Eintrag (#410)", async () => {
+  const user = userEvent.setup();
+  const me = { membership, is_active_member: true, dolibarr: null };
+  let directory = { eligible: true, listed: false, blocked: false, editorial: false, slug: null, entry: { display_name: "Paula", gamertag: "paula", photo_url: "", bio: "", games: ["Rocket League"], platforms: ["PC"] } };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/directory" ? directory : me }));
+  apiMock.put.mockImplementation(async (url, body) => {
+    directory = { ...directory, ...(body.listed !== undefined ? { listed: body.listed, slug: "paula" } : {}), entry: { ...directory.entry, ...(body.gamertag !== undefined ? { gamertag: body.gamertag, games: body.games, platforms: body.platforms, bio: body.bio } : {}) } };
+    return { data: directory };
+  });
+  renderPage();
+  const toggle = await screen.findByTestId("membership-directory-switch");
+  expect(toggle).toHaveAttribute("aria-checked", "false");
+  expect(screen.queryByTestId("membership-directory-form")).toBeNull();
+
+  await user.click(toggle);
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/membership/me/directory", { listed: true }));
+  expect(await screen.findByTestId("membership-directory-form")).toBeInTheDocument();
+  expect(screen.getByTestId("membership-directory-link")).toHaveAttribute("href", "/members/paula");
+  expect(screen.getByTestId("membership-directory-games")).toHaveValue("Rocket League");
+
+  await user.clear(screen.getByTestId("membership-directory-gamertag"));
+  await user.type(screen.getByTestId("membership-directory-gamertag"), "PaulaGG");
+  await user.clear(screen.getByTestId("membership-directory-games"));
+  await user.type(screen.getByTestId("membership-directory-games"), "F1 25, Rocket League");
+  await user.click(screen.getByTestId("membership-directory-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenLastCalledWith("/membership/me/directory", { gamertag: "PaulaGG", games: ["F1 25", "Rocket League"], platforms: ["PC"], bio: "" }));
+  expect(toastMock.success).toHaveBeenCalledWith("Eintrag gespeichert.");
+});
+
+test("ein gesperrter Eintrag zeigt nur den Hinweis", async () => {
+  const me = { membership, is_active_member: true, dolibarr: null };
+  const directory = { eligible: true, listed: false, blocked: true, editorial: false, slug: "paula", entry: { display_name: "Paula", gamertag: "paula", games: [], platforms: [], bio: "" } };
+  apiMock.get.mockImplementation(async (url) => ({ data: url === "/membership/me/directory" ? directory : me }));
+  renderPage();
+  expect(await screen.findByTestId("membership-directory-blocked")).toHaveTextContent("gesperrt");
+  expect(screen.queryByTestId("membership-directory-switch")).toBeNull();
 });
 
 test("ist Dolibarr nicht angebunden, bleibt die Seite wie bisher", async () => {

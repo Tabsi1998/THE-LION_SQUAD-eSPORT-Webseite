@@ -21,7 +21,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError, capabilities_for, instance_key, load_settings
 from services.dolibarr_links import close_link, note_candidate, verified_link_for_member, verify_link
-from services.membership_service import ACTIVE_STATUSES, VALID_TYPES
+from services.membership_service import ACTIVE_STATUSES, VALID_TYPES, end_self_directory_entry
 
 logger = logging.getLogger("tls.dolibarr.sync")
 
@@ -139,6 +139,7 @@ async def apply_summary(db, settings: dict, link: dict, summary: dict) -> str:
     await db.users.update_one({"id": user_id}, {"$set": {
         "user_type": "club_member" if is_member else "community_user", "is_club_member": is_member, "updated_at": now,
     }})
+    await end_self_directory_entry(user_id, is_member)
     if unchanged:
         return "unchanged"
     try:
@@ -161,6 +162,7 @@ async def end_membership_of_gone_member(db, link: dict) -> None:
                                   "to_status": "former", "notes": HISTORY_NOTE}},
         })
     await db.users.update_one({"id": link["user_id"]}, {"$set": {"user_type": "community_user", "is_club_member": False, "updated_at": now}})
+    await end_self_directory_entry(link["user_id"], False)
     await close_link(db, link, status="gone", actor_id=ACTOR, note="in Dolibarr nicht mehr vorhanden")
 
 
