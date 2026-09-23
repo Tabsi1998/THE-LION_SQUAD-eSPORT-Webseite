@@ -1166,14 +1166,14 @@ App-Sperre, #219 Teil 1 Bildgrößen und AAB), #381 (#320 eigene Rechnungen für
 alle, Rechnungen im Profil) – alle vier am 23.09. gemergt, `update.sh` und
 Build 70 danach. Dann #383 (Doku-Stand nach #381) und #384 (#217 Stufe 2
 Passkey in der App; `update.sh`, Build 71 am 23.09.) und #385 (#219 Teil 2
-Absturzberichte über Crashlytics; nur App, Build 72 am 23.09.). `main` steht
-auf `7dbebf8`.
+Absturzberichte über Crashlytics; nur App, Build 72 am 23.09.) und #386 (#230
+Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und Teambanner in Web und
+App; `update.sh`, Build 73 am 23.09.; die alten Turniere trägt der Job
+`awards_backfill` von selbst nach – alle 5 min, läuft leer, sobald
+Auszeichnungen da sind). `main` steht auf `2c540e3`.
 
 ### Offene PRs
-- #386 (#230 Auszeichnungen: Vergabe, Trophäen-Bilder, Profil- und
-  Teambanner in Web und App; baut auf #385 auf). Nach dem Merge `update.sh`;
-  die alten Turniere trägt der Job `awards_backfill` von selbst nach (alle
-  5 min, läuft leer, sobald Auszeichnungen da sind), Build 73 vom Haupt-PC.
+- Derzeit keiner.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1207,7 +1207,10 @@ auf `7dbebf8`.
   #217 Stufe 2), am Vereinsserver abgelegt, **Build 72**
   (`mobile-v0.13.0-beta-build72`, Commit 7dbebf8, am 23.09. vom Haupt-PC
   gebaut, APK-SHA-256 beginnt mit `02e19223`; #219 Teil 2 Absturzberichte),
-  am Vereinsserver abgelegt. Nächster Build ist 73.
+  am Vereinsserver abgelegt, **Build 73** (`mobile-v0.14.0-beta-build73`,
+  Commit 2c540e3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
+  `c1720f6c`; #230 Auszeichnungen), am Vereinsserver abgelegt. Nächster Build
+  ist 74.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1224,6 +1227,12 @@ auf `7dbebf8`.
   Members Intent, Bot auf den Server, „Bot verbinden“) und Einstellungen →
   Branding → „Aus Logo und Akzentfarbe erzeugen“ (Standard-Favicon für helle
   Tableisten).
+- Nach #384–#386 (23.09.): `update.sh` ist gelaufen. Offen beim Betreiber:
+  den Absatz zu den Absturzberichten (Vorschlag am Issue #219) in die
+  Datenschutzerklärung einfügen, bevor Build 72+ breit verteilt wird; das
+  Google-Play-Konto anlegen und die Store-Texte an #219 bestätigen; für #231
+  am Server `bash scripts/tournament-dryrun.sh` laufen lassen und die
+  Zähl-Zeilen schicken.
 - Server: `docker-compose.override.yml` mit dem Host-Eintrag für
   `erp.lionsquad.at` ist seit 21.09. angelegt (#351) – Dolibarr ist wieder
   erreichbar; `update.sh` fasst die Datei nie an.
@@ -1235,7 +1244,7 @@ auf `7dbebf8`.
   #337 und `update.sh` zeigt Einstellungen → Twitch je Kanal, ob er auf die
   Startseite käme.
 
-### Meilensteine und offene Issues (16 offen nach dem Merge von #384)
+### Meilensteine und offene Issues (15 offen nach dem Merge von #386)
 Seit 21.09. hängt **jedes** offene Issue an einem Meilenstein; alle
 Dolibarr-Issues tragen das Label `dolibarr`. Fertige Meilensteine sind auf
 GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
@@ -1254,7 +1263,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
-| Auszeichnungen und Marke | #229 Standard-Favicon für hell und dunkel (im Admin erzeugt) und Markenbilder/Vereinsname in der App – umgesetzt in #379, im Build 70 vom 23.09. #230 Gewinnerbanner und Trophäen – Entscheidungen am 23.09. bestätigt („passt“: Daten bei der Vergabe, Bild beim Ansehen, Bilder für Platz 1–3 je Turnier hochladen, Korrektur = erneut veröffentlichen). umgesetzt in #386 (Web, Teams, App), Build 73 nach dem Merge |
+| Auszeichnungen und Marke | #229 Standard-Favicon für hell und dunkel (im Admin erzeugt) und Markenbilder/Vereinsname in der App – umgesetzt in #379, im Build 70 vom 23.09. #230 Gewinnerbanner und Trophäen – Entscheidungen am 23.09. bestätigt („passt“: Daten bei der Vergabe, Bild beim Ansehen, Bilder für Platz 1–3 je Turnier hochladen, Korrektur = erneut veröffentlichen). umgesetzt in #386 (Web, Teams, App), im Build 73 vom 23.09. Der Meilenstein ist durch |
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
