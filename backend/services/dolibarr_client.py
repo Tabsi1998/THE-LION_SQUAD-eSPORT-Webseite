@@ -20,7 +20,7 @@ import logging
 import re
 import socket
 import ssl
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 
@@ -419,6 +419,48 @@ class DolibarrClient:
             # 401/403 beweisen, dass die API da ist.
             return "vereine_missing" if exc.kind in ("unauthorized", "forbidden") else "api_missing"
         return "vereine_missing"
+
+    # ------------------------------------------------ Beitrittsantrag (#328)
+    async def application_form(self) -> dict:
+        """Welche Felder der Antrag verlangt - Pflichtfelder und eigene Felder des Vereins."""
+        data = await self._get("/vereine/applicationform")
+        if not isinstance(data, dict) or "required" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def membership_fees(self) -> list[dict]:
+        """Mitgliedsarten mit Beitrag, wie „Mitglied werden“ sie zeigt."""
+        data = await self._get("/vereine/membershipfees")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def consent_texts(self) -> list[dict]:
+        """Die Einwilligungstexte in ihrer neuesten Version - direkt vor dem Formular lesen."""
+        data = await self._get("/vereine/consents")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def submit_application(self, payload: dict) -> dict:
+        """Ohne Wiederholung durch den Client: die external_id macht ein zweites Senden ungefährlich,
+        aber das entscheidet der Aufrufer (Job), nicht eine stille Schleife."""
+        data = await self._send("POST", "/vereine/applications", payload)
+        if not isinstance(data, dict) or "id" not in data or "status" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def application_state(self, external_id: str) -> dict:
+        data = await self._get(f"/vereine/applications/{quote(str(external_id), safe='')}")
+        if not isinstance(data, dict) or "status" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def withdraw_application(self, external_id: str) -> dict:
+        data = await self._send("POST", f"/vereine/applications/{quote(str(external_id), safe='')}/withdraw", {})
+        if not isinstance(data, dict) or "status" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
 
     async def organization(self) -> dict:
         """Der Verein für Impressum und Vereinsseite (#326): Name, ZVR, Behörde, Anschrift, Kontakt, Gründung, Zweck."""

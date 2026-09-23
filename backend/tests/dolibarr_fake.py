@@ -72,6 +72,19 @@ def response_schema(path_template: str) -> dict:
     return OPENAPI["paths"][path_template]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
 
 
+def request_schema(path_template: str, method: str = "post") -> dict:
+    return OPENAPI["paths"][path_template][method]["requestBody"]["content"]["application/json"]["schema"]
+
+
+def membership_fee(fee_id: int, label: str, *, amount: float | None = 50.0, for_whom: str = "natural", description: str = "",
+                   admission_fee: float = 0, prorated: bool = False) -> dict:
+    return {
+        "id": fee_id, "label": label, "description": description, "for": for_whom, "subscription_required": amount is not None,
+        "amount": amount, "amount_editable": False, "duration": {"value": 1, "unit": "y"}, "year_starts_month": 1,
+        "prorated": prorated, "proration": "half_year" if prorated else "none", "admission_fee": admission_fee, "currency": "EUR",
+    }
+
+
 def invoice(invoice_id: int, *, ref: str | None = None, kind: str = "standard", status: str = "open", total: float = 60,
             remaining: float | None = None, date: str = "2026-08-01", due: str = "2026-08-15", payment_url: str = "", fee: bool = True) -> dict:
     if remaining is None:
@@ -138,6 +151,25 @@ class FakeDolibarr:
             {"code": "kassier", "label": "Kassier:in", "board": True, "represents": False, "auditor": False, "holders": [{"name": None, "since": "2024-04-01"}]},
             {"code": "rechnungspruefung", "label": "Rechnungsprüfer:in", "board": False, "represents": False, "auditor": True, "holders": []},
         ]
+        # Beitrittsantrag (#328): Pflichtfelder wie ab Werk, zwei Mitgliedsarten, ein Einwilligungstext; Anträge je external_id.
+        self.application_form = {"required": ["lastname", "firstname", "address", "zip", "town", "email"], "fields": []}
+        self.membership_fees = [membership_fee(2, "Ordentliches Mitglied", amount=50.0, description="Mit Stimmrecht", prorated=True),
+                                membership_fee(3, "Jugend", amount=20.0, description="Bis 18"), membership_fee(4, "Firma", amount=200.0, for_whom="legal")]
+        self.consent_texts = [{"code": "fotos", "label": "Fotos auf der Website", "version": 2, "text": "Fotos von Veranstaltungen dürfen auf der Website erscheinen."}]
+        self.applications: dict[str, dict] = {}
+
+    def decide(self, external_id: str, status: str, reason: str = "") -> dict:
+        """Der Verein entscheidet in Dolibarr: aufgenommen wird das Entwurfsmitglied aktiv."""
+        row = self.applications[external_id]
+        row["status"] = status
+        row["decided_at"] = "2026-09-24T18:00:00+02:00"
+        row["reason"] = reason if status == "rejected" else ""
+        if status == "accepted":
+            row["member_id"] = row["draft_member_id"]
+            row["member_ref"] = str(row["draft_member_id"])
+            self.members[row["draft_member_id"]]["status"] = "active"
+            self.members[row["draft_member_id"]]["member_since"] = "2026-09-24"
+        return row
 
     def add(self, summary: dict, email: str | None = None) -> dict:
         self.members[summary["id"]] = summary
@@ -160,6 +192,49 @@ class FakeDolibarr:
         if status == 200:
             validate(payload, response_schema(template))
         return httpx.Response(status, json=payload)
+
+    def _json_post(self, template: str, payload) -> httpx.Response:
+        validate(payload, OPENAPI["paths"][template]["post"]["responses"]["200"]["content"]["application/json"]["schema"])
+        return httpx.Response(200, json=payload)
+
+    def _application(self, body: dict) -> httpx.Response:
+        """POST /vereine/applications wie das Modul: Pflichtfelder aus dem Formular, bekannte Felder,
+        aktuelle Einwilligungsversionen; dieselbe external_id legt nie ein zweites Mitglied an."""
+        validate(body, request_schema("/vereine/applications"))
+        external_id = body.get("external_id") or f"anon-{self.next_id + 1}"
+        existing = self.applications.get(external_id)
+        if existing:
+            if existing["payload"] != body:
+                return httpx.Response(409, json={"error": {"code": 409, "message": "x"}})
+            known_member = self.members[existing["draft_member_id"]]
+            return self._json_post("/vereine/applications", {"id": known_member["id"], "ref": known_member["ref"], "status": known_member["status"], "duplicate": True, "document": True, "application_status": existing["status"]})
+        for field in self.application_form["required"]:
+            if not str(body.get(field) or "").strip():
+                return httpx.Response(400, json={"error": {"code": 400, "message": f"{field} is required"}})
+        known = {f["code"]: f for f in self.application_form["fields"]}
+        for code in body.get("fields") or {}:
+            if code not in known:
+                return httpx.Response(400, json={"error": {"code": 400, "message": f"fields.{code} unknown"}})
+        for code, meta in known.items():
+            if meta["required"] and not str((body.get("fields") or {}).get(code) or "").strip():
+                return httpx.Response(400, json={"error": {"code": 400, "message": f"fields.{code} is required"}})
+        current = {c["code"]: c["version"] for c in self.consent_texts}
+        for consent in body.get("consents") or []:
+            if current.get(consent.get("code")) != consent.get("version"):
+                return httpx.Response(400, json={"error": {"code": 400, "message": "consent version outdated"}})
+        if not any(fee["id"] == body.get("type_id") and fee["for"] in ("natural", "both") for fee in self.membership_fees):
+            return httpx.Response(400, json={"error": {"code": 400, "message": "type_id unknown"}})
+        self.next_id += 1
+        member_id = self.next_id
+        self.members[member_id] = member(member_id, status="draft", firstname=body["firstname"], lastname=body["lastname"], type_id=body["type_id"],
+                                         type_label=next(fee["label"] for fee in self.membership_fees if fee["id"] == body["type_id"]), fee_status="due", paid_until="")
+        if body.get("email"):
+            self.emails.setdefault(body["email"].lower(), []).append(member_id)
+        self.applications[external_id] = {
+            "external_id": external_id, "status": "received", "received_at": "2026-09-23T10:15:00+02:00", "decided_at": "", "reason": "",
+            "member_id": 0, "member_ref": "", "payload": body, "draft_member_id": member_id,
+        }
+        return self._json_post("/vereine/applications", {"id": member_id, "ref": str(member_id), "status": "draft", "duplicate": False, "document": True, "application_status": "received"})
 
     # ------------------------------------------------ Kern-API (Abrechnung)
     def add_thirdparty(self, name: str, email: str = "", **extra) -> dict:
@@ -334,6 +409,30 @@ class FakeDolibarr:
         if path == "/status":
             # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
             return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})
+        if path == "/vereine/applicationform":
+            return self._json("/vereine/applicationform", self.application_form)
+        if path == "/vereine/membershipfees":
+            return self._json("/vereine/membershipfees", self.membership_fees)
+        if path == "/vereine/consents":
+            return self._json("/vereine/consents", self.consent_texts)
+        if path == "/vereine/applications" and request.method == "POST":
+            return self._application(json.loads(request.content.decode("utf-8")))
+        match = re.fullmatch(r"/vereine/applications/([^/]+)/withdraw", path)
+        if match and request.method == "POST":
+            row = self.applications.get(match.group(1))
+            if not row:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            if row["status"] in ("accepted", "rejected"):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "x"}})
+            changed = row["status"] != "withdrawn"
+            row["status"] = "withdrawn"
+            return self._json_post("/vereine/applications/{external_id}/withdraw", {"external_id": row["external_id"], "status": "withdrawn", "changed": changed})
+        match = re.fullmatch(r"/vereine/applications/([^/]+)", path)
+        if match and request.method == "GET":
+            row = self.applications.get(match.group(1))
+            if not row:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            return self._json("/vereine/applications/{external_id}", {k: v for k, v in row.items() if k not in ("payload", "draft_member_id")})
         if path == "/vereine/organization":
             # Der Verein fürs Impressum (#326); die Form ist der Vertrag des Moduls.
             return self._json("/vereine/organization", self.organization)

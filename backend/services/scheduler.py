@@ -260,6 +260,14 @@ async def _safe_dolibarr_sync():
         await run_sync()
     except Exception as exc:
         _log_task_failure("dolibarr_sync", exc)
+    try:
+        # Beitrittsanträge (#328): hängende Sendungen wieder versuchen, offene Anträge nachlesen.
+        from services.dolibarr_applications import refresh_due as refresh_applications
+        res = await refresh_applications()
+        if res.get("ok") and (res.get("sent") or res.get("checked")):
+            logger.info(f"[scheduler] dolibarr_applications {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_applications", exc)
 
 
 async def _safe_dolibarr_pending():

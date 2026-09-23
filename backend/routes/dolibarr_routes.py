@@ -83,6 +83,8 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         },
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
+        "applications_enabled": bool(settings.get("applications_enabled")),
+        "applications_coupled": settings["mode"] == "live" and bool(settings.get("applications_enabled")),
         "type_map": settings.get("type_map") or {},
         "website_types": sorted(VALID_TYPES),
         "sync": state,
@@ -211,6 +213,8 @@ class DolibarrSettingsUpdate(BaseModel):
     instance: str | None = Field(None, max_length=60)
     entity: int | None = Field(None, ge=1, le=9999)
     auto_link_verified_email: bool | None = None
+    # Beitrittsanträge nach Dolibarr (#328): nur im Modus „live“ wirksam; aus = Antrag und Entscheidung auf der Website.
+    applications_enabled: bool | None = None
     type_map: dict[str, str] | None = None
 
 
@@ -243,6 +247,8 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         if data["write_enabled"] and not (data.get("write_api_key") or current.get("write_api_key") or data.get("api_key") or current.get("api_key")):
             raise HTTPException(400, "Schreibzugriff braucht einen API-Schlüssel (der des Website-Benutzers reicht).")
         updates["write_enabled"] = bool(data["write_enabled"])
+    if "applications_enabled" in data:
+        updates["applications_enabled"] = bool(data["applications_enabled"])
     for key in TERM_FIELDS:
         if key in data:
             updates[key] = int(data[key]) if data[key] else None
