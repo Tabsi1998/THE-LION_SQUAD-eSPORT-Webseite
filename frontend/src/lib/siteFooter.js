@@ -40,6 +40,23 @@ export function footerColumns(settings = {}, { isMember = false } = {}) {
   ];
 }
 
+export const PLAY_BADGE_SRC = "/assets/brand/google-play-badge-de.png";
+
+/**
+ * Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge - der Badge
+ * erst, wenn ein Play-Store-Link gepflegt ist (Googles Regel: nur mit Link zum öffentlichen
+ * Eintrag); vorher ein stiller Chip „bald bei Google Play“.
+ */
+export function footerButtons(settings = {}) {
+  const discord = String(settings?.discord_invite_url || "").trim();
+  const play = String(settings?.play_store_url || "").trim();
+  return {
+    discord: /^https?:\/\//i.test(discord) ? discord : null,
+    playStoreUrl: /^https?:\/\/play\.google\.com\//i.test(play) ? play : null,
+    playSoonLabel: "LionsAPP – bald bei Google Play",
+  };
+}
+
 /** Kontaktblock: nur, was gepflegt ist - eine leere Zeile gibt es nicht. */
 export function contactLines(settings = {}) {
   const name = String(settings?.legal_name || settings?.club_name || "").trim();

@@ -278,13 +278,14 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "tournaments": len(upcoming["tournaments"]),
         "fastlaps": len(upcoming["challenges"]),
     }
-    # Der Verein in Zahlen (#407): echte Zähler, nur was öffentlich zählt - keine Entwürfe, keine
-    # Absagen, keine nicht-öffentlichen Turniere, keine internen Events.
+    # Der Verein in Zahlen (#407, #425): echte Zähler, nur was öffentlich zählt - keine Entwürfe,
+    # keine Absagen, keine nicht-öffentlichen Turniere, keine internen Events. „Turnierteilnahmen“
+    # sind die Referenzen (der Verein bei fremden Turnieren), nicht die Auszeichnungen.
     club_numbers = {
         "members": await db.memberships.count_documents({"member_status": {"$in": ["active", "honorary"]}}),
         "tournaments": await db.tournaments.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}),
         "events": await db.events.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}),
-        "awards": await db.tournament_awards.count_documents({}),
+        "participations": await db.references.count_documents({}),
     }
 
     await _attach_live_counts(db, live, today, soon, upcoming)
