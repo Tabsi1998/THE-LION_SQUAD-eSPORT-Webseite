@@ -216,6 +216,43 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Verknüpfte Konten sichtbar, Grund der Plattform bei Rückruf-Fehlern (#260
+  Nachtrag; PR #458; Backend + Web; `update.sh`). `services/platform_links`:
+  `official_url(platform, external_id, handle)` (Discord `discord.com/users/
+  <id>`, Twitch-Kanal, Steam-Profil), `links_for` liefert `url`,
+  `linked_accounts(db, user_id, platforms)` fürs öffentliche Profil
+  (`user_routes.get_public_profile` → `linked_accounts`, nur sichtbare
+  Plattformen, nie `external_id`); `fetch_identity`: Plattform-Fehler außer
+  `access_denied` → `LinkError("platform_error", "<error>: <description>")`,
+  Netzfehler nur als Fehlerart; `callback_target(..., detail=)` hängt
+  `link_detail` an (bereinigt, ≤ 160 Zeichen); die Rückruf-Route loggt jeden
+  Fehlschlag. Web `lib/platformLinks` `linkErrorText(code, detail)`,
+  `formatLinkedAt`; `ProfilePage` liest `link_detail`; `SocialsTab` „verknüpft
+  als … seit …“ + `${testId}-official`; `PublicProfilePage.LinkedAccountsCard`
+  (`public-profile-linked`, `linked-account-<platform>[-verified]`, Rahmen in
+  Plattformfarbe über `--social-color`), verifizierte Socials-Symbole mit
+  farbigem Rahmen; `PlatformLinkSettings` Schritte je Plattform
+  (`platform-link-howto`). Tests `test_platform_links_flow.py` (erweitert),
+  `PublicProfilePage.linked.test.jsx`, `SocialsTab.test.jsx`. App: #459.
+- Dolibarr-Übersicht „was läuft, was fehlt, wo es steht“, Dashboard-Kachel
+  „Konten verknüpfen“ (PR #461; Backend + Web; `update.sh`).
+  `dolibarr_routes._features(db, settings)` → `GET /api/admin/dolibarr/status`
+  liefert `features` (key members|club_facts|sponsors|applications|consents|
+  invoices|webhook; label, enabled, state, hint, where, where_label);
+  `AdminDolibarrPage` Reiter Stand: Panel `dolibarr-features`,
+  `dolibarr-feature-<key>[-where]`. `AdminDashboardPage.settingsHub` „Konten
+  verknüpfen“ aus `/me/platform-links.available`. Tests
+  `test_dolibarr_flow.py` (Status erweitert), `AdminDolibarrPage.test.jsx` (+1).
+- Profil-Sichtbarkeit je Betrachter (#257 Nachtrag; PR #462; Backend;
+  `update.sh`). `user_routes._viewer_context(db, viewer, target_id)` → {self,
+  logged_in, member, admin} (Mitglied über `membership_service.get_membership`
+  / `is_active_member`, Admin-Team über `visibility.ADMIN_ROLES` oder
+  `permissions.areas_for`); `_field_visible(user, key, public, ctx)`: public →
+  alle, community → eingeloggt, members → Mitglied oder Admin-Team, admins →
+  Admin-Team, private → nur selbst; alle Feldaufrufe in `get_public_profile`
+  geben `ctx` mit (auch `verified_platforms` → `linked_accounts`). Vorher galt
+  alles außer „public“ als versteckt - das Steam-Häkchen des Betreibers
+  fehlte. Test `test_profile_visibility_levels_flow.py`.
 - Rechtliches speichern, Wegweiser in der Admin-Suche, Dolibarr-Reiter
   verlinkbar (#326 Nachtrag, #260 Auffindbarkeit; PR #456; nur Web;
   `update.sh`). Ursache „Haken Vereinsdaten aus Dolibarr geht nicht“: live
@@ -1744,14 +1781,12 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`). `main` steht auf `c7f0dbf`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`). `main` steht auf `ed84ec8`.
 
 ### Offene PRs
-- #458 (#260 Nachtrag: Karte „Verknüpfte Konten“ mit Rahmen und offiziellem
-  Link im öffentlichen Profil, `linked_accounts` im Profil-Endpunkt, Grund
-  der Plattform bei Rückruf-Fehlern `link_error=platform_error` +
-  `link_detail`; Backend + Web; bereit, lokal grün; `update.sh`). Danach
-  App-Gegenstück #459 (App 1.0.0). **Regel seit 23.09. abends:**
+- #463 (#416 Verwarnungen mit Stufen; Backend + Web + App; bereit, lokal
+  grün; `update.sh`, danach App-Build). App-Gegenstück zu den verknüpften
+  Konten: #459 (App 1.0.0). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1837,6 +1872,11 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #461, #462 (24.09.): `update.sh`. Discord-App (Client ID + Secret aus
+  dem Developer Portal, App des Bots, Reiter OAuth2; Rückrufadresse unter
+  Redirects) und Twitch-Rückrufadresse in der Developer Console eintragen
+  (beides für „morgen“ angekündigt), dann im Profil verknüpfen. Profil →
+  Privatsphäre → Gaming: Steam auf „Öffentlich“, wenn es alle sehen sollen.
 - Nach #456, #457 (24.09.): `update.sh`. Dann Einstellungen → Rechtliches →
   Haken „Vereinsdaten aus Dolibarr übernehmen“ → „Rechtliches speichern“
   (bisher scheiterte das Speichern an der Analytics-Prüfung; danach kommen
