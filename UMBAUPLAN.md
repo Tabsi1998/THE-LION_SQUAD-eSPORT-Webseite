@@ -472,7 +472,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – PR #450 (Block 48.4); #324 Dokumente (wartet auf #157), #329 Einwilligungen, eigene Daten, Austritt – mit Vereinsmodul 0.8.0 baubar |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), Teil 2 (Kontaktänderung, Austritt, Mandat) wartet auf dolibarr-vereine#164/#125; #324 Dokumente (wartet auf #157) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
@@ -714,6 +714,19 @@ beim ersten Speichern fest; die alten Felder bleiben als Spiegel des besten Eint
 Startseite, SEO, Sitemap und Profilsuche nichts merken. Das Mitgliederprofil zählt die eigenen
 Einträge – ein Einzelstarter seine Platzierung, ein Teammitglied die seines Teams.
 
+## Block 49 — Moderation II, Teil 1: Wortfilter
+
+### Was 49.1 gefunden hat (#417 – PR #453)
+
+**Text im Chat wurde nur durch Meldungen und Rate-Limits gebremst.** Jetzt pflegt die Moderation eine
+Wortliste (deutsch/englisch, je Eintrag „zurückhalten“ oder „nur markieren“), der Server prüft beim
+Senden in allen vier Chats und beim Speichern von Bio, Anzeigename, Teamname und Benutzername –
+normalisiert (Umlaute, Leetspeak, Trennzeichen), kurze Wörter nur als ganzes Wort. Zurückgehalten
+heißt: gespeichert, nur der Absender sieht „wird geprüft“ (Web und App gleich), die Moderation gibt
+frei oder weist zurück; zurückgewiesen zählt als Treffer (`moderation_strikes`) und ist damit die
+Grundlage für die Stufen aus #416. Keine Cloud-Textprüfung. Offen im Meilenstein: #415 Bildprüfung
+(lokales Modell, Größe vorher messen) und #416 Verwarnungen mit Stufen.
+
 ## Block 48 — Dolibarr III: Sponsoren, Über uns, Verzeichnis, Antrag
 
 ### Was 48.1 gefunden hat (#405 – PR #447)
@@ -751,6 +764,15 @@ Konto), die Verwaltung kann sperren, und endet die Mitgliedschaft – durch den 
 Dolibarr – geht der Eintrag offline. Die Community-Seite erklärt Accounts und Mitglieder und zählt aus
 der Mitgliederverwaltung. Notiert, nicht geändert: Legt die Verwaltung ein Profil mit verknüpftem Konto
 an, aktiviert das ohne Dolibarr still die Mitgliedschaft (`_activate_linked_membership`).
+
+### Was 48.5 gefunden hat (#329 Teil 1 – PR #452)
+
+**Einwilligungen lagen nur in Dolibarr; die Website konnte sie weder zeigen noch entgegennehmen.**
+Jetzt sieht ein Mitglied mit bestätigter Zuordnung unter „Meine Mitgliedschaft“ je Zweck den Stand
+(zugestimmt mit Fassung, widerrufen, offen), liest beim Zustimmen den aktuellen Text (die Fassung
+geht mit, eine alte lehnt Dolibarr ab) und widerruft jederzeit – ohne eine lokale zweite Wahrheit:
+jede Entscheidung geht mit fester Vorgangskennung nach Dolibarr, bei Ausfall ändert sich nichts.
+Kontaktänderung, Austritt und SEPA-Mandat fehlen dem Modul noch (dolibarr-vereine#164/#125).
 
 ### Was 48.4 gefunden hat (#328 – PR #450)
 
