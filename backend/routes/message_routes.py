@@ -13,6 +13,7 @@ from services.rate_limit import enforce_rate_limit
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services.stickers import sticker_for_message
+from services import word_filter
 
 router = APIRouter(prefix="/api/messages", tags=["messages"])
 
@@ -63,7 +64,7 @@ def _public_message(message: dict, users: dict[str, dict] | None = None) -> dict
     out.pop("_id", None)
     out["sender"] = _public_user(sender) if sender else None
     out["recipient"] = _public_user(recipient) if recipient else None
-    return out
+    return word_filter.public_moderation(out)
 
 
 async def _share_team(db, sender_id: str, recipient_id: str) -> bool:
@@ -177,6 +178,9 @@ async def list_conversations(me: dict = Depends(get_current_user)):
     ).sort("created_at", -1).to_list(600)
     threads: dict[str, dict] = {}
     for row in rows:
+        # Zurückgehaltene Nachrichten (#417) sieht nur, wer sie geschrieben hat.
+        if not word_filter.visible_to(row, me["id"]):
+            continue
         other_id = row["recipient_id"] if row.get("sender_id") == me["id"] else row.get("sender_id")
         if not other_id:
             continue
@@ -241,7 +245,7 @@ async def get_direct_thread(
         query["created_at"] = {"$lt": anchor["created_at"]}
     rows = await db.direct_messages.find(query, {"_id": 0}).sort("created_at", -1).to_list(page_size + 1)
     has_more = len(rows) > page_size
-    rows = list(reversed(rows[:page_size]))
+    rows = [row for row in reversed(rows[:page_size]) if word_filter.visible_to(row, me["id"])]
     if not before:
         now = now_utc().isoformat()
         await db.direct_messages.update_many(
@@ -291,9 +295,15 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         "created_at": now,
         "updated_at": now,
     }
+    # Wortfilter (#417): zurückgehalten heißt gespeichert, aber nur für den Absender sichtbar - bis die Moderation entscheidet.
+    verdict = await word_filter.screen_message(db, doc, kind="direct", context={"recipient_id": recipient["id"]})
     await db.direct_messages.insert_one(doc)
-    # Both sides: the recipient sees the message, the sender's other devices too.
     from services.change_events import publish_user_change
+    if verdict == "hold":
+        await publish_user_change([me["id"]], "messages")
+        doc.pop("_id", None)
+        return _public_message(doc, {me["id"]: me, recipient["id"]: recipient})
+    # Both sides: the recipient sees the message, the sender's other devices too.
     await publish_user_change([me["id"], recipient["id"]], "messages")
     await create_user_notification(
         recipient["id"],

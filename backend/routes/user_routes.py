@@ -776,6 +776,11 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     db = get_db()
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in USER_NULLABLE_FIELDS}
+    # Wortfilter (#417): Bio und Anzeigename werden vor dem Speichern geprüft.
+    from services import word_filter
+    for field in ("bio", "display_name"):
+        if updates.get(field):
+            await word_filter.screen_field(db, updates[field], kind=field, user_id=me["id"], ref_id=me["id"])
     updates = _normalize_social_updates(updates)
     if "notification_preferences" in updates:
         updates["notification_preferences"] = _normalize_notification_preferences(updates.get("notification_preferences"))

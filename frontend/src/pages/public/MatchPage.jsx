@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { Link, useParams } from "react-router-dom";
 import { CalendarClock, Check, Flag, MessageSquare, RefreshCw, Send, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
@@ -526,6 +527,7 @@ export default function MatchPage() {
                 <div key={m.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
                   <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{m.author?.display_name || m.author?.username || "Benutzer"}</div>
                   {m.message && <div className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{m.message}</div>}
+                  <ModerationStateBadge moderation={m.moderation} />
                   <ChatMessageAttachments attachments={m.attachments} />
                   <ChatMessageSticker sticker={m.sticker} />
                 </div>

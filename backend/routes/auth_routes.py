@@ -587,6 +587,9 @@ async def register(body: UserRegister, request: Request, response: Response):
     if await db.users.find_one({"username": username}):
         raise HTTPException(status_code=409, detail="Benutzername bereits vergeben")
     user_id = new_id()
+    # Wortfilter (#417): ein gesperrtes Wort im Benutzernamen kommt gar nicht erst ins System.
+    from services import word_filter
+    await word_filter.screen_field(db, username, kind="username", user_id=user_id, ref_id=user_id)
     user_doc = {
         "id": user_id,
         "email": email,

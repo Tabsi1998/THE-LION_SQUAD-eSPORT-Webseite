@@ -321,6 +321,11 @@ function MessageBubble({ message, own, grouped, onOpenProfile, onReport }: {
       ) : null}
       <MessageAttachments attachments={message.attachments} />
       <MessageSticker sticker={message.sticker} />
+      {message.moderation?.state === "held" || message.moderation?.state === "rejected" ? (
+        <Muted style={[styles.moderation, message.moderation.state === "rejected" && styles.moderationRejected]} testID={`chat-moderation-${message.id}`}>
+          {message.moderation.state === "held" ? "Wird geprüft – nur du siehst diese Nachricht" : "Von der Moderation zurückgewiesen – nur du siehst sie noch"}
+        </Muted>
+      ) : null}
     </Pressable>
   );
 }
@@ -378,6 +383,8 @@ const styles = StyleSheet.create({
   ownRichText: {
     opacity: 0.98,
   },
+  moderation: { marginTop: 6, fontSize: 11 },
+  moderationRejected: { color: "#FF3B30" },
   ownMuted: {
     color: "rgba(255,255,255,0.68)",
   },

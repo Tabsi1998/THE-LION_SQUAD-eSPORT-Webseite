@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -486,6 +487,7 @@ function TournamentChat({ tournament, user }) {
                       {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
                       <ChatMessageAttachments attachments={message.attachments} />
                       <ChatMessageSticker sticker={message.sticker} />
+                      <ModerationStateBadge moderation={message.moderation} />
                     </div>
                   </div>
                 );

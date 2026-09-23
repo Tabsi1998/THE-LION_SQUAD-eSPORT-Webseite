@@ -8,6 +8,7 @@ from auth import get_current_user
 from models import now_utc, new_id
 from services.user_notifications import create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
+from services import word_filter
 from routes.tournament_common import (
     STAFF_ROLES,
     TOURNAMENT_MUTATION_LOCKED_DETAIL,
@@ -152,6 +153,7 @@ async def list_tournament_chat(tid: str, me: dict = Depends(get_current_user)):
         {"_id": 0},
     ).sort("created_at", -1).to_list(100)
     messages.reverse()
+    messages = [word_filter.public_moderation(m) for m in messages if word_filter.visible_to(m, me["id"])]
     user_ids = list({m.get("user_id") for m in messages if m.get("user_id")})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}},
@@ -198,15 +200,18 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
         "created_at": now,
         "updated_at": now,
     }
+    verdict = await word_filter.screen_message(db, doc, kind="tournament", context={"tournament_id": tid})
     await db.tournament_chat_messages.insert_one(doc)
-    mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
-    await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
+    if verdict != "hold":
+        mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
+        await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
     except Exception:
         pass
     doc.pop("_id", None)
+    doc = word_filter.public_moderation(doc)
     doc["author"] = {
         "id": me.get("id"),
         "username": me.get("username"),

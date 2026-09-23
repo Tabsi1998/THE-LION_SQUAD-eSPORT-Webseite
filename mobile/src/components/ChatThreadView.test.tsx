@@ -231,3 +231,16 @@ test("lange auf eine fremde Nachricht drücken meldet sie - eigene nicht (#414)"
   await fireEvent(screen.getByTestId("chat-message-g-2"), "longPress");
   expect(onReportMessage).toHaveBeenCalledTimes(1);
 });
+
+test("zeigt „wird geprüft“ nur bei zurückgehaltenen Nachrichten (#417)", async () => {
+  mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : {
+    data: [
+      { ...existing, id: "m-held", user_id: "u-1", message: "so eine sch31sse", attachments: [], author: { id: "u-1", display_name: "Ich" }, moderation: { state: "held" } },
+      { ...existing, id: "m-ok", attachments: [], moderation: { state: "flagged" } },
+    ],
+  }));
+  await renderChat();
+  await waitFor(() => expect(screen.getByTestId("chat-moderation-m-held")).toBeTruthy());
+  expect(screen.getByText("Wird geprüft – nur du siehst diese Nachricht")).toBeTruthy();
+  expect(screen.queryByTestId("chat-moderation-m-ok")).toBeNull();
+});

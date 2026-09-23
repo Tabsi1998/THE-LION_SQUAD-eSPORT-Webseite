@@ -573,6 +573,8 @@ export type ChatMessage = {
   read_at?: string | null;
   attachments?: ChatAttachment[];
   sticker?: ChatSticker | null;
+  // Wortfilter (#417): „held“ sieht nur der Absender, „rejected“ ebenso; der Server liefert nie mehr.
+  moderation?: { state: "held" | "flagged" | "released" | "rejected" } | null;
 };
 
 export type DirectConversation = {
