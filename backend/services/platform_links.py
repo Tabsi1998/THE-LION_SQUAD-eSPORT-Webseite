@@ -57,11 +57,23 @@ STEAM_ID_RE = re.compile(r"/openid/id/(\d{17})$")
 
 
 class LinkError(Exception):
-    """Warum die Verknüpfung nicht zustande kam - der Code landet als ``link_error`` in der Adresse."""
+    """Warum die Verknüpfung nicht zustande kam - der Code landet als ``link_error`` in der Adresse,
+    ein kurzer Grund (von der Plattform oder von uns, nie ein Geheimnis) als ``link_detail``."""
 
     def __init__(self, code: str, text: str = ""):
         self.code = code
         super().__init__(text or code)
+
+
+# Offizielle Adresse des verknüpften Kontos - damit im Profil steht, wohin es geht.
+def official_url(platform: str, external_id: str, handle: str) -> str:
+    if platform == "discord" and external_id:
+        return f"https://discord.com/users/{external_id}"
+    if platform == "twitch" and handle:
+        return f"https://www.twitch.tv/{handle}"
+    if platform == "steam" and external_id:
+        return f"https://steamcommunity.com/profiles/{external_id}"
+    return ""
 
 
 def providers_configured(branding: dict | None) -> dict[str, bool]:
@@ -140,7 +152,13 @@ def _client() -> httpx.AsyncClient:
 async def fetch_identity(platform: str, branding: dict, query: dict) -> dict:
     """Wer da ist - ``{"external_id", "handle", "display_name"}``. Wirft ``LinkError``."""
     if query.get("error"):
-        raise LinkError("denied", str(query.get("error")))
+        # „access_denied“ heißt: die Person hat abgebrochen. Alles andere (z. B. redirect_mismatch,
+        # wenn die Rückrufadresse in der Entwickler-Konsole fehlt) ist ein Einrichtungsfehler - der
+        # Grund der Plattform kommt mit, damit der Betreiber ihn im Profil lesen kann.
+        error = str(query.get("error"))
+        if error == "access_denied":
+            raise LinkError("denied", error)
+        raise LinkError("platform_error", f"{error}: {query.get('error_description') or ''}".strip(" :"))
     try:
         if platform == "discord":
             return await _discord_identity(branding, str(query.get("code") or ""))
@@ -150,7 +168,8 @@ async def fetch_identity(platform: str, branding: dict, query: dict) -> dict:
             return await _steam_identity(branding, query)
     except httpx.HTTPError as exc:
         logger.warning("[platform-links] %s: %s", platform, exc)
-        raise LinkError("exchange_failed", str(exc))
+        # Nur die Fehlerart nach außen - die Meldung könnte die Adresse samt Code enthalten.
+        raise LinkError("exchange_failed", f"Plattform nicht erreichbar ({type(exc).__name__})")
     raise LinkError("unknown")
 
 
@@ -247,8 +266,32 @@ async def unlink(db, user_id: str, platform: str) -> bool:
 
 
 async def links_for(db, user_id: str) -> list[dict]:
-    rows = await db.platform_links.find({"user_id": user_id}, {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1}).to_list(20)
-    return sorted(rows, key=lambda row: row.get("platform") or "")
+    """Die eigenen Verknüpfungen mit der offiziellen Adresse - die Kennung selbst bleibt beim Server."""
+    rows = await db.platform_links.find({"user_id": user_id}, {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(20)
+    out = []
+    for row in sorted(rows, key=lambda row: row.get("platform") or ""):
+        external_id = row.pop("external_id", "")
+        row["url"] = official_url(row.get("platform") or "", external_id, row.get("handle") or "")
+        out.append(row)
+    return out
+
+
+async def linked_accounts(db, user_id: str, platforms: list[str]) -> list[dict]:
+    """Für das öffentliche Profil: die verknüpften Konten der sichtbaren Plattformen mit Beschriftung,
+    Anzeigename, Datum und offizieller Adresse - so sieht jeder, dass das Konto echt ist und wohin es geht."""
+    if not platforms:
+        return []
+    rows = await db.platform_links.find({"user_id": user_id, "platform": {"$in": list(platforms)}},
+                                        {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(20)
+    out = []
+    for row in sorted(rows, key=lambda row: list(PLATFORMS).index(row["platform"]) if row.get("platform") in PLATFORMS else 99):
+        platform = row.get("platform") or ""
+        out.append({
+            "platform": platform, "label": PLATFORMS.get(platform, {}).get("label", platform),
+            "handle": row.get("handle") or "", "display_name": row.get("display_name") or row.get("handle") or "",
+            "linked_at": row.get("linked_at"), "url": official_url(platform, row.get("external_id") or "", row.get("handle") or ""),
+        })
+    return out
 
 
 def verified_platforms(user: dict | None) -> list[str]:
@@ -267,10 +310,13 @@ def changed_verified_platforms(updates: dict, user: dict) -> list[str]:
     return changed
 
 
-def callback_target(*, linked: str | None = None, error: str | None = None) -> str:
+def callback_target(*, linked: str | None = None, error: str | None = None, detail: str | None = None) -> str:
     query = {"tab": "socials"}
     if linked:
         query["linked"] = linked
     if error:
         query["link_error"] = error
+    if error and detail:
+        # Kurz und ohne Steuerzeichen - es landet in der Adresse und im Hinweis auf der Seite.
+        query["link_detail"] = re.sub(r"[^\w .,:;()/=+@'-]", " ", str(detail))[:160].strip()
     return f"{frontend_url()}/profile?{urlencode(query)}"

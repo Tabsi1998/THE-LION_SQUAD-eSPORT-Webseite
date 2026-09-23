@@ -5,6 +5,8 @@ Der Rückruf kommt vom Browser ohne unsere Anmeldung - wer verknüpft, sagt der 
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
@@ -15,6 +17,7 @@ from services import platform_links
 from services.platform_links import PLATFORMS, LinkError
 
 router = APIRouter(prefix="/api", tags=["platform-links"])
+logger = logging.getLogger("tls.platform_links")
 
 
 async def _branding(db) -> dict:
@@ -75,7 +78,10 @@ async def platform_link_callback(platform: str, request: Request):
         identity = await platform_links.fetch_identity(platform, await _branding(db), query)
         link = await platform_links.link_account(db, user_id, platform, identity)
     except LinkError as exc:
-        return RedirectResponse(platform_links.callback_target(error=exc.code), status_code=302)
+        # Im Log steht, woran es lag (Einrichtung, Plattform, Sitzung) - und die Person liest den Grund im Profil.
+        logger.warning("[platform-links] %s: Rückruf fehlgeschlagen - %s (%s)", platform, exc.code, exc)
+        detail = str(exc) if exc.code in ("platform_error", "exchange_failed") else None
+        return RedirectResponse(platform_links.callback_target(error=exc.code, detail=detail), status_code=302)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})
     return RedirectResponse(platform_links.callback_target(linked=platform), status_code=302)
 

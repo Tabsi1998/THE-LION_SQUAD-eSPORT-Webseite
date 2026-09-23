@@ -587,6 +587,9 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         # Verknüpfte Konten (#260): das Häkchen, nie die Plattform-Kennung.
         "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, {"discord": "discord", "twitch": "twitch", "steam": "steam"}[p], public)],
     }
+    # Die verknüpften Konten mit offizieller Adresse - nur die Plattformen, deren Feld sichtbar ist.
+    from services.platform_links import linked_accounts
+    base["linked_accounts"] = await linked_accounts(db, u["id"], base["verified_platforms"])
     if viewer:
         from services.friend_service import relationship_status
         base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])

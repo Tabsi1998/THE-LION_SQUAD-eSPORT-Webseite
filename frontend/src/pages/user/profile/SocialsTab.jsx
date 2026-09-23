@@ -2,7 +2,7 @@ import { BadgeCheck, ExternalLink, Link2, Unlink } from "lucide-react";
 import { Row, Section } from "./fields";
 import { ProfileSwitch } from "./SwitchRow";
 import { SOCIAL_PLATFORMS, normalizeSocialInput, socialProfileUrl } from "./socials";
-import { PLATFORM_BY_FIELD, linkForField } from "@/lib/platformLinks";
+import { PLATFORM_BY_FIELD, formatLinkedAt, linkForField } from "@/lib/platformLinks";
 
 // Socials (#258): je Feld ein Plattform-Symbol, eine eingefügte Adresse wird
 // sofort zum Nutzernamen, daneben ein Vorschau-Link. Der Twitch-Schalter
@@ -57,9 +57,19 @@ function SocialField({ platform, value, onChange, link, linkable, onLink, onUnli
           </a>
         ) : null}
         {platformKey && link && (
-          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-white/55 hover:text-[#FF3B30]">
-            <Unlink className="w-3 h-3" aria-hidden="true" /> Trennen
-          </button>
+          <>
+            <span className="text-[11px] text-white/45" data-testid={`${testId}-linked-since`}>
+              verknüpft{link.display_name ? ` als ${link.display_name}` : ""}{formatLinkedAt(link.linked_at) ? ` seit ${formatLinkedAt(link.linked_at)}` : ""}
+            </span>
+            {link.url && (
+              <a href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-official`} className="inline-flex items-center gap-1 text-[11px] text-[#29B6E8] hover:text-white">
+                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" /> Bei {platform.l} öffnen
+              </a>
+            )}
+            <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-white/55 hover:text-[#FF3B30]">
+              <Unlink className="w-3 h-3" aria-hidden="true" /> Trennen
+            </button>
+          </>
         )}
         {platformKey && !link && (
           <button type="button" onClick={() => onLink(platformKey)} disabled={!linkable} title={linkable ? undefined : "Auf der Website noch nicht eingerichtet"} data-testid={`${testId}-link`} className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">

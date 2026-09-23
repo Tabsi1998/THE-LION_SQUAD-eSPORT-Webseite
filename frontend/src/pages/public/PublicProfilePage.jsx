@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { formatLinkedAt } from "@/lib/platformLinks";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
@@ -282,6 +283,7 @@ export default function PublicProfilePage() {
     ? liveStreams.find((stream) => stream.twitch_login === twitchChannel || stream.username === profile.username || stream.user_id === profile.id)
     : null;
   const socialLinks = publicSocialLinks(profile, twitchUrl);
+  const linkedAccounts = Array.isArray(profile?.linked_accounts) ? profile.linked_accounts : [];
   const gamingIds = publicGamingIds(profile);
   const profileReferences = Array.isArray(profile.references)
     ? { items: profile.references, stats: { total: profile.references.length, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } }
@@ -593,6 +595,7 @@ export default function PublicProfilePage() {
                 </div>
               )}
 
+              {linkedAccounts.length > 0 && <LinkedAccountsCard accounts={linkedAccounts} />}
               {socialLinks.length > 0 && <ProfileLinksCard links={socialLinks} />}
               {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
 
@@ -918,6 +921,53 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
   );
 }
 
+// Verknüpfte Konten (#260): jedes per Anmeldung bestätigte Konto bekommt einen Rahmen in der
+// Plattformfarbe, den Anzeigenamen, das Datum und die offizielle Adresse - man sieht, dass es echt
+// ist und wohin es geht. Die Socials-Leiste darunter bleibt für alles Getippte.
+export function LinkedAccountsCard({ accounts }) {
+  return (
+    <div className="border border-[#00FF88]/25 rounded-sm bg-[#121212] p-4" data-testid="public-profile-linked">
+      <h2 className="font-heading text-xl font-bold uppercase mb-1 flex items-center gap-2">
+        <BadgeCheck className="w-4 h-4 text-[#00FF88]" /> Verknüpfte Konten
+      </h2>
+      <p className="text-[11px] text-white/45 mb-3">Per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {accounts.map((account) => {
+          const meta = socialMeta(account);
+          const since = formatLinkedAt(account.linked_at);
+          const inner = (
+            <>
+              <span className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 border-[var(--social-color)] text-[var(--social-color)] bg-black/40">
+                <SocialIcon kind={meta.key} className="w-5 h-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 font-bold text-white text-sm">
+                  <span className="truncate">{account.display_name || account.handle}</span>
+                  <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`linked-account-${account.platform}-verified`} />
+                </span>
+                <span className="block text-[11px] text-white/50 truncate">
+                  {meta.label}{account.handle && account.handle !== account.display_name ? ` · ${account.handle}` : ""}{since ? ` · seit ${since}` : ""}
+                </span>
+              </span>
+              {account.url && <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />}
+            </>
+          );
+          const className = "flex items-center gap-3 border rounded-sm px-3 py-2.5 border-[var(--social-color)]/50 bg-[#0A0A0A] shadow-[0_0_18px_-6px_var(--social-color)] transition";
+          const style = { "--social-color": meta.color };
+          if (account.url) {
+            return (
+              <a key={account.platform} href={account.url} target="_blank" rel="noopener noreferrer" title={`${meta.label}-Konto öffnen`} data-testid={`linked-account-${account.platform}`} className={`${className} hover:border-[var(--social-color)] hover:bg-white/[0.03]`} style={style}>
+                {inner}
+              </a>
+            );
+          }
+          return <div key={account.platform} data-testid={`linked-account-${account.platform}`} className={className} style={style}>{inner}</div>;
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ProfileLinksCard({ links }) {
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-socials">
@@ -928,7 +978,7 @@ function ProfileLinksCard({ links }) {
         {links.map((link) => {
           const meta = socialMeta(link);
           const key = `${meta.key}:${link.url || link.value}`;
-          const className = "relative inline-flex h-10 w-10 items-center justify-center border border-white/10 bg-[#0A0A0A] rounded-sm text-white/70 transition hover:bg-white/[0.03]";
+          const className = `relative inline-flex h-10 w-10 items-center justify-center border bg-[#0A0A0A] rounded-sm transition hover:bg-white/[0.03] ${link.verified ? "border-[var(--social-color)] text-[var(--social-color)] shadow-[0_0_14px_-4px_var(--social-color)]" : "border-white/10 text-white/70"}`;
           const style = { "--social-color": meta.color };
           if (link.url) {
             return (

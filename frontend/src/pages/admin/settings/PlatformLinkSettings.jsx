@@ -32,6 +32,11 @@ export function PlatformLinkSettings({ brand, setBrandField, saving, onSave, onC
         <div>
           <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#29B6E8]" /> Konten verknüpfen (Discord, Twitch, Steam)</div>
           <p className="text-xs text-white/50 mt-1">Mitglieder verknüpfen ihr Discord-, Twitch- oder Steam-Konto im Profil per Anmeldung bei der Plattform – der Eintrag wird befüllt und als „verifiziert“ markiert. Dafür braucht die Website eine Discord-App; Twitch nimmt die Helix-App aus dem Twitch-Reiter, Steam braucht keine.</p>
+          <ul className="text-xs text-white/50 mt-2 space-y-1 list-disc pl-4" data-testid="platform-link-howto">
+            <li><strong className="text-white/70">Discord:</strong> Client ID und Client Secret stehen im Discord Developer Portal bei derselben App wie der Bot (Reiter OAuth2). Ohne beides bleibt „Mit Discord verknüpfen“ im Profil ausgegraut.</li>
+            <li><strong className="text-white/70">Twitch:</strong> in der Twitch Developer Console bei der App unter „OAuth Redirect URLs“ die Rückrufadresse unten genau so eintragen (ohne Schrägstrich am Ende), Client-Typ „Confidential“. Fehlt sie, lehnt Twitch die Anmeldung ab – der Grund steht dann im Profil.</li>
+            <li><strong className="text-white/70">Steam:</strong> nichts einzurichten; der Schlüssel liefert nur den Anzeigenamen statt der SteamID.</li>
+          </ul>
         </div>
         <div className="text-[10px] font-bold uppercase tracking-wider text-right space-y-1 shrink-0">
           <div className={discordReady ? "text-[#00FF88]" : "text-[#FFD700]"} data-testid="platform-link-discord-state">Discord: {discordReady ? "bereit" : "fehlt"}</div>
