@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from services.dolibarr_policy import CLUB_TZ
 
 SOON_HOURS = 24
+SPONSOR_WARNING_DAYS = 30
 TODAY_MATCH_STATUSES = ("scheduled", "ready", "in_progress", "waiting_result")
 
 
@@ -44,6 +45,11 @@ async def task_counts(db, now: datetime | None = None) -> dict:
         "schedule_deadlines": await db.matches_v2.count_documents({"schedule_status": "proposed", "schedule_deadline_at": {"$lte": soon}}),
         # Prüffälle der Abrechnung (#321): Storno mit Beleg, Überzahlung, Abweichung - wartet auf Finanzen.
         "billing_cases": await db.billing_cases.count_documents({"status": "open"}),
+        # Sponsoring läuft in den nächsten 30 Tagen aus (#405) - rechtzeitig verlängern oder verabschieden.
+        "sponsors_expiring": await db.sponsors.count_documents({
+            "is_active": {"$ne": False}, "contract_status": {"$nin": ["paused", "cancelled"]},
+            "contract_end": {"$gte": now.date().isoformat(), "$lte": (now + timedelta(days=SPONSOR_WARNING_DAYS)).date().isoformat()},
+        }),
     }
 
 

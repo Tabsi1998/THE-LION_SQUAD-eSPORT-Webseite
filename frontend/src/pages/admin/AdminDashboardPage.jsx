@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -16,6 +16,7 @@ function StatusDot({ ok }) {
 export default function AdminDashboardPage() {
   const auth = useAuth();
   const canFinance = typeof auth?.can === "function" && auth.can("finance");
+  const canContent = typeof auth?.can === "function" && auth.can("content");
   const [data, setData] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
   const [sys, setSys] = useState(null);
@@ -86,6 +87,7 @@ export default function AdminDashboardPage() {
   const contactMessages = Number(daily.contact_messages || 0);
   const scheduleDeadlines = Number(daily.schedule_deadlines || 0);
   const billingCases = Number(daily.billing_cases || 0);
+  const sponsorsExpiring = Number(daily.sponsors_expiring || 0);
   const today = Array.isArray(data?.today) ? data.today : [];
   const taskItems = [
     {
@@ -142,6 +144,15 @@ export default function AdminDashboardPage() {
       icon: Wallet,
       tone: billingCases > 0 ? "#FF3B30" : "#00FF88",
       key: "billing-cases",
+    }] : []),
+    // Sponsoring läuft aus (#405): 30 Tage vorher, damit verlängert oder verabschiedet wird - nur für die Redaktion.
+    ...(canContent ? [{
+      label: "Sponsoring läuft aus",
+      detail: `${sponsorsExpiring} Verträge enden in 30 Tagen`,
+      to: "/admin/sponsors",
+      icon: Star,
+      tone: sponsorsExpiring > 0 ? "#FFD700" : "#00FF88",
+      key: "sponsors-expiring",
     }] : []),
     {
       label: "Mitgliedsanträge",
@@ -238,6 +249,7 @@ export default function AdminDashboardPage() {
     if (item.to === "/setup") return Boolean(setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100));
     if (item.to === "/admin/tournaments?status=live") return Number(data?.open_disputes || 0) > 0;
     if (item.to === "/admin/membership-applications?status=pending") return pendingApplications > 0;
+    if (item.to === "/admin/sponsors") return sponsorsExpiring > 0;
     if (item.to === "/admin/tournaments?status=registration_open") return pendingRegistrations > 0;
     if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
     if (item.to === "/admin/mobile-push") return pushErrors > 0;

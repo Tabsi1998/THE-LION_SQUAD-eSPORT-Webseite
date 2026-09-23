@@ -178,7 +178,8 @@ async def _safe_discord_bot_roles():
 
 
 async def _safe_dolibarr_public():
-    """Vereinsdaten und Vorstand aus Dolibarr (#326): stündlich nachlesen, alter Stand bleibt bei Fehlern."""
+    """Vereinsdaten und Vorstand (#326) sowie Sponsoren und Partner (#405) aus Dolibarr: stündlich
+    nachlesen, alter Stand bleibt bei Fehlern."""
     try:
         from services.club_facts import refresh_due
         res = await refresh_due()
@@ -186,6 +187,13 @@ async def _safe_dolibarr_public():
             logger.info(f"[scheduler] dolibarr_public {res}")
     except Exception as exc:
         _log_task_failure("dolibarr_public", exc)
+    try:
+        from services.dolibarr_sponsors import refresh_due as refresh_sponsors
+        res = await refresh_sponsors()
+        if res.get("ok"):
+            logger.info(f"[scheduler] dolibarr_sponsors {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_sponsors", exc)
 
 
 async def _safe_billing_reconcile():
