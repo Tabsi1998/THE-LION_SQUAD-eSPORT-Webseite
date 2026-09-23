@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
 import { ArrowDown } from "lucide-react";
 import { ChatMessageAttachments } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker } from "@/components/tls/ChatStickers";
@@ -117,6 +118,7 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
                 {message.message ? <div className={`whitespace-pre-wrap break-words text-sm text-white/85 ${showHeader ? "mt-1" : ""}`}>{message.message}</div> : null}
                 <ChatMessageAttachments attachments={message.attachments} />
                 <ChatMessageSticker sticker={message.sticker} />
+                <ModerationStateBadge moderation={message.moderation} />
               </div>
             </div>
           );

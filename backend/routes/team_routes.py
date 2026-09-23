@@ -11,6 +11,7 @@ from services.notification_preferences import send_user_template
 from services.user_notifications import build_public_url, create_user_notification
 from services.chat_attachments import MAX_ATTACHMENTS_PER_MESSAGE, chat_message_preview, claim_attachments
 from services.query_filters import safe_regex
+from services import word_filter
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
 
@@ -379,6 +380,7 @@ async def list_team_chat(team_id: str, me: dict = Depends(get_current_user)):
         {"_id": 0},
     ).sort("created_at", -1).to_list(150)
     messages.reverse()
+    messages = [word_filter.public_moderation(m) for m in messages if word_filter.visible_to(m, me["id"])]
     return await _enrich_team_chat(messages)
 
 
@@ -410,9 +412,14 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
         "created_at": now,
         "updated_at": now,
     }
+    verdict = await word_filter.screen_message(db, message, kind="team", context={"team_id": team_id, "member_ids": [*(team.get("member_ids") or []), me["id"]]})
     await db.team_chat_messages.insert_one(message)
-    # Team chat is not a public resource; only members (and the sender) are told.
     from services.change_events import publish_user_change
+    if verdict == "hold":
+        await publish_user_change([me["id"]], "teams")
+        message.pop("_id", None)
+        return (await _enrich_team_chat([word_filter.public_moderation(message)]))[0]
+    # Team chat is not a public resource; only members (and the sender) are told.
     await publish_user_change([*(team.get("member_ids") or []), me["id"]], "teams")
     mentioned_user_ids = await _notify_team_mentions(db, team, me, message)
     await _notify_team_chat_message(db, team, me, message, mentioned_user_ids)
@@ -422,7 +429,7 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     except Exception:
         pass
     message.pop("_id", None)
-    enriched = await _enrich_team_chat([message])
+    enriched = await _enrich_team_chat([word_filter.public_moderation(message)])
     return enriched[0]
 
 
@@ -586,6 +593,7 @@ async def create_team(body: TeamCreate, me: dict = Depends(get_current_user)):
     if await db.teams.find_one({"tag": body.tag}):
         raise HTTPException(status_code=409, detail="Team-Tag bereits vergeben")
     team_id = new_id()
+    await word_filter.screen_field(db, f"{body.name} {body.tag}", kind="team_name", user_id=me["id"], ref_id=team_id)
     doc = {
         "id": team_id,
         "name": body.name,
@@ -638,6 +646,8 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     nullable_fields = {"description", "logo_url", "banner_url", "discord_link", "social_links"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if updates.get("name") or updates.get("tag"):
+        await word_filter.screen_field(db, f"{updates.get('name') or ''} {updates.get('tag') or ''}", kind="team_name", user_id=me["id"], ref_id=team_id)
     updates["updated_at"] = now_utc().isoformat()
     await db.teams.update_one({"id": team_id}, {"$set": updates})
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})

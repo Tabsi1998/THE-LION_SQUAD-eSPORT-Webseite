@@ -32,6 +32,7 @@ from services.match_planning import ensure_station_slot_available, ensure_tourna
 from services.match_v2_results import MatchV2ResultError
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from services.rate_limit import enforce_rate_limit
+from services import word_filter
 from services.station_labels import attach_station_info
 from services.user_notifications import create_user_notification
 from services.v2_result_submission import submit_v2_result
@@ -825,6 +826,7 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
         {"match_id": match_id},
         {"_id": 0},
     ).sort("created_at", 1).to_list(500)
+    messages = [word_filter.public_moderation(m) for m in messages if word_filter.visible_to(m, (user or {}).get("id"))]
     users = await _public_user_map(list({m.get("user_id") for m in messages if m.get("user_id")}))
     for message in messages:
         message["author"] = users.get(message.get("user_id"))
@@ -868,11 +870,13 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
         "created_at": now_iso,
         "updated_at": now_iso,
     }
+    verdict = await word_filter.screen_message(db, doc, kind="match", context={"match_id": match_id, "tournament_id": match.get("tournament_id")})
     await db.match_chat_messages.insert_one(doc)
-    try:
-        await _notify_match_chat_message(db, match, collection, me, doc)
-    except Exception:
-        pass
+    if verdict != "hold":
+        try:
+            await _notify_match_chat_message(db, match, collection, me, doc)
+        except Exception:
+            pass
     try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
