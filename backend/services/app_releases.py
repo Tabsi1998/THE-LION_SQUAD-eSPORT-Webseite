@@ -208,3 +208,23 @@ def release_file(doc: dict) -> Path | None:
 
 def next_check_after() -> str:
     return (now_utc() + timedelta(minutes=CHECK_INTERVAL_MINUTES)).isoformat()
+
+
+# Server-Updater als Schalter (#421): Play-Installationen bekommen Googles Update-Dialog; die
+# Server-APK ist nur für Sideload und den Notfall. Sobald die App öffentlich im Play Store ist,
+# schaltet der Betreiber den Server-Updater ab - dann zeigt auch eine Sideload-App nur noch Play.
+SETTINGS_ID = "app_releases"
+
+
+async def updater_settings(db) -> dict:
+    doc = await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0}) or {}
+    return {"server_updater_enabled": doc.get("server_updater_enabled", True) is not False}
+
+
+async def set_updater_settings(db, *, server_updater_enabled: bool, by: str | None = None) -> dict:
+    await db.settings.update_one(
+        {"id": SETTINGS_ID},
+        {"$set": {"server_updater_enabled": bool(server_updater_enabled), "updated_at": now_utc().isoformat(), "updated_by": by}},
+        upsert=True,
+    )
+    return await updater_settings(db)

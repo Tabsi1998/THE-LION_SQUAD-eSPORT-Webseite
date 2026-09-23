@@ -30,6 +30,9 @@ export default function AdminAppReleasesPage() {
   const confirm = useConfirm();
   const [rows, setRows] = useState([]);
   const [tokenStatus, setTokenStatus] = useState(null);
+  // Server-Updater an/aus (#421): Play-Installationen nehmen Googles Dialog; die Server-APK ist für
+  // Sideload und den Notfall - sobald die App öffentlich ist, schaltet der Betreiber sie hier ab.
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ version: "", build: "", notes: "", min_build: "", set_current: true, file: null });
@@ -37,12 +40,14 @@ export default function AdminAppReleasesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data }, statusResult] = await Promise.all([
+      const [{ data }, statusResult, settingsResult] = await Promise.all([
         api.get("/admin/app-releases"),
         api.get("/admin/app-releases/status").catch(() => ({ data: null })),
+        api.get("/admin/app-releases/settings").catch(() => ({ data: null })),
       ]);
       setRows(Array.isArray(data) ? data : []);
       setTokenStatus(statusResult?.data?.upload_token || null);
+      setSettings(settingsResult?.data && typeof settingsResult.data.server_updater_enabled === "boolean" ? settingsResult.data : null);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     } finally {
@@ -97,6 +102,16 @@ export default function AdminAppReleasesPage() {
     }
   };
 
+  const toggleServerUpdater = async (enabled) => {
+    try {
+      const { data } = await api.patch("/admin/app-releases/settings", { server_updater_enabled: enabled });
+      setSettings(data);
+      toast.success(enabled ? "Server-Updater ist an." : "Server-Updater ist aus – Updates nur noch über Google Play.");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+  };
+
   const setMinBuild = async (row) => {
     const value = window.prompt(`Ab welchem Build ist das Update Pflicht? (0 = keine Pflicht)`, String(row.min_build || 0));
     if (value === null) return;
@@ -135,6 +150,18 @@ export default function AdminAppReleasesPage() {
               {tokenStatus.configured
                 ? "Das Release-Skript kann die APK nach dem Veröffentlichen selbst ablegen."
                 : `${tokenStatus.env} in der Server-.env setzen (mindestens ${tokenStatus.min_length} Zeichen), docker-compose reicht es durch, danach update.sh. Bis dahin: APK unten von Hand hochladen.`}
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {settings ? (
+        <div className="mb-6 flex items-start gap-3 rounded-sm border border-white/10 bg-[#121212] px-4 py-3 text-sm" data-testid="app-release-server-updater">
+          <input id="app-release-server-updater-toggle" type="checkbox" checked={settings.server_updater_enabled} onChange={(e) => toggleServerUpdater(e.target.checked)} data-testid="app-release-server-updater-toggle" className="mt-1" />
+          <div>
+            <label htmlFor="app-release-server-updater-toggle" className="block font-bold cursor-pointer">Server-Updater anbieten (APK vom Vereinsserver)</label>
+            <div className="text-white/55">
+              Geräte, die die App über Google Play haben, bekommen Updates immer von Google – die Server-APK lässt sich dort nicht installieren.
+              Der Schalter gilt für Sideload-Geräte: an, solange die App nur im Test läuft; aus, sobald sie öffentlich im Play Store ist – dann zeigt auch die Server-Version nur noch den Play Store.
             </div>
           </div>
         </div>

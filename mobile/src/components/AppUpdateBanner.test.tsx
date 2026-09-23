@@ -69,3 +69,23 @@ test("ein Pflicht-Update hat kein „Später“, ein normales schon", async () =
   await fireEvent.press(screen.getByTestId("app-update-later"));
   expect(onLater).toHaveBeenCalledTimes(1);
 });
+
+// Herkunft Google Play (#421): kein Download, „Update starten“ öffnet Googles Dialog; klappt der
+// nicht, die Store-Seite.
+test("über Google Play: Update starten statt herunterladen, Store als Rückfall", async () => {
+  const { Linking } = jest.requireActual("react-native");
+  const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  const downloader = jest.fn();
+  const onStartPlayUpdate = jest.fn(async () => false);
+  await render(
+    <AppUpdateBanner release={release} mandatory onLater={jest.fn()} onWhatsNew={jest.fn()} token={null} path="play" onStartPlayUpdate={onStartPlayUpdate} downloader={downloader} installer={jest.fn()} />,
+  );
+  expect(screen.queryByTestId("app-update-download")).toBeNull();
+  expect(screen.getByText(/kommt über den Play Store/)).toBeTruthy();
+
+  await fireEvent.press(screen.getByTestId("app-update-play"));
+  await waitFor(() => expect(onStartPlayUpdate).toHaveBeenCalledWith(true));
+  await waitFor(() => expect(openUrl).toHaveBeenCalledWith("market://details?id=at.lionsquad.app"));
+  expect(downloader).not.toHaveBeenCalled();
+  openUrl.mockRestore();
+});

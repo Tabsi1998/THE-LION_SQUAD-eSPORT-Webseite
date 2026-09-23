@@ -1,4 +1,4 @@
-import { decideUpdate, progressShare, releaseSizeLabel, releaseTitle, shouldCheck, verifyDownload, type AppRelease } from "./appUpdate";
+import { decideUpdate, progressShare, releaseSizeLabel, releaseTitle, shouldCheck, updatePath, verifyDownload, type AppRelease } from "./appUpdate";
 
 // Update aus der App (#250): wann gefragt wird, wann der Banner erscheint,
 // wann ein Download als heil gilt.
@@ -41,4 +41,15 @@ test("eine unvollständige oder fremde Datei wird nicht installiert", () => {
   expect(verifyDownload(release, { size: 100 })).toMatch(/unvollständig/);
   expect(verifyDownload(release, { size: 52_428_800, md5: "ffff" })).toMatch(/Prüfsumme/);
   expect(verifyDownload({ ...release, md5: null }, { size: 52_428_800, md5: "egal" })).toBeNull();
+});
+
+// Herkunft der App (#421): Play-Installationen nehmen Googles Weg; die Server-APK nur, solange
+// der Betreiber sie anbietet.
+test("updatePath: Play bleibt Play, Sideload nimmt den Server - außer der Updater ist aus", () => {
+  const info = { current: null, update_available: true, mandatory: false } as const;
+  expect(updatePath("play", info)).toBe("play");
+  expect(updatePath("sideload", info)).toBe("server");
+  expect(updatePath("unknown", info)).toBe("server");
+  expect(updatePath("sideload", { ...info, server_updater_enabled: false })).toBe("play");
+  expect(updatePath("unknown", null)).toBe("server");
 });

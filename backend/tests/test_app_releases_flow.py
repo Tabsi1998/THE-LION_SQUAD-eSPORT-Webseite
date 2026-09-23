@@ -149,3 +149,29 @@ async def test_the_admin_sees_whether_the_server_has_an_upload_token(flow, monke
     player = await flow.add_user(role="player", name="spieler")
     flow.act_as(player)
     assert (await flow.get("/api/admin/app-releases/status")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_server_updater_switch_reaches_the_app_and_only_club_admins_flip_it(flow):
+    """Server-Updater an/aus (#421): Standard an; der Club-Admin schaltet, die App liest es mit."""
+    admin = await flow.add_user(role="club_admin", name="clubadmin")
+    flow.act_as(admin)
+    assert (await upload(flow)).status_code == 200
+    assert (await flow.get("/api/admin/app-releases/settings")).json() == {"server_updater_enabled": True}
+
+    player = await flow.add_user(role="player", name="spieler")
+    flow.act_as(player)
+    info = (await flow.get("/api/mobile/app-version?build=62")).json()
+    assert info["server_updater_enabled"] is True
+    assert info["play_store_url"].endswith("id=at.lionsquad.app")
+    denied = await flow.client.patch("/api/admin/app-releases/settings", json={"server_updater_enabled": False})
+    assert denied.status_code == 403
+
+    flow.act_as(admin)
+    flipped = await flow.client.patch("/api/admin/app-releases/settings", json={"server_updater_enabled": False})
+    assert flipped.status_code == 200, flipped.text
+    assert flipped.json() == {"server_updater_enabled": False}
+    flow.act_as(player)
+    assert (await flow.get("/api/mobile/app-version?build=62")).json()["server_updater_enabled"] is False
+    # Die {build}-Routen bleiben unberührt: „settings“ ist keine Buildnummer.
+    assert (await flow.get("/api/admin/app-releases")).status_code == 403

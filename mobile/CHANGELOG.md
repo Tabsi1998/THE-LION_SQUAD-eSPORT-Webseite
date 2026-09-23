@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.0-beta - 2026-09-23
+
+- Mobile: Updates je nach Herkunft der App – kommt sie über Google Play, öffnet sich Googles eigener Update-Dialog (bei Pflicht-Updates sofort), und der Banner führt in den Play Store statt eine APK zu laden, die sich über eine Play-Installation nicht installieren lässt. Die APK vom Vereinsserver bleibt für Geräte ohne Play; der Vorstand kann sie unter App-Versionen abschalten, sobald die App öffentlich ist (#421).
+
 ## 0.16.0-beta - 2026-09-23
 
 - Mobile: Kostenpflichtige Events lassen sich in der App anmelden wie im Web – Preis je Person oder je Anmeldung, wählbare Zusätze, Summe mit Begleitpersonen, Kostenhaken als Pflicht; an der eigenen Anmeldung stehen Betrag und Zahlungsstand. Vorher antwortete der Server mit 400, weil die App die Positionen nicht schickte (#396).
