@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Handshake, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Handshake, Pencil, Plus, Trash2 } from "lucide-react";
 
 const emptyPartner = {
   name: "",
@@ -45,7 +48,7 @@ export default function AdminPartnersPage() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Partner</h1>
           <p className="mt-2 text-white/60 text-sm max-w-xl">Befreundete Vereine, Veranstalter und Communitys für die öffentliche Partnerseite.</p>
         </div>
-        <button onClick={() => setEditing(emptyPartner)} className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+        <button onClick={() => setEditing(emptyPartner)} data-testid="partner-new" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neuer Partner
         </button>
       </div>
@@ -106,42 +109,18 @@ function PartnerForm({ partner, onClose, onSaved }) {
     }
   };
 
+  // Seitenblatt statt Fenster (#435): die Liste bleibt daneben sichtbar.
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <form onSubmit={save} className="bg-[#121212] border border-white/10 rounded-sm max-w-lg w-full p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <h3 className="font-heading text-xl font-bold uppercase">{isNew ? "Neuer Partner" : "Partner bearbeiten"}</h3>
-          <button type="button" onClick={onClose} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
-        </div>
-        <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required />
-        <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
-        <Field label="Link" value={form.link} onChange={(v) => set("link", v)} placeholder="https://…" />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" />
-          <Field label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} />
-        </div>
-        <label className="inline-flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.is_active !== false} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" />
-          Aktiv
-        </label>
-        <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Beschreibung</div>
-          <textarea rows={3} value={form.description || ""} onChange={(e) => set("description", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        </label>
-        <div className="flex gap-2 pt-2">
-          <button type="submit" disabled={saving} className="flex-1 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, required, placeholder, type = "text" }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} required={required} placeholder={placeholder} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
+    <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
+      <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" />
+      <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
+      <TextField label="Link" value={form.link} onChange={(v) => set("link", v)} placeholder="https://…" testId="partner-link" />
+      <FormGrid>
+        <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" />
+        <TextField label="Reihenfolge" type="number" value={form.order_index} onChange={(v) => set("order_index", Number(v) || 0)} testId="partner-order" />
+      </FormGrid>
+      <CheckField label="Aktiv" checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="partner-active" />
+      <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="partner-description" />
+    </AdminSheet>
   );
 }
