@@ -16,7 +16,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_locations, pricing
-from services.permissions import user_has_area
+from services.permissions import areas_for, user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -172,7 +172,12 @@ def _registration_seats(registration: dict) -> int:
     return 1 + max(0, companion_count)
 
 
-def _public_event_registration(registration: dict, is_staff: bool = False) -> dict:
+def _public_event_registration(registration: dict, is_staff: bool = False, with_price: bool | None = None) -> dict:
+    """Eine Anmeldung, wie andere sie sehen dürfen.
+
+    `is_staff` gibt Status, Begleitpersonen, E-Mail und Notiz frei; `with_price` den eingefrorenen
+    Preis (ohne Angabe: wie `is_staff`). Der Vorstand sieht die Teilnehmer, aber kein Geld (#397).
+    """
     payload = {
         "id": registration.get("id"),
         "user_id": registration.get("user_id"),
@@ -184,7 +189,7 @@ def _public_event_registration(registration: dict, is_staff: bool = False) -> di
         "updated_at": registration.get("updated_at"),
     }
     snapshot = registration.get("price_snapshot")
-    if snapshot and is_staff:
+    if snapshot and (is_staff if with_price is None else with_price):
         # Nur die eigene Anmeldung (is_staff=True in own_registration) und die Verwaltung sehen den
         # eingefrorenen Preis - in der öffentlichen Teilnehmerliste steht kein Geld. Dolibarr-Nummern nie.
         payload["price"] = {
@@ -413,8 +418,18 @@ async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
 
 
 async def _attach_event_registration_view(event: dict, user: dict | None) -> None:
+    """Eigene Anmeldung und Teilnehmerliste - mit den Rechten, die der Server kennt (#397).
+
+    Wer Turniere leitet (Bereich `tournaments`, damit auch die Staff-Rollen) oder im Vorstand ist
+    (Bereich `club`), sieht alle Anmeldungen mit Status, Begleitpersonen und Notiz; Geld nur, wer
+    Finanzen hat oder eine Staff-Rolle (wie bisher). Einchecken darf nur die Turnierleitung - die
+    App liest `participant_view` und `can_check_in`, statt Rollen selbst zu deuten.
+    """
     db = get_db()
     is_staff = bool(user and user.get("role") in STAFF_ROLES)
+    areas = await areas_for(user) if user else set()
+    manages = is_staff or bool(areas & {"tournaments", "club"})
+    sees_price = is_staff or "finance" in areas
     event["own_registration"] = None
     if user:
         own = await db.event_registrations.find_one(
@@ -423,15 +438,17 @@ async def _attach_event_registration_view(event: dict, user: dict | None) -> Non
         )
         if own:
             event["own_registration"] = _public_event_registration(own, is_staff=True)
-    if event.get("show_participants") or is_staff:
-        statuses = ADMIN_EVENT_REGISTRATION_STATUSES if is_staff else PUBLIC_EVENT_REGISTRATION_STATUSES
+    if event.get("show_participants") or manages:
+        statuses = ADMIN_EVENT_REGISTRATION_STATUSES if manages else PUBLIC_EVENT_REGISTRATION_STATUSES
         regs = await db.event_registrations.find(
             {"event_id": event["id"], "status": {"$in": list(statuses)}},
             {"_id": 0},
         ).sort("created_at", 1).to_list(2000)
-        event["registrations"] = [_public_event_registration(r, is_staff=is_staff) for r in regs]
+        event["registrations"] = [_public_event_registration(r, is_staff=manages, with_price=manages and sees_price) for r in regs]
     else:
         event["registrations"] = []
+    event["participant_view"] = "staff" if manages else ("public" if event.get("show_participants") else "none")
+    event["can_check_in"] = "tournaments" in areas
 
 
 async def _attach_event_sponsors(event: dict) -> None:

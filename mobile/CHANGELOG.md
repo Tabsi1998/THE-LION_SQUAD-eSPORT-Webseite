@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.0-beta - 2026-09-23
+
+- Mobile: Kostenpflichtige Events lassen sich in der App anmelden wie im Web – Preis je Person oder je Anmeldung, wählbare Zusätze, Summe mit Begleitpersonen, Kostenhaken als Pflicht; an der eigenen Anmeldung stehen Betrag und Zahlungsstand. Vorher antwortete der Server mit 400, weil die App die Positionen nicht schickte (#396).
+- Mobile: Wer Turniere leitet oder im Vorstand ist, sieht bei Events die angemeldeten Teilnehmer ausklappbar mit Status, Begleitpersonen, Hinweis und E-Mail; die Turnierleitung checkt direkt ein. Öffentliche Teilnehmerlisten zeigen wie im Web nur Namen. Vereinsinterne Events tragen im Detail das Kennzeichen (#397).
+
 ## 0.15.0-beta - 2026-09-23
 
 - Mobile: „Konto löschen“ in den Profil-Einstellungen: dein Konto wird dauerhaft anonymisiert – derselbe Weg wie auf der Website, zweimal bestätigt. Google Play verlangt das, weil man sich in der App registrieren kann (#390).

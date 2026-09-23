@@ -38,7 +38,24 @@ export type TournamentPrice = {
   billing_status?: string;
   invoice_ref?: string | null;
   invoice_status?: string | null;
+  payment_state?: string | null;
   payer_user_id?: string | null;
+};
+
+// Eine Event-Anmeldung, wie der Server sie zeigt (#396, #397): E-Mail, Notiz und Preis stehen nur
+// an der eigenen Anmeldung und in der Sicht der Verwaltung.
+export type EventRegistration = {
+  id?: string;
+  user_id?: string | null;
+  display_name?: string | null;
+  status?: string;
+  companion_count?: number;
+  seat_count?: number;
+  note?: string | null;
+  internal_note?: string | null;
+  email?: string | null;
+  price?: TournamentPrice | null;
+  created_at?: string | null;
 };
 
 export type Tournament = {
@@ -253,7 +270,13 @@ export type ClubEvent = {
   registration_closes_at?: string | null;
   allow_companions?: boolean;
   max_companions_per_registration?: number | null;
-  own_registration?: { id?: string; status?: string; display_name?: string | null; companion_count?: number; seat_count?: number } | null;
+  own_registration?: EventRegistration | null;
+  // Kosten am Event (#396) - dieselbe Form wie das Startgeld am Turnier, ohne Dolibarr-Nummern.
+  offer?: TournamentOffer | null;
+  // Teilnehmer (#397): "staff" mit Status und Begleitpersonen, "public" nur Namen, "none" gar nicht.
+  registrations?: EventRegistration[];
+  participant_view?: "staff" | "public" | "none";
+  can_check_in?: boolean;
   content_embeds?: ContentEmbed[];
 };
 
