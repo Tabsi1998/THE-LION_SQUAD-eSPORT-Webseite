@@ -216,6 +216,55 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Admin-Formulare und Seitenblatt (#434, #435; PRs #438, #440, #441, #442;
+  nur Web). Ein Rahmen für Anlegen und Bearbeiten:
+  `components/tls/AdminForm.jsx` (`AdminFormPage` = Kopf mit Zurück-Link,
+  `FormColumns` = Inhalt links und Seitenleiste 20–24 rem rechts ab 1280 px,
+  darunter eine Spalte; `FormSection` auch `collapsible` oder `plain`;
+  `FormGrid` 2/3/4 Spalten; `FormActions` = feststehende Speichern-Leiste,
+  `onSubmitClick` für Seiten ohne eigenes `<form>`), `FormFields.jsx`
+  (`TextField` mit `suggestions`/`maxLength`, `SelectField` nimmt
+  `[wert, text]` und `{k, l}`, `CheckField` mit `hint`/`accent`,
+  `TextAreaField`, `FieldLabel`, `INPUT_CLASS`), `AdminSheet.jsx`
+  (Seitenblatt von rechts, `size` md/lg/xl = 36/44/56 rem, am Handy
+  Vollbild, Esc und Klick daneben schließen, `footer` für eigene Knöpfe,
+  ohne `onSubmit` ein `<div>`). Editor-Seiten: Turnier neu, Fast Lap neu,
+  Turnier bearbeiten (Reiter „Bearbeiten“), Fast Lap bearbeiten
+  (Einstellungen), Event `/admin/events/new|:id` (`AdminEventEditPage`),
+  News `/admin/news/new|:id` (`AdminNewsEditPage`; alte `?edit=` leiten
+  weiter; Daten aus derselben Liste wie die Übersicht). Seitenblätter:
+  Sponsoren, Partner, Vorstand, Referenzen (#441); Spiele, Auszeichnungen,
+  Jahreswertung, Sticker, Stationen-Zuweisen, Dokumente, Galerie (Album,
+  Abschnitt, Video-Link), Vorteile, Mitgliedschaft, Mitgliederprofile,
+  Bewerbung, Benutzer anlegen (#442). Jeder PR, der Lint-Verstöße
+  entfernt, muss `yarn lint:prune` laufen lassen (`eslint-suppressions.json`,
+  sonst „suppressions left“ = Fehler) – die Datei kollidiert zwischen
+  parallelen PRs, deshalb stapeln. Tests `AdminForm.test.jsx` (4),
+  `AdminSheet.test.jsx` (3), `AdminEventEditPage.test.jsx` (3),
+  `AdminNewsEditPage.test.jsx` (3), `AdminF1EditPage.test.jsx` (2),
+  `AdminPartnersPage.test.jsx` (2), `AdminGamesPage.test.jsx` (1); E2E
+  `admin-tournament-new.spec.js` +1 (1920 px), `admin-forms.spec.js`
+  (#436, PR #443: 1920/1024/390 px mit Screenshots).
+- Startseite III (#431; PR #433; nur Web). `PublicLayout`: Streifen
+  `footer-cta` ganz oben im Footer über den Sponsoren mit `footer-buttons`
+  (Discord-Knopf, Play-Badge bzw. „bald bei Google Play“), Kontaktspalte
+  ohne Knöpfe; `HomePage` ohne `AppStrip`, `BoardTeaser` als eigener
+  Abschnitt unter „Aktuelle News“ (Bild `w-16/20`, Name in `font-heading`,
+  bis `lg:grid-cols-4`), `hero-join` nur für Gäste; `UserMenu` Grundklasse
+  ohne Textfarbe (Mitgliederbereich Gold mit Goldgrund, Admin Blau, Abmelden
+  Rot – `text-white/80` hatte die Akzente überstimmt). Tests
+  `HomePage.test.jsx` (DOM-Reihenfolge, +1), `UserMenu.test.jsx`
+  (Farbklassen).
+- Turnierbaum neu (#399; PR #430; nur Web). `components/tls/BracketTree.jsx`
+  komplett neu: `connectorTargets(countFrom, countTo)`,
+  `nextMatchFor(matches, mineId)`, `KnockoutTree` mit per ResizeObserver
+  gemessenen SVG-Verbindungslinien (Spalten 272 px, kompakt 228 px),
+  `RoundSteps` am Handy (Runde für Runde,
+  `bracket-step-prev/next/label`), `NextMatchBanner` (`bracket-next-match`),
+  leere Setzplätze „—“, `HeatNode`-Karten („Durchgang A · N Spieler · M
+  kommen weiter“), eigene Knoten `data-mine` mit Goldring;
+  `TournamentBracketPage` gibt `mineId` (`t.my_registration.id`) mit;
+  TV-Ansicht behält ihr Raster. Tests `BracketTree.test.jsx` (10).
 - Adminmenü umgruppiert (#408; PR #429; nur Web). `AdminLayout.ADMIN_GROUPS`
   (jetzt exportiert): Übersicht / Verein (Vereinsdaten →
   `/admin/settings?tab=legal`, Vorstand, Sponsoren, Partner, Referenzen,
@@ -1452,15 +1501,22 @@ Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418), #420
 (Doku-Stand), #422 (#403 + #407 Footer und Startseite; `update.sh`), #423
 (#421 App-Update je Installationsquelle; Build 77 am 23.09.; `update.sh`),
 #424 (#400 QR mit Löwe), #427 (#425 Startseite II; `update.sh`), #428 (#426
-Layout am PC) und #429 (#408 Adminmenü). `main` steht auf `6861b19`.
+Layout am PC), #429 (#408 Adminmenü), #430 (#399 Turnierbaum), #432
+(Doku-Stand), #433 (#431 Startseite III), #438 (#434 Admin-Formulare I), #440
+(#434 Teil II – der Squash von #439 war in den toten Basiszweig gegangen, #440
+hat den Stand nachgezogen) und #441 (#435 Seitenblatt, Gruppe Verein). `main`
+steht auf `75283c8`.
 
 ### Offene PRs
-- #430 (#399 Turnierbaum neu: Linien, Knoten, Durchgänge, Runde für Runde,
-  „Dein nächstes Spiel“; nur Web; bereit). **Regel seit 23.09. abends:**
+- #442 (#435 Seitenblatt für eSports, Content und Mitglieder; nur Web;
+  bereit, auf `main`) und #443 (#436 Playwright bei 1920/1024/390 px;
+  Entwurf bis zum lokalen Check). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
-  PRs nicht mehr. Danach: #401 Turnierseite (Reiter auf einer Seite, „Dein
+  PRs nicht mehr. Danach: #437 Web-CMS (Befund: Seiten-Reiter ist nirgends
+  angebunden, E-Mail-Vorlagen werden gebraucht – wartet auf die Entscheidung
+  A/B des Betreibers), #401 Turnierseite (Reiter auf einer Seite, „Dein
   Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
   #409 Referenzen-Rework (Datenmodell: Teilnahme mit Einträgen Team/Einzel,
   Kommentar an #409), dann Dolibarr III (#405, #406, #326 Teil 2, #410) und
@@ -1480,9 +1536,12 @@ Layout am PC) und #429 (#408 Adminmenü). `main` steht auf `6861b19`.
   gestapelter PR, den der Betreiber merged, solange seine Basis noch der
   Feature-Zweig ist, landet in diesem Zweig – und verschwindet mit dessen
   Löschung (23.09. bei #395: 10 s nach #394 gemergt, Inhalt fehlte auf
-  `main`, mit #398 nachgeholt). Deshalb in der Merge-Meldung an den Betreiber
-  immer nur **einen** PR nennen und den nächsten erst nach dem Umsetzen auf
-  `main` freigeben.
+  `main`, mit #398 nachgeholt; am 23.09. abends noch einmal bei #439, 9 s
+  nach #438 – Nachzug als neuer Zweig aus `origin/<Basis>` plus `git rebase
+  main`, PR #440). Deshalb in der Merge-Meldung an den Betreiber immer nur
+  **einen** PR nennen; ohne gemeinsame Dateien den nächsten direkt auf `main`
+  aufsetzen, sonst als Entwurf stapeln und erst nach dem Merge der Basis
+  rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
