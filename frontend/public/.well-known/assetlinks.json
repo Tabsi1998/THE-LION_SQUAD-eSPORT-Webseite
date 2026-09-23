@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "at.lionsquad.app",
       "sha256_cert_fingerprints": [
-        "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98"
+        "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98",
+        "1D:10:7A:DD:2E:64:AF:1B:04:E4:87:5D:A9:26:6B:F9:65:63:2A:91:F8:54:AF:B8:90:8F:FB:56:A2:EC:BA:26"
       ]
     }
   }

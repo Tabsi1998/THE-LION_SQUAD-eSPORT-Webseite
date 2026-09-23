@@ -11,7 +11,10 @@ from webauthn.helpers import bytes_to_base64url
 from routes import passkey_routes as routes
 from test_passkeys_unit import authentication_credential, enroll, make_setup
 
-APP_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(routes.DEFAULT_APK_KEY_HASHES.replace(":", "")))
+UPLOAD_HASH, PLAY_HASH = routes.DEFAULT_APK_KEY_HASHES.split(",")
+# Die APK vom Vereinsserver (Upload-Schlüssel) und die Play-Version (Googles App-Signaturschlüssel, #219).
+APP_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(UPLOAD_HASH.replace(":", "")))
+PLAY_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(PLAY_HASH.replace(":", "")))
 
 
 @pytest.fixture
@@ -19,9 +22,10 @@ def setup(monkeypatch):
     return make_setup(monkeypatch)
 
 
-def test_app_origins_come_from_the_signing_key_hash(monkeypatch):
-    assert routes.mobile_origins() == [APP_ORIGIN]
+def test_app_origins_come_from_the_signing_key_hashes(monkeypatch):
+    assert routes.mobile_origins() == [APP_ORIGIN, PLAY_ORIGIN], "Server-APK und Play-Version sind beide erlaubt"
     assert APP_ORIGIN.startswith("android:apk-key-hash:b2mi") and "=" not in APP_ORIGIN, "base64url ohne Füllzeichen"
+    assert PLAY_ORIGIN.startswith("android:apk-key-hash:HRB6") and PLAY_ORIGIN != APP_ORIGIN
     monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98, " + "ab" * 32 + ",kaputt")
     assert routes.mobile_origins() == [APP_ORIGIN, "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex("ab" * 32))]
     monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "")

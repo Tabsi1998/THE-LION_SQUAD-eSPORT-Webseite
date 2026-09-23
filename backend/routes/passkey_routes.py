@@ -34,11 +34,16 @@ from services.rate_limit import enforce_rate_limit
 router = APIRouter(prefix="/api/auth/passkeys", tags=["passkeys"])
 
 # App-Herkunft (#217 Stufe 2): Android nennt statt einer https-Adresse den SHA-256 des
-# Signaturschlüssels der App (base64url, ohne Füllzeichen). Der Schlüssel seit Build 57 ist der
-# Standard; weitere Hashes (etwa ein Debug-Zertifikat auf einem Testserver) kommen über die
-# Umgebung, mit oder ohne Doppelpunkte. (Der Fingerabdruck ist öffentlich - er steht in jeder
-# Release-Notiz; die Doppelpunkte sind die Schreibweise der Android-Werkzeuge.)
-DEFAULT_APK_KEY_HASHES = "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98"
+# Signaturschlüssels der App (base64url, ohne Füllzeichen). Standard sind zwei Schlüssel: der
+# Upload-Schlüssel seit Build 57 (APK vom Vereinsserver) und seit 23.09. der Schlüssel, mit dem
+# Google Play die App für die Nutzer signiert (Play App Signing, #219). Weitere Hashes (etwa ein
+# Debug-Zertifikat auf einem Testserver) kommen über die Umgebung, mit oder ohne Doppelpunkte.
+# (Die Fingerabdrücke sind öffentlich - sie stehen in assetlinks.json; die Doppelpunkte sind die
+# Schreibweise der Android-Werkzeuge.)
+DEFAULT_APK_KEY_HASHES = (
+    "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98,"
+    "1D:10:7A:DD:2E:64:AF:1B:04:E4:87:5D:A9:26:6B:F9:65:63:2A:91:F8:54:AF:B8:90:8F:FB:56:A2:EC:BA:26"
+)
 
 
 def mobile_origins() -> list[str]:
