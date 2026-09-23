@@ -7,7 +7,7 @@ import { SocialsTab } from "./SocialsTab";
 // Plattform nicht eingerichtet hat. Der Hinweis nennt, was die Plattform liefert.
 
 const LINKS = {
-  links: [{ platform: "discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z" }],
+  links: [{ platform: "discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z", url: "https://discord.com/users/123" }],
   available: { discord: true, twitch: false, steam: true },
   platforms: { discord: { delivers: "Discord-Kennung und Nutzername" }, twitch: { delivers: "Twitch-Kennung, Login und Anzeigename" }, steam: { delivers: "SteamID64" } },
 };
@@ -23,6 +23,9 @@ test("verknüpft: Feld gesperrt, verifiziert, Trennen; unverknüpft: Verknüpfen
   const props = renderTab();
   expect(screen.getByTestId("profile-discord")).toBeDisabled();
   expect(screen.getByTestId("profile-discord-verified")).toHaveTextContent("verifiziert");
+  // Wer sieht, dass er verknüpft ist, sieht auch als wer, seit wann und wohin es geht.
+  expect(screen.getByTestId("profile-discord-linked-since")).toHaveTextContent("verknüpft als Paula B. seit 22.09.2026");
+  expect(screen.getByTestId("profile-discord-official")).toHaveAttribute("href", "https://discord.com/users/123");
   await user.click(screen.getByTestId("profile-discord-unlink"));
   expect(props.onUnlink).toHaveBeenCalledWith("discord");
 

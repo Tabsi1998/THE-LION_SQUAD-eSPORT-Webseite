@@ -146,8 +146,15 @@ async def test_discord_callback_fills_and_verifies_the_field_once_per_account(fl
     flow.act_as(paula)
     listing = (await flow.get("/api/me/platform-links")).json()["links"]
     assert [row["platform"] for row in listing] == ["discord"] and "external_id" not in listing[0]
+    assert listing[0]["url"] == "https://discord.com/users/123456789012345678"
     public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
     assert public["verified_platforms"] == ["discord"] and public["discord_name"] == "paula"
+    # Verknüpfte Konten mit offizieller Adresse - Beschriftung, Anzeigename, Datum, Link; nie die Kennung als Feld.
+    assert len(public["linked_accounts"]) == 1
+    account = public["linked_accounts"][0]
+    assert account["platform"] == "discord" and account["label"] == "Discord" and account["handle"] == "paula"
+    assert account["display_name"] == "Paula B." and account["url"] == "https://discord.com/users/123456789012345678" and account["linked_at"]
+    assert "external_id" not in account
 
     # Dasselbe Discord-Konto an einem zweiten Profil: abgelehnt.
     max_ = await person(flow, "max")
@@ -166,7 +173,11 @@ async def test_discord_callback_fills_and_verifies_the_field_once_per_account(fl
 
     # Abgelehnt bei Discord, kaputter Code, gefälschter oder fremder state: immer eine Erklärung, nie ein Häkchen.
     assert target(await flow.get(f"/api/platform-links/discord/callback?error=access_denied&state={state3}"))["link_error"] == "denied"
-    assert target(await flow.get(f"/api/platform-links/discord/callback?code=schlecht&state={state3}"))["link_error"] == "exchange_failed"
+    failed = target(await flow.get(f"/api/platform-links/discord/callback?code=schlecht&state={state3}"))
+    assert failed["link_error"] == "exchange_failed" and failed["link_detail"] == "token 400"
+    # Einrichtungsfehler der Plattform (z. B. Rückrufadresse nicht eingetragen): der Grund kommt mit.
+    mismatch = target(await flow.get(f"/api/platform-links/discord/callback?error=redirect_mismatch&error_description=Parameter+redirect_uri+does+not+match+registered+URI&state={state3}"))
+    assert mismatch["link_error"] == "platform_error" and "redirect_uri does not match" in mismatch["link_detail"]
     assert target(await flow.get("/api/platform-links/discord/callback?code=gut&state=kaputt"))["link_error"] == "invalid"
     flow.act_as(paula)
     wrong = state_of((await flow.post("/api/me/platform-links/twitch/start")).json()["url"])

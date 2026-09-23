@@ -9,13 +9,21 @@ const ERROR_TEXTS = {
   denied: "Die Anmeldung bei der Plattform wurde abgebrochen – es wurde nichts verknüpft.",
   taken: "Dieses Konto ist schon mit einem anderen Profil verknüpft. Melde dich dort ab oder trenne es zuerst.",
   exchange_failed: "Die Plattform hat die Anmeldung nicht bestätigt. Bitte noch einmal versuchen.",
+  platform_error: "Die Plattform hat die Anmeldung abgelehnt – meist fehlt die Rückrufadresse in der Entwickler-Konsole (Einstellungen → Login & Konten).",
   invalid: "Der Rückruf passte nicht zu deiner Sitzung (zu alt oder verfälscht). Bitte noch einmal starten.",
   not_configured: "Diese Plattform ist auf der Website noch nicht eingerichtet.",
   unknown: "Diese Plattform gibt es nicht.",
 };
 
-export function linkErrorText(code) {
-  return ERROR_TEXTS[code] || "Die Verknüpfung hat nicht geklappt. Bitte noch einmal versuchen.";
+export function linkErrorText(code, detail = "") {
+  const text = ERROR_TEXTS[code] || "Die Verknüpfung hat nicht geklappt. Bitte noch einmal versuchen.";
+  return detail ? `${text} (${detail})` : text;
+}
+
+export function formatLinkedAt(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("de-DE", { dateStyle: "medium" });
 }
 
 export function linkedText(platform) {

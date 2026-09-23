@@ -157,16 +157,18 @@ export default function ProfilePage() {
   }, [tab, loadPlatformLinks]);
   const linkedParam = params.get("linked");
   const linkErrorParam = params.get("link_error");
+  const linkDetailParam = params.get("link_detail");
   useEffect(() => {
     if (!linkedParam && !linkErrorParam) return;
     if (linkedParam) toast.success(linkedText(linkedParam));
-    if (linkErrorParam) toast.error(linkErrorText(linkErrorParam));
+    if (linkErrorParam) toast.error(linkErrorText(linkErrorParam, linkDetailParam || ""), { duration: 12000 });
     const next = new URLSearchParams(params);
     next.delete("linked");
     next.delete("link_error");
+    next.delete("link_detail");
     setParams(next, { replace: true });
     refresh?.();
-  }, [linkedParam, linkErrorParam, params, setParams, refresh]);
+  }, [linkedParam, linkErrorParam, linkDetailParam, params, setParams, refresh]);
   const startPlatformLink = async (platform) => {
     try {
       const { data } = await api.post(`/me/platform-links/${platform}/start`);
