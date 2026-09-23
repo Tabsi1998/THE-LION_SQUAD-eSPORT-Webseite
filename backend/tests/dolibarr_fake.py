@@ -190,7 +190,19 @@ class FakeDolibarr:
             return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         if path == "/invoices" and method == "GET":
             match = re.search(r"t\.ref_ext:=:'([^']*)'", params.get("sqlfilters", ""))
-            rows = [r for r in self.core_invoices.values() if match and r.get("ref_ext") == match.group(1)]
+            source = re.search(r"t\.fk_facture_source:=:'?(\d+)'?", params.get("sqlfilters", ""))
+            if source:
+                # Gutschriften zu einem Beleg (#321): Art 2 mit Verweis auf das Original.
+                rows = [r for r in self.core_invoices.values() if str(r.get("fk_facture_source") or "") == source.group(1)]
+            else:
+                rows = [r for r in self.core_invoices.values() if match and r.get("ref_ext") == match.group(1)]
+            return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+        match = re.fullmatch(r"/invoices/(\d+)/payments", path)
+        if match and method == "GET":
+            row = self.core_invoices.get(int(match.group(1)))
+            if not row:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            rows = row.get("payments") or []
             return httpx.Response(200, json=rows) if rows else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         if path == "/invoices" and method == "POST":
             assert int(body.get("socid") or 0) in self.thirdparties, "Rechnung braucht einen bestehenden Geschäftspartner"
@@ -199,8 +211,10 @@ class FakeDolibarr:
                 assert isinstance(line["subprice"], (int, float)) and int(line["qty"]) >= 1 and "tva_tx" in line
             self.next_id += 1
             total = round(sum(float(l["subprice"]) * int(l["qty"]) * (1 + float(l["tva_tx"]) / 100) for l in body["lines"]), 2)
-            row = {"id": self.next_id, "ref": f"(PROV{self.next_id})", "ref_ext": body.get("ref_ext"), "socid": int(body["socid"]),
+            row = {"id": self.next_id, "ref": f"(PROV{self.next_id})", "ref_ext": body.get("ref_ext"), "socid": int(body["socid"]), "type": int(body.get("type") or 0),
                    "statut": 0, "paye": 0, "total_ttc": total, "remaintopay": total, "lines": body["lines"], "note_public": body.get("note_public", ""),
+                   # Zahlungsziel (#321): 30 Tage nach dem Belegdatum, als Unix-Sekunden wie Dolibarr.
+                   "date_lim_reglement": int(body.get("date") or 0) + 30 * 86400, "payments": [],
                    # Konditionen (#370): Dolibarr übernimmt sie beim Anlegen, sonst bleiben sie leer.
                    "cond_reglement_id": body.get("cond_reglement_id"), "mode_reglement_id": body.get("mode_reglement_id"), "fk_account": body.get("fk_account")}
             self.core_invoices[row["id"]] = row
@@ -237,10 +251,36 @@ class FakeDolibarr:
                                              "content": __import__("base64").b64encode(content).decode(), "encoding": "base64"})
         return None
 
-    def pay(self, invoice_id: int) -> None:
-        """Der Kassier bucht in Dolibarr eine Zahlung - die Website liest es nur."""
+    def pay(self, invoice_id: int, amount: float | None = None, on: str = "2026-09-23", kind: str = "VIR") -> None:
+        """Der Kassier bucht in Dolibarr eine Zahlung - die Website liest es nur. Ohne Betrag den
+        ganzen Rest; ein Teilbetrag lässt den Rest offen; zu viel ergibt eine Überzahlung (Rest < 0)."""
         row = self.core_invoices[invoice_id]
-        row.update(statut=2, paye=1, remaintopay=0)
+        amount = float(row["remaintopay"]) if amount is None else float(amount)
+        row.setdefault("payments", []).append({"amount": f"{amount:.2f}", "date": on, "type": kind, "ref": f"PAY-{len(row.get('payments') or []) + 1}", "num": ""})
+        row["remaintopay"] = round(float(row["total_ttc"]) - sum(float(p["amount"]) for p in row["payments"]) - float(row.get("credited") or 0), 2)
+        if row["remaintopay"] <= 0:
+            row.update(statut=2, paye=1)
+
+    def credit(self, invoice_id: int, amount: float, *, validated: bool = True) -> dict:
+        """Eine Gutschrift in Dolibarr mit Bezug auf den Beleg (#321) - angewendet auf den Rest."""
+        original = self.core_invoices[invoice_id]
+        self.next_id += 1
+        row = {"id": self.next_id, "ref": f"AV2609-{self.next_id:04d}" if validated else f"(PROV{self.next_id})", "type": 2, "fk_facture_source": invoice_id,
+               "socid": original["socid"], "statut": 1 if validated else 0, "paye": 0, "total_ttc": -float(amount), "remaintopay": 0, "lines": [], "payments": []}
+        self.core_invoices[row["id"]] = row
+        if validated:
+            original["credited"] = float(original.get("credited") or 0) + float(amount)
+            original["remaintopay"] = round(float(original["total_ttc"]) - sum(float(p["amount"]) for p in original.get("payments") or []) - original["credited"], 2)
+            if original["remaintopay"] <= 0:
+                original.update(statut=2, paye=1)
+        return row
+
+    def abandon(self, invoice_id: int) -> None:
+        self.core_invoices[invoice_id].update(statut=3)
+
+    def remove(self, invoice_id: int) -> None:
+        """Jemand löscht den Beleg in Dolibarr - die Website darf das nie, sieht es aber."""
+        self.core_invoices.pop(invoice_id, None)
 
     def _handle(self, request: httpx.Request) -> httpx.Response:
         assert request.url.scheme == "https", "die Website darf Dolibarr nur über https ansprechen"

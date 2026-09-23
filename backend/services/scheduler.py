@@ -177,6 +177,17 @@ async def _safe_discord_bot_roles():
         _log_task_failure("discord_bot_roles", exc)
 
 
+async def _safe_billing_reconcile():
+    """Täglicher Abgleich (#321): jeden Beleg neu lesen, auch bezahlte."""
+    try:
+        from services.billing_orders import reconcile_due
+        res = await reconcile_due()
+        if res.get("looked"):
+            logger.info(f"[scheduler] billing_reconcile {res}")
+    except Exception as exc:
+        _log_task_failure("billing_reconcile", exc)
+
+
 async def _safe_billing_sync():
     try:
         from services.billing_orders import sync_due
@@ -448,6 +459,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("matchday_schedule", _safe_matchday_schedule), IntervalTrigger(minutes=15), id="matchday_schedule",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("billing_sync", _safe_billing_sync), IntervalTrigger(minutes=10), id="billing_sync",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("billing_reconcile", _safe_billing_reconcile, lease_seconds=600.0), IntervalTrigger(hours=24), id="billing_reconcile",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)

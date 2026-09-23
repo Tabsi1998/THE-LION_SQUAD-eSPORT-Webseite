@@ -111,5 +111,6 @@ def public_price(registration: dict) -> dict | None:
         "positions": [{k: line.get(k) for k in ("key", "label", "quantity", "unit_cents", "total_cents", "optional")} for line in snapshot.get("positions") or []],
         "accepted_at": snapshot.get("accepted_at"), "billing_status": registration.get("billing_status") or "pending",
         "invoice_ref": registration.get("invoice_ref"), "invoice_status": registration.get("invoice_status"),
+        "payment_state": registration.get("payment_state"),
         "payer_user_id": (snapshot.get("recipient") or {}).get("user_id"),
     }

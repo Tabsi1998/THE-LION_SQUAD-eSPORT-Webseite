@@ -171,6 +171,51 @@ Seit dem 15. September gilt:
   Tests `test_site_banner_channels_flow.py` (3), `test_friends_changes_flow.py`
   (2), App `friends.test.ts`, `banners.test.ts`, `FriendsCard.test.tsx`,
   `SiteBannerTicker.test.tsx` (10), Admin-Settings-Test unverändert grün.
+- Abrechnung fertig (#321, #322; PR #388, baut auf #387 auf; kein Build).
+  `services/dolibarr_billing`: `payment_state_for(status, total, remaining, due_on,
+  credited_cents=, today=)` (draft/open/partial/paid/overdue/overpaid/credited/
+  abandoned), `_invoice_state` liefert `remote_total_cents` (nie in `total_cents`
+  des Auftrags – der eingefrorene Preis geht nie mit), `remaining_cents`, `due_on`,
+  `credit_notes`, `payment_state`, `remote_socid`; `payment_view`; `sync_one`
+  (Beleg + `client.credit_notes_of` + `client.invoice_payments`; 403 auf Zahlungen
+  → `payments=None`, dann gilt Summe minus Rest; 404 → `sync_error: not_found` +
+  Prüffall `invoice_gone`; nie still), `_review_cases` (amount_mismatch,
+  recipient_mismatch, overpaid, paid_after_cancel; Auto-Erledigung, wenn Dolibarr
+  aufgelöst hat), `sync_invoiced(full=, order_ids=)` mit `_due_query` (unbezahlt
+  immer, `SETTLED_STATES` nur nach `RESYNC_SETTLED_HOURS` 24 h), `tax_confirmed`,
+  `may_auto_validate` (auto_validate ∧ terms_complete ∧ tax_confirmed).
+  `services/billing_cases.py` (NEU): `KINDS` (label + todo), `open_case` (einer je
+  Auftrag+Art, idempotent), `resolve_case(auto=)`, `auto_resolve`, `cases_for_order`,
+  `list_cases`, `open_count`. `services/billing_orders`: `PAYMENT_STATE_LABELS`,
+  `SETTLED_STATES`, `paid_cents(order, payments=)` (**Summe der Zahlungen**; Gutschrift
+  ist kein Geld; ohne Zahlungsliste Summe minus Rest), `refunded_cents`,
+  `credited_cents`, `cancel_orders_for` (invoiced → `booking_state: cancelled`,
+  `paid_cents_at_cancel`, Prüffall), `note_change_after_invoice`, `add_refund`
+  (`RefundError`; ≤ bezahlt − erstattet; Audit `billing.refund.record`),
+  `sync_due(full=, order_ids=)`, `reconcile_due` (Job `billing_reconcile` täglich,
+  Lease 600), `overview(kind=, source_id=, user_ids=)` (+`cases`, `cases_open`,
+  `payment_labels`), `source_summary`, `anonymize_user` (aus `dsgvo_routes`).
+  `dolibarr_client`: `invoice_payments`, `credit_notes_of` (`fk_facture_source`,
+  Art 2). Routen `finance_routes`: `GET /overview?kind&source&q`,
+  `GET /sources/{kind}/{id}`, `GET /orders/{id}` (Positionen, `sums`, `timeline`,
+  `cases`), `POST /orders/{id}/resync` (409 außer live), `POST /orders/{id}/refunds`
+  (`case_id` optional), `GET /cases?status`, `POST /cases/{id}/resolve` (Grund
+  Pflicht, 409 wenn erledigt), `POST /reconcile`. `dolibarr_routes`: Settings-PUT
+  `tax_confirmed` (setzt `tax_confirmed_at/by/by_name`; false schaltet
+  `invoice_auto_validate` aus), auto_validate 400 ohne Bestätigung; Status
+  `tax_rates`, `tax_confirmed`. `event_routes`: Begleitpersonen-Änderung nach dem
+  Beleg → `note_change_after_invoice` (Snapshot bleibt); `payment_state` im
+  eigenen Preis (Event + Turnier). `daily_center.task_counts.billing_cases`.
+  Fake: `pay(id, amount=, on=)`, `credit(id, amount)`, `abandon`, `remove`,
+  `/invoices/{id}/payments`, `fk_facture_source`-Filter, `date_lim_reglement`.
+  Web: `lib/billing.js` (`formatCents`, `parseEuro`, `sourcesFrom`, `summaryLines`,
+  `csvCell` (Formel-Injektion), `toCsv`, `syncLine`), `AdminFinancePage` (Filter,
+  Summen `finance-sum-*`, Prüffälle `finance-case-*`, Detail `finance-detail`
+  mit Zeitleiste, Erstattungsformular `finance-refund-save`, `finance-resync`,
+  `finance-reconcile`, `finance-csv`), `AdminDolibarrPage` Block `dolibarr-tax`
+  (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
+  `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
+  `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
 - Auszeichnungen (#230; PR #386, baut auf #385 auf; Build 73).
   Entscheidungen des Betreibers vom 23.09. („passt“): Vergabe speichert
   Daten, Bilder entstehen beim Ansehen; Platz 1–3 mit hochgeladenem Bild je
@@ -1173,7 +1218,10 @@ App; `update.sh`, Build 73 am 23.09.; die alten Turniere trägt der Job
 Auszeichnungen da sind). `main` steht auf `2c540e3`.
 
 ### Offene PRs
-- Derzeit keiner.
+- #388 (#321 + #322 Abrechnung fertig: Zahlungsstand, Prüffälle, Erstattungen,
+  Finanzübersicht mit Summen, Steuersätze bestätigen; baut auf #387 auf). Nach dem
+  Merge `update.sh`; kein Build. Danach Admin → Dolibarr → „Steuersätze geprüft“
+  anhaken, wenn „gleich freigeben“ je gewünscht ist.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1255,7 +1303,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366 |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
-| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. #320 eigene Rechnungen für alle (Nicht-Mitglieder über die Einzelbelege ihrer Vorgänge, Quelle je Beleg, Filter, App-Bildschirm) – umgesetzt in #381. Offen: #321 Zahlungsabgleich im Detail, Storno mit Beleg, Erstattungen |
+| Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. #320 eigene Rechnungen für alle (Nicht-Mitglieder über die Einzelbelege ihrer Vorgänge, Quelle je Beleg, Filter, App-Bildschirm) – umgesetzt in #381. #321 Zahlungsstand im Detail, Prüffälle (Storno/Änderung nach dem Beleg, Überzahlung, Abweichung, verschwundener Beleg), Erstattungen mit Nachweis und #322 Rest (Filter, Summen je Veranstaltung, Zeitleiste, CSV, Steuersätze bestätigen, Runbook, Aufbewahrung) – umgesetzt in #388. Der Meilenstein ist durch |
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #324 Dokumente, #326 Vereinsdaten/Vorstand/Statuten, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe der späteren Pakete (Testverbund, Vorschau und Anleitung sind fertig) – **wartet** auf das Vereinsmodul (dolibarr-vereine#156–#158 und v0.7) |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
@@ -1292,7 +1340,7 @@ sinnvoll hältst“):
 6. Web: Dynamik – umgesetzt in #360.
 7. Abrechnung I – Teil 1 in #363 (Modell, Events, Aufträge, Finanzen),
    Teil 2 in #365 (Kunden und Belege in Dolibarr; erster Durchlauf am 22.09.
-   bestätigt), #320 in #381. Rest (#321) offen. Admin und Turniere – umgesetzt in
+   bestätigt), #320 in #381, #321 + #322 in #388 – der Meilenstein ist durch. Admin und Turniere – umgesetzt in
    #369 (#203/#204 berührten dieselben
    Event-Formulare wie #318 – zusammen planen). Abrechnung II – umgesetzt in
    #371 (baut auf #369 auf). App 0.8.0-beta.

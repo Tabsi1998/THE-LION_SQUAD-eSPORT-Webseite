@@ -42,6 +42,8 @@ async def task_counts(db, now: datetime | None = None) -> dict:
         "contact_messages": await db.contact_messages.count_documents({"status": "new"}),
         # Vorschläge ohne Antwort, deren Frist in den nächsten 24 Stunden abläuft (oder schon abgelaufen ist).
         "schedule_deadlines": await db.matches_v2.count_documents({"schedule_status": "proposed", "schedule_deadline_at": {"$lte": soon}}),
+        # Prüffälle der Abrechnung (#321): Storno mit Beleg, Überzahlung, Abweichung - wartet auf Finanzen.
+        "billing_cases": await db.billing_cases.count_documents({"status": "open"}),
     }
 
 

@@ -115,7 +115,7 @@ async def test_member_gets_the_invoice_on_the_thirdparty_of_her_membership(flow,
 
 @pytest.mark.asyncio
 async def test_non_member_gets_a_new_thirdparty_and_a_validated_invoice_when_configured(flow, fake):
-    await connect(flow, invoice_auto_validate=True, **TERMS)
+    await connect(flow, invoice_auto_validate=True, tax_confirmed_at="2026-09-23T10:00:00+00:00", **TERMS)
     kassier = await person(flow, "kassier", role="club_admin")
     event = await paid_event(flow, kassier)
     gast = await person(flow, "gast")

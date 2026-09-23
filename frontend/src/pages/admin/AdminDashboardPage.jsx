@@ -2,10 +2,11 @@ import { opsDetail, opsTone } from "@/lib/ops";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
-import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock } from "lucide-react";
+import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet } from "lucide-react";
 
 function StatusDot({ ok }) {
   const color = ok === true ? "#00FF88" : ok === false ? "#FF3B30" : "#FFD700";
@@ -13,6 +14,8 @@ function StatusDot({ ok }) {
 }
 
 export default function AdminDashboardPage() {
+  const auth = useAuth();
+  const canFinance = typeof auth?.can === "function" && auth.can("finance");
   const [data, setData] = useState(null);
   const [setupStatus, setSetupStatus] = useState(null);
   const [sys, setSys] = useState(null);
@@ -82,6 +85,7 @@ export default function AdminDashboardPage() {
   const moderationReports = Number(daily.moderation_reports || 0);
   const contactMessages = Number(daily.contact_messages || 0);
   const scheduleDeadlines = Number(daily.schedule_deadlines || 0);
+  const billingCases = Number(daily.billing_cases || 0);
   const today = Array.isArray(data?.today) ? data.today : [];
   const taskItems = [
     {
@@ -130,6 +134,15 @@ export default function AdminDashboardPage() {
       icon: Mail,
       tone: contactMessages > 0 ? "#FFD700" : "#00FF88",
     },
+    // Prüffälle der Abrechnung (#321): nur für Finanzen - die Seite dahinter ist für andere gesperrt.
+    ...(canFinance ? [{
+      label: "Abrechnung prüfen",
+      detail: `${billingCases} Prüffälle (Storno mit Beleg, Überzahlung, Abweichung)`,
+      to: "/admin/finance",
+      icon: Wallet,
+      tone: billingCases > 0 ? "#FF3B30" : "#00FF88",
+      key: "billing-cases",
+    }] : []),
     {
       label: "Mitgliedsanträge",
       detail: `${pendingApplications} offene Anträge`,

@@ -314,6 +314,26 @@ class DolibarrClient:
             raise
         return data if isinstance(data, list) else []
 
+    async def invoice_payments(self, invoice_id: int) -> list[dict]:
+        """Die in Dolibarr gebuchten Zahlungen eines Belegs (#321) - Betrag, Tag, Art. Nur lesen."""
+        try:
+            data = await self._get(f"/invoices/{int(invoice_id)}/payments")
+        except DolibarrError as exc:
+            if exc.kind == "not_found":
+                return []
+            raise
+        return [row for row in data if isinstance(row, dict)] if isinstance(data, list) else []
+
+    async def credit_notes_of(self, invoice_id: int) -> list[dict]:
+        """Gutschriften, die in Dolibarr auf diesen Beleg verweisen (`fk_facture_source`, Art 2)."""
+        try:
+            data = await self._get("/invoices", {"sqlfilters": f"(t.fk_facture_source:=:{int(invoice_id)})", "limit": 20})
+        except DolibarrError as exc:
+            if exc.kind == "not_found":
+                return []
+            raise
+        return [row for row in data if isinstance(row, dict) and str(row.get("type")) == "2"] if isinstance(data, list) else []
+
     async def invoice_document(self, ref: str) -> dict:
         """Das PDF eines Belegs über Dolibarrs Dokument-API (#320) - für Belege ohne Mitglied.
 
