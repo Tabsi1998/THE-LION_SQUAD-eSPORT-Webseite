@@ -216,6 +216,15 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Play-Signaturschlüssel als zweite App-Herkunft (#219; PR #394, baut auf #392
+  auf; kein Build). Google Play signiert die App seit dem ersten Upload am
+  23.09. mit eigenem Schlüssel (Play App Signing, SHA-256 `1D:10:7A:DD…BA:26`,
+  öffentlich). `frontend/public/.well-known/assetlinks.json` führt beide
+  Fingerabdrücke; `passkey_routes.DEFAULT_APK_KEY_HASHES` ist jetzt
+  kommagetrennt (Upload-Schlüssel seit Build 57 + Play-Schlüssel),
+  `mobile_origins()` liefert beide `android:apk-key-hash:`-Herkünfte
+  (`b2mi…` und `HRB6…`). `release-version.cjs` prüft weiterhin nur den
+  Upload-Schlüssel (unsere APKs). Test `test_passkeys_mobile_unit.py`.
 - Konto löschen in der App (#390; PR #391, baut auf #389 auf; Build 75).
   Google-Play-Pflicht (Registrierung in der App → Löschung in der App + öffentlicher
   Web-Link). App `ProfileScreen`: `deleteAccount` (zwei `Alert.alert`, dann
@@ -299,7 +308,8 @@ Seit dem 15. September gilt:
 - Passkey-Login in der App (#217 Stufe 2; PR #384; Build 71).
   Derselbe Passkey wie auf der Website; Android nennt als Herkunft nicht die
   Adresse, sondern den SHA-256 des Signaturschlüssels. Backend
-  `passkey_routes.py`: `DEFAULT_APK_KEY_HASHES` (Schlüssel seit Build 57),
+  `passkey_routes.py`: `DEFAULT_APK_KEY_HASHES` (Upload-Schlüssel seit Build 57
+  und seit #394 auch Googles Play-Signaturschlüssel),
   `mobile_origins()` (auch `PASSKEY_APK_KEY_HASHES`, kommagetrennt, mit oder
   ohne Doppelpunkte → `android:apk-key-hash:<base64url>`),
   `_verified_login_user` (gemeinsame Prüfung für Web und App),
@@ -1241,7 +1251,9 @@ in der App + Abschnitt „Konto löschen“ in der Datenschutzerklärung; `updat
 Build 75 am 23.09.). `main` steht auf `495e4a3`.
 
 ### Offene PRs
-- Derzeit keiner.
+- #394 (#219 Play-Signaturschlüssel als zweite App-Herkunft: assetlinks.json +
+  Passkey-Login; baut auf #392 auf – **erst #392, dann #394**). Nach dem Merge
+  `update.sh`; kein Build.
 - Gestapelte PRs: nach jedem
   Squash-Merge die restlichen sofort auf `main` umsetzen (`git rebase --onto
   origin/main <alter Basis-Zweig>`), sonst meldet GitHub „conflicting“, obwohl
@@ -1309,15 +1321,16 @@ Build 75 am 23.09.). `main` steht auf `495e4a3`.
   Google-Play-Konto anlegen und die Store-Texte an #219 bestätigen; für #231
   am Server `bash scripts/tournament-dryrun.sh` laufen lassen und die
   Zähl-Zeilen schicken.
-- Play Console (23.09.): Beim ersten AAB-Upload „App-Signatur durch Google
-  Play“ annehmen und den **SHA-256 des App-Signaturschlüssels** (Einrichtung →
-  App-Signatur) schicken – er kommt zusätzlich in
-  `frontend/public/.well-known/assetlinks.json` und in `DEFAULT_APK_KEY_HASHES`
-  (`backend/routes/passkey_routes.py`), sonst gehen Passkeys in der
-  Play-Version nicht. Testkonto `playtest` (normales Konto, keine Zwei-Faktor,
-  kein Mitglied) anlegen und nur in der Play Console eintragen. „App
-  einrichten“ nach der Liste vom 23.09.; Datensicherheit → Lösch-Link
-  `https://lionsquad.at/privacy#account-deletion` (ab #391).
+- Play Console (23.09.): Build 75 läuft im internen Test (Rollout 14:37).
+  Play App Signing ist aktiv; der SHA-256 des App-Signaturschlüssels
+  (`1D:10:7A:DD…BA:26`, Seite „Mit Google Play geschützt“ → „Play
+  App-Signatur verwalten“) ist mit #394 in `assetlinks.json` und
+  `DEFAULT_APK_KEY_HASHES` eingetragen – nach `update.sh` gehen Passkeys auch
+  in der Play-Version. Noch offen beim Betreiber: Testkonto `playtest`
+  (normales Konto, keine Zwei-Faktor, kein Mitglied) anlegen und nur in der
+  Play Console eintragen; „App einrichten“ nach der Liste vom 23.09.
+  (Datensicherheit → Lösch-Link `https://lionsquad.at/privacy#account-deletion`);
+  Screenshots vom Handy; Tester-Liste und Beitrittslink.
 - Server: `docker-compose.override.yml` mit dem Host-Eintrag für
   `erp.lionsquad.at` ist seit 21.09. angelegt (#351) – Dolibarr ist wieder
   erreichbar; `update.sh` fasst die Datei nie an.
