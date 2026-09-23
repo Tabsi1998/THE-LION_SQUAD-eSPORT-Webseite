@@ -6,6 +6,7 @@ import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { AwardCard } from "../../components/AwardCard";
+import { BlockedUsersCard } from "../../components/BlockedUsersCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
@@ -633,6 +634,9 @@ export function ProfileScreen() {
             </View>
           </Card>
         ) : null}
+
+        {/* Blockierte Benutzer (#414): wie auf der Website unter Privatsphäre. */}
+        {!profileLoading && view === "settings" ? <BlockedUsersCard style={styles.card} /> : null}
 
         {!profileLoading && view === "settings" ? (
           <Card style={styles.card}>

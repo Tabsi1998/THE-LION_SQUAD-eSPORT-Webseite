@@ -212,3 +212,22 @@ test("ein GIF wird gar nicht erst hochgeladen", async () => {
   await waitFor(() => expect(screen.getByText("Nur Bilder und Videos.")).toBeTruthy());
   expect(mockPost).not.toHaveBeenCalledWith("/chat-attachments", expect.anything(), expect.anything());
 });
+
+test("lange auf eine fremde Nachricht drücken meldet sie - eigene nicht (#414)", async () => {
+  const onReportMessage = jest.fn();
+  mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : {
+    data: [
+      { id: "g-1", user_id: "u-2", message: "Fremd", author: { id: "u-2", display_name: "Mitspieler" } },
+      { id: "g-2", user_id: "u-1", message: "Eigen" },
+    ],
+  }));
+  await render(
+    <ChatThreadView currentUserId="u-1" emptyTitle="Leer" listUrl="/teams/t-1/chat" postUrl="/teams/t-1/chat" onReportMessage={onReportMessage} />,
+  );
+  await waitFor(() => expect(screen.getByText("Fremd")).toBeTruthy());
+
+  await fireEvent(screen.getByTestId("chat-message-g-1"), "longPress");
+  expect(onReportMessage).toHaveBeenCalledWith(expect.objectContaining({ id: "g-1", user_id: "u-2" }));
+  await fireEvent(screen.getByTestId("chat-message-g-2"), "longPress");
+  expect(onReportMessage).toHaveBeenCalledTimes(1);
+});

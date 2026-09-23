@@ -1,19 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { AwardCard } from "../../components/AwardCard";
 import { Card } from "../../components/Card";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
+import { ReportSheet, type ReportDraft } from "../../components/ReportSheet";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
+import { blockUser, listBlocked, unblockUser } from "../../lib/moderation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { LiveStream } from "../../types";
@@ -81,7 +84,11 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 ];
 
 export function PublicProfileScreen({ navigation, route }: Props) {
+  const { user: me } = useAuth();
   const [profile, setProfile] = useState<PublicProfilePayload | null>(null);
+  // Melden und Blockieren (#414): der Blockier-Stand kommt aus der eigenen Liste, nicht aus dem Profil.
+  const [blockedByMe, setBlockedByMe] = useState(false);
+  const [report, setReport] = useState<(Omit<ReportDraft, "category" | "details"> & { targetName?: string }) | null>(null);
   const [achievements, setAchievements] = useState<AchievementPayload>({ awards: [], groups: [] });
   const [liveStreams, setLiveStreams] = useState<LiveStream[]>([]);
   const [tab, setTab] = useState<TabKey>("overview");
@@ -94,6 +101,9 @@ export function PublicProfileScreen({ navigation, route }: Props) {
     try {
       const { data } = await api.get<PublicProfilePayload>(`/users/public/${route.params.username}`);
       setProfile(data || null);
+      if (data?.id && me?.id && data.id !== me.id) {
+        listBlocked().then((entries) => setBlockedByMe(entries.some((entry) => (entry.blocked_id || entry.user?.id) === data.id))).catch(() => setBlockedByMe(false));
+      }
       api.get<LiveStream[]>("/streams/live").then(({ data: streams }) => setLiveStreams(Array.isArray(streams) ? streams : [])).catch(() => setLiveStreams([]));
       if (data?.id) {
         const achievementResult = await api.get<AchievementPayload>(`/achievements/user/${data.id}`).catch(() => ({ data: { awards: [], groups: [] } }));
@@ -108,7 +118,40 @@ export function PublicProfileScreen({ navigation, route }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [route.params.username]);
+  }, [me?.id, route.params.username]);
+
+  // Melden und Blockieren (#414) über „Mehr“ neben Nachricht und Freund.
+  const toggleBlock = useCallback(() => {
+    if (!profile?.id) return;
+    const run = async () => {
+      try {
+        if (blockedByMe) await unblockUser(profile.id);
+        else await blockUser(profile.id);
+        setBlockedByMe(!blockedByMe);
+        await load();
+      } catch (err) {
+        Alert.alert("Das hat nicht geklappt", errorMessage(err, "Blockierung konnte nicht geändert werden."));
+      }
+    };
+    if (blockedByMe) {
+      void run();
+      return;
+    }
+    Alert.alert("Benutzer blockieren?", "Direktnachrichten und Freundschaftsanfragen werden in beide Richtungen unterbunden. Du kannst das unter Profil → Privatsphäre wieder aufheben.", [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Blockieren", style: "destructive", onPress: () => { void run(); } },
+    ]);
+  }, [blockedByMe, load, profile?.id]);
+
+  const openMoreMenu = useCallback(() => {
+    if (!profile?.id) return;
+    const name = profile.display_name || profile.username;
+    Alert.alert(name, undefined, [
+      { text: "Benutzer melden", onPress: () => setReport({ targetUserId: profile.id, targetName: name, direct: true }) },
+      { text: blockedByMe ? "Blockierung aufheben" : "Blockieren", style: blockedByMe ? "default" : "destructive", onPress: toggleBlock },
+      { text: "Abbrechen", style: "cancel" },
+    ]);
+  }, [blockedByMe, profile?.display_name, profile?.id, profile?.username, toggleBlock]);
 
   useEffect(() => {
     load();
@@ -190,6 +233,13 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               ) : null}
               {/* Freund hinzufügen (#240): der Zustand kommt aus der Profil-Antwort und wird live nachgeladen. */}
               {profile.relationship && profile.relationship.status !== "self" ? <FriendButton userId={profile.id} initial={profile.relationship} /> : null}
+              {me?.id && profile.id !== me.id ? (
+                <Pressable onPress={openMoreMenu} accessibilityRole="button" accessibilityLabel="Melden oder blockieren" style={({ pressed }) => [styles.moreButton, pressed && styles.pressed]} testID="profile-more">
+                  <Ionicons name="ellipsis-horizontal" color={colors.cyan} size={16} />
+                  <Muted style={styles.moreButtonText}>{blockedByMe ? "Blockiert" : "Mehr"}</Muted>
+                </Pressable>
+              ) : null}
+              <ReportSheet draft={report} onClose={() => setReport(null)} onSent={() => Alert.alert("Danke", "Die Moderation sieht sich das an.")} />
             </View>
           </View>
         </View>
@@ -656,6 +706,22 @@ const styles = StyleSheet.create({
   },
   messageButtonText: {
     color: colors.black,
+    fontWeight: "900",
+  },
+  moreButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    borderColor: "rgba(41,182,232,0.4)",
+    borderRadius: 7,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  moreButtonText: {
+    color: colors.cyan,
     fontWeight: "900",
   },
   linkIcon: {
