@@ -58,7 +58,7 @@ const STATUS_LABELS = {
 // bleibt einen Klick entfernt, aber man sieht, wozu es gehört.
 const SETTINGS_GROUPS = [
   { label: "Zugang", tabs: [
-    ["auth", "Login & Google", LogIn],
+    ["auth", "Login & Konten", LogIn],
   ] },
   { label: "E-Mail", tabs: [
     ["email", "Resend", Mail],
@@ -568,15 +568,19 @@ export default function AdminSettingsPage() {
   const saveBrand = async () => {
     if (savingBrand) return;
     if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
-    if (brand.analytics_provider === "google" && !isGoogleMeasurementId(brand.google_analytics_id)) {
-      return toast.error("Bitte eine gültige Google Measurement ID eintragen, z.B. G-3X155KW480.");
-    }
     setSavingBrand(true);
     try {
       loadSeqRef.current += 1;
       const payload = buildDirtyPayload(brandPayload(brand), originalBrandRef.current);
       if (!hasPayloadChanges(payload)) {
         toast.info("Keine Änderungen zum Speichern.");
+        return;
+      }
+      // Die Analytics-Prüfung greift nur, wenn Analytics selbst geändert wird: ein alter Stand „Google
+      // ohne Measurement ID“ blockierte sonst jedes Speichern auf allen Reitern - auch „Rechtliches“,
+      // wo der Betreiber nur sah, dass der Haken „Vereinsdaten aus Dolibarr“ nicht hält (#326).
+      if (("analytics_provider" in payload || "google_analytics_id" in payload) && brand.analytics_provider === "google" && !isGoogleMeasurementId(brand.google_analytics_id)) {
+        toast.error("SEO & Analytics: Bitte eine gültige Google Measurement ID eintragen, z.B. G-3X155KW480 – oder Analytics auf „Keine“ stellen.");
         return;
       }
       const { data } = await api.put("/settings/branding", payload);

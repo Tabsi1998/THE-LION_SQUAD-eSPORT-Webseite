@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { CheckCircle2, Link2, PlayCircle, RefreshCw, ShieldCheck, Unlink, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
@@ -26,7 +27,18 @@ export default function AdminDolibarrPage() {
     { key: "policy", label: "Funktionen" },
     ...(canSystem ? [{ key: "connection", label: "Verbindung" }] : []),
   ];
-  const [tab, setTab] = useState("overview");
+  // Reiter per ?tab= ansteuerbar (Admin-Suche, Links aus anderen Seiten); unbekannte oder nicht erlaubte Reiter fallen auf „Stand“.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [tab, setTabState] = useState(() => (tabs.some((entry) => entry.key === requestedTab) ? requestedTab : "overview"));
+  const setTab = (key) => {
+    setTabState(key);
+    setSearchParams(key === "overview" ? {} : { tab: key }, { replace: true });
+  };
+  useEffect(() => {
+    if (requestedTab && requestedTab !== tab && tabs.some((entry) => entry.key === requestedTab)) setTabState(requestedTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTab]);
   const [status, setStatus] = useState(null);
   const [links, setLinks] = useState([]);
   const [preview, setPreview] = useState(null);

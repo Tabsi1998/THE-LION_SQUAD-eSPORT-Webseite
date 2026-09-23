@@ -217,3 +217,61 @@ test("Branding: „Aus Logo und Akzentfarbe erzeugen“ ruft den Server, überni
   // Der neue Standard ist eine eigene Datei - der Hinweis verschwindet.
   await waitFor(() => expect(screen.queryByTestId("brand-favicon-dark-only")).not.toBeInTheDocument());
 });
+
+// Vereinsdaten aus Dolibarr (#326): der Haken muss sich setzen lassen, die übernommenen Felder sperren
+// und beim Speichern als legal_from_dolibarr mitgehen - der Betreiber meldete, der Haken „geht nicht“.
+test("Rechtliches: der Haken „Vereinsdaten aus Dolibarr übernehmen“ lässt sich setzen und wird gespeichert", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/admin/dolibarr/public")) {
+      return Promise.resolve({ data: {
+        enabled: false, has_data: true, fetched_at: "2026-09-23T21:20:00+00:00", names_withheld: false,
+        overlay: { legal_name: "THE LION SQUAD - eSPORTS", zvr_number: "1593703043" },
+        representative: { name: "Obperson Test", role: "Obmann/Obfrau" }, board: [], fields: ["legal_name", "zvr_number"],
+      } });
+    }
+    return Promise.resolve(responseFor(url));
+  });
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings?tab=legal"]}>
+        <AdminSettingsPage />
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  const box = await screen.findByTestId("legal-from-dolibarr");
+  await waitFor(() => expect(box).not.toBeDisabled());
+  await userEvent.click(box);
+  expect(box).toBeChecked();
+  const nameField = screen.getByTestId("legal-name");
+  const nameInput = nameField.tagName === "INPUT" ? nameField : nameField.querySelector("input");
+  await waitFor(() => expect(nameInput).toBeDisabled());
+  expect(nameInput).toHaveValue("THE LION SQUAD - eSPORTS");
+  await userEvent.click(screen.getByTestId("legal-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ legal_from_dolibarr: true })));
+});
+
+// Nachtrag: live stand Analytics auf „Google“ ohne Measurement ID - das blockierte jedes Speichern der
+// Markendaten, auch auf „Rechtliches“ (der Haken „Vereinsdaten aus Dolibarr“ hielt deshalb nie).
+// Die Analytics-Prüfung greift nur noch, wenn Analytics selbst geändert wird.
+test("Rechtliches speichert auch, wenn Analytics auf Google ohne ID steht - die Prüfung greift nur bei Analytics-Änderungen", async () => {
+  apiMock.get.mockImplementation((url) => {
+    const path = String(url);
+    if (path.startsWith("/settings/branding")) return Promise.resolve({ data: { club_name: "THE LION SQUAD", analytics_provider: "google", google_analytics_id: "" } });
+    if (path.startsWith("/admin/dolibarr/public")) return Promise.resolve({ data: { enabled: false, has_data: true, fetched_at: "2026-09-23T21:20:00+00:00", overlay: { legal_name: "THE LION SQUAD - eSPORTS" }, representative: null, board: [], fields: [] } });
+    return Promise.resolve(responseFor(url));
+  });
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings?tab=legal"]}>
+        <AdminSettingsPage />
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  const box = await screen.findByTestId("legal-from-dolibarr");
+  await waitFor(() => expect(box).not.toBeDisabled());
+  await userEvent.click(box);
+  await userEvent.click(screen.getByTestId("legal-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ legal_from_dolibarr: true })));
+  expect(toastMock.error).not.toHaveBeenCalled();
+});

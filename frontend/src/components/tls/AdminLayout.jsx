@@ -54,6 +54,10 @@ export const ADMIN_GROUPS = [
     items: [
       { to: "/admin/finance", label: "Finanzübersicht", icon: Wallet, areas: ["finance"] },
       { to: "/admin/dolibarr", label: "Dolibarr-Anbindung", icon: Link2, areas: ["club", "system"] },
+      { to: "/admin/dolibarr?tab=connection", label: "Dolibarr: Verbindung & Modus", icon: Link2, areas: ["system"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=preview", label: "Dolibarr: Umstellung", icon: Link2, areas: ["club"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=links", label: "Dolibarr: Zuordnungen", icon: Link2, areas: ["club"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=policy", label: "Dolibarr: Funktionen und Bereiche", icon: Link2, areas: ["club", "system"], searchOnly: true },
     ],
   },
   {
@@ -95,6 +99,20 @@ export const ADMIN_GROUPS = [
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
+      // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
+      // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
+      { to: "/admin/settings?tab=auth", label: "Einstellungen: Login & Konten", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=email", label: "Einstellungen: E-Mail (Resend)", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=smtp", label: "Einstellungen: SMTP", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=newsletter", label: "Einstellungen: Newsletter", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=queue", label: "Einstellungen: Mail-Queue", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=logs", label: "Einstellungen: Versandlogs", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=brand", label: "Einstellungen: Branding", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=socials", label: "Einstellungen: Socials", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=seo", label: "Einstellungen: SEO & Analytics", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=discord", label: "Einstellungen: Discord", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=twitch", label: "Einstellungen: Twitch", icon: SettingsIcon, areas: ["system"], searchOnly: true },
+      { to: "/admin/settings?tab=system", label: "Einstellungen: Systemstatus", icon: SettingsIcon, areas: ["system"], searchOnly: true },
     ],
   },
 ];
@@ -103,14 +121,15 @@ const ADMIN_SEARCH_TERMS = {
   "/admin": ["home", "start", "control"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
-  "/admin/members": ["verein", "mitgliedschaft", "beitrag"],
+  "/admin/members": ["verein", "mitgliedschaft", "beitrag", "verzeichnis", "einwilligung", "dolibarr", "mitgliedsnummer"],
+  "/admin/moderation": ["moderation", "wortfilter", "sperre", "gesperrt", "meldungen", "gemeldet", "blockiert", "strikes", "chat"],
   "/admin/member-profiles": ["profile", "spielerprofile", "vereinsspieler"],
   "/admin/membership-applications": ["antraege", "beitritt", "join"],
   "/admin/benefits": ["vorteile", "rabatte"],
   "/admin/documents": ["dateien", "downloads"],
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
-  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about"],
+  "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
   "/admin/f1": ["fastlap", "racing", "challenge"],
@@ -128,8 +147,8 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/nav": ["menue", "navigation"],
   "/admin/achievements": ["badges", "punkte", "level"],
   "/admin/stickers": ["chat", "emoji", "fluent"],
-  "/admin/sponsors": ["unterstuetzer", "partner"],
-  "/admin/partners": ["kooperationen", "netzwerk"],
+  "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
+  "/admin/partners": ["kooperationen", "netzwerk", "dolibarr", "kategorie"],
   "/admin/references": ["erfolge", "platzierungen", "results"],
   "/admin/contact": ["kontakt", "inbox", "nachrichten"],
   "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
@@ -138,7 +157,23 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/mobile-logs": ["app", "fehler", "client"],
   "/admin/mobile-push": ["push", "notifications", "app"],
   "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
-  "/admin/settings?tab=legal": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal"],
+  "/admin/settings?tab=legal": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
+  "/admin/settings?tab=auth": ["login", "anmeldung", "google", "passkey", "passkeys", "fingerabdruck", "registrierung", "zwei-faktor", "2fa", "steam", "discord app", "twitch app", "plattform-konten", "konten verknuepfen", "konten verknüpfen", "verknuepfung", "verknüpfung", "oauth", "rueckruf", "rückruf", "callback", "steam api key", "client id"],
+  "/admin/settings?tab=email": ["resend", "absender", "api key", "mail", "e-mail", "versand"],
+  "/admin/settings?tab=smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
+  "/admin/settings?tab=newsletter": ["newsletter", "rundmail", "empfänger", "abo"],
+  "/admin/settings?tab=queue": ["mail-queue", "warteschlange", "versand", "haengt", "hängt", "failed"],
+  "/admin/settings?tab=logs": ["versandlogs", "mail logs", "zugestellt", "bounce"],
+  "/admin/settings?tab=brand": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke"],
+  "/admin/settings?tab=socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links"],
+  "/admin/settings?tab=seo": ["seo", "google analytics", "measurement id", "plausible", "analytics", "indexnow", "sitemap", "suchmaschine", "bing", "site verification", "meta"],
+  "/admin/settings?tab=discord": ["discord", "webhook", "bot", "token", "kanal", "meldungen", "rollen abgleichen", "befehle"],
+  "/admin/settings?tab=twitch": ["twitch", "helix", "livestream", "live-erkennung", "stream"],
+  "/admin/settings?tab=system": ["systemstatus", "status", "datenbank", "scheduler", "uploads", "mail-queue", "smtp test"],
+  "/admin/dolibarr?tab=connection": ["dolibarr verbindung", "api schluessel", "api schlüssel", "modus", "vorschau", "live", "schreibzugriff", "rechnungen freigeben", "steuersaetze", "steuersätze", "konditionen", "webhook", "beitrittsantraege", "beitrittsanträge", "e-mail zuordnen", "erp"],
+  "/admin/dolibarr?tab=preview": ["umstellung", "vorschau", "trockenlauf", "mitgliedsarten", "konten bestätigen", "ohne konto"],
+  "/admin/dolibarr?tab=links": ["zuordnungen", "konto mitglied", "verknuepfung", "verknüpfung", "loesen", "lösen"],
+  "/admin/dolibarr?tab=policy": ["funktionen", "bereich", "vorstand rechte", "freigabe", "vereinsverwaltung", "obmann", "kassier"],
   "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
   "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };
@@ -161,6 +196,20 @@ function itemMatchesQuery(item, groupLabel, query) {
     ...(ADMIN_SEARCH_TERMS[item.to] || []),
   ].join(" "));
   return haystack.includes(query);
+}
+
+// Was jemand im Menü sieht: nur seine Bereiche (#287); Wegweiser-Einträge (searchOnly)
+// nur, wenn die Suche sie trifft.
+export function navGroupsFor(user, query) {
+  const searchQuery = normalizeSearch(query);
+  return ADMIN_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const allowed = hasArea(user, ...(item.areas || [])) || (item.staff && Boolean(user?.is_tournament_staff));
+      if (item.searchOnly && !searchQuery) return false;
+      return allowed && itemMatchesQuery(item, group.label, searchQuery);
+    }),
+  })).filter((group) => group.items.length > 0);
 }
 
 // Moderatoren sehen nur diese Routen
@@ -224,13 +273,7 @@ export function AdminLayout({ children }) {
   // Rechte nach Bereichen (#287): ein Eintrag erscheint, wenn die Person einen
   // seiner Bereiche hat; die Seiten der Turnierleitung auch für zugewiesene
   // Helfer (staff). Wer nichts davon hat, sieht kein Menü.
-  const visibleGroups = useMemo(() => ADMIN_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => {
-      const allowed = hasArea(user, ...(item.areas || [])) || (item.staff && Boolean(user?.is_tournament_staff));
-      return allowed && itemMatchesQuery(item, group.label, searchQuery);
-    }),
-  })).filter((group) => group.items.length > 0), [searchQuery, user]);
+  const visibleGroups = useMemo(() => navGroupsFor(user, navQuery), [navQuery, user]);
 
   const activeGroup = groupLabelForPath(location.pathname);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {

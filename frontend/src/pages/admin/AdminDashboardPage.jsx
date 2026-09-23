@@ -48,7 +48,7 @@ export default function AdminDashboardPage() {
 
   const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
   const settingsHub = [
-    { label: "Login & Google", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
+    { label: "Login & Konten", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
     { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings?tab=brand", icon: Palette, ok: undefined },
     { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings?tab=email", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
     { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings?tab=smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
