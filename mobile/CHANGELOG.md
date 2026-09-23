@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.0-beta - 2026-09-23
+
+- Mobile: „Konto löschen“ in den Profil-Einstellungen: dein Konto wird dauerhaft anonymisiert – derselbe Weg wie auf der Website, zweimal bestätigt. Google Play verlangt das, weil man sich in der App registrieren kann (#390).
+
 ## 0.14.1-beta - 2026-09-23
 
 - Mobile: Auszeichnungen haben im Profil einen eigenen Reiter – Referenzen sind die Turnier-Historie, Auszeichnungen die Banner und Trophäen; vorher standen beide unter „Referenzen“ (#230).
