@@ -114,7 +114,9 @@ async def test_list_is_moderation_only_and_held_direct_messages_wait_for_a_decis
     assert (await flow.patch(f"/api/moderation/items/{item['id']}", json={"decision": "release"})).status_code == 409
     strike = await flow.db.moderation_strikes.find_one({"user_id": paula["id"]}, {"_id": 0})
     assert strike["source"] == "word_filter" and strike["ref_id"] == second["id"] and strike["note"] == "Beleidigung"
-    assert await flow.db.notifications.count_documents({"user_id": paula["id"], "kind": "moderation"}) == 1
+    # Zurückweisung + Hinweis der ersten Stufe (#416).
+    assert await flow.db.notifications.count_documents({"user_id": paula["id"], "kind": "moderation"}) == 2
+    assert (await flow.db.moderation_sanctions.find_one({"user_id": paula["id"]}, {"_id": 0}))["action"] == "notice"
     flow.act_as(otto)
     assert second["id"] not in [m["id"] for m in (await flow.get(f"/api/messages/direct/{paula['id']}")).json()["messages"]]
     flow.act_as(paula)

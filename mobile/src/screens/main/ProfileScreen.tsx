@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Alert, Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Alert, Image, Linking, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -20,6 +20,14 @@ import { FadeIn, staggerDelay } from "../../components/FadeIn";
 import { type AchievementGroup, achievementIcon } from "../../lib/achievements";
 import { sortAwards, type Award } from "../../lib/awards";
 import { API_BASE_URL } from "../../config";
+
+// Der eigene Stand bei der Moderation (#416): nur lesen; Einspruch und Verlauf liegen im Web.
+type ModerationStanding = {
+  strike_count: number;
+  strike_ttl_months: number;
+  active: null | { action: string; label: string; reason?: string | null; chat_blocked_until?: string | null; open_until_decision?: boolean; created_at?: string };
+};
+const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
@@ -125,6 +133,7 @@ export function ProfileScreen() {
     }
   };
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
+  const [standing, setStanding] = useState<ModerationStanding | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -189,13 +198,15 @@ export function ProfileScreen() {
       return;
     }
     try {
-      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult] = await Promise.all([
+      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult, standingResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
         api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
         api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
+        api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
       ]);
+      setStanding((standingResult.data as ModerationStanding | null) || null);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
       setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
       setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
@@ -432,6 +443,22 @@ export function ProfileScreen() {
         <FadeIn trigger={activeTab} style={styles.tabContent}>
         {!profileLoading && activeTab === "overview" ? (
           <>
+            {standing && (standing.active || standing.strike_count > 0) ? (
+              <Card style={styles.card}>
+                <Heading>Moderation</Heading>
+                {standing.active ? (
+                  <Muted>
+                    {standing.active.label}
+                    {standing.active.chat_blocked_until ? ` · Chat gesperrt bis ${formatDate(standing.active.chat_blocked_until)}` : standing.active.open_until_decision ? " · bis zur Entscheidung der Moderation" : ""}
+                  </Muted>
+                ) : null}
+                {standing.active?.reason ? <Muted>Grund: {standing.active.reason}</Muted> : null}
+                <Muted>{standing.strike_count} Treffer in den letzten {standing.strike_ttl_months} Monaten.</Muted>
+                <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${WEB_BASE_URL}/my/penalties`)} testID="profile-moderation-web">
+                  <Muted style={{ color: colors.cyan }}>Details und Einspruch auf der Website</Muted>
+                </Pressable>
+              </Card>
+            ) : null}
             <Card style={styles.card}>
               <Heading>Profilstatus</Heading>
               <ProgressBar value={completeness.score || 0} color={colors.cyan} />

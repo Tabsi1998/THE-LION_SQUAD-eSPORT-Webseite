@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 
 from auth import get_current_user, get_optional_user
 from database import get_db
+from services import moderation_standing
 from services.chat_attachments import (
     CHAT_UPLOAD_RATE_LIMIT,
     attachment_path,
@@ -29,6 +30,7 @@ async def upload_chat_attachment(
     poster: UploadFile | None = File(None),
     me: dict = Depends(get_current_user),
 ):
+    await moderation_standing.require_chat_allowed(get_db(), me)
     await enforce_rate_limit(
         request,
         "chat-attachments:upload",

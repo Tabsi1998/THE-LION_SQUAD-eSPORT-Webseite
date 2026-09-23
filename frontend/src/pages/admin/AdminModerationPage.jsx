@@ -1,20 +1,32 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
+import { formatMoment } from "@/components/tls/ModerationStandingCard";
 
 // Moderation (#417): drei Reiter - die Meldungen der Community, die Funde des Wortfilters
 // (zurückgehalten wartet auf eine Entscheidung, markiert steht nur da) und die Wortliste selbst.
 
-const STATUS = ["open", "reviewing", "resolved", "dismissed"];
-const STATUS_LABEL = { open: "Offen", reviewing: "In Prüfung", resolved: "Erledigt", dismissed: "Verworfen" };
-const TABS = [["reports", "Meldungen"], ["items", "Wortfilter-Funde"], ["filter", "Wortfilter"]];
+// „Berechtigt“ (#416) erledigt die Meldung und zählt als Treffer für die Stufen.
+const STATUS = ["open", "reviewing", "resolved", "justified", "dismissed"];
+const STATUS_LABEL = { open: "Offen", reviewing: "In Prüfung", resolved: "Erledigt", justified: "Berechtigt (zählt als Treffer)", dismissed: "Verworfen" };
+const TABS = [["reports", "Meldungen"], ["items", "Wortfilter-Funde"], ["filter", "Wortfilter"], ["people", "Personen"], ["levels", "Stufen"]];
+const SANCTION_ACTIONS = [["notice", "Hinweis"], ["warning", "Verwarnung mit Chat-Sperre"], ["suspension", "Sperre bis zur Entscheidung"]];
+const SANCTION_STATUS = { active: "läuft", lifted: "aufgehoben", expired: "abgelaufen", superseded: "durch höhere Stufe ersetzt" };
 const ACTION_LABEL = { hold: "zurückhalten", flag: "nur markieren" };
 const ITEM_STATE_LABEL = { pending: "wartet", flagged: "markiert", released: "freigegeben", rejected: "zurückgewiesen", noted: "gesehen" };
 
 export default function AdminModerationPage() {
-  const [tab, setTab] = useState("reports");
+  // Reiter per ?tab= ansteuerbar - die Einspruch-Benachrichtigung führt direkt zu „Personen“.
+  const [params, setParams] = useSearchParams();
+  const requested = params.get("tab");
+  const [tab, setTabState] = useState(TABS.some(([key]) => key === requested) ? requested : "reports");
+  const setTab = (key) => {
+    setTabState(key);
+    setParams(key === "reports" ? {} : { tab: key }, { replace: true });
+  };
   return (
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community Safety</span>
@@ -27,7 +39,235 @@ export default function AdminModerationPage() {
       {tab === "reports" && <ReportsTab />}
       {tab === "items" && <ItemsTab />}
       {tab === "filter" && <WordFilterTab />}
+      {tab === "people" && <PeopleTab />}
+      {tab === "levels" && <LevelsTab />}
     </AdminLayout>
+  );
+}
+
+// Personen (#416): wer Treffer oder Maßnahmen hat, mit Historie - Treffer eintragen oder
+// zurücknehmen, Stufe von Hand setzen oder aufheben, Einsprüche entscheiden, CSV für den Vorstand.
+function PeopleTab() {
+  const [people, setPeople] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [strikeNote, setStrikeNote] = useState("");
+  const [sanction, setSanction] = useState({ action: "warning", reason: "", chat_hours: "" });
+  const [note, setNote] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      const { data } = await api.get("/moderation/people");
+      setPeople(Array.isArray(data) ? data : []);
+    } catch (error) {
+      toast.error(formatRequestError(error, "Personen konnten nicht geladen werden."));
+    }
+  }, []);
+  const loadDetail = useCallback(async (userId) => {
+    if (!userId) return;
+    try {
+      const { data } = await api.get(`/moderation/people/${userId}`);
+      setDetail(data);
+    } catch (error) {
+      toast.error(formatRequestError(error, "Historie konnte nicht geladen werden."));
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadDetail(selected); }, [selected, loadDetail]);
+
+  const run = async (key, action, success) => {
+    setBusy(key);
+    try {
+      await action();
+      toast.success(success);
+      await Promise.all([load(), loadDetail(selected)]);
+    } catch (error) {
+      toast.error(formatRequestError(error, "Das hat nicht geklappt."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const active = detail?.active;
+  return (
+    <div className="grid lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
+      <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">{people.length} Personen</div>
+          <a href="/api/moderation/people/export.csv" data-testid="people-export" className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Download className="w-3 h-3" /> CSV</a>
+        </div>
+        {people.length === 0 ? <div className="text-sm text-white/40 py-6 text-center">Noch keine Treffer oder Maßnahmen.</div> : (
+          <ul className="divide-y divide-white/5">
+            {people.map((row) => (
+              <li key={row.user_id}>
+                <button type="button" onClick={() => setSelected(row.user_id)} data-testid={`people-row-${row.user.username}`} className={`w-full text-left py-2 px-2 rounded-sm ${selected === row.user_id ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-sm truncate">{row.user.display_name || row.user.username}</span>
+                    {row.open_appeal && <span className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Einspruch</span>}
+                  </div>
+                  <div className="text-[11px] text-white/50">{row.active_strikes} Treffer{row.active ? ` · ${row.active.label}` : ""}</div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {!detail ? (
+        <div className="border border-dashed border-white/10 rounded-sm p-10 text-center text-white/40">Person links wählen.</div>
+      ) : (
+        <div className="space-y-4" data-testid="people-detail">
+          <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="font-heading font-bold uppercase">{detail.user.display_name || detail.user.username} <span className="text-white/40 normal-case font-normal text-sm">@{detail.user.username}</span></div>
+                <div className="text-xs text-white/50 mt-1">{detail.active_strike_count} Treffer in den letzten {detail.settings?.strike_ttl_months} Monaten · {detail.sanctions.length} Maßnahmen · {detail.reports.length} Meldungen gegen die Person</div>
+              </div>
+              {active ? (
+                <div className="text-right">
+                  <div className="text-[#FF9500] font-bold text-sm" data-testid="people-active">{active.label}</div>
+                  <div className="text-[11px] text-white/50">{active.chat_blocked_until ? `Chat bis ${formatMoment(active.chat_blocked_until)}` : active.open_until_decision ? "bis zur Entscheidung" : "ohne Einschränkung"}</div>
+                </div>
+              ) : <div className="text-[11px] text-white/45">keine laufende Maßnahme</div>}
+            </div>
+            {active?.appeal && (
+              <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="people-appeal">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
+                <p className="mt-1 whitespace-pre-wrap text-white/80">{active.appeal.message}</p>
+                {active.appeal.status === "open" && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Annehmen und aufheben</button>
+                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "keep", note: note || null }), "Einspruch abgelehnt – Maßnahme bleibt.")} data-testid={`appeal-keep-${active.id}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Ablehnen</button>
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="mt-3 grid md:grid-cols-2 gap-3">
+              <div className="border border-white/10 rounded-sm p-3">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Treffer eintragen</div>
+                <input value={strikeNote} onChange={(e) => setStrikeNote(e.target.value)} placeholder="Was ist passiert? (steht im Hinweis an die Person)" data-testid="people-strike-note" className="w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                <button type="button" disabled={!!busy} onClick={() => run("strike", () => api.post(`/moderation/people/${detail.user.id}/strikes`, { note: strikeNote || null }).then(() => setStrikeNote("")), "Treffer eingetragen – die Stufe wurde neu bestimmt.")} data-testid="people-strike-add" className="mt-2 px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Treffer eintragen</button>
+              </div>
+              <div className="border border-white/10 rounded-sm p-3">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Stufe von Hand setzen</div>
+                <div className="flex flex-wrap gap-2">
+                  <select value={sanction.action} onChange={(e) => setSanction((c) => ({ ...c, action: e.target.value }))} data-testid="people-sanction-action" className="bg-black/40 border border-white/10 px-2 py-2 rounded-sm text-sm">
+                    {SANCTION_ACTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                  </select>
+                  {sanction.action === "warning" && <input type="number" min="1" max="720" value={sanction.chat_hours} onChange={(e) => setSanction((c) => ({ ...c, chat_hours: e.target.value }))} placeholder="Stunden" aria-label="Chat-Sperre in Stunden" data-testid="people-sanction-hours" className="w-24 bg-black/40 border border-white/10 px-2 py-2 rounded-sm text-sm" />}
+                </div>
+                <input value={sanction.reason} onChange={(e) => setSanction((c) => ({ ...c, reason: e.target.value }))} placeholder="Grund (steht in der Benachrichtigung)" data-testid="people-sanction-reason" className="mt-2 w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
+                <button type="button" disabled={!!busy || sanction.reason.trim().length < 3} onClick={() => run("sanction", () => api.post(`/moderation/people/${detail.user.id}/sanctions`, { action: sanction.action, reason: sanction.reason.trim(), ...(sanction.action === "warning" && sanction.chat_hours ? { chat_hours: Number(sanction.chat_hours) } : {}) }).then(() => setSanction((c) => ({ ...c, reason: "" }))), "Stufe gesetzt – die Person ist benachrichtigt.")} data-testid="people-sanction-set" className="mt-2 px-3 py-1.5 border border-[#FF9500]/50 text-[#FF9500] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Stufe setzen</button>
+              </div>
+            </div>
+            <div className="mt-3">
+              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz für Aufheben, Zurücknehmen oder Einspruch (optional)" data-testid="people-note" className="w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Treffer</div>
+              {detail.strikes.length === 0 ? <div className="text-sm text-white/40">Keine.</div> : (
+                <ul className="space-y-2 text-sm">
+                  {detail.strikes.map((strike) => (
+                    <li key={strike.id} className={`flex items-start justify-between gap-2 ${strike.revoked ? "opacity-50 line-through" : ""}`} data-testid={`people-strike-${strike.id}`}>
+                      <span><span className="text-white/45 text-xs">{formatMoment(strike.created_at)}</span> · {strike.source_label}{strike.note ? ` · ${strike.note}` : ""}{strike.revoked && strike.revoke_note ? ` (zurückgenommen: ${strike.revoke_note})` : ""}</span>
+                      {!strike.revoked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="text-[10px] font-bold uppercase tracking-wider text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Maßnahmen</div>
+              {detail.sanctions.length === 0 ? <div className="text-sm text-white/40">Keine.</div> : (
+                <ul className="space-y-2 text-sm">
+                  {detail.sanctions.map((entry) => (
+                    <li key={entry.id} className="flex items-start justify-between gap-2" data-testid={`people-sanction-${entry.id}`}>
+                      <span><span className="text-white/45 text-xs">{formatMoment(entry.created_at)}</span> · {entry.label} · {SANCTION_STATUS[entry.status] || entry.status}{entry.automatic ? "" : " · von Hand"}{entry.reason ? ` · ${entry.reason}` : ""}</span>
+                      {entry.status === "active" && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="text-[10px] font-bold uppercase tracking-wider text-[#00FF88] shrink-0">Aufheben</button>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+          {detail.reports.length > 0 && (
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Meldungen gegen die Person</div>
+              <ul className="space-y-1 text-sm">
+                {detail.reports.map((report) => <li key={report.id}><span className="text-white/45 text-xs">{formatMoment(report.created_at)}</span> · {report.category} · {STATUS_LABEL[report.status] || report.status}{report.resolution_note ? ` · ${report.resolution_note}` : ""}</li>)}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Stufen (#416): ab wie vielen Treffern welche Maßnahme, wie lange die Chat-Sperre dauert, wann Treffer verfallen.
+function LevelsTab() {
+  const [settings, setSettings] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/moderation/levels").then(({ data }) => setSettings(data && Array.isArray(data.levels) ? data : { levels: [], strike_ttl_months: 12 })).catch(() => setSettings({ levels: [], strike_ttl_months: 12 }));
+  }, []);
+
+  if (!settings) return <div className="text-white/40 text-sm">Lade Stufen …</div>;
+  const setLevel = (index, key, value) => setSettings((c) => ({ ...c, levels: c.levels.map((level, i) => (i === index ? { ...level, [key]: value } : level)) }));
+  const save = async () => {
+    setBusy(true);
+    try {
+      const payload = {
+        levels: settings.levels.map((level) => ({ strikes: Number(level.strikes), action: level.action, chat_hours: Number(level.chat_hours || 0) })),
+        strike_ttl_months: Number(settings.strike_ttl_months),
+      };
+      const { data } = await api.put("/moderation/levels", payload);
+      setSettings(data);
+      toast.success("Stufen gespeichert.");
+    } catch (error) {
+      toast.error(formatRequestError(error, "Stufen konnten nicht gespeichert werden."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="max-w-3xl space-y-4">
+      <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
+        <p className="text-xs text-white/50 mb-3">Nach jedem Treffer wird die Stufe neu bestimmt; eine Maßnahme entsteht nur, wenn sie höher ist als die laufende. Die Sperre bis zur Entscheidung hebt immer ein Mensch auf.</p>
+        <div className="space-y-2">
+          {settings.levels.map((level, index) => (
+            <div key={index} className="flex flex-wrap items-center gap-2 text-sm" data-testid={`levels-row-${index}`}>
+              <span className="text-white/50">ab</span>
+              <input type="number" min="1" max="50" value={level.strikes} onChange={(e) => setLevel(index, "strikes", e.target.value)} aria-label="Treffer" data-testid={`levels-strikes-${index}`} className="w-20 bg-black/40 border border-white/10 px-2 py-2 rounded-sm" />
+              <span className="text-white/50">Treffern:</span>
+              <select value={level.action} onChange={(e) => setLevel(index, "action", e.target.value)} aria-label="Maßnahme" data-testid={`levels-action-${index}`} className="bg-black/40 border border-white/10 px-2 py-2 rounded-sm">
+                {SANCTION_ACTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+              </select>
+              {level.action === "warning" && (
+                <>
+                  <input type="number" min="1" max="720" value={level.chat_hours || ""} onChange={(e) => setLevel(index, "chat_hours", e.target.value)} aria-label="Chat-Sperre in Stunden" data-testid={`levels-hours-${index}`} className="w-24 bg-black/40 border border-white/10 px-2 py-2 rounded-sm" />
+                  <span className="text-white/50">Stunden Chat-Sperre</span>
+                </>
+              )}
+              <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: c.levels.filter((_, i) => i !== index) }))} aria-label="Stufe entfernen" data-testid={`levels-remove-${index}`} className="ml-auto text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+            </div>
+          ))}
+        </div>
+        {settings.levels.length < 5 && (
+          <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: [...c.levels, { strikes: (Number(c.levels[c.levels.length - 1]?.strikes) || 0) + 1, action: "warning", chat_hours: 24 }] }))} data-testid="levels-add" className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3 h-3" /> Stufe hinzufügen</button>
+        )}
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-white/50">Treffer verfallen nach</span>
+          <input type="number" min="1" max="60" value={settings.strike_ttl_months} onChange={(e) => setSettings((c) => ({ ...c, strike_ttl_months: e.target.value }))} aria-label="Verfall in Monaten" data-testid="levels-ttl" className="w-20 bg-black/40 border border-white/10 px-2 py-2 rounded-sm" />
+          <span className="text-white/50">Monaten</span>
+        </div>
+        <button type="button" onClick={save} disabled={busy} data-testid="levels-save" className="mt-4 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Speichere…" : "Stufen speichern"}</button>
+      </div>
+    </div>
   );
 }
 

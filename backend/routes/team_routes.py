@@ -5,6 +5,7 @@ from typing import Optional, Literal
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
+from services import moderation_standing
 from auth import get_current_user, get_optional_user, require_admin
 from models import TeamCreate, TeamUpdate, now_utc, new_id
 from services.notification_preferences import send_user_template
@@ -387,6 +388,7 @@ async def list_team_chat(team_id: str, me: dict = Depends(get_current_user)):
 @router.post("/{team_id}/chat")
 async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(get_current_user)):
     db = get_db()
+    await moderation_standing.require_chat_allowed(db, me)
     team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")

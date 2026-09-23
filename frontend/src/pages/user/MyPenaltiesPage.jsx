@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -43,6 +44,9 @@ export default function MyPenaltiesPage() {
         <p className="mt-3 text-white/60 max-w-2xl">
           Hier siehst du jede Strafe, ungültige Runde oder Forfeit-Entscheidung gegen dich — inklusive der vollständigen Begründung des Admins. Bei Fragen wende dich an den Vorstand.
         </p>
+
+        {/* Verwarnungen mit Stufen (#416): der eigene Stand bei der Moderation samt Einspruch. */}
+        <div className="mt-8"><ModerationStandingCard /></div>
 
         <div className="mt-8" data-testid="my-penalties-list">
           {loading ? (

@@ -4,6 +4,7 @@ import re
 from fastapi import HTTPException, Depends
 from pydantic import BaseModel, Field
 from database import get_db
+from services import moderation_standing
 from auth import get_current_user
 from models import now_utc, new_id
 from services.user_notifications import create_user_notification
@@ -174,6 +175,7 @@ async def list_tournament_chat(tid: str, me: dict = Depends(get_current_user)):
 @router.post("/{tid}/chat")
 async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = Depends(get_current_user)):
     db = get_db()
+    await moderation_standing.require_chat_allowed(db, me)
     tid = await _resolve_tid(tid)
     tournament = await _get_visible_tournament(tid, me)
     if _is_tournament_locked(tournament):

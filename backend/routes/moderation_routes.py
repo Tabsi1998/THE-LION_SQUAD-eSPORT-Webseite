@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Literal
 
@@ -9,12 +10,13 @@ from auth import get_current_user, require_role, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
-from services import word_filter
+from services import moderation_standing, word_filter
 
 router = APIRouter(prefix="/api/moderation", tags=["moderation"])
 
 ReportCategory = Literal["harassment", "spam", "hate", "impersonation", "privacy", "cheating", "other"]
-ReportStatus = Literal["open", "reviewing", "resolved", "dismissed"]
+# „berechtigt“ (#416): erledigt und zählt als Treffer für die Stufen.
+ReportStatus = Literal["open", "reviewing", "resolved", "dismissed", "justified"]
 
 
 class UserReportCreate(BaseModel):
@@ -279,11 +281,125 @@ async def list_reports(status: ReportStatus | None = None, me: dict = Depends(re
 @router.patch("/reports/{report_id}")
 async def review_report(report_id: str, body: UserReportPatch, me: dict = Depends(require_area("moderation"))):
     db = get_db()
+    report = await db.user_reports.find_one({"id": report_id}, {"_id": 0})
+    if not report:
+        raise HTTPException(404, "Meldung nicht gefunden")
     now = now_utc().isoformat()
-    result = await db.user_reports.update_one({"id": report_id}, {"$set": {
+    await db.user_reports.update_one({"id": report_id}, {"$set": {
         "status": body.status, "resolution_note": (body.resolution_note or "").strip() or None,
         "reviewed_by": me["id"], "reviewed_at": now, "updated_at": now,
     }})
-    if result.matched_count == 0:
-        raise HTTPException(404, "Meldung nicht gefunden")
-    return {"ok": True}
+    result: dict = {"ok": True}
+    # „berechtigt“ zählt genau einmal als Treffer (#416) - und stößt die Stufe an.
+    if body.status == "justified" and report.get("status") != "justified":
+        outcome = await moderation_standing.add_strike(
+            db, report["target_user_id"], source="report", kind=report.get("category"), ref_id=report.get("message_id"),
+            report_id=report_id, moderator_id=me["id"], note=body.resolution_note,
+        )
+        result["strike"] = outcome["strike"]["id"]
+        result["sanction"] = outcome["sanction"]
+        await _audit(me["id"], "moderation.report_justified", report["target_user_id"], {"report_id": report_id})
+    return result
+
+
+# ---------------------------------------------------------------- Verwarnungen mit Stufen (#416)
+
+class LevelsBody(BaseModel):
+    levels: list[dict] | None = None
+    strike_ttl_months: int | None = Field(default=None, ge=1, le=60)
+
+
+class SanctionBody(BaseModel):
+    action: Literal["notice", "warning", "suspension"]
+    reason: str = Field(min_length=3, max_length=1000)
+    chat_hours: int | None = Field(default=None, ge=1, le=720)
+
+
+class NoteBody(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class AppealBody(BaseModel):
+    sanction_id: str
+    message: str = Field(min_length=10, max_length=2000)
+
+
+class AppealDecisionBody(BaseModel):
+    decision: Literal["lift", "keep"]
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.get("/levels")
+async def get_levels(me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.load_settings(get_db())
+
+
+@router.put("/levels")
+async def update_levels(body: LevelsBody, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    saved = await moderation_standing.save_settings(db, body.model_dump(exclude_unset=True))
+    await _audit(me["id"], "moderation.levels", None, saved)
+    return saved
+
+
+@router.get("/people")
+async def list_people(me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.people_overview(get_db())
+
+
+@router.get("/people/export.csv")
+async def export_people(me: dict = Depends(require_area("moderation"))):
+    rows = await moderation_standing.people_overview(get_db())
+    await _audit(me["id"], "moderation.people_export", None, {"rows": len(rows)})
+    return Response(content="\ufeff" + moderation_standing.export_csv(rows), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": "attachment; filename=moderation-personen.csv"})
+
+
+@router.get("/people/{user_id}")
+async def person_history(user_id: str, me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.person_history(get_db(), user_id)
+
+
+@router.post("/people/{user_id}/strikes")
+async def add_manual_strike(user_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        raise HTTPException(404, "Benutzer nicht gefunden")
+    outcome = await moderation_standing.add_strike(db, user_id, source="manual", moderator_id=me["id"], note=body.note)
+    await _audit(me["id"], "moderation.strike", user_id, {"strike_id": outcome["strike"]["id"], "note": body.note})
+    return {"ok": True, "strike": outcome["strike"], "sanction": outcome["sanction"]}
+
+
+@router.post("/people/{user_id}/sanctions")
+async def set_person_sanction(user_id: str, body: SanctionBody, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 1}):
+        raise HTTPException(404, "Benutzer nicht gefunden")
+    return await moderation_standing.set_sanction(db, user_id, body.action, moderator_id=me["id"], reason=body.reason, chat_hours=body.chat_hours)
+
+
+@router.post("/sanctions/{sanction_id}/lift")
+async def lift_sanction(sanction_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.lift_sanction(get_db(), sanction_id, moderator_id=me["id"], note=body.note)
+
+
+@router.post("/strikes/{strike_id}/revoke")
+async def revoke_strike(strike_id: str, body: NoteBody, me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.revoke_strike(get_db(), strike_id, moderator_id=me["id"], note=body.note)
+
+
+@router.post("/sanctions/{sanction_id}/appeal-decision")
+async def decide_appeal(sanction_id: str, body: AppealDecisionBody, me: dict = Depends(require_area("moderation"))):
+    return await moderation_standing.decide_appeal(get_db(), sanction_id, moderator_id=me["id"], decision=body.decision, note=body.note)
+
+
+@router.get("/me/standing")
+async def my_standing(me: dict = Depends(get_current_user)):
+    return await moderation_standing.standing_for(get_db(), me["id"])
+
+
+@router.post("/me/appeal")
+async def my_appeal(body: AppealBody, request: Request, me: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "moderation:appeal", limit=5, window_seconds=86400, subject=me["id"])
+    await moderation_standing.submit_appeal(get_db(), me["id"], body.sanction_id, body.message)
+    return {"ok": True, "standing": await moderation_standing.standing_for(get_db(), me["id"])}
