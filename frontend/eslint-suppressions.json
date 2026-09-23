@@ -44,11 +44,6 @@
       "count": 1
     }
   },
-  "src/pages/admin/AdminDocumentsPage.jsx": {
-    "jsx-a11y/label-has-associated-control": {
-      "count": 1
-    }
-  },
   "src/pages/admin/AdminF1EditPage.jsx": {
     "jsx-a11y/click-events-have-key-events": {
       "count": 2
@@ -81,14 +76,6 @@
       "count": 3
     }
   },
-  "src/pages/admin/AdminMembershipApplicationsPage.jsx": {
-    "jsx-a11y/click-events-have-key-events": {
-      "count": 2
-    },
-    "jsx-a11y/no-static-element-interactions": {
-      "count": 2
-    }
-  },
   "src/pages/admin/AdminSeasonsPage.jsx": {
     "jsx-a11y/label-has-associated-control": {
       "count": 1
@@ -97,14 +84,6 @@
   "src/pages/admin/AdminSettingsPage.jsx": {
     "jsx-a11y/label-has-associated-control": {
       "count": 1
-    }
-  },
-  "src/pages/admin/AdminStationsPage.jsx": {
-    "jsx-a11y/click-events-have-key-events": {
-      "count": 2
-    },
-    "jsx-a11y/no-static-element-interactions": {
-      "count": 2
     }
   },
   "src/pages/public/GalleryAlbumPage.jsx": {

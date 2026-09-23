@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API, api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -397,32 +398,23 @@ export default function AdminStationsPage() {
         </div>
       </div>
 
-      {/* Assign modal */}
+      {/* Zuweisen als Seitenblatt (#435): die Stationen bleiben daneben sichtbar. */}
       {assignFor && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setAssignFor(null)}>
-          <div className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Zuweisen zu</div>
-                <div className="font-heading text-lg font-bold">{assignFor.name}</div>
-              </div>
-              <button onClick={() => setAssignFor(null)} className="text-white/40 hover:text-white"><XIcon className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
-              {unassignedMatches.map((m) => (
-                <div key={m.id} className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
-                  <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
-                  <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
-                  <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Zuweisen</button>
-                    <button type="button" onClick={() => assign(assignFor.id, m.id, true)} className="px-2 py-1 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Direkt starten</button>
-                  </div>
+        <AdminSheet title={assignFor.name} eyebrow="Zuweisen zu" onClose={() => setAssignFor(null)} testId="station-assign-sheet">
+          <div className="space-y-1.5">
+            {unassignedMatches.map((m) => (
+              <div key={m.id} className="p-2 border border-white/10 rounded-sm hover:border-[#29B6E8] hover:bg-[#29B6E8]/5 text-xs">
+                <div className="text-white/40 text-[10px] uppercase tracking-widest">{detailOfMatch(m)}</div>
+                <div className="text-white font-semibold mt-0.5">{nameOfMatch(m)}</div>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => assign(assignFor.id, m.id)} data-testid={`assign-match-${m.id}`} className="px-2 py-1 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase">Zuweisen</button>
+                  <button type="button" onClick={() => assign(assignFor.id, m.id, true)} className="px-2 py-1 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[10px] font-bold uppercase">Direkt starten</button>
                 </div>
-              ))}
-              {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
-            </div>
+              </div>
+            ))}
+            {unassignedMatches.length === 0 && <div className="text-white/40 text-xs text-center py-6">Keine offenen Spiele</div>}
           </div>
-        </div>
+        </AdminSheet>
       )}
     </AdminLayout>
   );

@@ -5,10 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Crown, Check, X as XIcon, Inbox, Eye } from "lucide-react";
+import { Check, X as XIcon, Inbox, Eye } from "lucide-react";
 
 const TABS = [
   { key: "pending",  label: "Offen",      color: "#29B6E8" },
@@ -108,39 +109,40 @@ export default function AdminMembershipApplicationsPage() {
         </div>
       </div>
 
+      {/* Detail als Seitenblatt (#435): Annehmen und Ablehnen stehen in der Leiste unten. */}
       {selected && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur flex items-center justify-center p-4 overflow-y-auto" onClick={() => setSelected(null)}>
-          <div className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-xl p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Crown className="w-5 h-5 text-[#FFD700]" /> Bewerbung Detail</h3>
-              <button onClick={() => setSelected(null)} className="text-white/50 hover:text-white"><XIcon className="w-5 h-5" /></button>
+        <AdminSheet
+          title="Bewerbung Detail"
+          eyebrow="Mitgliedsbewerbungen"
+          accent="#FFD700"
+          onClose={() => setSelected(null)}
+          testId="application-sheet"
+          footer={selected.status === "pending" ? (
+            <div className="ml-auto flex flex-wrap gap-2">
+              <button type="button" onClick={() => decide(selected, "reject")} data-testid="application-sheet-reject" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm text-xs font-bold uppercase">Ablehnen</button>
+              <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase">Annehmen</button>
             </div>
-            <div className="space-y-3 text-sm">
-              <Row k="Spieler" v={`${selected.user_display_name || selected.user_username} (@${selected.user_username})`} />
-              <Row k="E-Mail" v={selected.user_email} />
-              <Row k="Wunsch" v={PREF_LABEL[selected.contribution_pref]} />
-              <Row k="Eingereicht" v={new Date(selected.created_at).toLocaleString("de-DE")} />
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Motivation</div>
-                <p className="mt-1 whitespace-pre-wrap text-white/80">{selected.motivation}</p>
-              </div>
-              {selected.notes && <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Anmerkungen</div>
-                <p className="mt-1 whitespace-pre-wrap text-white/80">{selected.notes}</p>
-              </div>}
-              {selected.decision_note && <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Admin-Notiz</div>
-                <p className="mt-1 text-white/80">{selected.decision_note}</p>
-              </div>}
+          ) : null}
+        >
+          <div className="space-y-3 text-sm">
+            <Row k="Spieler" v={`${selected.user_display_name || selected.user_username} (@${selected.user_username})`} />
+            <Row k="E-Mail" v={selected.user_email} />
+            <Row k="Wunsch" v={PREF_LABEL[selected.contribution_pref]} />
+            <Row k="Eingereicht" v={new Date(selected.created_at).toLocaleString("de-DE")} />
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Motivation</div>
+              <p className="mt-1 whitespace-pre-wrap text-white/80">{selected.motivation}</p>
             </div>
-            {selected.status === "pending" && (
-              <div className="flex justify-end gap-2 pt-4 mt-4 border-t border-white/10">
-                <button onClick={() => decide(selected, "reject")} className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm text-xs font-bold uppercase">Ablehnen</button>
-                <button onClick={() => decide(selected, "approve")} className="px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase">Annehmen</button>
-              </div>
-            )}
+            {selected.notes && <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Anmerkungen</div>
+              <p className="mt-1 whitespace-pre-wrap text-white/80">{selected.notes}</p>
+            </div>}
+            {selected.decision_note && <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Admin-Notiz</div>
+              <p className="mt-1 text-white/80">{selected.decision_note}</p>
+            </div>}
           </div>
-        </div>
+        </AdminSheet>
       )}
     </AdminLayout>
   );
