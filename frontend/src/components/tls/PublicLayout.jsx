@@ -177,9 +177,35 @@ export function PublicLayout({ children }) {
       <LevelUpCelebration />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="bottom_fixed" />
-      {/* Footer (#403): Sponsoren-Streifen, drei Spalten mit den Hauptbereichen, Kontakt aus den
-          Vereinsdaten, Bottom-Bar ohne Versionsnummer (die steht im Admin unter System). */}
+      {/* Footer (#403, #431): Mitmach-Streifen mit Discord-Knopf und Play-Badge über den Sponsoren,
+          Sponsoren-Streifen, drei Spalten mit den Hauptbereichen, Kontakt aus den Vereinsdaten,
+          Bottom-Bar ohne Versionsnummer (die steht im Admin unter System). */}
       <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
+        <div className="border-b border-white/5 bg-[#0D0D0E]" data-testid="footer-cta">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dabei sein</div>
+              <div className="mt-1 text-sm text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
+            </div>
+            {/* Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge (erst mit Link). */}
+            <div className="flex flex-wrap items-center gap-3 shrink-0" data-testid="footer-buttons">
+              {footerCta.discord && (
+                <a href={footerCta.discord} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
+                </a>
+              )}
+              {footerCta.playStoreUrl ? (
+                <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex">
+                  <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-11 w-auto" />
+                </a>
+              ) : (
+                <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                  <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <SponsorTicker compact placement="footer" className="pb-8 border-b border-white/5" />
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
@@ -215,23 +241,6 @@ export function PublicLayout({ children }) {
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
                   </a>
                 ))}
-              </div>
-              {/* Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge (erst mit Link). */}
-              <div className="mt-5 flex flex-wrap items-center gap-3" data-testid="footer-buttons">
-                {footerCta.discord && (
-                  <a href={footerCta.discord} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
-                  </a>
-                )}
-                {footerCta.playStoreUrl ? (
-                  <a href={footerCta.playStoreUrl} target="_blank" rel="noreferrer" data-testid="footer-play-badge" className="inline-flex">
-                    <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-11 w-auto" />
-                  </a>
-                ) : (
-                  <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
-                    <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
-                  </span>
-                )}
               </div>
             </div>
           </div>

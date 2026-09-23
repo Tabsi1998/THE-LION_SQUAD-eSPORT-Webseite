@@ -48,6 +48,12 @@ test("Mitglieder sehen den Mitgliederbereich, Admins den Adminbereich", async ()
   await user.click(screen.getByTestId("nav-user"));
   expect(screen.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
   expect(screen.getByTestId("nav-admin")).toHaveAttribute("href", "/admin");
+  // Gold, Blau und Rot ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss.
+  expect(screen.getByTestId("nav-member-area").className).toMatch(/text-\[#FFD700\]/);
+  expect(screen.getByTestId("nav-member-area").className).not.toMatch(/text-white/);
+  expect(screen.getByTestId("nav-admin").className).toMatch(/text-\[#29B6E8\]/);
+  expect(screen.getByTestId("nav-logout").className).toMatch(/text-\[#FF3B30\]/);
+  expect(screen.getByTestId("nav-logout").className).not.toMatch(/text-white/);
 });
 
 test("Abmelden ruft die Abmeldung auf und schliesst das Menue", async () => {

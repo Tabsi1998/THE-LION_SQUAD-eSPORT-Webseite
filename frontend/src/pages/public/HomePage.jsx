@@ -3,9 +3,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
-import { getCachedBranding } from "@/lib/brandingEvents";
 import { boardContacts } from "@/lib/memberArea";
-import { PLAY_BADGE_SRC, footerButtons } from "@/lib/siteFooter";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -20,14 +18,15 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
-import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users, Smartphone } from "lucide-react";
+import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
-// Startseite (#407): Community zuerst - der Verein lebt von Leuten, die mitspielen und sich
-// einbringen; Mitglied wird man nicht per Klick. Deshalb führt der Hero zur Community und zu den
-// Turnieren, „Mitglied werden“ steht leise darunter. Zahlen und Ansprechpartner kommen aus echten
-// Daten (`club_numbers`, `/board`), nie aus Platzhaltern.
+// Startseite (#407, #425, #431): Community zuerst - der Verein lebt von Leuten, die mitspielen und
+// sich einbringen; Mitglied wird man nicht per Klick. Der Hero hat keine Knöpfe, „Mitglied werden“
+// steht leise darunter; Discord und LionsAPP stehen im Footer. Zahlen und Ansprechpartner kommen
+// aus echten Daten (`club_numbers`, `/board`), nie aus Platzhaltern - die Ansprechpartner als
+// eigener Abschnitt unter den News.
 
 export default function HomePage() {
   const [state, setState] = useState(null);
@@ -78,14 +77,13 @@ export default function HomePage() {
               <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">
                 Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.
               </p>
-              {/* Keine Knöpfe im Hero (#425): Discord und Play stehen im Footer, Turniere bei den Terminen. */}
-              <p className="mt-6 text-sm text-white/45" data-testid="hero-join">
-                {isClubMember ? (
-                  <Link to="/members/area" className="text-[#FFD700] hover:underline">Zum Mitgliederbereich</Link>
-                ) : (
-                  <>Mitglied wird, wer sich einbringt — <Link to="/membership/join" className="text-[#FFD700] hover:underline">so läuft das bei uns</Link>.</>
-                )}
-              </p>
+              {/* Keine Knöpfe im Hero (#425); Mitglieder sehen auch keine Zeile (#431) - ihr Weg in
+                  den Mitgliederbereich steht im Benutzermenü. */}
+              {!isClubMember && (
+                <p className="mt-6 text-sm text-white/45" data-testid="hero-join">
+                  Mitglied wird, wer sich einbringt — <Link to="/membership/join" className="text-[#FFD700] hover:underline">so läuft das bei uns</Link>.
+                </p>
+              )}
             </div>
             <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative">
@@ -139,22 +137,6 @@ export default function HomePage() {
       {/* Jahreswertung widget */}
       <SeasonPassWidget />
 
-      {(board.length > 0) && (
-        <section className="border-y border-white/10 bg-[#080808]/35">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 grid lg:grid-cols-2 gap-8 min-w-0">
-            <BoardTeaser contacts={board} />
-            <AppStrip />
-          </div>
-        </section>
-      )}
-      {board.length === 0 && (
-        <section className="border-y border-white/10 bg-[#080808]/35">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 min-w-0">
-            <AppStrip />
-          </div>
-        </section>
-      )}
-
       {newsItems.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <SectionHeader icon={Newspaper} accent="#29B6E8" title="Aktuelle News" actionLabel="Alle News" actionTo="/news" />
@@ -162,6 +144,15 @@ export default function HomePage() {
             {newsItems.map((n, idx) => (
               <NewsCard key={n.id} news={n} featured={idx === 0} />
             ))}
+          </div>
+        </section>
+      )}
+
+      {/* Ansprechpartner unter den News (#431), über die volle Breite - der App-Kasten daneben ist weg. */}
+      {board.length > 0 && (
+        <section className="border-t border-white/10 bg-[#080808]/35">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 min-w-0">
+            <BoardTeaser contacts={board} />
           </div>
         </section>
       )}
@@ -257,50 +248,27 @@ function NumberTile({ id, label, value }) {
   );
 }
 
-// Ansprechpartner (#407): die freigegebenen Namen aus dem Vorstand - dieselbe Auswahl wie im
-// Mitgliederbereich; ohne besetzte Posten bleibt der Block weg.
+// Ansprechpartner (#407, #431): die freigegebenen Namen aus dem Vorstand - dieselbe Auswahl wie im
+// Mitgliederbereich; ohne besetzte Posten bleibt der Block weg. Größere Karten mit Bild, bis zu
+// vier nebeneinander.
 function BoardTeaser({ contacts }) {
   return (
     <div className="min-w-0" data-testid="home-board">
       <SectionHeader icon={Users} accent="#FFD700" title="Ansprechpartner" actionLabel="Ganzer Vorstand" actionTo="/board" />
-      <div className="mt-6 grid sm:grid-cols-2 gap-3">
+      <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {contacts.map((contact) => (
-          <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} className="flex items-center gap-3 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] px-3 py-2 transition min-w-0">
+          <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
             {contact.avatar ? (
-              <LazyImg src={contact.avatar} alt="" className="w-10 h-10 rounded-sm object-cover shrink-0" />
+              <LazyImg src={contact.avatar} alt="" className="w-16 h-16 md:w-20 md:h-20 rounded-sm object-cover shrink-0" />
             ) : (
-              <span className="w-10 h-10 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
+              <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
             )}
             <span className="min-w-0">
-              <span className="block text-[10px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
-              <span className="block text-sm font-bold truncate">{contact.name}</span>
+              <span className="block text-[11px] uppercase tracking-widest font-bold text-[#FFD700] truncate">{contact.title}</span>
+              <span className="block font-heading text-lg md:text-xl font-black uppercase leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
             </span>
           </Link>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// LionsAPP (#407, #425): der offizielle Play-Badge, sobald der Eintrag öffentlich ist (Play-Store-
-// Link im Branding); vorher ehrlich „bald bei Google Play“.
-function AppStrip() {
-  const buttons = footerButtons(getCachedBranding() || {});
-  return (
-    <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-5 md:p-6 min-w-0" data-testid="home-app-strip">
-      <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]"><Smartphone className="w-3.5 h-3.5" /> LionsAPP fürs Handy</div>
-      <h2 className="mt-2 font-heading text-2xl font-black uppercase">Der Verein in der Hosentasche</h2>
-      <p className="mt-2 text-sm text-white/65 max-w-xl">Termine mit Kalender, Turniere mit Anmeldung, Chat mit dem Team, Mitgliedskarte mit QR — und Push, wenn es losgeht.</p>
-      <div className="mt-4">
-        {buttons.playStoreUrl ? (
-          <a href={buttons.playStoreUrl} target="_blank" rel="noreferrer" data-testid="home-play-badge" className="inline-flex">
-            <img src={PLAY_BADGE_SRC} alt="Jetzt bei Google Play" className="h-12 w-auto" />
-          </a>
-        ) : (
-          <span data-testid="home-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
-            <Smartphone className="w-4 h-4" /> {buttons.playSoonLabel}
-          </span>
-        )}
       </div>
     </div>
   );

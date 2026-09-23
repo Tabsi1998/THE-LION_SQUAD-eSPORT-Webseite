@@ -20,7 +20,13 @@ function Avatar({ user }) {
   );
 }
 
-const itemClass = "flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-white/80 hover:bg-white/5 hover:text-white transition";
+// Grundklasse ohne Textfarbe (#431): Gold für den Mitgliederbereich, Blau für Admin und Rot für
+// Abmelden kamen vorher als Zusatz zu `text-white/80` - und blieben im Browser weiß.
+const itemBase = "flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition";
+const itemClass = `${itemBase} text-white/80 hover:bg-white/5 hover:text-white`;
+const memberClass = `${itemBase} text-[#FFD700] bg-[#FFD700]/5 hover:bg-[#FFD700]/10`;
+const adminClass = `${itemBase} text-[#29B6E8] hover:bg-[#29B6E8]/10`;
+const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B30]/10 border-t border-white/10`;
 
 export function UserMenu() {
   const { user, logout, isAdmin, isClubMember } = useAuth();
@@ -80,12 +86,12 @@ export function UserMenu() {
           <Link to="/profile" role="menuitem" onClick={close} data-testid="nav-profile" className={itemClass}><Settings className="w-3.5 h-3.5" /> Mein Profil</Link>
           <Link to="/messages" role="menuitem" onClick={close} data-testid="nav-messages-menu" className={itemClass}><MessageSquare className="w-3.5 h-3.5" /> Nachrichten</Link>
           {isClubMember ? (
-            <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={`${itemClass} text-[#FFD700] hover:text-[#FFD700]`}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
+            <Link to="/members/area" role="menuitem" onClick={close} data-testid="nav-member-area" className={memberClass}><Crown className="w-3.5 h-3.5" /> Mitgliederbereich</Link>
           ) : null}
           {isAdmin ? (
-            <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin" className={`${itemClass} text-[#29B6E8] hover:text-[#29B6E8]`}><Shield className="w-3.5 h-3.5" /> Admin</Link>
+            <Link to="/admin" role="menuitem" onClick={close} data-testid="nav-admin" className={adminClass}><Shield className="w-3.5 h-3.5" /> Admin</Link>
           ) : null}
-          <button type="button" role="menuitem" onClick={doLogout} data-testid="nav-logout" className={`${itemClass} w-full text-left text-[#FF3B30] hover:text-[#FF3B30] border-t border-white/10`}>
+          <button type="button" role="menuitem" onClick={doLogout} data-testid="nav-logout" className={logoutClass}>
             <LogOut className="w-3.5 h-3.5" /> Abmelden
           </button>
         </div>
