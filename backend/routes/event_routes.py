@@ -192,6 +192,7 @@ def _public_event_registration(registration: dict, is_staff: bool = False) -> di
             "positions": [{k: line.get(k) for k in ("key", "label", "quantity", "unit_cents", "total_cents", "optional")} for line in snapshot.get("positions") or []],
             "accepted_at": snapshot.get("accepted_at"), "billing_status": registration.get("billing_status") or "pending",
             "invoice_ref": registration.get("invoice_ref"), "invoice_status": registration.get("invoice_status"),
+            "payment_state": registration.get("payment_state"),
         }
     if is_staff:
         payload["email"] = registration.get("email")
@@ -875,6 +876,13 @@ async def update_event_registration(event_id: str, registration_id: str, body: E
         updates["billing_status"] = "pending"
         if seats_changed:
             await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert")
+    elif pricing.is_paid(offer) and becomes_active and seats_changed and current.get("billing_status") in ("invoiced", "paid"):
+        # Der Beleg existiert schon: der eingefrorene Preis bleibt, Finanzen bekommt einen Prüffall mit alt und neu (#321).
+        try:
+            price = pricing.quote(offer, seats=_registration_seats(proposed), selected=current.get("selected_positions") or [])
+        except pricing.PricingError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        await billing_orders.note_change_after_invoice(db, kind="event", registration_id=registration_id, reason="Begleitpersonen geändert", new_total_cents=int(price.get("total_cents") or 0))
     if proposed_status in {"cancelled", "no_show"} and current.get("status") not in {"cancelled", "no_show"}:
         await billing_orders.cancel_orders_for(db, kind="event", registration_id=registration_id, reason="Anmeldung durch Verwaltung beendet")
         if current.get("price_snapshot"):

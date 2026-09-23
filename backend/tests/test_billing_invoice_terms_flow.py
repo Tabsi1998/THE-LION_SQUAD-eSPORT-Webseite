@@ -88,7 +88,7 @@ def test_terms_only_when_all_three_are_set():
 
 @pytest.mark.asyncio
 async def test_invoice_carries_terms_and_a_readable_text_with_the_extra_line(flow, fake):
-    await connect(flow, invoice_auto_validate=True, **TERMS)
+    await connect(flow, invoice_auto_validate=True, tax_confirmed_at="2026-09-23T10:00:00+00:00", **TERMS)
     kassier = await person(flow, "kassier", role="club_admin")
     event = await paid_event(flow, kassier)
     paula = await person(flow, "paula", display_name="Paula Beispiel")
@@ -119,7 +119,7 @@ async def test_invoice_carries_terms_and_a_readable_text_with_the_extra_line(flo
 
 @pytest.mark.asyncio
 async def test_without_complete_terms_the_invoice_stays_a_draft_even_with_auto_validate(flow, fake):
-    await connect(flow, invoice_auto_validate=True, invoice_payment_term_id=2)
+    await connect(flow, invoice_auto_validate=True, tax_confirmed_at="2026-09-23T10:00:00+00:00", invoice_payment_term_id=2)
     kassier = await person(flow, "kassier", role="club_admin")
     event = await paid_event(flow, kassier)
     gast = await person(flow, "gast")
@@ -149,11 +149,20 @@ async def test_settings_offer_the_dolibarr_lists_and_refuse_auto_validate_withou
 
     refused = await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True})
     assert refused.status_code == 400 and "Zahlungsziel" in refused.json()["detail"]
-    ok = await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True, **TERMS})
+    # Steuersätze (#322): ohne bewusste Bestätigung gibt die Website nichts von selbst frei.
+    refused = await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True, **TERMS})
+    assert refused.status_code == 400 and "Steuersätze" in refused.json()["detail"]
+    ok = await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True, "tax_confirmed": True, **TERMS})
     assert ok.status_code == 200, ok.text
     status = (await flow.get("/api/admin/dolibarr/status")).json()
     assert status["invoice_terms"] == {"payment_term_id": 2, "payment_mode_id": 2, "bank_account_id": 1, "complete": True}
     assert status["invoice_auto_validate"] is True
+    assert status["tax_confirmed"]["at"] and status["tax_rates"] == {"none": 0.0, "standard": 20.0, "reduced": 10.0}
+    # Bestätigung zurückgenommen: das automatische Freigeben geht mit aus.
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"tax_confirmed": False})).status_code == 200
+    status = (await flow.get("/api/admin/dolibarr/status")).json()
+    assert status["tax_confirmed"] is None and status["invoice_auto_validate"] is False
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True, "tax_confirmed": True})).status_code == 200
     # 0 löscht eine Kondition - und damit die Vollständigkeit.
     assert (await flow.put("/api/admin/dolibarr/settings", json={"invoice_bank_account_id": 0})).status_code == 200
     assert (await flow.get("/api/admin/dolibarr/status")).json()["invoice_terms"]["complete"] is False

@@ -405,9 +405,23 @@ export default function AdminDolibarrPage() {
                   <input type="checkbox" checked={Boolean(status?.write_enabled)} disabled={!!busy || !(status?.api_key_configured || status?.write_api_key_configured)} onChange={(e) => saveSettings({ write_enabled: e.target.checked }, e.target.checked ? "Schreibzugriff eingeschaltet." : "Schreibzugriff ausgeschaltet.")} data-testid="dolibarr-write-enabled" />
                   Schreibzugriff einschalten (Kunden und Rechnungen anlegen)
                 </label>
+                {/* Steuersätze (#322): kein stiller Automatismus - erst wenn jemand sie geprüft hat, darf die Website Belege von selbst freigeben. */}
+                <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="dolibarr-tax">
+                  <div className="text-[11px] uppercase tracking-wider font-bold text-white/70">Steuersätze je Profil</div>
+                  <div className="text-xs text-white/60">
+                    {Object.entries(status?.tax_rates || {}).map(([profile, rate]) => (
+                      <span key={profile} className="inline-block mr-3">{({ none: "ohne Umsatzsteuer", standard: "Normalsatz", reduced: "ermäßigt" })[profile] || profile}: <span className="text-white tabular-nums">{Number(rate).toLocaleString("de-AT")} %</span></span>
+                    ))}
+                  </div>
+                  <label className="inline-flex items-center gap-2">
+                    <input type="checkbox" checked={Boolean(status?.tax_confirmed)} disabled={!!busy} onChange={(e) => saveSettings({ tax_confirmed: e.target.checked }, e.target.checked ? "Steuersätze als geprüft gemerkt." : "Bestätigung der Steuersätze zurückgenommen – Belege bleiben Entwurf.")} data-testid="dolibarr-tax-confirmed" />
+                    Steuersätze geprüft (Kassier oder Steuerberatung)
+                    {status?.tax_confirmed?.at && <span className="text-xs text-white/45"> – {status.tax_confirmed.by || "bestätigt"} am {formatDate(status.tax_confirmed.at)}</span>}
+                  </label>
+                </div>
                 <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy || (!status?.invoice_auto_validate && !status?.invoice_terms?.complete)} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
-                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr){!status?.invoice_terms?.complete && <span className="text-xs text-[#FFD700]"> – erst mit vollständigen Konditionen</span>}
+                  <input type="checkbox" checked={Boolean(status?.invoice_auto_validate)} disabled={!!busy || (!status?.invoice_auto_validate && !(status?.invoice_terms?.complete && status?.tax_confirmed))} onChange={(e) => saveSettings({ invoice_auto_validate: e.target.checked }, e.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")} data-testid="dolibarr-invoice-auto-validate" />
+                  Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr){!(status?.invoice_terms?.complete && status?.tax_confirmed) && <span className="text-xs text-[#FFD700]"> – erst mit vollständigen Konditionen und geprüften Steuersätzen</span>}
                 </label>
                 <InvoiceTermsPanel terms={status?.invoice_terms} connected={Boolean(status && status.mode !== "off")} busy={busy} onSave={(payload) => saveSettings(payload, "Rechnungskonditionen gespeichert.")} />
                 <details className="text-xs text-white/55 border border-white/10 rounded-sm p-3">

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_area, require_super
 from database import get_db
 from models import new_id, now_utc
-from services.dolibarr_billing import DEFAULT_MODE_CODE, DEFAULT_TERM_CODE, TERM_FIELDS, terms_complete
+from services.dolibarr_billing import DEFAULT_MODE_CODE, DEFAULT_TAX_RATES, DEFAULT_TERM_CODE, TERM_FIELDS, tax_confirmed, tax_rate_for, terms_complete
 from services.dolibarr_client import (
     ENVIRONMENTS, MODES, SETTINGS_ID, DolibarrClient, DolibarrError, capabilities_for, clean_base_url, load_settings,
     write_capable,
@@ -71,6 +71,9 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "write_enabled": bool(settings.get("write_enabled")),
         "write_capable": write_capable(settings),
         "invoice_auto_validate": bool(settings.get("invoice_auto_validate")),
+        # Steuersätze (#322): was je Profil auf den Beleg käme - und ob das jemand bestätigt hat.
+        "tax_rates": {profile: tax_rate_for(settings, profile) for profile in DEFAULT_TAX_RATES},
+        "tax_confirmed": {"at": settings.get("tax_confirmed_at"), "by": settings.get("tax_confirmed_by_name")} if settings.get("tax_confirmed_at") else None,
         # Konditionen (#370): ohne die drei bleibt jeder Beleg Entwurf.
         "invoice_terms": {
             "payment_term_id": settings.get("invoice_payment_term_id") or None,
@@ -107,6 +110,8 @@ class DolibarrSettingsUpdate(BaseModel):
     write_enabled: bool | None = None
     # Rechnungen gleich freigeben - oder als Entwurf zur Prüfung lassen (sichere Erstinbetriebnahme, #317).
     invoice_auto_validate: bool | None = None
+    # Steuersätze bestätigt (#322): Voraussetzung fürs automatische Freigeben; wer und wann wird gemerkt.
+    tax_confirmed: bool | None = None
     # Konditionen (#370): Dolibarr-Nummern aus den Wörterbüchern und der Kontenliste; 0 löscht.
     invoice_payment_term_id: int | None = Field(None, ge=0, le=999999)
     invoice_payment_mode_id: int | None = Field(None, ge=0, le=999999)
@@ -149,9 +154,23 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
     for key in TERM_FIELDS:
         if key in data:
             updates[key] = int(data[key]) if data[key] else None
+    if "tax_confirmed" in data:
+        if data["tax_confirmed"]:
+            updates["tax_confirmed_at"] = now_utc().isoformat()
+            updates["tax_confirmed_by"] = me["id"]
+            updates["tax_confirmed_by_name"] = str(me.get("display_name") or me.get("username") or "")
+        else:
+            updates["tax_confirmed_at"] = None
+            updates["tax_confirmed_by"] = None
+            updates["tax_confirmed_by_name"] = None
+            # Ohne bestätigte Steuersätze gibt die Website nichts mehr von selbst frei.
+            if current.get("invoice_auto_validate"):
+                updates["invoice_auto_validate"] = False
     if "invoice_auto_validate" in data:
         if data["invoice_auto_validate"] and not terms_complete({**current, **updates}):
             raise HTTPException(400, "Zum automatischen Freigeben braucht es Zahlungsziel, Zahlungsart und Bankkonto (unten eintragen).")
+        if data["invoice_auto_validate"] and not tax_confirmed({**current, **updates}):
+            raise HTTPException(400, "Zum automatischen Freigeben müssen die Steuersätze bestätigt sein (Haken „Steuersätze geprüft“).")
         updates["invoice_auto_validate"] = bool(data["invoice_auto_validate"])
     if "instance" in data:
         updates["instance"] = (data["instance"] or "").strip()

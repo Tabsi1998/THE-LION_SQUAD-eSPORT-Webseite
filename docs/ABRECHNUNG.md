@@ -107,12 +107,94 @@ Beleg schließen den Auftrag. Die Aufträge stehen in derselben Finanzübersicht
 enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
 das Turnier kein Startgeld und es entsteht keine zweite Rechnung.
 
+## Nach dem Beleg: Zahlungsstand, Prüffälle, Erstattungen (#321)
+
+**Dolibarr ist führend für den Beleg und das Geld, die Website für die Buchung.** Die Website
+schreibt nach dem Anlegen nie mehr an einem Beleg – sie liest. Offene Belege alle zehn Minuten,
+bezahlte, gutgeschriebene und aufgegebene einmal am Tag (damit eine späte Gutschrift oder eine
+Löschung nicht unbemerkt bleibt); „Alles abgleichen“ in der Finanzübersicht liest sofort alles.
+
+**Zahlungsstand** je Beleg, aus Summe, Rest, Zahlungsziel und Gutschriften in Dolibarr:
+
+| Stand | Bedeutung |
+| --- | --- |
+| Entwurf | noch nicht freigegeben – in Dolibarr prüfen und freigeben |
+| offen | freigegeben, nichts bezahlt, Zahlungsziel nicht erreicht |
+| teilweise bezahlt | eine Zahlung ist da, ein Rest offen (steht dabei) |
+| überfällig | Zahlungsziel vorbei, Rest offen |
+| bezahlt | Rest null |
+| Überzahlung | mehr Geld als der Beleg verlangt → Prüffall |
+| gutgeschrieben | eine Gutschrift in Dolibarr deckt den Beleg |
+| aufgegeben | in Dolibarr als uneinbringlich/aufgegeben markiert |
+
+Bei jedem Beleg steht, wie frisch der Stand ist („Stand 23.09., 11:40“). Konnte Dolibarr nicht
+lesen, steht der Grund dort – nichts wird still alt.
+
+**Prüffälle.** Wenn Buchung und Beleg auseinanderlaufen, ändert die Website nichts – weder in
+Dolibarr noch am eingefrorenen Preis. Sie legt einen Prüffall an und sagt, was zu tun ist:
+
+| Prüffall | Wann | Was ihr tut |
+| --- | --- | --- |
+| Storniert, Beleg existiert | jemand sagt ab, die Rechnung ist schon da | Entwurf in Dolibarr löschen oder Gutschrift mit Bezug anlegen; bezahltes Geld erstatten |
+| Buchung nach dem Beleg geändert | Begleitpersonen ändern sich nach der Rechnung | in Dolibarr korrigieren (Gutschrift + neuer Beleg oder Nachberechnung); der Fall nennt alt und neu |
+| Überzahlung | mehr bezahlt als verlangt | Differenz erstatten oder als Spende vereinbaren |
+| Zahlung auf stornierte Buchung | Geld kommt für eine abgesagte Anmeldung | nicht reaktivieren – erstatten oder klären |
+| Betrag weicht ab | der Beleg in Dolibarr lautet auf einen anderen Betrag als der eingefrorene Preis | Beleg prüfen; wenn richtig, Fall mit Grund erledigen |
+| Empfänger weicht ab | der Beleg hängt an einem anderen Geschäftspartner | Zuordnung prüfen |
+| Beleg nicht mehr in Dolibarr | Dolibarr kennt die Nummer nicht mehr | nachsehen; die Website legt keinen zweiten an |
+
+Ein Fall wird **mit Grund** erledigt („Gutschrift GA2026-0003 angelegt, 20 € am 24.09.
+überwiesen“). Sieht der Abgleich, dass Dolibarr den Fall aufgelöst hat (Gutschrift über den
+ganzen Betrag, Beleg aufgegeben, Betrag stimmt wieder), erledigt er ihn selbst und schreibt das
+dazu. Offene Prüffälle stehen als Aufgabe auf der Admin-Startseite (nur für Finanzen).
+
+**Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
+was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
+Auftrags fest: Betrag, Tag, Referenz, Grund. Nie mehr als bezahlt abzüglich schon erstattet; die
+Website löst keine Überweisung aus. Der Verlauf je Auftrag zeigt beides getrennt: Zahlungen,
+Gutschriften, Erstattungen, Storno, Prüffälle, Freigaben.
+
+**Summen je Veranstaltung** (Filter „Veranstaltung“ in der Finanzübersicht): gebucht, fakturiert,
+bezahlt, offen, gutgeschrieben, erstattet – jede Belegrevision zählt einmal, stornierte Aufträge
+ohne Beleg zählen nicht mit. **CSV** exportiert die angelegten Belege für den Kassier – nur
+Nummer, Angebot, Person, Beträge, Stand; keine Adressen, Bankdaten oder Dolibarr-Nummern.
+
+**Steuersätze bestätigt.** Was je Steuerprofil auf den Beleg käme (ohne Umsatzsteuer 0 %,
+Normalsatz 20 %, ermäßigt 10 %), steht unter Admin → Dolibarr → Schreibzugriff. Der Haken
+„Steuersätze geprüft“ (Kassier oder Steuerberatung, mit Name und Tag) ist – neben den
+Konditionen – Voraussetzung für „Rechnungen gleich freigeben“. Ohne ihn bleibt jeder Beleg
+Entwurf; wird er zurückgenommen, geht das automatische Freigeben mit aus.
+
+## Wenn etwas schiefgeht
+
+- **Dolibarr antwortet nicht** (Ausfall, Netz): Aufträge bleiben „neu“ und werden weiter versucht,
+  nach fünf Fehlversuchen „gescheitert“ – Text lesen, Ursache beheben, „Erneut versuchen“. Der
+  Abgleich der Belege meldet den Fehler am Beleg und versucht es beim nächsten Lauf wieder.
+- **Recht fehlt** (403): Text nennt das Recht; beim Website-Benutzer in Dolibarr setzen.
+- **Antwort verloren** (Beleg angelegt, Website hat es nicht mehr gespeichert): Der nächste Lauf
+  findet den Beleg über die Auftragskennung (`ref_ext`) wieder – es entsteht nie ein zweiter.
+- **Falsche Zuordnung**: In Dolibarr richtigstellen; der Abgleich meldet „Empfänger weicht ab“,
+  bis der Beleg am erwarteten Geschäftspartner hängt oder ihr den Fall mit Grund erledigt.
+- **Notschalter**: Haken „Schreibzugriff einschalten“ (Admin → Dolibarr) aus → die Website legt
+  nichts mehr an, liest aber weiter; nichts geht verloren, Aufträge warten. Modus „Vorschau“
+  stoppt auch das Lesen der Belege.
+- **Nach Restore oder Replay**: Vor dem Wiedereinschalten „Alles abgleichen“ laufen lassen –
+  vorhandene Belege werden über die Auftragskennung erkannt, es entstehen keine Doppelbelege.
+
+## Aufbewahrung und Kontolöschung
+
+Belege und Zahlungen leben in Dolibarr (dort gilt die Aufbewahrung der BAO, sieben Jahre). Die
+Website hält je Auftrag nur Betrag, Positionen, Belegnummer, Zahlungsstand und Zeitpunkte. Löscht
+jemand sein Konto, bleibt der Auftrag mit Betrag und Belegnummer (Nachweis gegenüber Dolibarr),
+verliert aber Name und E-Mail; die Zuordnung Konto ↔ Geschäftspartner fällt weg. Der Verlauf
+enthält keine Bankdaten – sie stehen nie auf der Website.
+
 ## Was noch nicht geht
 
-- **Storno mit Beleg, Gutschriften, Erstattungen, Teilzahlungen im Detail** (#321).
-- **Rechnungen für Nicht-Mitglieder im eigenen Konto** (#320) – heute sehen Mitglieder ihre
-  Belege unter „Meine Rechnungen“, Nicht-Mitglieder nur den Stand an der Anmeldung.
+- **Mahnwesen-Stand aus Dolibarr** (Mahnstufe, Gebühren) auf der Website – wartet auf die API des
+  Moduls dolibarr-mahnwesen; bis dahin: in Dolibarr nachsehen.
 - **Einzelrechnungen je Spieler** bei Team-Startgeldern; Preisgelder (#323).
+- **Online-Zahlung** (Zahlungsanbieter) – bewusst nicht; Überweisung mit Zahlungsziel.
 
 ## Was ihr in Dolibarr einrichtet
 
@@ -144,9 +226,13 @@ und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
 
 ## Wer darf was
 
-- **Finanzen** (neuer Bereich): Kosten an Events und Startgelder an Turnieren pflegen,
-  Finanzübersicht sehen, Aufträge freigeben. Club-Admin und Superadmin haben ihn; anderen gibt ihn der Superadmin unter
-  Admin → Alle Benutzer als Freigabe. Wie jeder Adminbereich verlangt er Zwei-Faktor.
+- **Finanzen** (Bereich): Kosten an Events und Startgelder an Turnieren pflegen,
+  Finanzübersicht sehen, Aufträge freigeben, Prüffälle erledigen, Erstattungen festhalten,
+  Belege nachlesen und exportieren. Club-Admin und Superadmin haben ihn; anderen gibt ihn der
+  Superadmin unter Admin → Alle Benutzer als Freigabe. Wie jeder Adminbereich verlangt er
+  Zwei-Faktor; jede dieser Aktionen steht mit Person und Grund im Audit-Log.
+- **Steuersätze bestätigen** und die Dolibarr-Anbindung selbst (Adresse, Schlüssel, Schreibzugriff)
+  gehören zum Bereich **System** – Finanzen sieht die Anbindung, ändert sie nicht.
 - **Turnierleitung** bearbeitet Events und Turniere weiterhin – ohne den Bereich Finanzen sieht
   sie die Abschnitte „Kosten und Abrechnung“ und „Startgeld“ nicht, und der Server lehnt
   Änderungen daran ab.

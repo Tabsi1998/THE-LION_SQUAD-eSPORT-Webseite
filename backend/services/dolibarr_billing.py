@@ -26,9 +26,10 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
+from services.billing_orders import SETTLED_STATES
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key
 from services.dolibarr_links import verified_link
 from services.dolibarr_policy import CLUB_TZ
@@ -92,6 +93,16 @@ def invoice_terms(settings: dict) -> dict:
 def terms_complete(settings: dict) -> bool:
     """Ohne die drei Konditionen wird kein Beleg automatisch freigegeben (#370)."""
     return len(invoice_terms(settings)) == 3
+
+
+def tax_confirmed(settings: dict) -> bool:
+    """Die Steuersätze je Profil hat jemand bewusst bestätigt (#322) - erst dann darf die Website
+    Belege von selbst freigeben. Ohne Bestätigung bleibt es beim Entwurf zur Prüfung."""
+    return bool(settings.get("tax_confirmed_at"))
+
+
+def may_auto_validate(settings: dict) -> bool:
+    return bool(settings.get("invoice_auto_validate")) and terms_complete(settings) and tax_confirmed(settings)
 
 
 # ---------------------------------------------------------------- Texte (#370)
@@ -297,31 +308,98 @@ async def assign_thirdparty(db, settings: dict, client: DolibarrClient, user_id:
 
 # ---------------------------------------------------------------- Belege
 
-def _invoice_state(invoice: dict) -> dict:
+def _cents(value) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(round(float(value) * 100))
+    except (TypeError, ValueError):
+        return None
+
+
+def _day(value) -> str:
+    """Ein Dolibarr-Datum (Unix-Sekunden oder Text) als Wiener Tag, sonst leer."""
+    if value in (None, "", 0, "0"):
+        return ""
+    try:
+        return datetime.fromtimestamp(int(value), tz=timezone.utc).astimezone(CLUB_TZ).strftime("%Y-%m-%d")
+    except (TypeError, ValueError, OverflowError):
+        return str(value)[:10]
+
+
+def payment_state_for(invoice_status: str, total_cents: int | None, remaining_cents: int | None, due_on: str, *, credited_cents: int = 0, today: str | None = None) -> str:
+    """Der fachliche Zahlungsstand eines Belegs (#321): offen, teilweise bezahlt, bezahlt,
+    überfällig, Überzahlung, gutgeschrieben, aufgegeben - aus Summe, Rest und Zahlungsziel."""
+    if invoice_status == "draft":
+        return "draft"
+    if invoice_status == "abandoned":
+        return "abandoned"
+    total = total_cents or 0
+    if credited_cents and total and credited_cents >= total:
+        return "credited"
+    if remaining_cents is None:
+        return "paid" if invoice_status == "paid" else "open"
+    if remaining_cents < 0:
+        return "overpaid"
+    if remaining_cents == 0:
+        return "paid"
+    if remaining_cents < total:
+        return "partial"
+    today = today or datetime.now(CLUB_TZ).strftime("%Y-%m-%d")
+    if due_on and due_on < today:
+        return "overdue"
+    return "open"
+
+
+def _invoice_state(invoice: dict, *, credit_notes: list[dict] | None = None, today: str | None = None) -> dict:
     status = int(invoice.get("statut") if invoice.get("statut") is not None else invoice.get("status") or 0)
     paid = bool(int(invoice.get("paye") or 0)) or status == 2
     remaining = invoice.get("remaintopay")
+    invoice_status = {0: "draft", 1: "validated", 2: "paid", 3: "abandoned"}.get(status, str(status))
+    total_cents, remaining_cents = _cents(invoice.get("total_ttc")), _cents(remaining)
+    notes = [{"id": int(row.get("id") or 0), "ref": row.get("ref") or "", "total_cents": abs(_cents(row.get("total_ttc")) or 0),
+              "status": {0: "draft", 1: "validated", 2: "paid", 3: "abandoned"}.get(int(row.get("statut") or row.get("status") or 0), "draft")}
+             for row in credit_notes or []]
+    credited = sum(note["total_cents"] for note in notes if note["status"] != "draft")
+    due_on = _day(invoice.get("date_lim_reglement"))
     return {
         "invoice_id": int(invoice["id"]),
         "invoice_ref": invoice.get("ref") or "",
-        "invoice_status": {0: "draft", 1: "validated", 2: "paid", 3: "abandoned"}.get(status, str(status)),
+        "invoice_status": invoice_status,
+        "invoice_type": int(invoice.get("type") or 0),
         "paid": paid,
         "remaining": float(remaining) if remaining not in (None, "") else None,
         "total": float(invoice.get("total_ttc") or 0) if invoice.get("total_ttc") not in (None, "") else None,
+        # Der Betrag laut Dolibarr - getrennt vom eingefrorenen Preis (`total_cents` am Auftrag), der nie mitgeht.
+        "remote_total_cents": total_cents,
+        "remaining_cents": remaining_cents,
+        "due_on": due_on,
+        "credit_notes": notes,
+        "payment_state": payment_state_for(invoice_status, total_cents, remaining_cents, due_on, credited_cents=credited, today=today),
+        "remote_socid": int(invoice.get("socid") or 0) or None,
     }
 
 
-async def _mark_invoiced(db, order: dict, state: dict) -> None:
+def payment_view(row: dict) -> dict:
+    """Eine Zahlung aus Dolibarrs Liste - Betrag in Cent, Tag, Art, Referenz. Keine Bankdaten."""
+    return {"amount_cents": _cents(row.get("amount")) or 0, "date": _day(row.get("date")) if str(row.get("date") or "").isdigit() else str(row.get("date") or "")[:10],
+            "type": str(row.get("type") or ""), "ref": str(row.get("ref") or row.get("num") or "")[:60]}
+
+
+async def _mark_invoiced(db, order: dict, state: dict, *, payments: list[dict] | None = None) -> None:
     now = now_utc().isoformat()
+    fields = {key: value for key, value in state.items() if key != "remote_socid"}
     await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
-        "status": "invoiced", "note": "", **state, "invoiced_at": order.get("invoiced_at") or now, "updated_at": now,
+        "status": "invoiced", "note": "", **fields, "invoiced_at": order.get("invoiced_at") or now, "synced_at": now, "updated_at": now,
+        **({"payments": payments} if payments is not None else {}),
         **({"paid_at": now} if state.get("paid") and not order.get("paid_at") else {}),
-    }})
+    }, "$unset": {"sync_error": "", "sync_error_at": ""}})
     billing_status = "paid" if state.get("paid") else "invoiced"
     collection = {"event": db.event_registrations, "tournament": db.tournament_registrations}.get(order.get("kind"))
     if collection is not None:
         await collection.update_one({"id": order["registration_id"]}, {"$set": {
             "billing_status": billing_status, "invoice_id": state["invoice_id"], "invoice_ref": state["invoice_ref"], "invoice_status": state["invoice_status"],
+            "payment_state": state.get("payment_state"),
         }})
 
 
@@ -342,8 +420,9 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     invoice_id = await client.create_invoice(payload)
     # Sofort merken: Ab hier gibt es den Beleg - ein Abbruch darf keinen zweiten erzeugen.
     await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"invoice_id": invoice_id, "thirdparty_id": socid, "updated_at": now_utc().isoformat()}})
-    # Freigeben nur mit vollständigen Konditionen (#370) - sonst bleibt der Beleg Entwurf zur Prüfung.
-    if settings.get("invoice_auto_validate") and terms_complete(settings):
+    # Freigeben nur mit vollständigen Konditionen (#370) und bestätigten Steuersätzen (#322) -
+    # sonst bleibt der Beleg Entwurf zur Prüfung.
+    if may_auto_validate(settings):
         await client.validate_invoice(invoice_id)
     invoice = await client.invoice(invoice_id)
     return _invoice_state(invoice)
@@ -367,20 +446,105 @@ async def process_order(db, settings: dict, client: DolibarrClient, order: dict)
     return "invoiced"
 
 
-async def sync_invoiced(db, settings: dict, client: DolibarrClient, limit: int = 50) -> dict:
-    """Offene Belege nachlesen: freigegeben? bezahlt? Dolibarr ist dafür führend."""
-    counts = {"looked": 0, "changed": 0, "paid": 0}
-    rows = await db.billing_orders.find({"status": "invoiced", "paid": {"$ne": True}}, {"_id": 0}).sort("updated_at", 1).to_list(limit)
-    for order in rows:
-        counts["looked"] += 1
+RESYNC_SETTLED_HOURS = 24
+
+
+def _due_query(full: bool) -> dict:
+    """Welche Belege der Abgleich jetzt liest: unbezahlte immer; bezahlte, gutgeschriebene und
+    aufgegebene einmal am Tag (eine spätere Gutschrift oder Löschung darf nicht unbemerkt bleiben)."""
+    if full:
+        return {"status": "invoiced"}
+    stale = (now_utc() - timedelta(hours=RESYNC_SETTLED_HOURS)).isoformat()
+    return {"status": "invoiced", "$or": [
+        {"payment_state": {"$nin": list(SETTLED_STATES)}},
+        {"synced_at": {"$lt": stale}},
+        {"synced_at": {"$exists": False}},
+    ]}
+
+
+async def _review_cases(db, order: dict, state: dict, payments: list[dict] | None) -> int:
+    """Was Dolibarr sagt, mit dem Auftrag vergleichen - Abweichungen werden Prüffälle, aufgelöste
+    Fälle schließen sich von selbst. Nichts wird zurückgeschrieben."""
+    from services import billing_cases
+    from services.billing_orders import paid_cents
+
+    opened = 0
+    total = int(order.get("total_cents") or 0)
+    credited = sum(note["total_cents"] for note in state.get("credit_notes") or [] if note["status"] != "draft")
+    # Betrag: der Beleg muss auf den eingefrorenen Preis lauten - eine Gutschrift dazu ist in Ordnung.
+    if state.get("remote_total_cents") is not None and state["remote_total_cents"] != total and state["invoice_type"] == 0:
+        opened += 1
+        await billing_cases.open_case(db, order, "amount_mismatch", {"invoiced_cents": total, "remote_cents": state["remote_total_cents"], "invoice_ref": state["invoice_ref"]})
+    else:
+        await billing_cases.auto_resolve(db, order["id"], "amount_mismatch", "Der Betrag in Dolibarr stimmt wieder mit dem Auftrag überein.")
+    if order.get("thirdparty_id") and state.get("remote_socid") and int(order["thirdparty_id"]) != int(state["remote_socid"]):
+        opened += 1
+        await billing_cases.open_case(db, order, "recipient_mismatch", {"expected": int(order["thirdparty_id"]), "remote": int(state["remote_socid"]), "invoice_ref": state["invoice_ref"]})
+    else:
+        await billing_cases.auto_resolve(db, order["id"], "recipient_mismatch", "Der Beleg hängt wieder am erwarteten Geschäftspartner.")
+    if state.get("payment_state") == "overpaid":
+        opened += 1
+        await billing_cases.open_case(db, order, "overpaid", {"over_cents": -int(state.get("remaining_cents") or 0), "invoice_ref": state["invoice_ref"]})
+    else:
+        await billing_cases.auto_resolve(db, order["id"], "overpaid", "Die Überzahlung ist in Dolibarr ausgeglichen.")
+    if order.get("booking_state") == "cancelled":
+        paid_now = paid_cents({**order, **{k: v for k, v in state.items() if k != "remote_socid"}}, payments)
+        if paid_now > int(order.get("paid_cents_at_cancel") or 0):
+            opened += 1
+            await billing_cases.open_case(db, order, "paid_after_cancel", {"paid_cents": paid_now, "invoice_ref": state["invoice_ref"]})
+        # Dolibarr hat den Storno aufgelöst: Gutschrift über den ganzen Betrag oder Beleg aufgegeben.
+        if state.get("invoice_status") == "abandoned":
+            await billing_cases.auto_resolve(db, order["id"], "cancelled_after_invoice", "Der Beleg ist in Dolibarr aufgegeben.")
+        elif credited and credited >= total:
+            refs = ", ".join(note["ref"] for note in state.get("credit_notes") or [] if note["status"] != "draft") or "Gutschrift"
+            await billing_cases.auto_resolve(db, order["id"], "cancelled_after_invoice", f"In Dolibarr gutgeschrieben ({refs}).")
+    await billing_cases.auto_resolve(db, order["id"], "invoice_gone", "Der Beleg ist in Dolibarr wieder lesbar.")
+    return opened
+
+
+async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, counts: dict | None = None) -> dict | None:
+    """Einen Beleg samt Zahlungen und Gutschriften nachlesen. Nicht lesbar → sichtbar am Auftrag
+    (`sync_error`), nie still; verschwunden → Prüffall. Gibt den Stand zurück, None ohne."""
+    from services import billing_cases
+
+    counts = counts if counts is not None else {"looked": 0, "changed": 0, "paid": 0, "cases": 0, "errors": 0}
+    counts["looked"] += 1
+    now = now_utc().isoformat()
+    try:
+        invoice = await client.invoice(int(order["invoice_id"]))
+        notes = await client.credit_notes_of(int(order["invoice_id"]))
         try:
-            state = _invoice_state(await client.invoice(int(order["invoice_id"])))
+            payments: list[dict] | None = [payment_view(row) for row in await client.invoice_payments(int(order["invoice_id"]))]
         except DolibarrError as exc:
+            if exc.kind not in ("forbidden", "unauthorized"):
+                raise
+            payments = None   # Zahlungen darf der Website-Benutzer nicht lesen: dann gilt Summe minus Rest.
+    except DolibarrError as exc:
+        counts["errors"] += 1
+        await db.billing_orders.update_one({"id": order["id"]}, {"$set": {"sync_error": exc.kind, "sync_error_text": exc.text, "sync_error_at": now}})
+        if exc.kind == "not_found":
+            counts["cases"] += 1
+            await billing_cases.open_case(db, order, "invoice_gone", {"invoice_ref": order.get("invoice_ref") or "", "invoice_id": order.get("invoice_id")})
+        else:
             logger.warning("[billing] Stand von Beleg %s nicht lesbar: %s", order.get("invoice_id"), exc.kind)
-            continue
-        if state["invoice_status"] != order.get("invoice_status") or state["paid"] != bool(order.get("paid")) or state["invoice_ref"] != order.get("invoice_ref"):
-            await _mark_invoiced(db, order, state)
-            counts["changed"] += 1
-            if state["paid"]:
-                counts["paid"] += 1
+        return None
+    state = _invoice_state(invoice, credit_notes=notes)
+    changed = any(state.get(key) != order.get(key) for key in ("invoice_status", "paid", "invoice_ref", "payment_state", "remaining_cents", "remote_total_cents")) \
+        or (payments is not None and payments != (order.get("payments") or [])) or state["credit_notes"] != (order.get("credit_notes") or [])
+    await _mark_invoiced(db, order, state, payments=payments)
+    if changed:
+        counts["changed"] += 1
+        if state["paid"] and not order.get("paid"):
+            counts["paid"] += 1
+    counts["cases"] += await _review_cases(db, order, state, payments)
+    return state
+
+
+async def sync_invoiced(db, settings: dict, client: DolibarrClient, limit: int = 50, *, full: bool = False, order_ids: list[str] | None = None) -> dict:
+    """Belege nachlesen: freigegeben? bezahlt? teilweise? gutgeschrieben? Dolibarr ist dafür führend."""
+    counts = {"looked": 0, "changed": 0, "paid": 0, "cases": 0, "errors": 0}
+    query = {"status": "invoiced", "id": {"$in": list(order_ids)}} if order_ids is not None else _due_query(full)
+    rows = await db.billing_orders.find(query, {"_id": 0}).sort("synced_at", 1).to_list(limit)
+    for order in rows:
+        await sync_one(db, settings, client, order, counts)
     return counts
