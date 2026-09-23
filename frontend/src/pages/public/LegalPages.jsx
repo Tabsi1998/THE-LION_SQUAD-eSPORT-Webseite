@@ -38,9 +38,9 @@ function LegalArticle({ title, intro, updatedAt, children }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, id }) {
   return (
-    <section className="border-t border-white/10 pt-6">
+    <section className="border-t border-white/10 pt-6" id={id}>
       <h2 className="font-heading text-2xl font-black uppercase text-white">{title}</h2>
       <div className="mt-3 space-y-3">{children}</div>
     </section>
@@ -403,6 +403,27 @@ export function PrivacyPage() {
           Bereiche erfolgen rollenbasiert. Zusätzlich kommen Schutzmaßnahmen wie CSRF-Schutz,
           Zugriffsbeschränkungen, private Dokumentansichten, optional freigegebene Downloads,
           SMTP-Diagnose und Audit-Logs zum Einsatz.
+        </p>
+      </Section>
+
+      {/* Konto löschen (#390): öffentlich lesbar, weil Google Play einen Link dorthin verlangt. */}
+      <Section title="Konto löschen" id="account-deletion">
+        <p>
+          Du kannst dein Konto jederzeit selbst löschen – in der LionsAPP unter Profil → Einstellungen
+          (Zahnrad) → „Konto löschen“, oder auf der Website nach der Anmeldung unter{" "}
+          <Link to="/privacy-account" className="text-[#29B6E8] hover:underline">Datenschutz → Meine Daten → „Account anonymisieren“</Link>.
+          Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr
+          anmelden kann, schreibt an{" "}
+          {privacyEmail ? <EmailLink email={privacyEmail} /> : <Link to="/contact" className="text-[#29B6E8] hover:underline">das Kontaktformular</Link>}.
+        </p>
+        <p>
+          Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, Bilder, verknüpfte
+          Konten (Discord, Twitch, Steam), Push-Geräte, Freundschaften und Anmeldedaten; eigene
+          Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben Turnier-Ergebnisse ohne
+          Namen (sportliche Integrität) und – wenn du Rechnungen hattest – die Belege in der
+          Vereinsbuchhaltung, weil das Steuerrecht sieben Jahre Aufbewahrung verlangt; der Auftrag
+          auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und
+          lässt sich nicht rückgängig machen.
         </p>
       </Section>
 

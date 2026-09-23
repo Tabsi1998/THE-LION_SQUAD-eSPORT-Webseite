@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Alert, Image, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -72,6 +72,36 @@ export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user, logout, refreshMe } = useAuth();
+  // Konto löschen (#390): derselbe Weg wie auf der Website (Anonymisierung), zweimal bestätigt.
+  // Google Play verlangt das in der App, weil man sich hier auch registrieren kann.
+  const deleteAccount = () => {
+    Alert.alert(
+      "Konto löschen?",
+      "Dein Konto wird dauerhaft anonymisiert: Name, E-Mail, verknüpfte Konten, Profiltexte und Bilder werden entfernt, Chatnachrichten als gelöscht markiert. Turnier-Ergebnisse bleiben ohne Namen erhalten; Rechnungen bleiben in der Vereinsbuchhaltung, weil das Gesetz es verlangt. Das lässt sich nicht rückgängig machen.",
+      [
+        { text: "Abbrechen", style: "cancel" },
+        {
+          text: "Weiter",
+          style: "destructive",
+          onPress: () => Alert.alert("Wirklich löschen?", "Danach kannst du dich mit diesem Konto nicht mehr anmelden.", [
+            { text: "Abbrechen", style: "cancel" },
+            {
+              text: "Konto löschen",
+              style: "destructive",
+              onPress: async () => {
+                try {
+                  await api.post("/dsgvo/anonymize-me");
+                  await logout();
+                } catch (error) {
+                  Alert.alert("Das hat nicht geklappt", errorMessage(error, "Bitte später noch einmal versuchen oder an dsgvo@lionsquad.at schreiben."));
+                }
+              },
+            },
+          ]),
+        },
+      ],
+    );
+  };
   const appLock = useAppLock();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
@@ -666,7 +696,10 @@ export function ProfileScreen() {
             <Muted>Live-Gastmodus aktiv. Profilbearbeitung und persönliche Einstellungen sind nach Login verfügbar.</Muted>
           </Card>
         ) : view === "settings" ? (
-          <ActionRow icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." tone="danger" onPress={logout} />
+          <>
+            <ActionRow icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." tone="danger" onPress={logout} />
+            <ActionRow icon="trash-outline" label="Konto löschen" detail="Dauerhaft anonymisieren – wie auf der Website unter Datenschutz." tone="danger" onPress={deleteAccount} />
+          </>
         ) : null}
       </ScrollView>
     </Screen>

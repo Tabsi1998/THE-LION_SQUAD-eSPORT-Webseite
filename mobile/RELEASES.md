@@ -151,6 +151,7 @@ Neueste oben.
 - `0.13.0-beta`: Build 72, Absturzberichte über Firebase Crashlytics (Meilenstein App 1.0.0, #219 Teil 2)
 - `0.14.0-beta`: Build 73, Auszeichnungen – Gewinnerbanner und Trophäen im Profil (Meilenstein Auszeichnungen und Marke, #230)
 - `0.14.1-beta`: Build 74, Auszeichnungen im eigenen Reiter statt unter Referenzen (#230 Nachtrag); erster Build, der auch als App-Bundle (AAB) für den internen Test in der Play Console gebaut wird
+- `0.15.0-beta`: Build 75, „Konto löschen“ in der App (Google-Play-Pflicht vor dem geschlossenen Test, #390)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
 
 Vor dem Neustart bei 0.x galt ein Schema mit Zähler (`-beta.N`, `-alpha.N`). Diese Versionen sind historisch:

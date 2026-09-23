@@ -1,8 +1,8 @@
 {
-  "version": "0.14.1-beta",
-  "build": 74,
+  "version": "0.15.0-beta",
+  "build": 75,
   "date": "2026-09-23",
   "items": [
-    "Auszeichnungen haben im Profil einen eigenen Reiter – Referenzen sind die Turnier-Historie, Auszeichnungen die Banner und Trophäen; vorher standen beide unter „Referenzen“."
+    "„Konto löschen“ in den Profil-Einstellungen: dein Konto wird dauerhaft anonymisiert – derselbe Weg wie auf der Website, zweimal bestätigt. Google Play verlangt das, weil man sich in der App registrieren kann."
   ]
 }
