@@ -21,6 +21,8 @@ export default function AdminDashboardPage() {
   const [setupStatus, setSetupStatus] = useState(null);
   const [sys, setSys] = useState(null);
   const [authFlags, setAuthFlags] = useState(null);
+  // Konten verknüpfen (#260): ob Discord-App und Twitch-App eingerichtet sind - damit man es im Dashboard sieht.
+  const [linkAvail, setLinkAvail] = useState(null);
   const [publicCfg, setPublicCfg] = useState(null);
   const [growth, setGrowth] = useState(null);
   const [refreshedAt, setRefreshedAt] = useState(null);
@@ -29,6 +31,7 @@ export default function AdminDashboardPage() {
     api.get("/setup/status").then(({ data }) => setSetupStatus(data)).catch(() => {});
     api.get("/admin/system-status").then(({ data }) => setSys(data)).catch(() => {});
     api.get("/settings/auth").then(({ data }) => setAuthFlags(data)).catch(() => {});
+    api.get("/me/platform-links").then(({ data }) => setLinkAvail(data?.available || null)).catch(() => {});
     api.get("/settings/public").then(({ data }) => setPublicCfg(data)).catch(() => {});
     api.get("/admin/growth-stats?days=30").then(({ data }) => setGrowth(data)).catch(() => {});
   }, []);
@@ -49,6 +52,7 @@ export default function AdminDashboardPage() {
   const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
   const settingsHub = [
     { label: "Login & Konten", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
+    { label: "Konten verknüpfen", detail: linkAvail ? `Discord ${linkAvail.discord ? "bereit" : "fehlt"} · Twitch ${linkAvail.twitch ? "bereit" : "fehlt"} · Steam bereit` : "Discord, Twitch, Steam", to: "/admin/settings?tab=auth", icon: Share2, ok: linkAvail ? Boolean(linkAvail.discord && linkAvail.twitch) : undefined },
     { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings?tab=brand", icon: Palette, ok: undefined },
     { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings?tab=email", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
     { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings?tab=smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
