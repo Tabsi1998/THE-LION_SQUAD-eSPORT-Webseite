@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BootScreen } from "../screens/BootScreen";
+import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
@@ -41,6 +42,7 @@ import { TournamentDetailScreen } from "../screens/main/TournamentDetailScreen";
 import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { useAuth } from "../auth/AuthContext";
 import { isGuestUser } from "../live";
+import { useAppLock } from "../lock/AppLockProvider";
 import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
@@ -72,9 +74,12 @@ const theme = {
 
 export function AppNavigator() {
   const { user, loading } = useAuth();
+  const { locked } = useAppLock();
   const signedIn = Boolean(user && !isGuestUser(user));
 
   if (loading) return <BootScreen />;
+  // App-Sperre (#217): erst Fingerabdruck, dann Chats und Profil. Gäste haben nichts zu schützen.
+  if (signedIn && locked) return <LockScreen />;
 
   return (
     <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>

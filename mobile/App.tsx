@@ -5,6 +5,7 @@ import { AuthProvider } from "./src/auth/AuthContext";
 import { BrandingProvider } from "./src/branding/BrandingProvider";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { installMobileLogHandlers } from "./src/lib/mobileLog";
+import { AppLockProvider } from "./src/lock/AppLockProvider";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { NotificationProvider } from "./src/notifications/NotificationContext";
 import { LiveChangesProvider } from "./src/realtime/LiveChangesProvider";
@@ -20,12 +21,14 @@ export default function App() {
           <AuthProvider>
             <LiveChangesProvider>
               <BrandingProvider>
-                <NotificationProvider>
-                  <AppUpdateProvider>
-                    <StatusBar style="light" />
-                    <AppNavigator />
-                  </AppUpdateProvider>
-                </NotificationProvider>
+                <AppLockProvider>
+                  <NotificationProvider>
+                    <AppUpdateProvider>
+                      <StatusBar style="light" />
+                      <AppNavigator />
+                    </AppUpdateProvider>
+                  </NotificationProvider>
+                </AppLockProvider>
               </BrandingProvider>
             </LiveChangesProvider>
           </AuthProvider>

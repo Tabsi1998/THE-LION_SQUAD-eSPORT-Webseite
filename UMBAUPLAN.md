@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Passkey (14.7), #219 Store (14.8) |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), Build 69 nach dem Merge; Stufe 2 Passkey in der App (14.7) wartet auf den Server-Teil; der Rest von #219 (14.8) wartet auf das Play-Console-Konto |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -601,6 +601,40 @@ Turniers, fremde nicht.
 Antwort des Servers nennen den fehlenden Bereich und wer ihn vergibt; „Alle Benutzer“ sagt je
 Rolle „darf / darf nicht“. Die Rolle `team_leader` prüfte nie etwas – Teamleitung läuft pro
 Team –, sie ist weg, bestehende Konten wurden per Migration Spieler.
+
+## Block 38 — App 1.0.0, Teil 1: App-Sperre, Bildgrößen, App Bundle
+
+### Was 38.1 gefunden hat (#217 Stufe 1, #219 Teil 1 – PR #380)
+
+**Die Sitzung bleibt gespeichert – also liegt die App offen da.** Wer sein Handy weitergibt oder
+verliert, gibt Chats, Profil und Mitgliederkarte mit. Die Website hat Passkeys, die App hatte
+nichts dergleichen. Stufe 1 braucht keinen Server: ein Schalter im Profil, und die App fragt beim
+Start und nach einer Minute im Hintergrund nach Fingerabdruck, Gesicht oder Gerätesperre, bevor
+sie etwas zeigt. Kurz in eine andere App wechseln bleibt ohne Frage – sonst nervt die Sperre, und
+Nerven heißt: ausschalten.
+
+**Sich aussperren muss unmöglich sein.** Einschalten verlangt einmal den Fingerabdruck – dann ist
+bewiesen, dass die Methode am Gerät geht. Ohne eingerichtete Bildschirmsperre lässt sich der
+Schalter nicht setzen, und eine gespeicherte Sperre gilt dann nicht (das Gerät wurde inzwischen
+zurückgesetzt). „Abmelden“ geht auch gesperrt; danach ist nichts mehr zu schützen. Der Schalter
+liegt nur am Gerät, nicht am Server – ein anderes Handy fängt bei „aus“ an.
+
+**Stufe 2 bleibt offen.** Passkey-Login in der App selbst braucht ein natives Modul für den
+Android Credential Manager, den APK-Schlüssel als erlaubte Herkunft im Backend und die Datei
+`/.well-known/assetlinks.json` auf der Website – ein eigener Schritt mit dem Betreiber, weil der
+Server-Teil ausgerollt werden muss.
+
+**Nur die Galerie lud kleine Bilder.** Block 22 hat die 400/800/1600-Fassungen für alle Uploads
+gebracht, aber in der App nutzten sie nur Galerie und Chat; Karten, Kacheln und Profilbilder holten
+das Original – am Handy oft drei Megabyte für eine Kachel von 120 Pixeln. Statt jeden Aufruf
+anzufassen, misst das Bild-Element sich jetzt selbst und lädt die kleinste Fassung, die seine
+Fläche in Gerätepixeln füllt. Das gilt damit überall auf einmal, und ein neuer Bildschirm bekommt
+es von selbst.
+
+**Die Play Console nimmt keine APK.** Das Release-Skript baut auf Wunsch (`--aab`) zusätzlich das
+App Bundle, signiert mit demselben Schlüssel, und hängt es ans GitHub-Release. Die APK bleibt für
+den Vereinsserver und Sideload. Konto, Store-Eintrag und Absturzberichte sind Sache des Betreibers
+– ohne Play-Console-Konto geht dort nichts weiter.
 
 ## Block 37 — Marke: Standard-Favicon und Markenbilder in der App
 

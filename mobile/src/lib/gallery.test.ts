@@ -34,3 +34,7 @@ test("Abschnitte gruppieren in Albumreihenfolge, Lose zuerst", () => {
   expect(albumCountLabel({ id: "x", title: "leer" })).toBe("leer");
   expect(groupBySection({ id: "y", title: "ohne", photos: [{ id: "p" }] })[0].items).toHaveLength(1);
 });
+
+test("eine Adresse mit Breite bekommt keine zweite", () => {
+  expect(sizedUpload("/api/static/uploads/foto.webp?w=400", 800)).toBe("/api/static/uploads/foto.webp?w=400");
+});

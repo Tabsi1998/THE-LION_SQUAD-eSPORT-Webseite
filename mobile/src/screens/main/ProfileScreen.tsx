@@ -10,6 +10,8 @@ import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { availabilityText } from "../../lib/appLock";
+import { useAppLock } from "../../lock/AppLockProvider";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { AchievementGroupCard } from "../../components/AchievementGroupCard";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
@@ -66,6 +68,7 @@ export function ProfileScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user, logout, refreshMe } = useAuth();
+  const appLock = useAppLock();
   const [tab, setTab] = useState<TabKey>("overview");
   const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
   const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
@@ -520,6 +523,15 @@ export function ProfileScreen() {
               </Card>
             )}
           </>
+        ) : null}
+
+        {!profileLoading && view === "settings" ? (
+          <Card style={styles.card}>
+            <Heading>Sicherheit</Heading>
+            <Muted>Gilt nur auf diesem Gerät – nichts davon geht zum Server.</Muted>
+            {/* App-Sperre (#217): Einschalten fragt einmal den Fingerabdruck ab; ohne Gerätesperre bleibt der Schalter aus. */}
+            <Toggle label="App beim Öffnen sperren" detail={availabilityText(appLock.availability)} value={appLock.enabled} onValueChange={(v) => { void appLock.setEnabled(v); }} />
+          </Card>
         ) : null}
 
         {!profileLoading && view === "settings" ? (
