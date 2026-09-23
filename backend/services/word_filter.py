@@ -202,10 +202,10 @@ async def review(db, item: dict, *, decision: str, moderator_id: str, note: str 
         }})
     await db.moderation_items.update_one({"id": item["id"]}, {"$set": {"state": new_state, "decided_by": moderator_id, "decided_at": now, "note": (note or "").strip() or None, "updated_at": now}})
     if new_state == "rejected":
-        await db.moderation_strikes.insert_one({
-            "id": new_id(), "user_id": item["user_id"], "source": "word_filter", "kind": item.get("kind"), "ref_id": item.get("ref_id"),
-            "item_id": item["id"], "moderator_id": moderator_id, "note": (note or "").strip() or None, "created_at": now,
-        })
+        # Zurückgewiesen zählt als Treffer - und stößt die Stufe an (#416).
+        from services.moderation_standing import add_strike
+        await add_strike(db, item["user_id"], source="word_filter", kind=item.get("kind"), ref_id=item.get("ref_id"),
+                         item_id=item["id"], moderator_id=moderator_id, note=note)
     return await db.moderation_items.find_one({"id": item["id"]}, {"_id": 0})
 
 

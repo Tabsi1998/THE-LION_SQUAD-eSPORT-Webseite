@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from database import get_db
+from services import moderation_standing
 from auth import get_current_user, get_optional_user
 from services.visibility import user_can_see
 from services.tournament_permissions import (
@@ -836,6 +837,7 @@ async def list_match_chat(match_id: str, user: dict | None = Depends(get_optiona
 @router.post("/{match_id}/chat")
 async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request, me: dict = Depends(get_current_user)):
     db = get_db()
+    await moderation_standing.require_chat_allowed(db, me)
     match, collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     if not await _can_act_for_match(match, me):

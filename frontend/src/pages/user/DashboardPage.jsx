@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { NotificationRow } from "@/components/tls/NotificationRow";
+import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { bundleNotifications } from "@/lib/notifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -192,6 +193,8 @@ export default function DashboardPage() {
 
         <div className="grid lg:grid-cols-3 gap-6 items-start">
           <div className="lg:col-span-2 space-y-6 min-w-0">
+            {/* Nur, wenn die Moderation etwas festgehalten hat (#416) - sonst bleibt das Dashboard, wie es ist. */}
+            <ModerationStandingCard compact />
             {actions.length > 0 && (
               <section className="border border-[#FFD700]/30 rounded-sm bg-[#121212] p-5" data-testid="dashboard-actions">
                 <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-[#FFD700]" /> Offene Aktionen</h2>

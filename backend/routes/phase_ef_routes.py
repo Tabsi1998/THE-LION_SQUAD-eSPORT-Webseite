@@ -256,6 +256,23 @@ DEFAULT_EMAIL_TEMPLATES = [
      "subject": "Neue Mitgliedsbewerbung",
      "html": "<p>{{applicant}} hat eine Mitgliedsbewerbung eingereicht. Bitte im Admin-Bereich prüfen.</p>",
      "vars": ["applicant"]},
+    # Verwarnungen mit Stufen (#416): was gilt, warum, und der Weg zum Einspruch.
+    {"key": "moderation_notice", "name": "Moderation: Hinweis",
+     "subject": "Hinweis der Moderation",
+     "html": "<p>Hallo {{display_name}},</p><p>die Moderation hat einen Vorfall festgehalten: <strong>{{reason}}</strong>.</p><p>Das ist ein Hinweis – es gilt keine Einschränkung. Beim nächsten Vorfall folgt die nächste Stufe (Verwarnung mit Chat-Sperre).</p><p>Einspruch: unter „Meine Strafen“ auf der Website ({{appeal_url}}).</p>",
+     "vars": ["display_name", "reason", "appeal_url"]},
+    {"key": "moderation_warning", "name": "Moderation: Verwarnung mit Chat-Sperre",
+     "subject": "Verwarnung – Chat vorübergehend gesperrt",
+     "html": "<p>Hallo {{display_name}},</p><p>du bist verwarnt: <strong>{{reason}}</strong>.</p><p>Dein Chat (Direktnachrichten, Team-, Turnier- und Match-Chat, Anhänge) ist gesperrt bis <strong>{{until}}</strong>.</p><p>Einspruch: unter „Meine Strafen“ auf der Website ({{appeal_url}}).</p>",
+     "vars": ["display_name", "reason", "until", "appeal_url"]},
+    {"key": "moderation_suspension", "name": "Moderation: Sperre bis zur Entscheidung",
+     "subject": "Konto gesperrt – bis zur Entscheidung der Moderation",
+     "html": "<p>Hallo {{display_name}},</p><p>dein Konto ist gesperrt: <strong>{{reason}}</strong>.</p><p>Schreiben ist nicht möglich, bis die Moderation entschieden hat. Du kannst dich weiter anmelden und unter „Meine Strafen“ Einspruch einlegen ({{appeal_url}}).</p>",
+     "vars": ["display_name", "reason", "appeal_url"]},
+    {"key": "moderation_lifted", "name": "Moderation: Maßnahme aufgehoben",
+     "subject": "Maßnahme der Moderation aufgehoben",
+     "html": "<p>Hallo {{display_name}},</p><p>die Maßnahme ({{reason}}) ist aufgehoben. {{note}}</p>",
+     "vars": ["display_name", "reason", "note"]},
 ]
 
 
