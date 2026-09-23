@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
+import { Plus, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -201,76 +204,39 @@ function DocModal({ doc, meta, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isNew ? "Neues Dokument" : "Dokument bearbeiten"}</h2>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* File upload */}
-          <div className="border border-dashed border-[#FFD700]/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
-            <input ref={fileRef} type="file" onChange={upload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv,.md,.png,.jpg,.jpeg" data-testid="doc-file" />
-            {(form.storage_key || form.file_url) ? (
-              <div className="text-sm">
-                <div className="font-mono text-xs text-white/60 break-all">{form.original_filename || form.file_url}</div>
-                <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
-                <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold border border-white/20 text-white/70 rounded-sm">
-                  <UploadCloud className="w-3 h-3" /> Datei ersetzen
-                </button>
-              </div>
-            ) : (
-              <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 text-sm text-[#FFD700] font-bold uppercase tracking-wider">
-                <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`}
-              </button>
-            )}
+    <AdminSheet title={isNew ? "Neues Dokument" : "Dokument bearbeiten"} eyebrow="Dokumente" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="doc-save" testId="doc-sheet">
+      {/* File upload */}
+      <div className="border border-dashed border-[#FFD700]/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
+        <input ref={fileRef} type="file" onChange={upload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv,.md,.png,.jpg,.jpeg" data-testid="doc-file" />
+        {(form.storage_key || form.file_url) ? (
+          <div className="text-sm">
+            <div className="font-mono text-xs text-white/60 break-all">{form.original_filename || form.file_url}</div>
+            <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
+            <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold border border-white/20 text-white/70 rounded-sm">
+              <UploadCloud className="w-3 h-3" /> Datei ersetzen
+            </button>
           </div>
-
-          <Field label="Titel"><Input value={form.title} onChange={(v) => set("title", v)} testId="doc-title" required /></Field>
-          <Field label="Beschreibung"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Kategorie">
-              <select value={form.category} onChange={(e) => set("category", e.target.value)} data-testid="doc-category" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                {meta.categories.map((c) => <option key={c.k} value={c.k}>{c.l}</option>)}
-              </select>
-            </Field>
-            <Field label="Sichtbarkeit">
-              <select value={form.visibility} onChange={(e) => set("visibility", e.target.value)} data-testid="doc-visibility" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                {meta.visibilities.map((v) => <option key={v.k} value={v.k}>{v.l}</option>)}
-              </select>
-            </Field>
-          </div>
-          <Field label="Tags (Komma-getrennt)"><Input value={form.tags} onChange={(v) => set("tags", v)} placeholder="2026, Vorstand, GV" /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Sortierung"><Input value={form.order_index} onChange={(v) => set("order_index", v)} /></Field>
-            <label className="flex items-end gap-2 text-sm pb-2">
-              <input type="checkbox" checked={form.pinned} onChange={(e) => set("pinned", e.target.checked)} className="accent-[#FFD700]" />
-              <Pin className="w-3 h-3 text-[#FFD700]" /> Anpinnen
-            </label>
-          </div>
-          <label className="flex items-start gap-3 border border-white/10 rounded-sm bg-[#0A0A0A] p-3 text-sm text-white/70">
-            <input type="checkbox" checked={form.allow_download} onChange={(e) => set("allow_download", e.target.checked)} className="accent-[#FFD700] mt-1" />
-            <span>
-              <span className="block font-bold text-white">Download erlauben</span>
-              <span className="block text-xs text-white/45 mt-0.5">Standard ist nur Inline-Ansicht. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen.</span>
-            </span>
-          </label>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="doc-save" className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#FFD700] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#e8c200] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
+        ) : (
+          <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 text-sm text-[#FFD700] font-bold uppercase tracking-wider">
+            <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (max ${DOCUMENT_UPLOAD_LIMIT_MB} MB)`}
           </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+        )}
+      </div>
 
-function Field({ label, children }) {
-  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
-}
-function Input({ value, onChange, placeholder, testId, required }) {
-  return <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
+      <TextField label="Titel" value={form.title} onChange={(v) => set("title", v)} testId="doc-title" required />
+      <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} rows={2} testId="doc-description" />
+      <FormGrid>
+        <SelectField label="Kategorie" value={form.category} onChange={(v) => set("category", v)} options={meta.categories || []} testId="doc-category" />
+        <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={meta.visibilities || []} testId="doc-visibility" />
+      </FormGrid>
+      <TextField label="Tags (Komma-getrennt)" value={form.tags} onChange={(v) => set("tags", v)} placeholder="2026, Vorstand, GV" testId="doc-tags" />
+      <FormGrid>
+        <TextField label="Sortierung" value={form.order_index} onChange={(v) => set("order_index", v)} testId="doc-order" />
+        <CheckField label="Anpinnen" checked={form.pinned} onChange={(v) => set("pinned", v)} accent="#FFD700" className="self-end pb-2" testId="doc-pinned" />
+      </FormGrid>
+      <CheckField label="Download erlauben" hint="Standard ist nur Inline-Ansicht. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen." checked={form.allow_download} onChange={(v) => set("allow_download", v)} accent="#FFD700" testId="doc-allow-download" />
+    </AdminSheet>
+  );
 }

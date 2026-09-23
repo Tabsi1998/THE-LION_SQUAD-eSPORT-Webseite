@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError, formatRequestError, formatUploadError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { AdminSheet } from "@/components/tls/AdminSheet";
+import { FormGrid } from "@/components/tls/AdminForm";
+import { CheckField, FieldLabel, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { ImageUpload, prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -20,7 +23,7 @@ import {
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { captureVideoPoster } from "@/lib/videoPoster";
 import { toast } from "sonner";
-import { Plus, Save, X, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
+import { Plus, Trash2, Image as ImageIcon, ArrowLeft, Upload, Link as LinkIcon, Play, Film, Layers, Pencil } from "lucide-react";
 
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
@@ -245,47 +248,25 @@ function AlbumModal({ album, events, onClose, onSaved }) {
     setSaving(false);
   };
 
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isNew ? "Neues Album" : "Album bearbeiten"}</h2>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          <Field label="Titel"><Input value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="album-title" required /></Field>
-          <Field label="Slug"><Input value={form.slug} onChange={(v) => set("slug", v)} testId="album-slug" required /></Field>
-          <Field label="Beschreibung"><textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <Field label="Cover-Bild"><ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} testId="album-cover" variant="wide" allowLibrary /></Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Verknüpftes Event">
-              <select value={form.event_id || ""} onChange={(e) => set("event_id", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                <option value="">— keines —</option>
-                {events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Aufgenommen am"><GermanDateField id="gallery-taken-at" value={(form.taken_at || "").slice(0, 10)} onChange={(v) => set("taken_at", v)} testId="gallery-taken-at" /></Field>
-            <Field label="Sichtbarkeit">
-              <select value={form.visibility} onChange={(e) => set("visibility", e.target.value)} data-testid="album-visibility" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-                <option value="public">Öffentlich</option>
-                <option value="community">Community</option>
-                <option value="members">Nur Mitglieder</option>
-              </select>
-            </Field>
-            <Field label="Sortierung"><Input value={form.order_index} onChange={(v) => set("order_index", v)} /></Field>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.published} onChange={(e) => set("published", e.target.checked)} className="accent-[#29B6E8]" /> Veröffentlicht
-          </label>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} data-testid="album-save" className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
+    <AdminSheet title={isNew ? "Neues Album" : "Album bearbeiten"} eyebrow="Galerie" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="album-save" testId="album-sheet">
+      <FormGrid>
+        <TextField label="Titel" value={form.title} onChange={(v) => { set("title", v); if (isNew && !form.slug) set("slug", slugFrom(v)); }} testId="album-title" required />
+        <TextField label="Slug" value={form.slug} onChange={(v) => set("slug", v)} testId="album-slug" required />
+      </FormGrid>
+      <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} rows={2} testId="album-description" />
+      <FieldLabel label="Cover-Bild">
+        <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} testId="album-cover" variant="wide" allowLibrary />
+      </FieldLabel>
+      <FormGrid>
+        <SelectField label="Verknüpftes Event" value={form.event_id || ""} onChange={(v) => set("event_id", v)} options={[["", "— keines —"], ...events.map((e) => [e.id, e.name])]} testId="album-event" />
+        <GermanDateField id="gallery-taken-at" label="Aufgenommen am" value={(form.taken_at || "").slice(0, 10)} onChange={(v) => set("taken_at", v)} testId="gallery-taken-at" />
+        <SelectField label="Sichtbarkeit" value={form.visibility} onChange={(v) => set("visibility", v)} options={[["public", "Öffentlich"], ["community", "Community"], ["members", "Nur Mitglieder"]]} testId="album-visibility" />
+        <TextField label="Sortierung" value={form.order_index} onChange={(v) => set("order_index", v)} testId="album-order" />
+      </FormGrid>
+      <CheckField label="Veröffentlicht" checked={form.published} onChange={(v) => set("published", v)} testId="album-published" />
+    </AdminSheet>
   );
 }
 
@@ -582,12 +563,7 @@ function AlbumPhotos({ album, onBack }) {
           </button>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,16rem)_1fr] items-end">
-          <Field label="Upload-Ziel">
-            <select value={targetSectionId || ""} onChange={(e) => setTargetSectionId(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm">
-              <option value="">Ohne Abschnitt</option>
-              {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
-            </select>
-          </Field>
+          <SelectField label="Upload-Ziel" value={targetSectionId || ""} onChange={(v) => setTargetSectionId(v)} options={[["", "Ohne Abschnitt"], ...sections.map((section) => [section.id, section.title])]} testId="gallery-upload-target" />
           <div className="text-xs text-white/45 pb-2">
             Aktuell: <span className="text-white/75">{sectionTitle(sections, targetSectionId || null)}</span>
           </div>
@@ -704,32 +680,13 @@ function SectionModal({ section, onClose, onSave }) {
       setSaving(false);
     }
   };
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-lg bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isNew ? "Abschnitt anlegen" : "Abschnitt bearbeiten"}</h2>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          <Field label="Titel">
-            <Input value={form.title} onChange={(value) => set("title", value)} placeholder="Aufbau, Tag 1, Tag 2" required testId="gallery-section-title" />
-          </Field>
-          <Field label="Beschreibung">
-            <textarea value={form.description} onChange={(event) => set("description", event.target.value)} rows={2} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-          </Field>
-          <Field label="Reihenfolge">
-            <Input value={form.order_index} onChange={(value) => set("order_index", value)} testId="gallery-section-order" />
-          </Field>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
-            <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
-          </button>
-        </div>
-      </form>
-    </div>
+    <AdminSheet title={isNew ? "Abschnitt anlegen" : "Abschnitt bearbeiten"} eyebrow="Galerie" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="gallery-section-save" testId="gallery-section-sheet">
+      <TextField label="Titel" value={form.title} onChange={(value) => set("title", value)} placeholder="Aufbau, Tag 1, Tag 2" required testId="gallery-section-title" />
+      <TextAreaField label="Beschreibung" value={form.description} onChange={(value) => set("description", value)} rows={2} testId="gallery-section-description" />
+      <TextField label="Reihenfolge" value={form.order_index} onChange={(value) => set("order_index", value)} testId="gallery-section-order" />
+    </AdminSheet>
   );
 }
 
@@ -792,38 +749,14 @@ function VideoLinkModal({ onClose, onSave }) {
       setSaving(false);
     }
   };
+  // Seitenblatt statt Fenster (#435).
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">Video-Link hinzufügen</h2>
-          <button type="button" onClick={onClose} className="text-white/60 hover:text-white"><X className="w-5 h-5" /></button>
-        </div>
-        <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-          <Field label="Video-URL">
-            <Input value={form.url} onChange={(v) => set("url", v)} placeholder="YouTube, Twitch, Kick, Vimeo oder direkte MP4/WebM-URL" required testId="gallery-video-url" />
-          </Field>
-          <Field label="Titel / Caption">
-            <Input value={form.caption} onChange={(v) => set("caption", v)} placeholder="Optional" testId="gallery-video-caption" />
-          </Field>
-          <Field label="Vorschaubild">
-            <ImageUpload value={form.thumbnail_url} onChange={(v) => set("thumbnail_url", v)} testId="gallery-video-thumb" variant="wide" allowLibrary mediaScope="gallery" />
-          </Field>
-        </div>
-        <div className="flex gap-3 p-5 border-t border-white/10">
-          <button type="button" onClick={onClose} className="px-4 py-2 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm">Abbrechen</button>
-          <button type="submit" disabled={saving} className="ml-auto inline-flex items-center gap-2 px-5 py-2 bg-[#9F7AEA] text-white text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-[#805AD5] disabled:opacity-50">
-            <LinkIcon className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Link hinzufügen"}
-          </button>
-        </div>
-      </form>
-    </div>
+    <AdminSheet title="Video-Link hinzufügen" eyebrow="Galerie" accent="#9F7AEA" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Link hinzufügen" submitTestId="gallery-video-save" testId="gallery-video-sheet">
+      <TextField label="Video-URL" value={form.url} onChange={(v) => set("url", v)} placeholder="YouTube, Twitch, Kick, Vimeo oder direkte MP4/WebM-URL" required testId="gallery-video-url" />
+      <TextField label="Titel / Caption" value={form.caption} onChange={(v) => set("caption", v)} placeholder="Optional" testId="gallery-video-caption" />
+      <FieldLabel label="Vorschaubild">
+        <ImageUpload value={form.thumbnail_url} onChange={(v) => set("thumbnail_url", v)} testId="gallery-video-thumb" variant="wide" allowLibrary mediaScope="gallery" />
+      </FieldLabel>
+    </AdminSheet>
   );
-}
-
-function Field({ label, children }) {
-  return <label className="block"><div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>{children}</label>;
-}
-function Input({ value, onChange, placeholder, testId, required }) {
-  return <input value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} required={required} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />;
 }
