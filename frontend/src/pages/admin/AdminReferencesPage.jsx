@@ -3,27 +3,38 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
-import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { CheckField, FieldLabel, INPUT_CLASS, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
-import { ExternalLink, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { ExternalLink, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+
+// Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
+// ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
+// eigener Platzierung. Plattform, Format, Liga und Saison sind Felder, nicht mehr Teil des Titels
+// (`[PS] HC | Liga X | Cup`); alte Einträge zeigt der Server mit aus dem Titel abgeleiteten
+// Feldern, beim ersten Speichern werden sie fest.
+
+const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
+const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
+const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"], ["archived", "Archiviert"]];
+const KIND_OPTIONS = [["team", "Team"], ["solo", "Einzelstarter"]];
+const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
+const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
+const statusLabel = Object.fromEntries(STATUS_OPTIONS);
 
 const emptyReference = {
   title: "",
   organizer: "",
+  league: "",
+  season: "",
+  format: "",
+  platforms: [],
   game_id: "",
   game_name: "",
-  team_name: "THE LION SQUAD",
-  lineup: [],
-  member_profile_ids: [],
-  lineup_members: [],
-  placement: "",
-  placement_label: "",
-  participant_count: "",
-  team_count: "",
+  entries: [],
   start_date: "",
   end_date: "",
   location: "",
@@ -40,14 +51,83 @@ const emptyReference = {
   order_index: 0,
 };
 
-const VISIBILITY_OPTIONS = [["public", "Öffentlich"], ["community", "Community"], ["members", "Vereinsmitglieder"], ["internal", "Intern"]];
-const MODE_OPTIONS = [["online", "Online"], ["offline", "Vor Ort"], ["hybrid", "Hybrid"]];
-const STATUS_OPTIONS = [["active", "Laufend"], ["planned", "Geplant"], ["completed", "Abgeschlossen"], ["archived", "Archiviert"]];
-const medalLabel = { gold: "Gold", silver: "Silber", bronze: "Bronze" };
-const visibilityLabel = Object.fromEntries(VISIBILITY_OPTIONS);
-const statusLabel = Object.fromEntries(STATUS_OPTIONS);
-const DEFAULT_PLATFORM_TAGS = ["ALL", "Xbox", "PlayStation", "PC", "XBO+PS", "PS", "XBO"];
-const DEFAULT_TITLE_SEGMENTS = ["HC", "CORE", "S&D 4vs4", "S&D 2vs2", "S&Z 4vs4", "S&Z 2vs2", "LIGA A", "NEWCOMER LIGA"];
+let entryCounter = 0;
+export function emptyEntry(kind = "team") {
+  entryCounter += 1;
+  return {
+    id: "",
+    key: `new-${entryCounter}`,
+    kind,
+    team_name: kind === "team" ? "THE LION SQUAD" : "",
+    member_profile_ids: [],
+    lineup_text: "",
+    lineup_members: [],
+    placement: "",
+    placement_label: "",
+    participant_count: "",
+    team_count: "",
+  };
+}
+
+function entryToForm(entry) {
+  return {
+    id: entry.id || "",
+    key: entry.id || `new-${(entryCounter += 1)}`,
+    kind: entry.kind === "solo" ? "solo" : "team",
+    team_name: entry.team_name || "",
+    member_profile_ids: entry.member_profile_ids || [],
+    lineup_text: (entry.lineup || []).join(", "),
+    lineup_members: entry.lineup_members || [],
+    placement: entry.placement ?? "",
+    placement_label: entry.placement_label || "",
+    participant_count: entry.participant_count ?? "",
+    team_count: entry.team_count ?? "",
+  };
+}
+
+// Aus der angereicherten Referenz (Server liefert `display_title`, `platforms`, `entries`) wird das
+// Formular - so wandern alte Titel-Muster beim ersten Speichern in die Felder.
+export function referenceToForm(item) {
+  if (!item || !item.id) return { ...emptyReference, ...(item || {}), entries: (item?.entries || []).map(entryToForm) };
+  return {
+    ...emptyReference,
+    ...item,
+    title: item.display_title || item.title || "",
+    organizer: item.organizer || "",
+    league: item.league || "",
+    season: item.season || "",
+    format: item.format || "",
+    platforms: item.platforms || [],
+    game_id: item.game_id || "",
+    game_name: item.game_name || "",
+    entries: (item.entries || []).map(entryToForm),
+    start_date: item.start_date || "",
+    end_date: item.end_date || "",
+    location: item.location || "",
+    description: item.description || "",
+    highlights: item.highlights || "",
+  };
+}
+
+export function positiveNumberOrNull(value) {
+  if (value === "" || value == null) return null;
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 ? number : null;
+}
+
+export function entryPayload(entry) {
+  return {
+    id: entry.id || undefined,
+    kind: entry.kind === "solo" ? "solo" : "team",
+    team_name: entry.kind === "team" ? (entry.team_name || "").trim() || null : null,
+    member_profile_ids: entry.member_profile_ids || [],
+    lineup: String(entry.lineup_text || "").split(",").map((name) => name.trim()).filter(Boolean),
+    placement: positiveNumberOrNull(entry.placement),
+    placement_label: (entry.placement_label || "").trim() || null,
+    participant_count: positiveNumberOrNull(entry.participant_count),
+    team_count: positiveNumberOrNull(entry.team_count),
+  };
+}
 
 function cleanSuggestion(value) {
   return String(value || "").trim();
@@ -62,60 +142,51 @@ function uniqueSuggestions(values, limit = 80) {
   return [...seen.values()].sort((a, b) => a.localeCompare(b, "de-AT")).slice(0, limit);
 }
 
-function titleParts(title) {
-  const raw = cleanSuggestion(title);
-  const platforms = [...raw.matchAll(/\[([^\]]+)\]/g)].flatMap((match) => match[1].split(/[+/,&]/).map(cleanSuggestion));
-  const withoutTags = raw.replace(/\[[^\]]+\]\s*/g, " ");
-  const segments = withoutTags
-    .split(/\s+\|\s+|[-–—]/)
-    .map((part) => part.replace(/season\s*#?\d+/ig, "").trim())
-    .filter((part) => part.length >= 2 && part.length <= 24 && !/^\d+$/.test(part));
-  const modeTokens = [...withoutTags.matchAll(/\b(HC|CORE|S&D\s*\d+vs\d+|S&Z\s*\d+vs\d+|SEARCH\s*&\s*DESTROY)\b/ig)]
-    .map((match) => match[1].replace(/\s+/g, " ").toUpperCase());
-  return { platforms, segments: [...segments, ...modeTokens] };
-}
-
 function helperList(helpers, key) {
   return Array.isArray(helpers?.[key]) ? helpers[key] : [];
 }
 
-function helperPlatformKeys(helpers) {
-  return helperList(helpers, "platforms").map((item) => item?.key || item).filter(Boolean);
-}
-
 function buildReferenceSuggestions(items, helpers) {
-  const parsedTitles = (items || []).map((item) => titleParts(item.title));
   const auto = helpers?.auto || {};
+  const entries = (items || []).flatMap((item) => item.entries || []);
+  const platformRows = [...helperList(helpers, "platforms"), ...helperList(auto, "platforms")];
+  const platforms = new Map();
+  platformRows.forEach((row) => {
+    const key = cleanSuggestion(row?.key || row);
+    if (key && !platforms.has(key.toLocaleLowerCase("de-AT"))) platforms.set(key.toLocaleLowerCase("de-AT"), { key, label: cleanSuggestion(row?.label) || key });
+  });
+  (items || []).forEach((item) => (item.platforms || []).forEach((key) => {
+    if (key && !platforms.has(String(key).toLocaleLowerCase("de-AT"))) platforms.set(String(key).toLocaleLowerCase("de-AT"), { key, label: key });
+  }));
   return {
-    titles: uniqueSuggestions((items || []).map((item) => item.title), 160),
+    titles: uniqueSuggestions((items || []).map((item) => item.display_title || item.title), 160),
+    platforms: [...platforms.values()],
+    formats: uniqueSuggestions([...helperList(helpers, "formats"), ...helperList(auto, "formats"), ...(items || []).map((item) => item.format)]),
+    leagues: uniqueSuggestions([...helperList(helpers, "leagues"), ...helperList(auto, "leagues"), ...(items || []).map((item) => item.league)]),
+    seasons: uniqueSuggestions([...helperList(helpers, "seasons"), ...helperList(auto, "seasons"), ...(items || []).map((item) => item.season)]),
     organizers: uniqueSuggestions([...helperList(helpers, "organizers"), ...helperList(auto, "organizers"), ...(items || []).map((item) => item.organizer)]),
     gameNames: uniqueSuggestions([...helperList(helpers, "game_names"), ...helperList(auto, "game_names"), ...(items || []).map((item) => item.game_name)]),
-    teamNames: uniqueSuggestions([...helperList(helpers, "team_names"), ...helperList(auto, "team_names"), ...(items || []).map((item) => item.team_name)]),
-    placementLabels: uniqueSuggestions([...helperList(helpers, "placement_labels"), ...helperList(auto, "placement_labels"), ...(items || []).map((item) => item.placement_label)]),
+    teamNames: uniqueSuggestions([...helperList(helpers, "team_names"), ...helperList(auto, "team_names"), ...entries.map((entry) => entry.team_name)]),
+    placementLabels: uniqueSuggestions([...helperList(helpers, "placement_labels"), ...helperList(auto, "placement_labels"), ...entries.map((entry) => entry.placement_label)]),
     locations: uniqueSuggestions([...helperList(helpers, "locations"), ...helperList(auto, "locations"), ...(items || []).map((item) => item.location)]),
-    platformTags: uniqueSuggestions([...helperPlatformKeys(helpers), ...helperPlatformKeys(auto), ...DEFAULT_PLATFORM_TAGS, ...parsedTitles.flatMap((part) => part.platforms)], 30),
-    titleSegments: uniqueSuggestions([...helperList(helpers, "title_segments"), ...helperList(auto, "title_segments"), ...DEFAULT_TITLE_SEGMENTS, ...parsedTitles.flatMap((part) => part.segments)], 40),
   };
-}
-
-function upsertLeadingTag(title, tag) {
-  const value = cleanSuggestion(title);
-  const nextTag = `[${tag}]`;
-  if (!value) return `${nextTag} `;
-  if (/^\[[^\]]+\]/.test(value)) return value.replace(/^\[[^\]]+\]/, nextTag);
-  return `${nextTag} ${value}`;
-}
-
-function appendTitleSegment(title, segment) {
-  const value = cleanSuggestion(title);
-  if (!value) return segment;
-  if (value.toLocaleLowerCase("de-AT").includes(segment.toLocaleLowerCase("de-AT"))) return value;
-  return `${value} | ${segment}`;
 }
 
 function formatDate(value) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("de-DE", { dateStyle: "medium" });
+}
+
+function entryPeople(entry) {
+  const members = (entry.lineup_members || []).map((member) => member.display_name).filter(Boolean);
+  return [...members, ...(entry.lineup || [])];
+}
+
+function entrySummary(entry) {
+  const who = entry.kind === "solo" ? (entryPeople(entry)[0] || "Einzelstarter") : (entry.team_name || "Team");
+  const place = entry.placement ? `Platz ${entry.placement}${entry.participant_count ? ` von ${entry.participant_count}` : ""}` : "Teilnahme";
+  const people = entry.kind === "team" && entryPeople(entry).length ? ` (${entryPeople(entry).join(", ")})` : "";
+  return `${entry.kind === "solo" ? "Einzel" : "Team"} ${who} · ${place}${people}`;
 }
 
 export default function AdminReferencesPage() {
@@ -146,7 +217,7 @@ export default function AdminReferencesPage() {
   useApiInvalidation(load, ["references", "games"]);
 
   const remove = async (id) => {
-    if (!await confirm({ title: "Referenz löschen?", description: "Der externe Turniereintrag wird dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
+    if (!await confirm({ title: "Referenz löschen?", description: "Die Turnierteilnahme wird mit allen Einträgen dauerhaft entfernt.", confirmLabel: "Löschen" })) return;
     await api.delete(`/references/${id}`);
     toast.success("Referenz gelöscht.");
     load();
@@ -158,29 +229,27 @@ export default function AdminReferencesPage() {
         <div>
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Referenzen</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Externe Turniere, Ligen und Matches, bei denen THE LION SQUAD teilnimmt oder teilgenommen hat.</p>
+          <p className="mt-2 text-white/60 text-sm max-w-xl">Turnierteilnahmen des Vereins: je Teilnahme ein Team oder mehrere Einzelstarter mit eigener Platzierung. Plattform, Format, Liga und Saison sind Felder – nicht mehr Teil des Titels.</p>
         </div>
-        <button onClick={() => setEditing(emptyReference)} className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+        <button onClick={() => setEditing({})} data-testid="reference-new" className="px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neue Referenz
         </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3 mb-6">
-        <Stat label="Turniere" value={summary.total || 0} />
-        <Stat label="Laufend" value={summary.active || 0} />
-        <Stat label="Geplant" value={summary.planned || 0} />
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 mb-6">
+        <Stat label="Teilnahmen" value={summary.total || 0} />
+        <Stat label="Einträge" value={summary.entries || 0} />
         <Stat label="Podest" value={summary.podiums || 0} />
         <Stat label="Gold" value={summary.gold || 0} tone="gold" />
         <Stat label="Silber" value={summary.silver || 0} />
         <Stat label="Bronze" value={summary.bronze || 0} tone="bronze" />
-        <Stat label="Spiele" value={summary.games || 0} />
       </div>
 
       <ReferenceHelperAdmin helpers={helperSettings} onSaved={(helpers) => { setHelperSettings(helpers); load(); }} />
 
       <div className="space-y-3">
         {items.map((item) => (
-          <div key={item.id} className="border border-white/10 rounded-sm bg-[#121212] p-4">
+          <div key={item.id} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`reference-row-${item.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
@@ -191,14 +260,23 @@ export default function AdminReferencesPage() {
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
                   {item.is_active === false && <span className="text-[#FF3B30]">Inaktiv</span>}
                 </div>
-                <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{item.title}</h2>
-                <div className="mt-1 text-sm text-white/60">
-                  {item.organizer || "Veranstalter offen"} · {item.team_name || "THE LION SQUAD"}
-                  {item.placement && ` · Platz ${item.placement}${item.participant_count ? ` von ${item.participant_count}` : ""}`}
+                <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{item.display_title || item.title}</h2>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {(item.platforms || []).map((platform) => <Chip key={platform}>{platform}</Chip>)}
+                  {item.format && <Chip>{item.format}</Chip>}
+                  {item.league && <Chip>{item.league}</Chip>}
+                  {item.season && <Chip>{item.season}</Chip>}
+                  {item.organizer && <Chip muted>{item.organizer}</Chip>}
                 </div>
-                {referenceLineup(item).length > 0 && (
-                  <div className="mt-2 text-xs text-white/45">Lineup: {referenceLineup(item).join(", ")}</div>
-                )}
+                <ul className="mt-2 space-y-1 text-sm text-white/65">
+                  {(item.entries || []).map((entry) => (
+                    <li key={entry.id} className="flex items-center gap-2">
+                      {entry.kind === "solo" ? <User className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" /> : <Users className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" />}
+                      <span>{entrySummary(entry)}</span>
+                      {entry.medal && <Medal className={`w-3.5 h-3.5 ${entry.medal === "gold" ? "text-[#FFD700]" : entry.medal === "silver" ? "text-white/80" : "text-[#CD7F32]"}`} />}
+                    </li>
+                  ))}
+                </ul>
                 {(item.external_url || item.bracket_url || item.match_url || item.result_url) && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     <RefLink href={item.external_url} label="Turnier" />
@@ -209,7 +287,7 @@ export default function AdminReferencesPage() {
                 )}
               </div>
               <div className="flex gap-1 shrink-0">
-                <button onClick={() => setEditing(item)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
+                <button onClick={() => setEditing(item)} data-testid={`reference-edit-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
                 <button onClick={() => remove(item.id)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
@@ -233,11 +311,17 @@ function Stat({ label, value, tone }) {
   );
 }
 
+function Chip({ children, muted = false }) {
+  return <span className={`px-2 py-0.5 border rounded-sm text-[10px] uppercase tracking-widest font-bold ${muted ? "border-white/10 text-white/40" : "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>{children}</span>;
+}
+
 function helpersToForm(helpers) {
   return {
     platforms: (helpers?.platforms || []).map((item) => `${item.key} = ${item.label}`).join("\n"),
+    formats: (helpers?.formats || []).join("\n"),
+    leagues: (helpers?.leagues || []).join("\n"),
+    seasons: (helpers?.seasons || []).join("\n"),
     organizers: (helpers?.organizers || []).join("\n"),
-    title_segments: (helpers?.title_segments || []).join("\n"),
     game_names: (helpers?.game_names || []).join("\n"),
     team_names: (helpers?.team_names || []).join("\n"),
     placement_labels: (helpers?.placement_labels || []).join("\n"),
@@ -276,8 +360,10 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
     try {
       const payload = {
         platforms: parsePlatformLines(form.platforms),
+        formats: parseLines(form.formats),
+        leagues: parseLines(form.leagues),
+        seasons: parseLines(form.seasons),
         organizers: parseLines(form.organizers),
-        title_segments: parseLines(form.title_segments),
         game_names: parseLines(form.game_names),
         team_names: parseLines(form.team_names),
         placement_labels: parseLines(form.placement_labels),
@@ -296,23 +382,25 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
   return (
     <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm">
       <summary className="cursor-pointer px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/75 hover:text-[#29B6E8]">
-        Referenz-Helfer verwalten
+        Vorschlagslisten verwalten
       </summary>
       <div className="border-t border-white/10 p-4 space-y-4">
         <p className="text-sm text-white/55 max-w-3xl">
-          Manuelle Helfer bleiben gespeichert. Automatisch erkannte Werte aus Referenzen kommen zusätzlich dazu. Plattformen im Format <span className="font-mono text-white/80">Tag = Anzeige</span>, z.B. <span className="font-mono text-white/80">XBO = Xbox</span>.
+          Was hier steht, erscheint als Vorschlag im Formular. Automatisch erkannte Werte aus gespeicherten Referenzen kommen dazu. Plattformen im Format <span className="font-mono text-white/80">Kürzel = Anzeige</span>, z.B. <span className="font-mono text-white/80">XBO = Xbox</span>.
         </p>
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
           <HelperTextArea label="Plattformen" value={form.platforms} onChange={(v) => set("platforms", v)} rows={7} />
-          <HelperTextArea label="Veranstalter / Ligen" value={form.organizers} onChange={(v) => set("organizers", v)} rows={7} />
-          <HelperTextArea label="Modus-/Titel-Bausteine" value={form.title_segments} onChange={(v) => set("title_segments", v)} rows={7} />
+          <HelperTextArea label="Formate (HC, CORE …)" value={form.formats} onChange={(v) => set("formats", v)} />
+          <HelperTextArea label="Ligen" value={form.leagues} onChange={(v) => set("leagues", v)} />
+          <HelperTextArea label="Saisons" value={form.seasons} onChange={(v) => set("seasons", v)} />
+          <HelperTextArea label="Veranstalter" value={form.organizers} onChange={(v) => set("organizers", v)} rows={7} />
           <HelperTextArea label="Freie Spielnamen" value={form.game_names} onChange={(v) => set("game_names", v)} />
-          <HelperTextArea label="Team-/Lineup-Namen" value={form.team_names} onChange={(v) => set("team_names", v)} />
+          <HelperTextArea label="Team-Namen" value={form.team_names} onChange={(v) => set("team_names", v)} />
           <HelperTextArea label="Platzierungslabels" value={form.placement_labels} onChange={(v) => set("placement_labels", v)} />
           <HelperTextArea label="Orte" value={form.locations} onChange={(v) => set("locations", v)} />
         </div>
         <button type="button" onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
-          <Save className="w-4 h-4" /> {saving ? "Speichere..." : "Helfer speichern"}
+          <Save className="w-4 h-4" /> {saving ? "Speichere..." : "Vorschläge speichern"}
         </button>
       </div>
     </details>
@@ -323,7 +411,7 @@ function HelperTextArea({ label, value, onChange, rows = 5 }) {
   return (
     <label className="block">
       <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <textarea rows={rows} value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono leading-relaxed" />
+      <textarea rows={rows} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLASS} text-sm font-mono leading-relaxed`} />
     </label>
   );
 }
@@ -333,45 +421,60 @@ function RefLink({ href, label }) {
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
 }
 
-function referenceLineup(item) {
-  const memberNames = (item.lineup_members || []).map((member) => member.display_name).filter(Boolean);
-  return [...memberNames, ...(item.lineup || [])];
-}
-
 function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose, onSaved }) {
   const isNew = !reference.id;
-  const [form, setForm] = useState({
-    ...emptyReference,
-    ...reference,
-    lineup: reference.lineup || [],
-    member_profile_ids: reference.member_profile_ids || [],
-    lineup_members: reference.lineup_members || [],
-  });
+  const [form, setForm] = useState(() => referenceToForm(reference));
   const [saving, setSaving] = useState(false);
-  const [lineupText, setLineupText] = useState((reference.lineup || []).join(", "));
+  const [platformInput, setPlatformInput] = useState("");
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const toggleMember = (profileId) => setForm((current) => {
-    const ids = current.member_profile_ids || [];
-    return {
-      ...current,
-      member_profile_ids: ids.includes(profileId)
-        ? ids.filter((id) => id !== profileId)
-        : [...ids, profileId],
-    };
-  });
+  const setEntry = (key, patch) => setForm((current) => ({
+    ...current,
+    entries: current.entries.map((entry) => (entry.key === key ? { ...entry, ...(typeof patch === "function" ? patch(entry) : patch) } : entry)),
+  }));
+  const addEntry = (kind) => setForm((current) => ({ ...current, entries: [...current.entries, emptyEntry(kind)] }));
+  const removeEntry = (key) => setForm((current) => ({ ...current, entries: current.entries.filter((entry) => entry.key !== key) }));
+  const togglePlatform = (key) => setForm((current) => ({
+    ...current,
+    platforms: current.platforms.includes(key) ? current.platforms.filter((item) => item !== key) : [...current.platforms, key],
+  }));
+  const addPlatform = () => {
+    const key = platformInput.trim();
+    if (!key) return;
+    if (!form.platforms.includes(key)) set("platforms", [...form.platforms, key]);
+    setPlatformInput("");
+  };
 
   const save = async (e) => {
     e.preventDefault();
+    if (form.entries.length === 0) {
+      toast.error("Bitte mindestens einen Eintrag anlegen: ein Team oder einen Einzelstarter.");
+      return;
+    }
     setSaving(true);
     const payload = {
-      ...form,
-      lineup: lineupText.split(",").map((name) => name.trim()).filter(Boolean),
-      member_profile_ids: form.member_profile_ids || [],
-      placement: positiveNumberOrNull(form.placement),
-      participant_count: positiveNumberOrNull(form.participant_count),
-      team_count: positiveNumberOrNull(form.team_count),
-      order_index: Number(form.order_index) || 0,
+      title: form.title.trim(),
+      organizer: form.organizer.trim() || null,
+      league: form.league.trim() || null,
+      season: form.season.trim() || null,
+      format: form.format.trim() || null,
+      platforms: form.platforms,
       game_id: form.game_id || null,
+      game_name: form.game_name.trim() || null,
+      entries: form.entries.map(entryPayload),
+      start_date: form.start_date || null,
+      end_date: form.end_date || null,
+      location: form.location.trim() || null,
+      mode: form.mode,
+      external_url: form.external_url.trim() || null,
+      bracket_url: form.bracket_url.trim() || null,
+      match_url: form.match_url.trim() || null,
+      result_url: form.result_url.trim() || null,
+      description: form.description.trim() || null,
+      highlights: form.highlights.trim() || null,
+      visibility: form.visibility,
+      status: form.status,
+      is_active: form.is_active !== false,
+      order_index: Number(form.order_index) || 0,
     };
     try {
       if (isNew) await api.post("/references", payload);
@@ -385,43 +488,76 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
     }
   };
 
-  // Seitenblatt statt Fenster (#435): Turnier, Aufstellung, Ergebnis und Rahmen, Texte als
-  // Abschnitte - breit genug für vier Felder nebeneinander, die Liste bleibt daneben sichtbar.
+  const platformChoices = useMemo(() => {
+    const rows = [...suggestions.platforms];
+    form.platforms.forEach((key) => {
+      if (!rows.some((row) => row.key === key)) rows.push({ key, label: key });
+    });
+    return rows;
+  }, [form.platforms, suggestions.platforms]);
+
   return (
     <AdminSheet title={isNew ? "Neue Referenz" : "Referenz bearbeiten"} eyebrow="Verein" size="xl" onClose={onClose} onSubmit={save} saving={saving} submitTestId="reference-save" testId="reference-sheet">
-      <FormSection title="Turnier">
-        <TextField label="Titel" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" />
-        <TitleHelper
-          platforms={suggestions.platformTags}
-          segments={suggestions.titleSegments}
-          onPlatform={(tag) => set("title", upsertLeadingTag(form.title, tag))}
-          onSegment={(segment) => set("title", appendTitleSegment(form.title, segment))}
-        />
-        <FormGrid>
-          <TextField label="Veranstalter / Liga" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} testId="reference-organizer" />
+      <FormSection title="Turnier" hint="Plattform, Format, Liga und Saison sind eigene Felder – der Titel ist nur noch der Turniername.">
+        <TextField label="Turniername" value={form.title} onChange={(v) => set("title", v)} suggestions={suggestions.titles} required testId="reference-title" placeholder="z.B. Autumn Cup 2026" />
+        <FormGrid cols={3}>
+          <TextField label="Veranstalter" value={form.organizer} onChange={(v) => set("organizer", v)} suggestions={suggestions.organizers} testId="reference-organizer" />
+          <TextField label="Liga" value={form.league} onChange={(v) => set("league", v)} suggestions={suggestions.leagues} testId="reference-league" placeholder="z.B. Liga A" />
+          <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
+        </FormGrid>
+        <FormGrid cols={3}>
+          <TextField label="Format" value={form.format} onChange={(v) => set("format", v)} suggestions={suggestions.formats} testId="reference-format" placeholder="z.B. HC, CORE, S&D 4vs4" />
           <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...games.map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />
           <TextField label="Spielname falls nicht vorhanden" value={form.game_name} onChange={(v) => set("game_name", v)} suggestions={suggestions.gameNames} testId="reference-game-name" />
-          <TextField label="Team / Lineup-Name" value={form.team_name} onChange={(v) => set("team_name", v)} suggestions={suggestions.teamNames} testId="reference-team-name" />
         </FormGrid>
+        <FieldLabel label="Plattformen" hint="Mehrfachauswahl; eigene mit Enter hinzufügen.">
+          <div className="flex flex-wrap gap-1.5" data-testid="reference-platforms">
+            {platformChoices.map((platform) => (
+              <button
+                key={platform.key}
+                type="button"
+                onClick={() => togglePlatform(platform.key)}
+                data-testid={`reference-platform-${platform.key}`}
+                className={`px-2.5 py-1 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${form.platforms.includes(platform.key) ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`}
+              >
+                {platform.label}
+              </button>
+            ))}
+            <input
+              value={platformInput}
+              onChange={(e) => setPlatformInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addPlatform(); } }}
+              onBlur={addPlatform}
+              placeholder="Weitere …"
+              data-testid="reference-platform-input"
+              className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1 rounded-sm text-[11px] text-white focus:outline-none w-28"
+            />
+          </div>
+        </FieldLabel>
       </FormSection>
 
-      <FormSection title="Aufstellung">
-        <MemberPicker
-          profiles={memberProfiles}
-          selectedIds={form.member_profile_ids || []}
-          frozenMembers={form.lineup_members || []}
-          onToggle={toggleMember}
-        />
-        <TextField label="Weitere externe Spieler / alter Lineup-Text" value={lineupText} onChange={setLineupText} placeholder="Name 1, Name 2, Name 3" testId="reference-lineup" />
+      <FormSection title="Einträge" hint="Wer für den Verein angetreten ist: ein Team mit gemeinsamer Platzierung oder Einzelstarter mit je eigener Platzierung. Beides ist in derselben Teilnahme möglich.">
+        {form.entries.length === 0 && (
+          <div className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/45" data-testid="reference-entries-empty">Noch kein Eintrag – lege ein Team oder einen Einzelstarter an.</div>
+        )}
+        {form.entries.map((entry, index) => (
+          <EntryEditor
+            key={entry.key}
+            entry={entry}
+            index={index}
+            profiles={memberProfiles}
+            suggestions={suggestions}
+            onChange={(patch) => setEntry(entry.key, patch)}
+            onRemove={() => removeEntry(entry.key)}
+          />
+        ))}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => addEntry("team")} data-testid="reference-add-team" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10"><Users className="w-3.5 h-3.5" /> Team hinzufügen</button>
+          <button type="button" onClick={() => addEntry("solo")} data-testid="reference-add-solo" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10"><User className="w-3.5 h-3.5" /> Einzelstarter hinzufügen</button>
+        </div>
       </FormSection>
 
-      <FormSection title="Ergebnis und Rahmen">
-        <FormGrid cols={4}>
-          <TextField label="Platz" type="number" value={form.placement} onChange={(v) => set("placement", v)} testId="reference-placement" />
-          <TextField label="Label" value={form.placement_label} onChange={(v) => set("placement_label", v)} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId="reference-placement-label" />
-          <TextField label="Teilnehmer" type="number" value={form.participant_count} onChange={(v) => set("participant_count", v)} testId="reference-participants" />
-          <TextField label="Teams" type="number" value={form.team_count} onChange={(v) => set("team_count", v)} testId="reference-teams" />
-        </FormGrid>
+      <FormSection title="Rahmen">
         <FormGrid cols={4}>
           <GermanDateField id="reference-start-date" label="Start" value={(form.start_date || "").slice(0, 10)} onChange={(v) => set("start_date", v)} testId="reference-start-date" allowFuture />
           <GermanDateField id="reference-end-date" label="Ende" value={(form.end_date || "").slice(0, 10)} onChange={(v) => set("end_date", v)} testId="reference-end-date" allowFuture />
@@ -450,23 +586,67 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
   );
 }
 
-function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle }) {
+function EntryEditor({ entry, index, profiles, suggestions, onChange, onRemove }) {
+  const isSolo = entry.kind === "solo";
+  const toggleMember = (profileId) => onChange((current) => {
+    const ids = current.member_profile_ids || [];
+    if (current.kind === "solo") return { ...current, member_profile_ids: ids.includes(profileId) ? [] : [profileId] };
+    return { ...current, member_profile_ids: ids.includes(profileId) ? ids.filter((id) => id !== profileId) : [...ids, profileId] };
+  });
+  const setKind = (kind) => onChange((current) => ({
+    ...current,
+    kind,
+    team_name: kind === "team" ? (current.team_name || "THE LION SQUAD") : "",
+    member_profile_ids: kind === "solo" ? (current.member_profile_ids || []).slice(0, 1) : current.member_profile_ids,
+  }));
+  return (
+    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3" data-testid={`reference-entry-${index}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+          {isSolo ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />} Eintrag {index + 1} · {isSolo ? "Einzelstarter" : "Team"}
+        </div>
+        <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+      </div>
+      <FormGrid cols={3}>
+        <SelectField label="Art" value={entry.kind} onChange={setKind} options={KIND_OPTIONS} testId={`reference-entry-${index}-kind`} />
+        {!isSolo && <TextField label="Teamname" value={entry.team_name} onChange={(v) => onChange({ team_name: v })} suggestions={suggestions.teamNames} testId={`reference-entry-${index}-team`} className="md:col-span-2" />}
+      </FormGrid>
+      <MemberPicker
+        profiles={profiles}
+        selectedIds={entry.member_profile_ids || []}
+        frozenMembers={entry.lineup_members || []}
+        onToggle={toggleMember}
+        single={isSolo}
+        testIdPrefix={`reference-entry-${index}`}
+      />
+      <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
+      <FormGrid cols={4}>
+        <TextField label="Platz" type="number" min="1" value={entry.placement} onChange={(v) => onChange({ placement: v })} testId={`reference-entry-${index}-placement`} />
+        <TextField label="Label" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
+        <TextField label="Teilnehmer" type="number" min="1" value={entry.participant_count} onChange={(v) => onChange({ participant_count: v })} testId={`reference-entry-${index}-participants`} />
+        <TextField label="Teams" type="number" min="1" value={entry.team_count} onChange={(v) => onChange({ team_count: v })} testId={`reference-entry-${index}-teams`} />
+      </FormGrid>
+    </div>
+  );
+}
+
+function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle, single = false, testIdPrefix = "reference" }) {
   const selected = new Set(selectedIds || []);
   const sorted = [...(profiles || [])].sort((a, b) => memberName(a).localeCompare(memberName(b)));
   const missing = (frozenMembers || []).filter((member) => member.profile_id && !sorted.some((profile) => profile.id === member.profile_id));
   return (
-    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
           <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vereinsspieler</div>
-          <div className="text-xs text-white/45 mt-1">Mehrfachauswahl. Namen werden beim Speichern eingefroren, damit alte Referenzen erhalten bleiben.</div>
+          <div className="text-xs text-white/45 mt-1">{single ? "Eine Person." : "Mehrfachauswahl."} Namen werden beim Speichern eingefroren, damit alte Referenzen erhalten bleiben.</div>
         </div>
         <div className="text-xs text-[#29B6E8] font-bold">{selected.size} ausgewählt</div>
       </div>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
         {sorted.map((profile) => (
-          <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 text-sm cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#121212] text-white/65 hover:border-white/25"}`}>
-            <input type="checkbox" checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} className="accent-[#29B6E8]" />
+          <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 text-sm cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
+            <input type={single ? "radio" : "checkbox"} checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} onClick={single && selected.has(profile.id) ? () => onToggle(profile.id) : undefined} data-testid={`${testIdPrefix}-member-${profile.id}`} className="accent-[#29B6E8]" />
             <span className="min-w-0">
               <span className="block truncate font-semibold">{memberName(profile)}</span>
               {profile.is_active === false && <span className="block text-[10px] uppercase tracking-widest text-[#FFD700]">inaktiv</span>}
@@ -487,41 +667,3 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle }) {
 function memberName(profile) {
   return profile?.gamertag || profile?.display_name || profile?.real_name || profile?.linked_account?.display_name || profile?.linked_account?.username || "Unbekannt";
 }
-
-function positiveNumberOrNull(value) {
-  if (value === "" || value == null) return null;
-  const number = Number(value);
-  return Number.isFinite(number) && number >= 1 ? number : null;
-}
-
-function TitleHelper({ platforms, segments, onPlatform, onSegment }) {
-  return (
-    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-      <div className="flex flex-wrap items-start gap-4">
-        <ChipGroup label="Plattform-Tag" values={platforms} onPick={onPlatform} />
-        <ChipGroup label="Titel-Baustein" values={segments} onPick={onSegment} />
-      </div>
-      <div className="mt-2 text-[11px] text-white/40">
-        Vorschläge werden aus gespeicherten Referenzen gebildet. Neue Veranstalter, Labels oder Titel-Bausteine erscheinen nach dem Speichern automatisch wieder.
-      </div>
-    </div>
-  );
-}
-
-function ChipGroup({ label, values, onPick }) {
-  const visible = (values || []).slice(0, 10);
-  if (visible.length === 0) return null;
-  return (
-    <div className="min-w-0 flex-1">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45 mb-2">{label}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {visible.map((value) => (
-          <button key={value} type="button" onClick={() => onPick(value)} className="px-2.5 py-1 border border-white/10 bg-[#121212] text-white/70 hover:border-[#29B6E8]/70 hover:text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider">
-            {value}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-

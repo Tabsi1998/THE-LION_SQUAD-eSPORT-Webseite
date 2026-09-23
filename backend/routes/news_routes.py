@@ -782,10 +782,96 @@ def _medal_for_placement(placement: int | None) -> str | None:
     return None
 
 
+def _entry_placement(entry: dict | None) -> int | None:
+    try:
+        value = int((entry or {}).get("placement") or 0)
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 1 else None
+
+
+def _entry_from_legacy(item: dict) -> dict:
+    """Alte Referenz (eine Platzierung, ein Lineup) als ein Eintrag (#409)."""
+    members = _clean_reference_profile_ids(item.get("member_profile_ids"))
+    names = [str(name).strip() for name in (item.get("lineup") or []) if str(name or "").strip()]
+    people = len(members) + len(names)
+    return {
+        "id": f"{item.get('id') or 'ref'}-1",
+        "kind": "solo" if people == 1 and not item.get("team_name") else "team",
+        "team_name": item.get("team_name") or None,
+        "team_id": None,
+        "member_profile_ids": members,
+        "lineup": names,
+        "lineup_members": [member for member in (item.get("lineup_members") or []) if isinstance(member, dict)],
+        "placement": _entry_placement(item),
+        "placement_label": item.get("placement_label") or None,
+        "participant_count": item.get("participant_count"),
+        "team_count": item.get("team_count"),
+    }
+
+
+def _reference_entries(item: dict) -> list[dict]:
+    """Die Einträge einer Teilnahme (#409): Team oder Einzelstarter, je mit eigener Platzierung.
+    Referenzen ohne `entries` (vor #409) zählen als genau ein Eintrag."""
+    entries = item.get("entries")
+    if isinstance(entries, list) and entries:
+        return [entry for entry in entries if isinstance(entry, dict)]
+    return [_entry_from_legacy(item)]
+
+
+def _mirror_entries(doc: dict, entries: list[dict]) -> None:
+    """Spiegelt die Einträge in die alten Felder: beste Platzierung, erstes Team, alle Spieler.
+    Startseite, SEO, Sitemap und die Profil-Suche (`member_profile_ids`) lesen weiter dort."""
+    placed = [entry for entry in entries if _entry_placement(entry)]
+    best = min(placed, key=_entry_placement) if placed else (entries[0] if entries else None)
+    first_team = next((entry for entry in entries if entry.get("kind") == "team"), None)
+    seen_ids: list[str] = []
+    seen_names: list[str] = []
+    seen_members: dict[str, dict] = {}
+    for entry in entries:
+        for profile_id in entry.get("member_profile_ids") or []:
+            if profile_id not in seen_ids:
+                seen_ids.append(profile_id)
+        for name in entry.get("lineup") or []:
+            if name not in seen_names:
+                seen_names.append(name)
+        for member in entry.get("lineup_members") or []:
+            if isinstance(member, dict) and member.get("profile_id") and member["profile_id"] not in seen_members:
+                seen_members[member["profile_id"]] = member
+    doc["placement"] = _entry_placement(best)
+    doc["placement_label"] = (best or {}).get("placement_label") or None
+    doc["participant_count"] = (best or {}).get("participant_count")
+    doc["team_count"] = (best or {}).get("team_count")
+    doc["team_name"] = (first_team or {}).get("team_name") or None
+    doc["member_profile_ids"] = seen_ids
+    doc["lineup"] = seen_names
+    doc["lineup_members"] = list(seen_members.values())
+
+
+def _derive_title_fields(item: dict) -> dict:
+    """Plattform, Format, Liga, Saison und der reine Turniername aus alten Titeln wie
+    `[PS] HC | Liga X | Cup` - ein Vorschlag, solange die Felder leer sind (#409)."""
+    title = _clean_helper_value(item.get("title"))
+    platforms = _reference_title_platforms(title)
+    rest = re.sub(r"^(\[[^\]]+\]\s*)+", "", title).strip()
+    segments = [part.strip() for part in rest.split("|") if part.strip()]
+    fmt_match = re.search(r"\b(HC|CORE)\b", rest, re.I)
+    season_match = re.search(r"season\s*#?\s*(\d+)", title, re.I)
+    return {
+        "platforms": platforms,
+        "format": fmt_match.group(1).upper() if fmt_match else None,
+        "league": segments[1] if len(segments) >= 3 else None,
+        "season": f"Season {season_match.group(1)}" if season_match else None,
+        "display_title": " | ".join(segments[2:]) if len(segments) >= 3 else (rest or title),
+    }
+
+
 def _reference_summary(items: list[dict]) -> dict:
-    placements = [int(item["placement"]) for item in items if item.get("placement")]
+    entries = [entry for item in items for entry in _reference_entries(item)]
+    placements = [place for place in (_entry_placement(entry) for entry in entries) if place]
     return {
         "total": len(items),
+        "entries": len(entries),
         "active": sum(1 for item in items if (item.get("status") or "completed") == "active"),
         "planned": sum(1 for item in items if (item.get("status") or "completed") == "planned"),
         "podiums": sum(1 for place in placements if place <= 3),
@@ -794,6 +880,7 @@ def _reference_summary(items: list[dict]) -> dict:
         "bronze": sum(1 for place in placements if place == 3),
         "top10": sum(1 for place in placements if place <= 10),
         "games": len({item.get("game_id") or item.get("game_name") for item in items if item.get("game_id") or item.get("game_name")}),
+        "seasons": _unique_helper_values([item.get("season") for item in items]),
     }
 
 
@@ -807,6 +894,9 @@ REFERENCE_HELPER_DEFAULTS = {
         {"key": "PS", "label": "PlayStation"},
     ],
     "title_segments": ["HC", "CORE", "S&D 4vs4", "S&D 2vs2", "S&Z 4vs4", "S&Z 2vs2", "LIGA A", "NEWCOMER LIGA"],
+    "formats": ["HC", "CORE"],
+    "leagues": [],
+    "seasons": [],
     "organizers": [],
     "game_names": [],
     "team_names": ["THE LION SQUAD"],
@@ -855,6 +945,9 @@ def _normalize_reference_helpers(doc: dict | None) -> dict:
     return {
         "platforms": _normalize_platform_helpers(raw.get("platforms") or REFERENCE_HELPER_DEFAULTS["platforms"]),
         "title_segments": _unique_helper_values((raw.get("title_segments") or []) + REFERENCE_HELPER_DEFAULTS["title_segments"]),
+        "formats": _unique_helper_values((raw.get("formats") or []) + REFERENCE_HELPER_DEFAULTS["formats"]),
+        "leagues": _unique_helper_values(raw.get("leagues") or []),
+        "seasons": _unique_helper_values(raw.get("seasons") or []),
         "organizers": _unique_helper_values(raw.get("organizers") or []),
         "game_names": _unique_helper_values(raw.get("game_names") or []),
         "team_names": _unique_helper_values((raw.get("team_names") or []) + REFERENCE_HELPER_DEFAULTS["team_names"]),
@@ -899,18 +992,23 @@ def _platform_label(key: str, platform_helpers: list[dict]) -> str:
 
 
 def _reference_auto_helpers(items: list[dict]) -> dict:
+    derived = [_derive_title_fields(item) for item in items]
     platforms = [
         {"key": platform, "label": _platform_label(platform, REFERENCE_HELPER_DEFAULTS["platforms"])}
-        for item in items
-        for platform in _reference_title_platforms(item.get("title"))
+        for item, fields in zip(items, derived)
+        for platform in ((item.get("platforms") or []) or fields["platforms"])
     ]
+    entries = [entry for item in items for entry in _reference_entries(item)]
     return {
         "platforms": _normalize_platform_helpers(platforms),
         "title_segments": _unique_helper_values([segment for item in items for segment in _reference_title_segments(item.get("title"))]),
+        "formats": _unique_helper_values([item.get("format") or fields["format"] for item, fields in zip(items, derived)]),
+        "leagues": _unique_helper_values([item.get("league") or fields["league"] for item, fields in zip(items, derived)]),
+        "seasons": _unique_helper_values([item.get("season") or fields["season"] for item, fields in zip(items, derived)]),
         "organizers": _unique_helper_values([item.get("organizer") for item in items]),
         "game_names": _unique_helper_values([item.get("game_name") for item in items]),
-        "team_names": _unique_helper_values([item.get("team_name") for item in items]),
-        "placement_labels": _unique_helper_values([item.get("placement_label") for item in items]),
+        "team_names": _unique_helper_values([entry.get("team_name") for entry in entries]),
+        "placement_labels": _unique_helper_values([entry.get("placement_label") for entry in entries]),
         "locations": _unique_helper_values([item.get("location") for item in items]),
     }
 
@@ -929,7 +1027,8 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
     lineup_profile_ids = list({
         member.get("profile_id")
         for item in items
-        for member in (item.get("lineup_members") or [])
+        for entry in _reference_entries(item)
+        for member in (entry.get("lineup_members") or [])
         if isinstance(member, dict) and member.get("profile_id")
     })
     member_profiles_by_id = {}
@@ -961,26 +1060,42 @@ async def _enrich_references(items: list[dict]) -> list[dict]:
                 "cover_url": game.get("cover_url"),
             }
             item["game_name"] = item.get("game_name") or display_name
-        item["medal"] = _medal_for_placement(item.get("placement"))
-        platforms = _reference_title_platforms(item.get("title"))
+        # Felder statt Titel-Muster (#409): explizite Felder gewinnen, alte Titel werden zerlegt.
+        derived = _derive_title_fields(item)
+        explicit = bool(item.get("platforms") or item.get("format") or item.get("league") or item.get("season"))
+        item["platforms"] = [_clean_helper_value(p) for p in (item.get("platforms") or []) if _clean_helper_value(p)] or derived["platforms"]
+        item["format"] = item.get("format") or derived["format"]
+        item["league"] = item.get("league") or derived["league"]
+        item["season"] = item.get("season") or derived["season"]
+        item["display_title"] = _clean_helper_value(item.get("title")) if explicit else derived["display_title"]
         item["reference_meta"] = {
-            "platforms": [{"key": platform, "label": _platform_label(platform, helpers["platforms"])} for platform in platforms],
+            "platforms": [{"key": platform, "label": _platform_label(platform, helpers["platforms"])} for platform in item["platforms"]],
             "title_segments": _reference_title_segments(item.get("title")),
         }
-        item["lineup_members"] = [
-            {
+
+        def _with_profile(member: dict) -> dict:
+            profile = member_profiles_by_id.get(member.get("profile_id"), {})
+            return {
                 **member,
-                "display_name": (
-                    member_profiles_by_id.get(member.get("profile_id"), {}).get("gamertag")
-                    or member.get("display_name")
-                ),
-                "avatar_url": member_profiles_by_id.get(member.get("profile_id"), {}).get("photo_url"),
-                "profile_url": (
-                    f"/members/{member_profiles_by_id[member.get('profile_id')]['slug']}"
-                    if member_profiles_by_id.get(member.get("profile_id"), {}).get("slug")
-                    else None
-                ),
+                "display_name": profile.get("gamertag") or member.get("display_name"),
+                "avatar_url": profile.get("photo_url"),
+                "profile_url": f"/members/{profile['slug']}" if profile.get("slug") else None,
             }
+
+        entries = []
+        for entry in _reference_entries(item):
+            entries.append({
+                **entry,
+                "lineup_members": [_with_profile(member) for member in (entry.get("lineup_members") or []) if isinstance(member, dict)],
+                "medal": _medal_for_placement(_entry_placement(entry)),
+            })
+        item["entries"] = entries
+        placed = [entry for entry in entries if _entry_placement(entry)]
+        best = min(placed, key=_entry_placement) if placed else None
+        item["best_placement"] = _entry_placement(best)
+        item["medal"] = _medal_for_placement(item["best_placement"])
+        item["lineup_members"] = [
+            _with_profile(member)
             for member in (item.get("lineup_members") or [])
             if isinstance(member, dict)
         ]
@@ -1016,13 +1131,28 @@ def _reference_member_snapshot(profile: dict) -> dict:
     }
 
 
+LEGACY_ENTRY_FIELDS = ("team_name", "lineup", "member_profile_ids", "lineup_members", "placement", "placement_label", "participant_count", "team_count")
+
+
 async def _freeze_reference_members(db, doc: dict, existing: dict | None = None) -> None:
-    profile_ids = _clean_reference_profile_ids(doc.get("member_profile_ids"))
+    """Normalisiert die Einträge (#409) und friert die Vereinsspieler je Eintrag ein, damit alte
+    Referenzen ihre Namen behalten. Kommen nur die alten Felder (ein Lineup, eine Platzierung),
+    entsteht daraus ein Eintrag. Danach werden die Summen in die alten Felder gespiegelt."""
+    entries = doc.get("entries")
+    if not isinstance(entries, list) or not entries:
+        merged = {**(existing or {}), **{key: value for key, value in doc.items() if value is not None}}
+        merged.pop("entries", None)
+        entries = [_entry_from_legacy(merged)]
     previous = {
-        item.get("profile_id"): item
-        for item in ((existing or {}).get("lineup_members") or doc.get("lineup_members") or [])
-        if isinstance(item, dict) and item.get("profile_id")
+        member.get("profile_id"): member
+        for source in ([existing] if existing else [])
+        for entry in _reference_entries(source) + [source]
+        for member in (entry.get("lineup_members") or [])
+        if isinstance(member, dict) and member.get("profile_id")
     }
+    profile_ids = _clean_reference_profile_ids([
+        profile_id for entry in entries for profile_id in (entry.get("member_profile_ids") or [])
+    ])
     profiles = {}
     if profile_ids:
         profiles = {
@@ -1031,13 +1161,37 @@ async def _freeze_reference_members(db, doc: dict, existing: dict | None = None)
                 {"id": {"$in": profile_ids}}, {"_id": 0}
             ).to_list(500)
         }
-    doc["member_profile_ids"] = profile_ids
-    doc["lineup_members"] = [
-        _reference_member_snapshot(profiles[profile_id])
-        if profile_id in profiles
-        else previous.get(profile_id, {"profile_id": profile_id, "display_name": "Ehemaliges Mitglied"})
-        for profile_id in profile_ids
-    ]
+
+    def _count(value) -> int | None:
+        try:
+            number = int(value)
+        except (TypeError, ValueError):
+            return None
+        return number if number >= 1 else None
+
+    normalized = []
+    for entry in entries:
+        ids = _clean_reference_profile_ids(entry.get("member_profile_ids"))
+        normalized.append({
+            "id": _clean_helper_value(entry.get("id")) or new_id(),
+            "kind": "solo" if entry.get("kind") == "solo" else "team",
+            "team_name": _clean_helper_value(entry.get("team_name")) or None,
+            "team_id": _clean_helper_value(entry.get("team_id")) or None,
+            "member_profile_ids": ids,
+            "lineup": [str(name).strip() for name in (entry.get("lineup") or []) if str(name or "").strip()],
+            "lineup_members": [
+                _reference_member_snapshot(profiles[profile_id])
+                if profile_id in profiles
+                else previous.get(profile_id, {"profile_id": profile_id, "display_name": "Ehemaliges Mitglied"})
+                for profile_id in ids
+            ],
+            "placement": _entry_placement(entry),
+            "placement_label": _clean_helper_value(entry.get("placement_label")) or None,
+            "participant_count": _count(entry.get("participant_count")),
+            "team_count": _count(entry.get("team_count")),
+        })
+    doc["entries"] = normalized
+    _mirror_entries(doc, normalized)
 
 
 def _sort_references(items: list[dict]) -> list[dict]:
@@ -1183,16 +1337,15 @@ async def create_reference(body: ReferenceCreate, me: dict = Depends(require_are
 async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
     nullable_fields = {
-        "organizer", "game_id", "game_name", "team_name", "placement", "placement_label",
-        "participant_count", "team_count", "start_date", "end_date", "location",
+        "organizer", "league", "season", "format", "game_id", "game_name", "team_name", "placement",
+        "placement_label", "participant_count", "team_count", "start_date", "end_date", "location",
         "external_url", "bracket_url", "match_url", "result_url", "description", "highlights",
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
-    existing = None
-    if "member_profile_ids" in updates or "lineup_members" in updates:
+    if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):
         existing = await db.references.find_one({"id": rid}, {"_id": 0})
         if not existing:
             raise HTTPException(404, "Referenz nicht gefunden.")

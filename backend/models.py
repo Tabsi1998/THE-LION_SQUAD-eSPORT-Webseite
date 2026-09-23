@@ -1026,11 +1026,36 @@ ReferenceMode = Literal["online", "offline", "hybrid"]
 ReferenceStatus = Literal["planned", "active", "completed", "archived"]
 
 
+ReferenceEntryKind = Literal["team", "solo"]
+
+
+class ReferenceEntry(BaseModel):
+    """Ein Eintrag einer Turnierteilnahme (#409): entweder ein Team (Spieler treten gemeinsam an,
+    eine Platzierung) oder ein Einzelstarter mit eigener Platzierung."""
+    id: Optional[str] = None
+    kind: ReferenceEntryKind = "team"
+    team_name: Optional[str] = None
+    team_id: Optional[str] = None
+    member_profile_ids: List[str] = Field(default_factory=list)
+    lineup: List[str] = Field(default_factory=list)
+    lineup_members: List[dict] = Field(default_factory=list)
+    placement: Optional[int] = Field(default=None, ge=1)
+    placement_label: Optional[str] = None
+    participant_count: Optional[int] = Field(default=None, ge=1)
+    team_count: Optional[int] = Field(default=None, ge=1)
+
+
 class ReferenceCreate(BaseModel):
     title: str
     organizer: Optional[str] = None
+    league: Optional[str] = None
+    season: Optional[str] = None
+    format: Optional[str] = None
+    platforms: List[str] = Field(default_factory=list)
     game_id: Optional[str] = None
     game_name: Optional[str] = None
+    entries: List[ReferenceEntry] = Field(default_factory=list)
+    # Alte Felder: eine Platzierung je Referenz. Bleiben als Spiegel des besten Eintrags.
     team_name: Optional[str] = None
     lineup: List[str] = Field(default_factory=list)
     member_profile_ids: List[str] = Field(default_factory=list)
@@ -1058,8 +1083,13 @@ class ReferenceCreate(BaseModel):
 class ReferenceUpdate(BaseModel):
     title: Optional[str] = None
     organizer: Optional[str] = None
+    league: Optional[str] = None
+    season: Optional[str] = None
+    format: Optional[str] = None
+    platforms: Optional[List[str]] = None
     game_id: Optional[str] = None
     game_name: Optional[str] = None
+    entries: Optional[List[ReferenceEntry]] = None
     team_name: Optional[str] = None
     lineup: Optional[List[str]] = None
     member_profile_ids: Optional[List[str]] = None
