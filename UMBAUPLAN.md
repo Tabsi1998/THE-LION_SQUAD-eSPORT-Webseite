@@ -460,8 +460,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
-| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); offen: #408 Adminmenü, #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
+| Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum in PR #430; offen: #409 Referenzen, #401 Turnierseite + #399 Turnierbaum (Antworten vom 23.09.: Optik und Runde-für-Runde am Handy, Setzplätze leer) |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
 | Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223, #231 offen; dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
@@ -651,6 +651,33 @@ Dieselbe Komponente an allen Stellen (TV-Ansichten, Mitgliedskarte, Downloads), 
 
 **Drucken ohne Umweg.** Unter Downloads & QR gibt es je Ziel PNG (1024 px) und SVG mit
 eingebettetem Logo, dazu die festen Ziele „Website“ und „Kalender“ für Flyer und Plakate.
+
+### Was 46.4 gefunden hat (#425 – PR #427)
+
+**Die Rückmeldung nach dem ersten Wurf.** „Auszeichnungen“ in der Zahlen-Leiste sagte nichts –
+gemeint sind die Turnierteilnahmen des Vereins (die Referenzen). Die Zahlen sollen beim Scrollen
+hochzählen, schnell anlaufen und langsam auslaufen; wer „Bewegung reduzieren“ gesetzt hat, sieht
+sofort den Endwert. Der Hero braucht keine Knöpfe: Community, Discord und Turniere oben weg, die
+leise Zeile „Mitglied wird, wer sich einbringt“ bleibt. Discord gehört als offizieller Knopf in
+den Footer, Google Play als offizieller Badge – der erst erscheint, wenn im Branding ein
+Play-Store-Link steht (Googles Regel: nur mit Link zum öffentlichen Eintrag).
+
+### Was 46.5 gefunden hat (#426 – PR #428)
+
+**Am PC sah jede Seite aus wie am Handy.** Der Inhalt saß in einem festen Container von 1280 px
+(49 Stellen), auf einem breiten Monitor blieb die Hälfte leer, Kartenraster endeten bei drei
+Spalten. Ein Hebel in der Tailwind-Konfiguration hebt den Container auf 1792 px – alle Seiten
+ziehen mit, Lesetexte behalten ihre Lesebreite –, ab 1536 px kommt eine Spalte dazu, das
+Admin-Layout wird 1800 px breit. Ein Playwright-Spec misst die Kopfzeile bei 1366, 1920 und
+2560 px und prüft, dass nichts horizontal scrollt.
+
+### Was 46.6 gefunden hat (#408 – PR #429)
+
+**Den Verein pflegen hieß, an drei Stellen suchen.** Sponsoren und Partner unter „Verein“,
+Vorstand und Finanzen unter „Mitglieder“, die Vereinsdaten als sechster Reiter unter „System →
+Einstellungen“. Jetzt bündelt „Verein“ Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen
+und die Kontakt-Inbox; „Finanzen“ ist eine eigene Gruppe; „Downloads & QR“ liegt bei Content.
+Rechte je Eintrag und alle Links bleiben unverändert – nur die Einordnung ändert sich.
 
 ## Block 45 — App 1.0.0, Teil 4: Events in der App wie im Web
 

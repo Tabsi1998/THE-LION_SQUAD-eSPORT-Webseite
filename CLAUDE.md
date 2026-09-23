@@ -216,6 +216,38 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Adminmenü umgruppiert (#408; PR #429; nur Web). `AdminLayout.ADMIN_GROUPS`
+  (jetzt exportiert): Übersicht / Verein (Vereinsdaten →
+  `/admin/settings?tab=legal`, Vorstand, Sponsoren, Partner, Referenzen,
+  Kontakt-Inbox) / Mitglieder / Finanzen (Finanzübersicht, Dolibarr-Anbindung)
+  / eSports / Content (+ Downloads & QR) / System. `ADMIN_SEARCH_TERMS` +3
+  Wege. Rechte je Eintrag unverändert. Tests `AdminLayout.test.jsx` (3); E2E
+  `admin-navigation.spec.js` zählt 41 Einträge in 7 Gruppen.
+- Layout am PC (#426; PR #428; nur Web). Befund des Betreibers: jede Seite ein
+  1280-px-Streifen auf dem Monitor. `tailwind.config.js`
+  `theme.extend.maxWidth['7xl'] = '112rem'` (1792 px) – ein Hebel für alle 49
+  `max-w-7xl`-Container; `2xl:grid-cols-4` (Events, News, Turniere, Teams,
+  Mitglieder), `2xl:grid-cols-5` (Galerie, Spieler, Sponsoren Silber),
+  `2xl:grid-cols-6` (Sponsoren Bronze); `AdminLayout` main `max-w-[1800px]`.
+  E2E `layout-widths.spec.js` (nur Desktop-Projekt; 1366/1920/2560: Kopfzeile
+  ≥ min(Breite − 80, 1792), kein horizontales Scrollen auf /, /events,
+  /tournaments, /news; Screenshots als Anhang).
+- Startseite II (#425; PR #427; Backend + Web). Rückmeldung des Betreibers:
+  `club_numbers.participations` = `db.references.count_documents({})` statt
+  `awards`; Branding `play_store_url` (Settings-Modell, `/settings/public`,
+  Admin → Branding `brand-play-store-url`, leer bis der Eintrag öffentlich
+  ist). Web `hooks/useCountUp.js` (`easeOutExpo`, `canAnimateNumbers`:
+  matchMedia + rAF, nicht bei „Bewegung reduzieren“; IntersectionObserver
+  startet beim Sichtbarwerden), `HomePage` `NumberTile` (Mitglieder /
+  Veranstaltete Turniere / Veranstaltete Events / Turnierteilnahmen), Hero
+  ohne Knöpfe (`hero-join` bleibt), `AppStrip` `home-play-badge` /
+  `home-play-soon`; `lib/siteFooter.footerButtons(settings)` (Discord nur mit
+  https-Link, Badge nur mit `play.google.com`-Link, `PLAY_BADGE_SRC`
+  `/assets/brand/google-play-badge-de.png` = Googles offizielle Datei),
+  `PublicLayout` `footer-buttons` (`footer-discord-button` Blurple mit
+  `SOCIAL_ICONS.discord`, `footer-play-badge` / `footer-play-soon`). Tests
+  `useCountUp.test.js` (2), `siteFooter.test.js` +1, `HomePage.test.jsx`,
+  `test_home_numbers_flow.py` (participations).
 - QR-Code mit Löwe (#400; PR #424; kein Build). Antwort des Betreibers: das
   bestehende Logo als PNG unter Branding → „QR-Logo“ (`qr_logo_url`, gab es
   schon; Uploader nimmt kein SVG), eine Komponente für alle Stellen,
@@ -1416,21 +1448,28 @@ im gelöschten Basis-Zweig, Inhalt mit dem Doku-Stand danach nachgeholt) und
 Datenschutzerklärung aus den echten Schaltern; `update.sh`), #404 (Doku-Stand),
 #411 (#396 + #397 Events in der App: Kosten, Teilnehmer, Check-in; `update.sh`),
 #413 (#402 Kalender auf der Website mit Abo-Feed; `update.sh`) und #418 (#414
-Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418). `main`
-steht auf `c572c95`.
+Melden/Blockieren in der App; Build 76 am 23.09. aus #411 + #418), #420
+(Doku-Stand), #422 (#403 + #407 Footer und Startseite; `update.sh`), #423
+(#421 App-Update je Installationsquelle; Build 77 am 23.09.; `update.sh`),
+#424 (#400 QR mit Löwe), #427 (#425 Startseite II; `update.sh`), #428 (#426
+Layout am PC) und #429 (#408 Adminmenü). `main` steht auf `6861b19`.
 
 ### Offene PRs
-- #424 (#400 QR mit Löwe; nur Web; auf `main` nach #423). **Neue Regel
-  (23.09. abends):** Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht
-  mehr an – die Doku (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt
-  gebündelt im Doku-Stand-PR nach dem Merge; so gibt es die Konflikte
-  zwischen parallelen PRs nicht mehr. Danach Web: Design II weiter (#425
-  Startseite II, #408, #409, #401 + #399 mit den Antworten des Betreibers vom
-  23.09.); Play Console ruht auf Wunsch
-  des Betreibers, bis alles fertig ist; #412 (Play-Upload per API) wartet auf
-  die Identitätsbestätigung des Entwicklerkontos; Moderation II (#415–#417,
-  Meilenstein 28, Variante C) nach App 1.0.0. Nach #411, #413 und #398 beim
-  Betreiber: `update.sh`, dann Einstellungen →
+- #430 (#399 Turnierbaum neu: Linien, Knoten, Durchgänge, Runde für Runde,
+  „Dein nächstes Spiel“; nur Web; bereit). **Regel seit 23.09. abends:**
+  Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
+  (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
+  Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
+  PRs nicht mehr. Danach: #401 Turnierseite (Reiter auf einer Seite, „Dein
+  Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
+  #409 Referenzen-Rework (Datenmodell: Teilnahme mit Einträgen Team/Einzel,
+  Kommentar an #409), dann Dolibarr III (#405, #406, #326 Teil 2, #410) und
+  Moderation II (#415–#417, Meilenstein 28, Variante C) nach App 1.0.0; Play
+  Console ruht auf Wunsch des Betreibers, bis alles fertig ist; #412
+  (Play-Upload per API) wartet auf die Identitätsbestätigung des
+  Entwicklerkontos. Beim Betreiber offen: `update.sh` nach #422, #423 und
+  #427 (Backend: `club_numbers`, Server-Updater-Schalter, Branding
+  `play_store_url`); nach #398: Einstellungen →
   Rechtliches → „Jetzt nachlesen“ → Haken „Vereinsdaten aus Dolibarr
   übernehmen“; den Crashlytics-Absatz aus den Zusatz-Datenschutzhinweisen
   entfernen (steht jetzt fest im Abschnitt LionsAPP).
@@ -1489,7 +1528,11 @@ steht auf `c572c95`.
   beginnt mit `1272baeb`, AAB auf dem Desktop des Betreibers; #396/#397 Events
   in der App + #414 Melden/Blockieren – das Bundle, mit dem die
   Inhaltseinstufung auf „Blockieren/Melden = Ja“ gestellt werden kann), am
-  Vereinsserver abgelegt. Nächster Build ist 77.
+  Vereinsserver abgelegt, **Build 77** (`mobile-v0.17.0-beta-build77`, Commit
+  87583d3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `664355a5`,
+  AAB-SHA-256 beginnt mit `21cfce31`, AAB auf dem Desktop des Betreibers; #421
+  Play-Update je Installationsquelle, `expo-in-app-updates`), am Vereinsserver
+  abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
 - `update.sh` nach #332, falls noch nicht geschehen. Danach gilt: Club-Admins
@@ -1517,9 +1560,12 @@ steht auf `c572c95`.
   (`1D:10:7A:DD…BA:26`, Seite „Mit Google Play geschützt“ → „Play
   App-Signatur verwalten“) ist mit #394 in `assetlinks.json` und
   `DEFAULT_APK_KEY_HASHES` eingetragen – nach `update.sh` gehen Passkeys auch
-  in der Play-Version. Noch offen beim Betreiber: Build 76 (AAB auf dem
-  Desktop) in den internen Test laden, danach Inhaltseinstufung „Blockieren“
-  und „Melden“ auf Ja; Testkonto `playtest` (normales Konto, keine
+  in der Play-Version. Noch offen beim Betreiber (Play Console ruht auf seinen
+  Wunsch, bis alles fertig ist): Build 77 (AAB auf dem Desktop, Build 76
+  ebenso) in den internen Test laden, danach Inhaltseinstufung „Blockieren“
+  und „Melden“ auf Ja; sobald der Eintrag öffentlich ist: Branding →
+  „Play-Store-Link“ eintragen (Badge in Footer und Startseite) und Admin →
+  App-Versionen → „Server-Updater anbieten“ aus; Testkonto `playtest` (normales Konto, keine
   Zwei-Faktor, **aktives Mitglied**, damit die Prüfer den Mitgliederbereich
   sehen) anlegen und unter App-Zugriff eintragen (Text auf Englisch, siehe
   Chat vom 23.09.); „App einrichten“ nach der Tabelle vom 23.09. abends
