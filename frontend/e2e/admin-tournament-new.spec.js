@@ -118,6 +118,20 @@ test("Texte und Bilder halten den Einstieg nicht auf", async ({ page }) => {
   await expect(page.getByTestId("new-tr-slug")).toBeVisible();
 });
 
+test("am PC stehen die Zeiten rechts neben dem Turnier, die Speichern-Leiste bleibt ohne Scrollen sichtbar", async ({ page, isMobile }) => {
+  // Formular-Rahmen (#434): ab 1280 px zwei Spalten, die Leiste klebt unten.
+  test.skip(isMobile, "nur am PC");
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await openForm(page);
+
+  const main = await page.getByTestId("admin-form-main").boundingBox();
+  const aside = await page.getByTestId("admin-form-aside").boundingBox();
+  expect(aside.x).toBeGreaterThanOrEqual(main.x + main.width - 1);
+  expect(aside.width).toBeGreaterThanOrEqual(320);
+  await expect(page.getByTestId("new-tr-submit")).toBeInViewport();
+  await expect(page.getByTestId("new-tr-start")).toBeVisible();
+});
+
 test("das Formular bleibt am Telefon ohne Querlauf bedienbar", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openForm(page);

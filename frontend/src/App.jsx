@@ -93,7 +93,9 @@ const AdminGamesPage = lazy(() => import("@/pages/admin/AdminGamesPage"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/AdminUsersPage"));
 const AdminStationsPage = lazy(() => import("@/pages/admin/AdminStationsPage"));
 const AdminEventsPage = lazy(() => import("@/pages/admin/AdminEventsPage"));
+const AdminEventEditPage = lazy(() => import("@/pages/admin/AdminEventEditPage"));
 const AdminNewsPage = lazy(() => import("@/pages/admin/AdminNewsPage"));
+const AdminNewsEditPage = lazy(() => import("@/pages/admin/AdminNewsEditPage"));
 const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
 const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
 const AdminLogsPage = lazy(() => import("@/pages/admin/AdminLogsPage"));
@@ -269,7 +271,12 @@ function App() {
           <Route path="/admin/users" element={<ProtectedRoute requireArea="club"><AdminUsersPage /></ProtectedRoute>} />
           <Route path="/admin/stations" element={<ProtectedRoute requireModerator><AdminStationsPage /></ProtectedRoute>} />
           <Route path="/admin/events" element={<ProtectedRoute requireArea="tournaments"><AdminEventsPage /></ProtectedRoute>} />
+          {/* Event und Beitrag als eigene Seite mit URL statt Fenster über der Liste (#434). */}
+          <Route path="/admin/events/new" element={<ProtectedRoute requireArea="tournaments"><AdminEventEditPage /></ProtectedRoute>} />
+          <Route path="/admin/events/:id" element={<ProtectedRoute requireArea="tournaments"><AdminEventEditPage /></ProtectedRoute>} />
           <Route path="/admin/news" element={<ProtectedRoute requireArea="content"><AdminNewsPage /></ProtectedRoute>} />
+          <Route path="/admin/news/new" element={<ProtectedRoute requireArea="content"><AdminNewsEditPage /></ProtectedRoute>} />
+          <Route path="/admin/news/:id" element={<ProtectedRoute requireArea="content"><AdminNewsEditPage /></ProtectedRoute>} />
           <Route path="/admin/gallery" element={<ProtectedRoute requireArea="content"><AdminGalleryPage /></ProtectedRoute>} />
           <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />

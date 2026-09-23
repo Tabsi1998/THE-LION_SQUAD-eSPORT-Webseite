@@ -60,11 +60,6 @@
       "count": 2
     }
   },
-  "src/pages/admin/AdminF1NewPage.jsx": {
-    "jsx-a11y/label-has-associated-control": {
-      "count": 3
-    }
-  },
   "src/pages/admin/AdminGalleryPage.jsx": {
     "jsx-a11y/click-events-have-key-events": {
       "count": 2
