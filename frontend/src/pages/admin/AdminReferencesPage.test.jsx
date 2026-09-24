@@ -112,3 +112,15 @@ test("Bearbeiten übernimmt die abgeleiteten Felder und den Eintrag der alten Re
   expect(payload.platforms).toEqual(["PS"]);
   expect(payload.entries).toEqual([expect.objectContaining({ id: "e1", kind: "team", member_profile_ids: ["p1", "p2"], lineup: ["Gast"], placement: 2 })]);
 });
+
+test("Partner II (#469): der Partner-Haken an der Referenz geht als partner_ids mit", async () => {
+  mockApi([LEGACY_ITEM]);
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/partners" ? { data: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] } : base(url)));
+  render(<MemoryRouter><AdminReferencesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("reference-edit-r1"));
+  fireEvent.click(await screen.findByTestId("reference-partner-p1"));
+  fireEvent.submit(screen.getByTestId("reference-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1].partner_ids).toEqual(["p1"]);
+});

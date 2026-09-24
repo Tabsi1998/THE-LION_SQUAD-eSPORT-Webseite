@@ -1089,6 +1089,7 @@ class ReferenceCreate(BaseModel):
     season: Optional[str] = None
     format: Optional[str] = None
     platforms: List[str] = Field(default_factory=list)
+    partner_ids: List[str] = Field(default_factory=list)  # Partner II (#469): Partnerverein als Veranstalter oder Mitwirkender
     game_id: Optional[str] = None
     game_name: Optional[str] = None
     entries: List[ReferenceEntry] = Field(default_factory=list)
@@ -1124,6 +1125,7 @@ class ReferenceUpdate(BaseModel):
     season: Optional[str] = None
     format: Optional[str] = None
     platforms: Optional[List[str]] = None
+    partner_ids: Optional[List[str]] = None
     game_id: Optional[str] = None
     game_name: Optional[str] = None
     entries: Optional[List[ReferenceEntry]] = None

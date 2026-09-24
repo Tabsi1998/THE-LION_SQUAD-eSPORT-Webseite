@@ -277,8 +277,32 @@ async def attach_partners(db, item: dict) -> None:
     item["partners"] = [by_id[item_id] for item_id in ids if item_id in by_id]
 
 
+async def attach_partners_many(db, items: list[dict]) -> None:
+    """`partners` an viele Einträge hängen - eine Abfrage für alle."""
+    ids = list({item_id for item in items for item_id in (item.get("partner_ids") or []) if item_id})
+    by_id: dict[str, dict] = {}
+    if ids:
+        rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "kind": 1}).to_list(len(ids))
+        by_id = {row["id"]: partner_badge(row) for row in rows}
+    for item in items:
+        item["partners"] = [by_id[item_id] for item_id in (item.get("partner_ids") or []) if item_id in by_id]
+
+
+def _reference_summary_for_partner(ref: dict, partner_id: str) -> dict:
+    game = ref.get("game") or {}
+    return {
+        "id": ref.get("id"), "title": ref.get("display_title") or ref.get("title"), "organizer": ref.get("organizer"),
+        "league": ref.get("league"), "season": ref.get("season"), "start_date": ref.get("start_date"), "status": ref.get("status"),
+        "placement": ref.get("best_placement") if ref.get("best_placement") is not None else ref.get("placement"),
+        "medal": ref.get("medal"), "game_name": game.get("display_name") or game.get("name") or ref.get("game_name"),
+        "matched_by": "partner" if partner_id in (ref.get("partner_ids") or []) else "organizer",
+    }
+
+
 async def shared_for_partner(db, partner_id: str, *, user: dict | None) -> dict:
-    """Events und Turniere mit diesem Partner - nur, was die Person sehen darf; Entwürfe nie."""
+    """Events, Turniere und Referenzen mit diesem Partner - nur, was die Person sehen darf; Entwürfe nie.
+    Referenzen (echte Teilnahmen des Vereins, #469 Teil 3) gehören per Haken zum Partner - oder weil er
+    als Veranstalter eingetragen ist, ganz ohne Haken."""
     from services.visibility import user_can_see
 
     events = []
@@ -301,4 +325,14 @@ async def shared_for_partner(db, partner_id: str, *, user: dict | None) -> dict:
     games = {g["id"]: g for g in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(len(game_ids))} if game_ids else {}
     for tournament in tournaments:
         tournament["game"] = games.get(tournament.pop("game_id", None))
-    return {"events": events, "tournaments": tournaments}
+    partner = await db.partners.find_one({"id": partner_id}, {"_id": 0, "name": 1})
+    name = str((partner or {}).get("name") or "").strip()
+    ref_query: dict = {"is_active": {"$ne": False}, "$or": [{"partner_ids": partner_id}]}
+    if len(name) >= 3:
+        ref_query["$or"].append({"organizer": {"$regex": re.escape(name), "$options": "i"}})
+    from routes.news_routes import _enrich_references, _filter_visible
+
+    ref_rows = await db.references.find(ref_query, {"_id": 0}).to_list(200)
+    ref_rows = await _enrich_references(await _filter_visible(ref_rows, user))
+    references = sorted((_reference_summary_for_partner(ref, partner_id) for ref in ref_rows), key=lambda r: str(r.get("start_date") or ""), reverse=True)
+    return {"events": events, "tournaments": tournaments, "references": references}

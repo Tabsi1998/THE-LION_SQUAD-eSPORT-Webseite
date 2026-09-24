@@ -226,3 +226,25 @@ async def test_partners_at_events_and_tournaments_show_up_on_both_sides(flow):
     assert [e["slug"] for e in shared["events"]] == [event["slug"]]
     assert [t["slug"] for t in shared["tournaments"]] == [tournament["slug"]]
     assert shared["tournaments"][0]["game"]["name"] == "Teamfight Tactics"
+
+
+@pytest.mark.asyncio
+async def test_references_belong_to_the_partner_by_tick_or_organizer(flow):
+    """Teil 3: eine Referenz gehört zum Partner per Haken oder weil er als Veranstalter steht; nicht-öffentliche
+    Referenzen sieht ein Gast auch auf der Partnerseite nicht; die Referenz selbst nennt den Partner."""
+    admin = await flow.add_user(role="superadmin", name="Admin")
+    flow.act_as(admin)
+    partner = (await flow.post("/api/partners", json={"name": "PineApps eSports"})).json()
+    entry = [{"kind": "solo", "placement": 2, "lineup": ["Anni"]}]
+    ticked = (await flow.post("/api/references", json={"title": "TFT Cup", "organizer": "ESL", "start_date": "2026-05-01", "partner_ids": [partner["id"], "gibtsnicht"], "entries": entry})).json()
+    assert ticked["partner_ids"] == [partner["id"]] and [p["slug"] for p in ticked["partners"]] == ["pineapps-esports"]
+    by_name = (await flow.post("/api/references", json={"title": "PineApps Open", "organizer": "PineApps eSports", "start_date": "2026-06-01", "entries": entry})).json()
+    assert by_name["partner_ids"] == [] and by_name["partners"] == []
+    await flow.post("/api/references", json={"title": "Intern", "organizer": "PineApps eSports", "visibility": "members", "entries": entry})
+    await flow.post("/api/references", json={"title": "Anderes", "organizer": "ESL", "entries": entry})
+
+    flow.act_as(None)
+    listed = (await flow.get("/api/references")).json()["items"]
+    assert [p["name"] for p in next(item for item in listed if item["id"] == ticked["id"])["partners"]] == ["PineApps eSports"]
+    shared = (await flow.get("/api/partners/pineapps-esports")).json()["shared"]
+    assert [(r["title"], r["matched_by"], r["placement"]) for r in shared["references"]] == [("PineApps Open", "organizer", 2), ("TFT Cup", "partner", 2)]
