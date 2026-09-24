@@ -10,11 +10,16 @@ export function channelColor(kind) {
 
 export function ChannelIcon({ kind, className = "w-4 h-4" }) {
   const key = String(kind || "").toLowerCase();
-  const icon = key !== "website" && key !== "custom" ? SOCIAL_ICONS[key] : null;
+  const icon = SOCIAL_ICONS[key];
   if (!icon) return <Globe className={className} aria-hidden="true" />;
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d={icon.path} />
-    </svg>
-  );
+  // Markenpfad, wo es einen gibt - sonst das lucide-Symbol der Plattform (Threads, Bluesky, Telegram …).
+  if (icon.path && key !== "custom") {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d={icon.path} />
+      </svg>
+    );
+  }
+  const Icon = icon.Icon || Globe;
+  return <Icon className={className} aria-hidden="true" />;
 }

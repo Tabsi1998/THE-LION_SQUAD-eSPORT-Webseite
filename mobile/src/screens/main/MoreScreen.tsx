@@ -67,16 +67,31 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
   },
 ];
 
+// Dieselben Plattform-Schlüssel wie im Web (frontend/src/lib/socialIcons.js).
 const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   discord: "logo-discord",
   whatsapp: "logo-whatsapp",
+  telegram: "paper-plane-outline",
   facebook: "logo-facebook",
   instagram: "logo-instagram",
+  threads: "at-outline",
   tiktok: "logo-tiktok",
   youtube: "logo-youtube",
   twitch: "logo-twitch",
+  kick: "videocam-outline",
   twitter: "logo-twitter",
   x: "logo-twitter",
+  bluesky: "cloud-outline",
+  mastodon: "logo-mastodon",
+  linkedin: "logo-linkedin",
+  reddit: "logo-reddit",
+  steam: "logo-steam",
+  github: "logo-github",
+  snapchat: "logo-snapchat",
+  pinterest: "logo-pinterest",
+  vimeo: "logo-vimeo",
+  spotify: "musical-notes-outline",
+  email: "mail-outline",
   website: "globe-outline",
 };
 

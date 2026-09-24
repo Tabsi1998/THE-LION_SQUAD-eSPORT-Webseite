@@ -93,3 +93,12 @@ test("unten bei der Version steht „Was ist neu“ und öffnet die Karte", asyn
   await fireEvent.press(screen.getByTestId("more-whats-new"));
   expect(mockOpenWhatsNew).toHaveBeenCalledTimes(1);
 });
+
+// Dieselben Plattformen wie im Web: jeder Schlüssel aus der Auswahl hat ein Symbol, Unbekanntes den Kettenlink.
+test("socialIcon kennt X, Threads, Bluesky, Mastodon, Telegram, Kick, LinkedIn, Steam", () => {
+  for (const key of ["x", "threads", "bluesky", "mastodon", "telegram", "kick", "linkedin", "steam", "github", "email"]) {
+    expect(socialIcon(key)).not.toBe("link-outline");
+  }
+  expect(socialIcon("X")).toBe("logo-twitter");
+  expect(socialIcon("gibt-es-nicht")).toBe("link-outline");
+});

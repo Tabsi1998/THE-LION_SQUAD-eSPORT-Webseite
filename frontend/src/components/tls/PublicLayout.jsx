@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { SOCIAL_ICONS } from "@/lib/socialIcons";
+import { SOCIAL_ICONS, socialIconFor } from "@/lib/socialIcons";
+import { ChannelIcon } from "@/components/tls/ChannelIcon";
 import { useAuth } from "@/context/AuthContext";
 import { accountLinksFor } from "@/pages/user/profile/constants";
 import { Logo } from "@/components/tls/Logo";
@@ -249,7 +250,7 @@ export function PublicLayout({ children }) {
               <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
                 {socialLinks.map((social, index) => (
                   <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d={social.path} /></svg>
+                    <ChannelIcon kind={social.platform} className="w-4 h-4" />
                   </a>
                 ))}
               </div>
@@ -401,8 +402,8 @@ function getFooterSocialLinks(branding, twitchUrl) {
     .filter((social) => social?.enabled !== false && social?.url)
     .map((social) => {
       const platform = String(social.platform || "custom").toLowerCase();
-      const icon = SOCIAL_ICONS[platform] || SOCIAL_ICONS.custom;
-      return { ...icon, ...social, platform, label: social.label || platform };
+      const icon = socialIconFor(platform);
+      return { color: icon.color, hoverClass: icon.hoverClass, ...social, platform, label: social.label || platform };
     });
 }
 

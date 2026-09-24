@@ -1,5 +1,9 @@
-// Symbole der Kanäle - Footer (Socials des Vereins) und Partnerseiten (#469) nehmen dieselben
-// Pfade und Farben. `custom` ist der Kettenlink für alles Unbekannte.
+import { AtSign, Cloud, Gamepad2, Ghost, Github, Globe, Hash, Link2, Linkedin, Mail, MessageSquare, Music, Pin, Radio, Send, Video } from "lucide-react";
+
+// Symbole der Kanäle - Footer (Socials des Vereins), Partnerseiten (#469), die Auswahl unter
+// Einstellungen → Socials und die App nehmen dieselben Schlüssel und Farben. Wo es einen eigenen
+// Markenpfad gibt, steht er hier (`path`); die übrigen Plattformen bekommen ein Symbol aus lucide
+// (`Icon`) in ihrer Markenfarbe. `custom` ist der Kettenlink für alles Unbekannte.
 export const SOCIAL_ICONS = {
   discord: {
     color: "#5865F2", hoverClass: "hover:border-[#5865F2] hover:text-[#5865F2]",
@@ -15,5 +19,59 @@ export const SOCIAL_ICONS = {
   youtube: { color: "#FF0000", hoverClass: "hover:border-[#FF0000] hover:text-[#FF0000]", path: "M23.498 6.186a3.016 3.016 0 00-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 00.502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 002.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 002.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" },
   twitch: { color: "#9146FF", hoverClass: "hover:border-[#9146FF] hover:text-[#9146FF]", path: "M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z" },
   x: { color: "#FFFFFF", hoverClass: "hover:border-white hover:text-white", path: "M18.244 2h3.308l-7.227 8.26L22.827 22h-6.657l-5.214-6.817L4.99 22H1.68l7.73-8.835L1.254 2h6.826l4.713 6.231Zm-1.161 17.93h1.833L7.084 3.963H5.117Z" },
-  custom: { color: "#29B6E8", hoverClass: "hover:border-[#29B6E8] hover:text-[#29B6E8]", path: "M10.59 13.41a1.996 1.996 0 010-2.82l3.59-3.59a2 2 0 112.83 2.83l-1.24 1.24h2.67l.69-.69a4 4 0 00-5.66-5.66l-3.59 3.59a4 4 0 000 5.66 1 1 0 001.41-1.41zM13.41 10.59a1.996 1.996 0 010 2.82l-3.59 3.59a2 2 0 11-2.83-2.83l1.24-1.24H5.56l-.69.69a4 4 0 005.66 5.66l3.59-3.59a4 4 0 000-5.66 1 1 0 00-1.41 1.41z" },
+  threads: { color: "#FFFFFF", hoverClass: "hover:border-white hover:text-white", Icon: AtSign },
+  bluesky: { color: "#0085FF", hoverClass: "hover:border-[#0085FF] hover:text-[#0085FF]", Icon: Cloud },
+  mastodon: { color: "#6364FF", hoverClass: "hover:border-[#6364FF] hover:text-[#6364FF]", Icon: Hash },
+  telegram: { color: "#26A5E4", hoverClass: "hover:border-[#26A5E4] hover:text-[#26A5E4]", Icon: Send },
+  kick: { color: "#53FC18", hoverClass: "hover:border-[#53FC18] hover:text-[#53FC18]", Icon: Radio },
+  linkedin: { color: "#0A66C2", hoverClass: "hover:border-[#0A66C2] hover:text-[#0A66C2]", Icon: Linkedin },
+  reddit: { color: "#FF4500", hoverClass: "hover:border-[#FF4500] hover:text-[#FF4500]", Icon: MessageSquare },
+  steam: { color: "#66C0F4", hoverClass: "hover:border-[#66C0F4] hover:text-[#66C0F4]", Icon: Gamepad2 },
+  github: { color: "#FFFFFF", hoverClass: "hover:border-white hover:text-white", Icon: Github },
+  snapchat: { color: "#FFFC00", hoverClass: "hover:border-[#FFFC00] hover:text-[#FFFC00]", Icon: Ghost },
+  pinterest: { color: "#E60023", hoverClass: "hover:border-[#E60023] hover:text-[#E60023]", Icon: Pin },
+  vimeo: { color: "#1AB7EA", hoverClass: "hover:border-[#1AB7EA] hover:text-[#1AB7EA]", Icon: Video },
+  spotify: { color: "#1DB954", hoverClass: "hover:border-[#1DB954] hover:text-[#1DB954]", Icon: Music },
+  website: { color: "#29B6E8", hoverClass: "hover:border-[#29B6E8] hover:text-[#29B6E8]", Icon: Globe },
+  email: { color: "#29B6E8", hoverClass: "hover:border-[#29B6E8] hover:text-[#29B6E8]", Icon: Mail },
+  custom: { color: "#29B6E8", hoverClass: "hover:border-[#29B6E8] hover:text-[#29B6E8]", Icon: Link2, path: "M10.59 13.41a1.996 1.996 0 010-2.82l3.59-3.59a2 2 0 112.83 2.83l-1.24 1.24h2.67l.69-.69a4 4 0 00-5.66-5.66l-3.59 3.59a4 4 0 000 5.66 1 1 0 001.41-1.41zM13.41 10.59a1.996 1.996 0 010 2.82l-3.59 3.59a2 2 0 11-2.83-2.83l1.24-1.24H5.56l-.69.69a4 4 0 005.66 5.66l3.59-3.59a4 4 0 000-5.66 1 1 0 00-1.41 1.41z" },
 };
+
+// Die Auswahl unter Einstellungen → Socials, in der Reihenfolge, wie Vereine sie brauchen. Der Betreiber
+// (25.09.): „die Social Links sind sehr begrenzt … X fehlt“ - deshalb hier alles, was ein Verein hat.
+export const SOCIAL_PLATFORMS = [
+  ["discord", "Discord"],
+  ["whatsapp", "WhatsApp Kanal"],
+  ["telegram", "Telegram"],
+  ["facebook", "Facebook"],
+  ["instagram", "Instagram"],
+  ["threads", "Threads"],
+  ["x", "X (Twitter)"],
+  ["bluesky", "Bluesky"],
+  ["mastodon", "Mastodon"],
+  ["tiktok", "TikTok"],
+  ["youtube", "YouTube"],
+  ["twitch", "Twitch"],
+  ["kick", "Kick"],
+  ["linkedin", "LinkedIn"],
+  ["reddit", "Reddit"],
+  ["steam", "Steam"],
+  ["github", "GitHub"],
+  ["snapchat", "Snapchat"],
+  ["pinterest", "Pinterest"],
+  ["vimeo", "Vimeo"],
+  ["spotify", "Spotify"],
+  ["email", "E-Mail (mailto:)"],
+  ["website", "Website"],
+  ["custom", "Eigener Link"],
+];
+
+export function socialPlatformLabel(key) {
+  const hit = SOCIAL_PLATFORMS.find(([platform]) => platform === String(key || "").toLowerCase());
+  return hit ? hit[1] : String(key || "Link");
+}
+
+// Ein Symbol je Plattform: Markenpfad, sonst lucide - nie „kaputt“ für eine Plattform aus der Liste.
+export function socialIconFor(key) {
+  return SOCIAL_ICONS[String(key || "").toLowerCase()] || SOCIAL_ICONS.custom;
+}
