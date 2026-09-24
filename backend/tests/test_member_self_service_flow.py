@@ -196,9 +196,10 @@ async def test_member_keeps_own_website_profile_and_the_directory_follows(flow, 
     profile = await flow.db.club_member_profiles.find_one({"user_id": paula["id"]}, {"_id": 0})
     assert profile["gamertag"] == "Rocket League" and [row["code"] for row in profile["extra_fields"]] == ["gamertag", "streamer", "dabei_seit"]
 
-    # Ohne Bindung: Grund statt Formular.
+    # Ohne Bindung und ohne bestätigte Zuordnung (seit #531 reicht die Zuordnung ab Modul 1.4.0): Grund statt Formular.
     flow.act_as(paula)
     fake.revoke_identity(paula["id"])
+    await flow.db.dolibarr_links.delete_many({"user_id": paula["id"]})
     view = (await flow.get("/api/membership/me/website-profile")).json()
     assert view["available"] is False and view["reason"] == "not_bound"
     assert (await flow.put("/api/membership/me/website-profile", json={"fields": {"gamertag": "x"}})).status_code == 403

@@ -377,6 +377,7 @@ das Modul ausliefert (festgehalten in `backend/tests/contracts/manifest.json`):
 | Rechnungen mit PDF (Dolibarr II) | |
 | Vereinsdaten, Vorstand, Statuten (Rechtliches II, ab Vereine 0.11) | |
 | persönlicher Zugriff und Dokumente aus der Vereinsakte (ab Vereine 0.11) | |
+| Vereinsakte über die Mitgliedsnummer statt Einladungscode, eigene Rechnungen über die Bindung, PDF-Prüfsummen (ab Vereine 1.4.0) | |
 
 Bis #154 da ist, bemerkt die Website ein **gelöschtes** Mitglied erst beim
 täglichen vollständigen Lauf – und liest vor dem Austragen jedes fehlende
@@ -392,6 +393,7 @@ Mitglied einzeln nach.
   API-Beschreibung des Moduls; das Test-Dolibarr (`tests/dolibarr_fake.py`)
   prüft jede seiner Antworten dagegen. Das Modul prüft seine echten Antworten
   in Dolibarr 22, 23 und 24 gegen dieselbe Datei. Bei einer neuen Modulversion:
-  Datei und `manifest.json` ersetzen, Tests laufen lassen.
+  Datei und `manifest.json` ersetzen, Tests laufen lassen. Festgehalten ist
+  Vereine **1.4.0** (Tag `v1.4.0`, Commit `a249918`).
 - Keine produktiven Schlüssel oder Personendaten in Tests; nie gegen die
   Produktion testen.

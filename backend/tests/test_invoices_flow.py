@@ -217,3 +217,41 @@ async def test_unlinking_and_anonymisation_forget_the_invoice_state(flow, fake):
     flow.act_as(paula)
     assert (await flow.get("/api/account/invoices")).json()["connected"] is False
     assert (await flow.get("/api/account/invoices/d-31/pdf")).status_code == 404
+
+
+# ---------------------------------------------------------------- Über die Bindung (Vereine 1.4.0, #324)
+
+@pytest.mark.asyncio
+async def test_a_bound_account_without_link_sees_its_invoices_through_the_binding(flow, fake):
+    """Kein bestätigtes Konto ↔ Mitglied, aber ein Einladungscode mit Fähigkeit „Rechnungen“: die Belege
+    kommen über GET /vereine/me/invoices; ohne die Fähigkeit gibt es nichts, eine manipulierte Datei auch nicht."""
+    from services import dolibarr_identity
+    dolibarr_identity.reset_cache()
+    await connect(flow)
+    fake.add(member(12))
+    fake.add_invoice(12, invoice(31, status="open"))
+    fake.add_invoice(12, invoice(30, status="paid", date="2026-06-01"))
+    fake.add(member(13))
+    fake.add_invoice(13, invoice(900, status="overdue"))
+    fake.invite("RECHNUNG", 12, capabilities=("documents", "invoices"))
+    fake.invite("NUR-DOKU", 13, capabilities=("documents",))
+
+    paula = await flow.add_user(role="player", name="paula")
+    flow.act_as(paula)
+    assert (await flow.post("/api/membership/me/identity", json={"code": "RECHNUNG"})).json()["status"] == "bound"
+    data = (await flow.get("/api/account/invoices")).json()
+    assert data["connected"] is True and data["available"] is True and data["member"] is True
+    assert [row["key"] for row in data["invoices"]] == ["d-31", "d-30"]
+    assert any(path == "/vereine/me/invoices" and params.get("subject") == paula["id"] for path, params in fake.calls)
+    pdf = await flow.get("/api/account/invoices/d-31/pdf")
+    assert pdf.status_code == 200 and pdf.content == fake.pdf_bytes(31)
+    assert pdf.headers["x-content-sha256"] == hashlib.sha256(fake.pdf_bytes(31)).hexdigest()
+    assert (await flow.get("/api/account/invoices/d-900/pdf")).status_code == 404, "fremder Beleg: 404 wie unbekannt"
+    fake.tampered_invoice_ids.add(30)
+    assert (await flow.get("/api/account/invoices/d-30/pdf")).status_code in (502, 503), "Datei passt nicht zur Prüfsumme"
+
+    # Ohne die Fähigkeit „Rechnungen“ auf der Bindung: nichts, nicht einmal ein Fehler.
+    max_ = await flow.add_user(role="player", name="max")
+    flow.act_as(max_)
+    assert (await flow.post("/api/membership/me/identity", json={"code": "NUR-DOKU"})).json()["capabilities"] == ["documents"]
+    assert (await flow.get("/api/account/invoices")).json()["connected"] is False
