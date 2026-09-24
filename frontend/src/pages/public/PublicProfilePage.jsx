@@ -166,10 +166,10 @@ function publicSocialLinks(profile, twitchUrl) {
   const links = [
     profile.discord_name && { platform: "discord", label: "Discord", value: profile.discord_name, verified: isVerified(profile, "discord") },
     twitchUrl && { platform: "twitch", label: "Twitch", value: normalizeTwitchChannel(profile.twitch_handle), url: twitchUrl, verified: isVerified(profile, "twitch") },
-    profile.youtube_handle && { platform: "youtube", label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
+    profile.youtube_handle && { platform: "youtube", label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle), verified: isVerified(profile, "youtube") },
     profile.instagram_handle && { platform: "instagram", label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
-    profile.tiktok_handle && { platform: "tiktok", label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle) },
-    profile.x_handle && { platform: "x", label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle) },
+    profile.tiktok_handle && { platform: "tiktok", label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle), verified: isVerified(profile, "tiktok") },
+    profile.x_handle && { platform: "x", label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle), verified: isVerified(profile, "x") },
     profile.website && { platform: "website", label: "Website", value: profile.website, url: externalUrl(profile.website) },
   ].filter(Boolean);
 
@@ -198,6 +198,10 @@ function socialMeta(link) {
   if (platform.includes("tiktok")) return { key: "tiktok", label: "TikTok", color: "#69C9D0" };
   if (platform === "x" || platform.includes("twitter")) return { key: "x", label: "X", color: "#FFFFFF" };
   if (platform.includes("steam")) return { key: "steam", label: "Steam", color: "#66C0F4" };
+  if (platform.includes("battle")) return { key: "battlenet", label: "Battle.net", color: "#148EFF" };
+  if (platform.includes("riot")) return { key: "riot", label: "Riot Games", color: "#D13639" };
+  if (platform.includes("xbox")) return { key: "xbox", label: "Xbox", color: "#107C10" };
+  if (platform.includes("epic")) return { key: "epic", label: "Epic Games", color: "#C8C8C8" };
   if (platform.includes("website") || platform.includes("web")) return { key: "website", label: "Website", color: "#29B6E8" };
   return { key: "website", label: link.label || "Link", color: "#29B6E8" };
 }
@@ -210,6 +214,10 @@ function SocialIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "tiktok") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1Z" /></svg>;
   if (kind === "x") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2h3.308l-7.227 8.26L22.827 22h-6.657l-5.214-6.817L4.99 22H1.68l7.73-8.835L1.254 2h6.826l4.713 6.231Zm-1.161 17.93h1.833L7.084 3.963H5.117Z" /></svg>;
   if (kind === "steam") return <Gamepad2 className={className} />;
+  if (kind === "battlenet") return <AtSign className={className} />;
+  if (kind === "riot") return <Zap className={className} />;
+  if (kind === "xbox") return <Gamepad2 className={className} />;
+  if (kind === "epic") return <Flag className={className} />;
   return <Globe className={className} />;
 }
 
@@ -221,13 +229,13 @@ function isVerified(profile, platform) {
 function publicGamingIds(profile) {
   return [
     profile.steam_id && { label: "Steam", value: profile.steam_id, url: socialUrl("steam", profile.steam_id), verified: isVerified(profile, "steam") },
-    profile.epic_id && { label: "Epic", value: profile.epic_id },
+    profile.epic_id && { label: "Epic", value: profile.epic_id, verified: isVerified(profile, "epic") },
     profile.psn_id && { label: "PSN", value: profile.psn_id },
-    profile.xbox_id && { label: "Xbox", value: profile.xbox_id },
+    profile.xbox_id && { label: "Xbox", value: profile.xbox_id, url: `https://www.xbox.com/play/user/${encodeURIComponent(profile.xbox_id)}`, verified: isVerified(profile, "xbox") },
     profile.nintendo_fc && { label: "Nintendo", value: profile.nintendo_fc },
     profile.ea_id && { label: "EA", value: profile.ea_id },
-    profile.riot_id && { label: "Riot", value: profile.riot_id },
-    profile.battlenet_id && { label: "Battle.net", value: profile.battlenet_id },
+    profile.riot_id && { label: "Riot", value: profile.riot_id, verified: isVerified(profile, "riot") },
+    profile.battlenet_id && { label: "Battle.net", value: profile.battlenet_id, verified: isVerified(profile, "battlenet") },
   ].filter(Boolean);
 }
 

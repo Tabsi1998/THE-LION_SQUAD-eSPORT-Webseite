@@ -578,7 +578,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
             "internal_role": membership.get("internal_role"),
             "member_number": membership.get("member_number") if membership.get("show_member_number_publicly") else None,
         }
-    from services.platform_links import verified_platforms
+    from services.platform_links import PLATFORMS as LINK_PLATFORMS, verified_platforms
     # Base profile (always visible)
     base = {
         "id": u["id"],
@@ -614,7 +614,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "user_type": "club_member" if is_member else "community_user",
         "membership": public_member,
         # Verknüpfte Konten (#260): das Häkchen, nie die Plattform-Kennung.
-        "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, {"discord": "discord", "twitch": "twitch", "steam": "steam"}[p], public, ctx)],
+        "verified_platforms": [p for p in verified_platforms(u) if _field_visible(u, LINK_PLATFORMS[p]["visibility"], public, ctx)],
     }
     # Die verknüpften Konten mit offizieller Adresse - nur die Plattformen, deren Feld sichtbar ist.
     from services.platform_links import linked_accounts

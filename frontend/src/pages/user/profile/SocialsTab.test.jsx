@@ -34,7 +34,11 @@ test("verknüpft: Feld gesperrt, verifiziert, Trennen; unverknüpft: Verknüpfen
   expect(screen.getByTestId("profile-steam-link")).toBeEnabled();
   await user.click(screen.getByTestId("profile-steam-link"));
   expect(props.onLink).toHaveBeenCalledWith("steam");
-  expect(screen.queryByTestId("profile-epic-link")).not.toBeInTheDocument();
+  // Alle OAuth-Plattformen haben einen Knopf; was keine Anmeldung bietet, sagt warum.
+  expect(screen.getByTestId("profile-epic-link")).toBeDisabled();
+  expect(screen.getByTestId("profile-battlenet-link")).toBeDisabled();
+  expect(screen.getByTestId("profile-psn-not-linkable")).toHaveTextContent("PlayStation bietet keine Anmeldung");
+  expect(screen.queryByTestId("profile-psn-link")).not.toBeInTheDocument();
   expect(screen.getByTestId("profile-links-hint")).toHaveTextContent("Discord-Kennung und Nutzername; Twitch-Kennung, Login und Anzeigename; SteamID64");
 });
 

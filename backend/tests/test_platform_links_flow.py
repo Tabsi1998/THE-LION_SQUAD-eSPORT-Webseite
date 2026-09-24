@@ -1,5 +1,6 @@
 """Plattform-Konten verknüpfen (#260): Discord und Twitch per OAuth2, Steam per OpenID - das Feld
 wird befüllt und „verifiziert“; ein Konto gehört einem Nutzer; Handänderung nimmt das Häkchen."""
+import json
 import pathlib
 import sys
 from urllib.parse import parse_qs, urlparse
@@ -39,6 +40,11 @@ class FakePlatforms:
     def transport(self):
         return httpx.MockTransport(self.handle)
 
+    @staticmethod
+    def basic(client_id: str, secret: str) -> str:
+        import base64
+        return "Basic " + base64.b64encode(f"{client_id}:{secret}".encode()).decode()
+
     def handle(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url).split("?")[0]
         body = request.content.decode("utf-8") if request.content else ""
@@ -66,6 +72,42 @@ class FakePlatforms:
         if url == platform_links.TWITCH_USERS:
             assert request.headers.get("Client-Id") == "twitch-app" and request.headers.get("Authorization") == "Bearer t-token"
             return httpx.Response(200, json={"data": [self.twitch_user]})
+        if url == platform_links.BATTLENET_TOKEN:
+            return httpx.Response(200, json={"access_token": "bn"}) if request.headers.get("Authorization") == self.basic("battlenet-app", "battlenet-geheim") else httpx.Response(401, json={"error": "unauthorized"})
+        if url == platform_links.BATTLENET_USERINFO:
+            return httpx.Response(200, json={"id": 4711, "battletag": "Paula#1234"})
+        if url == platform_links.X_TOKEN:
+            assert form.get("grant_type") == "authorization_code" and form.get("code_verifier"), "X braucht PKCE"
+            return httpx.Response(200, json={"access_token": "x"}) if request.headers.get("Authorization") == self.basic("x-app", "x-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.X_APP_TOKEN:
+            return httpx.Response(200, json={"access_token": "x-app"}) if request.headers.get("Authorization") == self.basic("x-app", "x-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.X_ME:
+            return httpx.Response(200, json={"data": {"id": "77", "username": "paula_x", "name": "Paula"}})
+        if url == platform_links.GOOGLE_TOKEN:
+            return httpx.Response(200, json={"access_token": "g"}) if form.get("client_secret") == "youtube-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.YOUTUBE_CHANNELS:
+            return httpx.Response(200, json={"items": [{"id": "UC1", "snippet": {"title": "Paula plays", "customUrl": "@paulaplays"}}]})
+        if url == platform_links.TIKTOK_TOKEN:
+            return httpx.Response(200, json={"access_token": "tt"}) if form.get("client_secret") == "tiktok-geheim" and form.get("client_key") == "tiktok-app" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.TIKTOK_USERINFO:
+            return httpx.Response(200, json={"data": {"user": {"open_id": "o-1", "display_name": "Paula", "username": "paula.tt"}}})
+        if url == platform_links.RIOT_TOKEN:
+            return httpx.Response(200, json={"access_token": "r"}) if request.headers.get("Authorization") == self.basic("riot-app", "riot-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.RIOT_ACCOUNT_ME:
+            return httpx.Response(200, json={"puuid": "p-1", "gameName": "Paula", "tagLine": "EUW"})
+        if url == platform_links.MS_TOKEN:
+            return httpx.Response(200, json={"access_token": "ms"}) if form.get("client_secret") == "xbox-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.XBL_AUTH:
+            payload = json.loads(body)
+            assert payload["Properties"]["RpsTicket"] == "d=ms"
+            return httpx.Response(200, json={"Token": "xbl", "DisplayClaims": {"xui": [{"uhs": "u"}]}})
+        if url == platform_links.XSTS_AUTH:
+            assert json.loads(body)["Properties"]["UserTokens"] == ["xbl"]
+            return httpx.Response(200, json={"Token": "xsts", "DisplayClaims": {"xui": [{"xid": "9", "gtg": "PaulaGT", "uhs": "u"}]}})
+        if url == platform_links.EPIC_TOKEN:
+            return httpx.Response(200, json={"access_token": "e"}) if request.headers.get("Authorization") == self.basic("epic-app", "epic-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.EPIC_USERINFO:
+            return httpx.Response(200, json={"sub": "e-1", "preferred_username": "PaulaEpic"})
         if url == platform_links.STEAM_OPENID:
             assert form.get("openid.mode") == "check_authentication"
             return httpx.Response(200, text="ns:http://specs.openid.net/auth/2.0\nis_valid:true\n" if self.steam_valid else "is_valid:false\n")
@@ -89,10 +131,19 @@ def fake(monkeypatch):
     return instance
 
 
+MORE_APPS = {
+    "battlenet_client_id": "battlenet-app", "battlenet_client_secret": "battlenet-geheim", "x_client_id": "x-app", "x_client_secret": "x-geheim",
+    "youtube_client_id": "youtube-app", "youtube_client_secret": "youtube-geheim", "tiktok_client_key": "tiktok-app", "tiktok_client_secret": "tiktok-geheim",
+    "riot_client_id": "riot-app", "riot_client_secret": "riot-geheim", "xbox_client_id": "xbox-app", "xbox_client_secret": "xbox-geheim",
+    "epic_client_id": "epic-app", "epic_client_secret": "epic-geheim",
+}
+
+
 async def configure(flow, **extra):
+    more = {key: (encrypt_secret(value) if key.endswith("_secret") else value) for key, value in MORE_APPS.items()}
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {
         "id": "branding", "discord_client_id": "discord-app", "discord_client_secret": encrypt_secret("discord-geheim"),
-        "twitch_client_id": "twitch-app", "twitch_client_secret": encrypt_secret("twitch-geheim"), **extra,
+        "twitch_client_id": "twitch-app", "twitch_client_secret": encrypt_secret("twitch-geheim"), **more, **extra,
     }}, upsert=True)
 
 
@@ -123,10 +174,11 @@ async def test_start_needs_a_configured_app_and_signs_the_state(flow):
     paula = await person(flow, "paula")
     flow.act_as(paula)
     overview = (await flow.get("/api/me/platform-links")).json()
-    assert overview["available"] == {"discord": False, "twitch": False, "steam": True}
+    assert overview["available"]["steam"] is True and all(value is False for key, value in overview["available"].items() if key != "steam")
+    assert set(overview["available"]) == set(platform_links.PLATFORMS)
     assert overview["platforms"]["discord"]["field"] == "discord_name" and "Discord-Kennung" in overview["platforms"]["discord"]["delivers"]
     assert (await flow.post("/api/me/platform-links/discord/start")).status_code == 409
-    assert (await flow.post("/api/me/platform-links/xbox/start")).status_code == 404
+    assert (await flow.post("/api/me/platform-links/psn/start")).status_code == 404
 
     await configure(flow)
     url = (await flow.post("/api/me/platform-links/discord/start")).json()["url"]
@@ -315,4 +367,63 @@ async def test_admin_check_names_what_is_missing(flow, fake):
     steam = (await flow.post("/api/settings/platform-links/steam/check")).json()
     assert steam["ok"] is True and steam["checks"][1]["state"] == "warn"
     assert await flow.db.audit_logs.count_documents({"action": "platform_link.checked"}) == 6
+
+
+EXPECTED_LINKS = {
+    "battlenet": ("Paula#1234", "battlenet_id", ""),
+    "x": ("paula_x", "x_handle", "https://x.com/paula_x"),
+    "youtube": ("paulaplays", "youtube_handle", "https://www.youtube.com/@paulaplays"),
+    "tiktok": ("paula.tt", "tiktok_handle", "https://www.tiktok.com/@paula.tt"),
+    "riot": ("Paula#EUW", "riot_id", ""),
+    "xbox": ("PaulaGT", "xbox_id", "https://www.xbox.com/play/user/PaulaGT"),
+    "epic": ("PaulaEpic", "epic_id", ""),
+}
+
+
+@pytest.mark.asyncio
+async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
+    """Battle.net, X (mit PKCE), YouTube, TikTok, Riot, Xbox (drei Schritte) und Epic: Start, Rückruf, Feld, Häkchen, offizielle Adresse."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    for platform, (handle, field, url) in EXPECTED_LINKS.items():
+        flow.act_as(paula)
+        start = (await flow.post(f"/api/me/platform-links/{platform}/start")).json()["url"]
+        if platform == "x":
+            assert "code_challenge=" in start and "code_challenge_method=S256" in start
+        state = state_of(start)
+        flow.act_as(None)
+        landed = target(await flow.get(f"/api/platform-links/{platform}/callback?code=gut&state={state}"))
+        assert landed == {"tab": "socials", "linked": platform}, (platform, landed)
+        user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
+        assert user[field] == handle and user["platform_verified"][platform] is True, platform
+    flow.act_as(paula)
+    listing = {row["platform"]: row for row in (await flow.get("/api/me/platform-links")).json()["links"]}
+    assert set(listing) == set(EXPECTED_LINKS) and all("external_id" not in row for row in listing.values())
+    for platform, (_handle, _field, url) in EXPECTED_LINKS.items():
+        assert listing[platform]["url"] == url, platform
+    public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
+    assert set(public["verified_platforms"]) == set(EXPECTED_LINKS)
+    accounts = {row["platform"]: row for row in public["linked_accounts"]}
+    assert accounts["xbox"]["display_name"] == "PaulaGT" and accounts["riot"]["handle"] == "Paula#EUW" and accounts["youtube"]["url"] == "https://www.youtube.com/@paulaplays"
+
+    # Von Hand geändert: das Häkchen fällt - auch bei den neuen Plattformen.
+    flow.act_as(paula)
+    assert (await flow.patch("/api/users/me", json={"x_handle": "anders"})).status_code == 200
+    assert "x" not in (await flow.get(f"/api/users/public/{paula['username']}")).json()["verified_platforms"]
+
+    # Falsches Secret: die Prüfung im Admin sagt es; die Verknüpfung scheitert sauber.
+    chef = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(chef)
+    good = (await flow.post("/api/settings/platform-links/battlenet/check")).json()
+    assert good["checks"][0]["state"] == "ok" and good["checks"][1]["key"] == "redirect"
+    riot = (await flow.post("/api/settings/platform-links/riot/check")).json()
+    assert riot["checks"][0]["state"] == "warn" and "echten Verknüpfung" in riot["checks"][0]["text"]
+    await configure(flow, epic_client_secret=encrypt_secret("falsch"))
+    bad = (await flow.post("/api/settings/platform-links/epic/check")).json()
+    assert bad["ok"] is False and bad["checks"][0]["state"] == "fail"
+    flow.act_as(paula)
+    state = state_of((await flow.post("/api/me/platform-links/epic/start")).json()["url"])
+    flow.act_as(None)
+    failed = target(await flow.get(f"/api/platform-links/epic/callback?code=gut&state={state}"))
+    assert failed["link_error"] == "exchange_failed" and failed["link_detail"] == "token 401"
 

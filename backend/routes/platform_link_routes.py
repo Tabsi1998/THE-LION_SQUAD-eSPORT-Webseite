@@ -71,11 +71,12 @@ async def platform_link_callback(platform: str, request: Request):
     query = dict(request.query_params)
     db = get_db()
     try:
-        user_id = platform_links.read_state(query.get("state"), platform)
+        state_payload = platform_links.read_state_payload(query.get("state"), platform)
+        user_id = str(state_payload["sub"])
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "is_active": 1})
         if not user or user.get("is_active") is False:
             raise LinkError("invalid", "Konto nicht gefunden")
-        identity = await platform_links.fetch_identity(platform, await _branding(db), query)
+        identity = await platform_links.fetch_identity(platform, await _branding(db), query, state_payload=state_payload)
         link = await platform_links.link_account(db, user_id, platform, identity)
     except LinkError as exc:
         # Im Log steht, woran es lag (Einrichtung, Plattform, Sitzung) - und die Person liest den Grund im Profil.

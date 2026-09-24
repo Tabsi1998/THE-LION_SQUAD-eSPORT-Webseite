@@ -130,6 +130,28 @@ class BrandingSettings(BaseModel):
     clear_discord_client_secret: Optional[bool] = None
     steam_api_key: Optional[str] = None
     clear_steam_api_key: Optional[bool] = None
+    # Weitere Plattformen zum Verknüpfen (#260 II): je App Client ID + Secret, Secret verschlüsselt.
+    battlenet_client_id: Optional[str] = None
+    battlenet_client_secret: Optional[str] = None
+    clear_battlenet_client_secret: Optional[bool] = None
+    x_client_id: Optional[str] = None
+    x_client_secret: Optional[str] = None
+    clear_x_client_secret: Optional[bool] = None
+    youtube_client_id: Optional[str] = None
+    youtube_client_secret: Optional[str] = None
+    clear_youtube_client_secret: Optional[bool] = None
+    tiktok_client_key: Optional[str] = None
+    tiktok_client_secret: Optional[str] = None
+    clear_tiktok_client_secret: Optional[bool] = None
+    riot_client_id: Optional[str] = None
+    riot_client_secret: Optional[str] = None
+    clear_riot_client_secret: Optional[bool] = None
+    xbox_client_id: Optional[str] = None
+    xbox_client_secret: Optional[str] = None
+    clear_xbox_client_secret: Optional[bool] = None
+    epic_client_id: Optional[str] = None
+    epic_client_secret: Optional[str] = None
+    clear_epic_client_secret: Optional[bool] = None
     site_banner_enabled: Optional[bool] = None
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
@@ -270,9 +292,10 @@ class AuthSettings(BaseModel):
     google_client_id: Optional[str] = None
 
 
-SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key"}
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key",
+                               "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret"}
 # Geheimnisse der Branding-Einstellungen: nie zurückgeben, nur „gespeichert“ melden (#260 dazu: Discord, Steam).
-BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key")
+BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key", "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret")
 
 
 def _hide_branding_secrets(settings: dict) -> dict:
