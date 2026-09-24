@@ -272,6 +272,16 @@ nächsten Abruf: die Website merkt sich „widerrufen“, das Mitglied sieht wie
 kann mit einem neuen Code neu verbinden. E-Mail-Adresse, Mitgliedsnummer oder die bestätigte
 Zuordnung der Website ersetzen den Code nie – so will es das Modul, und so bleibt es.
 
+**Eigene Daten und Austritt (#329 Teil 2):** Trägt die Einladung auch die Fähigkeit **„eigene
+Daten“**, zeigt *Meine Mitgliedschaft* den Kasten „Meine Daten“ aus der Vereinsakte: Anschrift,
+Telefon, Mobil und E-Mail lassen sich ändern (Name und Geburtsdatum nicht). Felder, die der Verein
+im Modul als „sofort“ führt (in der Regel Telefon und Mobil), sind gleich übernommen; alles andere
+und jede neue E-Mail-Adresse prüft der Vorstand in Dolibarr – der Stand jeder Einreichung steht
+darunter. Hat sich der Datensatz in Dolibarr inzwischen geändert, wird nichts still überschrieben,
+die Person lädt neu. Der Austritt geht mit heutigem Eingang ein; den letzten Tag der Mitgliedschaft
+ergibt eure Kündigungsregel im Modul – ein früheres Wunschdatum wird nicht übernommen, ein späteres
+schon. Einmal erklärt, lässt er sich auf der Website nicht zurücknehmen (das macht der Vorstand).
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
