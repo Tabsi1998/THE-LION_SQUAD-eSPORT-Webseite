@@ -43,7 +43,7 @@ test("TikTok: Stand, Felder, Rückrufadresse, Anleitung offen - Speichern schick
   renderAt("/admin/integrations/tiktok");
   expect(await screen.findByTestId("integration-title")).toHaveTextContent("TikTok");
   await waitFor(() => expect(screen.getByTestId("integration-title")).toHaveTextContent("Optional"));
-  expect(screen.getByTestId("setup-guide-tiktok")).toHaveAttribute("open");
+  expect(screen.getByTestId("setup-guide-tiktok")).not.toHaveAttribute("open");
   expect(screen.getByTestId("integration-app")).toHaveTextContent(`${window.location.origin}/api/platform-links/tiktok/callback`);
 
   fireEvent.change(screen.getByTestId("tiktok-client-key"), { target: { value: "aw123" } });

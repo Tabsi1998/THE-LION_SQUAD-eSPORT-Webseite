@@ -112,7 +112,8 @@ export default function AdminIntegrationPage() {
         {integration.key === "discord" && <div data-testid="integration-settings"><DiscordSettings /></div>}
         {integration.key === "twitch" && <div data-testid="integration-settings"><TwitchSettings /></div>}
         <div className="space-y-3" data-testid="integration-guides">
-          {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open />)}
+          {/* Aufklappbar (#511): die Felder stehen oben, die Anleitung steht im FAQ unter Einrichtung genauso. */}
+          {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open={false} />)}
         </div>
         <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/10 text-[11px] font-bold uppercase tracking-wider">
           {previous ? <Link to={`/admin/integrations/${previous.key}`} data-testid="integration-prev" className="inline-flex items-center gap-1 text-white/50 hover:text-white"><ArrowLeft className="w-3 h-3" /> {previous.label}</Link> : <span />}
