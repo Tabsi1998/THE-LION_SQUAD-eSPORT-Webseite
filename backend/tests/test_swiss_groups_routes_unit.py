@@ -135,12 +135,12 @@ def test_existing_graph_matches_decide_even_without_a_stage():
     assert run(_competition_engine(db, "t1")) == "graph"
 
 
-def test_classic_matches_do_not_pull_a_tournament_into_the_graph():
-    """Ein laufendes Turnier darf nicht den Speicher wechseln - auch jetzt nicht,
-    wo jedes Format auf den Graph zeigt."""
+def test_rows_in_the_old_store_no_longer_count():
+    """Der klassische Speicher wird nicht mehr gelesen (#231): liegt dort noch etwas, zählt es nicht -
+    das Turnier folgt seinem Format und landet im Graph."""
     db = FakeDb(matches=[{"id": "m1", "tournament_id": "t1"}])
 
-    assert run(_competition_engine(db, "t1", {"format": "single_elim"})) == "classic"
+    assert run(_competition_engine(db, "t1", {"format": "single_elim"})) == "graph"
 
 
 # ---------------------------------------------------------------- Schweizer Runden
