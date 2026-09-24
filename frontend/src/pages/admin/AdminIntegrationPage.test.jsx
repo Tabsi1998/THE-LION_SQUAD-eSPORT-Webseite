@@ -2,8 +2,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Verbindungen: je Dienst eine eigene Seite - TikTok zeigt Stand, Felder, Rückrufadresse, „prüfen“
-// und die Anleitung aufgeklappt; Speichern schickt nur die eigenen Felder; E-Mail hat keine App,
-// aber zwei Anleitungen und den Weg zum Reiter.
+// und die Anleitung aufgeklappt; Speichern schickt nur die eigenen Felder; E-Mail hat keine eigene
+// Seite mehr, sondern führt direkt auf den Reiter mit den Feldern (#508).
 
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
@@ -59,15 +59,22 @@ test("TikTok: Stand, Felder, Rückrufadresse, Anleitung offen - Speichern schick
   expect(screen.getByTestId("integration-prev")).toHaveTextContent("YouTube");
 });
 
-test("E-Mail-Versand: keine App, zwei Anleitungen und der Weg zum Reiter", async () => {
+test("E-Mail-Versand, Google-Login, Analytics, Google Play und Dolibarr führen direkt auf ihren Reiter - keine Seite, die nur verlinkt (#508)", async () => {
   mockApi();
-  renderAt("/admin/integrations/mail");
-  expect(await screen.findByTestId("integration-title")).toHaveTextContent("E-Mail-Versand");
-  expect(screen.queryByTestId("integration-app")).toBeNull();
-  expect(screen.getByTestId("setup-guide-resend")).toBeInTheDocument();
-  expect(screen.getByTestId("setup-guide-smtp")).toBeInTheDocument();
-  expect(screen.getByTestId("integration-tab-link")).toHaveAttribute("href", "/admin/settings?tab=email");
-  await waitFor(() => expect(screen.getByTestId("integration-title")).toHaveTextContent("Fehlt"));
+  for (const [key, target] of [["mail", "/admin/settings?tab=email"], ["google", "/admin/settings?tab=auth"], ["analytics", "/admin/settings?tab=seo"], ["play", "/admin/settings?tab=brand"], ["dolibarr", "/admin/dolibarr?tab=connection"]]) {
+    const { unmount } = render(
+      <MemoryRouter initialEntries={[`/admin/integrations/${key}`]}>
+        <Routes>
+          <Route path="/admin/integrations/:key" element={<AdminIntegrationPage />} />
+          <Route path="/admin/settings" element={<div data-testid="settings-page" />} />
+          <Route path="/admin/dolibarr" element={<div data-testid="dolibarr-page" />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByTestId(target.startsWith("/admin/dolibarr") ? "dolibarr-page" : "settings-page")).toBeInTheDocument();
+    expect(screen.queryByTestId("integration-title")).toBeNull();
+    unmount();
+  }
 });
 
 test("unbekannte Verbindung führt zur Einrichtung", async () => {

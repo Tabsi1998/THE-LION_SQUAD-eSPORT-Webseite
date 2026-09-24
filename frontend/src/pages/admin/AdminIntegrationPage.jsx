@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SetupGuide, StatusChip } from "@/components/tls/SetupGuide";
 import { PlatformAppCard } from "@/pages/admin/settings/PlatformLinkSettings";
@@ -13,8 +13,9 @@ import { INTEGRATIONS, integrationApp, integrationByKey, integrationStatus } fro
 // Verbindungen (Wunsch des Betreibers, 24.09.): je Dienst eine eigene Seite - Stand, Zugangsdaten
 // (Client ID + Secret, bei Plattformen zum Verknüpfen), Rückrufadresse, „prüfen“ und die Anleitung
 // aufgeklappt. Discord und Twitch haben ihre laufenden Einstellungen (Webhooks, Bot, Zähler bzw.
-// Vereinskanal und Live-Erkennung) seit 24.09. nur noch hier („muss das doppelt sein?“); die
-// übrigen Dienste verlinken auf ihren Reiter in den Einstellungen.
+// Vereinskanal und Live-Erkennung) seit 24.09. nur noch hier („muss das doppelt sein?“). Dienste, deren
+// Felder auf einem Reiter liegen (E-Mail, Google-Login, Analytics, Google Play, Dolibarr), haben seit #508
+// keine eigene Seite mehr: die Adresse leitet auf den Reiter um - keine Seite, die nur verlinkt.
 
 const REQUESTS = [
   ["branding", "/settings/branding"], ["discord", "/settings/discord"], ["auth", "/settings/auth"],
@@ -74,6 +75,8 @@ export default function AdminIntegrationPage() {
     }
   };
 
+  if (integration?.tab) return <Navigate to={integration.tab} replace />;
+
   if (!integration) {
     return (
       <AdminLayout>
@@ -94,7 +97,6 @@ export default function AdminIntegrationPage() {
           </h1>
           <p className="text-sm text-white/55 mt-2 max-w-3xl">
             Alles zu {integration.label} an einer Stelle: Stand, Zugangsdaten, Rückrufadresse, Prüfung und die Anleitung Schritt für Schritt.
-            {integration.tab ? <> Die laufenden Einstellungen ({integration.tabLabel}) stehen im Reiter <Link to={integration.tab} data-testid="integration-tab-link" className="text-[#29B6E8] hover:text-white">{integration.tabLabel}</Link>.</> : null}
           </p>
         </div>
         <Link to="/admin/setup" className="text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-white inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Alle Verbindungen</Link>
@@ -112,11 +114,6 @@ export default function AdminIntegrationPage() {
         <div className="space-y-3" data-testid="integration-guides">
           {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open />)}
         </div>
-        {integration.tab && (
-          <Link to={integration.tab} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/80 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
-            <ExternalLink className="w-3.5 h-3.5" /> Zu den Einstellungen: {integration.tabLabel}
-          </Link>
-        )}
         <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/10 text-[11px] font-bold uppercase tracking-wider">
           {previous ? <Link to={`/admin/integrations/${previous.key}`} data-testid="integration-prev" className="inline-flex items-center gap-1 text-white/50 hover:text-white"><ArrowLeft className="w-3 h-3" /> {previous.label}</Link> : <span />}
           {following ? <Link to={`/admin/integrations/${following.key}`} data-testid="integration-next" className="inline-flex items-center gap-1 text-white/50 hover:text-white">{following.label} <ArrowRight className="w-3 h-3" /></Link> : <span />}

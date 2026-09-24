@@ -14,7 +14,12 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
   // Je Dienst ein Eintrag (Wunsch des Betreibers) - TikTok, Discord, Twitch und die anderen.
   const labels = group("Verbindungen").items.map((item) => item.label);
   expect(labels).toEqual(expect.arrayContaining(["Discord", "Twitch", "TikTok", "Steam", "Google-Login", "E-Mail-Versand", "Dolibarr"]));
-  expect(group("Verbindungen").items.every((item) => item.to.startsWith("/admin/integrations/") && item.areas.includes("system"))).toBe(true);
+  // Dienste mit eigener Seite führen dorthin; E-Mail, Google-Login, Analytics, Google Play und Dolibarr direkt auf ihren Reiter (#508).
+  expect(group("Verbindungen").items.every((item) => item.areas.includes("system"))).toBe(true);
+  expect(group("Verbindungen").items.filter((item) => !item.to.startsWith("/admin/integrations/")).map((item) => [item.label, item.to])).toEqual([
+    ["Google-Login", "/admin/settings?tab=auth"], ["E-Mail-Versand", "/admin/settings?tab=email"], ["Analytics & Suchmaschinen", "/admin/settings?tab=seo"],
+    ["Google Play", "/admin/settings?tab=brand"], ["Dolibarr", "/admin/dolibarr?tab=connection"],
+  ]);
 });
 
 test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Referenzen und Kontakt-Inbox", () => {
