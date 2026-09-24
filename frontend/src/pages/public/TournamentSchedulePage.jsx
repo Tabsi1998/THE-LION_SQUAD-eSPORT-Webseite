@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { CalendarClock, ChevronLeft, ChevronRight } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { api } from "@/lib/api";
@@ -189,6 +190,7 @@ export default function TournamentSchedulePage() {
         <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Zurück zum Turnier</Link>
         <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
         <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Heats, Zeiten und öffentlichen Matchseiten für Terminabstimmung, Chat und Ergebnisstatus.</p>
+        <TournamentTabs tournament={tournament} accessToken={accessToken} className="mt-5" />
 
         {currentWeek ? (
           <div className="mt-10" data-testid="matchday-pager">

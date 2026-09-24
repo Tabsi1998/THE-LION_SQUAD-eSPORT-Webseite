@@ -18,6 +18,7 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 vi.mock("@/components/tls/StreamEmbed", () => ({ StreamEmbed: () => null }));
 vi.mock("@/components/tls/PrizeList", () => ({ PrizeList: () => null }));
+vi.mock("@/components/tls/AddToCalendar", () => ({ AddToCalendar: () => <div data-testid="add-to-calendar" /> }));
 vi.mock("@/components/tls/MentionTextarea", () => ({ MentionTextarea: () => null }));
 vi.mock("@/components/tls/MentionText", () => ({ MentionText: ({ text }) => <span>{text}</span> }));
 vi.mock("@/components/tls/ChatAttachments", () => ({ ChatAttachButton: () => null, ChatAttachmentDrafts: () => null, ChatMessageAttachments: () => null, useChatAttachmentDrafts: () => ({ drafts: [], add: () => {}, remove: () => {}, clear: () => {}, uploading: false }) }));
@@ -101,7 +102,8 @@ test("die eigene Anmeldung zeigt den eingefrorenen Preis, Warteliste den Hinweis
     { id: "r2", display_name: "Fremd", status: "approved" },
   ]);
   renderPage();
-  expect(await screen.findByTestId("tournament-own-price")).toHaveTextContent("Dein Startgeld: 10,00 €");
+  expect(await screen.findByTestId("tournament-own-price")).toHaveTextContent("10,00 €");
+  expect(screen.getByTestId("tournament-my-stand")).toHaveTextContent("Startgeld");
   expect(screen.getByTestId("tournament-own-price")).toHaveTextContent("Meine Rechnungen");
   expect(screen.queryByTestId("tournament-register-btn")).not.toBeInTheDocument();
 
@@ -115,4 +117,66 @@ test("Partner II (#469): das Turnier nennt seine Partner mit Link auf die Partne
   renderPage();
   expect(await screen.findByTestId("tournament-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
   expect(screen.getByTestId("tournament-partner-pineapps-esports")).toHaveTextContent("mit PineApps eSports");
+});
+
+// Turnierseite aufgeräumt (#401): eine Hauptaktion je Phase, Reiter, Termine einmal als Zeitleiste,
+// „Dein Stand“ für Angemeldete, Teilnehmer sortiert mit Team, Spielerzahl und „du“.
+const DATES = { registration_open_from: "2026-09-01T10:00:00+00:00", registration_open_until: "2099-10-01T18:00:00+00:00", check_in_from: "2099-10-04T17:00:00+00:00", start_date: "2099-10-04T18:00:00+00:00", end_date: "2099-10-04T22:00:00+00:00" };
+
+test("Anmeldung offen: Anmelden ist die eine Hauptaktion, die anderen Wege sind Textlinks, Reiter und Zeitleiste stehen einmal", async () => {
+  mockApi({ ...base, ...DATES, format: "double_elimination" });
+  renderPage();
+  const actions = await screen.findByTestId("tournament-actions");
+  expect(actions.querySelector("button[data-testid='tournament-register-btn']")).toHaveClass("bg-[#29B6E8]");
+  expect(screen.getByTestId("tournament-bracket-link")).not.toHaveClass("bg-[#29B6E8]");
+  expect(screen.getByTestId("tournament-tabs")).toHaveTextContent("Übersicht");
+  expect(screen.getByTestId("tournament-tab-participants")).toHaveTextContent("Teilnehmer (0)");
+  expect(screen.getByTestId("tournament-timeline-registration_close")).toHaveTextContent("Anmeldung endet");
+  expect(screen.getByTestId("tournament-timeline-next")).toHaveTextContent("Anmeldung endet in");
+  expect(screen.getAllByText(/Anmeldung endet/).length).toBe(3); // Statuskasten, Zeitleiste, „nächster Schritt“ - nicht mehr in der Seitenleiste
+  expect(screen.queryByText("Anmeldung öffnet", { selector: "span" })).toBeInTheDocument();
+  expect(screen.getAllByText(/Anmeldung öffnet/).length).toBe(1); // nur in der Zeitleiste
+  expect(screen.getByTestId("tournament-registration-state")).toHaveTextContent("alle Termine unten in der Zeitleiste");
+  expect(screen.getByTestId("add-to-calendar")).toBeInTheDocument();
+  expect(screen.queryByTestId("tournament-my-stand")).toBeNull();
+});
+
+test("angemeldet im Check-in: Check-in ist die Hauptaktion, „Dein Stand“ zeigt Status, Team und Abmelden als leisen Link", async () => {
+  mockApi({ ...base, ...DATES, status: "check_in", team_mode: "team", team_size: 3, public_phase: { state: "check_in", label: "Check-in" } }, [
+    { id: "r1", status: "approved", display_name: "Paula", user_id: "u1", team_id: "tm1", team: { id: "tm1", name: "Neon Kings", tag: "NK", member_count: 3 }, is_mine: true, seed: 2 },
+    { id: "r2", status: "pending", display_name: "Max", team_id: "tm2", team: { id: "tm2", name: "Rex", tag: "RX", member_count: 2 } },
+    { id: "r3", status: "checked_in", display_name: "Mia", team_id: "tm3", team: { id: "tm3", name: "Turbo", tag: "TB", member_count: 3 }, seed: 1 },
+  ]);
+  apiMock.get.mockImplementation((path) => {
+    if (path === "/tournaments/cup") return Promise.resolve({ data: { ...base, ...DATES, status: "check_in", team_mode: "team", team_size: 3, public_phase: { state: "check_in", label: "Check-in" } } });
+    if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: [
+      { id: "r1", status: "approved", display_name: "Paula", user_id: "u1", team_id: "tm1", team: { id: "tm1", name: "Neon Kings", tag: "NK", member_count: 3 }, is_mine: true, seed: 2 },
+      { id: "r2", status: "pending", display_name: "Max", team_id: "tm2", team: { id: "tm2", name: "Rex", tag: "RX", member_count: 2 } },
+      { id: "r3", status: "checked_in", display_name: "Mia", team_id: "tm3", team: { id: "tm3", name: "Turbo", tag: "TB", member_count: 3 }, seed: 1 },
+    ] });
+    if (path === "/teams/my") return Promise.resolve({ data: [{ id: "tm1", name: "Neon Kings", tag: "NK", can_manage: true, my_role: "leader" }] });
+    return Promise.resolve({ data: [] });
+  });
+  renderPage();
+  expect(await screen.findByTestId("tournament-checkin-btn")).toHaveTextContent("Check-in");
+  expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
+  const stand = screen.getByTestId("tournament-my-stand");
+  expect(stand).toHaveTextContent("Dein Stand");
+  expect(screen.getByTestId("tournament-my-team")).toHaveTextContent("Neon Kings [NK]");
+  expect(screen.getByTestId("tournament-unregister-btn")).toHaveTextContent("Vom Turnier abmelden");
+  const rows = [...screen.getByTestId("tournament-participants").querySelectorAll("[data-testid^='tournament-participant-r']")].map((el) => el.getAttribute("data-testid"));
+  expect(rows).toEqual(["tournament-participant-r3", "tournament-participant-r1", "tournament-participant-r2"]);
+  expect(screen.getByTestId("tournament-participant-r1")).toHaveTextContent("#2");
+  expect(screen.getByTestId("tournament-participant-r1")).toHaveTextContent("[NK] · 3 Spieler");
+  expect(screen.getByTestId("tournament-participant-me-r1")).toHaveTextContent("du");
+  expect(screen.getByTestId("tournament-format-tile")).toHaveAttribute("title", expect.stringContaining("Team"));
+});
+
+test("Turnier vorbei: die Rangliste ist die Hauptaktion", async () => {
+  mockApi({ ...base, ...DATES, status: "completed", public_phase: { state: "completed", label: "Beendet" } });
+  renderPage();
+  const actions = await screen.findByTestId("tournament-actions");
+  expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("bg-[#FFD700]");
+  expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
+  expect(screen.queryByTestId("tournament-closed-btn")).toBeNull();
 });

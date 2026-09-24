@@ -12,7 +12,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake, ExternalLink } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
@@ -25,7 +25,9 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatTeamMode, formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { gameLabel } from "@/lib/gameLabels";
 import { formatCents, previewQuote, startFeeSummary } from "@/lib/pricing";
-import { AddToCalendar } from "@/components/tls/AddToCalendar";
+import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
+import { TournamentTimeline, countdownText, timelineSteps } from "@/components/tls/tournament/TournamentTimeline";
+import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -161,6 +163,46 @@ export default function TournamentDetailPage() {
     .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
     .sort((a, b) => Number(a.rank) - Number(b.rank))
     .slice(0, 3);
+  const nextStep = timelineSteps(t).find((step) => step.next) || null;
+  const finished = ["completed", "results_published", "archived"].includes(t.status);
+  const subPage = (part) => `/tournaments/${t.slug || t.id}/${part}${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`;
+  const checkinNow = !!myReg && canCheckIn && myReg.status === "approved" && t.status === "check_in";
+  // Die eine Hauptaktion je Phase (#401).
+  let primaryKey = "none";
+  let primaryAction = null;
+  const primaryClass = "px-6 py-3 font-bold uppercase tracking-wider rounded-sm transition disabled:opacity-50";
+  if (canSelfRegister && !myReg) {
+    primaryKey = "register";
+    primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
+  } else if (clubMemberBlocked && !myReg) {
+    primaryKey = "blocked";
+    primaryAction = <button type="button" disabled data-testid="tournament-blocked-btn" className={`${primaryClass} border border-[#FFD700]/30 text-[#FFD700]/70 cursor-not-allowed`}>Externe Anmeldung</button>;
+  } else if (checkinNow) {
+    primaryKey = "checkin";
+    primaryAction = <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className={`${primaryClass} bg-[#FFD700] text-black hover:bg-[#ffe45c]`}>Check-in</button>;
+  } else if (staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in") {
+    primaryKey = "checkin_local";
+    primaryAction = <button type="button" disabled data-testid="tournament-checkin-local" className={`${primaryClass} border border-[#FFD700]/35 text-[#FFD700]/75 cursor-not-allowed`}>Check-in vor Ort</button>;
+  } else if (finished) {
+    primaryKey = "standings";
+    primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} bg-[#FFD700] text-black hover:bg-[#ffe45c]`}>Rangliste</Link>;
+  } else if (t.started) {
+    primaryKey = "bracket";
+    primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>Turnierbaum</Link>;
+  } else if (myReg) {
+    primaryKey = "schedule";
+    primaryAction = <Link to={subPage("matches")} data-testid="tournament-schedule-link" className={`${primaryClass} border border-[#29B6E8]/50 text-[#29B6E8] hover:bg-[#29B6E8]/10`}>Spielplan</Link>;
+  } else {
+    primaryKey = "closed";
+    primaryAction = <button type="button" disabled data-testid="tournament-closed-btn" className={`${primaryClass} border border-white/10 text-white/35 cursor-not-allowed`}>{registration.label}</button>;
+  }
+  const STATUS_ORDER = { checked_in: 0, approved: 1, pending: 2, waitlist: 3, rejected: 4, no_show: 5 };
+  const sortedRegs = [...regs].sort((a, b) => ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
+  const calendarItem = {
+    id: t.id, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
+    location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
+    url: typeof window !== "undefined" && t.slug ? `${window.location.origin}/tournaments/${t.slug}` : null,
+  };
 
   return (
     <PublicLayout>
@@ -190,7 +232,8 @@ export default function TournamentDetailPage() {
             <InfoTile icon={Calendar} label="Start" value={formatDateTime(t.start_date)} />
             <InfoTile icon={Users} label={isTeamTournament ? "Teams" : "Teilnehmer"} value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
-            <InfoTile icon={Trophy} label="Format" value={formatTournamentDisplay(t)} />
+            {/* Format ganz (#401): kein Abschneiden, dazu der Tooltip mit Modus und Best-of */}
+            <InfoTile icon={Trophy} label="Format" value={formatTournamentDisplay(t)} wrap title={[formatTournamentDisplay(t), formatTeamMode(t.team_mode), t.best_of > 1 ? `Best of ${t.best_of}` : null].filter(Boolean).join(" · ")} testId="tournament-format-tile" />
           </div>
 
           <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
@@ -199,15 +242,11 @@ export default function TournamentDetailPage() {
               : registration.state === "scheduled"
                 ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
                 : "border-white/10 bg-[#121212] text-white/60"
-          }`}>
+          }`} data-testid="tournament-registration-state">
             <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
-            <div className="mt-1 text-white/55">
-              {t.registration_open_from && <span>Öffnet: {formatDateTime(t.registration_open_from)}</span>}
-              {t.registration_open_from && t.registration_open_until && <span className="mx-2 text-white/20">·</span>}
-              {t.registration_open_until && <span>Endet: {formatDateTime(t.registration_open_until)}</span>}
-              {!t.registration_open_from && !t.registration_open_until && <span>Status wird vom Admin gesteuert.</span>}
-              {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
-            </div>
+            {nextStep && <div className="mt-1 text-white/55">{nextStep.label} {countdownText(nextStep.ms)} – alle Termine unten in der Zeitleiste.</div>}
+            {!nextStep && !t.registration_open_from && !t.registration_open_until && <div className="mt-1 text-white/55">Status wird vom Admin gesteuert.</div>}
+            {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
           </div>
 
           {t.offer && (
@@ -216,112 +255,36 @@ export default function TournamentDetailPage() {
               <div className="mt-1 text-white">{startFeeSummary(t.offer, { teamMode: t.team_mode || "solo", teamSize: t.team_size })}</div>
               <ul className="mt-1 space-y-0.5 text-xs text-white/60">
                 {t.offer.positions.filter((position) => !position.optional).map((position) => (
-                  <li key={position.key}>{position.label}: {formatCents(position.amount_cents, t.offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : "je Anmeldung"}{position.description ? ` – ${position.description}` : ""}</li>
+                  <li key={position.key}>{position.label}: {formatCents(position.amount_cents, t.offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : ""}</li>
                 ))}
               </ul>
-              <div className="mt-1 text-xs text-white/45">{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst mit der verbindlichen Teilnahme.</div>
+              <div className="mt-1 text-xs text-white/45">{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst, wenn die Teilnahme bestätigt ist.</div>
             </div>
           )}
 
-          {myReg?.price && (
-            <div className="mt-3 text-sm max-w-3xl" data-testid="tournament-own-price">
-              <span className="text-white/65">Dein Startgeld: </span>
-              <strong className="text-white">{formatCents(myReg.price.total_cents, myReg.price.currency)}</strong>
-              <span className="text-white/45">
-                {" · "}
-                {myReg.price.billing_status === "cancelled" ? "storniert"
-                  : myReg.price.billing_status === "paid" ? `Rechnung ${myReg.price.invoice_ref || ""} bezahlt – danke!`
-                    : myReg.price.invoice_ref && myReg.price.invoice_status !== "draft" ? `Rechnung ${myReg.price.invoice_ref} offen – du findest sie unter „Meine Rechnungen“`
-                      : "die Rechnung kommt in dein Konto unter „Meine Rechnungen“"}
-              </span>
+          {/* Eine Hauptaktion je Phase (#401): Anmelden, Check-in, Turnierbaum oder Rangliste - der Rest als Textlinks. */}
+          <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" data-testid="tournament-actions">
+            {primaryAction}
+            <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider">
+              {primaryKey !== "bracket" && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
+              {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
+              {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
+              {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-[#FF3B30] hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}
+              {t.can_manage_results && <Link to={`/admin/tournaments/${t.id}?tab=stages`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-[#FFD700] hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Ergebnisse eintragen</Link>}
             </div>
-          )}
-          {myReg && !myReg.price && t.offer && myReg.user_id === user?.id && ["pending", "waitlist"].includes(myReg.status) && (
-            <div className="mt-3 text-xs text-white/45 max-w-3xl" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</div>
-          )}
-
-          <AddToCalendar className="mt-6" item={{
-            id: t.id, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
-            location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
-            url: typeof window !== "undefined" && t.slug ? `${window.location.origin}/tournaments/${t.slug}` : null,
-          }} />
-          <div className="mt-8 flex flex-wrap gap-3">
-            {canSelfRegister && !myReg && (
-              <button
-                data-testid="tournament-register-btn"
-                onClick={handleRegister}
-                disabled={loading}
-                className="px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
-              >
-                {loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}
-              </button>
-            )}
-            {clubMemberBlocked && !myReg && (
-              <button
-                type="button"
-                disabled
-                className="px-6 py-3 border border-[#FFD700]/30 text-[#FFD700]/70 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed"
-              >
-                Externe Anmeldung
-              </button>
-            )}
-            {!canSelfRegister && !clubMemberBlocked && !myReg && (
-              <button
-                type="button"
-                disabled
-                className="px-6 py-3 border border-white/10 text-white/35 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed"
-              >
-                {registration.label}
-              </button>
-            )}
-            {canCheckIn && myReg.status === "approved" && t.status === "check_in" && (
-              <button onClick={handleCheckin} disabled={loading} data-testid="tournament-checkin-btn" className="px-6 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#EAC200] disabled:opacity-50 transition">
-                Check-in
-              </button>
-            )}
-            {staffOnlyCheckIn && myReg?.status === "approved" && t.status === "check_in" && (
-              <button type="button" disabled className="px-6 py-3 border border-[#FFD700]/35 text-[#FFD700]/75 font-bold uppercase tracking-wider rounded-sm cursor-not-allowed">
-                Check-in vor Ort
-              </button>
-            )}
-            {canSelfUnregister && (
-              <button
-                type="button"
-                onClick={handleUnregister}
-                disabled={loading}
-                data-testid="tournament-unregister-btn"
-                className="px-6 py-3 border border-[#FF3B30]/45 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50 transition"
-              >
-                Abmelden
-              </button>
-            )}
-            {myReg && <StatusBadge status={myReg.status} size="lg" />}
-            <Link to={`/tournaments/${t.slug || t.id}/bracket${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-bracket-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
-              Turnierbaum ansehen
-            </Link>
-            <Link to={`/tournaments/${t.slug || t.id}/matches${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-schedule-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
-              Spielplan
-            </Link>
-            {t.can_manage_results && (
-              <Link to={`/admin/tournaments/${t.id}?tab=stages`} data-testid="tournament-result-entry-link" className="px-6 py-3 border border-[#FFD700]/45 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition">
-                Ergebnisse eintragen
-              </Link>
-            )}
-            <Link to={`/tournaments/${t.slug || t.id}/standings${accessToken ? `?access=${encodeURIComponent(accessToken)}` : ""}`} data-testid="tournament-standings-link" className="px-6 py-3 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm hover:border-[#29B6E8]/60 hover:text-[#29B6E8] transition">
-              Rangliste
-            </Link>
-            {t.stream_link && (
-              <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="px-6 py-3 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FF3B30]/10 transition inline-flex items-center gap-2">
-                <Radio className="w-4 h-4" /> Stream
-              </a>
-            )}
           </div>
           {!registerModal && actionError && <div className="mt-4 max-w-3xl"><AuthFormAlert id="tournament-action-error">{actionError}</AuthFormAlert></div>}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 grid lg:grid-cols-3 gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+        <TournamentTabs tournament={t} accessToken={accessToken} participantCount={regs.length} />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          <MyStandCard tournament={t} registration={myReg} team={myRegTeam} isTeamTournament={isTeamTournament} canCheckIn={false} staffOnlyCheckIn={staffOnlyCheckIn}
+            canUnregister={canSelfUnregister} onUnregister={handleUnregister} busy={loading} scheduleTo={subPage("matches")} />
+          <TournamentTimeline tournament={t} calendarItem={calendarItem} />
           {t.rules && (
             <section>
               <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>
@@ -360,29 +323,29 @@ export default function TournamentDetailPage() {
             </section>
           )}
           {t.show_chat && <TournamentChat tournament={t} user={user} />}
-          <section>
+          <section id="teilnehmer" data-testid="tournament-participants">
             <h2 className="font-heading text-2xl font-bold uppercase mb-3">Teilnehmer ({regs.length})</h2>
             <div className="border border-white/10 rounded-sm divide-y divide-white/5 bg-[#121212]">
-              {regs.map((r, i) => (
-                <div key={r.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="font-display font-bold text-[#29B6E8] w-6">{i + 1}</span>
-                    <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
-                    {r.team && <span className="text-white/40 text-xs">[{r.team.tag}]</span>}
+              {sortedRegs.map((r, i) => {
+                const mine = !!user && (r.user_id === user.id || r.is_mine);
+                return (
+                  <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "bg-[#FFD700]/5" : ""}`} data-testid={`tournament-participant-${r.id}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-display font-bold text-[#29B6E8] w-6">{r.seed ? `#${r.seed}` : i + 1}</span>
+                      <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
+                      {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
+                      {mine && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/50 rounded-sm px-1.5 py-0.5" data-testid={`tournament-participant-me-${r.id}`}>du</span>}
+                    </div>
+                    <StatusBadge status={r.status} />
                   </div>
-                  <StatusBadge status={r.status} />
-                </div>
-              ))}
+                );
+              })}
               {regs.length === 0 && <div className="p-6 text-white/40 text-sm text-center">Noch keine Teilnehmer</div>}
             </div>
           </section>
         </div>
         <aside className="space-y-4">
           {t.location && <InfoRow icon={MapPin} label="Ort" value={t.location} />}
-          {t.registration_open_from && <InfoRow icon={Calendar} label="Anmeldung öffnet" value={formatDateTime(t.registration_open_from)} />}
-          {t.registration_open_until && <InfoRow icon={Calendar} label="Anmeldung endet" value={formatDateTime(t.registration_open_until)} />}
-          {t.check_in_from && <InfoRow icon={Calendar} label="Check-in öffnet" value={formatDateTime(t.check_in_from)} />}
-          {t.check_in_until && <InfoRow icon={Calendar} label="Check-in endet" value={formatDateTime(t.check_in_until)} />}
           {t.best_of > 1 && <InfoRow icon={Trophy} label="Best of" value={t.best_of} />}
           <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />
           {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
@@ -662,11 +625,11 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
   );
 }
 
-function InfoTile({ icon: Icon, label, value }) {
+function InfoTile({ icon: Icon, label, value, wrap = false, title = "", testId = "" }) {
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] px-4 py-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
-      <div className="mt-1 font-display font-bold text-lg text-white truncate">{value}</div>
+    <div className="border border-white/10 rounded-sm bg-[#121212]/80 px-4 py-3" title={title || undefined} data-testid={testId || undefined}>
+      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
+      <div className={`mt-1 font-heading font-bold text-lg ${wrap ? "break-words leading-tight" : "truncate"}`}>{value}</div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { BracketTree } from "@/components/tls/BracketTree";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
@@ -79,6 +80,7 @@ export default function TournamentBracketPage() {
               <PhaseBadge phase={t.public_phase} status={t.status} />
               <span className="text-white/40 text-sm">{formatTournamentDisplay(t)}</span>
             </div>
+            <TournamentTabs tournament={t} accessToken={accessToken} className="mt-4" />
           </div>
           {t.can_view_display && (
             <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="inline-flex items-center gap-2 px-4 py-2.5 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 text-sm">
