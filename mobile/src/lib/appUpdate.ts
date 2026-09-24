@@ -15,9 +15,31 @@ export type AppRelease = {
   published_at?: string | null;
   min_build?: number | null;
   is_current?: boolean;
+  /** Beta (Pre-Release) oder Release (#309); fehlt der Wert, entscheidet die Versionsnummer. */
+  channel?: ReleaseChannel | null;
   filename: string;
   download_url: string;
 };
+
+export type ReleaseChannel = "beta" | "release";
+
+export function releaseChannel(release: Pick<AppRelease, "channel" | "version">): ReleaseChannel {
+  if (release.channel === "beta" || release.channel === "release") return release.channel;
+  return /-beta$/i.test(String(release.version || "")) ? "beta" : "release";
+}
+
+export function channelLabel(channel: ReleaseChannel) {
+  return channel === "beta" ? "BETA · Testversion" : "RELEASE";
+}
+
+/** Die Rückfrage vor dem Installieren (#309): je Art ein eigener Satz, Pflicht bleibt Pflicht. */
+export function installPrompt(channel: ReleaseChannel, mandatory: boolean): { title: string; message: string } {
+  const duty = mandatory ? " Dieses Update ist Pflicht – ohne geht es nicht weiter." : "";
+  if (channel === "beta") {
+    return { title: "Testversion installieren?", message: `Diese Version ist eine Beta – sie kann Fehler enthalten. Rückmeldungen bitte an den Vorstand (Mehr → Kontakt).${duty}` };
+  }
+  return { title: "Release installieren?", message: `Die neue Version ist geprüft und freigegeben.${duty}` };
+}
 
 export type AppVersionInfo = {
   current: AppRelease | null;

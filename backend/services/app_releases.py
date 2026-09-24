@@ -65,6 +65,13 @@ def upload_token_problem(presented: str | None) -> str | None:
     return "Upload-Token stimmt nicht mit dem Server überein."
 
 
+def channel_of(version: str, prerelease: bool | None = None) -> str:
+    """Beta oder Release (#309): aus GitHub (Pre-Release = Beta), beim Upload von Hand aus der Versionsnummer."""
+    if prerelease is not None:
+        return "beta" if prerelease else "release"
+    return "beta" if str(version or "").endswith("-beta") else "release"
+
+
 def update_decision(own_build: int | None, current: dict | None) -> dict:
     """Was die App tun soll: nichts, Update anbieten, oder Update verlangen."""
     if not current:
@@ -91,6 +98,10 @@ def public_release(doc: dict | None) -> dict | None:
         "published_at": doc.get("published_at"),
         "min_build": int(doc.get("min_build") or 0) or None,
         "is_current": bool(doc.get("is_current")),
+        # Kanal (#309): die App zeigt die Plakette und fragt je Art vor dem Installieren.
+        "channel": doc.get("channel") or channel_of(doc.get("version") or ""),
+        "source": doc.get("source") or "admin",
+        "github_url": doc.get("github_url"),
         "filename": apk_filename(doc.get("version") or "0.0.0", build),
         "download_url": f"/api/mobile/app-download/{build}",
     }

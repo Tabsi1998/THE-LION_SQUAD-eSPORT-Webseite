@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useState } from "react";
-import { Linking, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme";
-import { PLAY_STORE_URL, PLAY_STORE_WEB_URL, downloadUrl, progressShare, releaseSizeLabel, releaseTitle, verifyDownload, type AppRelease, type UpdatePath } from "../lib/appUpdate";
+import { PLAY_STORE_URL, PLAY_STORE_WEB_URL, channelLabel, downloadUrl, installPrompt, progressShare, releaseChannel, releaseSizeLabel, releaseTitle, verifyDownload, type AppRelease, type ReleaseChannel, type UpdatePath } from "../lib/appUpdate";
 import { errorMessage } from "../lib/api";
 import { Body, Muted } from "./Text";
 
@@ -24,7 +24,20 @@ type Props = {
   path?: UpdatePath;
   /** Googles Dialog starten; liefert, ob er aufging. Ohne Funktion nur der Store-Link. */
   onStartPlayUpdate?: (immediate: boolean) => Promise<boolean>;
+  /** Rückfrage je Art vor dem Installieren (#309): Beta oder Release; Standard ist ein Alert. */
+  confirmInstall?: (channel: ReleaseChannel, mandatory: boolean) => Promise<boolean>;
 };
+
+/** Standard-Rückfrage: ein Alert mit dem Satz je Art; „Abbrechen“ lässt den Banner stehen. */
+export function defaultConfirmInstall(channel: ReleaseChannel, mandatory: boolean): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { title, message } = installPrompt(channel, mandatory);
+    Alert.alert(title, message, [
+      { text: "Abbrechen", style: "cancel", onPress: () => resolve(false) },
+      { text: "Installieren", onPress: () => resolve(true) },
+    ], { cancelable: false, onDismiss: () => resolve(false) });
+  });
+}
 
 /** Store-Seite öffnen: erst die Play-App, sonst der Browser. */
 export async function openPlayStore(open: (url: string) => Promise<unknown> = (url) => Linking.openURL(url)) {
@@ -66,11 +79,12 @@ export const defaultInstaller: Installer = async (uri) => {
   });
 };
 
-export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew, path = "server", onStartPlayUpdate, downloader = defaultDownloader, installer = defaultInstaller }: Props & { downloader?: Downloader; installer?: Installer }) {
+export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew, path = "server", onStartPlayUpdate, confirmInstall = defaultConfirmInstall, downloader = defaultDownloader, installer = defaultInstaller }: Props & { downloader?: Downloader; installer?: Installer }) {
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const android = Platform.OS === "android";
   const viaPlay = path === "play";
+  const channel = releaseChannel(release);
 
   const startPlay = useCallback(async () => {
     if (!onStartPlayUpdate) {
@@ -84,6 +98,8 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
   }, [mandatory, onStartPlayUpdate]);
 
   const start = useCallback(async () => {
+    // Erst die Rückfrage je Art (#309) - eine Beta sagt, dass sie Fehler haben kann.
+    if (!(await confirmInstall(channel, mandatory))) return;
     setPhase({ name: "downloading", share: 0 });
     try {
       const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
@@ -101,7 +117,7 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
     } catch (error) {
       setPhase({ name: "error", text: errorMessage(error, "Download fehlgeschlagen.") });
     }
-  }, [downloader, installer, release, token]);
+  }, [channel, confirmInstall, downloader, installer, mandatory, release, token]);
 
   const busy = phase.name === "downloading" || phase.name === "installing";
 
@@ -110,6 +126,9 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
       <View style={styles.head}>
         <Ionicons name={viaPlay ? "logo-google-playstore" : "cloud-download-outline"} size={20} color={colors.cyan} />
         <View style={styles.headText}>
+          <View style={[styles.badge, channel === "beta" ? styles.badgeBeta : styles.badgeRelease]} testID="app-update-channel">
+            <Muted style={[styles.badgeText, channel === "beta" ? styles.badgeTextBeta : styles.badgeTextRelease]}>{channelLabel(channel)}</Muted>
+          </View>
           <Body style={styles.title}>{releaseTitle(release)}</Body>
           <Muted>
             {mandatory ? "Dieses Update ist Pflicht." : "Ein Update ist bereit."}
@@ -150,6 +169,12 @@ export function AppUpdateBanner({ release, mandatory, token, onLater, onWhatsNew
 }
 
 const styles = StyleSheet.create({
+  badge: { alignSelf: "flex-start", borderRadius: 4, borderWidth: 1, marginBottom: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  badgeBeta: { backgroundColor: "rgba(255,217,90,0.12)", borderColor: "rgba(255,217,90,0.6)" },
+  badgeRelease: { backgroundColor: "rgba(0,255,136,0.10)", borderColor: "rgba(0,255,136,0.5)" },
+  badgeText: { fontSize: 10, fontWeight: "700", letterSpacing: 1 },
+  badgeTextBeta: { color: "#FFD95A" },
+  badgeTextRelease: { color: "#00FF88" },
   banner: {
     backgroundColor: colors.surface,
     borderColor: "rgba(41,182,232,0.5)",

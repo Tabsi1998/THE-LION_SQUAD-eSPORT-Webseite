@@ -17,6 +17,7 @@ from services.ops_monitor import errors_overview, ops_summary, set_error_resolve
 from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settings, recent_alerts, save_alert_settings, send_test_alert
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
+from services import github_releases
 from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -867,6 +868,49 @@ async def admin_app_release_settings_update(body: AppReleaseSettingsUpdate, me: 
         "target": "server_updater", "details": result, "created_at": now_utc().isoformat(),
     })
     return result
+
+
+class GithubReleaseSettingsUpdate(BaseModel):
+    github_token: str | None = Field(default=None, max_length=400)
+    clear_github_token: bool = False
+    github_repo: str | None = Field(default=None, max_length=200)
+    github_sync_enabled: bool | None = None
+    github_rollout_betas: bool | None = None
+
+
+@router.get("/app-releases/github")
+async def admin_app_release_github(me: dict = Depends(require_club_admin())):
+    """GitHub-Abgleich (#309): Stand und Schalter - das Token bleibt beim Server."""
+    return await github_releases.settings(get_db())
+
+
+@router.patch("/app-releases/github")
+async def admin_app_release_github_update(body: GithubReleaseSettingsUpdate, me: dict = Depends(require_club_admin())):
+    try:
+        result = await github_releases.save_settings(
+            get_db(), by=me["id"], github_token=body.github_token, clear_github_token=body.clear_github_token,
+            github_repo=body.github_repo, github_sync_enabled=body.github_sync_enabled, github_rollout_betas=body.github_rollout_betas,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await get_db().audit_logs.insert_one({
+        "id": new_id(), "action": "app_release.github_settings", "actor": me["id"], "target": "github",
+        "details": {key: value for key, value in result.items() if key.startswith("github_") and "token" not in key},
+        "created_at": now_utc().isoformat(),
+    })
+    return result
+
+
+@router.post("/app-releases/github/sync")
+async def admin_app_release_github_sync(me: dict = Depends(require_club_admin())):
+    """„Jetzt abgleichen“ - auch, wenn der Hintergrundjob aus ist."""
+    result = await github_releases.sync(get_db(), force=True)
+    await get_db().audit_logs.insert_one({
+        "id": new_id(), "action": "app_release.github_sync", "actor": me["id"], "target": "github",
+        "details": {"imported": [row["build"] for row in result.get("imported", [])], "errors": result.get("errors", []), "skipped": result.get("skipped")},
+        "created_at": now_utc().isoformat(),
+    })
+    return {**result, "settings": await github_releases.settings(get_db())}
 
 
 @router.post("/app-releases")

@@ -1,3 +1,4 @@
+import { channelLabel, installPrompt, releaseChannel } from "./appUpdate";
 import { decideUpdate, progressShare, releaseSizeLabel, releaseTitle, shouldCheck, updatePath, verifyDownload, type AppRelease } from "./appUpdate";
 
 // Update aus der App (#250): wann gefragt wird, wann der Banner erscheint,
@@ -52,4 +53,15 @@ test("updatePath: Play bleibt Play, Sideload nimmt den Server - außer der Updat
   expect(updatePath("unknown", info)).toBe("server");
   expect(updatePath("sideload", { ...info, server_updater_enabled: false })).toBe("play");
   expect(updatePath("unknown", null)).toBe("server");
+});
+
+// Kanal und Rückfrage (#309): Beta aus dem Server-Feld oder der Versionsnummer; je Art ein eigener Satz.
+test("releaseChannel, channelLabel und installPrompt", () => {
+  expect(releaseChannel({ channel: "beta", version: "1.0.0" })).toBe("beta");
+  expect(releaseChannel({ channel: null, version: "0.9.0-beta" })).toBe("beta");
+  expect(releaseChannel({ version: "1.0.0" })).toBe("release");
+  expect(channelLabel("beta")).toBe("BETA · Testversion");
+  expect(installPrompt("beta", false)).toEqual({ title: "Testversion installieren?", message: expect.stringContaining("kann Fehler enthalten") });
+  expect(installPrompt("release", true).message).toContain("Pflicht");
+  expect(installPrompt("release", false).title).toBe("Release installieren?");
 });

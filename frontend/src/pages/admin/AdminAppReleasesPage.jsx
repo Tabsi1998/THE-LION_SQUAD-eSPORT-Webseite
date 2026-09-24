@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Download, RefreshCw, Smartphone, Trash2, Upload } from "lucide-react";
+import { CheckCircle2, Download, Github, RefreshCw, Smartphone, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -19,6 +19,20 @@ function formatTime(value) {
   }
 }
 
+// Kanal (#309): Pre-Release auf GitHub = Beta, Release = Release; von Hand aus der Versionsnummer.
+export function channelLabel(channel) {
+  return channel === "beta" ? "Beta" : "Release";
+}
+
+function ChannelBadge({ channel }) {
+  const beta = channel === "beta";
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border text-[10px] font-black uppercase tracking-widest ${beta ? "border-[#FFD95A]/50 text-[#FFD95A] bg-[#FFD95A]/10" : "border-[#00FF88]/40 text-[#00FF88] bg-[#00FF88]/10"}`}>
+      {channelLabel(channel)}
+    </span>
+  );
+}
+
 export function formatSize(bytes) {
   const size = Number(bytes || 0);
   if (!size) return "-";
@@ -33,6 +47,10 @@ export default function AdminAppReleasesPage() {
   // Server-Updater an/aus (#421): Play-Installationen nehmen Googles Dialog; die Server-APK ist für
   // Sideload und den Notfall - sobald die App öffentlich ist, schaltet der Betreiber sie hier ab.
   const [settings, setSettings] = useState(null);
+  // GitHub-Abgleich (#309): der Server holt sich die Releases selbst - Token, Repo, Schalter, Stand.
+  const [github, setGithub] = useState(null);
+  const [githubForm, setGithubForm] = useState({ token: "", repo: "" });
+  const [syncing, setSyncing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ version: "", build: "", notes: "", min_build: "", set_current: true, file: null });
@@ -40,14 +58,16 @@ export default function AdminAppReleasesPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data }, statusResult, settingsResult] = await Promise.all([
+      const [{ data }, statusResult, settingsResult, githubResult] = await Promise.all([
         api.get("/admin/app-releases"),
         api.get("/admin/app-releases/status").catch(() => ({ data: null })),
         api.get("/admin/app-releases/settings").catch(() => ({ data: null })),
+        api.get("/admin/app-releases/github").catch(() => ({ data: null })),
       ]);
       setRows(Array.isArray(data) ? data : []);
       setTokenStatus(statusResult?.data?.upload_token || null);
       setSettings(settingsResult?.data && typeof settingsResult.data.server_updater_enabled === "boolean" ? settingsResult.data : null);
+      setGithub(githubResult?.data && typeof githubResult.data.github_repo === "string" ? githubResult.data : null);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     } finally {
@@ -112,6 +132,42 @@ export default function AdminAppReleasesPage() {
     }
   };
 
+  const saveGithub = async (changes, success = "GitHub-Einstellungen gespeichert.") => {
+    try {
+      const { data } = await api.patch("/admin/app-releases/github", changes);
+      setGithub(data);
+      setGithubForm({ token: "", repo: "" });
+      toast.success(success);
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    }
+  };
+  const saveGithubForm = async () => {
+    const changes = {};
+    if (githubForm.token.trim()) changes.github_token = githubForm.token.trim();
+    if (githubForm.repo.trim()) changes.github_repo = githubForm.repo.trim();
+    if (!Object.keys(changes).length) return toast.error("Token oder Repository eintragen.");
+    await saveGithub(changes, changes.github_token ? "Token gespeichert – es bleibt beim Server." : "Repository gespeichert.");
+  };
+  const syncGithub = async () => {
+    setSyncing(true);
+    try {
+      const { data } = await api.post("/admin/app-releases/github/sync");
+      const imported = Array.isArray(data?.imported) ? data.imported : [];
+      const errors = Array.isArray(data?.errors) ? data.errors : [];
+      if (data?.settings) setGithub(data.settings);
+      if (imported.length) toast.success(`${imported.length} Release(s) übernommen: ${imported.map((row) => `Build ${row.build}`).join(", ")}.`);
+      else if (data?.skipped) toast.error(data.skipped);
+      else if (errors.length) toast.error(errors[0]);
+      else toast.success("Nichts Neues auf GitHub.");
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const setMinBuild = async (row) => {
     const value = window.prompt(`Ab welchem Build ist das Update Pflicht? (0 = keine Pflicht)`, String(row.min_build || 0));
     if (value === null) return;
@@ -166,12 +222,61 @@ export default function AdminAppReleasesPage() {
           </div>
         </div>
       ) : null}
+      {github ? (
+        <div className="mb-6 rounded-sm border border-white/10 bg-[#121212] px-4 py-4 text-sm space-y-3" data-testid="app-release-github">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="font-bold inline-flex items-center gap-2"><Github className="w-4 h-4 text-[#29B6E8]" /> GitHub-Releases von selbst übernehmen</div>
+            <button type="button" onClick={syncGithub} disabled={syncing || !github.github_token_configured} data-testid="app-release-github-sync" className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8] text-black rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">
+              <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} /> {syncing ? "Gleicht ab …" : "Jetzt abgleichen"}
+            </button>
+          </div>
+          <div className="text-white/55" data-testid="app-release-github-status">
+            {github.github_token_unreadable
+              ? "Token gespeichert, aber mit dem aktuellen Schlüssel nicht lesbar – bitte neu eintragen."
+              : github.github_token_configured
+                ? `Verbunden mit ${github.github_repo}`
+                : "Kein Token – ein feinkörniges GitHub-Token (nur Lesen von „Contents“ dieses Repos) eintragen, dann holt der Server jedes neue mobile-v*-Release selbst."}
+            {github.github_last_checked_at ? ` · geprüft ${formatTime(github.github_last_checked_at)}` : ""}
+            {github.github_last_release ? ` · letztes Release ${github.github_last_release}` : ""}
+          </div>
+          {github.github_last_error ? <div className="text-[#FF6B61]" data-testid="app-release-github-error">{github.github_last_error}</div> : null}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">GitHub-Token (nur Lesen)</div>
+              <input type="password" autoComplete="off" value={githubForm.token} onChange={(e) => setGithubForm((f) => ({ ...f, token: e.target.value }))} placeholder={github.github_token_configured ? "gespeichert – neues Token zum Ersetzen" : "github_pat_…"} data-testid="app-release-github-token" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Repository</div>
+              <input value={githubForm.repo} onChange={(e) => setGithubForm((f) => ({ ...f, repo: e.target.value }))} placeholder={github.github_repo} data-testid="app-release-github-repo" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
+            <button type="button" onClick={saveGithubForm} data-testid="app-release-github-save" className="px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider hover:border-[#29B6E8]/60">Speichern</button>
+            {github.github_token_configured ? (
+              <button type="button" onClick={() => saveGithub({ clear_github_token: true }, "Token entfernt – der Abgleich stoppt.")} data-testid="app-release-github-clear" className="text-[11px] font-bold uppercase tracking-wider text-[#FF6B61] hover:text-[#FF3B30]">Token entfernen</button>
+            ) : null}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={github.github_sync_enabled} onChange={(e) => saveGithub({ github_sync_enabled: e.target.checked }, e.target.checked ? "Abgleich alle 10 Minuten ist an." : "Abgleich ist aus – nur noch „Jetzt abgleichen“.")} data-testid="app-release-github-enabled" className="accent-[#29B6E8]" />
+              <span>alle {github.sync_interval_minutes || 10} Minuten abgleichen</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={github.github_rollout_betas} onChange={(e) => saveGithub({ github_rollout_betas: e.target.checked }, e.target.checked ? "Betas werden gleich ausgerollt." : "Betas landen nur in der Liste – aktuell wird erst ein Release.")} data-testid="app-release-github-betas" className="accent-[#29B6E8]" />
+              <span>Betas (Pre-Releases) gleich ausrollen</span>
+            </label>
+          </div>
+          <div className="text-white/45 text-xs">
+            Pre-Release auf GitHub = Beta, Release = Release; die App zeigt die Plakette und fragt vor dem Installieren je Art. Ohne den Beta-Haken landen Betas nur in der Liste.
+            Die Prüfsumme wird gegen die .sha256-Datei des Releases geprüft; das Release-Skript bleibt als Rückfall, Doppelte werden am Build erkannt.
+          </div>
+        </div>
+      ) : null}
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-x-auto mb-6">
         <table className="w-full text-sm" data-testid="app-releases-table">
           <thead>
             <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
               <th className="text-left p-3">Build</th>
               <th className="text-left p-3">Version</th>
+              <th className="text-left p-3">Kanal</th>
               <th className="text-right p-3">Größe</th>
               <th className="text-left p-3">Veröffentlicht</th>
               <th className="text-left p-3">Pflicht ab</th>
@@ -184,6 +289,7 @@ export default function AdminAppReleasesPage() {
               <tr key={row.build} className="border-b border-white/5" data-testid={`app-release-${row.build}`}>
                 <td className="p-3 font-display text-lg font-bold">{row.build}</td>
                 <td className="p-3 font-mono text-xs">v{row.version}<div className="text-white/40 truncate max-w-[16rem]" title={row.sha256 || ""}>{row.sha256 ? `sha256 ${row.sha256.slice(0, 12)}…` : ""}</div></td>
+                <td className="p-3"><ChannelBadge channel={row.channel || (String(row.version || "").endsWith("-beta") ? "beta" : "release")} />{row.source === "github" ? <div className="text-[10px] text-white/35 mt-1">von GitHub</div> : null}</td>
                 <td className="p-3 text-right">{formatSize(row.size)}</td>
                 <td className="p-3 text-white/70">{formatTime(row.published_at)}</td>
                 <td className="p-3">{row.min_build ? `Build ${row.min_build}` : "–"}</td>
@@ -204,7 +310,7 @@ export default function AdminAppReleasesPage() {
               </tr>
             ))}
             {!loading && !rows.length ? (
-              <tr><td colSpan={7} className="p-6 text-center text-white/50"><span className="inline-flex items-center gap-2"><Smartphone className="w-4 h-4 text-[#29B6E8]" /> Noch kein Release am Server. Das nächste Release-Skript legt eines ab, oder du lädst unten eine APK hoch.</span></td></tr>
+              <tr><td colSpan={8} className="p-6 text-center text-white/50"><span className="inline-flex items-center gap-2"><Smartphone className="w-4 h-4 text-[#29B6E8]" /> Noch kein Release am Server. Das nächste Release-Skript legt eines ab, oder du lädst unten eine APK hoch.</span></td></tr>
             ) : null}
           </tbody>
         </table>

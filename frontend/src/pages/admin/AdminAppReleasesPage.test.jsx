@@ -22,11 +22,16 @@ const RELEASES = [
 ];
 
 let tokenStatus = { configured: true, length: 48, min_length: 24, env: "APP_RELEASE_UPLOAD_TOKEN" };
+// GitHub-Abgleich (#309).
+const GITHUB = {
+  github_repo: "Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite", github_sync_enabled: true, github_rollout_betas: true, github_token_configured: true, github_token_unreadable: false,
+  github_last_checked_at: "2026-09-24T20:00:00Z", github_last_release: "mobile-v0.9.0-beta-build77", github_last_error: null, sync_interval_minutes: 10,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   tokenStatus = { configured: true, length: 48, min_length: 24, env: "APP_RELEASE_UPLOAD_TOKEN" };
-  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).endsWith("/status") ? { data: { upload_token: tokenStatus } } : { data: RELEASES }));
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).endsWith("/status") ? { data: { upload_token: tokenStatus } } : String(url).endsWith("/github") ? { data: GITHUB } : { data: RELEASES }));
   apiMock.patch.mockResolvedValue({ data: {} });
   apiMock.post.mockResolvedValue({ data: RELEASES[0] });
 });
@@ -100,4 +105,33 @@ test("der Server-Updater lässt sich abschalten, sobald die App im Play Store is
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/app-releases/settings", { server_updater_enabled: false }));
   await waitFor(() => expect(screen.getByTestId("app-release-server-updater-toggle")).not.toBeChecked());
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Google Play"));
+});
+
+// GitHub-Abgleich (#309): Stand, Token nur hin, Schalter, „Jetzt abgleichen“; je Release der Kanal.
+test("der GitHub-Kasten zeigt den Stand, speichert das Token und gleicht auf Knopfdruck ab", async () => {
+  const user = userEvent.setup();
+  apiMock.patch.mockResolvedValue({ data: GITHUB });
+  apiMock.post.mockResolvedValue({ data: { imported: [{ build: 78, version: "0.9.1-beta", channel: "beta" }], errors: [], settings: GITHUB } });
+  render(<MemoryRouter><AdminAppReleasesPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("app-release-github")).toBeInTheDocument());
+  expect(screen.getByTestId("app-release-github-status")).toHaveTextContent("Verbunden mit Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite");
+  expect(screen.getByTestId("app-release-github-status")).toHaveTextContent("mobile-v0.9.0-beta-build77");
+  expect(screen.getByTestId("app-release-63")).toHaveTextContent("Beta");
+  await user.type(screen.getByTestId("app-release-github-token"), "github_pat_geheim");
+  await user.click(screen.getByTestId("app-release-github-save"));
+  expect(apiMock.patch).toHaveBeenCalledWith("/admin/app-releases/github", { github_token: "github_pat_geheim" });
+  await user.click(screen.getByTestId("app-release-github-betas"));
+  expect(apiMock.patch).toHaveBeenCalledWith("/admin/app-releases/github", { github_rollout_betas: false });
+  await user.click(screen.getByTestId("app-release-github-sync"));
+  expect(apiMock.post).toHaveBeenCalledWith("/admin/app-releases/github/sync");
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Build 78")));
+});
+
+test("ohne Token sagt der Kasten, was zu tun ist, und der Abgleich-Knopf ist gesperrt", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).endsWith("/status") ? { data: { upload_token: tokenStatus } } : String(url).endsWith("/github") ? { data: { ...GITHUB, github_token_configured: false, github_last_release: null, github_last_error: "kein GitHub-Token hinterlegt" } } : { data: RELEASES }));
+  render(<MemoryRouter><AdminAppReleasesPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("app-release-github-status")).toHaveTextContent("Kein Token"));
+  expect(screen.getByTestId("app-release-github-sync")).toBeDisabled();
+  expect(screen.getByTestId("app-release-github-error")).toHaveTextContent("kein GitHub-Token");
+  expect(screen.queryByTestId("app-release-github-clear")).toBeNull();
 });
