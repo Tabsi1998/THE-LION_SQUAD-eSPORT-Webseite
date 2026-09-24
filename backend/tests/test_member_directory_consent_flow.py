@@ -82,6 +82,16 @@ async def test_directory_entry_follows_the_consent_in_dolibarr(flow, fake):
     assert profile["bio"] == "Spielt TFT." and profile["display_name"] == "Paula B." and profile["photo_url"].endswith("paula.png")
     assert profile["real_name"] == "Paula Beispiel-Neu", "der Klarname folgt der Mitgliederverwaltung"
 
+    # Der Vorstand setzt den Klarnamen selbst (nur Vorname): der Abgleich lässt ihn stehen; leer heißt wieder aus Dolibarr.
+    await flow.db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": {"real_name": "Paula"}})
+    fake.members[12]["lastname"] = "Beispiel"
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 0
+    profile = await profile_of(flow, paula)
+    assert profile["real_name"] == "Paula" and profile["dolibarr_name"] == "Paula Beispiel"
+    await flow.db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": {"real_name": None}})
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 0
+    assert (await profile_of(flow, paula))["real_name"] == "Paula Beispiel"
+
     # Widerruf in Dolibarr: offline mit Grund; wieder gegeben: wieder online, die Pflege bleibt.
     fake.member_consents[12]["verzeichnis"]["state"] = "withdrawn"
     assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1

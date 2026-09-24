@@ -270,7 +270,9 @@ dass ein Mitglied etwas tun muss:
 Ab dann legt jeder Abgleich für ein Mitglied mit bestätigter Zuordnung und erteilter Einwilligung
 den Eintrag an: Name aus der Mitgliederverwaltung, Foto und Spiele vom Website-Konto. Alles
 Weitere – Foto, Bio, Spiele, Anzeigename – pflegt der Vorstand unter *Verein → Mitgliederprofile*;
-der nächste Abgleich lässt es stehen (nur der Klarname folgt weiter der Mitgliederverwaltung). Ein
+der nächste Abgleich lässt es stehen. Der Klarname folgt der Mitgliederverwaltung nur, solange der
+Vorstand ihn nicht selbst gesetzt hat – soll bei jemandem der Nachname nicht öffentlich stehen,
+trägt der Vorstand nur den Vornamen ein; ein leeres Feld holt den Namen wieder aus Dolibarr. Ein
 Widerruf in Dolibarr nimmt den Eintrag beim nächsten Abgleich offline – auch einen Eintrag, den das
 Mitglied selbst per Opt-in angelegt hat; eine neue Zustimmung holt ihn samt Pflege zurück. Ein vom
 Vorstand gesperrter Eintrag bleibt gesperrt. Ohne ausgewählte Einwilligung ändert der Abgleich am
