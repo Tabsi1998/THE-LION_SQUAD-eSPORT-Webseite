@@ -1,8 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Sponsoren aus Dolibarr (#405): der Block über der Liste zeigt Schalter und Stand, Einschalten
-// speichert und lädt die Liste neu; bei einem Sponsor aus Dolibarr sind Name, Stufe, Laufzeit und
+// Sponsoren aus Dolibarr (#405, Schalter seit #510 unter Dolibarr → Funktionen): der Block über der
+// Liste zeigt den Stand und lädt nach; bei einem Sponsor aus Dolibarr sind Name, Stufe, Laufzeit und
 // Kontakt gesperrt, Beschreibung und Platzierung bleiben frei.
 
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
@@ -40,37 +40,25 @@ beforeEach(() => {
   toastMock.error.mockReset();
 });
 
-test("Schalter einschalten speichert, meldet den Lauf und lädt die Liste neu", async () => {
+// Seit #510 liegt der Schalter unter Dolibarr → Funktionen: aus = ein Satz mit dem Weg, an = Stand und „Jetzt nachlesen“.
+test("aus: nur der Weg zum Schalter; an: Stand, Nachlesen lädt die Liste neu", async () => {
   mockApi(SOURCE_OFF);
-  apiMock.patch.mockResolvedValue({ data: { ok: true, result: { ok: true, sponsors: { total: 2 }, partners: { total: 1 } }, view: SOURCE_ON } });
   render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
-  const toggle = await screen.findByTestId("dolibarr-source-switch");
-  expect(toggle).not.toBeChecked();
+  expect(await screen.findByTestId("dolibarr-source-off")).toHaveTextContent("Dolibarr → Funktionen");
+  expect(screen.getByTestId("dolibarr-source-features")).toHaveAttribute("href", "/admin/dolibarr?tab=features");
+  expect(screen.queryByTestId("dolibarr-source-switch")).toBeNull();
   expect(screen.queryByTestId("dolibarr-source-refresh")).toBeNull();
 
-  fireEvent.click(toggle);
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/dolibarr/sponsors", { from_dolibarr: true }));
-  await waitFor(() => expect(screen.getByTestId("dolibarr-source-switch")).toBeChecked());
-  expect(screen.getByTestId("dolibarr-source-state")).toHaveTextContent("2 Sponsoren");
-  expect(screen.getByTestId("dolibarr-source-refresh")).toBeInTheDocument();
-  expect(apiMock.get.mock.calls.filter(([url]) => url === "/sponsors/admin").length).toBeGreaterThanOrEqual(2);
-  expect(toastMock.success).toHaveBeenCalled();
-});
-
-test("Kategorien speichern schickt beide Namen; ohne Anbindung gibt es nur den Hinweis", async () => {
-  mockApi(SOURCE_OFF);
-  apiMock.patch.mockResolvedValue({ data: { ok: true, result: null, view: { ...SOURCE_OFF, sponsor_category: "Gönner" } } });
+  mockApi(SOURCE_ON);
+  apiMock.post.mockResolvedValue({ data: { ok: true, sponsors: { total: 2 }, partners: { total: 1 }, view: SOURCE_ON } });
   render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
-  const input = await screen.findByTestId("dolibarr-source-sponsor-category");
-  expect(screen.getByTestId("dolibarr-source-save")).toBeDisabled();
-  fireEvent.change(input, { target: { value: "Gönner" } });
-  fireEvent.click(screen.getByTestId("dolibarr-source-save"));
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/dolibarr/sponsors", { sponsor_category: "Gönner", partner_category: "Partner" }));
-
-  mockApi({ ...SOURCE_OFF, connected: false });
-  render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
-  expect(await screen.findByTestId("dolibarr-source-offline")).toHaveTextContent("nicht angebunden");
-  expect(screen.getAllByTestId("dolibarr-source-switch").at(-1)).toBeDisabled();
+  const state = (await screen.findAllByTestId("dolibarr-source-state")).at(-1);
+  expect(state).toHaveTextContent("2 Sponsoren, 1 Partner");
+  expect(screen.getAllByTestId("dolibarr-source").at(-1)).toHaveTextContent("Kategorie „Sponsor“");
+  fireEvent.click(screen.getAllByTestId("dolibarr-source-refresh").at(-1));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/sponsors/refresh"));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+  expect(apiMock.get.mock.calls.filter(([url]) => url === "/sponsors/admin").length).toBeGreaterThanOrEqual(3);
 });
 
 test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Handeintrag bleibt ganz frei", async () => {

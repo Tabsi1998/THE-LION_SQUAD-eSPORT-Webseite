@@ -61,29 +61,24 @@ test("die Seite heißt Vereinsdaten und lädt die Felder aus dem Branding", asyn
   await waitFor(() => expect(nameInput).toHaveValue("THE LION SQUAD – eSports Verein"));
 });
 
-test("der Haken „Vereinsdaten aus Dolibarr übernehmen“ lässt sich setzen und geht als Änderung raus", async () => {
-  mockApi();
+// Der Schalter liegt seit #510 unter Dolibarr → Funktionen; hier steht nur der Stand, und die Felder sind gesperrt.
+test("kommen die Vereinsdaten aus Dolibarr, sind die Felder gesperrt und der Weg zum Schalter steht da", async () => {
+  mockApi({ legal_from_dolibarr: true });
   renderPage();
-  const box = await screen.findByTestId("legal-from-dolibarr");
-  await waitFor(() => expect(box).not.toBeDisabled());
-  await userEvent.click(box);
-  expect(box).toBeChecked();
+  expect(await screen.findByTestId("legal-dolibarr-title")).toHaveTextContent("Vereinsdaten kommen aus Dolibarr");
+  expect(screen.getByTestId("legal-dolibarr-features")).toHaveAttribute("href", "/admin/dolibarr?tab=features");
+  expect(screen.queryByTestId("legal-from-dolibarr")).toBeNull();
   const nameField = screen.getByTestId("legal-name");
   const nameInput = nameField.tagName === "INPUT" ? nameField : nameField.querySelector("input");
   await waitFor(() => expect(nameInput).toBeDisabled());
   expect(nameInput).toHaveValue("THE LION SQUAD - eSPORTS");
   expect(screen.getByTestId("legal-dolibarr-statutes")).toHaveTextContent("Statuten: Fassung 2 gilt seit 20.04.2026 (3 Fassungen)");
-  await userEvent.click(screen.getByTestId("legal-save"));
-  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ legal_from_dolibarr: true })));
-  const payload = apiMock.put.mock.calls[0][1];
-  expect(Object.keys(payload)).toEqual(["legal_from_dolibarr"]);
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Vereinsdaten gespeichert."));
 });
 
 test("ohne Änderung wird nichts gesendet", async () => {
   mockApi();
   renderPage();
-  await screen.findByTestId("legal-from-dolibarr");
+  expect(await screen.findByTestId("legal-dolibarr-title")).toHaveTextContent("Vereinsdaten von Hand");
   await userEvent.click(screen.getByTestId("legal-save"));
   await waitFor(() => expect(toastMock.info).toHaveBeenCalledWith("Keine Änderungen zum Speichern."));
   expect(apiMock.put).not.toHaveBeenCalled();

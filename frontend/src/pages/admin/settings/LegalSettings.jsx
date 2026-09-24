@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { Link } from "react-router-dom";
 import { BrandField, LegalTextArea } from "./fields";
 
 // Reiter Rechtliches (#223: aus AdminSettingsPage herausgelöst, Verhalten unverändert): Vereinsdaten
-// für Impressum und Datenschutz, der Schalter „Vereinsdaten aus Dolibarr“ mit Stand (#326) und die
-// Zusatztexte. Der Entwurf (`brand`) und das Speichern bleiben bei der Seite, weil Marke und
+// für Impressum und Datenschutz, der Stand „Vereinsdaten aus Dolibarr“ (#326; der Schalter liegt seit
+// #510 unter Dolibarr → Funktionen) und die Zusatztexte. Der Entwurf (`brand`) und das Speichern bleiben bei der Seite, weil Marke und
 // Rechtliches denselben Datensatz teilen.
 
 export function mergedLegacyText(primary, legacy) {
@@ -60,10 +61,10 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
         </div>
         {/* Vereinsdaten aus Dolibarr (#326): Name, ZVR, Behörde, Anschrift, Telefon, Obmann/Obfrau – Redaktionelles bleibt von Hand. */}
         <div className={`border rounded-sm p-4 space-y-2 ${legalFromDolibarr ? "border-[#29B6E8]/40 bg-[#29B6E8]/5" : "border-white/10"}`} data-testid="legal-dolibarr">
-          <label htmlFor="legal-from-dolibarr" className="flex items-center gap-2 text-sm text-white/80 font-bold">
-            <input id="legal-from-dolibarr" type="checkbox" checked={legalFromDolibarr} onChange={(e) => setBrandField("legal_from_dolibarr", e.target.checked)} data-testid="legal-from-dolibarr" className="accent-[#29B6E8]" disabled={dolibarrPublic?.unavailable} />
-            Vereinsdaten aus Dolibarr übernehmen
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-white/80 font-bold">
+            <span data-testid="legal-dolibarr-title">{legalFromDolibarr ? "Vereinsdaten kommen aus Dolibarr" : "Vereinsdaten von Hand"}</span>
+            <Link to="/admin/dolibarr?tab=features" className="text-[11px] uppercase tracking-wider text-[#29B6E8] hover:underline font-bold" data-testid="legal-dolibarr-features">Schalter: Dolibarr → Funktionen →</Link>
+          </div>
           <p className="text-xs text-white/50">Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person kommen dann aus dem Vereinsmodul (stündlich nachgelesen). Datenschutz-E-Mail, inhaltlich Verantwortlicher, Hosting, UID und Zusatztexte bleiben hier. Ändert sich der Obmann in Dolibarr, stimmt das Impressum von selbst – wenn die Person der Nennung zugestimmt hat; sonst bleibt der Eintrag von Hand.</p>
           <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="legal-dolibarr-state">
             {!dolibarrPublic ? <span className="text-white/40">Lade Stand …</span>

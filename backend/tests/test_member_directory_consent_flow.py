@@ -127,7 +127,7 @@ async def test_directory_entry_follows_the_consent_in_dolibarr(flow, fake):
     assert rows[max_["id"]]["deactivated_reason"] == "consent_withdrawn"
     features = {row["key"]: row for row in (await flow.get("/api/admin/dolibarr/status")).json()["features"]}
     assert features["directory"]["enabled"] is True and features["directory"]["state"] == "Einwilligung „verzeichnis“ · 1 Einträge aus Dolibarr"
-    assert features["directory"]["where"] == "/admin/dolibarr?tab=connection"
+    assert features["directory"]["where"] == "/admin/dolibarr?tab=features"  # alle Schalter an einem Ort (#510)
 
 
 @pytest.mark.asyncio

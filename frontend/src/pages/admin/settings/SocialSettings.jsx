@@ -1,9 +1,10 @@
 import { Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { BrandField, BrandSelect } from "./fields";
 
 // Reiter Social Links (#223: aus AdminSettingsPage herausgelöst, Verhalten unverändert): die Liste für den
-// Footer und die Social-Erkennung - und seit #326 Teil 4 der Schalter, die öffentlichen Kanäle des Vereins
-// aus Dolibarr zu nehmen. Der Entwurf (`brand`) und das Speichern bleiben bei der Seite.
+// Footer und die Social-Erkennung - und seit #326 Teil 4 der Stand, ob die öffentlichen Kanäle aus Dolibarr
+// kommen (der Schalter liegt seit #510 unter Dolibarr → Funktionen). Der Entwurf (`brand`) und das Speichern bleiben bei der Seite.
 
 export const SOCIAL_PLATFORM_OPTIONS = [
   ["discord", "Discord"],
@@ -16,7 +17,7 @@ export const SOCIAL_PLATFORM_OPTIONS = [
   ["custom", "Eigener Link"],
 ];
 
-export function SocialsTab({ brand, setBrandField, setSocialLink, addSocialLink, removeSocialLink, saveBrand, saving }) {
+export function SocialsTab({ brand, setSocialLink, addSocialLink, removeSocialLink, saveBrand, saving }) {
   return (
     <div className="max-w-7xl space-y-4">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
@@ -34,10 +35,10 @@ export function SocialsTab({ brand, setBrandField, setSocialLink, addSocialLink,
         </div>
         {/* Kanäle aus Dolibarr (#326 Teil 4): die öffentlichen Kanäle des Vereins aus dem Vereinsmodul */}
         <div className={`border rounded-sm p-4 space-y-1 ${brand.channels_from_dolibarr ? "border-[#29B6E8]/40 bg-[#29B6E8]/5" : "border-white/10"}`} data-testid="socials-dolibarr">
-          <label htmlFor="channels-from-dolibarr" className="flex items-center gap-2 text-sm text-white/80 font-bold">
-            <input id="channels-from-dolibarr" type="checkbox" checked={Boolean(brand.channels_from_dolibarr)} onChange={(e) => setBrandField("channels_from_dolibarr", e.target.checked)} data-testid="channels-from-dolibarr" className="accent-[#29B6E8]" />
-            Kanäle aus Dolibarr übernehmen
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-white/80 font-bold">
+            <span data-testid="socials-dolibarr-title">{brand.channels_from_dolibarr ? "Kanäle kommen aus Dolibarr" : "Kanäle von Hand"}</span>
+            <Link to="/admin/dolibarr?tab=features" className="text-[11px] uppercase tracking-wider text-[#29B6E8] hover:underline font-bold" data-testid="socials-dolibarr-features">Schalter: Dolibarr → Funktionen →</Link>
+          </div>
           <p className="text-xs text-white/50">Footer und Suchmaschinen nehmen dann die öffentlichen Kanäle des Vereins aus dem Vereinsmodul (Einrichtung → Vereine → Kanäle und Konten), in dessen Reihenfolge – stündlich nachgelesen. Stehen dort keine, gilt die Liste unten; sie bleibt auch der Rückfall.</p>
         </div>
         <div className="space-y-2">
