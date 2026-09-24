@@ -1,4 +1,4 @@
-import { changedFields, exitLine, selfRequestLine, validWishedDay } from "./selfService";
+import { changedFields, exitLine, selfRequestLine, validWishedDay, websiteFieldText, websiteStateLine } from "./selfService";
 
 // Vereinsakte in der App (#324/#329): nur Geändertes geht raus, Sätze wie im Web.
 
@@ -19,4 +19,12 @@ test("Wunschdatum nur als JJJJ-MM-TT", () => {
   expect(validWishedDay("")).toBe(true);
   expect(validWishedDay("2026-12-31")).toBe(true);
   expect(validWishedDay("31.12.2026")).toBe(false);
+});
+
+test("Website-Profil (#260): Feldtext und Sichtbarkeitssatz", () => {
+  expect(websiteFieldText({ games: ["TFT", "F1 25"] }, "games")).toBe("TFT, F1 25");
+  expect(websiteFieldText({ gamertag: "LionKing" }, "gamertag")).toBe("LionKing");
+  expect(websiteStateLine({ consent: "", given: false })).toMatch(/keine Einwilligung/);
+  expect(websiteStateLine({ consent: "profil", given: false })).toMatch(/erst, wenn du/);
+  expect(websiteStateLine({ consent: "profil", given: true })).toMatch(/zeigt dieses Profil/);
 });

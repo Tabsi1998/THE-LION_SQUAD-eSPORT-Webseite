@@ -653,6 +653,30 @@ class FakeDolibarr:
             if ident is None:
                 return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
             return self._document_pdf("/vereine/me/documents/{id}/pdf", self._visible_documents(ident["member_id"]), int(match.group(1)))
+        if path == "/vereine/me/website-profile":
+            ident = self._identity(params, "profile")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            member_id = ident["member_id"]
+            stored = self.member_profiles.setdefault(member_id, {})
+            if request.method == "PUT":
+                body = json.loads(request.content.decode("utf-8"))
+                validate(body, request_schema("/vereine/me/website-profile", "put"))
+                limits = {"gamertag": 40, "bio": 2000, "games": 255, "platforms": 255}
+                for key, value in body.items():
+                    if key in ("games", "platforms"):
+                        items = value if isinstance(value, list) else [v.strip() for v in re.split(r"[,;\n]+", str(value)) if v.strip()]
+                        if len(", ".join(items)) > limits[key]:
+                            return httpx.Response(400, json={"error": {"code": 400, "message": f"{key} may have at most {limits[key]} characters"}})
+                        stored[key] = items
+                    else:
+                        if len(str(value)) > limits[key]:
+                            return httpx.Response(400, json={"error": {"code": 400, "message": f"{key} may have at most {limits[key]} characters"}})
+                        stored[key] = str(value).strip()
+            code = self.website_profile_consent
+            given = bool(code) and (self.member_consents.get(member_id, {}).get(code) or {}).get("state") == "given"
+            return self._json("/vereine/me/website-profile", {"consent": code, "given": given, "gamertag": stored.get("gamertag") or "", "bio": stored.get("bio") or "",
+                                                              "games": list(stored.get("games") or []), "platforms": list(stored.get("platforms") or [])})
         if path == "/vereine/me/profile" and request.method == "GET":
             ident = self._identity(params, "profile")
             if ident is None:

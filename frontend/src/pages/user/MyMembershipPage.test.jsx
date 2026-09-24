@@ -224,3 +224,23 @@ test("Austritt geplant: nur noch der Stand, kein Knopf", async () => {
   expect(await screen.findByTestId("membership-self-exit-planned")).toHaveTextContent("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026");
   expect(screen.queryByTestId("membership-self-exit-button")).not.toBeInTheDocument();
 });
+
+test("Mein Website-Profil (#260): nur Geändertes geht raus, der Stand der Einwilligung steht dabei", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/website-profile") return { data: { available: true, consent: "profil", given: false, gamertag: "LionKing", bio: "", games: ["TFT"], platforms: [] } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  apiMock.put.mockResolvedValue({ data: { available: true, consent: "profil", given: false, gamertag: "LionKing", bio: "Spielt TFT.", games: ["TFT", "Rocket League"], platforms: [] } });
+  const user = userEvent.setup();
+  renderPage();
+  const card = await screen.findByTestId("membership-website-card");
+  expect(screen.getByTestId("membership-website-state")).toHaveTextContent("erst, wenn du der Nennung zugestimmt hast");
+  expect(screen.getByTestId("membership-website-gamertag")).toHaveValue("LionKing");
+  expect(screen.getByTestId("membership-website-save")).toBeDisabled();
+  await user.type(screen.getByTestId("membership-website-games"), ", Rocket League");
+  await user.type(screen.getByTestId("membership-website-bio"), "Spielt TFT.");
+  await user.click(screen.getByTestId("membership-website-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/membership/me/website-profile", { games: "TFT, Rocket League", bio: "Spielt TFT." }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Website-Profil gespeichert."));
+  expect(card).toBeInTheDocument();
+});

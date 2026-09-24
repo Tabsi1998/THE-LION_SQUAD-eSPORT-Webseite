@@ -11,7 +11,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, member  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import dolibarr_client, dolibarr_identity  # noqa: E402
+from services import dolibarr_client, dolibarr_identity, dolibarr_sync  # noqa: E402
+from services.dolibarr_links import verify_link  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -120,3 +121,46 @@ async def test_a_revoked_binding_closes_the_self_service(flow, fake):
     assert view["available"] is False and view["reason"] == "not_bound"
     assert (await flow.get("/api/membership/me/identity")).json()["status"] == "revoked"
     assert (await flow.post("/api/membership/me/self-service/exit", json={})).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_member_keeps_own_website_profile_and_the_directory_follows(flow, fake, monkeypatch, tmp_path):
+    """Eigenes Website-Profil (#260): nur mit Bindung und Fähigkeit „profile“; nur gesendete Felder ändern sich,
+    zu lang heißt 400 mit Feldname; die Einwilligung steht dabei; nach dem Speichern liest die Website das
+    Mitglied nach, und das Verzeichnis zeigt den neuen Gamertag."""
+    monkeypatch.setattr(dolibarr_sync, "UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(dolibarr_sync, "PENDING_DELAY_SECONDS", 0)
+    await connect(flow)
+    fake.consent_texts.append({"code": "profil", "label": "Nennung auf der Website", "version": 1, "text": "…"})
+    fake.website_profile_consent = "profil"
+    paula = await paula_bound(flow, fake)
+    paula["is_club_member"] = True
+    settings = await dolibarr_client.load_settings(flow.db)
+    await verify_link(flow.db, settings, user_id=paula["id"], member_id=12, member_ref="12", source="admin", actor_id="admin")
+
+    view = (await flow.get("/api/membership/me/website-profile")).json()
+    assert view == {"available": True, "consent": "profil", "given": False, "gamertag": "", "bio": "", "games": [], "platforms": []}
+
+    saved = (await flow.put("/api/membership/me/website-profile", json={"gamertag": " LionKing ", "games": "TFT, Rocket League, TFT"})).json()
+    assert saved["gamertag"] == "LionKing" and saved["games"] == ["TFT", "Rocket League"] and saved["bio"] == "" and saved["given"] is False
+    saved = (await flow.put("/api/membership/me/website-profile", json={"bio": "Spielt TFT.", "platforms": ["PC", "PS5"]})).json()
+    assert saved["gamertag"] == "LionKing" and saved["bio"] == "Spielt TFT." and saved["platforms"] == ["PC", "PS5"], "nicht gesendete Felder bleiben"
+    too_long = await flow.put("/api/membership/me/website-profile", json={"gamertag": "x" * 41})
+    assert too_long.status_code == 400 and "Gamertag" in too_long.json()["detail"]
+    assert (await flow.put("/api/membership/me/website-profile", json={})).status_code == 400
+    assert fake.member_profiles[12]["gamertag"] == "LionKing", "dieselbe Ablage wie die Mitgliedskarte"
+
+    # Einwilligung erteilt: das Profil ist „given“, und nach dem nächsten Speichern zeigt das Verzeichnis den Gamertag.
+    fake.member_consents.setdefault(12, {})["profil"] = {"state": "given", "version": 1, "moment": "2026-09-25T09:00:00+00:00"}
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["ok"] is True
+    assert (await flow.get("/api/membership/me/website-profile")).json()["given"] is True
+    await flow.put("/api/membership/me/website-profile", json={"gamertag": "LionQueen"})
+    assert (await dolibarr_sync.process_pending(flow.db))["processed"] == 1
+    profile = await flow.db.club_member_profiles.find_one({"user_id": paula["id"]}, {"_id": 0})
+    assert profile["gamertag"] == "LionQueen" and profile["bio"] == "Spielt TFT." and profile["games"] == ["TFT", "Rocket League"]
+
+    # Ohne Fähigkeit oder Bindung: Grund statt Formular.
+    fake.revoke_identity(paula["id"])
+    view = (await flow.get("/api/membership/me/website-profile")).json()
+    assert view["available"] is False and view["reason"] == "not_bound"
+    assert (await flow.put("/api/membership/me/website-profile", json={"gamertag": "x"})).status_code == 403
