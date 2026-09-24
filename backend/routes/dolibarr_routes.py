@@ -29,7 +29,8 @@ from services.dolibarr_client import (
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
-from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, apply_summary, migration_preview, queue_member, run_sync, sync_state
+from services import dolibarr_identity
+from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.membership_service import VALID_TYPES
 from services.rate_limit import enforce_rate_limit
 from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
@@ -62,6 +63,18 @@ async def _features(db, settings: dict) -> list[dict]:
     mode = settings.get("mode") or "off"
     live = mode == "live"
     connection = "/admin/dolibarr?tab=connection"
+    state = await sync_state(db)
+    # Vereinsakte ohne Einladungscode (#531): Modul ab 1.4.0 und das Recht „im Namen jedes Mitglieds handeln“.
+    member_mode = dolibarr_identity.module_supports_member_id(state)
+    member_access = state.get("member_access") or {}
+    if not live:
+        member_state = "erst im Modus Live"
+    elif not member_mode:
+        member_state = f"Modul {state.get('module_version') or '–'} – braucht Vereine 1.4.0; bis dahin Einladungscode"
+    elif member_access.get("ok") is False:
+        member_state = f"Recht fehlt · seit {str(member_access.get('at') or '')[:16].replace('T', ' ')}"
+    else:
+        member_state = "an (bestätigte Zuordnung reicht)"
     # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): eigener Code oder der des Moduls fürs Website-Profil.
     directory_code = str(settings.get("directory_consent_code") or (await sync_state(db)).get("website_profile_consent") or "").strip()
     directory_entries = await db.club_member_profiles.count_documents({"source": "dolibarr"})
@@ -89,6 +102,10 @@ async def _features(db, settings: dict) -> list[dict]:
         {"key": "consents", "label": "Einwilligungen unter „Meine Mitgliedschaft“", "enabled": live, "state": "an (Modus Live)" if live else "erst im Modus Live",
          "hint": "Läuft von selbst mit Vereinsmodul ab 0.8.0; das API-Recht für Beitrittsanträge deckt es mit ab.",
          "where": connection, "where_label": "Verbindung → Modus"},
+        {"key": "member_access", "label": "Vereinsakte ohne Einladungscode (Unterlagen, eigene Daten, Website-Profil)",
+         "enabled": live and member_mode and member_access.get("ok") is not False, "state": member_state,
+         "hint": f"Ab Vereinsmodul 1.4.0 reicht die bestätigte Zuordnung des Kontos; der API-Benutzer der Website braucht in Dolibarr das Recht „{dolibarr_identity.MEMBER_RIGHT_LABEL}“. Fehlt eines davon, bleibt der Einladungscode (Einrichtung → Externe Identitäten) der Weg.",
+         "where": "/admin/dolibarr?tab=links", "where_label": "Dolibarr → Zuordnungen"},
         {"key": "directory", "label": "Mitgliederverzeichnis und Profile aus Dolibarr", "enabled": live and bool(directory_code),
          "state": (f"Einwilligung „{directory_code}“{' (aus dem Modul)' if directory_code and not settings.get('directory_consent_code') else ''} · "
                    f"{directory_entries} Einträge aus Dolibarr" + (f", davon {directory_without_account} ohne Konto" if directory_without_account else "")) if live and directory_code else ("erst im Modus Live" if directory_code else "aus (keine Einwilligung gewählt)"),
@@ -473,6 +490,9 @@ async def test_dolibarr_connection(me: dict = Depends(require_area("system"))):
         status = await (await DolibarrClient.from_db()).status()
     except DolibarrError as exc:
         return {"ok": False, "error": exc.kind, "text": exc.text, "status": exc.status}
+    # Die Modulversion gleich merken: davon hängt ab, ob die Vereinsakte ohne Einladungscode geht (#531).
+    await get_db().settings.update_one({"id": STATE_ID}, {"$set": {"id": STATE_ID, "module_version": status.get("module_version"),
+                                                                    "api_version": status.get("api_version")}}, upsert=True)
     return {
         "ok": True, "module_version": status.get("module_version"), "api_version": status.get("api_version"),
         "server_time": status.get("server_time"), "capabilities": capabilities_for(status),

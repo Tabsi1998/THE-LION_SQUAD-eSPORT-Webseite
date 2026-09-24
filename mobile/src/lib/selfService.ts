@@ -4,6 +4,12 @@
 export type IdentityState = {
   available?: boolean;
   status?: "none" | "bound" | "revoked" | string;
+  // "member": bestätigte Zuordnung reicht (Vereinsmodul ab 1.4.0, #531); "code": Bindung per Einladungscode.
+  via?: "member" | "code" | string;
+  linked?: boolean;
+  member_ref?: string | null;
+  module_too_old?: boolean;
+  right_missing?: boolean;
   capabilities?: string[];
   capability_labels?: string[];
   linked_at?: string | null;

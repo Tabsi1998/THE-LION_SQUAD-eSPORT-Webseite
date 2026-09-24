@@ -79,8 +79,8 @@ export default function MemberDocumentsPage() {
         </p>
         {identity && identity.status !== "bound" && (
           <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75" data-testid="docs-identity-hint">
-            Deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Beschlüsse, Schreiben) erscheinen hier, sobald dein Konto verbunden ist –{" "}
-            <Link to="/members/membership" className="text-[#FFD700] hover:underline">Einladungscode unter Meine Mitgliedschaft einlösen</Link>.
+            Deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Beschlüsse, Schreiben) erscheinen hier von selbst, sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (über die bestätigte E-Mail-Adresse oder durch den Vorstand) – oder du löst einen{" "}
+            <Link to="/members/membership" className="text-[#FFD700] hover:underline">Einladungscode unter Meine Mitgliedschaft</Link> ein.
           </div>
         )}
 

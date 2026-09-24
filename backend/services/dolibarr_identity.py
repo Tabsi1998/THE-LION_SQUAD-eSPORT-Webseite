@@ -12,8 +12,8 @@ der Verein für die Öffentlichkeit veröffentlicht (``GET /vereine/documents``)
 Die Website hält je Konto und Installation eine Bindung in ``dolibarr_identities`` (Mitglied,
 Fähigkeiten, seit wann). Widerruft der Verein, antwortet das Modul 403 - dann steht die Bindung hier
 auf ``revoked``, und die Person sieht wieder nur Öffentliches, bis sie einen neuen Code einlöst.
-E-Mail, Mitgliedsnummer oder eine bestätigte Zuordnung der Website gelten dem Modul nie als
-Nachweis; deshalb ersetzt nichts davon den Code.
+Ab Vereine 1.4.0 (#531) reicht die bestätigte Zuordnung der Website: die Aufrufe gehen dann mit
+``member_id`` statt ``subject`` (siehe ``access_for``); der Code bleibt der Ersatzweg für ältere Module.
 
 Dokumente aus der Akte erscheinen in der gemeinsamen Liste ``GET /api/documents`` mit der Kennung
 ``dolibarr-<document_id>`` und ``source: dolibarr`` - die Statutenfassungen (``me/statutes`` mit
@@ -31,6 +31,7 @@ import time
 
 from models import new_id, now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, load_settings
+from services.dolibarr_links import verified_link
 
 logger = logging.getLogger("tls.dolibarr.identity")
 
@@ -45,7 +46,19 @@ KIND_CATEGORY = {"statute": "statutes", "minutes": "minutes", "resolution": "res
 WHAT_LABELS = {"built": "erstellt", "signed": "unterschrieben", "scan": "Scan des unterschriebenen Papiers", "excerpt": "gekürzte Fassung"}
 AUDIENCE_LABELS = {"person": "nur für dich", "members": "für Mitglieder", "board": "für den Vorstand", "public": "öffentlich"}
 CAPABILITY_LABELS = {"documents": "Dokumente", "consents": "Einwilligungen", "votes": "Abstimmungen", "meetings": "Sitzungen",
-                     "profile": "eigene Daten", "events": "Veranstaltungen", "accounts": "Konten", "applications": "Antrag"}
+                     "profile": "eigene Daten", "events": "Veranstaltungen", "accounts": "Konten", "applications": "Antrag",
+                     "website": "Website-Profil"}
+
+# Vereinsakte ohne Einladungscode (#531): ab Vereine 1.4.0 nimmt jeder me/*-Aufruf statt der Bindung (``subject``)
+# auch die Mitgliedsnummer (``member_id``). Die bestätigte Zuordnung der Website (``dolibarr_links``) reicht dann
+# als Nachweis; dafür braucht der API-Benutzer der Website im Modul das Recht „Über die API im Namen jedes
+# Mitglieds handeln“. Ältere Module ignorieren member_id (400 „subject is needed“) - dort bleibt der Code der Weg.
+MEMBER_MODE_MIN_VERSION = (1, 4, 0)
+MEMBER_MODE_CAPABILITIES = ["documents", "profile", "website"]
+MEMBER_RIGHT_LABEL = "Über die API im Namen jedes Mitglieds handeln"
+MEMBER_RIGHT_TEXT = ("Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand gibt dem "
+                     f"API-Benutzer der Website in Dolibarr das Recht „{MEMBER_RIGHT_LABEL}“.")
+STATE_ID = "dolibarr_sync_state"
 
 _LIST_CACHE: dict[str, tuple[float, list[dict]]] = {}
 
@@ -70,23 +83,98 @@ async def binding_for(db, settings: dict, user_id: str) -> dict | None:
     return await db[COLLECTION].find_one({"user_id": user_id, "instance": instance_key(settings)}, {"_id": 0})
 
 
-def public_state(binding: dict | None, settings: dict) -> dict:
-    """Was die Person über ihre Bindung sieht - nie Kennungen des Moduls."""
+def parse_version(text) -> tuple[int, ...]:
+    """„1.4.0“ → (1, 4, 0); leer oder unlesbar → () - und das ist kleiner als jede Mindestversion."""
+    parts: list[int] = []
+    for piece in str(text or "").strip().split("."):
+        digits = "".join(ch for ch in piece if ch.isdigit())
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def module_supports_member_id(state: dict | None) -> bool:
+    return parse_version((state or {}).get("module_version")) >= MEMBER_MODE_MIN_VERSION
+
+
+async def _sync_state(db) -> dict:
+    return await db.settings.find_one({"id": STATE_ID}, {"_id": 0, "id": 0}) or {}
+
+
+async def note_member_access(db, ok: bool, text: str = "") -> None:
+    """Für Dolibarr → Stand: ging der letzte Aufruf über die Mitgliedsnummer durch, oder fehlt das Recht?"""
+    await db.settings.update_one({"id": STATE_ID}, {"$set": {"id": STATE_ID, "member_access": {"ok": ok, "at": now_utc().isoformat(), "text": text}}}, upsert=True)
+
+
+async def access_for(db, settings: dict, user_id: str) -> dict | None:
+    """Wie die Website für diese Person beim Modul auftritt - oder None, wenn es keinen Weg gibt.
+    ``member``: bestätigte Zuordnung und Modul ab 1.4.0 (Parameter ``member_id``);
+    ``subject``: Bindung per Einladungscode (Parameter ``subject``). ``params`` geht so an den Client."""
+    link = await verified_link(db, settings, user_id)
+    state = await _sync_state(db)
+    if link and link.get("member_id") and module_supports_member_id(state):
+        member_id = int(link["member_id"])
+        return {"mode": "member", "params": {"member_id": member_id}, "member_id": member_id, "link": link, "binding": None,
+                "capabilities": list(MEMBER_MODE_CAPABILITIES), "state": state}
+    binding = await binding_for(db, settings, user_id)
+    if binding and binding.get("status") == "bound":
+        return {"mode": "subject", "params": {"subject": binding["subject"]}, "member_id": binding.get("member_id"), "link": link, "binding": binding,
+                "capabilities": [c for c in binding.get("capabilities") or [] if isinstance(c, str)], "state": state}
+    return None
+
+
+def access_key(access: dict) -> str:
+    return f"me:{access['mode']}:{access['params'].get('member_id') or access['params'].get('subject')}"
+
+
+async def forbidden(db, access: dict) -> None:
+    """Das Modul hat Nein gesagt: über die Bindung heißt das Widerruf, über die Mitgliedsnummer fehlt dem
+    API-Benutzer das Recht - beides merkt sich die Website sofort, nicht erst beim nächsten Abgleich."""
+    if access["mode"] == "subject":
+        await mark_revoked(db, access["binding"])
+        return
+    _LIST_CACHE.pop(access_key(access), None)
+    await note_member_access(db, False, MEMBER_RIGHT_TEXT)
+
+
+async def member_call_ok(db, access: dict) -> None:
+    """Ein Aufruf über die Mitgliedsnummer ging durch - eine gemerkte Störung ist damit vorbei."""
+    if access["mode"] == "member" and (access["state"].get("member_access") or {}).get("ok") is False:
+        access["state"]["member_access"] = {"ok": True}
+        await note_member_access(db, True)
+
+
+def public_state(binding: dict | None, settings: dict, link: dict | None = None, state: dict | None = None) -> dict:
+    """Was die Person über ihre Verbindung zur Vereinsakte sieht - nie Kennungen des Moduls.
+    ``via``: „member“ (Zuordnung reicht, #531) oder „code“ (Bindung per Einladungscode)."""
     if settings.get("mode") != "live":
         return {"available": False, "status": "none", "capabilities": []}
+    linked = bool(link and link.get("status") == "verified" and link.get("member_id"))
+    if linked and module_supports_member_id(state):
+        access = (state or {}).get("member_access") or {}
+        return {
+            "available": True, "status": "bound", "via": "member", "linked": True, "member_ref": link.get("member_ref"),
+            "capabilities": list(MEMBER_MODE_CAPABILITIES), "capability_labels": [CAPABILITY_LABELS.get(c, c) for c in MEMBER_MODE_CAPABILITIES],
+            "linked_at": link.get("verified_at"), "right_missing": access.get("ok") is False, "module_too_old": False,
+        }
+    base = {"linked": linked, "member_ref": link.get("member_ref") if linked else None, "module_too_old": linked and not module_supports_member_id(state)}
     if not binding:
-        return {"available": True, "status": "none", "capabilities": []}
+        return {"available": True, "status": "none", "capabilities": [], **base}
     capabilities = [c for c in binding.get("capabilities") or [] if isinstance(c, str)]
     return {
-        "available": True, "status": binding.get("status") or "bound", "capabilities": capabilities,
+        "available": True, "status": binding.get("status") or "bound", "via": "code", "capabilities": capabilities,
         "capability_labels": [CAPABILITY_LABELS.get(c, c) for c in capabilities],
-        "linked_at": binding.get("linked_at"), "revoked_at": binding.get("revoked_at"), "proof": binding.get("proof"),
+        "linked_at": binding.get("linked_at"), "revoked_at": binding.get("revoked_at"), "proof": binding.get("proof"), **base,
     }
 
 
 async def state(db, user: dict) -> dict:
     settings = await load_settings(db)
-    return public_state(await binding_for(db, settings, user["id"]), settings)
+    if settings.get("mode") != "live":
+        return public_state(None, settings)
+    return public_state(await binding_for(db, settings, user["id"]), settings,
+                        link=await verified_link(db, settings, user["id"]), state=await _sync_state(db))
 
 
 async def claim(db, user: dict, code: str) -> dict:
@@ -129,14 +217,14 @@ async def claim(db, user: dict, code: str) -> dict:
         "checked_at": now_utc().isoformat(), "status": "bound",
     }
     await db[COLLECTION].update_one({"user_id": user["id"], "instance": doc["instance"]}, {"$set": doc, "$unset": {"revoked_at": ""}}, upsert=True)
-    _LIST_CACHE.pop(f"me:{doc['subject']}", None)
-    return public_state(doc, settings)
+    _LIST_CACHE.pop(f"me:subject:{doc['subject']}", None)
+    return await state(db, user)
 
 
 async def mark_revoked(db, binding: dict) -> None:
     """Das Modul hat Nein gesagt: die Bindung gilt nicht mehr - sofort, nicht erst beim nächsten Abgleich."""
     await db[COLLECTION].update_one({"id": binding["id"]}, {"$set": {"status": "revoked", "revoked_at": now_utc().isoformat()}})
-    _LIST_CACHE.pop(f"me:{binding.get('subject')}", None)
+    _LIST_CACHE.pop(f"me:subject:{binding.get('subject')}", None)
 
 
 def _describe(row: dict) -> str:
@@ -202,10 +290,10 @@ def statute_view(row: dict) -> dict:
     }
 
 
-async def _statutes_rows(client: DolibarrClient, binding: dict | None, bound: bool) -> list[dict]:
-    """Die Fassungen, die die Person sehen darf: mit Bindung die für Mitglieder freigegebenen, sonst die öffentlichen."""
+async def _statutes_rows(client: DolibarrClient, access: dict | None) -> list[dict]:
+    """Die Fassungen, die die Person sehen darf: verbunden die für Mitglieder freigegebenen, sonst die öffentlichen."""
     try:
-        data = await client.my_statutes(binding["subject"]) if bound else await client.statutes()
+        data = await client.my_statutes(access["params"]) if access else await client.statutes()
     except DolibarrError as exc:
         logger.warning("[dolibarr] Statuten nicht lesbar: %s", exc.kind)
         return []
@@ -220,9 +308,8 @@ async def documents_for(db, user: dict) -> list[dict]:
     settings = await load_settings(db)
     if settings.get("mode") != "live":
         return []
-    binding = await binding_for(db, settings, user["id"])
-    bound = bool(binding and binding.get("status") == "bound")
-    key = f"me:{binding['subject']}" if bound else "public"
+    access = await access_for(db, settings, user["id"])
+    key = access_key(access) if access else "public"
     cached = _LIST_CACHE.get(key)
     if cached and time.monotonic() - cached[0] < LIST_TTL_SECONDS:
         return [dict(doc) for doc in cached[1]]
@@ -231,15 +318,27 @@ async def documents_for(db, user: dict) -> list[dict]:
     except DolibarrError:
         return []
     try:
-        rows = await client.my_documents(binding["subject"]) if bound else await client.public_documents()
+        rows = await client.my_documents(access["params"]) if access else await client.public_documents()
     except DolibarrError as exc:
-        if bound and exc.kind == "forbidden":
-            await mark_revoked(db, binding)
-            return await documents_for(db, user)
-        logger.warning("[dolibarr] Dokumente nicht lesbar: %s", exc.kind)
-        return []
+        if access and exc.kind == "forbidden":
+            await forbidden(db, access)
+            if access["mode"] == "subject":
+                return await documents_for(db, user)
+            # Über die Mitgliedsnummer fehlt das Recht: bis der Vorstand es setzt, gibt es das Öffentliche.
+            access = None
+            try:
+                rows = await client.public_documents()
+            except DolibarrError as inner:
+                logger.warning("[dolibarr] Dokumente nicht lesbar: %s", inner.kind)
+                return []
+        else:
+            logger.warning("[dolibarr] Dokumente nicht lesbar: %s", exc.kind)
+            return []
+    else:
+        if access:
+            await member_call_ok(db, access)
     docs = [document_view(row) for row in rows if isinstance(row, dict) and row.get("document_id")]
-    docs.extend(statute_view(row) for row in await _statutes_rows(client, binding, bound))
+    docs.extend(statute_view(row) for row in await _statutes_rows(client, access))
     _LIST_CACHE[key] = (time.monotonic(), docs)
     return [dict(doc) for doc in docs]
 
@@ -250,14 +349,13 @@ async def document_pdf(db, user: dict, document_id: int) -> tuple[bytes, dict]:
     settings = await load_settings(db)
     if settings.get("mode") != "live":
         raise DolibarrError("not_configured")
-    binding = await binding_for(db, settings, user["id"])
-    bound = bool(binding and binding.get("status") == "bound")
+    access = await access_for(db, settings, user["id"])
     client = DolibarrClient(settings)
     try:
-        data = await client.my_document_pdf(binding["subject"], document_id) if bound else await client.public_document_pdf(document_id)
+        data = await client.my_document_pdf(access["params"], document_id) if access else await client.public_document_pdf(document_id)
     except DolibarrError as exc:
-        if bound and exc.kind == "forbidden":
-            await mark_revoked(db, binding)
+        if access and exc.kind == "forbidden":
+            await forbidden(db, access)
         raise
     expected = str(data.get("sha256") or "")
     try:
@@ -275,14 +373,13 @@ async def statute_pdf(db, user: dict, version_id: int) -> tuple[bytes, dict]:
     settings = await load_settings(db)
     if settings.get("mode") != "live":
         raise DolibarrError("not_configured")
-    binding = await binding_for(db, settings, user["id"])
-    bound = bool(binding and binding.get("status") == "bound")
+    access = await access_for(db, settings, user["id"])
     client = DolibarrClient(settings)
     try:
-        data = await client.my_statute_pdf(binding["subject"], version_id) if bound else await client.statute_pdf(version_id)
+        data = await client.my_statute_pdf(access["params"], version_id) if access else await client.statute_pdf(version_id)
     except DolibarrError as exc:
-        if bound and exc.kind == "forbidden":
-            await mark_revoked(db, binding)
+        if access and exc.kind == "forbidden":
+            await forbidden(db, access)
         raise
     expected = str(data.get("sha256") or "")
     try:

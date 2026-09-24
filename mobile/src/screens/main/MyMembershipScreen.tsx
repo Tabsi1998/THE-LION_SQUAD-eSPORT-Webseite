@@ -281,7 +281,12 @@ export function MyMembershipScreen({ navigation }: Props) {
         {identity ? (
           <Card style={[styles.card, identity.status === "bound" ? styles.ok : styles.info]} testID="membership-identity">
             <Heading>Vereinsakte</Heading>
-            {identity.status === "bound" ? (
+            {identity.status === "bound" && identity.via === "member" ? (
+              <Muted testID="membership-identity-bound">
+                Über deine Mitgliedsnummer{identity.member_ref ? ` ${identity.member_ref}` : ""} verbunden – Unterlagen, eigene Daten und Website-Profil kommen von selbst aus der Mitgliederverwaltung.
+                {identity.right_missing ? " Die Website darf dort noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein." : ""}
+              </Muted>
+            ) : identity.status === "bound" ? (
               <Muted testID="membership-identity-bound">
                 Verbunden seit {formatDate(identity.linked_at)}{identity.capability_labels?.length ? ` (${identity.capability_labels.join(", ")})` : ""}. Deine Unterlagen stehen unter Vereinsdokumente.
               </Muted>
@@ -290,7 +295,9 @@ export function MyMembershipScreen({ navigation }: Props) {
                 <Muted>
                   {identity.status === "revoked"
                     ? "Der Verein hat die Verbindung widerrufen. Mit einem neuen Code vom Vorstand verbindest du dein Konto wieder."
-                    : "Mit einem Einladungscode vom Vorstand siehst du deine persönlichen Unterlagen aus der Vereinsakte. Der Code gilt eine Stunde und genau einmal."}
+                    : identity.module_too_old
+                      ? "Dein Konto ist deinem Mitgliedseintrag zugeordnet – ohne Code geht es ab Vereinsmodul 1.4.0. Bis dahin: Einladungscode vom Vorstand."
+                      : "Sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (E-Mail-Abgleich oder Vorstand), kommen deine Unterlagen von selbst. Alternativ: Einladungscode vom Vorstand (eine Stunde, genau einmal)."}
                 </Muted>
                 <TextInput
                   style={styles.input}

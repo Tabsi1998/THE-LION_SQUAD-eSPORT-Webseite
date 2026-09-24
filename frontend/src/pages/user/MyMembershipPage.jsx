@@ -157,9 +157,9 @@ export default function MyMembershipPage() {
   );
 }
 
-// Vereinsakte verbinden (#324 Teil 1): Der Vorstand erzeugt in Dolibarr einen Einladungscode (gilt eine
-// Stunde, genau einmal); eingelöst ist das Konto an das Mitglied gebunden, und die Vereinsdokumente
-// zeigen auch die persönlichen Unterlagen. Ein Widerruf im Modul wirkt beim nächsten Abruf.
+// Vereinsakte (#324 Teil 1, #531): Ab Vereinsmodul 1.4.0 reicht die bestätigte Zuordnung des Kontos zum
+// Mitgliedseintrag - Unterlagen, eigene Daten und Website-Profil kommen dann von selbst (via "member").
+// Der Einladungscode vom Vorstand (gilt eine Stunde, genau einmal) bleibt der Ersatzweg für ältere Module.
 function IdentityCard() {
   const [state, setState] = useState(null);
   const [code, setCode] = useState("");
@@ -185,22 +185,28 @@ function IdentityCard() {
   };
   if (!state) return null;
   const bound = state.status === "bound";
+  const viaMember = bound && state.via === "member";
+  const hint = state.status === "revoked"
+    ? "Der Verein hat die Verbindung widerrufen. Mit einem neuen Code vom Vorstand verbindest du dein Konto wieder."
+    : state.module_too_old
+      ? `Dein Konto ist deinem Mitgliedseintrag${state.member_ref ? ` (Nr. ${state.member_ref})` : ""} zugeordnet. Damit deine Unterlagen ohne Code erscheinen, braucht der Verein das Vereinsmodul ab 1.4.0 – bis dahin geht es mit einem Einladungscode vom Vorstand.`
+      : "Sobald dein Konto deinem Mitgliedseintrag zugeordnet ist – von selbst über deine bestätigte E-Mail-Adresse oder durch den Vorstand –, siehst du unter Vereinsdokumente auch deine persönlichen Unterlagen aus der Vereinsakte. Alternativ geht ein Einladungscode vom Vorstand (gilt eine Stunde, genau einmal).";
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-identity-card">
       <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Vereinsakte</h2>
       {bound ? (
         <div className="mt-2 text-sm text-white/70" data-testid="membership-identity-bound">
-          Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden
-          {state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.{" "}
+          {viaMember
+            ? <>Dein Konto ist über deine Mitgliedsnummer{state.member_ref ? ` ${state.member_ref}` : ""} mit der Vereinsakte verbunden – Unterlagen, eigene Daten und dein Website-Profil kommen von selbst aus der Mitgliederverwaltung.</>
+            : <>Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden{state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.</>}{" "}
           <Link to="/members/documents" className="text-[#FFD700] hover:underline" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
+          {viaMember && state.right_missing ? (
+            <p className="mt-2 text-[#FFD700]/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
+          ) : null}
         </div>
       ) : (
         <>
-          <p className="mt-2 text-sm text-white/70" data-testid="membership-identity-hint">
-            {state.status === "revoked"
-              ? "Der Verein hat die Verbindung widerrufen. Mit einem neuen Code vom Vorstand verbindest du dein Konto wieder."
-              : "Mit einem Einladungscode vom Vorstand siehst du unter Vereinsdokumente auch deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Protokolle, Beschlüsse). Der Code gilt eine Stunde und genau einmal."}
-          </p>
+          <p className="mt-2 text-sm text-white/70" data-testid="membership-identity-hint">{hint}</p>
           <form onSubmit={submit} className="mt-3 flex flex-col sm:flex-row gap-2" data-testid="membership-identity-form">
             <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={120} placeholder="Einladungscode" autoComplete="off" data-testid="membership-identity-code" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
