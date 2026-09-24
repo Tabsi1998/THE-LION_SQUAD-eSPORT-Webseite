@@ -152,6 +152,8 @@ async def _viewer_context(db, viewer: dict | None, target_id: str) -> dict:
 def _field_visible(user: dict, key: str, profile_public: bool, ctx: dict | None = None) -> bool:
     """Die Stufe eines Felds gegen den Betrachter: public → alle, community → eingeloggt, members →
     Vereinsmitglieder und Admin-Team, admins → Admin-Team, private → nur die Person selbst."""
+    if key in (ctx or {}).get("off", ()):
+        return False   # vom Verein abgehakt (#558): erscheint nirgends, auch nicht der Person selbst
     if not profile_public:
         return False
     ctx = ctx or {}
@@ -601,6 +603,8 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
     public = bool(u.get("privacy_public_profile"))
     # Die Stufen Community/Verein/Nur Admins/Privat gelten je Betrachter - nicht nur „öffentlich oder nichts“.
     ctx = await _viewer_context(db, viewer, u["id"])
+    from services.platform_links import disabled_platforms
+    ctx["off"] = disabled_platforms(await db.settings.find_one({"id": "branding"}, {"_id": 0, "disabled_platforms": 1}))
     # Membership data
     membership = await db.memberships.find_one({"user_id": u["id"]}, {"_id": 0})
     is_member = bool(membership and membership.get("member_status") in ("active", "honorary"))

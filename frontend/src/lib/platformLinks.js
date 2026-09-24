@@ -84,3 +84,12 @@ export function linkForField(links, field) {
   if (!platform) return null;
   return (links || []).find((link) => link.platform === platform) || null;
 }
+
+// Getippte Plattformen (#558): welches Profilfeld zu welchem Haken unter Alle Verbindungen gehört.
+export const MANUAL_PLATFORM_OF = { instagram_handle: "instagram", psn_id: "psn", nintendo_fc: "nintendo", ea_id: "ea" };
+
+// Abgehakte Plattformen (#558) erscheinen nirgends - die Liste kommt vom Server (`/me/platform-links` → disabled,
+// `/settings/public` → disabled_platforms).
+export function platformsOff(list) {
+  return new Set(Array.isArray(list) ? list : []);
+}

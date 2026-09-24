@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Link2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ArrowRight, Link2, RefreshCw, ToggleLeft } from "lucide-react";
 import { toast } from "sonner";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
@@ -22,9 +22,56 @@ export function StateChip({ state, testId }) {
   return <span data-testid={testId} className={`inline-flex items-center px-2 py-0.5 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${meta.className}`}>{meta.label}</span>;
 }
 
+const PLATFORM_GROUPS = [["social", "Socials"], ["game", "Spielkonten"]];
+
+// Haken je Plattform (#558): abgehakt heißt nirgends - nicht im Profil, nicht im öffentlichen Profil, nicht in der
+// App, nicht in der Datenschutzerklärung. Gespeichert bleibt alles; der Haken bringt es zurück.
+export function PlatformSwitches({ platforms, off, onChange, onSave, saving, dirty }) {
+  if (!platforms.length) return null;
+  const toggle = (key, enabled) => {
+    const next = new Set(off);
+    if (enabled) next.delete(key);
+    else next.add(key);
+    onChange(next);
+  };
+  return (
+    <section className="mb-8" data-testid="platforms-section">
+      <h2 className="font-heading text-lg font-black uppercase mb-1 inline-flex items-center gap-2"><ToggleLeft className="w-4 h-4 text-[#29B6E8]" /> Plattformen für Mitglieder</h2>
+      <p className="text-xs text-white/55 mb-3 max-w-3xl">
+        Abgehakt heißt: die Plattform erscheint nirgends – nicht im Profil, nicht im öffentlichen Profil, nicht in der App, nicht in der
+        Datenschutzerklärung. Eingetragene Namen und Verknüpfungen bleiben gespeichert und sind wieder da, sobald der Haken zurück ist.
+      </p>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <button type="button" onClick={() => onChange(new Set())} data-testid="platforms-enable-all" className="px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white hover:border-white/40">Alle an</button>
+        <button type="button" onClick={() => onChange(new Set(platforms.map((platform) => platform.key)))} data-testid="platforms-disable-all" className="px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white hover:border-white/40">Alle aus</button>
+        <button type="button" onClick={onSave} disabled={saving || !dirty} data-testid="platforms-save" className="px-3 py-1.5 bg-[#29B6E8] text-black rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">{saving ? "Speichert …" : "Speichern"}</button>
+        <span className="text-xs text-white/45" data-testid="platforms-off-count">{off.size} von {platforms.length} aus</span>
+      </div>
+      <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
+        {PLATFORM_GROUPS.map(([group, title]) => (
+          <div key={group} className="p-4">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-2">{title}</div>
+            <div className="grid sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5">
+              {platforms.filter((platform) => platform.group === group).map((platform) => (
+                <label key={platform.key} className="inline-flex items-center gap-2 text-sm cursor-pointer" data-testid={`platform-toggle-${platform.key}-row`}>
+                  <input type="checkbox" checked={!off.has(platform.key)} onChange={(event) => toggle(platform.key, event.target.checked)} data-testid={`platform-toggle-${platform.key}`} className="accent-[#29B6E8] w-4 h-4" />
+                  <span className={off.has(platform.key) ? "text-white/40 line-through" : "text-white"}>{platform.label}</span>
+                  {!platform.linkable && <span className="text-[10px] text-white/30 uppercase tracking-wider">getippt</span>}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function AdminIntegrationsOverviewPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [platformsOff, setPlatformsOff] = useState(null);
+  const [savingPlatforms, setSavingPlatforms] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,6 +88,23 @@ export default function AdminIntegrationsOverviewPage() {
   useEffect(() => { load(); }, [load]);
 
   const items = data?.items || [];
+  const platforms = useMemo(() => (Array.isArray(data?.platforms) ? data.platforms : []), [data]);
+  const serverOff = useMemo(() => new Set(platforms.filter((platform) => !platform.enabled).map((platform) => platform.key)), [platforms]);
+  useEffect(() => { setPlatformsOff(null); }, [serverOff]);
+  const off = platformsOff || serverOff;
+  const platformsDirty = off.size !== serverOff.size || [...off].some((key) => !serverOff.has(key));
+  const savePlatforms = async () => {
+    setSavingPlatforms(true);
+    try {
+      await api.put("/settings/branding", { disabled_platforms: [...off].sort() });
+      toast.success("Plattformen gespeichert – abgehakte erscheinen ab jetzt nirgends.");
+      await load();
+    } catch (error) {
+      toast.error(formatRequestError(error, "Speichern hat nicht geklappt."));
+    } finally {
+      setSavingPlatforms(false);
+    }
+  };
   const summary = data?.summary || {};
   const groups = (data?.groups || []).filter((group) => items.some((item) => item.group === group));
   const unreadable = items.filter((item) => item.state === "unreadable");
@@ -81,6 +145,8 @@ export default function AdminIntegrationsOverviewPage() {
           </div>
         </div>
       )}
+
+      <PlatformSwitches platforms={platforms} off={off} onChange={setPlatformsOff} onSave={savePlatforms} saving={savingPlatforms} dirty={platformsDirty} />
 
       {data === null ? (
         <p className="text-white/40 text-sm" data-testid="integrations-loading">Verbindungen werden geprüft …</p>

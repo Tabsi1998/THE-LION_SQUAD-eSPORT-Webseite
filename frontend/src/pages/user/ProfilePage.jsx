@@ -143,7 +143,7 @@ export default function ProfilePage() {
 
   // Verknüpfte Plattform-Konten (#260): Liste vom Server; „Verknüpfen“ schickt den Browser zur
   // Plattform, die Rückkehr landet mit ?linked= oder ?link_error= hier und wird einmal gemeldet.
-  const [platformLinks, setPlatformLinks] = useState({ links: [], available: {}, platforms: {} });
+  const [platformLinks, setPlatformLinks] = useState({ links: [], available: {}, platforms: {}, disabled: [] });
   const loadPlatformLinks = useCallback(async () => {
     try {
       const { data } = await api.get("/me/platform-links");
@@ -377,6 +377,7 @@ export default function ProfilePage() {
                 setVisibility={setVisibility}
                 setVisibilityGroup={setVisibilityGroup}
                 autosave={autosave}
+                disabled={platformLinks.disabled || []}
               />
             )}
             {tab === "notifications" && (

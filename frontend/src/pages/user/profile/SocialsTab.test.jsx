@@ -58,3 +58,13 @@ test("ohne geladene Verknüpfungen: alles von Hand, kein Knopf", () => {
   expect(screen.queryByTestId("profile-discord-verified")).toBeNull();
   expect(screen.queryByTestId("profile-discord-link")).toBeNull();
 });
+
+// Abgehakt vom Verein (#558): weder Zeile noch Textfeld - die Plattform erscheint nirgends.
+test("abgehakte Plattformen fehlen: keine Zeile, kein Textfeld", () => {
+  renderTab({ links: { ...LINKS, disabled: ["twitch", "psn"] }, form: { discord_name: "paula", steam_id: "", psn_id: "Paula998", nintendo_fc: "" } });
+  expect(screen.queryByTestId("profile-twitch-row")).toBeNull();
+  expect(screen.queryByTestId("profile-twitch-link")).toBeNull();
+  expect(screen.queryByTestId("profile-psn")).toBeNull();
+  expect(screen.getByTestId("profile-steam-row")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-nintendo")).toBeInTheDocument();
+});

@@ -203,6 +203,7 @@ class BrandingSettings(BaseModel):
     wargaming_application_id: Optional[str] = None
     bungie_api_key: Optional[str] = None
     clear_bungie_api_key: Optional[bool] = None
+    disabled_platforms: Optional[list[str]] = None   # abgehakte Plattformen (#558): erscheinen nirgends
     site_banner_enabled: Optional[bool] = None
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
@@ -676,6 +677,7 @@ async def public_settings(response: Response):
     # Vereinsdaten aus Dolibarr (#326) liegen über den Handfeldern, wenn der Schalter gesetzt ist;
     # die Datenschutzerklärung baut sich aus den Schaltern, die wirklich an sind (privacy_facts).
     from services import site_texts
+    from services.platform_links import disabled_platforms
     legal_settings, facts = await site_texts.legal_context(db)
     legal_settings.pop("contact_ready", None)
     legal_settings.pop("missing_legal_fields", None)
@@ -714,6 +716,7 @@ async def public_settings(response: Response):
         "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
         "social_links": await _public_social_links(db, b),
         "channels_from_dolibarr": bool(b.get("channels_from_dolibarr")),
+        "disabled_platforms": sorted(disabled_platforms(b)),
         **(await load_auth_settings(db)),
     }
 
@@ -756,7 +759,7 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
     lesbar“, wenn ein Schlüssel nicht zum aktuellen SETTINGS_ENCRYPTION_KEY passt (nach einem Server-Update
     die häufigste Ursache für „alle Verbindungen sind weg“). Nie Schlüssel oder Adressen in der Antwort."""
     from collections import Counter
-    from services.platform_links import PLATFORMS
+    from services.platform_links import PLATFORMS, disabled_platforms, platform_catalog
     from services.media_scan import SETTINGS_ID as MEDIA_SCAN_ID, load_settings as load_media_scan
     from services.dolibarr_client import load_settings as load_dolibarr
     db = get_db()
@@ -803,8 +806,12 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
         add("smtp", "SMTP", GROUP_LOGIN_MAIL, "/admin/settings/smtp", "off", "Mailserver gespeichert · Versand läuft über Resend" if provider == "resend" else "Mailserver gespeichert · Versand ausgeschaltet")
 
     # Plattformen zum Verknüpfen
+    off = disabled_platforms(branding)
     for key, spec in PLATFORMS.items():
         to = f"/admin/integrations/{key}"
+        if key in off:
+            add(key, spec["label"], GROUP_PLATFORMS, to, "off", "vom Verein abgeschaltet – erscheint nirgends (Haken unter Plattformen für Mitglieder)")
+            continue
         if not spec.get("id_field") and key != "steam":
             add(key, spec["label"], GROUP_PLATFORMS, to, "active", "Mitglieder können verknüpfen · keine App nötig")
             continue
@@ -897,6 +904,8 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
         "items": rows,
         "summary": {state: counts.get(state, 0) for state in ("active", "off", "missing", "unreadable", "error")},
         "groups": [GROUP_LOGIN_MAIL, GROUP_PLATFORMS, GROUP_DISCORD, GROUP_OTHER],
+        # Haken je Plattform (#558): Socials und Spielkonten, verknüpfbar oder getippt.
+        "platforms": platform_catalog(branding),
     }
 
 
@@ -1288,6 +1297,13 @@ async def update_branding(body: BrandingSettings, me: dict = Depends(require_clu
     db = get_db()
     nullable_fields = set(BrandingSettings.model_fields.keys())
     raw = body.model_dump(exclude_unset=True)
+    if raw.get("disabled_platforms") is not None:
+        from services.platform_links import MANUAL_PLATFORMS, PLATFORMS as LINK_PLATFORMS
+        known = set(LINK_PLATFORMS) | set(MANUAL_PLATFORMS)
+        unknown = sorted({str(key) for key in raw["disabled_platforms"] if str(key) not in known})
+        if unknown:
+            raise HTTPException(400, f"Unbekannte Plattform: {', '.join(unknown)}")
+        raw["disabled_platforms"] = sorted({str(key) for key in raw["disabled_platforms"]})
     unset = {}
     for field in BRANDING_SECRET_FIELDS:
         if raw.pop(f"clear_{field}", False):

@@ -224,7 +224,36 @@ def providers_configured(branding: dict | None) -> dict[str, bool]:
         if spec.get("extra_field"):
             ready = ready and bool(branding.get(spec["extra_field"]))
         out[key] = ready
+    for key in disabled_platforms(branding):
+        if key in out:
+            out[key] = False
     return out
+
+
+# Plattformen ohne Anmeldung, die Mitglieder von Hand eintragen - der Verein kann auch sie abschalten (#558).
+MANUAL_PLATFORMS = {
+    "instagram": {"label": "Instagram", "field": "instagram_handle", "visibility": "instagram"},
+    "psn": {"label": "PlayStation Network", "field": "psn_id", "visibility": "psn"},
+    "nintendo": {"label": "Nintendo", "field": "nintendo_fc", "visibility": "nintendo"},
+    "ea": {"label": "EA", "field": "ea_id", "visibility": "ea"},
+}
+GAME_PLATFORM_KEYS = {"steam", "psn", "xbox", "epic", "nintendo", "ea", "riot", "battlenet", "faceit", "startgg", "roblox", "osu", "lichess", "wargaming", "bungie"}
+
+
+def disabled_platforms(branding: dict | None) -> set[str]:
+    """Die vom Verein abgehakten Plattformen (#558) - nur bekannte Schlüssel zählen."""
+    known = set(PLATFORMS) | set(MANUAL_PLATFORMS)
+    return {str(key) for key in ((branding or {}).get("disabled_platforms") or []) if str(key) in known}
+
+
+def platform_catalog(branding: dict | None) -> list[dict]:
+    """Jede Plattform, die Mitglieder eintragen oder verknüpfen können, mit Haken-Zustand - für Alle Verbindungen."""
+    off = disabled_platforms(branding)
+    rows = []
+    for key, spec in {**PLATFORMS, **MANUAL_PLATFORMS}.items():
+        rows.append({"key": key, "label": spec["label"], "field": spec["field"], "group": "game" if key in GAME_PLATFORM_KEYS else "social",
+                     "linkable": key in PLATFORMS, "enabled": key not in off})
+    return rows
 
 
 def _credentials(platform: str, branding: dict) -> tuple[str, str]:
@@ -287,6 +316,8 @@ def authorize_url(platform: str, branding: dict, state: str) -> str:
     """Die Adresse, an die der Browser geschickt wird."""
     if platform not in PLATFORMS:
         raise LinkError("unknown")
+    if platform in disabled_platforms(branding):
+        raise LinkError("disabled")
     if not providers_configured(branding).get(platform):
         raise LinkError("not_configured")
     redirect = redirect_uri(platform)
@@ -1002,11 +1033,15 @@ async def unlink(db, user_id: str, platform: str) -> bool:
     return result.deleted_count > 0
 
 
-async def links_for(db, user_id: str) -> list[dict]:
-    """Die eigenen Verknüpfungen mit der offiziellen Adresse - die Kennung selbst bleibt beim Server."""
-    rows = await db.platform_links.find({"user_id": user_id}, {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(20)
+async def links_for(db, user_id: str, branding: dict | None = None) -> list[dict]:
+    """Die eigenen Verknüpfungen mit der offiziellen Adresse - die Kennung selbst bleibt beim Server.
+    Abgehakte Plattformen (#558) fehlen, bleiben aber gespeichert."""
+    hidden = disabled_platforms(branding) if branding is not None else set()
+    rows = await db.platform_links.find({"user_id": user_id}, {"_id": 0, "platform": 1, "handle": 1, "display_name": 1, "linked_at": 1, "external_id": 1}).to_list(40)
     out = []
     for row in sorted(rows, key=lambda row: row.get("platform") or ""):
+        if row.get("platform") in hidden:
+            continue
         external_id = row.pop("external_id", "")
         row["url"] = official_url(row.get("platform") or "", external_id, row.get("handle") or "")
         out.append(row)

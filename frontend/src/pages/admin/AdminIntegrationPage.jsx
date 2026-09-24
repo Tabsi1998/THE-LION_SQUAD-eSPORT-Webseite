@@ -77,6 +77,8 @@ export default function AdminIntegrationPage() {
   };
 
   if (integration?.tab) return <Navigate to={integration.tab} replace />;
+  // Abgehakt vom Verein (#558): die Seite bleibt, aber der Hinweis steht oben.
+  const platformOff = Boolean(integration?.app && Array.isArray(brand?.disabled_platforms) && brand.disabled_platforms.includes(integration.app));
 
   if (!integration) {
     return (
@@ -104,6 +106,12 @@ export default function AdminIntegrationPage() {
       </div>
 
       <div className="max-w-4xl space-y-4">
+        {platformOff && (
+          <div data-testid="integration-disabled-hint" className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 text-sm">
+            <strong className="text-[#FFD700]">Für Mitglieder abgeschaltet.</strong> {integration.label} erscheint nirgends – im Profil, im öffentlichen Profil, in der App und in der Datenschutzerklärung nicht.
+            Wieder anbieten: Haken setzen unter <Link to="/admin/integrations" className="text-[#29B6E8] hover:underline">Alle Verbindungen → Plattformen für Mitglieder</Link>.
+          </div>
+        )}
         {app && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="integration-app">
             <div className="font-heading font-bold uppercase text-sm mb-3">Zugangsdaten und Prüfung</div>

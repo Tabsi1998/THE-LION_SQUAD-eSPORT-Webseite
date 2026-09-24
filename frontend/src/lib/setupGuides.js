@@ -517,6 +517,7 @@ export function guideStatus(key, data = {}) {
     case "lichess":
       return ok("Keine App nötig");
     case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic": case "threads": case "facebook": case "linkedin": case "snapchat": case "pinterest": case "telegram": case "wargaming": case "bungie": case "faceit": case "startgg": case "roblox": case "osu": case "github": case "kick": case "reddit": case "spotify":
+      if (Array.isArray(branding?.disabled_platforms) && branding.disabled_platforms.includes(key)) return optional("Vom Verein abgeschaltet");
       if (!links) return unknown;
       return links[key] ? ok("App eingetragen") : optional("Noch nicht angebunden");
     case "resend":
