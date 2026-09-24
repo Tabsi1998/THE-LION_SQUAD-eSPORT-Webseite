@@ -114,7 +114,7 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
     const before = await navMetrics(page);
 
-    for (const group of ["Mitglieder", "Content", "Verein", "System"]) {
+    for (const group of ["Mitglieder", "Content", "Verein", "System", "eSports"]) {
       await page.getByTestId(`admin-nav-group-${group}`).click();
     }
 
