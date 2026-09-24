@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from copy import deepcopy
 
 from services.competition_read import load_registration_matches
@@ -27,19 +26,6 @@ async def registration_match_snapshot(db, registration_ids: list[str], *, limit:
         _privacy_match_projection(match)
         for match in await load_registration_matches(db, registration_ids, limit=limit)
     ]
-
-
-def anonymized_legacy_match(match: dict, registration_ids: set[str], updated_at: str) -> dict | None:
-    updates = {}
-    for field in ("participant_a_id", "participant_b_id", "winner_id", "loser_id"):
-        if match.get(field) in registration_ids:
-            updates[field] = None
-    if not updates:
-        return None
-    if match.get("status") not in TERMINAL_MATCH_STATUSES:
-        updates["status"] = "waiting_result"
-    updates["updated_at"] = updated_at
-    return updates
 
 
 def anonymized_stage_match(match: dict, registration_ids: set[str], updated_at: str) -> dict | None:
@@ -73,32 +59,16 @@ async def anonymize_registration_match_references(
 ) -> dict:
     ids = {registration_id for registration_id in registration_ids if registration_id}
     if not ids:
-        return {"legacy_matches": 0, "stage_matches": 0}
+        return {"stage_matches": 0}
     query_ids = sorted(ids)
-    legacy_cursor = db.matches.find({"$or": [
-        {"participant_a_id": {"$in": query_ids}},
-        {"participant_b_id": {"$in": query_ids}},
-        {"winner_id": {"$in": query_ids}},
-        {"loser_id": {"$in": query_ids}},
-    ]})
-    stage_cursor = db.matches_v2.find({"$or": [
+    stage = await db.matches_v2.find({"$or": [
         {"slots.registration_id": {"$in": query_ids}},
         {"results.registration_id": {"$in": query_ids}},
-    ]})
-    legacy, stage = await asyncio.gather(
-        legacy_cursor.to_list(5000),
-        stage_cursor.to_list(5000),
-    )
-    legacy_count = 0
+    ]}).to_list(5000)
     stage_count = 0
-    for match in legacy:
-        updates = anonymized_legacy_match(match, ids, updated_at)
-        if updates:
-            await db.matches.update_one({"id": match["id"]}, {"$set": updates})
-            legacy_count += 1
     for match in stage:
         updates = anonymized_stage_match(match, ids, updated_at)
         if updates:
             await db.matches_v2.update_one({"id": match["id"]}, {"$set": updates})
             stage_count += 1
-    return {"legacy_matches": legacy_count, "stage_matches": stage_count}
+    return {"stage_matches": stage_count}

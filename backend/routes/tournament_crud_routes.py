@@ -380,5 +380,4 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
-    await db.matches.delete_many({"tournament_id": tid})
     return {"ok": True}

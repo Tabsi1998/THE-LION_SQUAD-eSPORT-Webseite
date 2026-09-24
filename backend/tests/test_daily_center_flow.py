@@ -43,7 +43,6 @@ async def test_counts_and_today_list(flow):
     await flow.db.matches_v2.insert_one({"id": "m3", "tournament_id": "t1", "status": "scheduled", "match_key": "B1", "scheduled_at": (end + timedelta(hours=1)).isoformat()})
     await flow.db.matches_v2.insert_one({"id": "m4", "tournament_id": "t1", "status": "pending", "schedule_status": "proposed", "schedule_deadline_at": (now + timedelta(hours=3)).isoformat()})
     await flow.db.matches_v2.insert_one({"id": "m5", "tournament_id": "t1", "status": "pending", "schedule_status": "proposed", "schedule_deadline_at": (now + timedelta(days=3)).isoformat()})
-    await flow.db.matches.insert_one({"id": "old1", "tournament_id": "t1", "status": "waiting_result"})
     await flow.db.user_reports.insert_one({"id": "r1", "status": "open"})
     await flow.db.user_reports.insert_one({"id": "r2", "status": "accepted"})
     await flow.db.contact_messages.insert_one({"id": "c1", "status": "new"})
@@ -54,7 +53,7 @@ async def test_counts_and_today_list(flow):
     await flow.db.events.insert_one({"id": "e4", "slug": "vorbei", "name": "Gestern ohne Ende", "status": "scheduled", "start_date": (start - timedelta(hours=5)).isoformat()})
 
     counts = await task_counts(flow.db, now)
-    assert counts == {"reported_results": 2, "moderation_reports": 1, "contact_messages": 1, "schedule_deadlines": 1, "billing_cases": 0, "sponsors_expiring": 0}
+    assert counts == {"reported_results": 1, "moderation_reports": 1, "contact_messages": 1, "schedule_deadlines": 1, "billing_cases": 0, "sponsors_expiring": 0}
 
     today = await today_items(flow.db, now)
     assert [item["title"] for item in today] == ["Mehrtägig", "Herbst-Cup – A1", "LAN heute", "Check-in: Liga", "Herbst-Cup – A2"]
@@ -64,4 +63,4 @@ async def test_counts_and_today_list(flow):
     admin = await flow.add_user(role="club_admin", name="admin")
     flow.act_as(admin)
     dashboard = (await flow.get("/api/admin/dashboard")).json()
-    assert dashboard["daily_tasks"]["reported_results"] == 2 and len(dashboard["today"]) == 5
+    assert dashboard["daily_tasks"]["reported_results"] == 1 and len(dashboard["today"]) == 5

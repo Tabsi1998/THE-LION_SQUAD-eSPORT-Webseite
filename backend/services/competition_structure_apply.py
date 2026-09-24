@@ -52,7 +52,6 @@ async def activate_structure_plan(
     engine: str,
     matches: list[dict],
     stage: dict | None,
-    previous_legacy_matches: list[dict],
     previous_stage_matches: list[dict],
     previous_stages: list[dict],
     plan_hash: str,
@@ -62,14 +61,15 @@ async def activate_structure_plan(
 ) -> dict:
     """Activate one already validated plan and compensate on write failure."""
 
-    if engine not in {"classic", "graph"}:
+    if engine != "graph":
+        # Der klassische Speicher nimmt seit #231 nichts mehr an - es gibt ihn nur noch als leere Sammlung.
         raise StructureApplyPreconditionError("Unbekanntes Struktur-Schreibmodell")
     if not matches:
         raise StructureApplyPreconditionError("Strukturplan enthält keine Matches")
-    if engine == "graph" and not stage:
+    if not stage:
         raise StructureApplyPreconditionError("Graph-Strukturplan enthält keine Stage")
 
-    previous_matches = [*previous_legacy_matches, *previous_stage_matches]
+    previous_matches = list(previous_stage_matches)
     if any(not match.get("is_preview") for match in previous_matches):
         raise StructureApplyPreconditionError(
             "Bestehende reale Matches dürfen mit dem sicheren Apply-Weg nicht ersetzt werden"
@@ -139,26 +139,16 @@ async def activate_structure_plan(
     tournament_updated = False
 
     try:
-        if engine == "graph":
-            await db.tournament_stages.insert_one(new_stage)
-            await db.matches_v2.insert_many(new_matches)
-            await db.matches.delete_many({"tournament_id": tournament["id"]})
-            await db.matches_v2.delete_many({
-                "tournament_id": tournament["id"],
-                "id": {"$nin": new_match_ids},
-            })
-            await db.tournament_stages.delete_many({
-                "tournament_id": tournament["id"],
-                "id": {"$ne": new_stage["id"]},
-            })
-        else:
-            await db.matches.insert_many(new_matches)
-            await db.matches.delete_many({
-                "tournament_id": tournament["id"],
-                "id": {"$nin": new_match_ids},
-            })
-            await db.matches_v2.delete_many({"tournament_id": tournament["id"]})
-            await db.tournament_stages.delete_many({"tournament_id": tournament["id"]})
+        await db.tournament_stages.insert_one(new_stage)
+        await db.matches_v2.insert_many(new_matches)
+        await db.matches_v2.delete_many({
+            "tournament_id": tournament["id"],
+            "id": {"$nin": new_match_ids},
+        })
+        await db.tournament_stages.delete_many({
+            "tournament_id": tournament["id"],
+            "id": {"$ne": new_stage["id"]},
+        })
 
         if old_v2_ids:
             await db.match_reports_v2.delete_many({"match_id": {"$in": old_v2_ids}})
@@ -179,7 +169,6 @@ async def activate_structure_plan(
                 "engine": engine,
                 "structure_revision": revision,
                 "match_count": len(new_matches),
-                "replaced_legacy_match_count": len(previous_legacy_matches),
                 "replaced_stage_match_count": len(previous_stage_matches),
                 "replaced_stage_count": len(previous_stages),
                 "removed_report_count": len(previous_reports),
@@ -195,11 +184,9 @@ async def activate_structure_plan(
             except Exception as rollback_exc:  # pragma: no cover - catastrophic DB failure
                 rollback_errors.append(rollback_exc)
 
-        await rollback(db.matches.delete_many({"id": {"$in": new_match_ids}}))
         await rollback(db.matches_v2.delete_many({"id": {"$in": new_match_ids}}))
         if new_stage:
             await rollback(db.tournament_stages.delete_one({"id": new_stage["id"]}))
-        await rollback(_restore_documents(db.matches, previous_legacy_matches))
         await rollback(_restore_documents(db.matches_v2, previous_stage_matches))
         await rollback(_restore_documents(db.tournament_stages, previous_stages))
         await rollback(_restore_documents(db.match_reports_v2, previous_reports))

@@ -7,17 +7,7 @@ REGISTRATIONS = {
 }
 
 
-def test_legacy_and_stage_duels_use_the_same_result_summary():
-    legacy = _canonical_match({
-        "id": "legacy-1",
-        "tournament_id": "t1",
-        "participant_a_id": "r1",
-        "participant_b_id": "r2",
-        "score_a": 3,
-        "score_b": 1,
-        "winner_id": "r1",
-        "status": "completed",
-    }, "matches")
+def test_stage_duels_get_a_readable_result_summary():
     stage = _canonical_match({
         "id": "stage-1",
         "tournament_id": "t1",
@@ -33,9 +23,7 @@ def test_legacy_and_stage_duels_use_the_same_result_summary():
         "status": "completed",
     }, "matches_v2")
 
-    expected = "Alice gegen Bob ist bestätigt: 3:1. Gewinner: Alice."
-    assert _result_summary(legacy, REGISTRATIONS) == expected
-    assert _result_summary(stage, REGISTRATIONS) == expected
+    assert _result_summary(stage, REGISTRATIONS) == "Alice gegen Bob ist bestätigt: 3:1. Gewinner: Alice."
 
 
 def test_stage_placement_match_keeps_ranked_result_summary():

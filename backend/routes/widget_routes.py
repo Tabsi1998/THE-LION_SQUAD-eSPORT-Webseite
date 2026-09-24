@@ -48,13 +48,6 @@ def _public_registration(reg: dict) -> dict:
     }
 
 
-def _public_widget_legacy_match(match: dict) -> dict:
-    return {
-        key: value
-        for key, value in match.items()
-        if key not in {"admin_note", "reports", "disputes"}
-    }
-
 
 def _public_widget_stage_match(match: dict) -> dict:
     public_fields = {
@@ -90,10 +83,10 @@ async def widget_bracket(slug_or_id: str):
     ).to_list(500)
     return {
         "tournament": {"id": t["id"], "title": t["title"], "format": t["format"], "status": t["status"]},
-        "matches": [_public_widget_legacy_match(match) for match in read_model.legacy_matches],
+        "matches": [],
         "matches_v2": [_public_widget_stage_match(match) for match in read_model.stage_matches],
         "stages": read_model.stages,
-        "engine": "stage" if read_model.stages or read_model.stage_matches else "legacy",
+        "engine": "stage",
         "structure": structure,
         "registrations": [_public_registration(r) for r in regs],
     }

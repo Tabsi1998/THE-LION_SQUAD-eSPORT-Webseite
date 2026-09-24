@@ -259,7 +259,7 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     if not stage:
         raise HTTPException(status_code=404, detail="Stage nicht gefunden")
     existing_matches = await db.matches_v2.find({"stage_id": stage_id}, {"_id": 0}).to_list(3000)
-    match_plan = _collect_match_plan([], existing_matches)
+    match_plan = _collect_match_plan(existing_matches)
     existing = len(existing_matches)
     can_replace_preview = bool(existing_matches) and all(m.get("is_preview") for m in existing_matches)
     if existing and not force and not can_replace_preview:

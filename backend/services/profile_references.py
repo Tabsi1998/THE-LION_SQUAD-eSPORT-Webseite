@@ -159,7 +159,7 @@ async def _tournament_rank_for_user(tournament_id: str, user_id: str, team_ids: 
             return rank, participant_count
 
     read_model = await load_competition_read_model(db, tournament_id)
-    if not read_model.legacy_matches and not read_model.stage_matches:
+    if not read_model.stage_matches:
         return None, participant_count
 
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, "format": 1}) or {}

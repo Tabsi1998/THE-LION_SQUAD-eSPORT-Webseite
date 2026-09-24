@@ -95,10 +95,11 @@ async def export_match_plan_csv(tid: str, me: dict = Depends(get_current_user)):
 async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool) -> dict:
     t["public_phase"] = derive_public_phase(t, "tournament")
     read_model = await load_competition_read_model(db, t["id"])
-    matches = read_model.legacy_matches
+    # Der klassische Speicher wird nicht mehr gelesen (#231); `matches` bleibt leer, damit Web und App
+    # ihre Antwortform behalten.
+    matches: list[dict] = []
     stages = read_model.stages
     matches_v2 = read_model.stage_matches
-    await attach_station_info(db, matches)
     await attach_station_info(db, matches_v2)
     regs = await db.tournament_registrations.find({"tournament_id": t["id"]}, {"_id": 0}).to_list(500)
     regs = [_public_registration(r, user, is_staff) for r in regs]
@@ -119,7 +120,7 @@ async def _build_bracket_payload(db, t: dict, user: dict | None, is_staff: bool)
         "registrations": regs,
         "stages": stages,
         "matches_v2": matches_v2,
-        "engine": "stage" if stages or matches_v2 else "legacy",
+        "engine": "stage",
         "structure": structure,
     }
 

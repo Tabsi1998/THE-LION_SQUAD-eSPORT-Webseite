@@ -752,7 +752,6 @@ def test_structure_plan_reports_replacement_impact_and_force_requirement(monkeyp
 
     assert result["apply_requirements"]["force_required"] is True
     assert result["replacement_impact"] == {
-        "legacy_match_count": 1,
         "stage_match_count": 0,
         "stage_count": 0,
     }
@@ -787,11 +786,16 @@ def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
         "t1", plan_request, {"id": "admin-1"},
     ))
 
-    db.matches.find.return_value = _Cursor([{
+    db.matches_v2.find.return_value = _Cursor([{
         "id": "changed-after-preview",
         "tournament_id": "t1",
+        "stage_id": "s1",
+        "match_key": "A",
         "round": 1,
-        "match_index": 0,
+        "order": 0,
+        "slots": [],
+        "results": [],
+        "advancement": [],
         "is_preview": True,
         "status": "preview",
     }])
@@ -814,57 +818,6 @@ def test_structure_apply_rejects_stale_base_before_any_write(monkeypatch):
     db.audit_logs.insert_one.assert_not_awaited()
 
 
-def test_a_tournament_in_the_classic_store_is_planned_there_and_protected(monkeypatch):
-    """Zwei Schutzmechanismen auf einmal - und ein Nebenbefund.
-
-    Ein Turnier mit echten Spielen im alten Speicher wird weiter dort geplant;
-    es wandert nicht beim Neuaufbau. Angewendet wird der Plan trotzdem nicht,
-    weil der sichere Weg reale Strukturen grundsaetzlich nicht ersetzt.
-
-    Daraus folgt: seit kein Format mehr klassisch startet, ist der klassische
-    Anwendungsweg praktisch unerreichbar - Entwuerfe binden die Engine nicht,
-    und alles mit echten Spielen ist geschuetzt. Das macht ihn zum Kandidaten
-    fuer die Stilllegung des alten Speichers.
-    """
-    tournament = {
-        "id": "t1",
-        "format": "round_robin",
-        "max_participants": 4,
-        "seeding_mode": "manual",
-        "status": "draft",
-        "structure_revision": 2,
-    }
-    registrations = [
-        {"id": f"r{seed}", "status": "approved", "seed": seed}
-        for seed in range(1, 5)
-    ]
-    played = [{
-        "id": "alt-1", "tournament_id": "t1", "round": 1, "match_index": 0,
-        "bracket": "round_robin", "is_preview": False, "status": "completed",
-        "participant_a_id": "r1", "participant_b_id": "r2", "winner_id": "r1",
-    }]
-    db = _bracket_rebuild_db(
-        tournament=tournament, registrations=registrations, legacy_matches=played)
-    _patch_bracket_rebuild_dependencies(monkeypatch, db)
-
-    plan = asyncio.run(tournament_structure_routes.plan_bracket_from_tournament_format(
-        "t1",
-        tournament_structure_routes.TournamentStructurePlanPayload(preview=False),
-        {"id": "admin-1"},
-    ))
-    assert plan["engine"] == "classic", "Bestand im alten Speicher gibt die Engine vor"
-
-    with pytest.raises(HTTPException) as error:
-        asyncio.run(tournament_structure_routes.apply_tournament_structure_plan(
-            "t1",
-            _apply_payload_from_plan(plan),
-            {"id": "admin-1"},
-        ))
-
-    assert error.value.status_code == 409
-    assert error.value.detail["code"] == "protected_existing_structure"
-    db.matches.insert_many.assert_not_awaited()
-    db.matches.delete_many.assert_not_awaited()
 
 def test_structure_apply_activates_graph_plan_with_stage(monkeypatch):
     tournament = {
@@ -926,7 +879,6 @@ def test_structure_apply_rejects_invalid_validated_graph_before_write(monkeypatc
             },
             "apply_requirements": {"force_required": False},
             "replacement_impact": {
-                "legacy_match_count": 0,
                 "stage_match_count": 0,
                 "stage_count": 0,
             },
@@ -967,10 +919,16 @@ def test_structure_apply_rejects_real_existing_matches_before_write(monkeypatch)
     existing = {
         "id": "real-match",
         "tournament_id": "t1",
+        "stage_id": "s1",
+        "match_key": "A",
         "round": 1,
-        "match_index": 0,
-        "participant_a_id": "r1",
-        "participant_b_id": "r2",
+        "order": 0,
+        "slots": [
+            {"slot": 1, "registration_id": "r1", "status": "filled"},
+            {"slot": 2, "registration_id": "r2", "status": "filled"},
+        ],
+        "results": [],
+        "advancement": [],
         "status": "pending",
         "is_preview": False,
     }
@@ -980,7 +938,7 @@ def test_structure_apply_rejects_real_existing_matches_before_write(monkeypatch)
     ]
     db = _bracket_rebuild_db(
         tournament=tournament,
-        legacy_matches=[existing],
+        v2_matches=[existing],
         registrations=registrations,
     )
     _patch_bracket_rebuild_dependencies(monkeypatch, db)
@@ -1064,23 +1022,22 @@ def test_structure_apply_restores_previous_preview_after_late_failure():
         "is_preview": True,
         "status": "preview",
     }
-    db = _bracket_rebuild_db(tournament=tournament, legacy_matches=[previous_match])
+    db = _bracket_rebuild_db(tournament=tournament, v2_matches=[previous_match])
     db.audit_logs.insert_one.side_effect = RuntimeError("audit unavailable")
 
     with pytest.raises(RuntimeError, match="audit unavailable"):
         asyncio.run(activate_structure_plan(
             db,
             tournament=tournament,
-            engine="classic",
+            engine="graph",
             matches=[{
                 "id": "new-match",
                 "tournament_id": "t1",
                 "is_preview": False,
                 "status": "pending",
             }],
-            stage=None,
-            previous_legacy_matches=[previous_match],
-            previous_stage_matches=[],
+            stage={"id": "stage-new", "tournament_id": "t1"},
+            previous_stage_matches=[previous_match],
             previous_stages=[],
             plan_hash="a" * 64,
             base_structure_hash="b" * 64,
@@ -1088,12 +1045,12 @@ def test_structure_apply_restores_previous_preview_after_late_failure():
             actor_id="admin-1",
         ))
 
-    db.matches.replace_one.assert_awaited_once_with(
+    db.matches_v2.replace_one.assert_awaited_once_with(
         {"id": "old-preview"},
         previous_match,
         upsert=True,
     )
-    assert db.matches.delete_many.await_count == 2
+    assert db.matches_v2.delete_many.await_count == 2
     assert db.tournaments.update_one.await_count == 2
     rollback_update = db.tournaments.update_one.await_args_list[-1].args[1]
     assert rollback_update["$set"]["structure_revision"] == 2

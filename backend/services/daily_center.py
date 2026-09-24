@@ -38,7 +38,7 @@ async def task_counts(db, now: datetime | None = None) -> dict:
     soon = (now + timedelta(hours=SOON_HOURS)).isoformat()
     return {
         # Gemeldet, noch nicht bestätigt - nur Konflikte standen bisher in der Zentrale.
-        "reported_results": await db.matches_v2.count_documents({"status": "waiting_result"}) + await db.matches.count_documents({"status": "waiting_result"}),
+        "reported_results": await db.matches_v2.count_documents({"status": "waiting_result"}),
         "moderation_reports": await db.user_reports.count_documents({"status": "open"}),
         "contact_messages": await db.contact_messages.count_documents({"status": "new"}),
         # Vorschläge ohne Antwort, deren Frist in den nächsten 24 Stunden abläuft (oder schon abgelaufen ist).

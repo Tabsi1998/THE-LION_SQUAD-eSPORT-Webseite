@@ -66,7 +66,7 @@ async def _finalize_stage_previews_for_checkin(db, tournament: dict, actor_id: s
     total_matches = 0
     for stage in stages:
         existing_matches = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
-        match_plan = _collect_match_plan([], existing_matches)
+        match_plan = _collect_match_plan(existing_matches)
         if existing_matches and not all(match.get("is_preview") for match in existing_matches):
             continue
         try:
@@ -128,17 +128,9 @@ async def _finalize_bracket_for_checkin(db, tournament: dict, actor_id: str | No
             stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if stage_count:
         finalized = await _finalize_stage_previews_for_checkin(db, tournament, actor_id)
-        if finalized:
-            legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-            if legacy_matches and all(match.get("is_preview") for match in legacy_matches):
-                await db.matches.delete_many({"tournament_id": tid})
         return finalized
 
-    existing_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    can_replace_preview = bool(existing_matches) and all(match.get("is_preview") for match in existing_matches)
-    if existing_matches and not can_replace_preview:
-        return None
     if v2_matches and not all(_v2_match_can_be_rebuilt(match) for match in v2_matches):
         return None
     if v2_matches:

@@ -445,7 +445,7 @@ export default function AdminTournamentEditPage() {
         toast.success(`Teilnehmer hinzugefügt. ${autoBracketUpdate.preview === false ? "Turnierbaum" : "Vorschau"} mit ${autoBracketUpdate.participant_count} Teilnehmern neu gemischt.`);
       } else {
         toast.success(replacement
-        ? `Teilnehmer hinzugefügt und ${replacement.legacy_matches + replacement.v2_matches} Spielplätze ersetzt.`
+        ? `Teilnehmer hinzugefügt und ${replacement.v2_matches} Spielplätze ersetzt.`
         : autoBracketUpdate?.match_count
           ? `Teilnehmer hinzugefügt. Vorschau mit ${autoBracketUpdate.participant_count} Teilnehmern neu gemischt.`
           : "Teilnehmer hinzugefügt.");

@@ -107,7 +107,7 @@ def _legacy_event_mode(tournament: dict | None) -> str | None:
     return None
 
 
-def _match_policy(match: dict, collection: str, tournament: dict | None = None, stage: dict | None = None) -> dict:
+def _match_policy(match: dict, tournament: dict | None = None, stage: dict | None = None) -> dict:
     match_settings = _match_settings(match)
     stage_settings = _stage_settings(stage)
     event_mode = _first_mode(
@@ -128,7 +128,7 @@ def _match_policy(match: dict, collection: str, tournament: dict | None = None, 
         (tournament or {}).get("result_entry_mode"),
     )
     if not result_entry_mode:
-        result_entry_mode = "staff_only" if event_mode == "local" or collection == "matches_v2" else "player_confirmed"
+        result_entry_mode = "staff_only"
     schedule_mode = _first_mode(
         SCHEDULE_MODES,
         match.get("schedule_mode"),
@@ -336,7 +336,7 @@ async def _notify_match_chat_message(
     stage = await db.tournament_stages.find_one(
         {"id": match.get("stage_id")}, {"_id": 0, "creation_key": 0}
     ) if match.get("stage_id") else None
-    policy = _match_policy(match, collection, tournament, stage)
+    policy = _match_policy(match, tournament, stage)
     handles = {handle.lower() for handle in MENTION_RE.findall(message.get("message") or "")}
     staff_requested = bool(handles & STAFF_MENTION_HANDLES)
     participant_ids = await _match_participant_user_ids(db, match)
@@ -429,12 +429,8 @@ async def _can_submit_result_for_match(match: dict, user: dict | None) -> bool:
     return await has_match_result_permission(user, match)
 
 
-async def _can_forfeit_match(match: dict, user: dict | None, collection: str) -> bool:
-    return bool(
-        user
-        and collection == "matches"
-        and await has_match_result_permission(user, match)
-    )
+async def _can_forfeit_match(match: dict, user: dict | None) -> bool:
+    return bool(user and await has_match_result_permission(user, match))
 
 
 async def _can_read_match(match: dict, user: dict | None) -> bool:
@@ -591,9 +587,9 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         proposal.pop("match_collection", None)
     acting_reg = await _acting_registration_for_match(match, user)
     direct_reg = await _user_registration_for_match(match, user)
-    policy = _match_policy(match, collection, tournament, stage)
+    policy = _match_policy(match, tournament, stage)
     can_submit_result = await _can_submit_result_for_match(match, user)
-    can_player_report = bool(collection == "matches" and direct_reg and _players_can_report(policy))
+    can_player_report = bool(direct_reg and _players_can_report(policy))
     can_propose_schedule = bool(user and await _can_act_for_match(match, user) and _schedule_proposals_enabled(policy))
     round_number = match.get("matchday_number") or match.get("round")
     league_like = (tournament or {}).get("format") in {"league", "round_robin"} or (stage or {}).get("stage_type") in {"league", "round_robin_groups", "ffa_league"}
@@ -616,8 +612,8 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "can_staff_submit_result": can_submit_result,
         "can_propose_schedule": can_propose_schedule,
         "can_manage_schedule": can_propose_schedule,
-        "can_dispute": bool(collection == "matches" and user and (_is_staff(user) or (direct_reg and _players_can_report(policy)))),
-        "can_forfeit": await _can_forfeit_match(match, user, collection),
+        "can_dispute": bool(user and (_is_staff(user) or (direct_reg and _players_can_report(policy)))),
+        "can_forfeit": await _can_forfeit_match(match, user),
         "event_mode": policy["event_mode"],
         "result_entry_mode": policy["result_entry_mode"],
         "schedule_mode": policy["schedule_mode"],
@@ -663,7 +659,7 @@ async def create_schedule_proposal(match_id: str, body: MatchScheduleProposalCre
     acting_reg = await _acting_registration_for_match(match, me)
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
-    policy = _match_policy(match, collection, tournament, stage)
+    policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
         raise HTTPException(status_code=403, detail="Terminvorschläge sind für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
@@ -718,7 +714,7 @@ async def decide_schedule_proposal(match_id: str, proposal_id: str, body: MatchS
         raise HTTPException(status_code=404, detail="Terminvorschlag nicht gefunden")
     tournament = await db.tournaments.find_one({"id": match.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": match.get("stage_id")}, {"_id": 0}) if match.get("stage_id") else None
-    policy = _match_policy(match, collection, tournament, stage)
+    policy = _match_policy(match, tournament, stage)
     if not _schedule_proposals_enabled(policy):
         raise HTTPException(status_code=403, detail="Terminabstimmung ist für dieses Match nicht aktiviert")
     if not await _can_act_for_match(match, me):
@@ -900,17 +896,13 @@ async def submit_match_result(match_id: str, body: MatchV2ResultSubmit,
                               force: bool = False,
                               me: dict = Depends(get_current_user)):
     db = get_db()
-    match, collection = await _find_match_any(match_id)
-    if collection != "matches_v2":
-        raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist für Mehrspieler-Heats vorgesehen")
+    match, _collection = await _find_match_any(match_id)
     await _ensure_match_tournament_unlocked(db, match)
     await ensure_tournament_accepts_results(db, match["tournament_id"])
     await _require_result_permission(me, match)
     try:
         async with mutation_lock(db, tournament_write_resource(match["tournament_id"])):
-            match, collection = await _find_match_any(match_id)
-            if collection != "matches_v2":
-                raise HTTPException(status_code=400, detail="Dieses Ergebnisformular ist für Mehrspieler-Heats vorgesehen")
+            match, _collection = await _find_match_any(match_id)
             await _ensure_match_tournament_unlocked(db, match)
             await ensure_tournament_accepts_results(db, match["tournament_id"])
             await _require_result_permission(me, match)
@@ -1040,7 +1032,7 @@ async def report_score(match_id: str, body: MatchScoreReport, me: dict = Depends
     await ensure_tournament_accepts_results(db, m["tournament_id"])
     tournament = await db.tournaments.find_one({"id": m.get("tournament_id")}, {"_id": 0})
     stage = await db.tournament_stages.find_one({"id": m.get("stage_id")}, {"_id": 0}) if m.get("stage_id") else None
-    policy = _match_policy(m, collection, tournament, stage)
+    policy = _match_policy(m, tournament, stage)
     if not _players_can_report(policy):
         raise HTTPException(status_code=403, detail="Ergebnisse werden für dieses Match durch die Turnierleitung eingetragen")
     return await _report_v2(db, m, body, me)
