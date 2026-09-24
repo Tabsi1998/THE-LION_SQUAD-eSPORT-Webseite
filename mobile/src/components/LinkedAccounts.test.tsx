@@ -1,7 +1,7 @@
 import React from "react";
 import { Linking } from "react-native";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { AccountsCard, LinkedAccountsCard, accountDetail, accountGroups, accountTitle, isVerified, platformColor } from "./LinkedAccounts";
+import { AccountsCard, LinkedAccountsCard, PlatformLinkRows, accountDetail, accountGroups, accountTitle, isVerified, linkButtonLabel, platformColor } from "./LinkedAccounts";
 
 // Verknüpfte Konten (#459, wie im Web): Anzeigename, Plattform, Kennung, „seit …“ und der Link zum
 // echten Konto; eine Steam-ID als Name wird zu „Steam-Profil“; das Häkchen kommt nur vom Server.
@@ -60,4 +60,27 @@ test("accountGroups und AccountsCard: jedes Konto genau einmal, gruppiert, mit H
   expect(screen.queryByTestId("profile-account-psn-verified")).toBeNull();
   expect(screen.getByText("Spielkonten")).toBeTruthy();
   expect(screen.getAllByText("Paula B.").length).toBe(1);
+});
+
+
+// Konten verknüpfen (#521): verknüpft → Name, Haken, „lösen“; eingerichtet → offizieller Knopf; sonst nur der Hinweis.
+test("PlatformLinkRows: Knopf nur, wo die Website eingerichtet ist; verknüpft nur lösen", async () => {
+  const onLink = jest.fn();
+  const onUnlink = jest.fn();
+  await render(<PlatformLinkRows
+    links={[{ platform: "discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z", url: "https://discord.com/users/123" }]}
+    available={{ discord: true, twitch: true, riot: false }}
+    onLink={onLink}
+    onUnlink={onUnlink}
+  />);
+  expect(screen.getByTestId("profile-link-discord-verified")).toBeTruthy();
+  expect(screen.queryByTestId("profile-link-discord-link")).toBeNull();
+  await fireEvent.press(screen.getByTestId("profile-link-discord-unlink"));
+  expect(onUnlink).toHaveBeenCalledWith("discord");
+  await fireEvent.press(screen.getByTestId("profile-link-twitch-link"));
+  expect(onLink).toHaveBeenCalledWith("twitch");
+  expect(screen.getByText("Mit Twitch verknüpfen")).toBeTruthy();
+  expect(screen.queryByTestId("profile-link-riot-link")).toBeNull();
+  expect(screen.getAllByText("auf der Website noch nicht eingerichtet").length).toBeGreaterThan(0);
+  expect(linkButtonLabel("steam")).toBe("Mit Steam anmelden");
 });

@@ -1,38 +1,43 @@
-import { BadgeCheck, ExternalLink, Link2, Unlink } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BadgeCheck, ExternalLink, Lock, Unlink } from "lucide-react";
 import { Row, Section } from "./fields";
 import { ProfileSwitch } from "./SwitchRow";
 import { SOCIAL_PLATFORMS, normalizeSocialInput, socialProfileUrl } from "./socials";
-import { NOT_LINKABLE, PLATFORM_BY_FIELD, formatLinkedAt, linkForField } from "@/lib/platformLinks";
+import { NOT_LINKABLE, PLATFORM_BY_FIELD, PLATFORM_LABELS, formatLinkedAt, linkForField } from "@/lib/platformLinks";
+import { PlatformIcon, brandButtonStyle, linkButtonLabel, platformMeta } from "@/lib/platformBrand";
 
-// Socials (#258): je Feld ein Plattform-Symbol, eine eingefügte Adresse wird
-// sofort zum Nutzernamen, daneben ein Vorschau-Link. Der Twitch-Schalter
-// steht direkt beim Twitch-Feld.
-// Discord, Twitch und Steam lassen sich verknüpfen (#260): dann ist das Feld
-// gesperrt und trägt „verifiziert“; „Trennen“ lässt den Text stehen.
+// Socials (#258, #260, #521): Wo die Plattform eine Anmeldung bietet, gibt es nur noch den offiziellen
+// Knopf „Mit … verknüpfen“ - der Name kommt von der Plattform, tippen muss niemand mehr. Verknüpft
+// steht der Name mit Häkchen und „seit …“, dazu „Verknüpfung lösen“. Von Hand eingetragen wird nur, was
+// sich nicht verknüpfen lässt (PlayStation, Nintendo, EA, Instagram, Website) oder was die Website noch
+// nicht eingerichtet hat. Die Sichtbarkeit je Konto regelt der Reiter Privatsphäre - auch für den
+// verknüpften Namen.
 const TEST_IDS = { discord_name: "profile-discord", twitch_handle: "profile-twitch", steam_id: "profile-steam" };
+const LINK_ORDER = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic"];
+const FIELD_BY_PLATFORM = Object.fromEntries(Object.entries(PLATFORM_BY_FIELD).map(([field, key]) => [key, field]));
+const MANUAL_ROWS = [["instagram_handle", "psn_id"], ["nintendo_fc", "ea_id"]];
 
-function testIdFor(key) {
+export function testIdFor(key) {
   return TEST_IDS[key] || `profile-${key.replace(/_(handle|id|name|fc)$/, "")}`;
 }
 
-// Beim Tippen bleibt der Text, wie er ist; nur eine Adresse (mit Host und
-// Pfad) wird sofort bereinigt, damit Einfügen wie erwartet wirkt. Beim
-// Verlassen des Felds wird vollständig bereinigt (führendes @, Leerzeichen).
+// Beim Tippen bleibt der Text, wie er ist; nur eine Adresse (mit Host und Pfad) wird sofort bereinigt,
+// damit Einfügen wie erwartet wirkt. Beim Verlassen des Felds wird vollständig bereinigt.
 function whileTyping(key, value) {
   return /:\/\/|\.[a-z]{2,}\//i.test(value) ? normalizeSocialInput(key, value) : value;
 }
 
-function SocialField({ platform, value, onChange, link, linkable, onLink, onUnlink }) {
+const byKey = Object.fromEntries(SOCIAL_PLATFORMS.map((platform) => [platform.k, platform]));
+
+function ManualField({ platform, value, onChange, note = "" }) {
   const Icon = platform.icon;
   const testId = testIdFor(platform.k);
   const preview = socialProfileUrl(platform.k, value);
-  const platformKey = PLATFORM_BY_FIELD[platform.k];
   return (
     <div>
       <label className="block">
         <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">
           <Icon className="w-3.5 h-3.5 text-[#29B6E8]" aria-hidden="true" /> {platform.l}
-          {link && <span className="inline-flex items-center gap-1 text-[#00FF88] normal-case tracking-normal" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
         </div>
         <input
           value={value ?? ""}
@@ -40,104 +45,140 @@ function SocialField({ platform, value, onChange, link, linkable, onLink, onUnli
           onBlur={(e) => onChange(normalizeSocialInput(platform.k, e.target.value))}
           placeholder={platform.placeholder}
           data-testid={testId}
-          disabled={Boolean(link)}
-          className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white disabled:opacity-70"
+          className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white"
         />
       </label>
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         {preview ? (
-          <a
-            href={preview}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid={`${testId}-preview`}
-            className="inline-flex items-center gap-1 text-[11px] text-white/45 hover:text-[#29B6E8] break-all"
-          >
+          <a href={preview} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-preview`} className="inline-flex items-center gap-1 text-[11px] text-white/45 hover:text-[#29B6E8] break-all">
             <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" /> {preview}
           </a>
         ) : null}
-        {platformKey && link && (
-          <>
-            <span className="text-[11px] text-white/45" data-testid={`${testId}-linked-since`}>
-              verknüpft{link.display_name ? ` als ${link.display_name}` : ""}{formatLinkedAt(link.linked_at) ? ` seit ${formatLinkedAt(link.linked_at)}` : ""}
-            </span>
-            {link.url && (
-              <a href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-official`} className="inline-flex items-center gap-1 text-[11px] text-[#29B6E8] hover:text-white">
-                <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" /> Bei {platform.l} öffnen
-              </a>
-            )}
-            <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-white/55 hover:text-[#FF3B30]">
-              <Unlink className="w-3 h-3" aria-hidden="true" /> Trennen
-            </button>
-          </>
+        {note ? <span className="text-[11px] text-white/35" data-testid={`${testId}-not-linkable`}>{note}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+// Eine Zeile je verknüpfbarer Plattform: Logo in Plattformfarbe, Stand, offizieller Knopf oder „lösen“.
+function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink }) {
+  const meta = platformMeta({ platform: platformKey });
+  const label = PLATFORM_LABELS[platformKey] || meta.label;
+  const field = FIELD_BY_PLATFORM[platformKey];
+  const testId = testIdFor(field);
+  const since = link ? formatLinkedAt(link.linked_at) : "";
+  const numericName = /^\d{17}$/.test(String(link?.display_name || ""));
+  const linkedName = link ? (numericName ? `${label}-Profil ${link.display_name}` : (link.display_name || link.handle || label)) : "";
+  return (
+    <div data-testid={`${testId}-row`} className={`flex flex-wrap items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] ${link ? "border-[var(--social-color)]/60 shadow-[0_0_18px_-6px_var(--social-color)]" : "border-white/10"}`} style={{ "--social-color": meta.color }}>
+      <span className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 border-[var(--social-color)] text-[var(--social-color)] bg-black/40">
+        <PlatformIcon kind={meta.key} className="w-5 h-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+          <span>{label}</span>
+          {link && <span className="inline-flex items-center gap-1 text-[#00FF88] text-[11px] font-bold" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
+        </div>
+        {link ? (
+          <div className="text-[11px] text-white/55 truncate" data-testid={`${testId}-linked-since`}>
+            verknüpft als {linkedName}{since ? ` · seit ${since}` : ""}
+          </div>
+        ) : available ? (
+          <div className="text-[11px] text-white/45">nicht verknüpft – einmal anmelden, der Name kommt von {label}.</div>
+        ) : (
+          <div className="text-[11px] text-white/45" data-testid={`${testId}-not-available`}>Auf der Website noch nicht eingerichtet – bis dahin von Hand:</div>
         )}
-        {platformKey && !link && (
-          <button type="button" onClick={() => onLink(platformKey)} disabled={!linkable} title={linkable ? undefined : "Auf der Website noch nicht eingerichtet"} data-testid={`${testId}-link`} className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white disabled:opacity-40 disabled:cursor-not-allowed">
-            <Link2 className="w-3 h-3" aria-hidden="true" /> Mit {platform.l} verknüpfen
+        {!link && !available && field ? (
+          <input
+            value={form[field] ?? ""}
+            onChange={(e) => set(field, whileTyping(field, e.target.value))}
+            onBlur={(e) => set(field, normalizeSocialInput(field, e.target.value))}
+            placeholder={byKey[field]?.placeholder}
+            data-testid={testId}
+            className="mt-1.5 w-full max-w-sm bg-[#121212] border border-white/10 focus:border-[#29B6E8] px-3 py-1.5 rounded-sm text-sm text-white"
+          />
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {link && link.url && (
+          <a href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-official`} title={`Bei ${label} öffnen`} className="inline-flex items-center gap-1 text-[11px] text-[#29B6E8] hover:text-white">
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> öffnen
+          </a>
+        )}
+        {link && (
+          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/60 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+            <Unlink className="w-3.5 h-3.5" aria-hidden="true" /> Verknüpfung lösen
           </button>
         )}
-        {!platformKey && NOT_LINKABLE[platform.k] && (
-          <span className="text-[11px] text-white/35" data-testid={`${testId}-not-linkable`}>{NOT_LINKABLE[platform.k]}</span>
+        {!link && available && (
+          <button type="button" onClick={() => onLink(platformKey)} data-testid={`${testId}-link`} style={brandButtonStyle(meta.key)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 border rounded-sm text-xs font-bold tracking-wide shadow-[0_0_16px_-8px_var(--social-color)] hover:brightness-110 transition">
+            <PlatformIcon kind={meta.key} className="w-4 h-4" /> {linkButtonLabel(meta.key, label)}
+          </button>
         )}
       </div>
     </div>
   );
 }
 
-const byKey = Object.fromEntries(SOCIAL_PLATFORMS.map((platform) => [platform.k, platform]));
-const ROWS = [
-  ["discord_name", "twitch_handle"],
-  ["youtube_handle", "instagram_handle"],
-  ["tiktok_handle", "x_handle"],
-  ["steam_id", "epic_id"],
-  ["psn_id", "xbox_id"],
-  ["nintendo_fc", "ea_id"],
-  ["riot_id", "battlenet_id"],
-];
-
 export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlink = () => {} }) {
   const available = links?.available || {};
   const delivers = links?.platforms || {};
   const linkedRows = links?.links || [];
+  const twitchLinked = Boolean(linkForField(linkedRows, "twitch_handle"));
   return (
     <Section>
       <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/65" data-testid="profile-links-hint">
-        <strong className="text-white">Konto verknüpfen statt tippen:</strong> Wo ein Knopf „verknüpfen“ steht, meldest du dich einmal bei der Plattform an – der Eintrag wird befüllt und trägt „verifiziert“, sichtbar im öffentlichen Profil und bei Turnieren. Die Website erhält dabei nur {Object.keys(delivers).map((key) => delivers[key]?.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername des Kontos"}. Trennen geht jederzeit; der Text bleibt dann stehen, das Häkchen nicht.
+        <strong className="text-white">Konto verknüpfen statt tippen:</strong> Einmal bei der Plattform anmelden – der Name kommt von dort und trägt „verifiziert“, sichtbar für alle, die dein Profil sehen dürfen.
+        {" "}Die Plattform liefert nur, was hier steht: {Object.values(delivers).map((p) => p.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername"}.
+        {" "}<Lock className="inline w-3 h-3 align-[-2px] text-white/45" aria-hidden="true" /> Wer welches Konto sieht, regelst du unter{" "}
+        <Link to="/profile?tab=privacy" className="text-[#29B6E8] hover:underline" data-testid="profile-links-privacy">Privatsphäre</Link> – das gilt auch für verknüpfte Namen.
       </div>
-      {ROWS.map((keys) => (
-        <div key={keys.join("+")} className="space-y-4">
-          <Row>
-            {keys.map((key) => (
-              <SocialField
-                key={key}
-                platform={byKey[key]}
-                value={form[key]}
-                onChange={(v) => set(key, v)}
-                link={linkForField(linkedRows, key)}
-                linkable={Boolean(available[PLATFORM_BY_FIELD[key]])}
-                onLink={onLink}
-                onUnlink={onUnlink}
-              />
-            ))}
-          </Row>
-          {keys.includes("twitch_handle") && form.twitch_handle ? (
-            <div className="flex items-start justify-between gap-4 p-3 border border-[#9146FF]/30 bg-[#9146FF]/5 rounded-sm">
-              <div className="text-sm">
-                <div className="font-bold text-white">Twitch-Live-Embed im öffentlichen Profil zeigen</div>
-                <div className="text-white/60 text-xs mt-1">Wenn du live bist, erscheint dein Stream als eingebetteter Player auf deinem öffentlichen Profil.</div>
-              </div>
-              <ProfileSwitch
-                label="Twitch-Live-Embed im öffentlichen Profil zeigen"
-                checked={!!form.show_twitch_embed}
-                onCheckedChange={(checked) => set("show_twitch_embed", checked)}
-                testId="profile-twitch-embed"
-                className="mt-0.5"
-              />
-            </div>
-          ) : null}
+
+      <div className="space-y-2" data-testid="profile-link-rows">
+        {LINK_ORDER.map((platformKey) => (
+          <LinkRow
+            key={platformKey}
+            platformKey={platformKey}
+            link={linkForField(linkedRows, FIELD_BY_PLATFORM[platformKey])}
+            available={Boolean(available[platformKey])}
+            form={form}
+            set={set}
+            onLink={onLink}
+            onUnlink={onUnlink}
+          />
+        ))}
+      </div>
+
+      {(twitchLinked || form.twitch_handle) ? (
+        <div className="flex items-start justify-between gap-4 p-3 border border-[#9146FF]/30 bg-[#9146FF]/5 rounded-sm">
+          <div className="text-sm">
+            <div className="font-bold text-white">Twitch-Live-Embed im öffentlichen Profil zeigen</div>
+            <div className="text-white/60 text-xs mt-1">Wenn du live bist, erscheint dein Stream als eingebetteter Player auf deinem öffentlichen Profil.</div>
+          </div>
+          <ProfileSwitch
+            label="Twitch-Live-Embed im öffentlichen Profil zeigen"
+            checked={!!form.show_twitch_embed}
+            onCheckedChange={(checked) => set("show_twitch_embed", checked)}
+            testId="profile-twitch-embed"
+            className="mt-0.5"
+          />
         </div>
-      ))}
-      <SocialField platform={byKey.website} value={form.website} onChange={(v) => set("website", v)} link={null} linkable={false} onLink={onLink} onUnlink={onUnlink} />
+      ) : null}
+
+      <div>
+        <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-2">Von Hand – diese Plattformen bieten keine Anmeldung</div>
+        <div className="space-y-4">
+          {MANUAL_ROWS.map((keys) => (
+            <Row key={keys.join("+")}>
+              {keys.map((key) => (
+                <ManualField key={key} platform={byKey[key]} value={form[key]} onChange={(v) => set(key, v)} note={NOT_LINKABLE[key] || ""} />
+              ))}
+            </Row>
+          ))}
+          <ManualField platform={byKey.website} value={form.website} onChange={(v) => set("website", v)} />
+        </div>
+      </div>
     </Section>
   );
 }

@@ -152,6 +152,31 @@ const styles = StyleSheet.create({
   group: {
     gap: 8,
   },
+  brand: {
+    alignItems: "center",
+    borderRadius: 6,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  brandText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  unlink: {
+    borderColor: "rgba(255,255,255,0.15)",
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  unlinkText: {
+    fontSize: 11,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
   groupTitle: {
     fontSize: 11,
     letterSpacing: 1.5,
@@ -317,6 +342,75 @@ export function AccountsCard({ groups, testID = "public-profile-accounts" }: { g
           </View>
         ) : null}
       </Card>
+    </View>
+  );
+}
+
+
+// Konten verknüpfen (#521): je verknüpfbarer Plattform eine Zeile - verknüpft mit Namen, Häkchen und
+// „lösen“; sonst der offizielle Knopf, der den Browser zur Website schickt (der Rückruf der Plattform
+// braucht den Browser). Was die Website nicht eingerichtet hat, bleibt Tipparbeit.
+export const LINKABLE_PLATFORMS = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic"];
+export const BRAND_BUTTONS: Record<string, { bg: string; fg: string; border?: string }> = {
+  discord: { bg: "#5865F2", fg: "#FFFFFF" }, twitch: { bg: "#9146FF", fg: "#FFFFFF" }, steam: { bg: "#171A21", fg: "#FFFFFF", border: "#66C0F4" },
+  battlenet: { bg: "#148EFF", fg: "#FFFFFF" }, x: { bg: "#000000", fg: "#FFFFFF", border: "#FFFFFF" }, youtube: { bg: "#FF0000", fg: "#FFFFFF" },
+  tiktok: { bg: "#000000", fg: "#FFFFFF", border: "#69C9D0" }, riot: { bg: "#D13639", fg: "#FFFFFF" }, xbox: { bg: "#107C10", fg: "#FFFFFF" },
+  epic: { bg: "#2F2F2F", fg: "#FFFFFF", border: "#C8C8C8" },
+};
+
+export function linkButtonLabel(platform: string): string {
+  const label = PLATFORM_LABELS[platform] || platform;
+  return platform === "steam" ? `Mit ${label} anmelden` : `Mit ${label} verknüpfen`;
+}
+
+export function PlatformLinkRows({ links, available, onLink, onUnlink, testID = "profile-link-rows" }: {
+  links: LinkedAccount[];
+  available: Record<string, boolean>;
+  onLink: (platform: string) => void;
+  onUnlink: (platform: string) => void;
+  testID?: string;
+}) {
+  const byPlatform = new Map(links.filter((row) => row && row.platform).map((row) => [platformKey(row.platform), row]));
+  return (
+    <View testID={testID} style={styles.group}>
+      {LINKABLE_PLATFORMS.map((platform) => {
+        const link = byPlatform.get(platform) || null;
+        const color = platformColor(platform);
+        const label = PLATFORM_LABELS[platform] || platform;
+        const brand = BRAND_BUTTONS[platform] || { bg: colors.cyan, fg: "#000000" };
+        return (
+          <View key={platform} testID={`profile-link-${platform}`} style={[styles.row, { borderColor: link ? color : "rgba(255,255,255,0.12)" }]}>
+            <View style={[styles.icon, { borderColor: color }]}>
+              <Ionicons name={platformIcon(platform)} color={color} size={18} />
+            </View>
+            <View style={styles.flex}>
+              <View style={styles.nameRow}>
+                <Body style={styles.strong} numberOfLines={1}>{label}</Body>
+                {link ? (
+                  <View testID={`profile-link-${platform}-verified`} accessibilityLabel="verifiziert">
+                    <Ionicons name="checkmark-circle" color={VERIFIED_COLOR} size={16} />
+                  </View>
+                ) : null}
+              </View>
+              <Muted numberOfLines={1}>
+                {link ? `verknüpft als ${accountTitle(link)}${link.linked_at ? ` · seit ${formatDate(link.linked_at)}` : ""}`
+                  : available[platform] ? "nicht verknüpft – einmal im Browser anmelden" : "auf der Website noch nicht eingerichtet"}
+              </Muted>
+            </View>
+            {link ? (
+              <Pressable onPress={() => onUnlink(platform)} accessibilityRole="button" testID={`profile-link-${platform}-unlink`} style={({ pressed }) => [styles.unlink, pressed && styles.pressed]}>
+                <Muted style={styles.unlinkText}>lösen</Muted>
+              </Pressable>
+            ) : available[platform] ? (
+              <Pressable onPress={() => onLink(platform)} accessibilityRole="button" testID={`profile-link-${platform}-link`}
+                style={({ pressed }) => [styles.brand, { backgroundColor: brand.bg, borderColor: brand.border || brand.bg }, pressed && styles.pressed]}>
+                <Ionicons name={platformIcon(platform)} color={brand.fg} size={15} />
+                <Body style={[styles.brandText, { color: brand.fg }]}>{linkButtonLabel(platform)}</Body>
+              </Pressable>
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }

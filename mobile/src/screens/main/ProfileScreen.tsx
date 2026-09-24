@@ -6,7 +6,7 @@ import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { AwardCard } from "../../components/AwardCard";
-import { LinkedAccountsCard, type LinkedAccount } from "../../components/LinkedAccounts";
+import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../components/LinkedAccounts";
 import { BlockedUsersCard } from "../../components/BlockedUsersCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
@@ -137,7 +137,29 @@ export function ProfileScreen() {
   const [standing, setStanding] = useState<ModerationStanding | null>(null);
   // Verknüpfte Konten (#459): nur lesen; verknüpfen läuft im Web (Rückruf der Plattform im Browser).
   const [links, setLinks] = useState<LinkedAccount[]>([]);
+  // Welche Plattformen die Website eingerichtet hat (#521): nur dort gibt es den Knopf.
+  const [linkAvailable, setLinkAvailable] = useState<Record<string, boolean>>({});
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
+  // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
+  const manualSocialKeys = useMemo(() => {
+    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id" };
+    const notReady = LINKABLE_PLATFORMS.filter((platform) => !linkedPlatforms.has(platform) && !linkAvailable[platform]).map((platform) => fieldOf[platform]);
+    return [...notReady, "instagram_handle", "psn_id", "nintendo_fc", "ea_id", "website"];
+  }, [linkAvailable, linkedPlatforms]);
+  const startPlatformLink = useCallback((platform: string) => {
+    Linking.openURL(`${WEB_BASE_URL}/profile?tab=socials&link=${encodeURIComponent(platform)}`).catch(() => {});
+  }, []);
+  const unlinkPlatform = useCallback((platform: string) => {
+    Alert.alert("Verknüpfung lösen?", "Der Name bleibt im Profil, das Häkchen „verifiziert“ ist weg.", [
+      { text: "Abbrechen", style: "cancel" },
+      { text: "Lösen", style: "destructive", onPress: () => {
+        api.delete(`/me/platform-links/${platform}`)
+          .then(() => setLinks((rows) => rows.filter((row) => String(row.platform || "").toLowerCase() !== platform)))
+          .catch((err) => Alert.alert("Das hat nicht geklappt", errorMessage(err)));
+      } },
+    ]);
+  }, []);
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
   const [profileLoading, setProfileLoading] = useState(true);
@@ -208,10 +230,11 @@ export function ProfileScreen() {
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
         api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
         api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
-        api.get<{ links?: LinkedAccount[] }>("/me/platform-links").catch(() => ({ data: { links: [] } })),
+        api.get<{ links?: LinkedAccount[]; available?: Record<string, boolean> }>("/me/platform-links").catch(() => ({ data: { links: [], available: {} } })),
       ]);
       setStanding((standingResult.data as ModerationStanding | null) || null);
       setLinks(Array.isArray(linksResult.data?.links) ? linksResult.data.links : []);
+      setLinkAvailable(linksResult.data?.available || {});
       setAchievements(achievementResult.data || { groups: [], awards: [] });
       setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
       setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
@@ -604,12 +627,11 @@ export function ProfileScreen() {
             <Field label="Hauptplattform" value={form.main_platform} onChangeText={(v) => setField(setForm, "main_platform", v)} />
             <Field label="Bevorzugte Rolle" value={form.preferred_role} onChangeText={(v) => setField(setForm, "preferred_role", v)} />
             <Field label="Eingabegerät" value={form.input_device} onChangeText={(v) => setField(setForm, "input_device", v)} />
-            <Heading>Socials & IDs</Heading>
-            <LinkedAccountsCard accounts={links} testID="profile-linked-accounts" />
-            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${WEB_BASE_URL}/profile?tab=socials`)} testID="profile-links-web" style={styles.smallAction}>
-              <Muted style={styles.smallActionText}>{links.length ? "Konten im Web verwalten" : "Konten im Web verknüpfen (Discord, Twitch, Steam …)"}</Muted>
-            </Pressable>
-            {["discord_name", "twitch_handle", "youtube_handle", "tiktok_handle", "instagram_handle", "x_handle", "steam_id", "epic_id", "psn_id", "xbox_id", "nintendo_fc", "ea_id", "riot_id", "battlenet_id", "website"].map((key) => (
+            <Heading>Konten</Heading>
+            <Muted>Verknüpfen läuft im Browser: die Plattform bestätigt dein Konto, der Name kommt von dort. Wer welches Konto sieht, regelst du unter Privatsphäre.</Muted>
+            <PlatformLinkRows links={links} available={linkAvailable} onLink={startPlatformLink} onUnlink={unlinkPlatform} />
+            <Muted>Von Hand – diese Plattformen bieten keine Anmeldung:</Muted>
+            {manualSocialKeys.map((key) => (
               <Field key={key} label={labelFor(key)} value={form[key]} onChangeText={(v) => setField(setForm, key, v)} />
             ))}
             <Button label={saving ? "Speichert ..." : "Profil speichern"} onPress={() => save()} disabled={guest || saving} />
