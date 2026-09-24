@@ -204,6 +204,22 @@ async def _store_member_photo(client: DolibarrClient, member_id: int, photo: dic
     return f"/api/static/uploads/{name}"
 
 
+LEGACY_FIELDS = (("gamertag", "Gamertag", "text", 40), ("bio", "Kurztext", "textarea", 2000), ("games", "Spiele", "text", 255), ("platforms", "Plattformen", "text", 255))
+
+
+def _legacy_fields(data: dict) -> list[dict]:
+    """Vereine 1.1 liefert feste Felder statt `fields` - in die Feldform übersetzt, damit der Abgleich gleich bleibt."""
+    fields = []
+    for code, label, kind, limit in LEGACY_FIELDS:
+        if code not in data:
+            continue
+        value = data.get(code)
+        if isinstance(value, list):
+            value = ", ".join(str(v).strip() for v in value if str(v).strip())
+        fields.append({"code": code, "label": label, "type": kind, "editable": False, "value": str(value or "").strip() or None, "max_length": limit})
+    return fields
+
+
 async def _member_website_profile(client: DolibarrClient, member_id: int) -> dict | None:
     """Das Website-Profil der Mitgliedskarte - nur mit Einwilligung; ein älteres Modul kennt es nicht."""
     try:
@@ -212,7 +228,11 @@ async def _member_website_profile(client: DolibarrClient, member_id: int) -> dic
         if exc.kind not in ("not_found", "module_off"):
             logger.warning("[dolibarr] Website-Profil von Mitglied %s nicht lesbar: %s", member_id, exc.kind)
         return None
-    return data if isinstance(data, dict) and data.get("given") else None
+    if not isinstance(data, dict) or not data.get("given"):
+        return None
+    if "fields" not in data:
+        data = {**data, "fields": _legacy_fields(data)}
+    return data
 
 
 async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, member_id: int, data: dict | None = None) -> bool:
