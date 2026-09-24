@@ -138,3 +138,36 @@ test("ist Dolibarr nicht angebunden, bleibt die Seite wie bisher", async () => {
   expect(screen.queryByTestId("membership-fee-card")).toBeNull();
   expect(screen.queryByTestId("membership-link-card")).toBeNull();
 });
+
+test("Vereinsakte (#324): mit dem Einladungscode wird das Konto gebunden, danach steht der Stand da", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/identity") return { data: { available: true, status: "none", capabilities: [] } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  apiMock.post.mockResolvedValue({ data: { available: true, status: "bound", capabilities: ["documents"], capability_labels: ["Dokumente"], linked_at: "2026-09-24T10:00:00Z" } });
+  const user = userEvent.setup();
+  renderPage();
+  expect(await screen.findByTestId("membership-identity-hint")).toHaveTextContent("Einladungscode vom Vorstand");
+  expect(screen.getByTestId("membership-identity-claim")).toBeDisabled();
+  await user.type(screen.getByTestId("membership-identity-code"), " LION-1234 ");
+  await user.click(screen.getByTestId("membership-identity-claim"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/identity", { code: "LION-1234" }));
+  expect(await screen.findByTestId("membership-identity-bound")).toHaveTextContent("Dokumente");
+  expect(screen.getByTestId("membership-identity-documents")).toHaveAttribute("href", "/members/documents");
+  expect(toastMock.success).toHaveBeenCalled();
+});
+
+test("Vereinsakte (#324): ein falscher Code zeigt die Antwort des Servers, widerrufen bleibt der Weg offen", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/identity") return { data: { available: true, status: "revoked", capabilities: [], revoked_at: "2026-09-24T12:00:00Z" } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  apiMock.post.mockRejectedValue({ response: { data: { detail: "Der Code passt nicht." } } });
+  const user = userEvent.setup();
+  renderPage();
+  expect(await screen.findByTestId("membership-identity-hint")).toHaveTextContent("widerrufen");
+  await user.type(screen.getByTestId("membership-identity-code"), "FALSCH");
+  await user.click(screen.getByTestId("membership-identity-claim"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Code passt nicht."));
+  expect(screen.getByTestId("membership-identity-form")).toBeInTheDocument();
+});

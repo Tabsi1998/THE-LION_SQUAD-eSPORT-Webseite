@@ -1,18 +1,22 @@
 """Document routes for the member portal."""
+import logging
 import pathlib
 from typing import Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from auth import get_optional_user, require_club_admin, require_area
 from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
+from services import dolibarr_identity
+from services.dolibarr_client import DolibarrError
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
+logger = logging.getLogger("tls.documents")
 ADMIN_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
 
 
@@ -130,7 +134,32 @@ async def list_documents(
     for doc in docs:
         if await _user_can_see(user, doc.get("visibility") or "members"):
             out.append(_public_doc(doc, user))
+    # Dokumente aus der Vereinsakte (#324 Teil 1): nur für Mitglieder, nie ein Fehler für die Seite.
+    if user and (user.get("is_club_member") or _is_admin(user)):
+        try:
+            from_dolibarr = await dolibarr_identity.documents_for(db, user)
+        except Exception as exc:  # noqa: BLE001 - die Liste der eigenen Unterlagen darf nie an Dolibarr scheitern
+            logger.warning("[documents] Vereinsakte nicht lesbar: %s", exc)
+            from_dolibarr = []
+        out.extend(doc for doc in from_dolibarr if not category or doc.get("category") == category)
     return out
+
+
+async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str) -> Response:
+    """Ein PDF aus der Vereinsakte über denselben Weg wie die eigenen Dateien - Web und App kennen nur den."""
+    if not user or not (user.get("is_club_member") or _is_admin(user)):
+        raise HTTPException(403, "Nur für Mitglieder.")
+    try:
+        content, data = await dolibarr_identity.document_pdf(get_db(), user, dolibarr_id)
+    except DolibarrError as exc:
+        if exc.kind in ("not_found", "forbidden"):
+            raise HTTPException(404, "Dieses Dokument gibt es nicht oder es ist für dich nicht freigegeben.")
+        if exc.kind == "invalid_response":
+            raise HTTPException(502, "Die Datei aus Dolibarr passt nicht zur Prüfsumme der Vereinsakte – bitte im Vereinsmodul prüfen.")
+        raise HTTPException(503, "Die Vereinsakte ist gerade nicht erreichbar.")
+    filename = str(data.get("filename") or f"dokument-{dolibarr_id}.pdf").replace("\\", "/").rsplit("/", 1)[-1].replace('"', "") or f"dokument-{dolibarr_id}.pdf"
+    return Response(content=content, media_type="application/pdf",
+                    headers={"Content-Disposition": f'{disposition}; filename="{filename}"', "Cache-Control": "private, no-store"})
 
 
 @router.get("/admin")
@@ -192,6 +221,9 @@ async def delete_document(doc_id: str, me: dict = Depends(require_area("club")))
 @router.get("/{doc_id}/view")
 async def view_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
     """Inline stream a document after membership/internal checks."""
+    dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
+    if dolibarr_id is not None:
+        return await _dolibarr_file(dolibarr_id, user, "inline")
     db = get_db()
     doc, path = await _load_authorized_doc(doc_id, user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"view_count": 1}})
@@ -201,6 +233,9 @@ async def view_document(doc_id: str, user: dict | None = Depends(get_optional_us
 @router.get("/{doc_id}/download")
 async def download_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
     """Download only when explicitly enabled. Admins can always download."""
+    dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
+    if dolibarr_id is not None:
+        return await _dolibarr_file(dolibarr_id, user, "attachment")
     db = get_db()
     doc, path = await _load_authorized_doc(doc_id, user)
     if not doc.get("allow_download") and not _is_admin(user):

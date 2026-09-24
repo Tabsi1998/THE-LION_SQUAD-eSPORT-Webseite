@@ -12,12 +12,16 @@ const CATEGORY_LABELS = {
   regulations: "Regelwerk", guideline: "Leitlinie", download: "Download",
   media_kit: "Media Kit", presentation: "Präsentation", template: "Vorlage",
   other: "Sonstiges",
+  // Dokumentarten der Vereinsakte (#324 Teil 1)
+  resolution: "Beschluss", audit_report: "Prüfbericht", account: "Rechnungsabschluss", payout: "Auszahlung",
+  letter: "Schreiben", ballot: "Abstimmung",
 };
 
 const CATEGORY_COLORS = {
   statutes: "#FFD700", minutes: "#9F7AEA", form: "#29B6E8",
   regulations: "#FF3B30", guideline: "#10B981", download: "#29B6E8",
   media_kit: "#FFD700", presentation: "#9F7AEA", template: "#10B981", other: "#6B7280",
+  resolution: "#9F7AEA", audit_report: "#FF3B30", account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: "#FFD700",
 };
 
 function fmtSize(bytes) {
@@ -35,6 +39,11 @@ export default function MemberDocumentsPage() {
   const [loading, setLoading] = useState(true);
   // PDFs öffnen im gemeinsamen Betrachter (#325) statt in einem neuen Tab; alles andere wie bisher.
   const [viewing, setViewing] = useState(null);
+  // Vereinsakte (#324 Teil 1): ohne Bindung ein Hinweis, wo die persönlichen Unterlagen herkommen.
+  const [identity, setIdentity] = useState(null);
+  useEffect(() => {
+    api.get("/membership/me/identity").then(({ data }) => setIdentity(data && data.available === true ? data : null)).catch(() => setIdentity(null));
+  }, []);
 
   const loadMeta = useCallback(() => api.get("/documents/meta").then(({ data }) => setMeta(data)).catch(() => {}), []);
   useEffect(() => { loadMeta(); }, [loadMeta]);
@@ -68,6 +77,12 @@ export default function MemberDocumentsPage() {
         <p className="mt-3 text-white/60 max-w-2xl">
           Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>
+        {identity && identity.status !== "bound" && (
+          <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75" data-testid="docs-identity-hint">
+            Deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Beschlüsse, Schreiben) erscheinen hier, sobald dein Konto verbunden ist –{" "}
+            <Link to="/members/membership" className="text-[#FFD700] hover:underline">Einladungscode unter Meine Mitgliedschaft einlösen</Link>.
+          </div>
+        )}
 
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="flex gap-2 flex-wrap">
@@ -144,6 +159,7 @@ function DocRow({ d, onView }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: c }}>{CATEGORY_LABELS[d.category] || d.category}</span>
+          {d.source === "dolibarr" && <span className="text-[10px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm border border-white/15 text-white/55" data-testid={`doc-source-${d.id}`}>{d.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</span>}
           {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
         <div className="font-heading font-bold text-white mt-0.5">{d.title}</div>

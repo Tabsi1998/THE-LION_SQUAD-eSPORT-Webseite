@@ -21,11 +21,16 @@ export type MemberDocument = {
   download_url?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  // Unterlagen aus der Vereinsakte (#324 Teil 1): Herkunft und „nur für dich“.
+  source?: string | null;
+  personal?: boolean;
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular", regulations: "Regelwerk", guideline: "Leitlinie",
   download: "Download", media_kit: "Media Kit", presentation: "Präsentation", template: "Vorlage", other: "Sonstiges",
+  // Dokumentarten der Vereinsakte (#324 Teil 1)
+  resolution: "Beschluss", audit_report: "Prüfbericht", account: "Rechnungsabschluss", payout: "Auszahlung", letter: "Schreiben", ballot: "Abstimmung",
 };
 
 const EXTENSIONS: Record<string, string> = {

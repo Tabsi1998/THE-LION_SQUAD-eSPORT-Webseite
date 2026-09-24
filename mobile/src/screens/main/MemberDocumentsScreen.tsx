@@ -102,6 +102,7 @@ export function MemberDocumentsScreen({ opener = openDocument }: Props) {
                 <Ionicons name={busy ? "hourglass-outline" : "document-text-outline"} color={colors.gold} size={22} />
                 <View style={styles.docText}>
                   <Body style={styles.docTitle}>{doc.title || doc.original_filename || "Dokument"}</Body>
+                  {doc.source === "dolibarr" ? <Muted style={styles.docSource} testID={`document-source-${doc.id}`}>{doc.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</Muted> : null}
                   <Muted>
                     {[categoryLabel(doc.category), doc.visibility === "internal" ? "Vorstand" : "", formatFileSize(doc.file_size), doc.updated_at || doc.created_at ? formatDate(doc.updated_at || doc.created_at) : ""].filter(Boolean).join(" · ")}
                   </Muted>
@@ -146,6 +147,11 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
     minWidth: 0,
+  },
+  docSource: {
+    color: colors.gold,
+    fontSize: 11,
+    marginTop: 2,
   },
   docTitle: {
     fontWeight: "900",

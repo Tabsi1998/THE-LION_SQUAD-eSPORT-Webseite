@@ -89,6 +89,19 @@ def statute_version(version_id: int, version: int, *, decided_on: str, valid_fro
             "source": "generated", "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
 
 
+def document_pdf_bytes(document_id: int, revision: int = 1) -> bytes:
+    """Die Datei einer Fassung aus der Vereinsakte - je Dokument und Fassung andere Bytes."""
+    return b"%PDF-1.7\n%fake-document-" + f"{document_id}-{revision}".encode() + b"\n%%EOF\n"
+
+
+def published_document(document_id: int, *, title: str, kind: str = "minutes", audience: str = "members", member_id: int | None = None,
+                       what: str = "signed", revision: int = 1, date: str = "2026-09-24T18:02:11+00:00") -> dict:
+    content = document_pdf_bytes(document_id, revision)
+    return {"document_id": document_id, "revision": revision, "derived_from": 0, "code": f"DOC{document_id:02d}-{revision}", "kind": kind, "title": title,
+            "date": date, "what": what, "sha256": hashlib.sha256(content).hexdigest(), "size": len(content), "audience": audience,
+            "_member_id": member_id}
+
+
 def membership_fee(fee_id: int, label: str, *, amount: float | None = 50.0, for_whom: str = "natural", description: str = "",
                    admission_fee: float = 0, prorated: bool = False) -> dict:
     return {
@@ -172,6 +185,12 @@ class FakeDolibarr:
             ],
         }
         self.statutes_public = True          # Einrichtung > Statuten: für die Öffentlichkeit freigegeben
+        # Persönlicher Zugriff (#324): Einladungen je Code, Bindungen je Kennung, veröffentlichte Dokumente der Akte.
+        self.identity_right = True           # die Website darf „für Personen handeln“ (Recht im Modul)
+        self.invitations: dict[str, dict] = {}
+        self.identities: dict[str, dict] = {}
+        self.published_documents: list[dict] = []
+        self.tampered_document_ids: set[int] = set()
         self.tampered_pdf_ids: set[int] = set()  # Fassungen, deren Datei nicht mehr zur Akte passt
         self.board = [
             {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
@@ -214,6 +233,43 @@ class FakeDolibarr:
     @staticmethod
     def pdf_bytes(invoice_id: int) -> bytes:
         return b"%PDF-1.7\n%fake-invoice-" + str(invoice_id).encode() + b"\n%%EOF\n"
+
+    def invite(self, code: str, member_id: int, capabilities: tuple[str, ...] = ("documents",)) -> None:
+        """Einrichtung > Externe Identitäten: eine Einladung für ein Mitglied, einmal einlösbar."""
+        self.invitations[code] = {"member_id": member_id, "capabilities": list(capabilities), "used": False}
+
+    def publish(self, document_id: int, **fields) -> dict:
+        row = published_document(document_id, **fields)
+        self.published_documents.append(row)
+        return row
+
+    def revoke_identity(self, subject: str) -> None:
+        if subject in self.identities:
+            self.identities[subject]["revoked"] = True
+
+    def _identity(self, params: dict, capability: str | None = None) -> dict | None:
+        ident = self.identities.get(str(params.get("subject") or ""))
+        if not ident or ident.get("revoked"):
+            return None
+        if capability and capability not in ident["capabilities"]:
+            return None
+        return ident
+
+    def _visible_documents(self, member_id: int | None) -> list[dict]:
+        rows = []
+        for row in self.published_documents:
+            audience = row["audience"]
+            if audience == "public" or (member_id is not None and (audience == "members" or (audience == "person" and row.get("_member_id") == member_id))):
+                rows.append({k: v for k, v in row.items() if not k.startswith("_")})
+        return rows
+
+    def _document_pdf(self, template: str, rows: list[dict], document_id: int) -> httpx.Response:
+        row = next((r for r in rows if r["document_id"] == document_id), None)
+        if row is None:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "No such document for the caller"}})
+        content = b"%PDF-1.7\n%corrupt\n%%EOF\n" if document_id in self.tampered_document_ids else document_pdf_bytes(document_id, row["revision"])
+        return self._json(template, {"filename": f"{row['code']}.pdf", "content_type": "application/pdf", "filesize": len(content),
+                                     "sha256": row["sha256"], "content": base64.b64encode(content).decode()})
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self._handle)
@@ -508,6 +564,38 @@ class FakeDolibarr:
             if not row:
                 return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
             return self._json("/vereine/applications/{external_id}", {k: v for k, v in row.items() if k not in ("payload", "draft_member_id")})
+        if path == "/vereine/identities/claim" and request.method == "POST":
+            subject, code = str(params.get("subject") or ""), str(params.get("code") or "")
+            invitation = self.invitations.get(code)
+            current = self.identities.get(subject)
+            if not self.identity_right or not subject or not invitation or invitation["used"] or (current and not current.get("revoked")):
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            invitation["used"] = True
+            identity = {"subject": subject, "member_id": invitation["member_id"], "application_id": None, "capabilities": list(invitation["capabilities"]),
+                        "proof": "invitation", "linked_at": "2026-09-24T10:00:00Z"}
+            self.identities[subject] = {**identity, "revoked": False}
+            return self._json_post("/vereine/identities/claim", identity)
+        if path == "/vereine/identities/me":
+            ident = self._identity(params)
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._json("/vereine/identities/me", {k: v for k, v in ident.items() if k != "revoked"})
+        if path == "/vereine/me/documents":
+            ident = self._identity(params, "documents")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._json("/vereine/me/documents", self._visible_documents(ident["member_id"]))
+        match = re.fullmatch(r"/vereine/me/documents/(\d+)/pdf", path)
+        if match:
+            ident = self._identity(params, "documents")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._document_pdf("/vereine/me/documents/{id}/pdf", self._visible_documents(ident["member_id"]), int(match.group(1)))
+        if path == "/vereine/documents":
+            return self._json("/vereine/documents", self._visible_documents(None))
+        match = re.fullmatch(r"/vereine/documents/(\d+)/pdf", path)
+        if match:
+            return self._document_pdf("/vereine/documents/{id}/pdf", self._visible_documents(None), int(match.group(1)))
         if path == "/vereine/statutes":
             payload = self.statutes if self.statutes_public else {"state": "not_published", "current": None, "versions": []}
             return self._json("/vereine/statutes", payload)

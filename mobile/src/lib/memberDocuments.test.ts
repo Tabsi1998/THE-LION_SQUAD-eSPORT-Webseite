@@ -36,3 +36,9 @@ test("eigener Ordner im Cache; Belege heißen nach ihrer Nummer", () => {
   expect(documentsDirectory("file:///cache/")).toBe("file:///cache/member-documents/");
   expect(invoiceFileName({ key: "k1", ref: "RE-2026/0007", type: "standard", type_label: "Rechnung", status: "open", status_label: "offen" })).toBe("beleg-RE-2026_0007.pdf");
 });
+
+test("Dokumentarten der Vereinsakte (#324) haben Namen", () => {
+  expect(categoryLabel("resolution")).toBe("Beschluss");
+  expect(categoryLabel("letter")).toBe("Schreiben");
+  expect(categoryLabel("unbekannt")).toBe("Dokument");
+});
