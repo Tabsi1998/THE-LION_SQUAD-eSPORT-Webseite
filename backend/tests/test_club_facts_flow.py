@@ -158,3 +158,43 @@ async def test_public_settings_carry_the_privacy_facts(flow):
     facts = public["privacy_facts"]
     assert facts["email_provider"] == "smtp" and facts["discord"] == {"webhooks": False, "bot": True} and facts["dolibarr"] is False
     assert set(facts) == {"analytics", "google_login", "passkeys", "discord", "twitch_embed", "email_provider", "dolibarr", "dolibarr_billing", "app", "hosting"}
+
+
+@pytest.mark.asyncio
+async def test_board_page_follows_dolibarr_when_the_switch_is_on(flow, fake):
+    """Vorstandsseite aus Dolibarr (#326 Teil 2): Funktionen und Inhaber von dort, Name nur mit Einwilligung,
+    Foto nur über den eigenen Verzeichnis-Eintrag; ohne Schalter die Posten von Hand."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": MANUAL}, upsert=True)
+    settings = await load_settings(flow.db)
+    assert (await club_facts.refresh(flow.db, settings, DolibarrClient(settings)))["ok"] is True
+
+    # Schalter aus: die Posten von Hand (Standard Obmann, Kassier, Schriftführer).
+    manual = (await flow.get("/api/board?active_only=true")).json()
+    assert [p["slug"] for p in manual] == ["obmann", "kassier", "schriftfuehrer"] and all("source" not in p for p in manual)
+    assert (await flow.get("/api/board/source")).json()["dolibarr"] is False
+
+    # Schalter an: Obmann mit Namen, Kassier ohne Einwilligung, Rechnungsprüfer gar nicht.
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": {"legal_from_dolibarr": True}})
+    board = (await flow.get("/api/board?active_only=true")).json()
+    assert [p["slug"] for p in board] == ["obmann", "kassier"] and all(p["source"] == "dolibarr" for p in board)
+    obmann, kassier = board
+    assert obmann["user"]["display_name"] == "Otto Obmann" and obmann["user"]["avatar_url"] is None and obmann["user"]["profile_url"] is None
+    assert obmann["represents"] is True and obmann["since"] == "2024-04-01" and obmann["display_title"] == "Obmann"
+    assert kassier["user"] is None and kassier["name_withheld"] is True and kassier["vacant"] is False
+    source = (await flow.get("/api/board/source")).json()
+    assert source["dolibarr"] is True and source["functions"] == 2 and source["fetched_at"]
+    # Der Admin sieht weiter die Posten von Hand als Rückfall.
+    assert [p["slug"] for p in (await flow.get("/api/board?manual=true")).json()] == ["obmann", "kassier", "schriftfuehrer"]
+
+    # Foto und Profil nur über ein Konto mit derselben Dolibarr-Funktion, das im Verzeichnis steht.
+    otto = await flow.add_user(role="player", name="otto")
+    await flow.db.memberships.insert_one({"id": "m-otto", "user_id": otto["id"], "member_status": "active", "source": "dolibarr", "dolibarr": {"functions": [{"code": "obmann", "label": "Obmann", "since": "2024-04-01"}]}})
+    await flow.db.club_member_profiles.insert_one({"id": "cp-otto", "user_id": otto["id"], "slug": "otto", "display_name": "Otto Obmann", "gamertag": "OttoGG", "photo_url": "/api/static/uploads/otto.png", "is_active": True, "source": "member"})
+    obmann = (await flow.get("/api/board?active_only=true")).json()[0]
+    assert obmann["user"]["avatar_url"] == "/api/static/uploads/otto.png" and obmann["user"]["profile_url"] == "/members/otto" and obmann["user"]["gamertag"] == "OttoGG"
+    # Aus dem Verzeichnis genommen: nur noch der Name aus Dolibarr.
+    await flow.db.club_member_profiles.update_one({"id": "cp-otto"}, {"$set": {"directory_blocked": True}})
+    obmann = (await flow.get("/api/board?active_only=true")).json()[0]
+    assert obmann["user"]["display_name"] == "Otto Obmann" and obmann["user"]["profile_url"] is None
+

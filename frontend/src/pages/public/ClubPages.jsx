@@ -105,8 +105,24 @@ function BoardRoleColumn({ p }) {
   );
 }
 
+// Aus Dolibarr (#326 Teil 2) kommen Posten ohne Profil-Link (nur Name), ohne Namen („nicht
+// freigegeben“) oder unbesetzt - jede Lage sagt ehrlich, was gilt.
+function boardPersonTarget(u) {
+  if (!u) return null;
+  if (u.profile_url) return u.profile_url;
+  return u.username ? `/u/${u.username}` : null;
+}
+
+function BoardEmpty({ p, compact }) {
+  const text = p.name_withheld ? "Name nicht freigegeben" : p.vacant ? "Unbesetzt" : "Position offen";
+  return <div className={`${compact ? "mt-3" : "m-5"} text-[10px] uppercase tracking-widest text-white/40`} data-testid={`board-empty-${p.slug}`}>{text}</div>;
+}
+
 function BoardCard({ p, compact = false, featured = false }) {
   const u = p.user;
+  const target = boardPersonTarget(u);
+  const Wrapper = target ? Link : "div";
+  const wrapperProps = target ? { to: target } : {};
   return (
     <div className={`border rounded-sm bg-[#121212] hover:border-[#FFD700]/40 transition overflow-hidden ${featured ? "border-[#FFD700]/30" : "border-white/10"} ${compact ? "p-5" : ""}`}>
       {!compact && (
@@ -125,7 +141,7 @@ function BoardCard({ p, compact = false, featured = false }) {
       )}
 
       {u ? (
-        <Link to={u.profile_url || `/u/${u.username}`} className={`${compact ? "mt-4" : "mt-5"} flex ${compact ? "items-center gap-3" : "flex-col"} group`}>
+        <Wrapper {...wrapperProps} className={`${compact ? "mt-4" : "mt-5"} flex ${compact ? "items-center gap-3" : "flex-col"} group`} data-testid={`board-person-${p.slug}`}>
           {!compact && (
             <div className="relative min-h-[17rem] bg-[radial-gradient(circle_at_50%_15%,rgba(255,215,0,0.14),rgba(10,10,10,0)_68%)] overflow-hidden">
               {u.avatar_url ? (
@@ -139,6 +155,7 @@ function BoardCard({ p, compact = false, featured = false }) {
                 <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{personGamertag(u)}</div>
                 {personRealName(u) && <div className="mt-0.5 text-xs text-white/55 truncate">{personRealName(u)}</div>}
                 {u.role_title && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">{u.role_title}</div>}
+                {p.since && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">seit {new Date(p.since).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</div>}
               </div>
             </div>
           )}
@@ -154,14 +171,14 @@ function BoardCard({ p, compact = false, featured = false }) {
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-white text-sm group-hover:text-[#FFD700] transition truncate">{personGamertag(u)}</div>
                 {personRealName(u) && <div className="text-[10px] text-white/50 truncate">{personRealName(u)}</div>}
-                <div className="text-[10px] text-white/40 uppercase tracking-widest">{u.source === "member_profile" ? "Vereinsprofil" : `@${u.username}`}</div>
+                <div className="text-[10px] text-white/40 uppercase tracking-widest">{u.source === "member_profile" ? "Vereinsprofil" : u.source === "dolibarr" ? "laut Vereinsregister" : `@${u.username}`}</div>
               </div>
-              <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />
+              {target && <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-[#FFD700] transition" />}
             </>
           )}
-        </Link>
+        </Wrapper>
       ) : (
-        <div className={`${compact ? "mt-3" : "m-5"} text-[10px] uppercase tracking-widest text-white/40`}>Position offen</div>
+        <BoardEmpty p={p} compact={compact} />
       )}
     </div>
   );

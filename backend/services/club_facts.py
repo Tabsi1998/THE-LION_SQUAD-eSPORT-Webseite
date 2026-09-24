@@ -160,6 +160,115 @@ async def public_legal_source(db, branding: dict) -> tuple[dict, dict]:
     return overlay, {"dolibarr": True, "fetched_at": state.get("fetched_at"), "fields": sorted(overlay), "error": state.get("error")}
 
 
+# ---------------------------------------------------------------- Vorstandsseite (#326 Teil 2)
+
+# Funktionscodes von Dolibarr auf die drei Kernposten der Website; „Stellvertretung“ wird eigener Posten.
+BOARD_CORE = {
+    "obmann": ("obmann", "obfrau", "obperson", "praesident", "präsident", "vorsitz"),
+    "kassier": ("kassier", "schatzmeister", "finanz"),
+    "schriftfuehrer": ("schriftfuehrer", "schriftführer", "sekretaer", "sekretär", "schrift"),
+}
+DEPUTY_MARKERS = ("stv", "stellvertret", "vize", "deputy")
+
+
+def board_slug(code: str | None, label: str | None) -> str:
+    raw = f"{code or ''} {label or ''}".lower()
+    deputy = any(marker in raw for marker in DEPUTY_MARKERS)
+    core = next((slug for slug, needles in BOARD_CORE.items() if any(needle in raw for needle in needles)), None)
+    if core:
+        return f"{core}-stv" if deputy else core
+    import re
+    return re.sub(r"[^a-z0-9]+", "-", str(code or label or "funktion").lower()).strip("-") or "funktion"
+
+
+def _normalized_name(value) -> str:
+    return " ".join(str(value or "").lower().replace("-", " ").split())
+
+
+async def board_positions(db, branding: dict) -> list[dict] | None:
+    """Der Vorstand aus Dolibarr in der Form der Website-Vorstandsposten - None, wenn der Schalter aus
+    ist oder Dolibarr noch keinen Vorstand geliefert hat (dann gilt die Liste von Hand).
+
+    Name nur mit Einwilligung (sonst „Name nicht freigegeben“, kein Foto, kein Profil). Foto und
+    Profil-Link kommen nur über das Konto, dessen Dolibarr-Mitgliedschaft dieselbe Funktion trägt und
+    das im Mitgliederverzeichnis steht (eigene Entscheidung, #410)."""
+    if not branding.get("legal_from_dolibarr"):
+        return None
+    state = await snapshot(db)
+    if state.get("board") is None:
+        return None
+    rows = board_public(state.get("board"), fetched_at=state.get("fetched_at"))
+    codes = [row["code"] for row in rows if row.get("code")]
+    candidates: dict[str, list[str]] = {}
+    if codes:
+        async for membership in db.memberships.find({"member_status": {"$in": ["active", "honorary"]}, "dolibarr.functions.code": {"$in": codes}}, {"_id": 0, "user_id": 1, "dolibarr.functions": 1}):
+            for fn in (membership.get("dolibarr") or {}).get("functions") or []:
+                if fn.get("code") in codes and membership.get("user_id"):
+                    candidates.setdefault(fn["code"], []).append(membership["user_id"])
+    user_ids = sorted({uid for ids in candidates.values() for uid in ids})
+    profiles: dict[str, dict] = {}
+    users: dict[str, dict] = {}
+    if user_ids:
+        async for profile in db.club_member_profiles.find({"user_id": {"$in": user_ids}, "is_active": {"$ne": False}, "directory_blocked": {"$ne": True}},
+                                                          {"_id": 0, "user_id": 1, "slug": 1, "display_name": 1, "gamertag": 1, "real_name": 1, "photo_url": 1, "gender": 1}):
+            profiles[profile["user_id"]] = profile
+        async for user in db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1, "gender": 1}):
+            users[user["id"]] = user
+
+    def person_for(code: str, name: str) -> dict | None:
+        wanted = _normalized_name(name)
+        matches = []
+        for uid in candidates.get(code, []):
+            profile = profiles.get(uid)
+            if not profile:
+                continue  # nicht im Verzeichnis: nur der Name aus Dolibarr
+            names = {_normalized_name(profile.get(k)) for k in ("real_name", "display_name", "gamertag")} | {_normalized_name(users.get(uid, {}).get("display_name"))}
+            if wanted in names:
+                matches.append(profile)
+        if len(matches) != 1:
+            single = [profiles[uid] for uid in candidates.get(code, []) if uid in profiles]
+            matches = single if len(single) == 1 else []
+        if not matches:
+            return None
+        profile = matches[0]
+        return {
+            "id": profile.get("user_id"), "slug": profile.get("slug"), "display_name": name, "gamertag": profile.get("gamertag") or name,
+            "real_name": name if (profile.get("gamertag") and _normalized_name(profile.get("gamertag")) != wanted) else None,
+            "avatar_url": profile.get("photo_url"), "photo_url": profile.get("photo_url"), "gender": profile.get("gender"),
+            "profile_url": f"/members/{profile.get('slug')}" if profile.get("slug") else None, "source": "member_profile",
+        }
+
+    positions = []
+    for index, row in enumerate(rows):
+        holders = row.get("holders") or []
+        for offset, holder in enumerate(holders or [None]):
+            name = (holder or {}).get("name")
+            withheld = holder is not None and not name
+            person = person_for(row["code"], name) if name else None
+            if name and not person:
+                person = {"display_name": name, "gamertag": name, "real_name": None, "avatar_url": None, "photo_url": None, "profile_url": None, "source": "dolibarr"}
+            slug = board_slug(row.get("code"), row.get("label"))
+            positions.append({
+                "id": f"dolibarr-{row.get('code')}-{offset}", "slug": slug if offset == 0 else f"{slug}-{offset + 1}", "code": row.get("code"),
+                "title_male": row.get("label"), "title_female": row.get("label"), "display_title": row.get("label"), "description": "",
+                "allow_deputy": False, "is_active": True, "is_default": False, "order_index": index * 10 + offset, "source": "dolibarr",
+                "represents": bool(row.get("represents")), "since": (holder or {}).get("since"),
+                "vacant": holder is None, "name_withheld": withheld, "user": person, "deputy_user": None,
+            })
+    return positions
+
+
+async def board_source(db, branding: dict) -> dict:
+    """Für den Admin: führt Dolibarr den Vorstand, und seit wann steht der Stand?"""
+    state = await snapshot(db)
+    return {
+        "dolibarr": bool(branding.get("legal_from_dolibarr")) and state.get("board") is not None,
+        "switch_on": bool(branding.get("legal_from_dolibarr")), "has_board": state.get("board") is not None,
+        "fetched_at": state.get("fetched_at"), "error": state.get("error"), "names_withheld": names_withheld(state.get("fetched_at")) if state.get("board") is not None else False,
+        "functions": len([row for row in (state.get("board") or []) if row.get("board")]),
+    }
+
+
 async def admin_view(db, branding: dict) -> dict:
     """Für den Reiter Rechtliches: Stand, Fehler, was übernommen würde, der Vorstand mit Einwilligungsstand."""
     state = await snapshot(db)
