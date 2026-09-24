@@ -21,10 +21,16 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
   Trophy, Flag, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
-  MessageSquare, UserPlus, UserCheck, X, Info, User, AtSign, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart,
+  MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
+// mit Level, Rolle und verknüpften Konten, eine Zahlenleiste, fünf Reiter (Übersicht, Achievements,
+// Auszeichnungen, Referenzen mit Turnieren und Fast Laps, Teams). Die Übersicht zeigt links die
+// Erfolge (Podestplätze, Auszeichnungen, Achievements, Referenzen) und rechts eine Konten-Karte,
+// „Über“, Setup und Teams; der Twitch-Player steht nur, wenn der Stream gerade läuft.
 
 function normalizeTwitchChannel(value) {
   const raw = String(value || "").trim();
@@ -90,7 +96,7 @@ const ROLE_LABELS = {
 
 const MEMBERSHIP_TYPE_LABELS = {
   ordinary: "Ordentliches Mitglied",
-  supporting: "Unterstuetzendes Mitglied",
+  supporting: "Unterstützendes Mitglied",
   honorary: "Ehrenmitglied",
   youth: "Jugendmitglied",
   guest: "Gastmitglied",
@@ -132,6 +138,19 @@ const SUBSCRIPTION_LABELS = {
   ubisoft_plus: "Ubisoft+",
   geforce_now: "GeForce NOW",
 };
+
+const RANK_TONES = {
+  1: { color: "#FFD700", label: "Gold" },
+  2: { color: "#C0C0C0", label: "Silber" },
+  3: { color: "#CD7F32", label: "Bronze" },
+};
+
+const REFERENCE_FILTERS = [
+  ["all", "Alle"],
+  ["tournament", "Turniere"],
+  ["fastlap", "Fast Lap"],
+  ["season", "Jahreswertung"],
+];
 
 function labelValue(value, labels = {}) {
   const raw = String(value || "").trim();
@@ -214,7 +233,7 @@ function SocialIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "tiktok") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1Z" /></svg>;
   if (kind === "x") return <svg className={className} viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2h3.308l-7.227 8.26L22.827 22h-6.657l-5.214-6.817L4.99 22H1.68l7.73-8.835L1.254 2h6.826l4.713 6.231Zm-1.161 17.93h1.833L7.084 3.963H5.117Z" /></svg>;
   if (kind === "steam") return <Gamepad2 className={className} />;
-  if (kind === "battlenet") return <AtSign className={className} />;
+  if (kind === "battlenet") return <Globe className={className} />;
   if (kind === "riot") return <Zap className={className} />;
   if (kind === "xbox") return <Gamepad2 className={className} />;
   if (kind === "epic") return <Flag className={className} />;
@@ -239,6 +258,14 @@ function publicGamingIds(profile) {
   ].filter(Boolean);
 }
 
+// Podestplätze zuerst nach Rang, dann nach Datum - die drei besten stehen als Highlights oben.
+export function podiumHighlights(items, limit = 3) {
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => Number(item?.rank) >= 1 && Number(item.rank) <= 3)
+    .sort((a, b) => (Number(a.rank) - Number(b.rank)) || (new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()))
+    .slice(0, limit);
+}
+
 export default function PublicProfilePage() {
   const { username } = useParams();
   const nav = useNavigate();
@@ -248,6 +275,7 @@ export default function PublicProfilePage() {
   const [liveStreams, setLiveStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
+  const [referenceFilter, setReferenceFilter] = useState("all");
   const seoDescription = seoTextPreview(profile?.bio, "Community-Profil bei THE LION SQUAD eSports.");
   useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", seoDescription, {
     image: profile?.avatar_url || profile?.banner_url,
@@ -300,8 +328,25 @@ export default function PublicProfilePage() {
     : (profile.references || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
   const referenceItems = Array.isArray(profileReferences.items) ? profileReferences.items : [];
   const referenceStats = profileReferences.stats || {};
+  const highlights = podiumHighlights(referenceItems);
+  const referenceTargets = new Set(referenceItems.map((item) => item.target_id).filter(Boolean));
+  const awards = Array.isArray(profile.awards) ? profile.awards : [];
+  const badges = Array.isArray(achievementsData?.awards) ? achievementsData.awards : [];
+  const teams = Array.isArray(profile.teams) ? profile.teams : [];
+  const tournaments = Array.isArray(profile.tournaments) ? profile.tournaments : [];
+  const fastLaps = Array.isArray(profile.f1_bests) ? profile.f1_bests : [];
+  // Turniere mit Ergebnis sind Referenzen; hier bleiben laufende, kommende und solche ohne Ergebnis.
+  const openTournaments = tournaments.filter((t) => !referenceTargets.has(t.slug) && !referenceTargets.has(t.id));
   const relationship = profile.relationship || { status: user?.id === profile.id ? "self" : "anonymous" };
   const isOwnProfile = user?.id === profile.id;
+  const displayName = profile.display_name || profile.username;
+  const referenceKinds = new Set(referenceItems.map((item) => item.kind || "tournament"));
+  const referenceFilters = REFERENCE_FILTERS.filter(([key]) => key === "all" || referenceKinds.has(key));
+  const filteredReferences = referenceFilter === "all" ? referenceItems : referenceItems.filter((item) => (item.kind || "tournament") === referenceFilter);
+  const showTwitchLive = Boolean(profile.show_twitch_embed && twitchChannel && liveStream);
+  const showTwitchChannel = Boolean(profile.show_twitch_embed && twitchChannel && !liveStream);
+  const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || referenceItems.length > 0 || showTwitchLive;
+
   // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu.
   const featureAward = async (awardId) => {
     try {
@@ -350,6 +395,26 @@ export default function PublicProfilePage() {
     nav(`/messages/${encodeURIComponent(profile.id)}`);
   };
 
+  const headerStats = [
+    { key: "points", icon: Zap, label: "Punkte", value: s.points || 0, color: "#29B6E8" },
+    { key: "badges", icon: Medal, label: "Achievements", value: badges.length },
+    { key: "wins", icon: Trophy, label: "Siege", value: s.wins || 0, color: "#FFD700", glory: true },
+    { key: "top3", icon: Medal, label: "Podium", value: s.top3 || 0, color: "#C0C0C0", glory: true },
+    { key: "tournaments", icon: Flag, label: "Turniere", value: s.tournaments || tournaments.length || 0 },
+    { key: "fastlaps", icon: TrendingUp, label: "Fast Laps", value: s.fast_laps || 0 },
+    ...((twitchChannel || s.twitch_live_sessions > 0) ? [{ key: "streams", icon: Radio, label: "Streams", value: s.twitch_live_sessions || 0, color: "#9146FF" }] : []),
+  ];
+
+  const tabs = [
+    ["overview", "Übersicht"],
+    ["badges", `Achievements (${badges.length})`],
+    ["awards", `Auszeichnungen (${awards.length})`],
+    ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
+    ["teams", `Teams (${teams.length})`],
+  ];
+
+  const lockedTab = isPrivate && (tab === "references" || tab === "teams");
+
   return (
     <PublicLayout>
       {showHighlight && (
@@ -357,99 +422,79 @@ export default function PublicProfilePage() {
           profile={profile}
           level={level}
           stats={s}
-          awards={achievementsData?.awards}
+          awards={badges}
           crown={crown}
           onClose={() => setShowHighlight(false)}
         />
       )}
-      {/* Hero */}
-      <div className="relative border-b border-white/10 overflow-hidden">
-        {/* Auszeichnung als Profilbanner (#230): das gewählte Banner liegt über dem Kopf, das eigene Bild bleibt dahinter. */}
-        {profile.featured_award && (
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6" data-testid="profile-featured-award">
-            <AwardBanner award={profile.featured_award} size="hero" linkTo={profile.featured_award.tournament?.slug ? `/tournaments/${profile.featured_award.tournament.slug}` : null} />
-          </div>
-        )}
-        {profile.banner_url && (
-          <img
-            src={resolveMediaUrl(profile.banner_url)}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-20"
-          />
-        )}
-        {profile.banner_url && <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/75 via-[#0A0A0A]/65 to-[#0A0A0A]" />}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-20 -left-10 w-[500px] h-[500px] rounded-full bg-[#29B6E8] blur-[160px] opacity-10" />
-          <div className="absolute -bottom-20 -right-10 w-[400px] h-[400px] rounded-full bg-[#FFD700] blur-[160px] opacity-5" />
+
+      {/* Kopf: Banner, Avatar darüber, Name, Pillen, Aktionen, Level und verknüpfte Konten, Zahlen */}
+      <header className="border-b border-white/10" data-testid="profile-hero">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: displayName }]} />
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <Breadcrumbs items={[{ label: "Home", to: "/" }, { label: "Spieler", to: "/players" }, { label: profile.display_name || profile.username }]} className="mb-6" />
-          <div className="flex flex-col md:flex-row gap-8 items-start">
-            <div className="shrink-0 pt-10 pb-3">
-              <LevelAvatarFrame level={level.level} crown={crown} className="w-32 h-32 md:w-40 md:h-40" testId="profile-avatar-frame">
+        <div className="relative h-44 sm:h-56 lg:h-72 overflow-hidden bg-[#0F0F10]" data-testid="profile-banner">
+          {profile.banner_url ? (
+            <img src={resolveMediaUrl(profile.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover object-[50%_30%]" />
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-[#29B6E8]/30 via-[#0A0A0A] to-[#FFD700]/15">
+              <div className="absolute -top-10 left-1/4 w-[420px] h-[420px] rounded-full bg-[#29B6E8] blur-[160px] opacity-20" />
+              <div className="absolute -bottom-20 right-1/4 w-[360px] h-[360px] rounded-full bg-[#FFD700] blur-[160px] opacity-10" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/35 to-transparent" />
+          {/* Auszeichnung als Profilbanner (#230): das gewählte Banner liegt rechts unten im Bannerbereich. */}
+          {profile.featured_award && (
+            <div className="absolute inset-x-0 bottom-3 sm:bottom-5">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-end">
+                <div className="w-full sm:max-w-md" data-testid="profile-featured-award">
+                  <AwardBanner award={profile.featured_award} linkTo={profile.featured_award.tournament?.slug ? `/tournaments/${profile.featured_award.tournament.slug}` : null} />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
+            <div className="shrink-0">
+              <LevelAvatarFrame level={level.level} crown={crown} className="w-28 h-28 sm:w-32 sm:h-32 lg:w-40 lg:h-40" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
-                  <img src={resolveMediaUrl(profile.avatar_url)} alt={profile.display_name} className="w-full h-full object-cover" />
+                  <img src={resolveMediaUrl(profile.avatar_url)} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]">
-                    {(profile.display_name || profile.username || "?").slice(0, 2).toUpperCase()}
+                    {(displayName || "?").slice(0, 2).toUpperCase()}
                   </div>
                 )}
               </LevelAvatarFrame>
             </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
+            <div className="flex-1 min-w-0 md:pb-1">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
                 <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}
               </div>
-              <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] tracking-tight truncate">
-                {profile.display_name || profile.username}
+              <h1 className="mt-1 font-heading text-3xl sm:text-4xl lg:text-5xl font-black uppercase leading-none tracking-tight break-words">
+                {displayName}
               </h1>
-              <div className="mt-2 text-white/50 text-sm flex flex-wrap items-center gap-3">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
                 <span>@{profile.username}</span>
                 <AccountLevelPill level={level.level} />
-                {liveStream && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm">
-                    <Radio className="w-3 h-3 animate-live" /> Live
-                  </span>
-                )}
-                {profile.country && <span>· <MapPin className="w-3.5 h-3.5 inline mr-1" />{countryName(profile.country)}</span>}
-                {joinedDate && <span>· <Calendar className="w-3.5 h-3.5 inline mr-1" />Mitglied seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
                 {profile.role && profile.role !== "player" && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] uppercase tracking-widest rounded-sm font-bold">
                     <Shield className="w-3 h-3" /> {labelValue(profile.role, ROLE_LABELS)}
                   </span>
                 )}
+                {liveStream && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
+                    <Radio className="w-3 h-3 animate-live" /> Live
+                  </span>
+                )}
+                {profile.country && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{countryName(profile.country)}</span>}
+                {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
               </div>
-              {profile.bio && <p className="mt-4 text-white/80 text-base max-w-2xl leading-relaxed">{profile.bio}</p>}
-              {/* Setup chips */}
-              {((profile.main_platforms?.length || 0) + (profile.input_devices?.length || 0) + (profile.gaming_subscriptions?.length || 0) > 0) && (
-                <div className="mt-4 flex flex-wrap gap-2" data-testid="profile-setup-chips">
-                  {profile.main_platforms?.map((p) => (
-                    <span key={p} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#29B6E8]/10 text-[#29B6E8] border border-[#29B6E8]/20 rounded-sm">{labelValue(p, PLATFORM_LABELS)}</span>
-                  ))}
-                  {profile.input_devices?.map((d) => (
-                    <span key={d} className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-white/5 text-white/70 border border-white/10 rounded-sm">{labelValue(d, INPUT_DEVICE_LABELS)}</span>
-                  ))}
-                  {profile.gaming_subscriptions?.length > 0 && (
-                    <span className="text-[10px] uppercase tracking-widest font-bold px-2 py-1 bg-[#FFD700]/10 text-[#FFD700] border border-[#FFD700]/20 rounded-sm">{profile.gaming_subscriptions.length} Abos</span>
-                  )}
-                </div>
-              )}
-              <div className="mt-4 max-w-md" data-testid="profile-level-progress">
-                <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
-              </div>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowHighlight(true)}
-                  data-testid="highlight-card-open"
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10"
-                >
-                  <Trophy className="w-3.5 h-3.5" /> Highlight-Karte
-                </button>
-              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 md:pb-1 md:justify-end shrink-0" data-testid="profile-actions">
               {!isOwnProfile && (
-                <div className="mt-5 flex flex-wrap gap-2" data-testid="profile-actions">
+                <>
                   <button
                     type="button"
                     onClick={openMessage}
@@ -479,37 +524,38 @@ export default function PublicProfilePage() {
                       <UserPlus className="w-3.5 h-3.5" /> Freund hinzufügen
                     </button>
                   )}
-                </div>
+                </>
               )}
-              {/* Quick stats */}
-              <div className="mt-6 grid grid-cols-3 md:grid-cols-6 gap-3">
-                <QuickStat icon={Zap} label="Level" value={level.level} color="#29B6E8" testId="profile-stat-level" />
-                <QuickStat icon={Medal} label="Achievements" value={achievementsData?.awards?.length || 0} testId="profile-stat-badges" />
-                {(twitchChannel || s.twitch_live_sessions > 0) && (
-                  <QuickStat icon={Radio} label="Streams" value={s.twitch_live_sessions || 0} color="#9146FF" testId="profile-stat-streams" />
-                )}
-                <QuickStat icon={Zap} label="Punkte" value={s.points || 0} color="#29B6E8" testId="profile-stat-points" />
-                <QuickStat icon={Trophy} label="Siege" value={s.wins || 0} color="#FFD700" glory testId="profile-stat-wins" />
-                <QuickStat icon={Medal} label="Podium" value={s.top3 || 0} color="#C0C0C0" glory testId="profile-stat-top3" />
-                <QuickStat icon={TrendingUp} label="Fast Laps" value={s.fast_laps || 0} testId="profile-stat-fastlaps" />
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowHighlight(true)}
+                data-testid="highlight-card-open"
+                className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FFD700]/10"
+              >
+                <Sparkles className="w-3.5 h-3.5" /> Highlight-Karte
+              </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Tabs */}
+          {profile.bio && <p className="mt-4 max-w-3xl text-white/80 text-base leading-relaxed" data-testid="profile-bio">{profile.bio}</p>}
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
+            <div data-testid="profile-level-progress">
+              <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
+            </div>
+            {linkedAccounts.length > 0 && <VerifiedChips accounts={linkedAccounts} />}
+          </div>
+
+          <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
+            {headerStats.map((stat) => <QuickStat key={stat.key} icon={stat.icon} label={stat.label} value={stat.value} color={stat.color} glory={stat.glory} testId={`profile-stat-${stat.key}`} />)}
+          </div>
+        </div>
+      </header>
+
+      {/* Reiter */}
       <div className="border-b border-white/10 sticky top-0 bg-[#0A0A0A]/95 backdrop-blur-sm z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 overflow-x-auto">
-          {[
-            ["overview", "Übersicht"],
-            ["badges", `Achievements (${achievementsData?.awards?.length || 0})`],
-            ["awards", `Auszeichnungen (${(profile.awards || []).length})`],
-            ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
-            ["tournaments", `Turniere (${profile.tournaments?.length || 0})`],
-            ["fastlap", `Fast Lap (${profile.f1_bests?.length || 0})`],
-            ["teams", `Teams (${profile.teams?.length || 0})`],
-          ].map(([k, l]) => (
+          {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} data-testid={`profile-tab-${k}`}
               className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${tab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
               {l}
@@ -518,108 +564,88 @@ export default function PublicProfilePage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {isPrivate && (tab === "references" || tab === "tournaments" || tab === "fastlap" || tab === "teams") && (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
+        {lockedTab && (
           <div className="py-20 text-center text-white/40">
             <Lock className="w-8 h-8 mx-auto mb-3 opacity-50" />
-            <p>Diese Daten hat {profile.display_name} privat gestellt.</p>
+            <p>Diese Daten hat {displayName} privat gestellt.</p>
           </div>
         )}
 
         {tab === "overview" && (
-          <div className="grid lg:grid-cols-3 gap-8 min-w-0">
-            <div className="lg:col-span-2 space-y-8">
-              <PublicInfoPanel profile={profile} joinedDate={joinedDate} />
-              <PublicSetupPanel profile={profile} />
-              <ReferenceStatsPanel stats={referenceStats} onOpen={() => setTab("references")} />
-              {/* Recent achievements */}
-              <div>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Medal className="w-5 h-5 text-[#FFD700]" /> Letzte Achievements</h2>
-              {achievementsData?.awards?.length ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2" data-testid="profile-recent-awards">
-                  {achievementsData.awards.slice(0, 4).map((a) => (
-                    <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#0F0F10]" style={{ boxShadow: `inset 2px 0 0 ${a.level_color}` }}>
-                      <div className="w-9 h-9 rounded-sm flex items-center justify-center border" style={{ borderColor: a.level_color + "55", backgroundColor: a.level_color + "12" }}>
-                        <Medal className="w-4 h-4" style={{ color: a.level_color }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: a.level_color }}>{a.level_name}</div>
-                        <div className="font-semibold truncate text-sm">{a.name}</div>
-                      </div>
-                      <div className="text-[10px] text-white/40 tabular-nums">+{a.points}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState text="Noch keine Achievements freigeschaltet." />
-              )}
-              {achievementsData?.awards?.length > 4 && (
-                <button onClick={() => setTab("badges")} className="mt-4 text-sm font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Alle Achievements ansehen →</button>
-              )}
-              </div>
-            </div>
-            <div className="space-y-6 min-w-0">
-              {profile.show_twitch_embed && twitchChannel && (
-                <div data-testid="public-profile-twitch-embed" className="min-w-0 max-w-full">
-                  <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-[#9146FF]" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z"/></svg>
-                    Live auf Twitch
-                  </h2>
-                  {hasConsent("external_media") ? (
-                    <div className="w-full max-w-full border border-[#9146FF]/30 bg-black rounded-sm overflow-hidden aspect-video min-h-[180px] sm:min-h-0">
-                      <iframe
-                        title={`Twitch Stream ${twitchChannel}`}
-                        src={twitchPlayerSrc(twitchChannel)}
-                        className="block w-full h-full border-0"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  ) : (
-                    <ExternalMediaNotice
-                      service="Twitch"
-                      reason="Der Twitch-Player wird erst nach Zustimmung zu externen Medien geladen."
-                      url={twitchUrl}
-                      accent="#9146FF"
-                      compact
-                      testId="profile-twitch-consent-notice"
-                    />
-                  )}
-                  <a href={twitchUrl} target="_blank" rel="noopener noreferrer" aria-label="Twitch öffnen" title="Twitch öffnen" className="mt-2 inline-flex h-9 w-9 items-center justify-center border border-[#9146FF]/40 text-[#9146FF] hover:border-[#9146FF] hover:text-[#b88cff] rounded-sm transition">
-                    <SocialIcon kind="twitch" className="w-4 h-4" />
-                  </a>
-                  {liveStream && (
-                    <div className="mt-2 text-xs text-white/55">
-                      <span className="text-[#FF3B30] font-bold uppercase tracking-widest">Jetzt live:</span> {liveStream.title || "Stream läuft"}
-                      {liveStream.viewer_count ? ` · ${liveStream.viewer_count} Zuschauer` : ""}
-                    </div>
-                  )}
-                  {s.twitch_stream_minutes > 0 && (
-                    <div className="mt-1 text-[11px] text-white/35">
-                      Erkannte Streamzeit: {Math.round(s.twitch_stream_minutes / 60)} Stunden in {s.twitch_live_sessions || 0} Sessions.
-                    </div>
-                  )}
-                  <p className="mt-1 text-[11px] text-white/35">
-                    Falls Twitch eine Inhaltsklassifizierung blockiert, öffne den Stream direkt bei Twitch. Das kommt vom Twitch-Player, nicht vom TLS-Profil.
-                  </p>
-                </div>
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div className="space-y-8 min-w-0" data-testid="profile-overview-main">
+              {showTwitchLive && (
+                <TwitchLiveCard channel={twitchChannel} url={twitchUrl} stream={liveStream} hasConsent={hasConsent} />
               )}
 
-              {linkedAccounts.length > 0 && <LinkedAccountsCard accounts={linkedAccounts} />}
-              {socialLinks.length > 0 && <ProfileLinksCard links={socialLinks} />}
-              {gamingIds.length > 0 && <GamingIdsCard ids={gamingIds} />}
+              {highlights.length > 0 && (
+                <section data-testid="profile-highlights">
+                  <SectionTitle icon={Trophy} color="#FFD700" kicker="Podest" title="Highlights" />
+                  <div className={`grid gap-3 ${highlights.length > 1 ? "md:grid-cols-2 xl:grid-cols-3" : ""}`}>
+                    {highlights.map((item) => <HighlightCard key={item.id} item={item} />)}
+                  </div>
+                </section>
+              )}
 
-              <div>
-                <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Referenzen</h2>
-                {referenceItems.length ? (
+              {awards.length > 0 && (
+                <section data-testid="profile-awards-preview">
+                  <SectionTitle icon={Medal} color="#FFD700" kicker="Turniere" title="Auszeichnungen" action={awards.length > 2 ? { label: "Alle ansehen", onClick: () => setTab("awards") } : null} />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {awards.slice(0, 2).map((award) => (
+                      <AwardBanner key={award.id} award={award} linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null} />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {badges.length > 0 && (
+                <section>
+                  <SectionTitle icon={Medal} color="#29B6E8" kicker="Zuletzt" title="Achievements" action={badges.length > 6 ? { label: "Alle ansehen", onClick: () => setTab("badges") } : null} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2" data-testid="profile-recent-awards">
+                    {badges.slice(0, 6).map((a) => (
+                      <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#121212]" style={{ boxShadow: `inset 2px 0 0 ${a.level_color}` }}>
+                        <div className="w-9 h-9 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: a.level_color + "55", backgroundColor: a.level_color + "12" }}>
+                          <Medal className="w-4 h-4" style={{ color: a.level_color }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: a.level_color }}>{a.level_name}</div>
+                          <div className="font-semibold truncate text-sm">{a.name}</div>
+                        </div>
+                        <div className="text-[10px] text-white/40 tabular-nums">+{a.points}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {referenceItems.length > 0 && (
+                <section data-testid="profile-references-preview">
+                  <SectionTitle icon={Flag} color="#29B6E8" kicker="Laufbahn" title="Referenzen" action={referenceItems.length > 5 ? { label: "Alle ansehen", onClick: () => setTab("references") } : null} />
                   <div className="space-y-2">
                     {referenceItems.slice(0, 5).map((item) => <ReferenceRow key={item.id} item={item} />)}
                   </div>
-                ) : (
-                  <EmptyState text="Noch keine Referenzen sichtbar." />
-                )}
-              </div>
+                </section>
+              )}
+
+              {!hasOverviewContent && (
+                <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-overview-empty">
+                  <Trophy className="w-8 h-8 mx-auto mb-3 text-white/25" />
+                  <div className="font-heading text-xl font-bold uppercase text-white/70">Noch keine Erfolge</div>
+                  <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">Turniere, Fast Laps und Achievements erscheinen hier, sobald {displayName} mitspielt.</p>
+                </div>
+              )}
             </div>
+
+            <aside className="space-y-4 min-w-0" data-testid="profile-sidebar">
+              {showTwitchChannel && <TwitchChannelCard channel={twitchChannel} url={twitchUrl} stats={s} />}
+              {(linkedAccounts.length > 0 || socialLinks.length > 0 || gamingIds.length > 0) && (
+                <AccountsCard linked={linkedAccounts} socials={socialLinks} ids={gamingIds} />
+              )}
+              <AboutCard profile={profile} joinedDate={joinedDate} />
+              <SetupCard profile={profile} />
+              {teams.length > 0 && <TeamsCard teams={teams} />}
+            </aside>
           </div>
         )}
 
@@ -629,14 +655,14 @@ export default function PublicProfilePage() {
           </div>
         )}
 
-        {/* Auszeichnungen (#230, eigener Reiter seit dem Nachtrag): Banner und Trophäen aus veröffentlichten Turnieren -
+        {/* Auszeichnungen (#230, eigener Reiter): Banner und Trophäen aus veröffentlichten Turnieren -
             keine Referenzen (die sind die Turnier-Historie). Das eigene Profil kann eines als Profilbanner wählen. */}
         {tab === "awards" && (
           <div className="space-y-3" data-testid="public-profile-awards">
             <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Auszeichnungen</h2>
-            {(profile.awards || []).length > 0 ? (
+            {awards.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2">
-                {profile.awards.map((award) => (
+                {awards.map((award) => (
                   <AwardBanner
                     key={award.id}
                     award={award}
@@ -660,48 +686,74 @@ export default function PublicProfilePage() {
           </div>
         )}
 
+        {/* Referenzen: die Turnier- und Fast-Lap-Historie mit Filter; Teilnahmen und Bestzeiten darunter. */}
         {tab === "references" && !isPrivate && (
-          <div className="space-y-6">
-            <ReferenceStatsPanel stats={referenceStats} />
+          <div className="space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3" data-testid="profile-reference-stats">
+              <QuickStat icon={Trophy} label="Referenzen" value={referenceStats.total || referenceItems.length} color="#29B6E8" />
+              <QuickStat icon={Crown} label="Siege" value={referenceStats.wins || 0} color="#FFD700" glory />
+              <QuickStat icon={Medal} label="Podien" value={referenceStats.podiums || 0} color="#C0C0C0" glory />
+              <QuickStat icon={Flag} label="Turniere" value={referenceStats.tournaments || 0} />
+              <QuickStat icon={Radio} label="Fast Laps" value={referenceStats.fastlaps || 0} />
+            </div>
             {referenceItems.length ? (
-              <div className="grid gap-3" data-testid="public-profile-references">
-                {referenceItems.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
-              </div>
-            ) : <EmptyState text="Keine öffentlichen Referenzen." />}
-          </div>
-        )}
-
-        {tab === "tournaments" && !isPrivate && (
-          <div className="space-y-3">
-            {profile.tournaments?.length ? (
-              profile.tournaments.map((t) => <TournamentRow key={t.id} t={t} expanded />)
-            ) : <EmptyState text="Keine Turniere." />}
-          </div>
-        )}
-
-        {tab === "fastlap" && !isPrivate && (
-          <div className="space-y-2">
-            {profile.f1_bests?.length ? (
-              profile.f1_bests.map((f, i) => (
-                <div key={i} className={`flex items-center justify-between px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
-                  <div className="min-w-0">
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
-                    <div className="font-heading text-lg font-bold truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
+              <section>
+                {referenceFilters.length > 2 && (
+                  <div className="flex flex-wrap gap-2 mb-4" data-testid="profile-reference-filters">
+                    {referenceFilters.map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setReferenceFilter(key)}
+                        data-testid={`profile-reference-filter-${key}`}
+                        className={`px-3 py-1.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider transition ${referenceFilter === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {f.is_leader && <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">Pole</span>}
-                    <span className="font-display text-xl font-bold tabular-nums">{f.time_str}</span>
-                  </div>
+                )}
+                <div className="grid gap-3" data-testid="public-profile-references">
+                  {filteredReferences.map((item) => <ReferenceRow key={item.id} item={item} expanded />)}
                 </div>
-              ))
-            ) : <EmptyState text="Keine Fast-Lap-Zeiten eingetragen." />}
+              </section>
+            ) : <EmptyState text="Keine öffentlichen Referenzen." />}
+
+            {openTournaments.length > 0 && (
+              <section data-testid="public-profile-tournaments">
+                <SectionTitle icon={Flag} color="#29B6E8" kicker="Ohne Ergebnis" title={`Weitere Teilnahmen (${openTournaments.length})`} />
+                <div className="space-y-2">
+                  {openTournaments.map((t) => <TournamentRow key={t.id} t={t} expanded />)}
+                </div>
+              </section>
+            )}
+
+            {fastLaps.length > 0 && (
+              <section data-testid="public-profile-fastlaps">
+                <SectionTitle icon={Radio} color="#FFD700" kicker="Bestzeiten" title={`Fast Lap (${fastLaps.length})`} />
+                <div className="space-y-2">
+                  {fastLaps.map((f, i) => (
+                    <div key={i} className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
+                      <div className="min-w-0">
+                        <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
+                        <div className="font-heading text-lg font-bold truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        {f.is_leader && <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">Pole</span>}
+                        <span className="font-display text-xl font-bold tabular-nums">{f.time_str}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
 
         {tab === "teams" && !isPrivate && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {profile.teams?.length ? (
-              profile.teams.map((tm) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {teams.length ? (
+              teams.map((tm) => (
                 <Link key={tm.id} to={`/teams/${tm.id}`} className="border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#29B6E8]/60 transition">
                   <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{tm.tag}]</div>
                   <div className="font-heading text-xl font-bold">{tm.name}</div>
@@ -716,70 +768,242 @@ export default function PublicProfilePage() {
   );
 }
 
-function PublicInfoPanel({ profile, joinedDate }) {
-  const birthday = formatPublicDate(profile.birth_date);
-  const location = [profile.city, profile.country].filter(Boolean).join(", ");
-  const membership = profile.membership?.membership_type
-    ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
-    : (profile.is_club_member ? "Vereinsmitglied" : "");
-  const infoRows = [
-    { label: "Name", value: profile.display_name || profile.username, icon: User, tone: "blue" },
-    { label: "Username", value: `@${profile.username}`, icon: AtSign, tone: "white" },
-    { label: "Mitglied seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
-    { label: "Geburtstag", value: birthday, icon: Cake, tone: "gold" },
-    { label: "Ort", value: location, icon: MapPin, tone: "blue" },
-    { label: "Rolle", value: profile.role && profile.role !== "player" ? labelValue(profile.role, ROLE_LABELS) : "", icon: Shield, tone: "violet" },
-    { label: "Mitgliedschaft", value: membership, icon: Crown, tone: "gold" },
-  ].filter((row) => row.value);
-
+function SectionTitle({ icon: Icon, color = "#29B6E8", kicker, title, action = null }) {
   return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5 overflow-hidden">
-      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Profil</div>
-          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
-            <Info className="w-5 h-5 text-[#29B6E8]" /> Öffentliche Infos
-          </h2>
-        </div>
-        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{infoRows.length} Freigaben</div>
+    <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
+      <div>
+        {kicker && <div className="text-[11px] uppercase tracking-[0.3em] font-bold" style={{ color }}>{kicker}</div>}
+        <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
+          <Icon className="w-5 h-5" style={{ color }} /> {title}
+        </h2>
       </div>
-      {infoRows.length ? (
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3" data-testid="public-profile-info">
-          {infoRows.map((row) => <ProfileInfoCard key={row.label} {...row} />)}
+      {action && (
+        <button type="button" onClick={action.onClick} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+          {action.label} →
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Verknüpfte Konten im Kopf: ein Chip je bestätigtem Konto mit Plattformfarbe und Häkchen.
+function VerifiedChips({ accounts }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="profile-verified-chips">
+      <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88]" /> Verknüpft</span>
+      {accounts.map((account) => {
+        const meta = socialMeta(account);
+        const numericName = /^\d{17}$/.test(String(account.display_name || ""));
+        const text = numericName ? meta.label : (account.display_name || account.handle || meta.label);
+        const className = "inline-flex items-center gap-1.5 border rounded-sm px-2.5 py-1.5 text-xs font-bold bg-[#0A0A0A] border-[var(--social-color)]/60 text-white shadow-[0_0_14px_-6px_var(--social-color)] transition";
+        const style = { "--social-color": meta.color };
+        const inner = (
+          <>
+            <SocialIcon kind={meta.key} className="w-3.5 h-3.5 text-[var(--social-color)]" />
+            <span className="truncate max-w-[10rem]">{text}</span>
+            <BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" aria-label="verifiziert" />
+          </>
+        );
+        if (account.url) {
+          return (
+            <a key={account.platform} href={account.url} target="_blank" rel="noopener noreferrer" title={`${meta.label}-Konto öffnen`} data-testid={`profile-verified-${account.platform}`} className={`${className} hover:border-[var(--social-color)] hover:bg-white/[0.03]`} style={style}>
+              {inner}
+            </a>
+          );
+        }
+        return <span key={account.platform} data-testid={`profile-verified-${account.platform}`} className={className} style={style}>{inner}</span>;
+      })}
+    </div>
+  );
+}
+
+function TwitchLiveCard({ channel, url, stream, hasConsent }) {
+  return (
+    <section data-testid="public-profile-twitch-embed" className="border border-[#9146FF]/40 rounded-sm bg-[#121212] overflow-hidden min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
+        <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+          <SocialIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
+        </h2>
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold">
+          <Radio className="w-3 h-3 animate-live" /> Live{stream.viewer_count ? ` · ${stream.viewer_count} Zuschauer` : ""}
+        </span>
+      </div>
+      {hasConsent("external_media") ? (
+        <div className="w-full bg-black aspect-video min-h-[180px] sm:min-h-0">
+          <iframe
+            title={`Twitch Stream ${channel}`}
+            src={twitchPlayerSrc(channel)}
+            className="block w-full h-full border-0"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+          />
         </div>
       ) : (
-        <EmptyState text="Keine öffentlichen Profildaten freigegeben." />
+        <div className="p-4">
+          <ExternalMediaNotice
+            service="Twitch"
+            reason="Der Twitch-Player wird erst nach Zustimmung zu externen Medien geladen."
+            url={url}
+            accent="#9146FF"
+            compact
+            testId="profile-twitch-consent-notice"
+          />
+        </div>
       )}
+      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/55">
+        <span className="truncate min-w-0">{stream.title || "Stream läuft"}</span>
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#9146FF] hover:text-white font-bold uppercase tracking-wider text-[10px]">
+          Bei Twitch öffnen <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
     </section>
   );
 }
 
-function PublicSetupPanel({ profile }) {
-  const setupGroups = [
+// Twitch ohne laufenden Stream: kein schwarzer Player, nur der Kanal mit Streamzeit und Link.
+function TwitchChannelCard({ channel, url, stats }) {
+  const hours = Math.round((stats.twitch_stream_minutes || 0) / 60);
+  return (
+    <section data-testid="profile-twitch-offline" className="border border-[#9146FF]/30 rounded-sm bg-[#121212] p-4">
+      <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+        <span className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 border-[#9146FF] text-[#9146FF] bg-black/40">
+          <SocialIcon kind="twitch" className="w-5 h-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold text-sm text-white truncate group-hover:text-[#b88cff]">{channel}</span>
+          <span className="block text-[11px] text-white/50 truncate">Twitch · gerade offline{hours > 0 ? ` · ${hours} Std. in ${stats.twitch_live_sessions || 0} Streams` : ""}</span>
+        </span>
+        <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />
+      </a>
+    </section>
+  );
+}
+
+function HighlightCard({ item }) {
+  const tone = RANK_TONES[Number(item.rank)] || { color: "#29B6E8", label: "Platz" };
+  const target = referenceTarget(item);
+  const date = formatPublicDate(item.date);
+  const body = (
+    <div
+      data-testid={`profile-highlight-${item.id}`}
+      className="relative overflow-hidden border rounded-sm bg-[#121212] p-4 h-full transition hover:bg-white/[0.03]"
+      style={{ borderColor: `${tone.color}55`, boxShadow: `inset 3px 0 0 ${tone.color}` }}
+    >
+      <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-3xl opacity-20 pointer-events-none" style={{ backgroundColor: tone.color }} />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tone.color }}>{tone.label} · {referenceKindLabel(item.kind)}</div>
+          <div className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{item.title || "Referenz"}</div>
+          <div className="mt-1 text-xs text-white/50 flex flex-wrap gap-x-2 gap-y-0.5">
+            {item.subtitle && <span className="break-words">{item.subtitle}</span>}
+            {date && <span>{date}</span>}
+            {item.time_str && <span className="tabular-nums text-white/70">{item.time_str}</span>}
+          </div>
+        </div>
+        <div className="font-display font-black text-4xl tabular-nums leading-none shrink-0" style={{ color: tone.color }}>#{item.rank}</div>
+      </div>
+    </div>
+  );
+  if (!target) return body;
+  return <Link to={target} className="block h-full">{body}</Link>;
+}
+
+function AccountsCard({ linked, socials, ids }) {
+  return (
+    <section className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4" data-testid="public-profile-accounts">
+      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <Globe className="w-4 h-4 text-[#29B6E8]" /> Konten
+      </h2>
+      {linked.length > 0 && <LinkedAccountsCard accounts={linked} embedded />}
+      {socials.length > 0 && <SocialsRow links={socials} />}
+      {ids.length > 0 && <GamingIdsList ids={ids} />}
+    </section>
+  );
+}
+
+function AboutCard({ profile, joinedDate }) {
+  const birthday = formatPublicDate(profile.birth_date);
+  const location = [profile.city, profile.country ? countryName(profile.country) : ""].filter(Boolean).join(", ");
+  const membership = profile.membership?.membership_type
+    ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
+    : (profile.is_club_member ? "Vereinsmitglied" : "");
+  const rows = [
+    { label: "Dabei seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
+    { label: "Geburtstag", value: birthday, icon: Cake, tone: "gold" },
+    { label: "Ort", value: location, icon: MapPin, tone: "blue" },
+    { label: "Mitgliedschaft", value: membership, icon: Crown, tone: "gold" },
+  ].filter((row) => row.value);
+  if (!rows.length) return null;
+  return (
+    <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-info">
+      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <Info className="w-4 h-4 text-[#29B6E8]" /> Über {profile.display_name || profile.username}
+      </h2>
+      <dl className="mt-3 space-y-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center gap-3 min-w-0">
+            <span className={`w-9 h-9 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[row.tone] || PROFILE_TONES.white}`}>
+              <row.icon className="w-4 h-4" />
+            </span>
+            <div className="min-w-0">
+              <dt className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{row.label}</dt>
+              <dd className="text-sm text-white/90 break-words">{row.value}</dd>
+            </div>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function SetupCard({ profile }) {
+  const groups = [
     { label: "Plattformen", items: listItems(profile.main_platforms?.length ? profile.main_platforms : profile.main_platform, PLATFORM_LABELS), icon: Monitor, tone: "blue" },
     { label: "Eingabe", items: listItems(profile.input_devices, INPUT_DEVICE_LABELS), icon: Keyboard, tone: "gold" },
     { label: "Abos", items: listItems(profile.gaming_subscriptions, SUBSCRIPTION_LABELS), icon: BadgeCheck, tone: "green" },
     { label: "Lieblingsspiele", items: listItems(profile.favorite_games), icon: Heart, tone: "violet" },
   ].filter((group) => group.items.length);
-
+  if (!groups.length) return null;
   return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Gaming</div>
-          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
-            <Gamepad2 className="w-5 h-5 text-[#FFD700]" /> Setup & Games
-          </h2>
-        </div>
-        <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{setupGroups.reduce((sum, group) => sum + group.items.length, 0)} Einträge</div>
+    <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-setup">
+      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <Gamepad2 className="w-4 h-4 text-[#FFD700]" /> Setup & Games
+      </h2>
+      <div className="mt-3 space-y-3">
+        {groups.map((group) => (
+          <div key={group.label} className="min-w-0">
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`w-7 h-7 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[group.tone] || PROFILE_TONES.white}`}>
+                <group.icon className="w-3.5 h-3.5" />
+              </span>
+              <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{group.label}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {group.items.map((item) => (
+                <span key={item} className="inline-flex items-center rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
-      {setupGroups.length ? (
-        <div className="grid md:grid-cols-2 gap-3">
-          {setupGroups.map((group) => <SetupGroupCard key={group.label} {...group} />)}
-        </div>
-      ) : (
-        <EmptyState text="Keine Setup-Daten freigegeben." />
-      )}
+    </section>
+  );
+}
+
+function TeamsCard({ teams }) {
+  return (
+    <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-teams">
+      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <Users className="w-4 h-4 text-[#29B6E8]" /> Teams
+      </h2>
+      <div className="mt-3 grid gap-2">
+        {teams.map((tm) => (
+          <Link key={tm.id} to={`/teams/${tm.id}`} className="flex items-center gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition min-w-0">
+            <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold shrink-0">[{tm.tag}]</span>
+            <span className="font-heading font-bold truncate">{tm.name}</span>
+          </Link>
+        ))}
+      </div>
     </section>
   );
 }
@@ -791,73 +1015,6 @@ const PROFILE_TONES = {
   violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
   white: "border-white/15 bg-white/[0.04] text-white/75",
 };
-
-function ProfileInfoCard({ icon: Icon, label, value, tone = "white" }) {
-  return (
-    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 min-w-0 flex items-start gap-3">
-      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[tone] || PROFILE_TONES.white}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-        <div className="mt-1 text-sm text-white/90 break-words">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function SetupGroupCard({ icon: Icon, label, items, tone = "white" }) {
-  return (
-    <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 min-w-0">
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[tone] || PROFILE_TONES.white}`}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-          <div className="font-heading text-base font-bold uppercase">{items.length} aktiv</div>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {items.map((item) => (
-          <span key={item} className="inline-flex items-center rounded-sm border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-white/75">
-            {item}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ReferenceStatsPanel({ stats = {}, onOpen }) {
-  const rows = [
-    { label: "Referenzen", value: stats.total || 0, icon: Trophy, color: "#29B6E8" },
-    { label: "Podien", value: stats.podiums || 0, icon: Medal, color: "#FFD700" },
-    { label: "Siege", value: stats.wins || 0, icon: Crown, color: "#FFD700" },
-    { label: "Turniere", value: stats.tournaments || 0, icon: Flag, color: "#FFFFFF" },
-    { label: "Fast Laps", value: stats.fastlaps || 0, icon: Radio, color: "#C0C0C0" },
-  ];
-  return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Historie</div>
-          <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-[#29B6E8]" /> Referenzen
-          </h2>
-        </div>
-        {onOpen && (
-          <button type="button" onClick={onOpen} className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#29B6E8]/10">
-            Alle ansehen <ExternalLink className="w-3.5 h-3.5" />
-          </button>
-        )}
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
-        {rows.map((row) => <QuickStat key={row.label} {...row} />)}
-      </div>
-    </section>
-  );
-}
 
 function referenceTarget(item) {
   if (!item?.target_id) return "";
@@ -871,17 +1028,12 @@ function referenceKindLabel(kind) {
   return kind === "fastlap" ? "Fast Lap" : "Turnier";
 }
 
-function statusLabel(status) {
-  const raw = String(status || "").trim();
-  if (!raw) return "";
-  return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
 function ReferenceRow({ item, expanded = false }) {
   const isFastlap = item.kind === "fastlap";
   const isSeason = item.kind === "season";
   const target = referenceTarget(item);
   const rank = item.rank ? `#${item.rank}` : "-";
+  const rankColor = RANK_TONES[Number(item.rank)]?.color || "#FFFFFF";
   const date = formatPublicDate(item.date);
   const content = (
     <div data-testid={`profile-reference-${item.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:px-4 sm:py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition min-w-0 overflow-hidden">
@@ -899,14 +1051,14 @@ function ReferenceRow({ item, expanded = false }) {
           <div className="text-xs text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
             {item.subtitle && <span className="break-words">{item.subtitle}</span>}
             {date && <span>{date}</span>}
-            {expanded && statusLabel(item.status) && <span>{statusLabel(item.status)}</span>}
+            {expanded && item.status && <StatusBadge status={item.status} />}
             {expanded && item.participant_count && <span>{item.participant_count} Teilnehmer</span>}
           </div>
         </div>
       </div>
       <div className="flex items-center justify-between gap-3 sm:justify-end sm:shrink-0 sm:text-right w-full sm:w-auto border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
         <div>
-          <div className={`font-display text-xl font-bold tabular-nums ${item.rank && Number(item.rank) <= 3 ? "text-[#FFD700]" : "text-white"}`}>{rank}</div>
+          <div className="font-display text-xl font-bold tabular-nums" style={{ color: rankColor }}>{rank}</div>
           <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Rang</div>
         </div>
         {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
@@ -933,13 +1085,13 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
 
 // Verknüpfte Konten (#260): jedes per Anmeldung bestätigte Konto bekommt einen Rahmen in der
 // Plattformfarbe, den Anzeigenamen, das Datum und die offizielle Adresse - man sieht, dass es echt
-// ist und wohin es geht. Die Socials-Leiste darunter bleibt für alles Getippte.
-export function LinkedAccountsCard({ accounts }) {
+// ist und wohin es geht. `embedded` stellt die Liste als Abschnitt in die Konten-Karte.
+export function LinkedAccountsCard({ accounts, embedded = false }) {
   return (
-    <div className="border border-[#00FF88]/25 rounded-sm bg-[#121212] p-4" data-testid="public-profile-linked">
-      <h2 className="font-heading text-xl font-bold uppercase mb-1 flex items-center gap-2">
+    <div className={embedded ? "" : "border border-[#00FF88]/25 rounded-sm bg-[#121212] p-4"} data-testid="public-profile-linked">
+      <h3 className={`${embedded ? "text-[10px] uppercase tracking-widest text-[#00FF88]" : "font-heading text-xl uppercase"} font-bold mb-1 flex items-center gap-2`}>
         <BadgeCheck className="w-4 h-4 text-[#00FF88]" /> Verknüpfte Konten
-      </h2>
+      </h3>
       <p className="text-[11px] text-white/45 mb-3">Per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
       <div className="grid gap-2">
         {accounts.map((account) => {
@@ -980,12 +1132,10 @@ export function LinkedAccountsCard({ accounts }) {
   );
 }
 
-function ProfileLinksCard({ links }) {
+function SocialsRow({ links }) {
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-socials">
-      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2">
-        <Globe className="w-4 h-4 text-[#29B6E8]" /> Socials
-      </h2>
+    <div data-testid="public-profile-socials">
+      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-[#29B6E8]" /> Socials</h3>
       <div className="flex flex-wrap gap-2">
         {links.map((link) => {
           const meta = socialMeta(link);
@@ -1031,23 +1181,23 @@ function ProfileLinksCard({ links }) {
   );
 }
 
-function GamingIdsCard({ ids }) {
+function GamingIdsList({ ids }) {
   return (
-    <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-gaming-ids">
-      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2">
-        <Gamepad2 className="w-4 h-4 text-[#FFD700]" /> Gaming IDs
-      </h2>
+    <div data-testid="public-profile-gaming-ids">
+      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Gamepad2 className="w-3.5 h-3.5 text-[#FFD700]" /> Gaming-IDs</h3>
       <div className="grid gap-2">
         {ids.map((id) => (
-          <div key={`${id.label}:${id.value}`} className="border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm">
-            <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1">{id.label}{id.verified && <BadgeCheck className="w-3 h-3 text-[#00FF88]" aria-label="verifiziert" data-testid={`profile-gaming-${id.label.toLowerCase()}-verified`} />}</div>
-            {id.url ? (
-              <a href={id.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex max-w-full items-center gap-1 text-sm text-white/85 hover:text-[#29B6E8]">
-                <span className="truncate">{id.value}</span><ExternalLink className="w-3 h-3 shrink-0" />
-              </a>
-            ) : (
-              <div className="mt-1 text-sm text-white/85 break-all">{id.value}</div>
-            )}
+          <div key={`${id.label}:${id.value}`} className="border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm flex items-center justify-between gap-3 min-w-0">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1">{id.label}{id.verified && <BadgeCheck className="w-3 h-3 text-[#00FF88]" aria-label="verifiziert" data-testid={`profile-gaming-${id.label.toLowerCase()}-verified`} />}</div>
+              {id.url ? (
+                <a href={id.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 flex max-w-full items-center gap-1 text-sm text-white/85 hover:text-[#29B6E8]">
+                  <span className="truncate">{id.value}</span><ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              ) : (
+                <div className="mt-0.5 text-sm text-white/85 break-all">{id.value}</div>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -1060,13 +1210,13 @@ function TournamentRow({ t, expanded = false }) {
   return (
     <Link to={`/tournaments/${t.slug || t.id}`} data-testid={`profile-tournament-${t.slug}`} className="flex items-center justify-between gap-3 px-4 py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition">
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={t.status} />
           {t.final_position === 1 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
           {t.final_position > 1 && t.final_position <= 3 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#CD7F32] border border-[#CD7F32]/40 px-1.5 py-0.5 rounded-sm">Top 3</span>}
         </div>
         <div className="mt-1 font-heading text-base font-bold truncate">{t.title}</div>
-        <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2">
+        <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
           {t.game && <span>{gameLabel(t.game)}</span>}
           {date && <span>· {date.toLocaleDateString("de-DE")}</span>}
           {expanded && t.final_position && <span>· Endplatz: <span className="text-white">{t.final_position}</span></span>}
