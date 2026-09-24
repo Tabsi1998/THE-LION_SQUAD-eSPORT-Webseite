@@ -35,7 +35,7 @@ Jede Freigabe steht im Audit-Log.
 Vereinsverwaltung von selbst. Die Besetzung der Posten ist damit eine Rechtevergabe.
 
 **Vorstand aus Dolibarr (#297):** Ist die Mitgliederverwaltung angebunden (Modus „Live“) und hat der
-Superadmin unter Admin → Dolibarr → Funktionen freigegeben, welche Funktion die Vereinsverwaltung
+Superadmin unter Admin → Dolibarr → Bereiche freigegeben, welche Funktion die Vereinsverwaltung
 öffnet, dann gilt **nur noch das**: Beginnt die Funktion in Dolibarr, ist der Bereich da; endet sie,
 ist er beim nächsten Abgleich weg – ohne neues Anmelden. Der lokal gepflegte Vorstandsposten
 verleiht dann nichts mehr, weil er sich redaktionell ändern lässt. Ableitbar ist allein die
@@ -115,6 +115,22 @@ die Reiter des Profils - die Konto-Seiten stehen nicht ein zweites Mal dort.
 
 ## Wer sieht was im Adminbereich
 
-Das Menü zeigt nur Gruppen und Einträge, für die ein Bereich vorhanden ist. Eine Seite ohne
+Das Menü zeigt nur Gruppen und Einträge, für die ein Bereich vorhanden ist. Menüname = Seitentitel,
+jede Adresse genau einmal (#512). Rollenbild des Betreibers: Vorstand pflegt Verein, Mitglieder und
+Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin die Technik.
+
+| Gruppe | Einträge | Wer |
+| --- | --- | --- |
+| Übersicht | Dashboard | jeder mit einem Bereich |
+| Verein | Vereinsdaten (System) · Über uns, Sponsoren, Partner, Referenzen (Redaktion) · Vorstand, Kontakt-Inbox (Vereinsverwaltung) | je Eintrag |
+| Mitglieder | Mitglieder, Mitgliederprofile, Bewerbungen, Mitgliedervorteile, Dokumente, Alle Benutzer (Vereinsverwaltung) · Dolibarr (Vereinsverwaltung und System) | Vereinsverwaltung |
+| Finanzen | Finanzübersicht | Finanzen |
+| eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Moderation, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
+| Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Achievements, Sticker (Redaktion) · Downloads & QR (alle) | Redaktion |
+| Verbindungen | je Dienst eine Seite (Discord, Twitch, Steam, …, Google-Login, E-Mail, Analytics, Google Play, Dolibarr) | System |
+| System | Betrieb, Logs, Audit Logs, App-Logs, Push-Tests, App-Versionen, Einstellungen, Einrichtung & FAQ, E-Mail-Vorlagen (System) · Moderation (Moderation) | System |
+
+Die Reiter der Einstellungen und der Dolibarr-Seite sind nur über die Suche im Menü erreichbar
+(Wegweiser), damit das Menü nicht länger wird. Eine Seite ohne
 Bereich führt auf `/403` mit dem fehlenden Bereich und dem Hinweis, wer ihn vergibt. Die Antwort
 des Servers sagt dasselbe („Dafür fehlt der Bereich „Redaktion“ …“).
