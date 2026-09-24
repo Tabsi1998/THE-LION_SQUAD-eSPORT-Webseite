@@ -225,6 +225,8 @@ def _admin_profile(doc: dict) -> dict:
         "deactivated_reason": doc.get("deactivated_reason"),
         # Profil aus Dolibarr (#496): wann der Abgleich zuletzt Gamertag, Kurztext, Spiele oder Foto von dort genommen hat.
         "dolibarr_profile_at": doc.get("dolibarr_profile_at"),
+        # Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich das Profil wieder - nie ein zweites.
+        "dolibarr_member_id": doc.get("dolibarr_member_id"),
     })
     return out
 

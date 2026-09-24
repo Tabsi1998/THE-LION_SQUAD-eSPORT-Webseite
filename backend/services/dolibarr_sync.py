@@ -46,7 +46,8 @@ STATUS_MAP = {"draft": "pending", "active": "active", "terminated": "former", "e
 # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): Einträge, die der Abgleich angelegt hat.
 DIRECTORY_SOURCE = "dolibarr"
 CONSENT_WITHDRAWN = "consent_withdrawn"
-DIRECTORY_CHANGES = ("created", "activated", "deactivated", "updated")
+DIRECTORY_CHANGES = ("created", "activated", "deactivated", "updated", "merged")
+DUPLICATE = "duplicate"
 # Foto der Mitgliedskarte (#255): als Datei unter den Uploads, benannt nach Profil und Prüfsumme.
 PHOTO_PREFIX = "member-photo-"
 PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp"}
@@ -198,16 +199,23 @@ async def _store_member_photo(client: DolibarrClient, member_id: int, photo: dic
     return f"/api/static/uploads/{name}"
 
 
-async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, member_id: int) -> bool:
-    """Was der Verein in Dolibarr am Website-Profil pflegt (Gamertag, Kurztext, Spiele, Plattformen, Foto),
-    führt; was dort leer ist, lässt den Stand der Website stehen. Liefert True, wenn sich etwas geändert hat."""
+async def _member_website_profile(client: DolibarrClient, member_id: int) -> dict | None:
+    """Das Website-Profil der Mitgliedskarte - nur mit Einwilligung; ein älteres Modul kennt es nicht."""
     try:
         data = await client.member_profile(member_id)
     except DolibarrError as exc:
-        if exc.kind not in ("not_found", "module_off"):  # ein älteres Modul kennt das Website-Profil nicht
+        if exc.kind not in ("not_found", "module_off"):
             logger.warning("[dolibarr] Website-Profil von Mitglied %s nicht lesbar: %s", member_id, exc.kind)
-        return False
-    if not data.get("given"):
+        return None
+    return data if isinstance(data, dict) and data.get("given") else None
+
+
+async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, member_id: int, data: dict | None = None) -> bool:
+    """Was der Verein in Dolibarr am Website-Profil pflegt (Gamertag, Kurztext, Spiele, Plattformen, Foto),
+    führt; was dort leer ist, lässt den Stand der Website stehen. Liefert True, wenn sich etwas geändert hat."""
+    if data is None:
+        data = await _member_website_profile(client, member_id)
+    if not data:
         return False
     update: dict = {}
     for key, limit in (("gamertag", 40), ("bio", 2000)):
@@ -231,7 +239,72 @@ async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, mem
     return True
 
 
-async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link: dict, summary: dict) -> str:
+def _norm(value) -> str:
+    """Namen vergleichbar machen: Kleinbuchstaben, nur Buchstaben und Ziffern."""
+    return "".join(ch for ch in str(value or "").casefold() if ch.isalnum())
+
+
+async def _find_directory_profile(db, member_id: int, user_id: str | None, name: str, gamertags: list[str], *, fuzzy: bool):
+    """Das bestehende Profil dieses Mitglieds (#504): Mitgliedsnummer, dann Konto, dann Gamertag/Slug, dann
+    Klarname. Treffen mehrere, führt das von Hand gepflegte; vom Abgleich angelegte Doppelte kommen als Liste
+    zurück und werden zusammengeführt. Ohne `fuzzy` (keine Einwilligung) zählen nur Nummer und Konto."""
+    matches: list[dict] = []
+    found = await db.club_member_profiles.find_one({"dolibarr_member_id": member_id}, {"_id": 0})
+    if found:
+        matches.append(found)
+    keys = {slugify(str(g), fallback="", max_length=60) for g in gamertags if str(g or "").strip()}
+    keys.discard("")
+    wanted = _norm(name) if len(str(name or "").split()) >= 2 else ""
+    async for row in db.club_member_profiles.find({"dolibarr_member_id": {"$ne": member_id}}, {"_id": 0}):
+        if row.get("dolibarr_member_id") or row.get("deactivated_reason") == DUPLICATE:
+            continue  # gehört einem anderen Mitglied oder ist schon als Doppel erkannt
+        if user_id and row.get("user_id") == user_id:
+            matches.append(row)
+            continue
+        if not fuzzy or (row.get("user_id") and user_id and row.get("user_id") != user_id):
+            continue  # ein anderes Konto hängt dran - dann entscheidet kein Name
+        if keys and (slugify(str(row.get("gamertag") or ""), fallback="", max_length=60) in keys or row.get("slug") in keys):
+            matches.append(row)
+            continue
+        if wanted and wanted in (_norm(row.get("real_name")), _norm(row.get("dolibarr_name")), _norm(row.get("display_name"))):
+            matches.append(row)
+    seen: set[str] = set()
+    unique = [m for m in matches if not (m["id"] in seen or seen.add(m["id"]))]
+    if not unique:
+        return None, []
+    unique.sort(key=lambda m: (m.get("source") == DIRECTORY_SOURCE, str(m.get("created_at") or "")))
+    primary = unique[0]
+    return primary, [m for m in unique[1:] if m.get("source") == DIRECTORY_SOURCE]
+
+
+async def _merge_duplicate_profile(db, primary: dict, dup: dict) -> None:
+    """Ein vom Abgleich angelegtes Doppel geht im gepflegten Profil auf (#504): Einwilligung, Mitgliedsnummer
+    und Dolibarr-Stand ziehen um, Foto/Kurztext/Spiele nur, wo das gepflegte Profil leer ist; Verweise
+    (Vorstand, Referenzen) hängen um. Nie von Hand bearbeitet → weg, sonst offline mit Grund `duplicate`."""
+    now = now_utc().isoformat()
+    update: dict = {}
+    for key in ("consent", "dolibarr_member_id", "dolibarr_name", "dolibarr_profile_at", "dolibarr_photo_sha", "user_id",
+                "photo_url", "bio", "games", "platforms", "gamertag"):
+        if dup.get(key) not in (None, "", []) and primary.get(key) in (None, "", []):
+            update[key] = dup[key]
+    if update:
+        update.update({"updated_at": now, "updated_by": ACTOR})
+        await db.club_member_profiles.update_one({"id": primary["id"]}, {"$set": update})
+        primary.update(update)
+    await db.board_positions.update_many({"user_id": dup["id"]}, {"$set": {"user_id": primary["id"]}})
+    async for ref in db.references.find({"member_profile_ids": dup["id"]}, {"_id": 0, "id": 1, "member_profile_ids": 1}):
+        ids = [primary["id"] if v == dup["id"] else v for v in ref.get("member_profile_ids") or []]
+        await db.references.update_one({"id": ref["id"]}, {"$set": {"member_profile_ids": list(dict.fromkeys(ids))}})
+    untouched = dup.get("created_by") == ACTOR and dup.get("updated_by") == ACTOR
+    if untouched:
+        await db.club_member_profiles.delete_one({"id": dup["id"]})
+    else:
+        await db.club_member_profiles.update_one({"id": dup["id"]}, {"$set": {
+            "is_active": False, "deactivated_reason": DUPLICATE, "dolibarr_member_id": None, "updated_at": now, "updated_by": ACTOR}})
+    logger.info("[dolibarr] Verzeichnis: Doppel %s in %s zusammengeführt (%s)", dup["id"], primary["id"], "entfernt" if untouched else "offline")
+
+
+async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link: dict | None, summary: dict) -> str:
     """Ein Eintrag im Mitgliederverzeichnis folgt der Einwilligung in Dolibarr (Code `directory_consent_code`):
     „given“ legt ihn an oder schaltet ihn frei - Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto,
     alles Weitere pflegt der Vorstand und bleibt beim nächsten Abgleich stehen. Der Klarname folgt der
@@ -240,7 +313,9 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     offline, auch einen Eintrag, den das Mitglied selbst angelegt hat. Ohne Code passiert nichts.
     Ist auf der Website kein Code gewählt, gilt der, den das Modul für das Website-Profil nennt. Mit
     Einwilligung führt außerdem, was der Verein in Dolibarr am Website-Profil pflegt (#255).
-    Liefert `created|activated|deactivated|updated|unchanged|skipped`."""
+    Ein Website-Konto ist keine Voraussetzung (#505): ohne Zuordnung (`link` None) entsteht das Profil aus
+    der Vereinsakte allein. Ein bestehendes Profil wird gefunden, nie verdoppelt (#504).
+    Liefert `created|activated|deactivated|updated|merged|unchanged|skipped`."""
     if settings.get("mode") != "live":
         return "skipped"
     code = str(settings.get("directory_consent_code") or "").strip()
@@ -256,17 +331,30 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     consent = next((row for row in rows if isinstance(row, dict) and row.get("code") == code), None)
     state = str((consent or {}).get("state") or "none")
     consent_info = {"code": code, "state": state, "version": (consent or {}).get("version"), "moment": (consent or {}).get("moment")}
-    user_id = link["user_id"]
+    member_id = int(summary["id"])
+    user_id = link["user_id"] if link else None
     now = now_utc().isoformat()
-    profile = await db.club_member_profiles.find_one({"user_id": user_id}, {"_id": 0})
     active_member = summary.get("status") == "active"
     name = _full_name(summary)
+    listed = state == "given" and active_member
+    website = await _member_website_profile(client, member_id) if listed else None
+    user = (await db.users.find_one({"id": user_id}, {"_id": 0, "username": 1, "display_name": 1, "avatar_url": 1, "favorite_games": 1,
+                                     "main_platforms": 1, "gender": 1}) if user_id else None) or {}
+    profile, duplicates = await _find_directory_profile(db, member_id, user_id, name, [(website or {}).get("gamertag") or "", user.get("username") or ""], fuzzy=listed)
+    for dup in duplicates:
+        await _merge_duplicate_profile(db, profile, dup)
+    merged = bool(duplicates)
+    claim: dict = {}
+    if profile is not None:
+        if profile.get("dolibarr_member_id") != member_id:
+            claim["dolibarr_member_id"] = member_id
+        if user_id and not profile.get("user_id"):
+            claim["user_id"] = user_id
 
-    if state == "given" and active_member:
+    if listed:
         if profile is None:
-            user = await db.users.find_one({"id": user_id}, {"_id": 0, "username": 1, "display_name": 1, "avatar_url": 1, "favorite_games": 1, "main_platforms": 1, "gender": 1}) or {}
             display_name = name or str(user.get("display_name") or user.get("username") or "Mitglied").strip()
-            gamertag = str(user.get("username") or "").strip()[:40] or None
+            gamertag = str((website or {}).get("gamertag") or user.get("username") or "").strip()[:40] or None
             doc = {
                 "id": new_id(), "display_name": display_name, "gamertag": gamertag, "real_name": name or None,
                 "slug": await _unique_directory_slug(db, gamertag or display_name),
@@ -274,14 +362,15 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
                 "gender": user.get("gender") if user.get("gender") in ("male", "female", "diverse") else None,
                 "games": [str(g).strip() for g in (user.get("favorite_games") or []) if str(g).strip()][:20],
                 "platforms": [str(p).strip() for p in (user.get("main_platforms") or []) if str(p).strip()][:20],
-                "user_id": user_id, "order_index": 0, "is_active": True, "source": DIRECTORY_SOURCE, "consent": consent_info, "dolibarr_name": name or None,
+                "user_id": user_id, "dolibarr_member_id": member_id, "order_index": 0, "is_active": True, "source": DIRECTORY_SOURCE,
+                "consent": consent_info, "dolibarr_name": name or None,
                 "created_at": now, "created_by": ACTOR, "updated_at": now, "updated_by": ACTOR,
             }
             await db.club_member_profiles.insert_one(doc)
-            logger.info("[dolibarr] Verzeichnis-Eintrag angelegt für Mitglied %s", summary.get("id"))
-            await _apply_dolibarr_profile(db, client, doc, int(summary["id"]))
+            logger.info("[dolibarr] Verzeichnis-Eintrag angelegt für Mitglied %s%s", member_id, "" if user_id else " (ohne Konto)")
+            await _apply_dolibarr_profile(db, client, doc, member_id, website)
             return "created"
-        update: dict = {"consent": consent_info}
+        update: dict = {"consent": consent_info, **claim}
         previous_name = profile.get("dolibarr_name")
         if name and name != previous_name:
             update["dolibarr_name"] = name
@@ -292,20 +381,20 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
                       and (profile.get("deactivated_reason") == CONSENT_WITHDRAWN or profile.get("source") == DIRECTORY_SOURCE))
         if reactivate:
             update.update({"is_active": True, "deactivated_reason": None})
-        changed = await _apply_dolibarr_profile(db, client, profile, int(summary["id"]))
+        changed = await _apply_dolibarr_profile(db, client, profile, member_id, website)
         if (profile.get("consent") or {}) == consent_info and not {k: v for k, v in update.items() if k != "consent"}:
-            return "updated" if changed else "unchanged"
+            return "merged" if merged else ("updated" if changed else "unchanged")
         update.update({"updated_at": now, "updated_by": ACTOR})
         await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
-        return "activated" if reactivate else ("updated" if changed else "unchanged")
+        return "activated" if reactivate else ("merged" if merged else ("updated" if changed or claim else "unchanged"))
 
     if profile is None:
         return "unchanged"
     goes_offline = profile.get("is_active", True) and (state == "withdrawn" or profile.get("source") == DIRECTORY_SOURCE)
-    update = {"consent": consent_info}
+    update = {"consent": consent_info, **claim}
     if goes_offline:
         update.update({"is_active": False, "deactivated_reason": CONSENT_WITHDRAWN if state == "withdrawn" or active_member else "membership_ended"})
-    if (profile.get("consent") or {}) == consent_info and not goes_offline:
+    if (profile.get("consent") or {}) == consent_info and not goes_offline and not claim:
         return "unchanged"
     update.update({"updated_at": now, "updated_by": ACTOR})
     await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
@@ -385,9 +474,10 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
                 link = await verified_link_for_member(db, settings, int(summary["id"]))
                 if not link:
                     counts["unlinked"] += 1
-                    continue
                 if live:
-                    counts[await apply_summary(db, settings, link, summary)] += 1
+                    if link:
+                        counts[await apply_summary(db, settings, link, summary)] += 1
+                    # Das Verzeichnis braucht kein Website-Konto (#505): die Einwilligung allein zählt.
                     if await sync_directory_entry(db, settings, client, link, summary) in DIRECTORY_CHANGES:
                         counts["directory"] += 1
             page += 1
@@ -454,14 +544,12 @@ async def process_pending(db=None) -> dict:
         return {"ok": False, "error": exc.kind}
     for entry in due:
         link = await verified_link_for_member(db, settings, entry["member_id"])
-        if not link:
-            await db.dolibarr_pending.delete_one({"key": entry["key"]})
-            continue
         try:
             summary = await client.member_summary(entry["member_id"])
         except DolibarrError as exc:
             if exc.kind == "not_found":
-                await end_membership_of_gone_member(db, link)
+                if link:
+                    await end_membership_of_gone_member(db, link)
                 await db.dolibarr_pending.delete_one({"key": entry["key"]})
             elif entry.get("attempts", 0) + 1 >= PENDING_MAX_ATTEMPTS:
                 # Der regelmäßige Abgleich holt es nach.
@@ -470,8 +558,9 @@ async def process_pending(db=None) -> dict:
                 retry = (now_utc() + timedelta(seconds=30 * (entry.get("attempts", 0) + 1))).isoformat()
                 await db.dolibarr_pending.update_one({"key": entry["key"]}, {"$set": {"due_at": retry}, "$inc": {"attempts": 1}})
             continue
-        await apply_summary(db, settings, link, summary)
-        await sync_directory_entry(db, settings, client, link, summary)
+        if link:
+            await apply_summary(db, settings, link, summary)
+        await sync_directory_entry(db, settings, client, link, summary)  # auch ohne Zuordnung (#505)
         await db.dolibarr_pending.delete_one({"key": entry["key"]})
         processed += 1
     return {"ok": True, "processed": processed}
