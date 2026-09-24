@@ -34,7 +34,17 @@ def media_scan_facts(settings: dict | None) -> dict:
     return {"enabled": provider not in ("", "off"), "provider": provider}
 
 
-def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, email: dict | None, dolibarr: dict | None, media_scan: dict | None = None) -> dict:
+def platform_facts(branding: dict | None) -> list[dict]:
+    """Welche Plattformen Mitglieder per Anmeldung verknüpfen können (#545) - Label, was die Website dabei
+    erhält und wer die Plattform betreibt. Nur eingerichtete; nie Client-IDs oder Secrets."""
+    from services.platform_links import PLATFORMS, providers_configured
+    configured = providers_configured(branding or {})
+    return [{"key": key, "label": spec["label"], "delivers": spec.get("delivers") or "", "operator": spec.get("operator") or spec["label"]}
+            for key, spec in PLATFORMS.items() if configured.get(key)]
+
+
+def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, email: dict | None, dolibarr: dict | None, media_scan: dict | None = None,
+               platforms: list[dict] | None = None) -> dict:
     """Reine Rechnung aus den Einstellungsdokumenten - ohne Geheimnisse."""
     b = branding or {}
     d = dolibarr or {}
@@ -50,13 +60,20 @@ def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, e
         "app": {"push": True, "crash_reports": True, "app_lock": True},   # LionsAPP seit Build 70/72
         "hosting": {"provider": str(b.get("hosting_provider") or "").strip(), "country": str(b.get("hosting_country") or "").strip()},
         "media_scan": media_scan_facts(media_scan),
+        "platforms": list(platforms or []),
     }
 
 
 async def privacy_facts(db) -> dict:
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "analytics_provider": 1, "twitch_channel": 1, "hosting_provider": 1, "hosting_country": 1}) or {}
+    from services.platform_links import PLATFORMS
+    fields = {"_id": 0, "analytics_provider": 1, "twitch_channel": 1, "hosting_provider": 1, "hosting_country": 1, "steam_api_key": 1}
+    for spec in PLATFORMS.values():
+        for field in (spec.get("id_field"), spec.get("secret_field")):
+            if field:
+                fields[field] = 1
+    branding = await db.settings.find_one({"id": "branding"}, fields) or {}
     discord = await db.settings.find_one({"id": "discord"}, {"_id": 0, "webhook_url": 1, "targets": 1, "bot_enabled": 1}) or {}
     email = await db.settings.find_one({"id": "email"}, {"_id": 0, "provider": 1, "smtp_host": 1, "resend_api_key": 1}) or {}
     dolibarr = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "mode": 1, "write_enabled": 1}) or {}
     from services.media_scan import load_settings as load_media_scan
-    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr, media_scan=await load_media_scan(db))
+    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr, media_scan=await load_media_scan(db), platforms=platform_facts(branding))
