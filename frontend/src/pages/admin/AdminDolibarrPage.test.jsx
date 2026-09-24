@@ -49,6 +49,7 @@ function mockApi() {
     if (url === "/admin/dolibarr/status") return { data: STATUS };
     if (url === "/admin/dolibarr/links") return { data: [] };
     if (url === "/admin/dolibarr/preview") return { data: PREVIEW };
+    if (url === "/admin/dolibarr/consent-texts") return { data: [{ code: "fotos", label: "Fotos auf der Website", version: 2 }, { code: "verzeichnis", label: "Nennung im Mitgliederverzeichnis", version: 1 }] };
     throw new Error(url);
   });
   apiMock.post.mockResolvedValue({ data: { status: "verified" } });
@@ -193,3 +194,13 @@ test("der Reiter Stand zeigt je Dolibarr-Funktion, ob sie an ist und wo sie eing
   expect(screen.getByTestId("dolibarr-feature-members")).toHaveTextContent("Modus Vorschau");
 });
 
+test("Mitgliederverzeichnis aus der Einwilligung (#410): die Auswahl auf „Verbindung“ speichert den Code", async () => {
+  authState.areas = ["system"];
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  const select = await screen.findByTestId("dolibarr-directory-consent");
+  expect(screen.getByTestId("dolibarr-directory")).toHaveTextContent("legt der Abgleich seinen Eintrag");
+  await user.selectOptions(select, "verzeichnis");
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { directory_consent_code: "verzeichnis" }));
+});

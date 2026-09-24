@@ -250,6 +250,26 @@ nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website
 oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
 steht, was Sache ist.
 
+## Mitgliederverzeichnis aus der Einwilligung
+
+Das Mitgliederverzeichnis auf der Website (*Verein → Mitglieder*) kann der Abgleich füllen, ohne
+dass ein Mitglied etwas tun muss:
+
+1. Im Vereinsmodul unter *Einrichtung > Vereine > Einwilligungen* einen Text anlegen, etwa
+   „Nennung im Mitgliederverzeichnis“, und ihn den Mitgliedern zur Zustimmung geben (beim
+   Beitritt oder in der Mitgliederverwaltung).
+2. Auf der Website unter *Dolibarr → Verbindung → Mitgliederverzeichnis aus der Einwilligung*
+   diesen Text auswählen.
+
+Ab dann legt jeder Abgleich für ein Mitglied mit bestätigter Zuordnung und erteilter Einwilligung
+den Eintrag an: Name aus der Mitgliederverwaltung, Foto und Spiele vom Website-Konto. Alles
+Weitere – Foto, Bio, Spiele, Anzeigename – pflegt der Vorstand unter *Verein → Mitgliederprofile*;
+der nächste Abgleich lässt es stehen (nur der Klarname folgt weiter der Mitgliederverwaltung). Ein
+Widerruf in Dolibarr nimmt den Eintrag beim nächsten Abgleich offline – auch einen Eintrag, den das
+Mitglied selbst per Opt-in angelegt hat; eine neue Zustimmung holt ihn samt Pflege zurück. Ein vom
+Vorstand gesperrter Eintrag bleibt gesperrt. Ohne ausgewählte Einwilligung ändert der Abgleich am
+Verzeichnis nichts.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer

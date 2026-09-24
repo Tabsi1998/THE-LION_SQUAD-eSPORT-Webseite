@@ -40,6 +40,8 @@ export default function AdminDolibarrPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedTab]);
   const [status, setStatus] = useState(null);
+  // Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): die Einwilligungstexte des Vereins zur Auswahl.
+  const [consentTexts, setConsentTexts] = useState([]);
   const [links, setLinks] = useState([]);
   const [preview, setPreview] = useState(null);
   const [busy, setBusy] = useState("");
@@ -57,6 +59,9 @@ export default function AdminDolibarrPage() {
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/admin/dolibarr/status");
+      if (canSystem && data?.mode && data.mode !== "off") {
+        api.get("/admin/dolibarr/consent-texts").then((result) => setConsentTexts(Array.isArray(result?.data) ? result.data : [])).catch(() => setConsentTexts([]));
+      }
       setStatus(data);
       setForm((current) => ({ ...current, base_url: data.base_url || "", instance: data.instance || "", entity: data.entity || 1, environment: data.environment || "production" }));
       if (!policyDirtyRef.current) setPolicyMap(data.policy?.map || {});
@@ -67,7 +72,7 @@ export default function AdminDolibarrPage() {
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
-  }, [canClub]);
+  }, [canClub, canSystem]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -499,6 +504,21 @@ export default function AdminDolibarrPage() {
                   <label htmlFor="dolibarr-auto-link" className="font-bold">Konten über die bestätigte E-Mail von selbst zuordnen</label>
                   <div className="text-xs text-white/45">Nur bei genau einem Treffer und wenn das Mitglied noch keinem Konto gehört. Aus heißt: Jede Zuordnung bestätigt die Vereinsverwaltung.</div>
                 </div>
+              </div>
+              {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag) */}
+              <div className="mt-4 border-t border-white/10 pt-4 text-sm" data-testid="dolibarr-directory">
+                <div className="font-bold">Mitgliederverzeichnis aus der Einwilligung</div>
+                <div className="text-xs text-white/45 mt-1 max-w-2xl">Hat ein Mitglied in Dolibarr dieser Einwilligung zugestimmt, legt der Abgleich seinen Eintrag im Mitgliederverzeichnis an – Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto, den Rest pflegst du unter Verein → Mitgliederprofile. Ein Widerruf nimmt den Eintrag offline. Leer heißt: nur Einträge von Hand oder per Opt-in des Mitglieds.</div>
+                <select value={status?.directory_consent_code || ""} disabled={!!busy} data-testid="dolibarr-directory-consent"
+                  onChange={(e) => saveSettings({ directory_consent_code: e.target.value }, e.target.value ? "Das Verzeichnis folgt jetzt dieser Einwilligung." : "Das Verzeichnis folgt keiner Einwilligung mehr.")}
+                  className="mt-2 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50">
+                  <option value="">– keine (aus) –</option>
+                  {consentTexts.map((text) => <option key={text.code} value={text.code}>{text.label} ({text.code})</option>)}
+                  {status?.directory_consent_code && !consentTexts.some((text) => text.code === status.directory_consent_code) && (
+                    <option value={status.directory_consent_code}>{status.directory_consent_code} (im Modul nicht mehr gefunden)</option>
+                  )}
+                </select>
+                {!consentTexts.length && <div className="text-xs text-[#FFD700] mt-1">Keine Einwilligungstexte gelesen – im Modul unter Einrichtung → Vereine → Einwilligungen anlegen (z. B. „Nennung im Mitgliederverzeichnis“).</div>}
               </div>
               {/* Beitrittsanträge nach Dolibarr (#328): nur im Modus Live wirksam; aus = Antrag und Entscheidung bleiben auf der Website. */}
               <div className="mt-4 flex items-start gap-3 text-sm">
