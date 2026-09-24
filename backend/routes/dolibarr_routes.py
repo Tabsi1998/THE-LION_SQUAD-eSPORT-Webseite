@@ -128,6 +128,8 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "applications_coupled": settings["mode"] == "live" and bool(settings.get("applications_enabled")),
         "type_map": settings.get("type_map") or {},
         "website_types": sorted(VALID_TYPES),
+        # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): welcher Einwilligungscode den Eintrag steuert.
+        "directory_consent_code": settings.get("directory_consent_code") or "",
         "sync": state,
         "links": links,
         "open_links": sum(links.get(status, 0) for status in OPEN_STATUSES),
@@ -258,6 +260,20 @@ class DolibarrSettingsUpdate(BaseModel):
     # Beitrittsanträge nach Dolibarr (#328): nur im Modus „live“ wirksam; aus = Antrag und Entscheidung auf der Website.
     applications_enabled: bool | None = None
     type_map: dict[str, str] | None = None
+    directory_consent_code: str | None = Field(None, max_length=60)
+
+
+@admin_router.get("/consent-texts")
+async def dolibarr_consent_texts(me: dict = Depends(require_area("system"))):
+    """Die Einwilligungstexte des Vereins (Code, Bezeichnung) - für die Auswahl, welche das Verzeichnis steuert."""
+    settings = await load_settings(get_db())
+    if settings.get("mode") == "off":
+        return []
+    try:
+        texts = await DolibarrClient(settings).consent_texts()
+    except DolibarrError as exc:
+        return {"error": exc.kind, "texts": []}
+    return [{"code": str(t.get("code") or ""), "label": str(t.get("label") or t.get("code") or ""), "version": t.get("version")} for t in texts if t.get("code")]
 
 
 @admin_router.put("/settings")
@@ -318,6 +334,11 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         updates["entity"] = data["entity"]
     if "auto_link_verified_email" in data:
         updates["auto_link_verified_email"] = bool(data["auto_link_verified_email"])
+    if "directory_consent_code" in data:
+        code = str(data["directory_consent_code"] or "").strip()
+        if code and not all(ch.isalnum() or ch in "_-" for ch in code):
+            raise HTTPException(400, "Der Einwilligungscode besteht aus Buchstaben, Ziffern, „_“ und „-“.")
+        updates["directory_consent_code"] = code
     if "type_map" in data:
         cleaned = {}
         for type_id, target in (data["type_map"] or {}).items():

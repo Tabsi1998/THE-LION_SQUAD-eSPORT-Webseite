@@ -21,6 +21,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError, capabilities_for, instance_key, load_settings
 from services.dolibarr_links import close_link, note_candidate, verified_link_for_member, verify_link
+from services.slug_utils import slugify
 from services.membership_service import ACTIVE_STATUSES, VALID_TYPES, end_self_directory_entry
 
 logger = logging.getLogger("tls.dolibarr.sync")
@@ -38,6 +39,9 @@ AUTO_LINK_RETRY_HOURS = 24
 # Der Verlauf steht auch auf „Meine Mitgliedschaft“ - also für das Mitglied geschrieben.
 HISTORY_NOTE = "Aus der Mitgliederverwaltung übernommen"
 STATUS_MAP = {"draft": "pending", "active": "active", "terminated": "former", "excluded": "former"}
+# Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): Einträge, die der Abgleich angelegt hat.
+DIRECTORY_SOURCE = "dolibarr"
+CONSENT_WITHDRAWN = "consent_withdrawn"
 
 
 # ---------------------------------------------------------------- Abbildung
@@ -150,6 +154,88 @@ async def apply_summary(db, settings: dict, link: dict, summary: dict) -> str:
     return "applied"
 
 
+# ---------------------------------------------------------------- Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag)
+
+def _full_name(summary: dict) -> str:
+    return " ".join(str(part).strip() for part in (summary.get("firstname"), summary.get("lastname")) if part).strip()
+
+
+async def _unique_directory_slug(db, source: str) -> str:
+    base = slugify(source, fallback="mitglied", max_length=60)
+    candidate, counter = base, 2
+    while await db.club_member_profiles.find_one({"slug": candidate}, {"_id": 1}):
+        candidate = f"{base}-{counter}"
+        counter += 1
+    return candidate
+
+
+async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link: dict, summary: dict) -> str:
+    """Ein Eintrag im Mitgliederverzeichnis folgt der Einwilligung in Dolibarr (Code `directory_consent_code`):
+    „given“ legt ihn an oder schaltet ihn frei - Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto,
+    alles Weitere pflegt der Vorstand und bleibt beim nächsten Abgleich stehen; „withdrawn“ nimmt ihn
+    offline, auch einen Eintrag, den das Mitglied selbst angelegt hat. Ohne Code passiert nichts.
+    Liefert `created|activated|deactivated|unchanged|skipped`."""
+    code = str(settings.get("directory_consent_code") or "").strip()
+    if not code or settings.get("mode") != "live":
+        return "skipped"
+    try:
+        rows = await client.member_consents(int(summary["id"]))
+    except DolibarrError as exc:
+        logger.warning("[dolibarr] Einwilligungen von Mitglied %s nicht lesbar: %s", summary.get("id"), exc.kind)
+        return "skipped"
+    consent = next((row for row in rows if isinstance(row, dict) and row.get("code") == code), None)
+    state = str((consent or {}).get("state") or "none")
+    consent_info = {"code": code, "state": state, "version": (consent or {}).get("version"), "moment": (consent or {}).get("moment")}
+    user_id = link["user_id"]
+    now = now_utc().isoformat()
+    profile = await db.club_member_profiles.find_one({"user_id": user_id}, {"_id": 0})
+    active_member = summary.get("status") == "active"
+    name = _full_name(summary)
+
+    if state == "given" and active_member:
+        if profile is None:
+            user = await db.users.find_one({"id": user_id}, {"_id": 0, "username": 1, "display_name": 1, "avatar_url": 1, "favorite_games": 1, "main_platforms": 1, "gender": 1}) or {}
+            display_name = name or str(user.get("display_name") or user.get("username") or "Mitglied").strip()
+            gamertag = str(user.get("username") or "").strip()[:40] or None
+            doc = {
+                "id": new_id(), "display_name": display_name, "gamertag": gamertag, "real_name": name or None,
+                "slug": await _unique_directory_slug(db, gamertag or display_name),
+                "role_title": None, "photo_url": user.get("avatar_url") or None, "cover_url": None, "bio": "", "birth_date": None,
+                "gender": user.get("gender") if user.get("gender") in ("male", "female", "diverse") else None,
+                "games": [str(g).strip() for g in (user.get("favorite_games") or []) if str(g).strip()][:20],
+                "platforms": [str(p).strip() for p in (user.get("main_platforms") or []) if str(p).strip()][:20],
+                "user_id": user_id, "order_index": 0, "is_active": True, "source": DIRECTORY_SOURCE, "consent": consent_info,
+                "created_at": now, "created_by": ACTOR, "updated_at": now, "updated_by": ACTOR,
+            }
+            await db.club_member_profiles.insert_one(doc)
+            logger.info("[dolibarr] Verzeichnis-Eintrag angelegt für Mitglied %s", summary.get("id"))
+            return "created"
+        update: dict = {"consent": consent_info}
+        if name and profile.get("source") == DIRECTORY_SOURCE and profile.get("real_name") != name:
+            update["real_name"] = name  # der Name aus der Mitgliederverwaltung führt bei automatischen Einträgen
+        reactivate = (not profile.get("is_active", True) and not profile.get("directory_blocked")
+                      and (profile.get("deactivated_reason") == CONSENT_WITHDRAWN or profile.get("source") == DIRECTORY_SOURCE))
+        if reactivate:
+            update.update({"is_active": True, "deactivated_reason": None})
+        if (profile.get("consent") or {}) == consent_info and len(update) == 1:
+            return "unchanged"
+        update.update({"updated_at": now, "updated_by": ACTOR})
+        await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
+        return "activated" if reactivate else "unchanged"
+
+    if profile is None:
+        return "unchanged"
+    goes_offline = profile.get("is_active", True) and (state == "withdrawn" or profile.get("source") == DIRECTORY_SOURCE)
+    update = {"consent": consent_info}
+    if goes_offline:
+        update.update({"is_active": False, "deactivated_reason": CONSENT_WITHDRAWN if state == "withdrawn" or active_member else "membership_ended"})
+    if (profile.get("consent") or {}) == consent_info and not goes_offline:
+        return "unchanged"
+    update.update({"updated_at": now, "updated_by": ACTOR})
+    await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
+    return "deactivated" if goes_offline else "unchanged"
+
+
 async def end_membership_of_gone_member(db, link: dict) -> None:
     """Das Mitglied gibt es in Dolibarr nicht mehr (404 beim direkten Lesen)."""
     now = now_utc().isoformat()
@@ -202,7 +288,7 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
         age = _hours_since(state.get("last_full_at"))
         full = age is None or age >= FULL_SYNC_HOURS or not state.get("cursor")
     started = now_utc().isoformat()
-    counts = {"seen": 0, "applied": 0, "unchanged": 0, "stale": 0, "unlinked": 0, "gone": 0}
+    counts = {"seen": 0, "applied": 0, "unchanged": 0, "stale": 0, "unlinked": 0, "gone": 0, "directory": 0}
     live = settings["mode"] == "live"
     try:
         client = DolibarrClient(settings)
@@ -223,6 +309,8 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
                     continue
                 if live:
                     counts[await apply_summary(db, settings, link, summary)] += 1
+                    if await sync_directory_entry(db, settings, client, link, summary) in ("created", "activated", "deactivated"):
+                        counts["directory"] += 1
             page += 1
             if page >= MAX_PAGES:
                 raise DolibarrError("invalid_response")
@@ -239,6 +327,8 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
                         counts["gone"] += 1
                     continue
                 counts[await apply_summary(db, settings, link, summary)] += 1
+                if await sync_directory_entry(db, settings, client, link, summary) in ("created", "activated", "deactivated"):
+                    counts["directory"] += 1
     except DolibarrError as exc:
         await _save_state(db, {"last_run_at": started, "ok": False, "last_error": {"kind": exc.kind, "status": exc.status, "text": exc.text, "at": started}})
         return {"ok": False, "error": exc.kind, "text": exc.text, "status": exc.status}
@@ -300,6 +390,7 @@ async def process_pending(db=None) -> dict:
                 await db.dolibarr_pending.update_one({"key": entry["key"]}, {"$set": {"due_at": retry}, "$inc": {"attempts": 1}})
             continue
         await apply_summary(db, settings, link, summary)
+        await sync_directory_entry(db, settings, client, link, summary)
         await db.dolibarr_pending.delete_one({"key": entry["key"]})
         processed += 1
     return {"ok": True, "processed": processed}

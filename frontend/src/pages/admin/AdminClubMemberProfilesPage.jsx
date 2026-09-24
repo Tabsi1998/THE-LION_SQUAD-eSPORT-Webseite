@@ -162,6 +162,9 @@ export function ClubMemberProfilesAdminContent() {
                     )}
                     {/* Verzeichnis per Opt-in (#410): vom Mitglied selbst angelegt, ggf. gesperrt */}
                     {profile.source === "member" && <p className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
+                    {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): vom Abgleich angelegt, Widerruf nimmt offline */}
+                    {profile.source === "dolibarr" && <p className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${new Date(profile.consent.moment).toLocaleDateString("de-DE")})` : ""}</p>}
+                    {profile.deactivated_reason === "consent_withdrawn" && <p className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
                     {profile.directory_blocked && <p className="text-[10px] uppercase tracking-widest font-bold text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
                   <span className="text-[10px] text-white/40 font-mono">#{profile.order_index || 0}</span>

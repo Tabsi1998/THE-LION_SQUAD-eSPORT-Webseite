@@ -220,6 +220,9 @@ def _admin_profile(doc: dict) -> dict:
         "directory_blocked": bool(doc.get("directory_blocked")),
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
+        # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): warum ein Eintrag da oder offline ist.
+        "consent": doc.get("consent"),
+        "deactivated_reason": doc.get("deactivated_reason"),
     })
     return out
 
