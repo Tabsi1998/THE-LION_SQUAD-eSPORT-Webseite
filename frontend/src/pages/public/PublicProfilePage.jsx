@@ -256,12 +256,27 @@ function linkedEntry(account) {
   };
 }
 
+// Ein getippter Wert kann noch eine ganze Adresse sein (alte Eingaben): im Kasten steht der Name, nie die Adresse.
+const HANDLE_SKIP = new Set(["c", "channel", "user", "id", "profiles", "www"]);
+function handleFromValue(raw) {
+  const value = String(raw || "").trim();
+  if (!/^[a-z]+:[/][/]/i.test(value) && !/^(www[.])?[a-z0-9.-]+[.][a-z]{2,}[/]/i.test(value)) return cleanHandle(value);
+  try {
+    const url = new URL(/^[a-z]+:[/][/]/i.test(value) ? value : `https://${value}`);
+    const segments = url.pathname.split("/").filter(Boolean).map((segment) => decodeURIComponent(segment));
+    const meaningful = segments.filter((segment) => !HANDLE_SKIP.has(segment.toLowerCase()));
+    return (meaningful[0] || url.hostname).replace(/^@/, "");
+  } catch {
+    return cleanHandle(value);
+  }
+}
+
 function manualEntry(platform, rawValue, profile) {
   const meta = socialMeta({ platform });
   let value = String(rawValue || "").trim();
   if (platform === "twitch") value = normalizeTwitchChannel(rawValue);
   else if (platform === "website") value = value.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
-  else if (SOCIAL_PLATFORMS.includes(platform)) value = cleanHandle(rawValue);
+  else if (SOCIAL_PLATFORMS.includes(platform)) value = handleFromValue(rawValue);
   if (!value) return null;
   return { platform, key: meta.key, label: meta.label, color: meta.color, title: value, detail: meta.label, value, url: manualUrl(platform, rawValue), verified: isVerified(profile, platform), since: "" };
 }

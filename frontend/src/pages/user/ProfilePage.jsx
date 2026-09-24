@@ -169,14 +169,14 @@ export default function ProfilePage() {
     setParams(next, { replace: true });
     refresh?.();
   }, [linkedParam, linkErrorParam, linkDetailParam, params, setParams, refresh]);
-  const startPlatformLink = async (platform) => {
+  const startPlatformLink = useCallback(async (platform) => {
     try {
       const { data } = await api.post(`/me/platform-links/${platform}/start`);
       if (data?.url) window.location.assign(data.url);
     } catch (err) {
       toast.error(formatRequestError(err, "Die Verknüpfung konnte nicht gestartet werden."));
     }
-  };
+  }, []);
   const unlinkPlatform = async (platform) => {
     try {
       await api.delete(`/me/platform-links/${platform}`);
