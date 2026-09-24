@@ -1,50 +1,60 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { SocialsTab } from "./SocialsTab";
 
-// Konten verknüpfen (#260): ein verknüpftes Feld ist gesperrt und trägt „verifiziert“, „Trennen“
-// ruft die Plattform; ein unverknüpftes bietet „Verknüpfen“ - gesperrt, wenn die Website die
-// Plattform nicht eingerichtet hat. Der Hinweis nennt, was die Plattform liefert.
+// Konten verknüpfen (#521): je verknüpfbarer Plattform eine Zeile mit dem offiziellen Knopf; verknüpft
+// steht der Name mit Häkchen, das Textfeld ist weg, nur „Verknüpfung lösen“ bleibt. Getippt wird nur, was
+// sich nicht verknüpfen lässt oder was die Website noch nicht eingerichtet hat.
 
 const LINKS = {
   links: [{ platform: "discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z", url: "https://discord.com/users/123" }],
-  available: { discord: true, twitch: false, steam: true },
+  available: { discord: true, twitch: true, steam: true, riot: false },
   platforms: { discord: { delivers: "Discord-Kennung und Nutzername" }, twitch: { delivers: "Twitch-Kennung, Login und Anzeigename" }, steam: { delivers: "SteamID64" } },
 };
 
 function renderTab(overrides = {}) {
-  const props = { form: { discord_name: "paula", twitch_handle: "", steam_id: "" }, set: vi.fn(), links: LINKS, onLink: vi.fn(), onUnlink: vi.fn(), ...overrides };
-  render(<SocialsTab {...props} />);
+  const props = { form: { discord_name: "paula", twitch_handle: "", steam_id: "", riot_id: "Paula#EUW", psn_id: "" }, set: vi.fn(), links: LINKS, onLink: vi.fn(), onUnlink: vi.fn(), ...overrides };
+  render(<MemoryRouter><SocialsTab {...props} /></MemoryRouter>);
   return props;
 }
 
-test("verknüpft: Feld gesperrt, verifiziert, Trennen; unverknüpft: Verknüpfen je nach Einrichtung", async () => {
+test("verknüpft: Name mit Häkchen, kein Textfeld, Verknüpfung lösen; unverknüpft: der offizielle Knopf in Plattformfarbe", async () => {
   const user = userEvent.setup();
   const props = renderTab();
-  expect(screen.getByTestId("profile-discord")).toBeDisabled();
+  expect(screen.queryByTestId("profile-discord")).toBeNull();
   expect(screen.getByTestId("profile-discord-verified")).toHaveTextContent("verifiziert");
-  // Wer sieht, dass er verknüpft ist, sieht auch als wer, seit wann und wohin es geht.
-  expect(screen.getByTestId("profile-discord-linked-since")).toHaveTextContent("verknüpft als Paula B. seit 22.09.2026");
+  expect(screen.getByTestId("profile-discord-linked-since")).toHaveTextContent("verknüpft als Paula B. · seit 22.09.2026");
   expect(screen.getByTestId("profile-discord-official")).toHaveAttribute("href", "https://discord.com/users/123");
+  expect(screen.queryByTestId("profile-discord-link")).toBeNull();
   await user.click(screen.getByTestId("profile-discord-unlink"));
   expect(props.onUnlink).toHaveBeenCalledWith("discord");
 
-  expect(screen.getByTestId("profile-twitch")).toBeEnabled();
-  expect(screen.getByTestId("profile-twitch-link")).toBeDisabled();
-  expect(screen.getByTestId("profile-steam-link")).toBeEnabled();
+  const twitch = screen.getByTestId("profile-twitch-link");
+  expect(twitch).toHaveTextContent("Mit Twitch verknüpfen");
+  expect(twitch.style.backgroundColor).toBe("rgb(145, 70, 255)");
+  expect(screen.queryByTestId("profile-twitch")).toBeNull();
+  expect(screen.getByTestId("profile-steam-link")).toHaveTextContent("Mit Steam anmelden");
   await user.click(screen.getByTestId("profile-steam-link"));
   expect(props.onLink).toHaveBeenCalledWith("steam");
-  // Alle OAuth-Plattformen haben einen Knopf; was keine Anmeldung bietet, sagt warum.
-  expect(screen.getByTestId("profile-epic-link")).toBeDisabled();
-  expect(screen.getByTestId("profile-battlenet-link")).toBeDisabled();
-  expect(screen.getByTestId("profile-psn-not-linkable")).toHaveTextContent("PlayStation bietet keine Anmeldung");
-  expect(screen.queryByTestId("profile-psn-link")).not.toBeInTheDocument();
-  expect(screen.getByTestId("profile-links-hint")).toHaveTextContent("Discord-Kennung und Nutzername; Twitch-Kennung, Login und Anzeigename; SteamID64");
 });
 
-test("ohne geladene Verknüpfungen bleibt alles wie bisher tippbar", () => {
+test("nicht eingerichtet: Feld von Hand mit Hinweis; ohne Anmeldung: Textfeld mit Grund; Privatsphäre-Link", async () => {
+  const user = userEvent.setup();
+  const props = renderTab();
+  expect(screen.getByTestId("profile-riot-not-available")).toHaveTextContent("noch nicht eingerichtet");
+  expect(screen.getByTestId("profile-riot")).toHaveValue("Paula#EUW");
+  expect(screen.queryByTestId("profile-riot-link")).toBeNull();
+  expect(screen.getByTestId("profile-psn-not-linkable")).toHaveTextContent("PlayStation bietet keine Anmeldung");
+  await user.type(screen.getByTestId("profile-psn"), "p");
+  expect(props.set).toHaveBeenCalledWith("psn_id", "p");
+  expect(screen.getByTestId("profile-links-hint")).toHaveTextContent("Discord-Kennung und Nutzername; Twitch-Kennung, Login und Anzeigename; SteamID64");
+  expect(screen.getByTestId("profile-links-privacy")).toHaveAttribute("href", "/profile?tab=privacy");
+});
+
+test("ohne geladene Verknüpfungen: alles von Hand, kein Knopf", () => {
   renderTab({ links: null });
-  expect(screen.getByTestId("profile-discord")).toBeEnabled();
-  expect(screen.queryByTestId("profile-discord-verified")).not.toBeInTheDocument();
-  expect(screen.getByTestId("profile-discord-link")).toBeDisabled();
+  expect(screen.getByTestId("profile-discord")).toHaveValue("paula");
+  expect(screen.queryByTestId("profile-discord-verified")).toBeNull();
+  expect(screen.queryByTestId("profile-discord-link")).toBeNull();
 });

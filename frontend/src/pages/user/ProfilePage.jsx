@@ -187,6 +187,19 @@ export default function ProfilePage() {
       toast.error(formatRequestError(err, "Die Verknüpfung konnte nicht getrennt werden."));
     }
   };
+  // Aus der App (#521): ?tab=socials&link=discord startet die Verknüpfung direkt, sobald die Plattformen
+  // geladen sind - einmal, dann verschwindet der Parameter.
+  const linkParam = params.get("link");
+  const autoLinkStarted = useRef(false);
+  useEffect(() => {
+    if (!linkParam || autoLinkStarted.current || !platformLinks.platforms[linkParam]) return;
+    autoLinkStarted.current = true;
+    const next = new URLSearchParams(params);
+    next.delete("link");
+    setParams(next, { replace: true });
+    if (platformLinks.available[linkParam]) startPlatformLink(linkParam);
+    else toast.error(`${platformLinks.platforms[linkParam]?.label || linkParam} ist auf der Website noch nicht eingerichtet.`);
+  }, [linkParam, platformLinks, params, setParams, startPlatformLink]);
   // Schalter und Auswahlfelder auf Privatsphäre und Benachrichtigungen
   // speichern kurz nach dem letzten Klick von selbst.
   const setSetting = (k, v) => {
