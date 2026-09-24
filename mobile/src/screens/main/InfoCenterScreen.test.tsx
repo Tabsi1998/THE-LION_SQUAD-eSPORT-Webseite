@@ -1,5 +1,6 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react-native";
+import { Linking } from "react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { InfoCenterScreen, achievementLine } from "./InfoCenterScreen";
 
 // Infocenter: Referenzen kommen als { items, summary } (#252), Rollen und
@@ -49,6 +50,12 @@ beforeEach(() => {
         { id: "s2", name: "Föger", tier: "bronze", logo_url: null },
         { id: "s3", name: "Omni FM", tier: "gold", logo_url: null },
       ] });
+    }
+    if (path === "/partners") {
+      return Promise.resolve({ data: [{
+        id: "pa-1", slug: "pineapps-esports", name: "PineApps eSports", kind: "Verein", link: "https://pineapps.at", description: "TFT-Community.",
+        channels: [{ key: "website", label: "Website", url: "https://pineapps.at" }, { key: "twitch", label: "Twitch", url: "https://www.twitch.tv/pineapps", handle: "pineapps" }],
+      }] });
     }
     if (path === "/users/public-list") {
       return Promise.resolve({ data: [{ id: "p-1", username: "Multimativ", user_type: "community_user", achievements_count: 0 }] });
@@ -111,4 +118,16 @@ test("Erfolge nur, wenn es welche gibt", () => {
   expect(achievementLine({ achievements_count: 0 })).toBe("");
   expect(achievementLine({ achievements_count: 1 })).toBe("1 Erfolg");
   expect(achievementLine({ achievements_count: 3, achievement_points: 120 })).toBe("3 Erfolge · 120 Punkte");
+});
+
+test("Partner (#469): Kanäle als Chips und der Weg zur Partnerseite im Web", async () => {
+  const open = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+  await render(<InfoCenterScreen navigation={navigation} route={routeFor("partners")} />);
+  await waitFor(() => expect(screen.getByText("PineApps eSports")).toBeTruthy());
+  expect(screen.getByText("Twitch")).toBeTruthy();
+  fireEvent.press(screen.getByTestId("partner-channel-pa-1-twitch"));
+  expect(open).toHaveBeenLastCalledWith("https://www.twitch.tv/pineapps");
+  fireEvent.press(screen.getByTestId("partner-page-pa-1"));
+  expect(open).toHaveBeenLastCalledWith(expect.stringMatching(/\/partners\/pineapps-esports$/));
+  open.mockRestore();
 });

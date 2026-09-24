@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } fro
 import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { platformColor, platformIcon } from "../../components/LinkedAccounts";
+import { API_BASE_URL } from "../../config";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -16,6 +18,10 @@ import { groupSponsorsByTier } from "../../lib/sponsors";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Reference, ReferenceSummary } from "../../types";
+
+// Partnerseiten (#469) liegen im Web; die App zeigt je Partner die Kanäle und den Weg dorthin.
+const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
+type PartnerChannel = { key: string; label: string; url: string; handle?: string | null };
 
 type Props = NativeStackScreenProps<MoreStackParamList, "InfoCenter">;
 type SectionKey = NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
@@ -202,7 +208,28 @@ function Partners({ items }: { items: any[] }) {
                   <Badge label={partner.kind || partner.internal_role || "Partner"} />
                 </View>
                 <Muted>{partner.description || `${partner.country || "Community"} · ${(partner.favorite_games || []).join(", ") || "THE LION SQUAD"}`}</Muted>
-                {partner.url || partner.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
+                {Array.isArray(partner.channels) && partner.channels.length ? (
+                  <View style={styles.channelRow}>
+                    {(partner.channels as PartnerChannel[]).map((channel) => (
+                      <Pressable
+                        key={channel.key}
+                        accessibilityRole="link"
+                        accessibilityLabel={`${channel.label} von ${partner.name}`}
+                        onPress={() => Linking.openURL(channel.url).catch(() => {})}
+                        testID={`partner-channel-${partner.id}-${channel.key}`}
+                        style={({ pressed }) => [styles.channelChip, { borderColor: platformColor(channel.key) }, pressed && styles.pressed]}
+                      >
+                        <Ionicons name={channel.key === "website" ? "globe-outline" : platformIcon(channel.key)} color={platformColor(channel.key)} size={14} />
+                        <Muted style={styles.channelText}>{channel.label}</Muted>
+                      </Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                {partner.slug || partner.id ? (
+                  <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${WEB_BASE_URL}/partners/${partner.slug || partner.id}`).catch(() => {})} testID={`partner-page-${partner.id}`}>
+                    <Muted style={styles.link}>Partnerseite öffnen</Muted>
+                  </Pressable>
+                ) : partner.url || partner.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
               </View>
             </View>
           </Card>
@@ -474,6 +501,25 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 10,
+  },
+  channelRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  channelChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    borderRadius: 6,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  channelText: {
+    fontSize: 12,
   },
   cardTop: {
     alignItems: "flex-start",

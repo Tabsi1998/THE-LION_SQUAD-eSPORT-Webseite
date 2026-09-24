@@ -384,6 +384,10 @@ async def sitemap():
     ):
         if a.get("slug"):
             urls.append({"loc": f"{base}/galerie/{a['slug']}", "lastmod": a.get("updated_at"), "changefreq": "monthly", "priority": "0.5"})
+    # partner pages (#469) - only active partners, the list page is static above
+    async for partner in db.partners.find({"is_active": {"$ne": False}}, {"slug": 1, "updated_at": 1, "_id": 0}):
+        if partner.get("slug"):
+            urls.append({"loc": f"{base}/partners/{partner['slug']}", "lastmod": partner.get("updated_at"), "changefreq": "monthly", "priority": "0.5"})
 
     xml_lines = ['<?xml version="1.0" encoding="UTF-8"?>',
                  '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
