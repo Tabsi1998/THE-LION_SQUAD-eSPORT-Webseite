@@ -24,11 +24,11 @@ export const SETUP_GUIDES = {
     key: "discord_bot",
     title: "Discord-Bot (Aktivität, Rollen, Befehle)",
     where: { to: "/admin/integrations/discord", label: "Verbindungen → Discord" },
-    summary: "Der Bot zählt Aktivität, gleicht Mitgliederrollen ab und beantwortet Befehle. Er braucht einen Bot-Token, zwei Intents und eine Einladung auf den Server.",
+    summary: "Der Bot zählt Aktivität, gleicht Mitgliederrollen ab und beantwortet Befehle. Er braucht einen Bot-Token, den „Server Members Intent“ und eine Einladung auf den Server.",
     steps: [
       { text: "Developer Portal → deine App → links „Bot“.", link: { href: "https://discord.com/developers/applications", label: "Developer Portal" } },
       { text: "„Reset Token“ klicken, den Token kopieren und hier im Bot-Bereich eintragen (wird verschlüsselt gespeichert, nie wieder angezeigt)." },
-      { text: "Auf derselben Seite unter „Privileged Gateway Intents“ die Schalter „Server Members Intent“ und „Message Content Intent“ einschalten, dann „Save Changes“." },
+      { text: "Auf derselben Seite unter „Privileged Gateway Intents“ den Schalter „Server Members Intent“ einschalten, dann „Save Changes“. „Message Content Intent“ bleibt aus – der Bot liest keine Inhalte. Ohne den Schalter lehnt Discord die Verbindung ab; der Bot versucht es dann alle fünf Minuten von selbst wieder." },
       { text: "Links „OAuth2“ → „URL Generator“: Scopes „bot“ und „applications.commands“ anhaken; Bot Permissions: „View Channels“, „Send Messages“, „Read Message History“, „Manage Roles“. Die erzeugte Adresse im Browser öffnen und den Bot auf den Vereinsserver einladen." },
       { text: "Server-ID: in Discord unter Einstellungen → Erweitert den „Entwicklermodus“ einschalten, dann Rechtsklick auf den Server → „Server-ID kopieren“ – hier eintragen (leer = der Server, auf dem der Bot ist)." },
       { text: "Rollen: die Rollennamen für Mitglieder und Vorstand hier eintragen; die Bot-Rolle muss in Discord über diesen Rollen stehen (Server-Einstellungen → Rollen → Reihenfolge), sonst darf er sie nicht vergeben." },

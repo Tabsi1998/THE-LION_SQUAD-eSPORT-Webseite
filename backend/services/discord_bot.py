@@ -14,6 +14,10 @@ Drei Aufgaben, jede nur für **verknüpfte Konten** (#260, ``platform_links`` mi
 - **Befehle:** ``/naechstes-event``, ``/turniere`` (offene Anmeldungen), ``/meine-erfolge`` (nur
   verknüpft, private Antwort), ``/status`` (nur Vorstand/System, private Antwort).
 
+Bricht die Verbindung ab (fehlender Intent im Developer Portal, falscher Token, Netz), steht der
+Grund als Klickweg in ``last_error`` (``friendly_bot_error``) und der Scheduler-Job
+``discord_bot_watch`` startet den Bot alle fünf Minuten neu (``restart_if_down``), bis es klappt.
+
 Die reine Logik (welche Rollen, was zählt, welcher Text) steht ohne Discord-Bibliothek hier
 oben, damit sie sich ohne Netz testen lässt; ``BotRunner`` ist die dünne Schicht um discord.py.
 """
@@ -128,6 +132,21 @@ def achievements_text(awards: list[dict], total_points: int) -> str:
     return f"Deine Erfolge ({len(awards)}, {total_points} Punkte): " + ", ".join(names) + more
 
 
+def friendly_bot_error(exc: BaseException) -> str:
+    """Discord-Fehler in Worte, die sagen, was zu tun ist - ohne die Bibliothek zu importieren."""
+    name = type(exc).__name__
+    text = str(exc).strip()
+    lowered = text.lower()
+    if name == "PrivilegedIntentsRequired" or "privileged intents" in lowered:
+        return ("Discord lässt den Bot nicht verbinden: Im Developer Portal fehlt der Schalter „Server Members Intent“ "
+                "(discord.com/developers → deine App → Bot → „Privileged Gateway Intents“ → einschalten → „Save Changes“). "
+                "Der Bot versucht es alle fünf Minuten von selbst wieder.")
+    if name == "LoginFailure" or "improper token" in lowered:
+        return ("Discord kennt den Bot-Token nicht (falsch, unvollständig oder zurückgesetzt): "
+                "Developer Portal → Bot → „Reset Token“, den neuen Token hier eintragen und speichern.")
+    return (text or name)[:300]
+
+
 def status_text(state: dict) -> str:
     parts = [
         f"Bot: {'online' if state.get('connected') else 'offline'}",
@@ -235,6 +254,14 @@ class BotRunner:
         self._token_fingerprint = ""
         return await self.start_if_enabled()
 
+    async def restart_if_down(self) -> bool:
+        """Läuft der Bot nicht mehr, obwohl er eingeschaltet ist: neu versuchen (Scheduler, alle fünf
+        Minuten) - so kommt er von selbst, sobald der Intent im Portal an oder der Token richtig ist."""
+        if self._task and not self._task.done():
+            return False
+        self._token_fingerprint = ""
+        return await self.start_if_enabled()
+
     def status(self) -> dict:
         return {"connected": self.connected, "guild_name": self.guild_name, "last_error": self.last_error, "last_action": self.last_action,
                 "running": bool(self._task and not self._task.done())}
@@ -330,7 +357,7 @@ class BotRunner:
             raise
         except Exception as exc:
             runner.connected = False
-            runner.last_error = str(exc)[:300]
+            runner.last_error = friendly_bot_error(exc)
             logger.warning("[discord-bot] %s", exc)
             await record_state(db, connected=False, last_error=runner.last_error)
         finally:
