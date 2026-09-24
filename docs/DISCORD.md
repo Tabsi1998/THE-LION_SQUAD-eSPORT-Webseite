@@ -119,7 +119,9 @@ jedes nur für Konten, die im Profil verknüpft sind (Abschnitt oben):
    steht direkt darunter. Die Server-ID ist nur nötig, wenn der Bot auf mehreren Servern ist.
 
 Jede Änderung an Token, Server-ID, Rollen oder Zählschalter startet den Bot neu; „Bot verbinden“
-aus hält ihn an. Ist der Bot aus, laufen Webhooks, Meldungen und Konto-Verknüpfung unverändert
+aus hält ihn an. Lehnt Discord die Verbindung ab (Intent im Portal aus, Token falsch), steht der
+Grund als Klickweg unter „Letzter Fehler“, und der Bot versucht es alle fünf Minuten von selbst
+wieder – nichts muss dafür neu gespeichert werden. Ist der Bot aus, laufen Webhooks, Meldungen und Konto-Verknüpfung unverändert
 weiter – er ist eine Ergänzung, keine Voraussetzung.
 
 ## Für die Entwicklung

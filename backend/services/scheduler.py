@@ -177,6 +177,16 @@ async def _safe_discord_bot_roles():
         _log_task_failure("discord_bot_roles", exc)
 
 
+async def _safe_discord_bot_watch():
+    """Bot nach einem Abbruch neu starten (#302) - je Prozess, denn der Bot läuft in jedem."""
+    try:
+        from services.discord_bot import bot
+        if await bot.restart_if_down():
+            logger.info("[scheduler] discord_bot_watch: Bot neu gestartet")
+    except Exception as exc:
+        _log_task_failure("discord_bot_watch", exc)
+
+
 async def _safe_dolibarr_public():
     """Vereinsdaten und Vorstand (#326) sowie Sponsoren und Partner (#405) aus Dolibarr: stündlich
     nachlesen, alter Stand bleibt bei Fehlern."""
@@ -514,6 +524,7 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)
+    sched.add_job(_safe_discord_bot_watch, IntervalTrigger(minutes=5), id="discord_bot_watch", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",
                   max_instances=1, coalesce=True)
     # Auszeichnungen (#230): nach der Einführung die alten Turniere nachtragen - läuft leer, sobald welche da sind.

@@ -46,3 +46,17 @@ def test_command_texts():
     assert discord_bot.achievements_text([{"name": "Hallo Welt"}, {"name": "Talker"}], 30) == "Deine Erfolge (2, 30 Punkte): Hallo Welt, Talker"
     status = discord_bot.status_text({"connected": True, "guild_name": "LION", "linked_count": 3, "last_error": "x"})
     assert "Bot: online" in status and "Server: LION" in status and "Letzter Fehler: x" in status
+
+
+def test_discord_errors_become_click_paths():
+    class PrivilegedIntentsRequired(Exception):
+        pass
+
+    class LoginFailure(Exception):
+        pass
+
+    intents = discord_bot.friendly_bot_error(PrivilegedIntentsRequired("Shard ID None is requesting privileged intents that have not been explicitly enabled"))
+    assert "Server Members Intent" in intents and "Save Changes" in intents and "fünf Minuten" in intents
+    assert "Reset Token" in discord_bot.friendly_bot_error(LoginFailure("Improper token has been passed."))
+    assert discord_bot.friendly_bot_error(RuntimeError("Netz weg")) == "Netz weg"
+    assert discord_bot.friendly_bot_error(RuntimeError("")) == "RuntimeError"

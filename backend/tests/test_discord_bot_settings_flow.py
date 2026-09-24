@@ -1,5 +1,6 @@
 """Discord-Bot (#302) im Admin: Token verschlüsselt und nie zurück, Schalter und Rollen, Neustart
 nach Änderung, Stand und Rollenabgleich über die Bot-Routen - ohne Discord."""
+import asyncio
 import pathlib
 import sys
 
@@ -107,3 +108,33 @@ async def test_message_counting_and_wanted_roles(flow):
     assert wanted[paula["id"]] == {"member"}
     assert "board" in wanted[chef["id"]] and "tournament" in wanted[chef["id"]]
     assert wanted["unbekannt"] == set()
+
+
+@pytest.mark.asyncio
+async def test_watch_restarts_the_bot_only_after_its_run_ended(flow, monkeypatch):
+    """Nach einem Abbruch (fehlender Intent, falscher Token) startet der Scheduler den Bot neu; solange er läuft, nicht."""
+    starts: list[str] = []
+    gate = asyncio.Event()
+
+    async def fake_run(token, view):
+        starts.append(view["guild_id"])
+        await gate.wait()
+
+    monkeypatch.setattr(discord_bot.bot, "_run", fake_run)
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    assert (await flow.put("/api/settings/discord", json={"bot_token": TOKEN, "bot_guild_id": "42", "bot_enabled": True})).status_code == 200
+    assert starts == ["42"] and discord_bot.bot.status()["running"] is True
+    assert await discord_bot.bot.restart_if_down() is False
+    gate.set()
+    await asyncio.wait_for(discord_bot.bot._task, 1)
+    assert discord_bot.bot.status()["running"] is False
+    assert await discord_bot.bot.restart_if_down() is True
+    await asyncio.sleep(0)  # die neue Aufgabe kommt erst beim nächsten Schleifendurchlauf dran
+    assert starts == ["42", "42"]
+    await discord_bot.bot.stop()
+    assert await discord_bot.bot.restart_if_down() is True
+    await asyncio.sleep(0)
+    assert starts == ["42", "42", "42"]
+    await flow.put("/api/settings/discord", json={"bot_enabled": False})
+    assert await discord_bot.bot.restart_if_down() is False and len(starts) == 3

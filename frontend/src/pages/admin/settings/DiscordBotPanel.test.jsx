@@ -53,3 +53,11 @@ test("mit Token online: kein Setup-Kasten, Verbinden schaltet, Rollenabgleich l�
   await user.click(screen.getByTestId("discord-bot-sync"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/discord/bot/sync"));
 });
+
+test("eingeschaltet, aber abgelehnt: Fehler mit Klickweg und der Hinweis, dass der Bot es von selbst wieder versucht", async () => {
+  apiMock.get.mockResolvedValue({ data: botState({ configured: true, enabled: true, connected: false, last_error: "Discord lässt den Bot nicht verbinden: Im Developer Portal fehlt der Schalter „Server Members Intent“" }) });
+  render(<DiscordBotPanel canSystem />);
+  expect(await screen.findByTestId("discord-bot-state")).toHaveTextContent("eingeschaltet, nicht verbunden");
+  expect(screen.getByTestId("discord-bot-log")).toHaveTextContent("Server Members Intent");
+  expect(screen.getByTestId("discord-bot-retry")).toHaveTextContent("alle fünf Minuten");
+});
