@@ -216,6 +216,139 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Vorstand aus Dolibarr (#326 Teil 2; PR #468; Backend + Web; `update.sh`).
+  Ein Schalter genügt: `legal_from_dolibarr`. `club_facts.board_positions(db,
+  branding)` → None (Schalter aus oder kein Vorstand geliefert) oder Posten in
+  der Form der Website (`id dolibarr-<code>-<n>`, `slug` über `board_slug`
+  mit `BOARD_CORE` obmann|kassier|schriftfuehrer und `DEPUTY_MARKERS` →
+  `<core>-stv`, `display_title`, `source "dolibarr"`, `represents`, `since`,
+  `vacant`, `name_withheld`, `user`); Name nur mit Einwilligung (sonst
+  `user None` + `name_withheld`), Foto/Profil nur über ein Konto mit derselben
+  Funktion (`memberships.dolibarr.functions.code`, Status active|honorary)
+  und Verzeichnis-Eintrag (`club_member_profiles` aktiv, nicht
+  `directory_blocked`; Namensabgleich `_normalized_name`, sonst einziger
+  Kandidat); `board_source` (dolibarr, switch_on, has_board, fetched_at,
+  error, names_withheld, functions). `contact_board_routes`: `GET /api/board`
+  liefert die Dolibarr-Posten, `?manual=true` die von Hand, `GET
+  /api/board/source`. Web `ClubPages`: `boardPersonTarget` (Link nur mit
+  Ziel), `BoardEmpty` („Name nicht freigegeben“ / „Unbesetzt“ / „Position
+  offen“, `board-empty-<slug>`), `board-person-<slug>`, „seit Monat Jahr“,
+  Quelle „laut Vereinsregister“; `AdminBoardPage` lädt `?manual=true` +
+  `/board/source`, Kasten `board-dolibarr` (Regeln, Zeilen
+  `board-dolibarr-<slug>`), `board-dolibarr-missing`. Dolibarr-Übersicht:
+  Eintrag club_facts nennt den Vorstand mit. Test `test_club_facts_flow.py`
+  (+1). Statuten folgen mit dolibarr-vereine#158.
+- Konten verknüpfen II: Battle.net, X, YouTube, TikTok, Riot, Xbox, Epic
+  (#260 II; PR #467; Backend + Web; `update.sh`). `services/platform_links.py`
+  als Registrierung `PLATFORMS` (label, field, visibility, delivers,
+  id_field, secret_field, official mit `{external_id}`/`{handle}`);
+  `providers_configured`/`authorize_url`/`fetch_identity(platform, branding,
+  query, state_payload)`/`official_url` folgen ihr. Neu: Battle.net (OAuth,
+  `/userinfo` battletag), X (OAuth 2.0 mit PKCE: `_pkce_verifier` =
+  HMAC(JWT-Secret, Nonce des state), `code_challenge` S256, `/2/users/me`),
+  YouTube (Google-Code-Flow, Scope youtube.readonly, `/youtube/v3/channels?
+  mine=true` → customUrl-Handle), TikTok (Login Kit v2, `client_key`),
+  Riot (RSO, `/riot/account/v1/accounts/me` → Name#TAG), Xbox (Microsoft
+  consumers → `user.auth.xboxlive.com` (`RpsTicket d=`) → XSTS → gtg), Epic
+  (Account Services, `/userInfo` preferred_username). `read_state_payload`;
+  Rückruf gibt die Nutzlast an `fetch_identity`. `check_provider` generisch:
+  `CLIENT_CREDENTIALS` (discord|twitch|battlenet|x|tiktok|epic|xbox),
+  `REDIRECT_HINTS`, Riot/YouTube nur Hinweis. Branding-Felder
+  `<plattform>_client_id|_secret` (+ `clear_`), `BRANDING_SECRET_FIELDS` und
+  `SETTING_AUDIT_SECRET_FIELDS` erweitert; `user_routes` filtert
+  `verified_platforms` über `PLATFORMS[p]["visibility"]`. Web
+  `lib/platformLinks.js`: `PLATFORM_BY_FIELD` (10), `PLATFORM_LABELS`,
+  `NOT_LINKABLE` (psn, nintendo, ea, instagram - Hinweis am Feld
+  `${testId}-not-linkable`), `PLATFORM_APPS` (idField, secretField, tab,
+  optional, note, guideKey), `PLATFORM_APP_FIELDS`, `PLATFORM_SECRET_FIELDS`;
+  `PlatformLinkSettings` je App Karte (`platform-app-<key>`,
+  `platform-link-<key>-state`, `platform-check-<key>`); `AdminSettingsPage`
+  `BRAND_SECRET_FIELDS` aus `PLATFORM_SECRET_FIELDS`, `savePlatformApps`
+  über `PLATFORM_APP_FIELDS`; sieben Anleitungen (battlenet, x, youtube,
+  tiktok, riot, xbox, epic) in `setupGuides.js`; `PublicProfilePage`
+  Häkchen auch für youtube|tiktok|x|epic|xbox|riot|battlenet, `socialMeta`
+  Farben, Xbox-Link. Tests `test_platform_links_flow.py` (+1, Fake je
+  Plattform), `platformLinks.test.js`, `SocialsTab.test.jsx`.
+- Mein Konto (PR #466; nur Web). `profile/constants.js`: `ACCOUNT_LINKS`
+  (Rechnungen → `/profile?tab=invoices`, Meine Mitgliedschaft
+  `/members/membership` nur Mitglieder, Strafen & Moderation `/my/penalties`,
+  Gewinne `/my/prizes`, Benachrichtigungen, Hilfe & Kontakt `/contact`),
+  `accountLinksFor(isClubMember)`; Block „Mein Konto“ im `UserMenu`
+  (`nav-account-<key>`), im Handy-Menü (`PublicLayout`, `…-mobile`) und in
+  `ProfileNav` (`profile-link-<key>`, Prop `isClubMember`). Tests
+  `UserMenu.test.jsx`, `ProfileNav.test.jsx` (+1).
+- Einrichtung im Admin: Anleitungen, Seite „Einrichtung“, Prüfung für
+  Discord/Twitch/Steam (PR #465; Backend + Web; `update.sh`).
+  `lib/setupGuides.js`: `SETUP_GUIDES` (je title, where, summary, steps
+  [{text, link, copy mit `{origin}`}], notes, checkPlatform),
+  `SETUP_GUIDE_ORDER`, `resolveGuideValue`, `guideStatus(key, data)`
+  (ok|missing|optional|unknown aus branding/discord/auth/email/smtp/
+  dolibarr/links). `components/tls/SetupGuide` (`setup-guide-<key>`,
+  `setup-link-<key>-<i>`, `setup-value-…`, `setup-copy-…`,
+  `setup-where-…`; `StatusChip` `setup-status`). `AdminSetupPage`
+  (`/admin/setup`, Bereich system, Menü System → Einrichtung; lädt
+  `/settings/branding|discord|auth|email|smtp`, `/admin/dolibarr/status`,
+  `/me/platform-links`; `setup-summary`; fehlende Anleitungen offen).
+  Anleitungen inline in `AdminSettingsPage` (auth: google_login; email:
+  resend; smtp; discord: discord_webhooks + discord_bot; twitch; brand:
+  play_store; seo: analytics + search_console). Prüfung
+  `platform_links.check_provider` → {platform, ok, redirect_uri, checks
+  [{key, state ok|fail|warn, text}]} (Discord client_credentials + mit
+  Bot-Token `DISCORD_APP_ME` → App-ID = Client ID?, Rückrufadresse in
+  `redirect_uris`?; Twitch client_credentials; Steam-Schlüssel); Route
+  `POST /api/settings/platform-links/{platform}/check`
+  (`require_club_admin`, Bot-Token aus `settings id discord`), Audit
+  `platform_link.checked`. Profil: `socialProfileUrl` normalisiert
+  gespeicherte ganze Adressen; `LinkedAccountsCard` eine Spalte, Steam mit
+  Farbe, „Steam-Profil“ + ID ohne API-Schlüssel. Tests
+  `test_platform_links_flow.py` (+1), `SetupGuide.test.jsx` (2),
+  `AdminSetupPage.test.jsx` (1), `PlatformLinkSettings.test.jsx` (1),
+  `socials.test.js` (+1).
+- Verwarnungen mit Stufen (#416; PR #463; Backend + Web + App; `update.sh`,
+  App-Build). `services/moderation_standing.py`: Einstellungen `settings id
+  moderation_levels` (`levels` [{strikes, action notice|warning|suspension,
+  chat_hours}], `strike_ttl_months`; `normalize_settings` → 400,
+  `load_settings`, `save_settings`, `level_for`); Treffer `moderation_strikes`
+  (`add_strike(db, user_id, source word_filter|report|manual|image_scan, kind,
+  ref_id, item_id, report_id, moderator_id, note)` → `apply_levels`,
+  `active_strikes` mit Verfall, `revoke_strike`); Sanktionen
+  `moderation_sanctions` (`apply_levels`: neue nur, wenn höher als die
+  laufende; `set_sanction` von Hand ersetzt; status active|superseded|lifted|
+  expired, `chat_blocked_until` bei warning, `open_until_decision` bei
+  suspension; `lift_sanction`; `active_sanction` markiert Abgelaufene);
+  Chat-Sperre `chat_block`/`block_text`/`require_chat_allowed(db, me)` (403)
+  in `message_routes.send_direct_message`, `team_routes.post_team_chat`,
+  `tournament_chat_routes.post_tournament_chat`,
+  `match_routes.post_match_chat`, `chat_attachment_routes.
+  upload_chat_attachment`; Sichten `standing_for` (Person: ohne
+  Moderator-IDs, `next_level`, `can_appeal`), `submit_appeal` (einmal,
+  benachrichtigt den Bereich Moderation), `decide_appeal` (lift →
+  `lift_sanction`), `person_history`, `people_overview`, `export_csv`
+  (Semikolon, BOM). Benachrichtigung kind `moderation` + Mail je Stufe
+  (Vorlagen `moderation_notice|warning|suspension|lifted` in
+  `DEFAULT_EMAIL_TEMPLATES`); Audit `moderation.sanction|sanction_lifted|
+  strike|strike_revoked|appeal|appeal_decided|levels|people_export|
+  report_justified`. `moderation_routes`: `ReportStatus` + `justified`
+  (`review_report` legt genau einmal einen Treffer an), `GET/PUT
+  /api/moderation/levels`, `GET /people`, `GET /people/export.csv`, `GET
+  /people/{user_id}`, `POST /people/{user_id}/strikes|sanctions`, `POST
+  /sanctions/{id}/lift|appeal-decision`, `POST /strikes/{id}/revoke`, `GET
+  /me/standing`, `POST /me/appeal` (5/Tag). `word_filter.review` nutzt
+  `add_strike`. Web `ModerationStandingCard` (`moderation-standing`,
+  `standing-active|clear|strikes|strike-list|appeal-form|appeal-message|
+  appeal-send|appeal-state|more`; `compact` fürs Dashboard) auf
+  `MyPenaltiesPage` (`/my/penalties`) und `DashboardPage`;
+  `AdminModerationPage` Reiter Personen (`people-row-<username>`,
+  `people-detail`, `people-active`, `people-appeal`, `appeal-lift|keep-<id>`,
+  `people-strike-note|add`, `people-sanction-action|hours|reason|set`,
+  `people-note`, `strike-revoke-<id>`, `sanction-lift-<id>`, `people-export`)
+  und Stufen (`levels-row|strikes|action|hours|remove-<i>`, `levels-add`,
+  `levels-ttl`, `levels-save`), `?tab=`, Meldungsstatus „Berechtigt (zählt
+  als Treffer)“. App `ProfileScreen`: Karte „Moderation“ (nur lesen,
+  `profile-moderation-web`). Tests `test_moderation_levels_flow.py` (2),
+  `ModerationStandingCard.test.jsx` (2), `AdminModerationPage.test.jsx` (+2).
+  Bewusst: Wettkampfstrafen (`penalty_routes`) unverändert; Stufe 3 hebt nur
+  ein Mensch auf; nach außen nichts sichtbar.
 - Verknüpfte Konten sichtbar, Grund der Plattform bei Rückruf-Fehlern (#260
   Nachtrag; PR #458; Backend + Web; `update.sh`). `services/platform_links`:
   `official_url(platform, external_id, handle)` (Discord `discord.com/users/
@@ -1781,12 +1914,12 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`). `main` steht auf `ed84ec8`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`). `main` steht auf `b41a725`.
 
 ### Offene PRs
-- #463 (#416 Verwarnungen mit Stufen; Backend + Web + App; bereit, lokal
-  grün; `update.sh`, danach App-Build). App-Gegenstück zu den verknüpften
-  Konten: #459 (App 1.0.0). **Regel seit 23.09. abends:**
+- #470 (Menügruppe „Verbindungen“: je Dienst eine eigene Seite; nur Web;
+  bereit, lokal grün). App-Gegenstück zu den verknüpften Konten: #459
+  (App 1.0.0). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -1872,6 +2005,15 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #463, #465–#468 (24.09.): `update.sh` – der Server lief bis dahin ohne
+  #463–#466 (kein `update.sh` seit dem Vorabend; die Anleitungen fehlten
+  deshalb live). Danach: System → Einrichtung durchgehen (fehlende stehen
+  offen), je Dienst die eigene Seite unter Verbindungen; Login & Konten →
+  „prüfen“ bei Discord; Moderation → Stufen prüfen; Vorstand: in Dolibarr
+  die Zustimmung zur Nennung je Person setzen, Fotos über den eigenen
+  Verzeichnis-Eintrag; App-Build (Moderationskarte, verknüpfte Konten #459).
+  Offene Entscheidungen: Profilseite überarbeiten (Vorschlag im Chat 24.09.),
+  Partner II (#469).
 - Nach #461, #462 (24.09.): `update.sh`. Discord-App (Client ID + Secret aus
   dem Developer Portal, App des Bots, Reiter OAuth2; Rückrufadresse unter
   Redirects) und Twitch-Rückrufadresse in der Developer Console eintragen
