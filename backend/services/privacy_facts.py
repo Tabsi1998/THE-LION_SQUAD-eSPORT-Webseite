@@ -68,7 +68,7 @@ async def privacy_facts(db) -> dict:
     from services.platform_links import PLATFORMS
     fields = {"_id": 0, "analytics_provider": 1, "twitch_channel": 1, "hosting_provider": 1, "hosting_country": 1, "steam_api_key": 1}
     for spec in PLATFORMS.values():
-        for field in (spec.get("id_field"), spec.get("secret_field")):
+        for field in (spec.get("id_field"), spec.get("secret_field"), spec.get("extra_field")):   # Bungie: auch der API Key
             if field:
                 fields[field] = 1
     branding = await db.settings.find_one({"id": "branding"}, fields) or {}

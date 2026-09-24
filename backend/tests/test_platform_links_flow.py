@@ -571,3 +571,8 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     failed = target(await flow.get(f"/api/platform-links/epic/callback?code=gut&state={state}"))
     assert failed["link_error"] == "exchange_failed" and failed["link_detail"] == "token 401"
 
+    # Die Datenschutzerklärung nennt jede eingerichtete Plattform - auch die mit zusätzlichem API Key (Bungie)
+    # und die ohne Secret (Wargaming); die Projektion in privacy_facts muss diese Felder mitlesen.
+    named = {row["key"] for row in (await flow.get("/api/settings/public")).json()["privacy_facts"]["platforms"]}
+    assert {"bungie", "wargaming", "lichess", "telegram"} <= named
+
