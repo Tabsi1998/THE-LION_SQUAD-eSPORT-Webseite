@@ -147,6 +147,24 @@ def friendly_bot_error(exc: BaseException) -> str:
     return (text or name)[:300]
 
 
+def no_guild_text(view: dict, client) -> str:
+    """Warum der Bot keinen Server findet - mit dem Klickweg, der es behebt (#515)."""
+    guilds = [g for g in (getattr(client, "guilds", None) or []) if getattr(g, "name", None)]
+    if view.get("guild_id") and guilds:
+        names = ", ".join(f"{g.name} ({g.id})" for g in guilds[:5])
+        return (f"Die eingetragene Server-ID {view['guild_id']} passt zu keinem Server, auf dem der Bot ist (er ist auf: {names}). "
+                "Discord → Einstellungen → Erweitert → Entwicklermodus einschalten, Rechtsklick auf den Vereinsserver → „Server-ID kopieren“ "
+                "und hier eintragen – oder das Feld leer lassen, dann nimmt der Bot den Server, auf dem er ist.")
+    return ("Der Bot ist auf keinem Server. Developer Portal → deine App → OAuth2 → URL Generator: Scopes „bot“ und "
+            "„applications.commands“, Rechte „View Channels“, „Send Messages“, „Read Message History“, „Manage Roles“ – die erzeugte "
+            "Adresse im Browser öffnen und den Bot auf den Vereinsserver einladen.")
+
+
+SYNC_TEXTS = {
+    "offline": "Der Bot ist nicht verbunden – erst „Bot verbinden“ einschalten; der Stand steht unter dem Kasten.",
+}
+
+
 def status_text(state: dict) -> str:
     parts = [
         f"Bot: {'online' if state.get('connected') else 'offline'}",
@@ -282,9 +300,10 @@ class BotRunner:
         @client.event
         async def on_ready():
             runner.connected = True
-            runner.last_error = ""
             guild = client.get_guild(int(view["guild_id"])) if view["guild_id"].isdigit() else (client.guilds[0] if client.guilds else None)
             runner.guild_name = guild.name if guild else ""
+            # Kein Server heißt: Rollen und Befehle gehen ins Leere - das steht dann in Worten im Kasten, nicht als Code (#515).
+            runner.last_error = "" if guild else no_guild_text(view, client)
             try:
                 if guild:
                     tree.copy_global_to(guild=guild)
@@ -368,12 +387,12 @@ class BotRunner:
         db = get_db()
         client = self._client
         if client is None or not self.connected:
-            return {"ok": False, "reason": "offline", "changes": 0}
+            return {"ok": False, "reason": "offline", "changes": 0, "text": SYNC_TEXTS["offline"]}
         settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
         view = bot_settings(settings)
         guild = client.get_guild(int(view["guild_id"])) if view["guild_id"].isdigit() else (client.guilds[0] if client.guilds else None)
         if guild is None:
-            return {"ok": False, "reason": "no_guild", "changes": 0}
+            return {"ok": False, "reason": "no_guild", "changes": 0, "text": no_guild_text(view, client)}
         roles_by_key = {key: next((r for r in guild.roles if r.name == name), None) for key, name in view["roles"].items()}
         missing = [view["roles"][key] for key, role in roles_by_key.items() if role is None]
         links = await linked_discord_ids(db)

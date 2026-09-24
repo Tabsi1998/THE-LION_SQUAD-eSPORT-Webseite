@@ -61,3 +61,9 @@ test("eingeschaltet, aber abgelehnt: Fehler mit Klickweg und der Hinweis, dass d
   expect(screen.getByTestId("discord-bot-log")).toHaveTextContent("Server Members Intent");
   expect(screen.getByTestId("discord-bot-retry")).toHaveTextContent("alle fünf Minuten");
 });
+
+test("online ohne Server: der Stand sagt es in Worten (#515)", async () => {
+  apiMock.get.mockResolvedValue({ data: botState({ configured: true, enabled: true, connected: true, guild_name: "" }) });
+  render(<DiscordBotPanel canSystem />);
+  expect(await screen.findByTestId("discord-bot-state")).toHaveTextContent("online · auf keinem Server");
+});
