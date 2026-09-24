@@ -83,7 +83,8 @@ async def test_status_and_sync_routes_without_a_connection(flow):
     status = (await flow.get("/api/settings/discord/bot/status")).json()
     assert status["connected"] is False and status["linked_count"] == 1 and status["roles"]["board"] == "Vorstand"
     sync = (await flow.post("/api/settings/discord/bot/sync")).json()
-    assert sync == {"ok": False, "reason": "offline", "changes": 0}
+    assert sync["ok"] is False and sync["reason"] == "offline" and sync["changes"] == 0
+    assert "Bot verbinden" in sync["text"], "der Grund steht in Worten, nicht als Code (#515)"
     player = await flow.add_user(role="player", name="max")
     flow.act_as(player)
     assert (await flow.get("/api/settings/discord/bot/status")).status_code == 403

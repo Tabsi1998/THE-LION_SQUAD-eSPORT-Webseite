@@ -230,7 +230,7 @@ export function DiscordSettings() {
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>
             <div className="font-heading font-bold uppercase">Discord-Aktivität</div>
-            <p className="mt-1 text-xs text-white/45">Pflege Nachrichten-Zähler für `discord_active` Achievements. Später kann hier ein Bot/Import automatisch schreiben.</p>
+            <p className="mt-1 text-xs text-white/45">Der Bot zählt Nachrichten verknüpfter Konten von selbst (nur die Zahl, für die Erfolge „Discord-Aktiv“). Hier korrigierst du einen Zähler von Hand – etwa für Zeiten, in denen der Bot aus war.</p>
           </div>
           <div className="relative w-full md:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />

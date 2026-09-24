@@ -60,3 +60,20 @@ def test_discord_errors_become_click_paths():
     assert "Reset Token" in discord_bot.friendly_bot_error(LoginFailure("Improper token has been passed."))
     assert discord_bot.friendly_bot_error(RuntimeError("Netz weg")) == "Netz weg"
     assert discord_bot.friendly_bot_error(RuntimeError("")) == "RuntimeError"
+
+
+def test_no_guild_becomes_a_click_path():
+    """#515: statt „no_guild“ steht, was los ist - Server-ID passt nicht, oder der Bot ist auf keinem Server."""
+    class Guild:
+        def __init__(self, gid, name):
+            self.id, self.name = gid, name
+
+    class Client:
+        def __init__(self, guilds):
+            self.guilds = guilds
+
+    wrong_id = discord_bot.no_guild_text({"guild_id": "999"}, Client([Guild(1, "LION")]))
+    assert "999" in wrong_id and "LION (1)" in wrong_id and "Server-ID kopieren" in wrong_id
+    nowhere = discord_bot.no_guild_text({"guild_id": ""}, Client([]))
+    assert nowhere.startswith("Der Bot ist auf keinem Server") and "URL Generator" in nowhere
+    assert "Bot verbinden" in discord_bot.SYNC_TEXTS["offline"]

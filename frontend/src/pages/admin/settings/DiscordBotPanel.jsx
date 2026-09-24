@@ -62,7 +62,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         </div>
         <div className="text-right text-[10px] font-bold uppercase tracking-wider space-y-1">
           <div className={online ? "text-[#00FF88]" : data.enabled ? "text-[#FFD700]" : "text-white/45"} data-testid="discord-bot-state">
-            {online ? `online · ${data.guild_name || "Server"}` : data.enabled ? "eingeschaltet, nicht verbunden" : "aus"}
+            {online ? `online · ${data.guild_name || "auf keinem Server"}` : data.enabled ? "eingeschaltet, nicht verbunden" : "aus"}
           </div>
           <div className="text-white/45 normal-case tracking-normal">{data.linked_count ?? 0} verknüpfte Konten</div>
         </div>
@@ -111,7 +111,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           <input type="checkbox" checked={Boolean(data.enabled)} disabled={!!busy || (!data.configured && !data.enabled)} onChange={(e) => toggle(e.target.checked)} className="accent-[#00FF88]" data-testid="discord-bot-enabled" />
           Bot verbinden
         </label>
-        <button type="button" onClick={() => run("sync", () => api.post("/settings/discord/bot/sync"), ({ data: res }) => (res?.ok ? `Rollen abgeglichen: ${res.changes} Änderungen bei ${res.linked} verknüpften Konten.` : `Nicht abgeglichen: ${res?.reason || "Bot offline"}`))} disabled={!!busy || !online} data-testid="discord-bot-sync" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={() => run("sync", () => api.post("/settings/discord/bot/sync"), ({ data: res }) => (res?.ok ? `Rollen abgeglichen: ${res.changes} Änderungen bei ${res.linked} verknüpften Konten.` : `Nicht abgeglichen: ${res?.text || res?.reason || "Bot offline"}`))} disabled={!!busy || !online} data-testid="discord-bot-sync" className="px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-40">
           <RefreshCw className={`w-3.5 h-3.5 ${busy === "sync" ? "animate-spin" : ""}`} /> Rollen jetzt abgleichen
         </button>
       </div>
