@@ -235,6 +235,12 @@ Handeintrag – die Website rekonstruiert nie einen Namen aus anderen Quellen. I
 Stand älter als zwei Tage, hält die Website Personennamen zurück, damit ein Widerruf in
 Dolibarr zeitnah wirkt; die Vereinsdaten selbst bleiben.
 
+**Kanäle:** Pflegt der Verein seine öffentlichen Kanäle im Modul unter *Einrichtung > Vereine >
+Kanäle und Konten* (Twitch, YouTube, Discord, Instagram …), nimmt die Website sie mit dem Haken
+**„Kanäle aus Dolibarr übernehmen“** (Einstellungen → Social Links) für den Footer und die
+Social-Erkennung der Suchmaschinen – in der Reihenfolge des Vereins, stündlich nachgelesen. Stehen
+dort keine Kanäle, gilt weiter die Liste von Hand; sie bleibt auch der Rückfall bei einem Ausfall.
+
 **Datenschutzerklärung:** `/privacy` baut ihre Abschnitte aus den Schaltern, die wirklich an
 sind (Statistik-Anbieter, Google-Login, Discord-Webhooks und -Bot, Twitch-Einbettung,
 E-Mail-Versand über Resend oder eigenen Mailserver, Dolibarr und Rechnungen, App mit Push und
@@ -265,6 +271,10 @@ Protokolle für Mitglieder) verlangt das Vereinsmodul deshalb eine Verbindung je
    Ab dann stehen seine Unterlagen unter *Vereinsdokumente* (Web und App) mit dem Hinweis
    „Vereinsakte“ bzw. „nur für dich“; das PDF holt die Website je Abruf aus Dolibarr, das dabei
    selbst prüft, ob die Person es sehen darf, und prüft die Datei gegen die Prüfsumme.
+
+Die Statutenfassungen stehen für Mitglieder ebenfalls unter *Vereinsdokumente* (Kategorie
+„Statuten“, geltende Fassung angepinnt): öffentlich freigegebene für jedes Mitglied, nur für
+Mitglieder freigegebene über die Verbindung.
 
 Ohne Verbindung sehen Mitglieder nur, was der Verein unter *Mitglieder > Verein > Vereinsakte* für
 die **Öffentlichkeit** veröffentlicht hat. Widerruft ihr eine Verbindung im Modul, wirkt das beim

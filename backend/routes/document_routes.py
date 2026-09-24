@@ -145,12 +145,15 @@ async def list_documents(
     return out
 
 
-async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str) -> Response:
+async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, *, statute: bool = False) -> Response:
     """Ein PDF aus der Vereinsakte über denselben Weg wie die eigenen Dateien - Web und App kennen nur den."""
     if not user or not (user.get("is_club_member") or _is_admin(user)):
         raise HTTPException(403, "Nur für Mitglieder.")
     try:
-        content, data = await dolibarr_identity.document_pdf(get_db(), user, dolibarr_id)
+        if statute:
+            content, data = await dolibarr_identity.statute_pdf(get_db(), user, dolibarr_id)
+        else:
+            content, data = await dolibarr_identity.document_pdf(get_db(), user, dolibarr_id)
     except DolibarrError as exc:
         if exc.kind in ("not_found", "forbidden"):
             raise HTTPException(404, "Dieses Dokument gibt es nicht oder es ist für dich nicht freigegeben.")
@@ -224,6 +227,9 @@ async def view_document(doc_id: str, user: dict | None = Depends(get_optional_us
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
         return await _dolibarr_file(dolibarr_id, user, "inline")
+    statute_id = dolibarr_identity.parse_statute_id(doc_id)
+    if statute_id is not None:
+        return await _dolibarr_file(statute_id, user, "inline", statute=True)
     db = get_db()
     doc, path = await _load_authorized_doc(doc_id, user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"view_count": 1}})
@@ -236,6 +242,9 @@ async def download_document(doc_id: str, user: dict | None = Depends(get_optiona
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
         return await _dolibarr_file(dolibarr_id, user, "attachment")
+    statute_id = dolibarr_identity.parse_statute_id(doc_id)
+    if statute_id is not None:
+        return await _dolibarr_file(statute_id, user, "attachment", statute=True)
     db = get_db()
     doc, path = await _load_authorized_doc(doc_id, user)
     if not doc.get("allow_download") and not _is_admin(user):

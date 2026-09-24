@@ -277,3 +277,22 @@ test("Rechtliches speichert auch, wenn Analytics auf Google ohne ID steht - die 
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ legal_from_dolibarr: true })));
   expect(toastMock.error).not.toHaveBeenCalled();
 });
+
+// Kanäle aus Dolibarr (#326 Teil 4): der Haken auf „Social Links“ speichert das Feld mit.
+test("Social Links: der Haken „Kanäle aus Dolibarr übernehmen“ lässt sich setzen und wird gespeichert", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(responseFor(url)));
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings?tab=socials"]}>
+        <AdminSettingsPage />
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  const box = await screen.findByTestId("channels-from-dolibarr");
+  expect(box).not.toBeChecked();
+  await userEvent.click(box);
+  expect(box).toBeChecked();
+  expect(screen.getByTestId("socials-dolibarr")).toHaveTextContent("Kanäle und Konten");
+  await userEvent.click(screen.getByTestId("socials-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ channels_from_dolibarr: true })));
+});

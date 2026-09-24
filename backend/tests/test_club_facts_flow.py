@@ -254,3 +254,34 @@ async def test_statutes_come_from_dolibarr_only_published_and_the_pdf_is_checked
     assert result["ok"] is True and result["statutes"] is None and result["functions"] == len(fake.board)
     state = await club_facts.snapshot(flow.db)
     assert state["statutes_error"] == "not_found" and state["statutes"]["state"] == "not_published", "der letzte Stand bleibt, der Fehler steht daneben"
+
+
+@pytest.mark.asyncio
+async def test_channels_follow_dolibarr_only_with_the_switch_and_only_when_the_club_keeps_some(flow, fake):
+    """Kanäle des Vereins (#326 Teil 4): mit Schalter die öffentlichen Kanäle aus dem Modul in dessen Reihenfolge
+    (nur mit Adresse, Netzwerk → Plattform-Schlüssel); ohne Schalter oder ohne Kanäle die Liste von Hand."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": {**MANUAL, "social_links": [{"platform": "instagram", "label": "Insta", "url": "https://instagram.com/hand", "enabled": True}]}}, upsert=True)
+    settings = await load_settings(flow.db)
+    assert (await club_facts.refresh(flow.db, settings, DolibarrClient(settings)))["ok"] is True
+    public = (await flow.get("/api/settings/public")).json()
+    assert [link["platform"] for link in public["social_links"]] == ["instagram"] and public["channels_from_dolibarr"] is False
+
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    assert (await flow.put("/api/settings/branding", json={"channels_from_dolibarr": True})).status_code == 200
+    view = (await flow.get("/api/admin/dolibarr/public")).json()
+    assert [c["platform"] for c in view["channels"]] == ["twitch", "discord"], "ohne Adresse zählt ein Kanal nicht"
+    flow.act_as(None)
+    public = (await flow.get("/api/settings/public")).json()
+    assert public["channels_from_dolibarr"] is True
+    assert [(link["platform"], link["label"], link["url"]) for link in public["social_links"]] == [
+        ("twitch", "Hauptstream", "https://www.twitch.tv/testverein"), ("discord", "Community", "https://discord.gg/testverein")]
+    assert public["social_links"][0]["stream"] is True and public["social_links"][0]["live_url"] == "https://www.twitch.tv/testverein"
+
+    # Der Verein pflegt im Modul keine Kanäle: die Liste von Hand bleibt.
+    fake.organization["channels"] = []
+    await club_facts.refresh(flow.db, settings, DolibarrClient(settings))
+    public = (await flow.get("/api/settings/public")).json()
+    assert [link["platform"] for link in public["social_links"]] == ["instagram"]
+    assert club_facts.channels_public({"channels": [{"network": "twitter", "url": "https://x.com/v"}]})[0]["platform"] == "x"

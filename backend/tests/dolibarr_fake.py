@@ -78,6 +78,9 @@ def request_schema(path_template: str, method: str = "post") -> dict:
     return OPENAPI["paths"][path_template][method]["requestBody"]["content"]["application/json"]["schema"]
 
 
+NL_BYTES = bytes([10])
+
+
 def statute_pdf_bytes(version_id: int) -> bytes:
     """Die Datei einer Statutenfassung, wie sie in der Vereinsakte liegt - je Fassung andere Bytes."""
     return b"%PDF-1.7\n%fake-statutes-" + str(version_id).encode() + b"\n%%EOF\n"
@@ -172,7 +175,10 @@ class FakeDolibarr:
             "email": "office@runtime-verein.test", "phone": "+43 5262 0", "url": "https://runtime-verein.test", "founded": "2019-03-01",
             "nonprofit": True, "purpose": "Förderung des eSports", "fiscal_year_start_month": 1,
             "channels": [{"network": "twitch", "network_label": "Twitch", "label": "Hauptstream", "target": "testverein",
-                          "url": "https://www.twitch.tv/testverein", "stream": True, "live_url": "https://www.twitch.tv/testverein"}],
+                          "url": "https://www.twitch.tv/testverein", "stream": True, "live_url": "https://www.twitch.tv/testverein"},
+                         {"network": "discord", "network_label": "Discord", "label": "Community", "target": "https://discord.gg/testverein",
+                          "url": "https://discord.gg/testverein", "stream": False, "live_url": ""},
+                         {"network": "twitter", "network_label": "X", "label": "Ohne Adresse", "target": "testverein", "url": "", "stream": False, "live_url": ""}],
         }
         # Statuten (#326 Teil 3): drei beschlossene Fassungen - aufgehoben, geltend, künftig; der Entwurf fehlt bewusst.
         self.statutes = {
@@ -185,6 +191,7 @@ class FakeDolibarr:
             ],
         }
         self.statutes_public = True          # Einrichtung > Statuten: für die Öffentlichkeit freigegeben
+        self.statutes_members = False        # … oder nur für Mitglieder (über die Bindung, Fähigkeit documents)
         # Persönlicher Zugriff (#324): Einladungen je Code, Bindungen je Kennung, veröffentlichte Dokumente der Akte.
         self.identity_right = True           # die Website darf „für Personen handeln“ (Recht im Modul)
         self.invitations: dict[str, dict] = {}
@@ -272,6 +279,18 @@ class FakeDolibarr:
                 "version": "v1", "direct": list(self.direct_fields), "exit": None,
             }
         return self.profiles[member_id]
+
+    def _statutes_payload(self, visible: bool) -> dict:
+        return self.statutes if visible else {"state": "not_published", "current": None, "versions": []}
+
+    def _statute_pdf(self, template: str, version_id: int, visible: bool) -> httpx.Response:
+        row = next((v for v in self.statutes["versions"] if v["id"] == version_id), None) if visible else None
+        if row is None:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "No such version for the caller"}})
+        content = b"%PDF-1.7" + NL_BYTES + b"%tampered" + NL_BYTES + b"%%EOF" + NL_BYTES if version_id in self.tampered_pdf_ids else statute_pdf_bytes(version_id)
+        # Die Prüfsumme ist die der Vereinsakte - passt die Datei nicht mehr dazu, merkt es die Website.
+        return self._json(template, {"filename": f"Statuten-{row['version']}.pdf", "content_type": "application/pdf", "filesize": len(content),
+                                     "sha256": row["sha256"], "content": base64.b64encode(content).decode()})
 
     def _visible_documents(self, member_id: int | None) -> list[dict]:
         rows = []
@@ -667,6 +686,17 @@ class FakeDolibarr:
         match = re.fullmatch(r"/vereine/documents/(\d+)/pdf", path)
         if match:
             return self._document_pdf("/vereine/documents/{id}/pdf", self._visible_documents(None), int(match.group(1)))
+        if path == "/vereine/me/statutes":
+            ident = self._identity(params, "documents")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._json("/vereine/me/statutes", self._statutes_payload(self.statutes_public or self.statutes_members))
+        match = re.fullmatch(r"/vereine/me/statutes/(" + chr(92) + "d+)/pdf", path)
+        if match:
+            ident = self._identity(params, "documents")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._statute_pdf("/vereine/me/statutes/{id}/pdf", int(match.group(1)), self.statutes_public or self.statutes_members)
         if path == "/vereine/statutes":
             payload = self.statutes if self.statutes_public else {"state": "not_published", "current": None, "versions": []}
             return self._json("/vereine/statutes", payload)
