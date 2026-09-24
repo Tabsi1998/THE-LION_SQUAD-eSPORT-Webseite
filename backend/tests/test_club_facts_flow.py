@@ -10,10 +10,10 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
+from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, statute_pdf_bytes  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from services import club_facts, dolibarr_client, privacy_facts  # noqa: E402
-from services.dolibarr_client import DolibarrClient, load_settings  # noqa: E402
+from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -202,3 +202,55 @@ async def test_board_page_follows_dolibarr_when_the_switch_is_on(flow, fake):
     obmann = (await flow.get("/api/board?active_only=true")).json()[0]
     assert obmann["user"]["display_name"] == "Otto Obmann" and obmann["user"]["profile_url"] is None
 
+
+@pytest.mark.asyncio
+async def test_statutes_come_from_dolibarr_only_published_and_the_pdf_is_checked_against_the_file_hash(flow, fake, monkeypatch):
+    """Statuten (#326 Teil 3): geltende und beschlossene Fassungen nur mit Schalter und Freigabe im Modul, nie mit
+    Prüfsumme nach außen; das PDF nur für eine Fassung aus dem Stand und nur, wenn die Bytes zur Vereinsakte passen."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": MANUAL}, upsert=True)
+    settings = await load_settings(flow.db)
+    assert (await club_facts.refresh(flow.db, settings, DolibarrClient(settings)))["statutes"] == "in_force"
+    assert (await flow.get("/api/board/statutes")).json() == {"available": False, "reason": "switch_off"}
+
+    await flow.db.settings.update_one({"id": "branding"}, {"$set": {"legal_from_dolibarr": True}})
+    public = (await flow.get("/api/board/statutes")).json()
+    assert public["available"] is True and public["state"] == "in_force" and public["fetched_at"]
+    assert public["current"]["version"] == 2 and public["current"]["valid_from"] == "2026-04-20" and public["current"]["id"] == 3
+    assert [(v["version"], v["state"]) for v in public["versions"]] == [(3, "future"), (2, "in_force"), (1, "repealed")]
+    assert "sha256" not in public["current"] and all("sha256" not in v and "source" not in v for v in public["versions"])
+
+    # Das PDF: die Bytes der Vereinsakte, als PDF mit Dateinamen; beim zweiten Mal aus dem Speicher.
+    pdf = await flow.get("/api/board/statutes/3/pdf")
+    assert pdf.status_code == 200 and pdf.headers["content-type"].startswith("application/pdf") and pdf.content == statute_pdf_bytes(3)
+    assert 'filename="Statuten-Fassung-2.pdf"' in pdf.headers["content-disposition"]
+    calls = len(fake.calls)
+    assert (await flow.get("/api/board/statutes/3/pdf")).content == statute_pdf_bytes(3) and len(fake.calls) == calls
+    assert (await flow.get("/api/board/statutes/99/pdf")).status_code == 404
+    fake.tampered_pdf_ids.add(5)
+    tampered = await flow.get("/api/board/statutes/5/pdf")
+    assert tampered.status_code == 502 and "Prüfsumme" in tampered.json()["detail"]
+
+    # Der Admin sieht den Stand im Reiter Rechtliches.
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    view = (await flow.get("/api/admin/dolibarr/public")).json()["statutes"]
+    assert view["state"] == "in_force" and view["current"]["version"] == 2 and view["versions"] == 3 and view["error"] is None
+    flow.act_as(None)
+
+    # Nicht für die Öffentlichkeit freigegeben: nichts, auch nicht die alte Fassung oder ihr PDF.
+    fake.statutes_public = False
+    await club_facts.refresh(flow.db, settings, DolibarrClient(settings))
+    assert (await flow.get("/api/board/statutes")).json() == {"available": False, "reason": "not_published"}
+    assert (await flow.get("/api/board/statutes/3/pdf")).status_code == 404
+
+    # Ein Modul ohne Statuten-API: Vereinsdaten und Vorstand kommen weiter, die Statuten sind „nicht abrufbar“.
+    async def no_statutes(self):
+        raise DolibarrError("not_found", 404)
+
+    monkeypatch.setattr(DolibarrClient, "statutes", no_statutes)
+    fake.statutes_public = True
+    result = await club_facts.refresh(flow.db, settings, DolibarrClient(settings))
+    assert result["ok"] is True and result["statutes"] is None and result["functions"] == len(fake.board)
+    state = await club_facts.snapshot(flow.db)
+    assert state["statutes_error"] == "not_found" and state["statutes"]["state"] == "not_published", "der letzte Stand bleibt, der Fehler steht daneben"

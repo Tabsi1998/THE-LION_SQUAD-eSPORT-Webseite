@@ -26,3 +26,12 @@ export function SystemCard({ title, ok, detail, problem, testId }) {
     </div>
   );
 }
+
+export function LegalTextArea({ label, value, onChange, testId, rows = 4 }) {
+  return (
+    <label className="block">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <textarea value={value || ""} onChange={(e) => onChange(e.target.value)} rows={rows} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+    </label>
+  );
+}

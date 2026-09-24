@@ -228,6 +228,7 @@ test("Rechtliches: der Haken „Vereinsdaten aus Dolibarr übernehmen“ lässt 
         enabled: false, has_data: true, fetched_at: "2026-09-23T21:20:00+00:00", names_withheld: false,
         overlay: { legal_name: "THE LION SQUAD - eSPORTS", zvr_number: "1593703043" },
         representative: { name: "Obperson Test", role: "Obmann/Obfrau" }, board: [], fields: ["legal_name", "zvr_number"],
+        statutes: { state: "in_force", current: { id: 3, version: 2, valid_from: "2026-04-20" }, versions: 3, error: null },
       } });
     }
     return Promise.resolve(responseFor(url));
@@ -247,6 +248,7 @@ test("Rechtliches: der Haken „Vereinsdaten aus Dolibarr übernehmen“ lässt 
   const nameInput = nameField.tagName === "INPUT" ? nameField : nameField.querySelector("input");
   await waitFor(() => expect(nameInput).toBeDisabled());
   expect(nameInput).toHaveValue("THE LION SQUAD - eSPORTS");
+  expect(screen.getByTestId("legal-dolibarr-statutes")).toHaveTextContent("Statuten: Fassung 2 gilt seit 20.04.2026 (3 Fassungen)");
   await userEvent.click(screen.getByTestId("legal-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ legal_from_dolibarr: true })));
 });
