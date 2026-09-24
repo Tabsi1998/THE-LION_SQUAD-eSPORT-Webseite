@@ -3,6 +3,7 @@ import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, FieldLabel, INPUT_CLASS, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -28,6 +29,7 @@ const statusLabel = Object.fromEntries(STATUS_OPTIONS);
 const emptyReference = {
   title: "",
   organizer: "",
+  partner_ids: [],
   league: "",
   season: "",
   format: "",
@@ -94,6 +96,7 @@ export function referenceToForm(item) {
     ...item,
     title: item.display_title || item.title || "",
     organizer: item.organizer || "",
+    partner_ids: item.partner_ids || [],
     league: item.league || "",
     season: item.season || "",
     format: item.format || "",
@@ -193,6 +196,7 @@ export default function AdminReferencesPage() {
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState({});
   const [games, setGames] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [memberProfiles, setMemberProfiles] = useState([]);
   const [helperSettings, setHelperSettings] = useState(null);
   const [editing, setEditing] = useState(null);
@@ -200,12 +204,15 @@ export default function AdminReferencesPage() {
   const suggestions = useMemo(() => buildReferenceSuggestions(items, helperSettings), [items, helperSettings]);
 
   const load = useCallback(async () => {
-    const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }] = await Promise.all([
+    const [{ data: refs }, { data: gameRows }, { data: profileRows }, { data: helpers }, partnerRows] = await Promise.all([
       api.get("/references/admin"),
       api.get("/games"),
       api.get("/membership/profiles/admin/all"),
       api.get("/references/admin/helpers"),
+      // Partner II (#469): Haken je Partner an der Referenz; ohne Partner bleibt das Feld weg.
+      api.get("/partners").then((result) => (Array.isArray(result?.data) ? result.data : [])).catch(() => []),
     ]);
+    setPartners(partnerRows || []);
     setItems(refs.items || []);
     setSummary(refs.summary || {});
     setGames(gameRows || []);
@@ -296,7 +303,7 @@ export default function AdminReferencesPage() {
         {items.length === 0 && <div className="text-center py-16 border border-dashed border-white/15 rounded-sm text-white/40 font-display tracking-widest">NOCH KEINE REFERENZEN</div>}
       </div>
 
-      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <ReferenceForm reference={editing} games={games} memberProfiles={memberProfiles} partners={partners} suggestions={suggestions} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -421,7 +428,7 @@ function RefLink({ href, label }) {
   return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
 }
 
-function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose, onSaved }) {
+function ReferenceForm({ reference, games, memberProfiles, partners = [], suggestions, onClose, onSaved }) {
   const isNew = !reference.id;
   const [form, setForm] = useState(() => referenceToForm(reference));
   const [saving, setSaving] = useState(false);
@@ -454,6 +461,7 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
     const payload = {
       title: form.title.trim(),
       organizer: form.organizer.trim() || null,
+      partner_ids: form.partner_ids || [],
       league: form.league.trim() || null,
       season: form.season.trim() || null,
       format: form.format.trim() || null,
@@ -505,6 +513,7 @@ function ReferenceForm({ reference, games, memberProfiles, suggestions, onClose,
           <TextField label="Liga" value={form.league} onChange={(v) => set("league", v)} suggestions={suggestions.leagues} testId="reference-league" placeholder="z.B. Liga A" />
           <TextField label="Saison" value={form.season} onChange={(v) => set("season", v)} suggestions={suggestions.seasons} testId="reference-season" placeholder="z.B. Season 3 oder 2026" />
         </FormGrid>
+        <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="reference-partner" hint="Der Partner zeigt die Referenz auf seiner Seite unter „Gemeinsam“. Steht ein Partner als Veranstalter, gehört sie ihm auch ohne Haken." />
         <FormGrid cols={3}>
           <TextField label="Format" value={form.format} onChange={(v) => set("format", v)} suggestions={suggestions.formats} testId="reference-format" placeholder="z.B. HC, CORE, S&D 4vs4" />
           <SelectField label="Spiel" value={form.game_id || ""} onChange={(v) => set("game_id", v)} options={[["", "— Spiel wählen —"], ...games.map((game) => [game.id, gameOptionLabel(game)])]} testId="reference-game" />

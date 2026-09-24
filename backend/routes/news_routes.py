@@ -1067,6 +1067,8 @@ def _reference_auto_helpers(items: list[dict]) -> dict:
 async def _enrich_references(items: list[dict]) -> list[dict]:
     db = get_db()
     helpers = await _get_reference_helpers(db)
+    # Partner II (#469): Partnervereine an der Referenz, Kurzform mit Link auf die Partnerseite.
+    await partner_pages.attach_partners_many(db, items)
     game_ids = list({item.get("game_id") for item in items if item.get("game_id")})
     games = {}
     if game_ids:
@@ -1412,6 +1414,7 @@ async def get_reference(rid: str, user: dict | None = Depends(get_optional_user)
 async def create_reference(body: ReferenceCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
     doc = body.model_dump()
+    doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     if doc.get("game_id") and not await db.games.find_one({"id": doc["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     await _freeze_reference_members(db, doc)
@@ -1434,6 +1437,8 @@ async def update_reference(rid: str, body: ReferenceUpdate, me: dict = Depends(r
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "partner_ids" in updates:
+        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
     if updates.get("game_id") and not await db.games.find_one({"id": updates["game_id"]}, {"id": 1}):
         raise HTTPException(404, "Spiel nicht gefunden.")
     if "entries" in updates or any(key in updates for key in LEGACY_ENTRY_FIELDS):

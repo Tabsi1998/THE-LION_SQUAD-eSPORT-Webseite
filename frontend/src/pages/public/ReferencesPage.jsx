@@ -7,7 +7,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCountUp } from "@/hooks/useCountUp";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, ExternalLink, Medal, Trophy, User, Users } from "lucide-react";
+import { ArrowRight, ExternalLink, Handshake, Medal, Trophy, User, Users } from "lucide-react";
 
 // Referenzen als Erfolgswand (#409, Design-Rework nach Rückmeldung des Betreibers): oben die
 // Medaillenbilanz des Vereins, dann die Trophäenwand mit allen Podestplätzen (Spiel-Cover, große
@@ -533,6 +533,11 @@ function ReferenceCard({ item }) {
           <div className="flex items-center gap-2 flex-wrap">
             <GameChip item={item} />
             {item.organizer && <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold truncate">{item.organizer}</span>}
+            {(item.partners || []).map((partner) => (
+              <Link key={partner.id} to={`/partners/${partner.slug || partner.id}`} data-testid={`reference-partner-${partner.slug || partner.id}`} className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">
+                <Handshake className="w-3 h-3" /> {partner.name}
+              </Link>
+            ))}
           </div>
           <Link to={`/references/${item.id}`} className="block mt-2 font-heading text-lg md:text-xl font-black uppercase leading-tight break-words hover:text-[#29B6E8] transition">{displayTitle(item)}</Link>
           <p className="mt-1 text-xs text-white/50">
@@ -615,6 +620,13 @@ function MetaList({ item }) {
   const rows = [
     ["Spiel", referenceGameName(item)],
     ["Veranstalter", item.organizer],
+    ["Partner", (item.partners || []).length ? (
+      <span className="flex flex-wrap justify-end gap-2">
+        {item.partners.map((partner) => (
+          <Link key={partner.id} to={`/partners/${partner.slug || partner.id}`} data-testid={`reference-detail-partner-${partner.slug || partner.id}`} className="text-[#29B6E8] hover:text-white">{partner.name}</Link>
+        ))}
+      </span>
+    ) : ""],
     ["Liga", item.league],
     ["Saison", item.season],
     ["Modus", modeLabels[item.mode] || item.mode],

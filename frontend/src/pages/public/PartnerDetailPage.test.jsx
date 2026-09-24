@@ -30,6 +30,7 @@ const PARTNER = {
   shared: {
     events: [{ id: "e1", slug: "sommer-cup", name: "Sommer-Cup", start_date: "2026-08-10T10:00:00Z" }],
     tournaments: [{ id: "t1", slug: "tft-open", title: "TFT Open", start_date: "2026-09-05T18:00:00Z", game: { name: "Teamfight Tactics" } }],
+    references: [{ id: "r1", title: "PineApps Open", placement: 2, game_name: "Teamfight Tactics", start_date: "2026-06-01", matched_by: "organizer" }],
   },
   redirected: false,
 };
@@ -76,10 +77,13 @@ test("Kopf, Live-Stream, Kanäle mit Stand, Tools mit Einbetten und News", async
   expect(screen.getByTestId("partner-shared")).toHaveTextContent("Turnier · Teamfight Tactics");
   expect(screen.getByTestId("partner-event-sommer-cup")).toHaveAttribute("href", "/events/sommer-cup");
   expect(screen.getByTestId("partner-tournament-tft-open")).toHaveAttribute("href", "/tournaments/tft-open");
+  // Teil 3: echte Teilnahmen des Vereins (Referenzen) mit Platz.
+  expect(screen.getByTestId("partner-reference-r1")).toHaveAttribute("href", "/references/r1");
+  expect(screen.getByTestId("partner-reference-r1")).toHaveTextContent("Teilnahme · Platz 2 · Teamfight Tactics");
 });
 
 test("ohne Stream und Widget bleiben Links; unbekannter Partner zeigt den Hinweis", async () => {
-  apiMock.get.mockResolvedValue({ data: { ...PARTNER, twitch: { configured: false, live: false }, discord: { enabled: false }, tools: [], news: [], about: "", shared: { events: [], tournaments: [] } } });
+  apiMock.get.mockResolvedValue({ data: { ...PARTNER, twitch: { configured: false, live: false }, discord: { enabled: false }, tools: [], news: [], about: "", shared: { events: [], tournaments: [], references: [] } } });
   renderAt("/partners/pineapps-tft");
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByTestId("partner-live-pill")).toBeNull();

@@ -104,3 +104,9 @@ test("die Spiel-Kachel filtert die Zeitleiste und lässt sich zurücksetzen", as
   fireEvent.click(screen.getByTestId("references-reset"));
   expect(screen.getByTestId("reference-card-r1")).toBeInTheDocument();
 });
+
+test("Partner II (#469): eine Referenz nennt ihren Partner mit Link auf die Partnerseite", async () => {
+  apiMock.get.mockResolvedValue({ data: { items: [{ ...ITEMS[0], partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] }, ITEMS[1]], summary: SUMMARY } });
+  render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
+});

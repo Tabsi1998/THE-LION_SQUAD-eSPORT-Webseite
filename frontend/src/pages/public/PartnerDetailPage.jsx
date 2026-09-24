@@ -95,7 +95,8 @@ export default function PartnerDetailPage() {
   const shared = partner.shared || {};
   const sharedEvents = Array.isArray(shared.events) ? shared.events : [];
   const sharedTournaments = Array.isArray(shared.tournaments) ? shared.tournaments : [];
-  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0 || sharedEvents.length > 0 || sharedTournaments.length > 0;
+  const sharedReferences = Array.isArray(shared.references) ? shared.references : [];
+  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0 || sharedEvents.length > 0 || sharedTournaments.length > 0 || sharedReferences.length > 0;
 
   return (
     <PublicLayout>
@@ -167,15 +168,18 @@ export default function PartnerDetailPage() {
               </section>
             )}
 
-            {(sharedEvents.length > 0 || sharedTournaments.length > 0) && (
+            {(sharedEvents.length > 0 || sharedTournaments.length > 0 || sharedReferences.length > 0) && (
               <section data-testid="partner-shared">
-                <SectionTitle icon={Calendar} kicker="Gemeinsam" title="Events & Turniere" />
+                <SectionTitle icon={Calendar} kicker="Gemeinsam" title={sharedReferences.length ? "Events, Turniere & Teilnahmen" : "Events & Turniere"} />
                 <div className="grid gap-3 md:grid-cols-2">
                   {sharedEvents.map((event) => (
                     <SharedCard key={event.id} to={`/events/${event.slug || event.id}`} testId={`partner-event-${event.slug || event.id}`} kicker="Event" title={event.name} date={event.start_date} />
                   ))}
                   {sharedTournaments.map((tournament) => (
                     <SharedCard key={tournament.id} to={`/tournaments/${tournament.slug || tournament.id}`} testId={`partner-tournament-${tournament.slug || tournament.id}`} kicker={tournament.game?.name ? `Turnier · ${tournament.game.name}` : "Turnier"} title={tournament.title} date={tournament.start_date} />
+                  ))}
+                  {sharedReferences.map((reference) => (
+                    <SharedCard key={reference.id} to={`/references/${reference.id}`} testId={`partner-reference-${reference.id}`} kicker={["Teilnahme", reference.placement ? `Platz ${reference.placement}` : null, reference.game_name || null].filter(Boolean).join(" · ")} title={reference.title} date={reference.start_date} />
                   ))}
                 </div>
               </section>
