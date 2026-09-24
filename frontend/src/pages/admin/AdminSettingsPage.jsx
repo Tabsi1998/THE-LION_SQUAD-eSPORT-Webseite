@@ -14,6 +14,7 @@ import { BrandField, SystemCard } from "./settings/fields";
 import { TwitchTab } from "./settings/TwitchTab";
 import { PlatformLinkSettings } from "./settings/PlatformLinkSettings";
 import { SetupGuide } from "@/components/tls/SetupGuide";
+import { PLATFORM_APP_FIELDS, PLATFORM_SECRET_FIELDS } from "@/lib/platformLinks";
 import { DiscordBotPanel } from "./settings/DiscordBotPanel";
 import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
@@ -189,7 +190,7 @@ function smtpPayload(source) {
 }
 
 // Geheimnisse gehen nur mit, wenn neu eingetippt; die „gespeichert“-Marke nie (#260 dazu: Discord, Steam).
-const BRAND_SECRET_FIELDS = ["twitch_client_secret", "discord_client_secret", "steam_api_key"];
+const BRAND_SECRET_FIELDS = [...new Set(["twitch_client_secret", ...PLATFORM_SECRET_FIELDS])];
 
 function brandPayload(source = {}) {
   const payload = normalizeAnalyticsPayload(source);
@@ -259,6 +260,7 @@ export default function AdminSettingsPage() {
     imprint: "", privacy_policy: "", legal_extra: "", privacy_extra: "", terms_of_use: "",
     discord_invite_url: "", play_store_url: "", twitch_channel: "", twitch_client_id: "", twitch_client_secret: "",
     discord_client_id: "", discord_client_secret: "", discord_client_secret_masked: "", steam_api_key: "", steam_api_key_masked: "",
+    ...Object.fromEntries(PLATFORM_APP_FIELDS.flatMap((field) => (field.endsWith("_secret") || field === "steam_api_key" ? [[field, ""], [`${field}_masked`, ""]] : [[field, ""]]))),
     whatsapp_channel_url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I",
     social_links: defaultSocialLinks(),
     analytics_provider: "", google_analytics_id: "", plausible_domain: "",
@@ -692,13 +694,15 @@ export default function AdminSettingsPage() {
     if (savingPlatformApps) return;
     setSavingPlatformApps(true);
     try {
-      const payload = brandPayload({ discord_client_id: brand.discord_client_id, discord_client_secret: brand.discord_client_secret, steam_api_key: brand.steam_api_key });
+      // Alle Plattform-Apps außer Twitch (die Helix-App speichert der Twitch-Reiter).
+      const appFields = PLATFORM_APP_FIELDS.filter((field) => !field.startsWith("twitch_"));
+      const payload = brandPayload(Object.fromEntries(appFields.map((field) => [field, brand[field]])));
       const patch = buildDirtyPayload(payload, originalBrandRef.current);
       if (!hasPayloadChanges(patch)) { toast.info("Keine Änderungen zum Speichern."); return; }
       loadSeqRef.current += 1;
       const { data } = await api.put("/settings/branding", patch);
       brandDirtyRef.current = false;
-      setBrand((prev) => ({ ...prev, ...data, discord_client_secret: "", steam_api_key: "" }));
+      setBrand((prev) => ({ ...prev, ...data, ...Object.fromEntries(PLATFORM_SECRET_FIELDS.map((field) => [field, ""])) }));
       toast.success("Plattform-Zugänge gespeichert.");
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }

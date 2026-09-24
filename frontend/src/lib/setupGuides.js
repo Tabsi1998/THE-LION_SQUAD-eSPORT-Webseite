@@ -93,6 +93,101 @@ export const SETUP_GUIDES = {
     notes: [],
     checkPlatform: "steam",
   },
+  battlenet: {
+    key: "battlenet",
+    title: "Battle.net (BattleTag verknüpfen)",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Ein Battle.net-Client der Website – Mitglieder verknüpfen ihren BattleTag per Anmeldung bei Blizzard.",
+    steps: [
+      { text: "Battle.net Developer Portal öffnen (Battle.net-Konto des Vereins) → „Create Client“.", link: { href: "https://develop.battle.net/access/clients", label: "Battle.net – API Access" } },
+      { text: "Client Name, Service URL = Adresse der Website, Intended Use kurz beschreiben. Bei „Redirect URLs“ eintragen:", copy: "{origin}/api/platform-links/battlenet/callback" },
+      { text: "Client ID und Client Secret kopieren → hier bei Battle.net eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Blizzard liefert nur BattleTag und Konto-Kennung."],
+    checkPlatform: "battlenet",
+  },
+  x: {
+    key: "x",
+    title: "X (Twitter) verknüpfen",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Eine X-App mit OAuth 2.0 (Free-Tarif reicht). Mitglieder verknüpfen ihren X-Nutzernamen per Anmeldung bei X.",
+    steps: [
+      { text: "X Developer Portal → Projekt und App anlegen (Free).", link: { href: "https://developer.x.com/en/portal/dashboard", label: "X Developer Portal" } },
+      { text: "Bei der App „User authentication settings“ → „Set up“: App permissions „Read“, Type of App „Web App, Automated App or Bot“." },
+      { text: "Callback URI / Redirect URL:", copy: "{origin}/api/platform-links/x/callback" },
+      { text: "Website URL = Adresse der Website, speichern. Unter „Keys and tokens“ die OAuth 2.0 Client ID und das Client Secret kopieren → hier eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Die Website liest nur Kennung, Nutzername und Anzeigename (Scope users.read)."],
+    checkPlatform: "x",
+  },
+  youtube: {
+    key: "youtube",
+    title: "YouTube-Kanal verknüpfen (Google)",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Über das Google-Projekt des Vereins: Mitglieder melden sich bei Google an, die Website liest nur, welcher YouTube-Kanal dazugehört.",
+    steps: [
+      { text: "Google Cloud Console → dasselbe Projekt wie beim Google-Login → „APIs & Dienste“ → „YouTube Data API v3“ aktivieren.", link: { href: "https://console.cloud.google.com/apis/library/youtube.googleapis.com", label: "YouTube Data API v3 aktivieren" } },
+      { text: "„Anmeldedaten“ → OAuth-Client vom Typ „Webanwendung“ (der Login-Client geht auch). Bei „Autorisierte Weiterleitungs-URIs“ eintragen:", copy: "{origin}/api/platform-links/youtube/callback", link: { href: "https://console.cloud.google.com/apis/credentials", label: "Anmeldedaten" } },
+      { text: "Client-ID und Client-Secret kopieren → hier bei YouTube eintragen und speichern." },
+      { text: "OAuth-Zustimmungsbildschirm: Bereich „…/auth/youtube.readonly“ hinzufügen. Solange die App nicht von Google geprüft ist, zeigt Google eine Warnung – das ist normal, die Verknüpfung geht trotzdem (bis 100 Nutzer)." },
+    ],
+    notes: ["Ohne YouTube-Kanal auf dem Google-Konto bricht die Verknüpfung mit einem Hinweis ab."],
+    checkPlatform: "youtube",
+  },
+  tiktok: {
+    key: "tiktok",
+    title: "TikTok verknüpfen (Login Kit)",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Eine TikTok-App mit Login Kit. TikTok schaltet die Anmeldung erst nach Prüfung der App frei; vorher geht nur ein Sandbox-Test.",
+    steps: [
+      { text: "TikTok for Developers → „Manage apps“ → App anlegen (Name, Beschreibung, Website).", link: { href: "https://developers.tiktok.com/", label: "TikTok for Developers" } },
+      { text: "Produkt „Login Kit“ hinzufügen; Redirect URI:", copy: "{origin}/api/platform-links/tiktok/callback" },
+      { text: "Scopes „user.info.basic“ und „user.info.profile“ anhaken, App zur Prüfung einreichen." },
+      { text: "Client Key und Client Secret kopieren → hier bei TikTok eintragen, speichern." },
+    ],
+    notes: ["Bis zur Freigabe durch TikTok funktioniert die Verknüpfung nur für in der Sandbox eingetragene Testkonten."],
+    checkPlatform: "tiktok",
+  },
+  riot: {
+    key: "riot",
+    title: "Riot ID verknüpfen (Riot Sign On)",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Riot Sign On (RSO) gibt es nur nach Antrag bei Riot. Danach verknüpfen Mitglieder ihre Riot ID (Name#TAG) per Anmeldung bei Riot.",
+    steps: [
+      { text: "Riot Developer Portal → mit dem Riot-Konto anmelden → „Register Product“ (Produkt: die Vereinswebsite) und dort RSO beantragen.", link: { href: "https://developer.riotgames.com/", label: "Riot Developer Portal" } },
+      { text: "Nach Freigabe beim RSO-Client die Redirect URI eintragen:", copy: "{origin}/api/platform-links/riot/callback" },
+      { text: "Client ID und Client Secret → hier bei Riot Games eintragen, speichern." },
+    ],
+    notes: ["Ohne Freigabe durch Riot bleibt das Feld getippt.", "Die Website liest nur PUUID und Riot ID (Name#TAG)."],
+    checkPlatform: "riot",
+  },
+  xbox: {
+    key: "xbox",
+    title: "Xbox-Gamertag verknüpfen (Microsoft)",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Eine App-Registrierung bei Microsoft (Azure). Mitglieder melden sich mit dem Microsoft-Konto an; die Website holt daraus den Gamertag.",
+    steps: [
+      { text: "Azure-Portal → „App-Registrierungen“ → „Neue Registrierung“.", link: { href: "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", label: "Azure – App-Registrierungen" } },
+      { text: "Name z. B. „THE LION SQUAD Website“; unterstützte Kontotypen „Nur persönliche Microsoft-Konten“; Umleitungs-URI (Web):", copy: "{origin}/api/platform-links/xbox/callback" },
+      { text: "Übersicht: „Anwendungs-ID (Client)“ kopieren → hier „Anwendungs-ID“. „Zertifikate & Geheimnisse“ → „Neuer geheimer Clientschlüssel“ → den Wert (nicht die ID) kopieren → hier „Geheimer Clientschlüssel“. Speichern, „prüfen“." },
+    ],
+    notes: ["Die Website fragt „XboxLive.signin“ ab und liest nur XUID und Gamertag.", "Microsoft-Konten ohne Xbox-Profil brechen mit einem Hinweis ab."],
+    checkPlatform: "xbox",
+  },
+  epic: {
+    key: "epic",
+    title: "Epic-Games-Konto verknüpfen",
+    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    summary: "Epic Account Services: Organisation und Produkt im Epic Developer Portal, eine Anwendung mit Markenprüfung, dann verknüpfen Mitglieder ihren Epic-Anzeigenamen.",
+    steps: [
+      { text: "Epic Developer Portal → Organisation anlegen → Produkt anlegen (die Vereinswebsite).", link: { href: "https://dev.epicgames.com/portal", label: "Epic Developer Portal" } },
+      { text: "Produkt → „Product Settings“ → „Clients“ → Client anlegen; „Epic Account Services“ → Anwendung anlegen, Berechtigung „Basic Profile“, den Client verknüpfen, Markenprüfung (Brand Review) einreichen." },
+      { text: "Bei der Anwendung die Redirect URL eintragen:", copy: "{origin}/api/platform-links/epic/callback" },
+      { text: "Client ID und Client Secret → hier bei Epic Games eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Bis zur Markenprüfung funktioniert die Anmeldung nur für Testkonten der Organisation."],
+    checkPlatform: "epic",
+  },
   resend: {
     key: "resend",
     title: "E-Mail-Versand über Resend",
@@ -168,7 +263,7 @@ export const SETUP_GUIDES = {
   },
 };
 
-export const SETUP_GUIDE_ORDER = ["discord_app", "discord_bot", "discord_webhooks", "twitch", "google_login", "steam", "resend", "smtp", "analytics", "search_console", "play_store", "dolibarr"];
+export const SETUP_GUIDE_ORDER = ["discord_app", "discord_bot", "discord_webhooks", "twitch", "google_login", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "resend", "smtp", "analytics", "search_console", "play_store", "dolibarr"];
 
 export function resolveGuideValue(value, origin) {
   return String(value || "").replaceAll("{origin}", origin || "");
@@ -200,6 +295,9 @@ export function guideStatus(key, data = {}) {
     case "steam":
       if (!branding) return unknown;
       return branding.steam_api_key_masked ? ok("Schlüssel da") : optional("Ohne Schlüssel bleibt die ID");
+    case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic":
+      if (!links) return unknown;
+      return links[key] ? ok("App eingetragen") : optional("Noch nicht angebunden");
     case "resend":
       if (!email) return unknown;
       return email.resend_api_key_masked ? ok(email.enabled ? "Schlüssel da, Versand an" : "Schlüssel da, Versand aus") : missing("API-Schlüssel fehlt");

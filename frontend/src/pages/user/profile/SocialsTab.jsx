@@ -2,7 +2,7 @@ import { BadgeCheck, ExternalLink, Link2, Unlink } from "lucide-react";
 import { Row, Section } from "./fields";
 import { ProfileSwitch } from "./SwitchRow";
 import { SOCIAL_PLATFORMS, normalizeSocialInput, socialProfileUrl } from "./socials";
-import { PLATFORM_BY_FIELD, formatLinkedAt, linkForField } from "@/lib/platformLinks";
+import { NOT_LINKABLE, PLATFORM_BY_FIELD, formatLinkedAt, linkForField } from "@/lib/platformLinks";
 
 // Socials (#258): je Feld ein Plattform-Symbol, eine eingefügte Adresse wird
 // sofort zum Nutzernamen, daneben ein Vorschau-Link. Der Twitch-Schalter
@@ -76,6 +76,9 @@ function SocialField({ platform, value, onChange, link, linkable, onLink, onUnli
             <Link2 className="w-3 h-3" aria-hidden="true" /> Mit {platform.l} verknüpfen
           </button>
         )}
+        {!platformKey && NOT_LINKABLE[platform.k] && (
+          <span className="text-[11px] text-white/35" data-testid={`${testId}-not-linkable`}>{NOT_LINKABLE[platform.k]}</span>
+        )}
       </div>
     </div>
   );
@@ -99,7 +102,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
   return (
     <Section>
       <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/65" data-testid="profile-links-hint">
-        <strong className="text-white">Konto verknüpfen statt tippen:</strong> Bei Discord, Twitch und Steam meldest du dich einmal bei der Plattform an – der Eintrag wird befüllt und trägt „verifiziert“, sichtbar im öffentlichen Profil und bei Turnieren. Die Website erhält dabei nur {["discord", "twitch", "steam"].map((key) => delivers[key]?.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername des Kontos"}. Trennen geht jederzeit; der Text bleibt dann stehen, das Häkchen nicht.
+        <strong className="text-white">Konto verknüpfen statt tippen:</strong> Wo ein Knopf „verknüpfen“ steht, meldest du dich einmal bei der Plattform an – der Eintrag wird befüllt und trägt „verifiziert“, sichtbar im öffentlichen Profil und bei Turnieren. Die Website erhält dabei nur {Object.keys(delivers).map((key) => delivers[key]?.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername des Kontos"}. Trennen geht jederzeit; der Text bleibt dann stehen, das Häkchen nicht.
       </div>
       {ROWS.map((keys) => (
         <div key={keys.join("+")} className="space-y-4">
