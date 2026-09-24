@@ -8,6 +8,8 @@ nicht: keine erfundenen erfolgreichen Antworten.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import pathlib
 import re
@@ -74,6 +76,17 @@ def response_schema(path_template: str) -> dict:
 
 def request_schema(path_template: str, method: str = "post") -> dict:
     return OPENAPI["paths"][path_template][method]["requestBody"]["content"]["application/json"]["schema"]
+
+
+def statute_pdf_bytes(version_id: int) -> bytes:
+    """Die Datei einer Statutenfassung, wie sie in der Vereinsakte liegt - je Fassung andere Bytes."""
+    return b"%PDF-1.7\n%fake-statutes-" + str(version_id).encode() + b"\n%%EOF\n"
+
+
+def statute_version(version_id: int, version: int, *, decided_on: str, valid_from: str, valid_to: str = "", state: str = "in_force") -> dict:
+    content = statute_pdf_bytes(version_id)
+    return {"id": version_id, "version": version, "decided_on": decided_on, "valid_from": valid_from, "valid_to": valid_to, "state": state,
+            "source": "generated", "sha256": hashlib.sha256(content).hexdigest(), "size": len(content)}
 
 
 def membership_fee(fee_id: int, label: str, *, amount: float | None = 50.0, for_whom: str = "natural", description: str = "",
@@ -145,14 +158,28 @@ class FakeDolibarr:
             "authority": "Bezirkshauptmannschaft Testbezirk", "address": {"street": "Teststraße 1", "zip": "6410", "town": "Testdorf", "country_code": "AT"},
             "email": "office@runtime-verein.test", "phone": "+43 5262 0", "url": "https://runtime-verein.test", "founded": "2019-03-01",
             "nonprofit": True, "purpose": "Förderung des eSports", "fiscal_year_start_month": 1,
+            "channels": [{"network": "twitch", "network_label": "Twitch", "label": "Hauptstream", "target": "testverein",
+                          "url": "https://www.twitch.tv/testverein", "stream": True, "live_url": "https://www.twitch.tv/testverein"}],
         }
+        # Statuten (#326 Teil 3): drei beschlossene Fassungen - aufgehoben, geltend, künftig; der Entwurf fehlt bewusst.
+        self.statutes = {
+            "state": "in_force",
+            "current": statute_version(3, 2, decided_on="2026-03-14", valid_from="2026-04-20", valid_to="2026-12-31", state="in_force"),
+            "versions": [
+                statute_version(5, 3, decided_on="2026-09-01", valid_from="2027-01-01", state="future"),
+                statute_version(3, 2, decided_on="2026-03-14", valid_from="2026-04-20", valid_to="2026-12-31", state="in_force"),
+                statute_version(1, 1, decided_on="2019-02-10", valid_from="2019-03-01", valid_to="2026-04-19", state="repealed"),
+            ],
+        }
+        self.statutes_public = True          # Einrichtung > Statuten: für die Öffentlichkeit freigegeben
+        self.tampered_pdf_ids: set[int] = set()  # Fassungen, deren Datei nicht mehr zur Akte passt
         self.board = [
             {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
             {"code": "kassier", "label": "Kassier:in", "board": True, "represents": False, "auditor": False, "holders": [{"name": None, "since": "2024-04-01"}]},
             {"code": "rechnungspruefung", "label": "Rechnungsprüfer:in", "board": False, "represents": False, "auditor": True, "holders": []},
         ]
         # Beitrittsantrag (#328): Pflichtfelder wie ab Werk, zwei Mitgliedsarten, ein Einwilligungstext; Anträge je external_id.
-        self.application_form = {"required": ["lastname", "firstname", "address", "zip", "town", "email"], "fields": []}
+        self.application_form = {"required": ["lastname", "firstname", "address", "zip", "town", "email"], "fields": [], "accounts": []}
         self.membership_fees = [membership_fee(2, "Ordentliches Mitglied", amount=50.0, description="Mit Stimmrecht", prorated=True),
                                 membership_fee(3, "Jugend", amount=20.0, description="Bis 18"), membership_fee(4, "Firma", amount=200.0, for_whom="legal")]
         self.consent_texts = [{"code": "fotos", "label": "Fotos auf der Website", "version": 2, "text": "Fotos von Veranstaltungen dürfen auf der Website erscheinen."}]
@@ -481,6 +508,18 @@ class FakeDolibarr:
             if not row:
                 return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
             return self._json("/vereine/applications/{external_id}", {k: v for k, v in row.items() if k not in ("payload", "draft_member_id")})
+        if path == "/vereine/statutes":
+            payload = self.statutes if self.statutes_public else {"state": "not_published", "current": None, "versions": []}
+            return self._json("/vereine/statutes", payload)
+        match = re.fullmatch(r"/vereine/statutes/(\d+)/pdf", path)
+        if match:
+            version_id = int(match.group(1))
+            row = next((v for v in self.statutes["versions"] if v["id"] == version_id), None) if self.statutes_public else None
+            if row is None:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "No such version for the caller"}})
+            content = b"%PDF-1.7\n%tampered\n%%EOF\n" if version_id in self.tampered_pdf_ids else statute_pdf_bytes(version_id)
+            return self._json("/vereine/statutes/{id}/pdf", {"filename": f"Statuten-{row['version']}.pdf", "content_type": "application/pdf", "filesize": len(content),
+                                                            "sha256": hashlib.sha256(content).hexdigest(), "content": base64.b64encode(content).decode()})
         if path == "/vereine/organization":
             # Der Verein fürs Impressum (#326); die Form ist der Vertrag des Moduls.
             return self._json("/vereine/organization", self.organization)

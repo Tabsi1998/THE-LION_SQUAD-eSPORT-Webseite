@@ -997,7 +997,7 @@
             "name": "object_type",
             "in": "query",
             "required": false,
-            "description": "Objektart: membership, function, fee, application oder consent",
+            "description": "Objektart: membership, function, fee, application, consent oder document",
             "schema": {
               "type": "string",
               "enum": [
@@ -1005,7 +1005,8 @@
                 "function",
                 "fee",
                 "application",
-                "consent"
+                "consent",
+                "document"
               ]
             }
           },
@@ -1328,6 +1329,1547 @@
           ]
         ]
       }
+    },
+    "/vereine/me/accounts": {
+      "get": {
+        "operationId": "getMyAccounts",
+        "summary": "Eigene Konten der gebundenen Person bei Discord, Twitch & Co.",
+        "description": "Die Netzwerke, die der Verein abfragt, und jedes weitere, bei dem die Person einen Namen hat. Braucht die Fähigkeit accounts.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konten der Person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyAccount"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/accounts/{network}": {
+      "put": {
+        "operationId": "putMyAccount",
+        "summary": "Konto der gebundenen Person setzen und bestätigen",
+        "description": "Setzt den Namen bei einem Netzwerk. Mit confirmed true sagt die Anwendung, dass sie das Konto beim Netzwerk geprüft hat, etwa nach dem Login mit Discord. Braucht die Fähigkeit accounts.",
+        "parameters": [
+          {
+            "name": "network",
+            "in": "path",
+            "required": true,
+            "description": "Kürzel des Netzwerks, wie GET /vereine/me/accounts es nennt",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "handle"
+                ],
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "confirmed": {
+                    "type": "boolean"
+                  },
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Konten der Person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyAccount"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      },
+      "delete": {
+        "operationId": "deleteMyAccount",
+        "summary": "Konto der gebundenen Person lösen",
+        "description": "Entfernt den Namen und seine Bestätigung. Braucht die Fähigkeit accounts.",
+        "parameters": [
+          {
+            "name": "network",
+            "in": "path",
+            "required": true,
+            "description": "Kürzel des Netzwerks, wie GET /vereine/me/accounts es nennt",
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Konten der Person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyAccount"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/documents": {
+      "get": {
+        "operationId": "getDocuments",
+        "summary": "Öffentlich veröffentlichte Dokumente des Vereins",
+        "description": "Nur, was der Verein für die Öffentlichkeit freigegeben hat, je Dokument die neueste Fassung. Braucht das Recht, den Verein zu lesen.",
+        "responses": {
+          "200": {
+            "description": "Veröffentlichte Dokumente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedDocument"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/documents/{id}/pdf": {
+      "get": {
+        "operationId": "getDocumentPdf",
+        "summary": "PDF eines öffentlich veröffentlichten Dokuments",
+        "description": "Die Bytes der veröffentlichten Fassung, unverändert, geprüft gegen die Prüfsumme der Vereinsakte.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Dokument",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "description": "Fassung; ohne die gerade veröffentlichte",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPdf"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/documents": {
+      "get": {
+        "operationId": "getMyDocuments",
+        "summary": "Dokumente für die gebundene Person",
+        "description": "Öffentliche, für Mitglieder (solange die Person aktives Mitglied ist) und für den Vorstand (solange sie ihm angehört). Braucht die Fähigkeit documents.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Veröffentlichte Dokumente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublishedDocument"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/documents/{id}/pdf": {
+      "get": {
+        "operationId": "getMyDocumentPdf",
+        "summary": "PDF eines Dokuments für die gebundene Person",
+        "description": "Bei jedem Abruf neu geprüft. Ein Dokument, das die Person nicht sehen darf, gibt es für sie nicht.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Dokument",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "description": "Fassung; ohne die gerade veröffentlichte",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPdf"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/statutes": {
+      "get": {
+        "operationId": "getStatutes",
+        "summary": "Statuten, wenn für die Öffentlichkeit veröffentlicht",
+        "description": "Jede beschlossene Fassung mit ihrem Stand am Stichtag und die geltende. Nie der Entwurf. Ohne Freigabe für die Öffentlichkeit state not_published.",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "description": "Stichtag JJJJ-MM-TT; ohne heute",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Statuten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Statutes"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/statutes/{id}/pdf": {
+      "get": {
+        "operationId": "getStatutePdf",
+        "summary": "PDF einer Fassung der Statuten, wenn öffentlich",
+        "description": "Die Bytes der Fassung, geprüft gegen ihre Prüfsumme.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Fassung",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPdf"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/statutes": {
+      "get": {
+        "operationId": "getMyStatutes",
+        "summary": "Statuten für die gebundene Person",
+        "description": "Wie GET /vereine/statutes, für Statuten, die für Mitglieder veröffentlicht sind, solange die Person aktives Mitglied ist. Braucht die Fähigkeit documents.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "description": "Stichtag JJJJ-MM-TT; ohne heute",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Statuten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Statutes"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/statutes/{id}/pdf": {
+      "get": {
+        "operationId": "getMyStatutePdf",
+        "summary": "PDF einer Fassung der Statuten für die gebundene Person",
+        "description": "Bei jedem Abruf neu geprüft.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Fassung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das PDF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentPdf"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/meetings": {
+      "get": {
+        "operationId": "getMyMeetings",
+        "summary": "Sitzungen, zu denen die gebundene Person eingeladen ist",
+        "description": "Nie eine Sitzung nur wegen der Mitgliedschaft. Braucht die Fähigkeit meetings.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sitzungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyMeeting"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/meetings/{id}/response": {
+      "put": {
+        "operationId": "putMyMeetingResponse",
+        "summary": "Zu- oder Absage der gebundenen Person",
+        "description": "yes, no oder maybe. Keine Anwesenheit, keine Stimme; dieselbe Antwort nochmal ändert nichts.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sitzung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "response"
+                ],
+                "properties": {
+                  "response": {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no",
+                      "maybe"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Die Sitzung danach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyMeeting"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/meetings/{id}/motions": {
+      "post": {
+        "operationId": "postMyMeetingMotion",
+        "summary": "Antrag der gebundenen Person zur Tagesordnung einer Generalversammlung",
+        "description": "Genau einmal je external_id; nach der Frist der Statuten als verspätet gekennzeichnet. Ob er auf die Tagesordnung kommt, entscheidet der Vorstand in Dolibarr.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Sitzung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "external_id",
+                  "title"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 255
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 5000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Der Antrag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyMotion"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/profile": {
+      "get": {
+        "operationId": "getMyProfile",
+        "summary": "Eigene Daten der gebundenen Person",
+        "description": "Braucht die Fähigkeit profile.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die eigenen Daten",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/profile/changes": {
+      "get": {
+        "operationId": "getMyProfileChanges",
+        "summary": "Eigene Änderungswünsche und Kündigung",
+        "description": "Ohne interne Notizen des Vorstands.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aufträge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyProfileRequest"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      },
+      "post": {
+        "operationId": "postMyProfileChange",
+        "summary": "Änderung der eigenen Kontaktdaten beantragen",
+        "description": "Nur Anschrift, Telefon und E-Mail; mit dem Stand aus GET me/profile.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "external_id",
+                  "version",
+                  "changes"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "version": {
+                    "type": "string"
+                  },
+                  "changes": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Der Auftrag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/exit": {
+      "post": {
+        "operationId": "postMyExit",
+        "summary": "Austritt erklären",
+        "description": "Endet am Tag, den die Kündigungsregel des Vereins ergibt, oder später, wenn so gewünscht.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "external_id"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "wished_last_day": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Der Auftrag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfileRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/events": {
+      "get": {
+        "operationId": "getEvents",
+        "summary": "Öffentliche Veranstaltungen ab heute",
+        "description": "Nur als öffentlich markierte; nie Teilnehmer, interne Aufgaben oder Geld.",
+        "responses": {
+          "200": {
+            "description": "Veranstaltungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicEvent"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/events": {
+      "get": {
+        "operationId": "getMyEvents",
+        "summary": "Veranstaltungen und Helferdienste für die gebundene Person",
+        "description": "Öffentliche und für Mitglieder, ab heute, mit Helferdiensten. Braucht die Fähigkeit events.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Veranstaltungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MyEvent"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/events/{id}/shifts/{shift}": {
+      "put": {
+        "operationId": "putMyShift",
+        "summary": "Helferdienst anfragen",
+        "description": "Wartet auf die Bestätigung in Dolibarr; nochmal anfragen ändert nichts.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Veranstaltung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "shift",
+            "in": "path",
+            "required": true,
+            "description": "Helferdienst",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Veranstaltung danach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      },
+      "delete": {
+        "operationId": "deleteMyShift",
+        "summary": "Unbestätigten Helferdienst zurückziehen",
+        "description": "Ein bestätigter Dienst wird mit dem Verein abgesagt.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Veranstaltung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "shift",
+            "in": "path",
+            "required": true,
+            "description": "Helferdienst",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Die Veranstaltung danach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEvent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/ballots": {
+      "get": {
+        "operationId": "getMyBallots",
+        "summary": "Abstimmungen für die gebundene Person",
+        "description": "Abstimmungen der Generalversammlungen, zu denen die Person eingeladen ist, ab der Freigabe. Braucht die Fähigkeit votes.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Abstimmungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ballot"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/ballots/{id}/votes": {
+      "post": {
+        "operationId": "postMyVote",
+        "summary": "Stimme abgeben",
+        "description": "Mit einem Stimmrecht aus GET me/ballots, solange die Abstimmung offen ist und die Person laut Anwesenheit in der Versammlung ist. Jedes Stimmrecht zählt einmal.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Abstimmung",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "right_id",
+                  "option"
+                ],
+                "properties": {
+                  "right_id": {
+                    "type": "integer"
+                  },
+                  "option": {
+                    "type": "string",
+                    "maxLength": 16
+                  },
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 64
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Die Abstimmung danach",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ballot"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
     }
   },
   "components": {
@@ -1438,7 +2980,8 @@
           "founded",
           "nonprofit",
           "purpose",
-          "fiscal_year_start_month"
+          "fiscal_year_start_month",
+          "channels"
         ],
         "properties": {
           "country_profile": {
@@ -1539,6 +3082,13 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 12
+          },
+          "channels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Channel"
+            },
+            "description": "Öffentliche Kanäle des Vereins in seiner Reihenfolge; mehrere je Netzwerk möglich"
           }
         }
       },
@@ -2186,11 +3736,8 @@
           },
           "fields": {
             "type": "object",
-            "description": "Eigene Felder des Vereins, etwa ein Gamertag: Kürzel => Wert. Welche es gibt und welche Pflicht sind, sagt GET /vereine/applicationform; ein Feld, das der Antrag nicht kennt, wird abgewiesen.",
-            "additionalProperties": {
-              "type": "string",
-              "maxLength": 255
-            }
+            "description": "Eigene Felder des Vereins: Kürzel => Wert. Welche es gibt, welcher Art sie sind und welche Pflicht sind, sagt GET /vereine/applicationform. Text als Zeichenkette, Zahl als Zahl oder Text, Datum als JJJJ-MM-TT, Ja/Nein als true/false, eine Auswahl als Kürzel, eine Mehrfachauswahl als Liste von Kürzeln. Ein Feld, das der Antrag nicht kennt, oder ein Wert, der nicht zur Art passt, wird abgewiesen.",
+            "additionalProperties": {}
           }
         }
       },
@@ -2641,7 +4188,8 @@
               "function",
               "fee",
               "application",
-              "consent"
+              "consent",
+              "document"
             ]
           },
           "object_id": {
@@ -2776,7 +4324,11 @@
                 "consents",
                 "applications",
                 "documents",
-                "votes"
+                "votes",
+                "accounts",
+                "meetings",
+                "profile",
+                "events"
               ]
             }
           },
@@ -2819,7 +4371,8 @@
         "type": "object",
         "required": [
           "required",
-          "fields"
+          "fields",
+          "accounts"
         ],
         "properties": {
           "required": {
@@ -2846,7 +4399,8 @@
               "required": [
                 "code",
                 "label",
-                "required"
+                "required",
+                "type"
               ],
               "properties": {
                 "code": {
@@ -2857,7 +4411,1126 @@
                 },
                 "required": {
                   "type": "boolean"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "textarea",
+                    "number",
+                    "date",
+                    "boolean",
+                    "select",
+                    "multi"
+                  ],
+                  "description": "Wie die Website das Feld zeigt und was sie schicken darf: Text, langer Text, Zahl, Datum (JJJJ-MM-TT), Ja/Nein (true/false), eine Option oder mehrere Optionen (Liste von Kürzeln)"
+                },
+                "max_length": {
+                  "type": "integer",
+                  "description": "Bei Text und langem Text: höchstens so viele Zeichen"
+                },
+                "options": {
+                  "type": "array",
+                  "description": "Bei Auswahl und Mehrfachauswahl: die Optionen, geschickt wird das Kürzel",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "label"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
                 }
+              }
+            }
+          },
+          "accounts": {
+            "type": "array",
+            "description": "Konten, die der Antrag abfragt; senden als accounts: {netzwerk: name}",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "network",
+                "label",
+                "required"
+              ],
+              "properties": {
+                "network": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Channel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "network_label",
+          "label",
+          "target",
+          "url",
+          "stream",
+          "live_url"
+        ],
+        "properties": {
+          "network": {
+            "type": "string",
+            "description": "Kürzel aus Dolibarrs Wörterbuch Soziale Netzwerke, z. B. twitch, youtube, discord"
+          },
+          "network_label": {
+            "type": "string",
+            "description": "Name des Netzwerks"
+          },
+          "label": {
+            "type": "string",
+            "description": "Bezeichnung des Vereins, z. B. Hauptstream"
+          },
+          "target": {
+            "type": "string",
+            "description": "Adresse oder Name, wie der Verein ihn eingetragen hat"
+          },
+          "url": {
+            "type": "string",
+            "description": "Adresse des Kanals; leer, wenn aus einem Namen keine zu bauen ist"
+          },
+          "stream": {
+            "type": "boolean",
+            "description": "Auf diesem Kanal wird gestreamt"
+          },
+          "live_url": {
+            "type": "string",
+            "description": "Seite des Livestreams (Twitch, YouTube, Kick); sonst leer"
+          }
+        }
+      },
+      "MyAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "network",
+          "label",
+          "asked",
+          "handle",
+          "url",
+          "confirmed",
+          "confirmed_at",
+          "client"
+        ],
+        "properties": {
+          "network": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string",
+            "description": "Name des Netzwerks"
+          },
+          "asked": {
+            "type": "string",
+            "enum": [
+              "",
+              "optional",
+              "required"
+            ],
+            "description": "Ob der Verein dieses Konto abfragt"
+          },
+          "handle": {
+            "type": "string",
+            "description": "Name bei diesem Netzwerk; leer, wenn keiner angegeben ist"
+          },
+          "url": {
+            "type": "string",
+            "description": "Adresse des Kontos; leer, wenn keine zu bauen ist"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "Eine Anwendung hat genau diesen Namen beim Netzwerk bestätigt"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "description": "Zeitpunkt der Bestätigung (RFC 3339); leer ohne Bestätigung"
+          },
+          "client": {
+            "type": "string",
+            "description": "Anwendung, die bestätigt hat; leer ohne Bestätigung"
+          }
+        }
+      },
+      "PublishedDocument": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_id",
+          "revision",
+          "derived_from",
+          "code",
+          "kind",
+          "title",
+          "date",
+          "what",
+          "sha256",
+          "size",
+          "audience"
+        ],
+        "properties": {
+          "document_id": {
+            "type": "integer"
+          },
+          "revision": {
+            "type": "integer",
+            "description": "Die veröffentlichte Fassung; für den Abruf des PDF"
+          },
+          "derived_from": {
+            "type": "integer",
+            "description": "Bei einer gekürzten Fassung die Fassung, aus der sie abgeleitet ist; sonst 0"
+          },
+          "code": {
+            "type": "string",
+            "description": "Kennung des Dokuments, wie auf dem PDF, z. B. ABCDE-23456"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "minutes",
+              "resolution",
+              "audit_report",
+              "account",
+              "payout",
+              "statute",
+              "letter",
+              "ballot"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "description": "Wann die Fassung entstand (RFC 3339)"
+          },
+          "what": {
+            "type": "string",
+            "enum": [
+              "built",
+              "signed",
+              "scan",
+              "excerpt"
+            ],
+            "description": "erstellt, unterschrieben, Scan des unterschriebenen Papiers oder gekürzte Fassung (excerpt)"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Größe in Bytes; 0, wenn die Datei fehlt"
+          },
+          "audience": {
+            "type": "string",
+            "enum": [
+              "board",
+              "members",
+              "public",
+              "person"
+            ]
+          }
+        }
+      },
+      "DocumentPdf": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "content_type",
+          "filesize",
+          "sha256",
+          "content"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "\\.pdf$"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "application/pdf"
+            ]
+          },
+          "filesize": {
+            "type": "integer",
+            "description": "Größe in Bytes nach dem Dekodieren"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Prüfsumme der Bytes, gleich der in der Vereinsakte"
+          },
+          "content": {
+            "type": "string",
+            "description": "Das PDF, base64-kodiert, unverändert samt Unterschriften"
+          }
+        }
+      },
+      "StatuteVersion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "decided_on",
+          "valid_from",
+          "valid_to",
+          "state",
+          "source",
+          "sha256",
+          "size"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Fassung 1, 2, …"
+          },
+          "decided_on": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "valid_from": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "valid_to": {
+            "type": "string",
+            "description": "Letzter Tag vor der nächsten Fassung; leer für die jüngste"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "in_force",
+              "future",
+              "repealed",
+              "ambiguous"
+            ]
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "uploaded"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "size": {
+            "type": "integer",
+            "description": "Größe in Bytes; 0, wenn die Datei fehlt"
+          }
+        }
+      },
+      "Statutes": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "current",
+          "versions"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "in_force",
+              "none",
+              "ambiguous",
+              "not_published"
+            ],
+            "description": "in_force: eine Fassung gilt; none: noch keine; ambiguous: zwei beginnen am selben Tag; not_published: nicht für den Abrufer freigegeben"
+          },
+          "current": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "version",
+              "decided_on",
+              "valid_from",
+              "valid_to",
+              "state",
+              "source",
+              "sha256",
+              "size"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "version": {
+                "type": "integer",
+                "description": "Fassung 1, 2, …"
+              },
+              "decided_on": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "valid_from": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "valid_to": {
+                "type": "string",
+                "description": "Letzter Tag vor der nächsten Fassung; leer für die jüngste"
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "in_force",
+                  "future",
+                  "repealed",
+                  "ambiguous"
+                ]
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "generated",
+                  "uploaded"
+                ]
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "size": {
+                "type": "integer",
+                "description": "Größe in Bytes; 0, wenn die Datei fehlt"
+              }
+            },
+            "nullable": true,
+            "description": "Die geltende Fassung; null, wenn keine oder mehrere gleichzeitig beginnen"
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StatuteVersion"
+            }
+          }
+        }
+      },
+      "MyMotion": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "external_id",
+          "title",
+          "text",
+          "received_at",
+          "late",
+          "status"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string",
+            "description": "Eingang (RFC 3339)"
+          },
+          "late": {
+            "type": "boolean",
+            "description": "Nach der Frist der Statuten eingelangt"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "received",
+              "accepted",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "MyMeeting": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "day",
+          "time",
+          "timezone",
+          "format",
+          "place",
+          "access",
+          "status",
+          "agenda",
+          "voting",
+          "response",
+          "responded_at",
+          "motion_deadline",
+          "motions"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "board",
+              "general",
+              "extraordinary"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "time": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "physical",
+              "virtual",
+              "hybrid"
+            ]
+          },
+          "place": {
+            "type": "string",
+            "description": "Ort; leer bei einer virtuellen Sitzung"
+          },
+          "access": {
+            "type": "string",
+            "description": "Zugang zur Online-Teilnahme; nur für Eingeladene, leer bei Sitzungen vor Ort"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "invited",
+              "held",
+              "cancelled"
+            ]
+          },
+          "agenda": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "voting": {
+            "type": "boolean",
+            "description": "Die Person ist laut Einladung stimmberechtigt"
+          },
+          "response": {
+            "type": "string",
+            "enum": [
+              "",
+              "yes",
+              "no",
+              "maybe"
+            ]
+          },
+          "responded_at": {
+            "type": "string"
+          },
+          "motion_deadline": {
+            "type": "string",
+            "description": "Letzter Tag für rechtzeitige Anträge; leer bei Vorstandssitzungen"
+          },
+          "motions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyMotion"
+            }
+          }
+        }
+      },
+      "MyProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "member_id",
+          "ref",
+          "firstname",
+          "lastname",
+          "birth",
+          "address",
+          "zip",
+          "town",
+          "country_code",
+          "phone",
+          "phone_mobile",
+          "email",
+          "member_type",
+          "status",
+          "version",
+          "direct",
+          "exit"
+        ],
+        "properties": {
+          "member_id": {
+            "type": "integer"
+          },
+          "ref": {
+            "type": "string"
+          },
+          "firstname": {
+            "type": "string"
+          },
+          "lastname": {
+            "type": "string"
+          },
+          "birth": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "zip": {
+            "type": "string"
+          },
+          "town": {
+            "type": "string"
+          },
+          "country_code": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "phone_mobile": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "member_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "draft",
+              "former"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "description": "Stand der Kontaktdaten; eine Änderung muss ihn nennen"
+          },
+          "direct": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Felder, die sofort übernommen werden"
+          },
+          "exit": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "reason",
+              "notice_day",
+              "last_day"
+            ],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": [
+                  "planned",
+                  "done"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "notice_day": {
+                "type": "string"
+              },
+              "last_day": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "MyProfileRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "external_id",
+          "kind",
+          "received_at"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "change",
+              "exit"
+            ]
+          },
+          "changes": {
+            "type": "object",
+            "description": "Feld => gewünschter Wert"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Begründung des Vorstands für das Mitglied"
+          },
+          "received_at": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": "string"
+          },
+          "notice_day": {
+            "type": "string"
+          },
+          "last_day": {
+            "type": "string",
+            "description": "Letzter Tag der Mitgliedschaft laut Kündigungsregel"
+          },
+          "wished_last_day": {
+            "type": "string"
+          },
+          "wished_too_early": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PublicEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "day",
+          "end_day",
+          "timezone",
+          "place",
+          "status",
+          "visibility",
+          "registration"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "end_day": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "done",
+              "cancelled"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "members"
+            ]
+          },
+          "registration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "external_ref"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "dolibarr",
+                  "external"
+                ],
+                "description": "Wo man sich anmeldet; genau eine Stelle"
+              },
+              "external_ref": {
+                "type": "string",
+                "description": "Bei external: die Anwendung oder Kennung, bei der angemeldet wird"
+              }
+            }
+          }
+        }
+      },
+      "MyEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "label",
+          "day",
+          "end_day",
+          "timezone",
+          "place",
+          "status",
+          "visibility",
+          "registration",
+          "shifts"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "end_day": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "place": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "done",
+              "cancelled"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "members"
+            ]
+          },
+          "registration": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "external_ref"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "dolibarr",
+                  "external"
+                ],
+                "description": "Wo man sich anmeldet; genau eine Stelle"
+              },
+              "external_ref": {
+                "type": "string",
+                "description": "Bei external: die Anwendung oder Kennung, bei der angemeldet wird"
+              }
+            }
+          },
+          "shifts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label",
+                "day",
+                "start",
+                "end",
+                "capacity",
+                "taken",
+                "full",
+                "mine"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "day": {
+                  "type": "string"
+                },
+                "start": {
+                  "type": "string"
+                },
+                "end": {
+                  "type": "string"
+                },
+                "capacity": {
+                  "type": "integer"
+                },
+                "taken": {
+                  "type": "integer",
+                  "description": "Bestätigte oder geleistete Plätze"
+                },
+                "full": {
+                  "type": "boolean"
+                },
+                "mine": {
+                  "type": "string",
+                  "enum": [
+                    "",
+                    "requested",
+                    "confirmed",
+                    "done",
+                    "cancelled"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "BallotRight": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "right_id",
+          "for",
+          "name",
+          "state",
+          "reason",
+          "option"
+        ],
+        "properties": {
+          "right_id": {
+            "type": "integer",
+            "description": "Zum Abstimmen; 0, wenn die Person dieses Stimmrecht nicht nutzen kann"
+          },
+          "for": {
+            "type": "string",
+            "enum": [
+              "self",
+              "proxy"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Bei einer Vollmacht: wen die Person vertritt"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "used",
+              "none"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "own",
+              "proxy",
+              "represented",
+              "no_voting_right",
+              "not_member"
+            ]
+          },
+          "option": {
+            "type": "string",
+            "description": "Die abgegebene Stimme, sobald das Stimmrecht genutzt ist"
+          }
+        }
+      },
+      "Ballot": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "meeting_id",
+          "meeting",
+          "day",
+          "item",
+          "kind",
+          "question",
+          "status",
+          "closes",
+          "timezone",
+          "options",
+          "rights",
+          "result"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "meeting_id": {
+            "type": "integer"
+          },
+          "meeting": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "item": {
+            "type": "integer"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "resolution",
+              "election",
+              "statutes",
+              "dissolution"
+            ]
+          },
+          "question": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "released",
+              "open",
+              "closed",
+              "evaluated",
+              "cancelled"
+            ]
+          },
+          "closes": {
+            "type": "string",
+            "description": "Uhrzeit HH:MM am Versammlungstag, leer ohne feste Zeit"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "label"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BallotRight"
+            }
+          },
+          "result": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": false,
+            "description": "Erst nach der Bestätigung durch die Versammlungsleitung; vorher null",
+            "required": [
+              "revision",
+              "outcome",
+              "passed",
+              "counts",
+              "valid",
+              "abstain",
+              "winner"
+            ],
+            "properties": {
+              "revision": {
+                "type": "integer"
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "rejected",
+                  "no_quorum",
+                  "no_majority"
+                ]
+              },
+              "passed": {
+                "type": "boolean"
+              },
+              "counts": {
+                "type": "object",
+                "description": "Stimmen je Antwort-Code"
+              },
+              "valid": {
+                "type": "integer"
+              },
+              "abstain": {
+                "type": "integer"
+              },
+              "winner": {
+                "type": "string",
+                "description": "Bei einer Wahl der Code der gewählten Person, sonst leer"
               }
             }
           }

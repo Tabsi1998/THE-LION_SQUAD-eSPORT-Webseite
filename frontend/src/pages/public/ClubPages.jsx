@@ -4,13 +4,13 @@
  * BoardPage ist jetzt dynamisch: liest /api/board und rendert nur is_active=true.
  */
 import { useCallback, useEffect, useState } from "react";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { API, api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight } from "lucide-react";
+import { Crown, Heart, Target, Sparkles, User as UserIcon, ArrowRight, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function personGamertag(person) {
@@ -25,6 +25,7 @@ function personRealName(person) {
 export function BoardPage() {
   useDocumentTitle("Vorstand", "Vorstand, Ansprechpartner und Vereinsverantwortliche von THE LION SQUAD eSports in Tirol.");
   const [positions, setPositions] = useState([]);
+  const [statutes, setStatutes] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
@@ -33,6 +34,10 @@ export function BoardPage() {
       .then(({ data }) => setPositions(data))
       .catch(() => {})
       .finally(() => setLoading(false));
+    // Statuten aus Dolibarr (#326 Teil 3) - ohne Schalter oder Freigabe bleibt der Hinweis von früher.
+    api.get("/board/statutes")
+      .then(({ data }) => setStatutes(data))
+      .catch(() => setStatutes(null));
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["board", "users", "membership"]);
@@ -73,14 +78,68 @@ export function BoardPage() {
           </div>
         )}
 
-        <div className="mt-10 border border-white/10 bg-[#121212] rounded-sm p-6">
-          <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten & Vereinsregister</h2>
-          <p className="text-sm text-white/60">
-            THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach Login angezeigt.
-          </p>
-        </div>
+        <StatutesBox statutes={statutes} />
       </div>
     </PublicLayout>
+  );
+}
+
+export function formatDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+}
+
+// Eine Fassung in einem Satz: künftig „gilt ab“, aufgehoben „von … bis“, geltend „seit“.
+export function statuteLine(version) {
+  if (!version) return "";
+  const from = formatDay(version.valid_from);
+  if (version.state === "future") return `Fassung ${version.version} gilt ab ${from}`;
+  if (version.state === "repealed") return `Fassung ${version.version}: ${from} bis ${formatDay(version.valid_to)}`;
+  return `Fassung ${version.version} seit ${from}`;
+}
+
+function StatutesBox({ statutes }) {
+  const available = Boolean(statutes?.available);
+  const current = available ? statutes.current : null;
+  const others = available ? (statutes.versions || []).filter((v) => !current || v.id !== current.id) : [];
+  return (
+    <div className="mt-10 border border-white/10 bg-[#121212] rounded-sm p-6" data-testid="board-statutes">
+      <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten & Vereinsregister</h2>
+      {!available ? (
+        <p className="text-sm text-white/60">
+          THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach Login angezeigt.
+        </p>
+      ) : (
+        <div className="space-y-4">
+          {current ? (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="board-statutes-current">
+              <div>
+                <div className="text-sm text-white font-bold">Geltende Fassung: Fassung {current.version}</div>
+                <div className="text-xs text-white/50">beschlossen am {formatDay(current.decided_on)} · gültig seit {formatDay(current.valid_from)}</div>
+              </div>
+              <a href={`${API}/board/statutes/${current.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/60 text-[#FFD700] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#FFD700]/10">
+                <FileText className="w-4 h-4" /> Statuten (PDF)
+              </a>
+            </div>
+          ) : (
+            <p className="text-sm text-white/60" data-testid="board-statutes-none">
+              {statutes.state === "ambiguous" ? "Welche Fassung heute gilt, ist in der Vereinsverwaltung noch nicht eindeutig." : "Derzeit ist noch keine Fassung in Kraft."}
+            </p>
+          )}
+          {others.length > 0 && (
+            <ul className="text-xs text-white/50 space-y-1" data-testid="board-statutes-archive">
+              {others.map((v) => (
+                <li key={v.id} className="flex flex-wrap items-center gap-x-2">
+                  <span>{statuteLine(v)}</span>
+                  <a href={`${API}/board/statutes/${v.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${v.id}`} className="text-[#FFD700] hover:underline">PDF</a>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-white/40">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

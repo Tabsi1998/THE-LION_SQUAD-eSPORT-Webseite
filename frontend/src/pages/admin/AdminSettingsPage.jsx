@@ -210,6 +210,21 @@ function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
 
+// Statuten aus Dolibarr (#326 Teil 3) im Reiter Rechtliches: ein Satz, der sagt, was die Vorstandsseite zeigt.
+function statutesDay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
+  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+}
+
+export function statutesSummary(statutes) {
+  if (!statutes) return "";
+  if (!statutes.state) return statutes.error ? `vom Modul nicht geliefert (${statutes.error}) – bleibt der Hinweis auf den Mitgliederbereich` : "noch nicht gelesen";
+  if (statutes.state === "not_published") return "im Modul nicht für die Öffentlichkeit freigegeben (Dolibarr → Einrichtung → Statuten) – die Vorstandsseite zeigt keine";
+  if (statutes.state === "in_force" && statutes.current) return `Fassung ${statutes.current.version} gilt seit ${statutesDay(statutes.current.valid_from)} (${statutes.versions} Fassungen)`;
+  if (statutes.state === "ambiguous") return "welche Fassung gilt, ist im Modul nicht eindeutig";
+  return `noch keine Fassung in Kraft (${statutes.versions} beschlossen)`;
+}
+
 export default function AdminSettingsPage() {
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
@@ -1702,6 +1717,7 @@ export default function AdminSettingsPage() {
                     <>
                       <span className="text-white/60">Stand {new Date(dolibarrPublic.fetched_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
                       <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-[#FFD700]">kein freigegebener Name – bleibt von Hand</span>}</span>
+                      {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-[#FFD700]"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
                       {dolibarrPublic.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}
                     </>
                   )}

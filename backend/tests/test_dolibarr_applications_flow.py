@@ -71,7 +71,7 @@ async def test_without_the_switch_the_website_keeps_its_own_application(flow, fa
 @pytest.mark.asyncio
 async def test_application_goes_to_dolibarr_once_and_the_person_follows_its_state(flow, fake):
     await connect(flow, applications_enabled=True)
-    fake.application_form["fields"] = [{"code": "gamertag", "label": "Gamertag", "required": True}]
+    fake.application_form["fields"] = [{"code": "gamertag", "label": "Gamertag", "required": True, "type": "text"}]
     amelie = await person(flow, "amelie")
     flow.act_as(amelie)
 

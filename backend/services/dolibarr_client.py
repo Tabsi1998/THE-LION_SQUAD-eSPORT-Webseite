@@ -492,6 +492,21 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
+    async def statutes(self) -> dict:
+        """Die Statuten, wie der Verein sie im Modul für die Öffentlichkeit freigibt (#326 Teil 3): Stand,
+        geltende Fassung und alle beschlossenen Fassungen - nie der Entwurf. Ein älteres Modul antwortet 404."""
+        data = await self._get("/vereine/statutes")
+        if not isinstance(data, dict) or "state" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def statute_pdf(self, version_id: int) -> dict:
+        """Das PDF einer freigegebenen Fassung, base64 mit Prüfsumme - unbekannte Fassungen antworten 404."""
+        data = await self._get(f"/vereine/statutes/{int(version_id)}/pdf")
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
         if not isinstance(data, dict) or "id" not in data:

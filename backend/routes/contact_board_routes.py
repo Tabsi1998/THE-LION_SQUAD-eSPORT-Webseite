@@ -7,7 +7,7 @@
 """
 from html import escape
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, Literal, List
 
@@ -292,6 +292,37 @@ async def board_source():
     db = get_db()
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
     return await club_facts.board_source(db, branding)
+
+
+@board_router.get("/statutes")
+async def board_statutes():
+    """Die Statuten aus Dolibarr (#326 Teil 3): geltende und beschlossene Fassungen - nur mit dem Schalter
+    „Vereinsdaten aus Dolibarr“ und nur, wenn der Verein sie im Modul für die Öffentlichkeit freigibt."""
+    from services import club_facts
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    return club_facts.statutes_public(await club_facts.snapshot(db), switch_on=bool(branding.get("legal_from_dolibarr")))
+
+
+@board_router.get("/statutes/{version_id}/pdf")
+async def board_statutes_pdf(version_id: int):
+    """Das PDF einer freigegebenen Fassung, geprüft gegen die Prüfsumme der Vereinsakte."""
+    from services import club_facts
+    from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    try:
+        client = DolibarrClient(await load_settings(db))
+        content, row = await club_facts.statutes_pdf(db, branding, version_id, client)
+    except DolibarrError as exc:
+        if exc.kind == "not_found":
+            raise HTTPException(404, "Diese Statutenfassung gibt es nicht oder sie ist nicht freigegeben.")
+        if exc.kind == "invalid_response":
+            raise HTTPException(502, "Die Datei aus Dolibarr passt nicht zur Prüfsumme der Vereinsakte – bitte im Vereinsmodul prüfen.")
+        raise HTTPException(503, "Die Statuten sind gerade nicht abrufbar – Dolibarr antwortet nicht.")
+    filename = f"Statuten-Fassung-{row.get('version')}.pdf"
+    return Response(content=content, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "public, max-age=3600"})
 
 
 @board_router.get("")

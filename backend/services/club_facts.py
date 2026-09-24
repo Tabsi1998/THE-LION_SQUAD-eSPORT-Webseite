@@ -15,9 +15,19 @@ Hosting, UID, Zusatztexte) bleibt von Hand. Namen: ``null`` heißt keine Einwill
 die vertretungsbefugte Person, wie sie von Hand eingetragen ist; nie aus anderen Quellen
 rekonstruieren. Vorstandsnamen aus einem Stand, der älter ist als ``NAME_MAX_AGE_HOURS``, werden
 zurückgehalten, damit ein Widerruf zeitnah wirkt.
+
+Statuten (Teil 3): ``/vereine/statutes`` liefert die beschlossenen Fassungen mit Stand (geltend,
+künftig, aufgehoben) - nur, wenn der Verein sie im Modul für die Öffentlichkeit freigibt, und nie den
+Entwurf. Die Website hält sie im selben Stand (``statutes``), zeigt sie mit demselben Schalter auf der
+Vorstandsseite und liefert das PDF nur für eine Fassung aus dem Stand und nur, wenn die Bytes zur
+Prüfsumme der Vereinsakte passen (``statutes_pdf``). Ein älteres Modul ohne Statuten-API ändert am
+Rest nichts: der Fehler steht als ``statutes_error`` daneben.
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 from datetime import datetime, timezone
 
 from models import now_utc
@@ -32,6 +42,11 @@ REPRESENTATIVE_CODES = ("obmann", "obfrau", "praesident", "vorsitz")
 # Felder, die der Schalter aus Dolibarr übernimmt - alles andere bleibt von Hand.
 OVERLAY_FIELDS = ("legal_name", "zvr_number", "register_authority", "street_address", "postal_code", "city", "country", "phone",
                   "representative_name", "representative_role")
+# Was die Website von einer Statutenfassung nach außen gibt - keine Prüfsummen, keine Quelle.
+STATUTE_FIELDS = ("id", "version", "decided_on", "valid_from", "valid_to", "state", "size")
+# PDF je Prüfsumme: eine beschlossene Fassung ändert sich nie, ihre Prüfsumme auch nicht.
+_PDF_CACHE: dict[str, bytes] = {}
+PDF_CACHE_LIMIT = 8
 
 
 def _age_hours(value, now: datetime | None = None) -> float | None:
@@ -113,7 +128,8 @@ def organization_public(organization: dict | None) -> dict:
 
 
 async def refresh(db, settings: dict, client: DolibarrClient) -> dict:
-    """Beides neu lesen. Ein Fehler lässt den letzten Stand stehen und wird daneben vermerkt."""
+    """Alles neu lesen. Ein Fehler lässt den letzten Stand stehen und wird daneben vermerkt; die Statuten
+    hängen an einem eigenen Vermerk, damit ein Modul ohne Statuten-API Vereinsdaten und Vorstand nicht sperrt."""
     now = now_utc().isoformat()
     try:
         organization = await client.organization()
@@ -121,12 +137,19 @@ async def refresh(db, settings: dict, client: DolibarrClient) -> dict:
     except DolibarrError as exc:
         await db[COLLECTION].update_one({"id": STATE_ID}, {"$set": {"error": exc.kind, "error_text": exc.text, "error_at": now}, "$setOnInsert": {"id": STATE_ID}}, upsert=True)
         return {"ok": False, "kind": exc.kind, "text": exc.text}
-    await db[COLLECTION].update_one({"id": STATE_ID}, {
-        "$set": {"organization": organization, "board": board, "fetched_at": now},
-        "$unset": {"error": "", "error_text": "", "error_at": ""},
-        "$setOnInsert": {"id": STATE_ID},
-    }, upsert=True)
-    return {"ok": True, "fetched_at": now, "functions": len(board)}
+    update = {"organization": organization, "board": board, "fetched_at": now}
+    unset = {"error": "", "error_text": "", "error_at": ""}
+    statutes_state = None
+    try:
+        statutes = await client.statutes()
+    except DolibarrError as exc:
+        update.update({"statutes_error": exc.kind, "statutes_error_at": now})
+    else:
+        statutes_state = statutes.get("state")
+        update.update({"statutes": statutes, "statutes_fetched_at": now})
+        unset.update({"statutes_error": "", "statutes_error_at": ""})
+    await db[COLLECTION].update_one({"id": STATE_ID}, {"$set": update, "$unset": unset, "$setOnInsert": {"id": STATE_ID}}, upsert=True)
+    return {"ok": True, "fetched_at": now, "functions": len(board), "statutes": statutes_state}
 
 
 async def refresh_due() -> dict:
@@ -143,6 +166,67 @@ async def refresh_due() -> dict:
     except DolibarrError as exc:
         return {"ok": False, "kind": exc.kind}
     return await refresh(db, settings, client)
+
+
+def _statute_version(row: dict) -> dict:
+    return {key: row.get(key) for key in STATUTE_FIELDS}
+
+
+def statutes_public(state: dict, *, switch_on: bool) -> dict:
+    """Die Statuten für die Website: nur mit Schalter und nur, wenn der Verein sie im Modul für die
+    Öffentlichkeit freigibt; sonst ``available`` False mit dem Grund. Nie der Entwurf, nie Prüfsummen."""
+    if not switch_on:
+        return {"available": False, "reason": "switch_off"}
+    statutes = state.get("statutes")
+    if not isinstance(statutes, dict):
+        return {"available": False, "reason": "unavailable" if state.get("statutes_error") else "not_fetched"}
+    if statutes.get("state") == "not_published":
+        return {"available": False, "reason": "not_published"}
+    current = statutes.get("current")
+    return {
+        "available": True, "state": statutes.get("state"),
+        "current": _statute_version(current) if isinstance(current, dict) else None,
+        "versions": [_statute_version(row) for row in statutes.get("versions") or [] if isinstance(row, dict) and row.get("id")],
+        "fetched_at": state.get("statutes_fetched_at"),
+    }
+
+
+def statutes_admin(state: dict) -> dict:
+    """Für den Reiter Rechtliches: Stand, geltende Fassung, Zahl der Fassungen, Fehler."""
+    statutes = state.get("statutes") if isinstance(state.get("statutes"), dict) else None
+    current = statutes.get("current") if statutes else None
+    return {
+        "state": statutes.get("state") if statutes else None,
+        "current": _statute_version(current) if isinstance(current, dict) else None,
+        "versions": len(statutes.get("versions") or []) if statutes else 0,
+        "fetched_at": state.get("statutes_fetched_at"), "error": state.get("statutes_error"),
+    }
+
+
+async def statutes_pdf(db, branding: dict, version_id: int, client: DolibarrClient) -> tuple[bytes, dict]:
+    """Das PDF einer freigegebenen Fassung: nur eine aus dem Stand (``not_found`` sonst) und nur, wenn die
+    Bytes zur Prüfsumme der Vereinsakte passen (``invalid_response`` sonst). Einmal geholt, bleibt es im Speicher."""
+    state = await snapshot(db)
+    public = statutes_public(state, switch_on=bool(branding.get("legal_from_dolibarr")))
+    rows = (state.get("statutes") or {}).get("versions") or [] if public.get("available") else []
+    row = next((row for row in rows if isinstance(row, dict) and int(row.get("id") or 0) == int(version_id)), None)
+    if row is None:
+        raise DolibarrError("not_found", 404)
+    expected = str(row.get("sha256") or "")
+    cached = _PDF_CACHE.get(expected) if expected else None
+    if cached is not None:
+        return cached, row
+    data = await client.statute_pdf(int(version_id))
+    try:
+        content = base64.b64decode(str(data.get("content") or ""), validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise DolibarrError("invalid_response", 200) from exc
+    if not content or not expected or hashlib.sha256(content).hexdigest() != expected:
+        raise DolibarrError("invalid_response", 200)
+    if len(_PDF_CACHE) >= PDF_CACHE_LIMIT:
+        _PDF_CACHE.clear()
+    _PDF_CACHE[expected] = content
+    return content, row
 
 
 async def snapshot(db) -> dict:
@@ -286,4 +370,5 @@ async def admin_view(db, branding: dict) -> dict:
         "board": board_public(state.get("board"), fetched_at=state.get("fetched_at")) if has_data else [],
         "organization": organization_public(state.get("organization")) if has_data else None,
         "fields": list(OVERLAY_FIELDS),
+        "statutes": statutes_admin(state),
     }

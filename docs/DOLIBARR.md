@@ -242,6 +242,14 @@ Absturzberichten). Wer einen Dienst ein- oder ausschaltet, ändert damit die Erk
 Text zu pflegen. Was die Website nicht kennt, gehört weiterhin in „Zusätzliche
 Datenschutzhinweise“.
 
+**Statuten:** Gibt der Verein seine Statuten im Modul unter *Einrichtung > Statuten* für die
+Öffentlichkeit frei, zeigt die Vorstandsseite mit demselben Schalter die geltende Fassung (Nummer,
+beschlossen am, gültig seit) mit PDF sowie frühere und künftige Fassungen. Das PDF holt die Website
+aus Dolibarr und prüft es gegen die Prüfsumme der Vereinsakte – passt es nicht, gibt es die Datei
+nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website nie. Ohne Freigabe
+oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
+steht, was Sache ist.
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
