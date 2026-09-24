@@ -1,4 +1,5 @@
 import { hasArea, roleLabel } from "@/lib/permissions";
+import { INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
@@ -89,6 +90,12 @@ export const ADMIN_GROUPS = [
     ],
   },
   {
+    // Wunsch des Betreibers (24.09.): „für alles ein Menü, also TikTok eins usw.“ - je Dienst eine
+    // eigene Seite mit Stand, Zugangsdaten, Prüfung und Anleitung.
+    label: "Verbindungen",
+    items: INTEGRATIONS.map((integration) => ({ to: `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
+  },
+  {
     label: "System",
     items: [
       { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, areas: ["system"] },
@@ -119,6 +126,7 @@ export const ADMIN_GROUPS = [
 ];
 
 const ADMIN_SEARCH_TERMS = {
+  ...Object.fromEntries(INTEGRATIONS.map((integration) => [`/admin/integrations/${integration.key}`, [integration.label.toLowerCase(), integration.key, "verbindung", "verknüpfen", "anleitung", "einrichten", "app", "client id", "secret"]])),
   "/admin": ["home", "start", "control"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],

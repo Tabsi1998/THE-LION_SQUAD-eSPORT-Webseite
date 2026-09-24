@@ -90,8 +90,8 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
     // 36 seit "Betrieb" unter System (#233), 37 seit "App-Versionen" (#250), 38 seit "Dolibarr" (#295),
     // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228), 41 seit "Vereinsdaten" (#408),
-    // 43 seit "Einrichtung" (Anleitungen im Admin).
-    expect((await navMetrics(page)).entries).toBe(43);
+    // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste).
+    expect((await navMetrics(page)).entries).toBe(58);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

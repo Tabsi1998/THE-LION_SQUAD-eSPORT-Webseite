@@ -9,8 +9,12 @@ function group(label) {
   return ADMIN_GROUPS.find((entry) => entry.label === label);
 }
 
-test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSports, Content, System", () => {
-  expect(ADMIN_GROUPS.map((entry) => entry.label)).toEqual(["Übersicht", "Verein", "Mitglieder", "Finanzen", "eSports", "Content", "System"]);
+test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSports, Content, Verbindungen, System", () => {
+  expect(ADMIN_GROUPS.map((entry) => entry.label)).toEqual(["Übersicht", "Verein", "Mitglieder", "Finanzen", "eSports", "Content", "Verbindungen", "System"]);
+  // Je Dienst ein Eintrag (Wunsch des Betreibers) - TikTok, Discord, Twitch und die anderen.
+  const labels = group("Verbindungen").items.map((item) => item.label);
+  expect(labels).toEqual(expect.arrayContaining(["Discord", "Twitch", "TikTok", "Steam", "Google-Login", "E-Mail-Versand", "Dolibarr"]));
+  expect(group("Verbindungen").items.every((item) => item.to.startsWith("/admin/integrations/") && item.areas.includes("system"))).toBe(true);
 });
 
 test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Referenzen und Kontakt-Inbox", () => {

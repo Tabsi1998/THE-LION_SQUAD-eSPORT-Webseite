@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { api } from "@/lib/api";
+import { Link } from "react-router-dom";
 import { SETUP_GUIDE_ORDER, guideStatus } from "@/lib/setupGuides";
+import { integrationForGuide } from "@/lib/integrations";
 
 // Einrichtung (Wunsch des Betreibers, 24.09.): alle Anleitungen an einer Stelle - je Dienst der
 // Stand (eingerichtet, fehlt, optional) und die Schritte mit Links und Werten zum Kopieren. Was
@@ -45,7 +47,17 @@ export default function AdminSetupPage() {
         <span className="border border-white/15 text-white/50 rounded-sm px-3 py-1.5 font-bold uppercase tracking-wider">{rows.length - done - missing} optional oder offen</span>
       </div>
       <div className="max-w-4xl space-y-3">
-        {rows.map((row) => <SetupGuide key={row.key} guideKey={row.key} status={row.status} open={row.status.state === "missing"} showWhere />)}
+        {rows.map((row) => {
+          const integration = integrationForGuide(row.key);
+          return (
+            <div key={row.key} className="space-y-1">
+              <SetupGuide guideKey={row.key} status={row.status} open={row.status.state === "missing"} showWhere />
+              {integration && (
+                <Link to={`/admin/integrations/${integration.key}`} data-testid={`setup-page-${row.key}`} className="inline-block text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">Eigene Seite: {integration.label} →</Link>
+              )}
+            </div>
+          );
+        })}
       </div>
     </AdminLayout>
   );
