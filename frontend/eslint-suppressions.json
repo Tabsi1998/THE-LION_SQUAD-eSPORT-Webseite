@@ -52,14 +52,6 @@
       "count": 2
     }
   },
-  "src/pages/admin/AdminGalleryPage.jsx": {
-    "jsx-a11y/click-events-have-key-events": {
-      "count": 2
-    },
-    "jsx-a11y/no-static-element-interactions": {
-      "count": 2
-    }
-  },
   "src/pages/admin/AdminGameServersPage.jsx": {
     "jsx-a11y/label-has-associated-control": {
       "count": 1
@@ -67,9 +59,6 @@
   },
   "src/pages/admin/AdminMediaPage.jsx": {
     "jsx-a11y/click-events-have-key-events": {
-      "count": 1
-    },
-    "jsx-a11y/media-has-caption": {
       "count": 1
     },
     "jsx-a11y/no-static-element-interactions": {
@@ -83,6 +72,19 @@
   },
   "src/pages/admin/AdminSettingsPage.jsx": {
     "jsx-a11y/label-has-associated-control": {
+      "count": 1
+    }
+  },
+  "src/pages/admin/gallery/AlbumPhotos.jsx": {
+    "jsx-a11y/click-events-have-key-events": {
+      "count": 2
+    },
+    "jsx-a11y/no-static-element-interactions": {
+      "count": 2
+    }
+  },
+  "src/pages/admin/media/MediaDetailSheet.jsx": {
+    "jsx-a11y/media-has-caption": {
       "count": 1
     }
   },
