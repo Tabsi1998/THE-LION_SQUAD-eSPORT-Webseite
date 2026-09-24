@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Navigate, useSearchParams } from "react-router-dom";
+import { Navigate, useParams, useSearchParams } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { isGoogleMeasurementId, normalizeAnalyticsPayload } from "@/lib/analyticsConfig";
@@ -12,11 +12,10 @@ import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, BrandSelect, LegalTextArea, SystemCard } from "./settings/fields";
 import { SOCIAL_PLATFORM_OPTIONS, SocialsTab } from "./settings/SocialSettings";
-import { PlatformLinkOverview } from "./settings/PlatformLinkSettings";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { PLATFORM_APP_FIELDS, PLATFORM_SECRET_FIELDS } from "@/lib/platformLinks";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, Server, Inbox, RefreshCw, Trash2, Activity, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
+import { Send, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Trash2, Activity, Eye, Plus } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -51,36 +50,38 @@ const STATUS_LABELS = {
   skipped: "übersprungen",
 };
 
-// Dreizehn gleich aussehende Reiter, von denen fünf den Mailversand betreffen:
-// "Resend", "SMTP", "Newsletter", "Mail-Queue" und "Versandlogs" sagen einzeln
-// nicht, welcher davon gemeint ist, und sie standen verstreut zwischen
-// Branding und Rechtlichem. Die Gruppen stehen jetzt über den Reitern - alles
-// bleibt einen Klick entfernt, aber man sieht, wozu es gehört.
-const SETTINGS_GROUPS = [
-  { label: "Zugang", tabs: [
-    ["auth", "Login & Konten", LogIn],
-  ] },
-  { label: "E-Mail", tabs: [
-    ["email", "Resend", Mail],
-    ["smtp", "SMTP", Server],
-    ["newsletter", "Newsletter", Mail],
-    ["queue", "Mail-Queue", Inbox],
-    ["logs", "Versandlogs", Send],
-  ] },
-  { label: "Auftritt", tabs: [
-    ["brand", "Branding", Palette],
-    ["socials", "Socials", Share2],
-    ["seo", "SEO & Analytics", Search],
-  ] },
-  { label: "System", tabs: [
-    ["system", "Status", Activity],
-  ] },
+// Seit #546 ist jede Einstellung eine eigene Seite in der Menüleiste (Verbindungen, E-Mail, Auftritt,
+// System) - keine zweite Reiterleiste mehr. Die Adresse sagt, welcher Teil gezeigt wird; Google und Zugang
+// teilen sich die Login-Einstellungen, liegen aber in verschiedenen Gruppen.
+export const SETTINGS_SECTIONS = {
+  google: { tab: "auth", group: "Verbindungen", label: "Google", superOnly: true },
+  zugang: { tab: "auth", group: "System", label: "Zugang", superOnly: true },
+  resend: { tab: "email", group: "Verbindungen", label: "Resend" },
+  smtp: { tab: "smtp", group: "Verbindungen", label: "SMTP" },
+  newsletter: { tab: "newsletter", group: "E-Mail", label: "Newsletter" },
+  "mail-queue": { tab: "queue", group: "E-Mail", label: "Mail-Queue" },
+  "mail-logs": { tab: "logs", group: "E-Mail", label: "Versandlogs" },
+  branding: { tab: "brand", group: "Auftritt", label: "Branding" },
+  socials: { tab: "socials", group: "Auftritt", label: "Socials" },
+  seo: { tab: "seo", group: "Auftritt", label: "SEO & Analytics" },
+  status: { tab: "system", group: "System", label: "Status" },
+};
+const GOOGLE_SWITCHES = [
+  ["google_login_enabled", "Google-Login", "Bestehende verknüpfte Nutzer können sich mit Google anmelden."],
+  ["google_registration_enabled", "Registrierung mit Google", "Neue Nutzer dürfen nach ausdrücklicher Zustimmung einen Account über Google erstellen."],
+  ["google_linking_enabled", "Google nachträglich verknüpfen", "Eingeloggte Nutzer können Google mit ihrem bestehenden Konto verbinden."],
 ];
-const SETTINGS_TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs);
-const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
-// Discord und Twitch haben seit 24.09. keine Reiter mehr: alles dazu steht auf ihrer Seite unter
-// Verbindungen („muss das doppelt sein?“). Alte Links und Lesezeichen landen dort.
-const LEGACY_TAB_REDIRECTS = { legal: "/admin/club", discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch" };
+const ACCESS_SWITCHES = [
+  ["password_login_enabled", "E-Mail & Passwort Login", "Klassische Anmeldung mit E-Mail und Passwort."],
+  ["registration_enabled", "Registrierung offen", "Neue Nutzer können selbst einen Community-Account erstellen."],
+];
+// Alte Reiter-Links (?tab=…) und Lesezeichen landen auf der passenden Seite.
+const LEGACY_TAB_REDIRECTS = {
+  legal: "/admin/club", discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch",
+  auth: "/admin/settings/google", email: "/admin/settings/resend", smtp: "/admin/settings/smtp", newsletter: "/admin/settings/newsletter",
+  queue: "/admin/settings/mail-queue", logs: "/admin/settings/mail-logs", brand: "/admin/settings/branding", socials: "/admin/settings/socials",
+  seo: "/admin/settings/seo", system: "/admin/settings/status",
+};
 const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
 const BANNER_TEMPLATE_PRESETS = {
@@ -187,10 +188,6 @@ function brandPayload(source = {}) {
   return payload;
 }
 
-function hasOriginalSnapshot(ref) {
-  return Object.keys(ref.current || {}).length > 0;
-}
-
 function mailTemplateLabel(job) {
   return MAIL_TEMPLATE_LABELS[job?.template_key] || job?.template_key || "Mail";
 }
@@ -198,9 +195,10 @@ function mailTemplateLabel(job) {
 export default function AdminSettingsPage() {
   const { user } = useAuth();
   const isSuperadmin = user?.role === "superadmin";
-  const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = SETTINGS_TAB_KEYS.has(searchParams.get("tab")) ? searchParams.get("tab") : "email";
-  const [tab, setTab] = useState(initialTab);
+  const [searchParams] = useSearchParams();
+  const { section } = useParams();
+  const sectionMeta = SETTINGS_SECTIONS[section] || null;
+  const tab = sectionMeta?.tab || "";
   const [email, setEmail] = useState({ resend_api_key: "", sender_name: "", sender_email: "", reply_to_email: "", enabled: true, resend_api_key_masked: "" });
   const [smtp, setSmtp] = useState({ provider: "resend", smtp_host: "", smtp_port: 587, smtp_user: "", smtp_pass: "", smtp_auth: "login", smtp_security: "auto", smtp_tls_verify: false, smtp_envelope_from: "", smtp_helo_name: "", sender_name: "", sender_email: "", reply_to_email: "", message_id_domain: "", enabled: true, smtp_pass_masked: "" });
   const [smtpTestEmail, setSmtpTestEmail] = useState("");
@@ -269,25 +267,6 @@ export default function AdminSettingsPage() {
   const loadSeqRef = useRef(0);
   const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
-
-  useEffect(() => {
-    const nextTab = searchParams.get("tab");
-    if (nextTab === "auth" && !isSuperadmin) {
-      setTab("email");
-      return;
-    }
-    if (SETTINGS_TAB_KEYS.has(nextTab) && nextTab !== tab) setTab(nextTab);
-  }, [searchParams, tab, isSuperadmin]);
-
-  const selectTab = (nextTab) => {
-    setTab(nextTab);
-    setSearchParams((current) => {
-      const params = new URLSearchParams(current);
-      if (nextTab === "email") params.delete("tab");
-      else params.set("tab", nextTab);
-      return params;
-    }, { replace: true });
-  };
 
   const load = useCallback(async () => {
     const seq = ++loadSeqRef.current;
@@ -733,7 +712,9 @@ export default function AdminSettingsPage() {
     catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
   };
 
-  const emailNotConfigured = !email.resend_api_key_masked;
+  // Läuft der Versand über SMTP, ist ein fehlender Resend-Key kein Problem (#546).
+  const mailViaSmtp = (smtp.provider || (smtp.smtp_host ? "smtp" : "resend")) === "smtp";
+  const emailNotConfigured = !email.resend_api_key_masked && !mailViaSmtp;
   const filteredQueue = queue.filter((j) => !queueFilter || j.status === queueFilter);
   const queueCounts = queueStats?.counts || {};
   const newsletterOptions = newsletter.kind === "event" ? newsletterSources.events : newsletterSources.news;
@@ -744,60 +725,47 @@ export default function AdminSettingsPage() {
     return raw.startsWith("http://") || raw.startsWith("https://") ? raw : `https://${raw}`;
   })();
   const indexNowKeyUrl = `${publicDomain}/indexnow-key.txt`;
-  const emailDirty = hasOriginalSnapshot(originalEmailRef) && hasPayloadChanges(buildDirtyPayload(emailPayload(email), originalEmailRef.current));
-  const smtpDirty = hasOriginalSnapshot(originalSmtpRef) && hasPayloadChanges(buildDirtyPayload(smtpPayload(smtp), originalSmtpRef.current));
-  const brandDirty = hasOriginalSnapshot(originalBrandRef) && hasPayloadChanges(buildDirtyPayload(brandPayload(brand), originalBrandRef.current));
-  const dirtyTabs = new Set([
-    emailDirty && "email",
-    smtpDirty && "smtp",
-    brandDirty && "brand",
-    brandDirty && "socials",
-    brandDirty && "seo",
-  ].filter(Boolean));
 
   const legacyTarget = LEGACY_TAB_REDIRECTS[searchParams.get("tab")];
   if (legacyTarget) return <Navigate to={legacyTarget} replace />;
+  if (!sectionMeta) return <Navigate to="/admin/integrations" replace />;
+  if (sectionMeta.superOnly && !isSuperadmin) return <Navigate to="/admin/integrations" replace />;
+
+  const authSwitches = (rows) => (
+    <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
+      {rows.map(([key, label, hint]) => (
+        <label key={key} className="flex items-start justify-between gap-4 p-5 cursor-pointer group" data-testid={`auth-toggle-${key}`}>
+          <div>
+            <div className="font-heading font-bold uppercase text-sm group-hover:text-[#29B6E8] transition">{label}</div>
+            <p className="text-xs text-white/50 mt-1">{hint}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!authConfig[key]}
+            disabled={savingAuth || (key.startsWith("google_") && !authConfig.google_configured)}
+            onClick={() => toggleAuth(key)}
+            data-testid={`auth-switch-${key}`}
+            className={`relative w-12 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 ${authConfig[key] ? "bg-[#29B6E8]" : "bg-white/15"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${authConfig[key] ? "translate-x-6" : ""}`} />
+          </button>
+        </label>
+      ))}
+    </div>
+  );
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Einstellungen</h1>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]" data-testid="settings-eyebrow">{sectionMeta.group}</span>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6" data-testid="settings-title">{sectionMeta.label}</h1>
 
-      <div className="flex flex-wrap gap-x-7 gap-y-4 mb-6 border-b border-white/10 pb-4" data-testid="settings-tabs">
-        {SETTINGS_GROUPS.map((group) => {
-          const tabs = group.tabs.filter(([key]) => key !== "auth" || isSuperadmin);
-          if (!tabs.length) return null;
-          const groupIsDirty = tabs.some(([key]) => dirtyTabs.has(key));
-          return (
-            <div key={group.label} data-testid={`settings-group-${group.label}`}>
-              <div className="mb-1.5 inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-white/25">
-                {group.label}
-                {groupIsDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700]" title="Ungespeicherte Änderungen in dieser Gruppe" />}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {tabs.map(([k, l, Icn]) => {
-                  const isDirty = dirtyTabs.has(k);
-                  return (
-                    <button key={k} onClick={() => selectTab(k)} data-testid={`settings-tab-${k}`}
-                      className={`px-3 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 whitespace-nowrap rounded-sm border transition ${tab === k ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:border-white/25 hover:text-white"}`}>
-                      <Icn className="w-3.5 h-3.5" />{l}
-                      {isDirty && <span className="w-1.5 h-1.5 rounded-full bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.8)]" title="Ungespeicherte Änderungen" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {tab === "auth" && (
+      {tab === "auth" && section === "google" && (
         <div className="max-w-2xl space-y-4" data-testid="auth-settings">
           <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-sm text-white/70">
-            <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Login & Google</div>
-            <p>Steuere zentral, wie sich Nutzer anmelden und registrieren. Google wird direkt über ein Google-Cloud-Projekt des Vereins angebunden; ein Client Secret ist für die Anmeldung nicht erforderlich.</p>
+            <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Google</div>
+            <p>Anmeldung und Registrierung mit Google über ein Google-Cloud-Projekt des Vereins; ein Client Secret ist für die Anmeldung nicht erforderlich. Die YouTube-Verknüpfung hat ihre eigene Seite unter Verbindungen → YouTube; wer sich überhaupt registrieren darf, steht unter System → Zugang.</p>
           </div>
-          <PlatformLinkOverview brand={brand} />
           <SetupGuide guideKey="google_login" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <div className="flex items-center justify-between gap-4">
@@ -827,42 +795,32 @@ export default function AdminSettingsPage() {
               </button>
             </div>
           </div>
-          <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
-            {[
-              ["password_login_enabled", "E-Mail & Passwort Login", "Klassische Anmeldung mit E-Mail und Passwort."],
-              ["registration_enabled", "Registrierung offen", "Neue Nutzer können selbst einen Community-Account erstellen."],
-              ["google_login_enabled", "Google-Login", "Bestehende verknüpfte Nutzer können sich mit Google anmelden."],
-              ["google_registration_enabled", "Registrierung mit Google", "Neue Nutzer dürfen nach ausdrücklicher Zustimmung einen Account über Google erstellen."],
-              ["google_linking_enabled", "Google nachträglich verknüpfen", "Eingeloggte Nutzer können Google mit ihrem bestehenden Konto verbinden."],
-            ].map(([key, label, hint]) => (
-              <label key={key} className="flex items-start justify-between gap-4 p-5 cursor-pointer group" data-testid={`auth-toggle-${key}`}>
-                <div>
-                  <div className="font-heading font-bold uppercase text-sm group-hover:text-[#29B6E8] transition">{label}</div>
-                  <p className="text-xs text-white/50 mt-1">{hint}</p>
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={!!authConfig[key]}
-                  disabled={savingAuth || (key.startsWith("google_") && !authConfig.google_configured)}
-                  onClick={() => toggleAuth(key)}
-                  data-testid={`auth-switch-${key}`}
-                  className={`relative w-12 h-6 rounded-full shrink-0 transition-colors disabled:opacity-50 ${authConfig[key] ? "bg-[#29B6E8]" : "bg-white/15"}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${authConfig[key] ? "translate-x-6" : ""}`} />
-                </button>
-              </label>
-            ))}
-          </div>
+          {authSwitches(GOOGLE_SWITCHES)}
           <p className="text-xs text-white/40">
             Deaktivierte Optionen werden für Web und App serverseitig blockiert. Hinterlege in Google Cloud dieselbe Produktions- und Staging-Origin, die du hier verwendest.
           </p>
         </div>
       )}
 
+      {tab === "auth" && section === "zugang" && (
+        <div className="max-w-2xl space-y-4" data-testid="access-settings">
+          <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-sm text-white/70">
+            <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Zugang</div>
+            <p>Wer sich auf Website und App anmelden und registrieren darf. Passkeys und die Zwei-Faktor-Anmeldung sind immer möglich; die Anmeldung mit Google hat ihre eigene Seite unter Verbindungen → Google.</p>
+          </div>
+          {authSwitches(ACCESS_SWITCHES)}
+          <p className="text-xs text-white/40">Deaktivierte Optionen werden für Web und App serverseitig blockiert.</p>
+        </div>
+      )}
+
       {tab === "email" && (
         <div className="max-w-2xl space-y-4">
           <SetupGuide guideKey="resend" />
+          {mailViaSmtp && (
+            <div data-testid="email-via-smtp" className="border border-white/10 bg-[#121212] rounded-sm p-4 text-sm text-white/70">
+              Der Versand läuft über <strong>SMTP</strong> (Verbindungen → SMTP). Resend ist damit nicht im Einsatz; ein hier gespeicherter Key stört nicht.
+            </div>
+          )}
           {emailNotConfigured && (
             <div data-testid="email-not-configured" className="flex items-start gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4">
               <AlertTriangle className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />

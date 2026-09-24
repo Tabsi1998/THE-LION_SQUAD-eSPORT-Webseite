@@ -18,11 +18,20 @@ export const INTEGRATIONS = [
   { key: "riot", label: "Riot Games", app: "riot", guides: ["riot"] },
   { key: "xbox", label: "Xbox", app: "xbox", guides: ["xbox"] },
   { key: "epic", label: "Epic Games", app: "epic", guides: ["epic"] },
-  { key: "google", label: "Google-Login", guides: ["google_login"], tab: "/admin/settings?tab=auth", tabLabel: "Client-ID und Login-Schalter" },
-  { key: "mail", label: "E-Mail-Versand", guides: ["resend", "smtp"], tab: "/admin/settings?tab=email", tabLabel: "Resend, SMTP, Testmail" },
-  { key: "analytics", label: "Analytics & Suchmaschinen", guides: ["analytics", "search_console"], tab: "/admin/settings?tab=seo", tabLabel: "Mess-ID, Bestätigungen, IndexNow" },
-  { key: "play", label: "Google Play", guides: ["play_store"], tab: "/admin/settings?tab=brand", tabLabel: "Play-Store-Link" },
-  { key: "dolibarr", label: "Dolibarr", guides: ["dolibarr"], tab: "/admin/dolibarr?tab=connection", tabLabel: "Verbindung, Modus, Schreibzugriff" },
+  // Seit #546 sind Google, Resend und SMTP eigene Seiten unter Verbindungen; Analytics, Google Play und
+  // Dolibarr haben ihre Seite anderswo (Auftritt bzw. Mitglieder) und stehen nur in der Übersicht.
+  { key: "google", label: "Google", guides: ["google_login"], tab: "/admin/settings/google", tabLabel: "Client-ID und Login-Schalter", searchTerms: ["google login", "google-login", "anmeldung mit google", "oauth", "web-client-id"] },
+  { key: "resend", label: "Resend", guides: ["resend"], tab: "/admin/settings/resend", tabLabel: "API-Key, Absender, Testmail", searchTerms: ["e-mail", "mail", "versand", "api key", "absender", "testmail"] },
+  { key: "smtp", label: "SMTP", guides: ["smtp"], tab: "/admin/settings/smtp", tabLabel: "Mailserver, Zugang, Diagnose", searchTerms: ["mailserver", "postausgang", "port", "tls", "e-mail", "diagnose"] },
+  { key: "analytics", label: "Analytics & Suchmaschinen", guides: ["analytics", "search_console"], tab: "/admin/settings/seo", tabLabel: "Mess-ID, Bestätigungen, IndexNow", menu: false },
+  { key: "play", label: "Google Play", guides: ["play_store"], tab: "/admin/settings/branding", tabLabel: "Play-Store-Link", menu: false },
+  { key: "dolibarr", label: "Dolibarr", guides: ["dolibarr"], tab: "/admin/dolibarr?tab=connection", tabLabel: "Verbindung, Modus, Schreibzugriff", menu: false },
+];
+
+// Die Einträge der Menügruppe Verbindungen - in dieser Reihenfolge, nach der Übersicht.
+export const MENU_INTEGRATIONS = [
+  ...INTEGRATIONS.filter((integration) => ["google", "resend", "smtp"].includes(integration.key)),
+  ...INTEGRATIONS.filter((integration) => integration.app),
 ];
 
 export function integrationByKey(key) {

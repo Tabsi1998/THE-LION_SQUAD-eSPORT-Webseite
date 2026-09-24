@@ -61,7 +61,7 @@ export default function AdminAuditPage() {
           { to: "/admin/users", label: "Globale Rollen", text: "Admin-, Staff- und Accountrechte", icon: Users },
           { to: "/admin/tournaments", label: "Turnier-Staff", text: "Leitung, Ergebnis, Stationen", icon: Trophy },
           { to: "/admin/f1", label: "Fast-Lap-Staff", text: "Zeitnehmer und Challenge-Rechte", icon: Flag },
-          { to: "/admin/settings?tab=system", label: "Systemrechte", text: "Integrationen, Mail, Analytics", icon: Settings },
+          { to: "/admin/settings/status", label: "Systemrechte", text: "Integrationen, Mail, Analytics", icon: Settings },
         ].map((item) => (
           <Link key={item.label} to={item.to} className="rounded-sm border border-white/10 bg-[#121212] p-4 hover:border-[#29B6E8]/45">
             <item.icon className="h-4 w-4 text-[#29B6E8]" />

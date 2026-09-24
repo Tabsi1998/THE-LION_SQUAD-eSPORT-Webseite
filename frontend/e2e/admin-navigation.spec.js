@@ -90,8 +90,10 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-tournaments")).toBeVisible();
     // 36 seit "Betrieb" unter System (#233), 37 seit "App-Versionen" (#250), 38 seit "Dolibarr" (#295),
     // 39 seit "Finanzen" (#322), 40 seit "Turnier-Leitfaden" (#228), 41 seit "Vereinsdaten" (#408),
-    // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste).
-    expect((await navMetrics(page)).entries).toBe(58);
+    // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste),
+    // 64 seit die Einstellungen im Menü liegen (#546: Alle Verbindungen, Google, Resend, SMTP,
+    // E-Mail und Auftritt als Gruppen, Status und Zugang unter System - „Einstellungen“ selbst weg).
+    expect((await navMetrics(page)).entries).toBe(64);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

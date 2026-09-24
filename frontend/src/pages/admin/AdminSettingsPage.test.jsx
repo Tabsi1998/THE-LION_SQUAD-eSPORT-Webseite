@@ -55,8 +55,8 @@ function responseFor(url) {
 function renderPage() {
   return render(
     <ConfirmDialogProvider>
-      <MemoryRouter initialEntries={["/admin/settings?tab=email"]}>
-        <AdminSettingsPage />
+      <MemoryRouter initialEntries={["/admin/settings/resend"]}>
+        <Routes><Route path="/admin/settings/:section" element={<AdminSettingsPage />} /></Routes>
       </MemoryRouter>
     </ConfirmDialogProvider>
   );
@@ -159,21 +159,34 @@ test("ein Ausfall einzelner Bereiche legt die Seite nicht lahm", async () => {
 // sagen, wozu ein Reiter gehoert - "Resend" und "Versandlogs" allein tun das
 // nicht.
 
-test("die Reiter stehen in benannten Gruppen", async () => {
+test("jede Einstellung ist eine eigene Seite: Kopfzeile nennt Gruppe und Seite, keine Reiterleiste (#546)", async () => {
   renderPage();
   await waitForLoadedEmailTab();
+  expect(screen.getByTestId("settings-eyebrow")).toHaveTextContent("Verbindungen");
+  expect(screen.getByTestId("settings-title")).toHaveTextContent("Resend");
+  expect(screen.queryByTestId("settings-tabs")).not.toBeInTheDocument();
+});
 
-  const mail = screen.getByTestId("settings-group-E-Mail");
-  for (const key of ["email", "smtp", "newsletter", "queue", "logs"]) {
-    expect(mail).toContainElement(screen.getByTestId(`settings-tab-${key}`));
-  }
+test("Resend warnt nicht, wenn der Versand über SMTP läuft (#546)", async () => {
+  apiMock.get.mockImplementation((url) => Promise.resolve(String(url).startsWith("/settings/smtp") ? { data: { provider: "smtp", smtp_host: "mail.example.test" } } : responseFor(url)));
+  renderPage();
+  await waitForLoadedEmailTab();
+  await waitFor(() => expect(screen.getByTestId("email-via-smtp")).toBeInTheDocument());
+  expect(screen.queryByTestId("email-not-configured")).not.toBeInTheDocument();
+});
 
-  const look = screen.getByTestId("settings-group-Auftritt");
-  expect(look).toContainElement(screen.getByTestId("settings-tab-brand"));
-  expect(look).not.toContainElement(screen.getByTestId("settings-tab-smtp"));
-
-  // Ohne Superadmin-Rechte gibt es die Zugangsgruppe nicht.
-  expect(screen.queryByTestId("settings-group-Zugang")).not.toBeInTheDocument();
+test("Google und Zugang gibt es nur für Superadmins - andere landen auf der Übersicht der Verbindungen", async () => {
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings/google"]}>
+        <Routes>
+          <Route path="/admin/settings/:section" element={<AdminSettingsPage />} />
+          <Route path="/admin/integrations" element={<div data-testid="integrations-overview" />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  expect(await screen.findByTestId("integrations-overview")).toBeInTheDocument();
 });
 
 test("eine unerwartet geformte Antwort legt nicht die ganze Seite lahm", async () => {
@@ -191,7 +204,7 @@ test("eine unerwartet geformte Antwort legt nicht die ganze Seite lahm", async (
   renderPage();
 
   await waitForLoadedEmailTab();
-  expect(screen.getByTestId("settings-tab-queue")).toBeInTheDocument();
+  expect(screen.getByTestId("settings-title")).toHaveTextContent("Resend");
 });
 
 test("Branding: „Aus Logo und Akzentfarbe erzeugen“ ruft den Server, übernimmt den neuen Standard-Favicon und warnt vorher, wenn der Standard nur die dunkle Fassung ist (#229)", async () => {
@@ -204,8 +217,8 @@ test("Branding: „Aus Logo und Akzentfarbe erzeugen“ ruft den Server, überni
   const user = userEvent.setup();
   render(
     <ConfirmDialogProvider>
-      <MemoryRouter initialEntries={["/admin/settings?tab=brand"]}>
-        <AdminSettingsPage />
+      <MemoryRouter initialEntries={["/admin/settings/branding"]}>
+        <Routes><Route path="/admin/settings/:section" element={<AdminSettingsPage />} /></Routes>
       </MemoryRouter>
     </ConfirmDialogProvider>
   );
@@ -223,8 +236,8 @@ test("Social Links: der Stand „Kanäle aus Dolibarr“ steht da, geschaltet wi
   apiMock.get.mockImplementation((url) => Promise.resolve(responseFor(url)));
   render(
     <ConfirmDialogProvider>
-      <MemoryRouter initialEntries={["/admin/settings?tab=socials"]}>
-        <AdminSettingsPage />
+      <MemoryRouter initialEntries={["/admin/settings/socials"]}>
+        <Routes><Route path="/admin/settings/:section" element={<AdminSettingsPage />} /></Routes>
       </MemoryRouter>
     </ConfirmDialogProvider>
   );
@@ -248,4 +261,18 @@ test("der alte Link auf den Reiter Rechtliches landet auf der Seite Vereinsdaten
     </ConfirmDialogProvider>
   );
   expect(await screen.findByTestId("club-data-page")).toBeInTheDocument();
+});
+
+test("alte Reiter-Links landen auf der neuen Seite: ?tab=email → Resend (#546)", async () => {
+  render(
+    <ConfirmDialogProvider>
+      <MemoryRouter initialEntries={["/admin/settings?tab=email"]}>
+        <Routes>
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
+          <Route path="/admin/settings/:section" element={<div data-testid="settings-section" />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmDialogProvider>
+  );
+  expect(await screen.findByTestId("settings-section")).toBeInTheDocument();
 });
