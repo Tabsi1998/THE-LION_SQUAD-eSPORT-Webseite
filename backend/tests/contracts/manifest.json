@@ -23,16 +23,20 @@
       "/vereine/applications/{external_id}/withdraw",
       "/vereine/members/{id}/consents",
       "/vereine/statutes",
-      "/vereine/statutes/{id}/pdf"
+      "/vereine/statutes/{id}/pdf",
+      "/vereine/identities/claim",
+      "/vereine/identities/me",
+      "/vereine/me/documents",
+      "/vereine/me/documents/{id}/pdf",
+      "/vereine/documents",
+      "/vereine/documents/{id}/pdf"
     ],
     "core_paths": [
       "/status"
     ],
     "waiting_for": {
-      "verified_identities": "dolibarr-vereine#153",
       "change_feed": "dolibarr-vereine#154",
-      "signed_webhooks": "dolibarr-vereine#155",
-      "documents": "dolibarr-vereine#157"
+      "signed_webhooks": "dolibarr-vereine#155"
     }
   }
 }

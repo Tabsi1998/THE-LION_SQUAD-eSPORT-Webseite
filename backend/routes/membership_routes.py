@@ -1,5 +1,5 @@
 """Membership routes — admin can mark users as official club members."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
@@ -21,6 +21,8 @@ from services.dolibarr_client import DolibarrClient, DolibarrError, load_setting
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS
 from services.dolibarr_sync import try_auto_link
+from services import dolibarr_identity
+from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
 
@@ -549,6 +551,26 @@ async def decide_my_consent(body: ConsentDecisionBody, user: dict = Depends(get_
 
 
 # ---------- Self ----------
+class IdentityClaimBody(BaseModel):
+    code: str
+
+
+@router.get("/me/identity")
+async def my_identity(user: dict = Depends(get_current_user)):
+    """Vereinsakte verbinden (#324 Teil 1): ist das Konto an das Vereinsmodul gebunden, und was darf es dort?"""
+    return await dolibarr_identity.state(get_db(), user)
+
+
+@router.post("/me/identity")
+async def claim_identity(body: IdentityClaimBody, request: Request, user: dict = Depends(get_current_user)):
+    """Einen Einladungscode vom Vorstand einlösen. Der Code ist der Nachweis; das Modul entscheidet."""
+    await enforce_rate_limit(request, "dolibarr:identity:claim", limit=10, window_seconds=900, subject=user["id"])
+    try:
+        return await dolibarr_identity.claim(get_db(), user, body.code)
+    except dolibarr_identity.ClaimError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
 @router.get("/me")
 async def my_membership(user: dict = Depends(get_current_user)):
     """Return logged-in user's membership record (or None)."""

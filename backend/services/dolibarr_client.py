@@ -75,10 +75,10 @@ CAPABILITIES_V1 = {
     "organization": True,
     "membership_fees": True,
     "webhook_member_changed": True,
-    "verified_identities": False,   # dolibarr-vereine#153
+    "verified_identities": True,    # dolibarr-vereine#153 - seit Vereine 0.11: identities/claim, me/*
     "change_feed": False,           # dolibarr-vereine#154
     "signed_webhooks": False,       # dolibarr-vereine#155
-    "documents": False,             # dolibarr-vereine#157
+    "documents": True,              # dolibarr-vereine#157 - seit Vereine 0.11: me/documents, documents
 }
 
 # Nur für Tests: ein httpx-Transport statt des Netzes.
@@ -503,6 +503,52 @@ class DolibarrClient:
     async def statute_pdf(self, version_id: int) -> dict:
         """Das PDF einer freigegebenen Fassung, base64 mit Prüfsumme - unbekannte Fassungen antworten 404."""
         data = await self._get(f"/vereine/statutes/{int(version_id)}/pdf")
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    # ------------------------------------------------ Persönlicher Zugriff (#324): Bindung je Person, Dokumente
+    async def claim_identity(self, subject: str, code: str) -> dict:
+        """Einladungscode einlösen - bindet die Kennung der Website (die Konto-ID) an das Mitglied. Ohne
+        Wiederholung: ein Code gilt genau einmal, ein zweiter Versuch hieße „schon eingelöst“."""
+        data = await self._request("POST", "/vereine/identities/claim", params={"subject": subject, "code": code}, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "subject" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def identity(self, subject: str) -> dict:
+        """Die Bindung der Person: Mitglied oder Antrag, Fähigkeiten, Nachweis."""
+        data = await self._get("/vereine/identities/me", {"subject": subject})
+        if not isinstance(data, dict) or "subject" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def my_documents(self, subject: str) -> list[dict]:
+        """Was der Verein für diese Person veröffentlicht hat - das Modul prüft die Bindung selbst."""
+        data = await self._get("/vereine/me/documents", {"subject": subject})
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def my_document_pdf(self, subject: str, document_id: int, revision: int | None = None) -> dict:
+        params: dict = {"subject": subject}
+        if revision:
+            params["revision"] = int(revision)
+        data = await self._get(f"/vereine/me/documents/{int(document_id)}/pdf", params)
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def public_documents(self) -> list[dict]:
+        """Was der Verein für die Öffentlichkeit veröffentlicht hat - ohne Bindung."""
+        data = await self._get("/vereine/documents")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def public_document_pdf(self, document_id: int, revision: int | None = None) -> dict:
+        params: dict = {"revision": int(revision)} if revision else {}
+        data = await self._get(f"/vereine/documents/{int(document_id)}/pdf", params or None)
         if not isinstance(data, dict) or "content" not in data:
             raise DolibarrError("invalid_response", 200)
         return data

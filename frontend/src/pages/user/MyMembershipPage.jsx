@@ -102,6 +102,8 @@ export default function MyMembershipPage() {
         )}
         {/* Meine Einwilligungen (#329, Teil 1): der Stand aus der Mitgliederverwaltung, nur mit bestätigter Zuordnung */}
         {erp?.led_by_dolibarr && <ConsentsCard />}
+        {/* Vereinsakte verbinden (#324 Teil 1): Einladungscode vom Vorstand, danach eigene Unterlagen aus der Akte */}
+        {erp?.connected && <IdentityCard />}
         {erp?.connected && !erp.led_by_dolibarr && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
             <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
@@ -148,6 +150,60 @@ export default function MyMembershipPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+// Vereinsakte verbinden (#324 Teil 1): Der Vorstand erzeugt in Dolibarr einen Einladungscode (gilt eine
+// Stunde, genau einmal); eingelöst ist das Konto an das Mitglied gebunden, und die Vereinsdokumente
+// zeigen auch die persönlichen Unterlagen. Ein Widerruf im Modul wirkt beim nächsten Abruf.
+function IdentityCard() {
+  const [state, setState] = useState(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    api.get("/membership/me/identity").then(({ data }) => setState(data && data.available === true ? data : null)).catch(() => setState(null));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!code.trim() || busy) return;
+    setBusy(true);
+    try {
+      const { data } = await api.post("/membership/me/identity", { code: code.trim() });
+      setState(data);
+      setCode("");
+      toast.success("Verbunden – deine Unterlagen aus der Vereinsakte stehen jetzt unter Vereinsdokumente.");
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!state) return null;
+  const bound = state.status === "bound";
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-identity-card">
+      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Vereinsakte</h2>
+      {bound ? (
+        <div className="mt-2 text-sm text-white/70" data-testid="membership-identity-bound">
+          Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden
+          {state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.{" "}
+          <Link to="/members/documents" className="text-[#FFD700] hover:underline" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
+        </div>
+      ) : (
+        <>
+          <p className="mt-2 text-sm text-white/70" data-testid="membership-identity-hint">
+            {state.status === "revoked"
+              ? "Der Verein hat die Verbindung widerrufen. Mit einem neuen Code vom Vorstand verbindest du dein Konto wieder."
+              : "Mit einem Einladungscode vom Vorstand siehst du unter Vereinsdokumente auch deine persönlichen Unterlagen aus der Vereinsakte (Bestätigungen, Protokolle, Beschlüsse). Der Code gilt eine Stunde und genau einmal."}
+          </p>
+          <form onSubmit={submit} className="mt-3 flex flex-col sm:flex-row gap-2" data-testid="membership-identity-form">
+            <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={120} placeholder="Einladungscode" autoComplete="off" data-testid="membership-identity-code" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
+          </form>
+        </>
+      )}
+    </div>
   );
 }
 

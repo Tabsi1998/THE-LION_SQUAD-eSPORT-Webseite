@@ -250,6 +250,28 @@ nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website
 oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
 steht, was Sache ist.
 
+## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
+
+Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer
+gerade angemeldet ist. Für **persönliche Unterlagen** (Beitrittsbestätigung, Schreiben, Beschlüsse,
+Protokolle für Mitglieder) verlangt das Vereinsmodul deshalb eine Verbindung je Person:
+
+1. Im Vereinsmodul dem technischen Benutzer der Website das Recht **„Für Personen handeln“**
+   geben (Benutzer → Rechte → Vereine).
+2. Für ein Mitglied unter *Einrichtung > Externe Identitäten* eine **Einladung** für die
+   Website erzeugen, Fähigkeit „Dokumente“ anhaken. Der Code wird einmal angezeigt, gilt eine
+   Stunde und genau einmal – ihn dem Mitglied persönlich geben (nicht in einen offenen Kanal).
+3. Das Mitglied löst den Code auf der Website unter *Meine Mitgliedschaft → Vereinsakte* ein.
+   Ab dann stehen seine Unterlagen unter *Vereinsdokumente* (Web und App) mit dem Hinweis
+   „Vereinsakte“ bzw. „nur für dich“; das PDF holt die Website je Abruf aus Dolibarr, das dabei
+   selbst prüft, ob die Person es sehen darf, und prüft die Datei gegen die Prüfsumme.
+
+Ohne Verbindung sehen Mitglieder nur, was der Verein unter *Mitglieder > Verein > Vereinsakte* für
+die **Öffentlichkeit** veröffentlicht hat. Widerruft ihr eine Verbindung im Modul, wirkt das beim
+nächsten Abruf: die Website merkt sich „widerrufen“, das Mitglied sieht wieder nur Öffentliches und
+kann mit einem neuen Code neu verbinden. E-Mail-Adresse, Mitgliedsnummer oder die bestätigte
+Zuordnung der Website ersetzen den Code nie – so will es das Modul, und so bleibt es.
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
@@ -257,11 +279,13 @@ das Modul ausliefert (festgehalten in `backend/tests/contracts/manifest.json`):
 
 | Vorhanden (Vereine ab 0.5, API-Version 1) | Noch offen im Modul |
 | --- | --- |
-| Zusammenfassung je Mitglied mit Beitragsstand und Funktionen | verifizierte Identitäten (dolibarr-vereine#153) |
-| Suche über E-Mail oder Nummer | Änderungsfeed mit Revisionen und Löschhinweisen (#154) |
-| nur geänderte Mitglieder (`changed_since`) | signierte Webhooks (#155) |
-| Benachrichtigung bei Änderung (ohne Personendaten) | Dokumente (#156/#157) |
-| Rechnungen mit PDF (kommt mit „Dolibarr II“) | |
+| Zusammenfassung je Mitglied mit Beitragsstand und Funktionen | Änderungsfeed mit Revisionen und Löschhinweisen (#154) |
+| Suche über E-Mail oder Nummer | signierte Webhooks (#155) |
+| nur geänderte Mitglieder (`changed_since`) | |
+| Benachrichtigung bei Änderung (ohne Personendaten) | |
+| Rechnungen mit PDF (Dolibarr II) | |
+| Vereinsdaten, Vorstand, Statuten (Rechtliches II, ab Vereine 0.11) | |
+| persönlicher Zugriff und Dokumente aus der Vereinsakte (ab Vereine 0.11) | |
 
 Bis #154 da ist, bemerkt die Website ein **gelöschtes** Mitglied erst beim
 täglichen vollständigen Lauf – und liest vor dem Austragen jedes fehlende
