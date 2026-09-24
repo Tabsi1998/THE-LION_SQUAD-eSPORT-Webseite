@@ -286,6 +286,14 @@ pflegt ihr weiter auf der Website. Die Einwilligung dafür wählt ihr im Modul u
 Einwilligungen*; die Website nimmt dieselbe für das Verzeichnis, wenn hier keine eigene gewählt ist.
 Ein Modul ohne diese Funktion ändert nichts – dann gilt nur, was auf der Website steht.
 
+**Keine Doppelten, kein Konto nötig:** Der Abgleich sucht zuerst nach der Mitgliedsnummer am Profil,
+dann nach dem zugeordneten Konto, dann nach Gamertag oder Klarname – eine Karte, die der Vorstand
+schon von Hand angelegt hat, wird also weitergeführt (Einwilligung und Nummer kommen dazu, Foto und
+Kurztext bleiben), nie verdoppelt. Hat ein früherer Lauf doch eine zweite Karte angelegt, geht sie
+beim nächsten Abgleich in der gepflegten auf. Ein Website-Konto braucht es nicht: Wer in Dolibarr
+zugestimmt hat, bekommt seine Karte aus der Vereinsakte allein („Mitglied Nr. … · ohne Konto“ im
+Admin); das Konto verknüpft der Vorstand später.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer

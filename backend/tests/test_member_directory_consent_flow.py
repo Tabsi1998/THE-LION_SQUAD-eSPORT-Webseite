@@ -209,3 +209,109 @@ async def test_profile_fields_and_photo_come_from_dolibarr_when_the_club_keeps_t
     flow.act_as(admin)
     row = next(r for r in (await flow.get("/api/membership/profiles/admin/all")).json() if r["user_id"] == paula["id"])
     assert row["dolibarr_profile_at"], "der Admin sieht, dass das Profil aus Dolibarr kam"
+
+
+async def manual_profile(flow, **fields):
+    """Ein vom Vorstand angelegtes Profil - so wie die Karten, die vor dem Abgleich schon da waren."""
+    doc = {"id": f"p-{fields.get('slug', 'x')}", "display_name": "KillerKetchup_2000", "gamertag": "KillerKetchup_2000", "real_name": "Paula Beispiel",
+           "slug": "killerketchup_2000", "photo_url": "/api/static/uploads/paula.png", "bio": "Farmt seit 2019.", "games": ["LS22"], "platforms": ["PC"],
+           "user_id": None, "order_index": 0, "is_active": True, "source": "editorial", "created_at": "2026-01-01T00:00:00+00:00", "created_by": "admin",
+           "updated_at": "2026-01-01T00:00:00+00:00", "updated_by": "admin"}
+    doc.update(fields)
+    await flow.db.club_member_profiles.insert_one(doc)
+    return doc
+
+
+@pytest.mark.asyncio
+async def test_sync_matches_the_manual_profile_by_name_instead_of_creating_a_second(flow, fake):
+    """#504: Paula steht schon von Hand im Verzeichnis (anderer Gamertag, kein Konto). Der Abgleich findet sie
+    über den Klarnamen, hängt Mitgliedsnummer, Konto und Einwilligung an und legt keine zweite Karte an."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"directory_consent_code": "verzeichnis"}})
+    fake.consent_texts.append({"code": "verzeichnis", "label": "Nennung", "version": 1, "text": "…"})
+    manual = await manual_profile(flow, slug="killerketchup_2000")
+    paula = await linked_member(flow, fake, "paula", 12)
+    fake.member_consents[12] = {"verzeichnis": {"state": "given", "version": 1, "moment": "2026-09-25T09:00:00+00:00"}}
+
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1
+    rows = await flow.db.club_member_profiles.find({}, {"_id": 0}).to_list(10)
+    assert [r["id"] for r in rows] == [manual["id"]], "keine zweite Karte"
+    row = rows[0]
+    assert row["dolibarr_member_id"] == 12 and row["user_id"] == paula["id"] and row["consent"]["state"] == "given"
+    assert row["photo_url"] == "/api/static/uploads/paula.png" and row["gamertag"] == "KillerKetchup_2000" and row["bio"] == "Farmt seit 2019."
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 0, "zweiter Lauf: über die Mitgliedsnummer gefunden"
+    flow.act_as(None)
+    listing = (await flow.get("/api/membership/profiles")).json()
+    assert [p["gamertag"] for p in listing] == ["KillerKetchup_2000"]
+    flow.act_as(await flow.add_user(role="club_admin", name="vorstand"))
+    admin_rows = (await flow.get("/api/membership/profiles/admin/all")).json()
+    assert admin_rows[0]["dolibarr_member_id"] == 12
+
+
+@pytest.mark.asyncio
+async def test_an_automatic_duplicate_is_merged_into_the_manual_profile(flow, fake):
+    """#504: Vor dem Fix hat der Abgleich eine zweite Karte angelegt. Beim nächsten Lauf geht sie in der
+    gepflegten Karte auf: Einwilligung und Nummer ziehen um, Foto/Bio bleiben, das Doppel verschwindet,
+    Verweise (Vorstand, Referenzen) hängen um."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"directory_consent_code": "verzeichnis"}})
+    fake.consent_texts.append({"code": "verzeichnis", "label": "Nennung", "version": 1, "text": "…"})
+    manual = await manual_profile(flow, slug="killerketchup_2000")
+    paula = await linked_member(flow, fake, "paula", 12)
+    fake.member_consents[12] = {"verzeichnis": {"state": "given", "version": 1, "moment": "2026-09-25T09:00:00+00:00"}}
+    auto = await manual_profile(flow, id="p-auto", slug="paula", display_name="Paula Beispiel", gamertag="paula", photo_url=None, bio="", games=[],
+                                user_id=paula["id"], source="dolibarr", created_by="dolibarr", updated_by="dolibarr",
+                                consent={"code": "verzeichnis", "state": "given", "version": 1, "moment": "2026-09-18T09:00:00+00:00"}, dolibarr_name="Paula Beispiel")
+    await flow.db.board_positions.insert_one({"id": "pos-1", "user_id": auto["id"], "title": "Kassier", "is_active": True, "order_index": 1})
+    await flow.db.references.insert_one({"id": "ref-1", "title": "Cup", "member_profile_ids": [auto["id"]], "is_active": True})
+
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1
+    rows = await flow.db.club_member_profiles.find({}, {"_id": 0}).to_list(10)
+    assert [r["id"] for r in rows] == [manual["id"]], "das Doppel ist weg"
+    row = rows[0]
+    assert row["dolibarr_member_id"] == 12 and row["user_id"] == paula["id"] and row["consent"]["state"] == "given"
+    assert row["photo_url"] == "/api/static/uploads/paula.png" and row["bio"] == "Farmt seit 2019." and row["games"] == ["LS22"]
+    assert (await flow.db.board_positions.find_one({"id": "pos-1"}))["user_id"] == manual["id"]
+    assert (await flow.db.references.find_one({"id": "ref-1"}))["member_profile_ids"] == [manual["id"]]
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 0
+
+
+@pytest.mark.asyncio
+async def test_a_member_without_website_account_gets_a_profile(flow, fake):
+    """#505: Die Einwilligung allein zählt - auch ohne zugeordnetes Konto entsteht die Karte aus der
+    Vereinsakte (Name, Gamertag vom Website-Profil des Moduls); öffentlich sichtbar, ohne Konto-Link. Der
+    Webhook-Weg (Nachlesen eines Mitglieds) macht dasselbe."""
+    await connect(flow)
+    await flow.db.settings.update_one({"id": "dolibarr"}, {"$set": {"directory_consent_code": "verzeichnis"}})
+    fake.consent_texts.append({"code": "verzeichnis", "label": "Nennung", "version": 1, "text": "…"})
+    fake.add(member(13, firstname="Max", lastname="Muster"))
+    fake.member_consents[13] = {"verzeichnis": {"state": "given", "version": 1, "moment": "2026-09-25T09:00:00+00:00"}}
+    fake.member_profiles[13] = {"gamertag": "MaxPower", "bio": "Fährt F1.", "games": ["F1 25"], "platforms": ["PC"]}
+    fake.website_profile_consent = "verzeichnis"
+
+    result = await dolibarr_sync.run_sync(flow.db, full=True)
+    assert result["directory"] == 1 and result["unlinked"] == 1
+    row = await flow.db.club_member_profiles.find_one({"dolibarr_member_id": 13}, {"_id": 0})
+    assert row["user_id"] is None and row["display_name"] == "Max Muster" and row["gamertag"] == "MaxPower" and row["bio"] == "Fährt F1." and row["slug"] == "maxpower"
+    flow.act_as(None)
+    listing = (await flow.get("/api/membership/profiles")).json()
+    assert [(p["gamertag"], p.get("linked_account")) for p in listing] == [("MaxPower", None)]
+    assert (await flow.get("/api/membership/profiles/maxpower")).status_code == 200
+
+    # Webhook-Weg: ein weiteres Mitglied ohne Konto kommt über das Nachlesen.
+    fake.add(member(14, firstname="Mia", lastname="Muster"))
+    fake.member_consents[14] = {"verzeichnis": {"state": "given", "version": 1, "moment": "2026-09-25T09:00:00+00:00"}}
+    settings = await dolibarr_client.load_settings(flow.db)
+    monkeypatch_delay = dolibarr_sync.PENDING_DELAY_SECONDS
+    dolibarr_sync.PENDING_DELAY_SECONDS = 0
+    try:
+        await dolibarr_sync.queue_member(flow.db, settings, 14)
+        assert (await dolibarr_sync.process_pending(flow.db))["processed"] == 1
+    finally:
+        dolibarr_sync.PENDING_DELAY_SECONDS = monkeypatch_delay
+    assert (await flow.db.club_member_profiles.find_one({"dolibarr_member_id": 14}, {"_id": 0}))["display_name"] == "Mia Muster"
+
+    # Widerruf nimmt die Karte ohne Konto genauso offline.
+    fake.member_consents[13]["verzeichnis"]["state"] = "withdrawn"
+    assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1
+    assert (await flow.db.club_member_profiles.find_one({"dolibarr_member_id": 13}, {"_id": 0}))["is_active"] is False
