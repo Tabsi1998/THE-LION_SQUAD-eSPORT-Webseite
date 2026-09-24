@@ -216,6 +216,32 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- News-Detail am PC breit (PR #472; nur Web; `update.sh`). `NewsDetailPage`
+  neu: Raster `lg:grid-cols-[minmax(0,1fr)_20rem]`/`xl:…_24rem]` – Artikel
+  (`news-article`) in Lesebreite mit großem Bild links, Seitenleiste rechts
+  (`news-sidebar`: `news-meta` mit Autor, Datum, Kategorie und Lesezeit
+  `readingMinutes`; Teilen `news-share-copy|whatsapp`; Verknüpftes
+  `news-linked`; erwähnte Personen `news-mentions`; weitere News `news-more`
+  / `news-more-<slug>` aus `/news?limit=6` ohne den eigenen Beitrag).
+  `stripLeadingTitle(text, title)` nimmt eine erste Überschrift (`#` oder
+  `<h1>`), die den Titel wiederholt, aus dem Text. Test
+  `NewsDetailPage.test.jsx` (2).
+- Menügruppe „Verbindungen“: je Dienst eine eigene Seite (PR #470; nur Web;
+  `update.sh`). `lib/integrations.js`: `INTEGRATIONS` (key, label, app =
+  Schlüssel aus `PLATFORM_APPS`, guides, tab, tabLabel; 15 Dienste),
+  `integrationByKey`, `integrationApp`, `integrationForGuide`,
+  `integrationStatus` (schlechtester Stand der Anleitungen).
+  `AdminIntegrationPage` (`/admin/integrations/:key`, Bereich system;
+  `integration-title` mit `StatusChip`, `integration-app` mit
+  `PlatformAppCard` inkl. eigenem Speichern `platform-app-save-<key>`
+  (nur die eigenen Felder, Secret nur wenn gesetzt) und `clear_<secret>`,
+  `integration-guides` offen, `integration-tab-link`, `integration-prev|next`,
+  `integration-missing`). `PlatformLinkSettings` exportiert `PlatformAppCard`
+  (eigener Prüf-Zustand, optional `onSave`, `showGuide`) und `appReady`.
+  `AdminLayout`: Gruppe „Verbindungen“ zwischen Content und System aus
+  `INTEGRATIONS`, Suchbegriffe je Verbindung; Nav-Zähler 58. `AdminSetupPage`
+  verlinkt je Anleitung „Eigene Seite“ (`setup-page-<guide>`). Tests
+  `AdminIntegrationPage.test.jsx` (3), `AdminLayout.test.jsx` (Gruppe).
 - Vorstand aus Dolibarr (#326 Teil 2; PR #468; Backend + Web; `update.sh`).
   Ein Schalter genügt: `legal_from_dolibarr`. `club_facts.board_positions(db,
   branding)` → None (Schalter aus oder kein Vorstand geliefert) oder Posten in
@@ -1914,12 +1940,11 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`). `main` steht auf `b41a725`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web). `main` steht auf `5e0dcb6`.
 
 ### Offene PRs
-- #470 (Menügruppe „Verbindungen“: je Dienst eine eigene Seite; nur Web;
-  bereit, lokal grün). App-Gegenstück zu den verknüpften Konten: #459
-  (App 1.0.0). **Regel seit 23.09. abends:**
+- Derzeit keiner; die Profilseite (Umbau, nur Web) ist in Arbeit. App-Gegenstück
+  zu den verknüpften Konten: #459 (App 1.0.0). **Regel seit 23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -2005,15 +2030,16 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
-- Nach #463, #465–#468 (24.09.): `update.sh` – der Server lief bis dahin ohne
+- Nach #463, #465–#468, #470, #472 (24.09.): `update.sh` – der Server lief bis dahin ohne
   #463–#466 (kein `update.sh` seit dem Vorabend; die Anleitungen fehlten
   deshalb live). Danach: System → Einrichtung durchgehen (fehlende stehen
   offen), je Dienst die eigene Seite unter Verbindungen; Login & Konten →
   „prüfen“ bei Discord; Moderation → Stufen prüfen; Vorstand: in Dolibarr
   die Zustimmung zur Nennung je Person setzen, Fotos über den eigenen
   Verzeichnis-Eintrag; App-Build (Moderationskarte, verknüpfte Konten #459).
-  Offene Entscheidungen: Profilseite überarbeiten (Vorschlag im Chat 24.09.),
-  Partner II (#469).
+  Reihenfolge am 24.09. vom Betreiber freigegeben („was Sinn macht“):
+  Profilseite überarbeiten (in Arbeit), dann Partner II (#469), dann #415
+  Bildprüfung.
 - Nach #461, #462 (24.09.): `update.sh`. Discord-App (Client ID + Secret aus
   dem Developer Portal, App des Bots, Reiter OAuth2; Rückrufadresse unter
   Redirects) und Twitch-Rückrufadresse in der Developer Console eintragen
