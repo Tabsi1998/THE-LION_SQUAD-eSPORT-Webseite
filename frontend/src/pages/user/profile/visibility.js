@@ -74,6 +74,8 @@ export const VISIBILITY_GROUPS = [
       { k: "snapchat", l: "Snapchat" },
       { k: "pinterest", l: "Pinterest" },
       { k: "telegram", l: "Telegram" },
+      { k: "mastodon", l: "Mastodon" },
+      { k: "bluesky", l: "Bluesky" },
     ],
   },
   {

@@ -62,6 +62,8 @@ export function profileToForm(user) {
     telegram_handle: user.telegram_handle || "",
     wargaming_handle: user.wargaming_handle || "",
     bungie_handle: user.bungie_handle || "",
+    mastodon_handle: user.mastodon_handle || "",
+    bluesky_handle: user.bluesky_handle || "",
     website: user.website || "",
     // privacy
     privacy_public_profile: user.privacy_public_profile ?? true,

@@ -8,7 +8,8 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
 
 from auth import get_current_user, require_club_admin
 from database import get_db
@@ -17,6 +18,13 @@ from services import platform_links
 from services.platform_links import PLATFORMS, LinkError
 
 router = APIRouter(prefix="/api", tags=["platform-links"])
+
+
+class LinkStart(BaseModel):
+    """Was die Person vor dem Start eintippt - Mastodon-Instanz, Bluesky-Handle (#547 Welle 3)."""
+    input: str = ""
+
+
 logger = logging.getLogger("tls.platform_links")
 
 
@@ -44,12 +52,12 @@ async def my_platform_links(me: dict = Depends(get_current_user)):
         "available": platform_links.providers_configured(branding),
         # Abgehakt vom Verein (#558): Web und App zeigen diese Plattformen nirgends.
         "disabled": sorted(platform_links.disabled_platforms(branding)),
-        "platforms": {key: {"label": spec["label"], "field": spec["field"], "delivers": spec["delivers"]} for key, spec in PLATFORMS.items()},
+        "platforms": {key: {"label": spec["label"], "field": spec["field"], "delivers": spec["delivers"], "input": spec.get("input")} for key, spec in PLATFORMS.items()},
     }
 
 
 @router.post("/me/platform-links/{platform}/start")
-async def start_platform_link(platform: str, me: dict = Depends(get_current_user)):
+async def start_platform_link(platform: str, body: LinkStart | None = None, me: dict = Depends(get_current_user)):
     """Die Anmeldeadresse der Plattform - der Browser geht dorthin, die Plattform ruft zurück."""
     platform = _platform(platform)
     db = get_db()
@@ -57,14 +65,25 @@ async def start_platform_link(platform: str, me: dict = Depends(get_current_user
     if not platform_links.public_base_url():
         raise HTTPException(503, "Die öffentliche Adresse der Website ist nicht gesetzt (PUBLIC_BACKEND_URL oder FRONTEND_URL).")
     try:
-        url = platform_links.authorize_url(platform, branding, platform_links.make_state(me["id"], platform))
+        url = await platform_links.begin_link(db, platform, branding, platform_links.make_state(me["id"], platform), (body.input if body else "") or "")
     except LinkError as exc:
+        if exc.code == "input":
+            raise HTTPException(400, str(exc))
+        if exc.code in ("platform_error", "exchange_failed"):
+            raise HTTPException(502, f"{PLATFORMS[platform]['label']}: {exc}")
         if exc.code == "disabled":
             raise HTTPException(409, f"{PLATFORMS[platform]['label']} bietet der Verein nicht an – unter Verbindungen → Alle Verbindungen abgeschaltet.")
         if exc.code == "not_configured":
             raise HTTPException(409, f"{PLATFORMS[platform]['label']} ist auf der Website noch nicht eingerichtet (Einstellungen → Twitch/Discord).")
         raise HTTPException(400, str(exc))
     return {"url": url}
+
+
+@router.get("/platform-links/bluesky/client-metadata.json")
+async def bluesky_client_metadata():
+    """Die Client-Metadaten der Website für Bluesky (atproto OAuth) - öffentlich, ohne Geheimnis."""
+    branding = await _branding(get_db())
+    return JSONResponse(platform_links.bluesky_client_metadata(branding), headers={"Cache-Control": "public, max-age=300"})
 
 
 @router.get("/platform-links/{platform}/callback")
@@ -80,7 +99,7 @@ async def platform_link_callback(platform: str, request: Request):
         user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "is_active": 1})
         if not user or user.get("is_active") is False:
             raise LinkError("invalid", "Konto nicht gefunden")
-        identity = await platform_links.fetch_identity(platform, await _branding(db), query, state_payload=state_payload)
+        identity = await platform_links.fetch_identity(platform, await _branding(db), query, state_payload=state_payload, db=db)
         link = await platform_links.link_account(db, user_id, platform, identity)
     except LinkError as exc:
         # Im Log steht, woran es lag (Einrichtung, Plattform, Sitzung) - und die Person liest den Grund im Profil.

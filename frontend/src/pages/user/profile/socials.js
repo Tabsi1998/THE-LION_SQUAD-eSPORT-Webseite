@@ -1,4 +1,4 @@
-import { AtSign, Box, Castle, CircleDot, Crosshair, Facebook, Gamepad, Gamepad2, Ghost, Github, Globe, Instagram, Joystick, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Rocket, Send, Shield, Swords, Trophy, Twitch, Twitter, Youtube, Zap } from "lucide-react";
+import { AtSign, Bird, Box, Castle, CircleDot, Crosshair, Facebook, Gamepad, Gamepad2, Ghost, Github, Globe, Globe2, Instagram, Joystick, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Rocket, Send, Shield, Swords, Trophy, Twitch, Twitter, Youtube, Zap } from "lucide-react";
 
 // Socials und Gaming-IDs (#258): je Feld ein Symbol, eine Bereinigung der
 // Eingabe (eine eingefügte Adresse wird zum Nutzernamen) und, wo es eine
@@ -39,6 +39,9 @@ export const SOCIAL_PLATFORMS = [
   { k: "telegram_handle", l: "Telegram", icon: Send, hosts: ["t.me", "telegram.me"], url: (h) => `https://t.me/${h}`, placeholder: "@nutzername oder Adresse", handle: true },
   { k: "wargaming_handle", l: "Wargaming.net", icon: Shield, placeholder: "Nickname", handle: true },
   { k: "bungie_handle", l: "Bungie.net", icon: Orbit, placeholder: "Name#1234", handle: true },
+  // Welle 3 (#547): Mastodon-Name ist name@instanz, Bluesky-Handle ist ein Domainname.
+  { k: "mastodon_handle", l: "Mastodon", icon: Globe2, url: (h) => (h.includes("@") ? `https://${h.split("@")[1]}/@${h.split("@")[0]}` : ""), placeholder: "name@instanz", handle: true },
+  { k: "bluesky_handle", l: "Bluesky", icon: Bird, hosts: ["bsky.app"], skip: ["profile"], url: (h) => `https://bsky.app/profile/${h}`, placeholder: "name.bsky.social oder Adresse", handle: true },
   { k: "website", l: "Website", icon: Globe, placeholder: "https://…", website: true },
 ];
 

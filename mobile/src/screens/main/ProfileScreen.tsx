@@ -145,7 +145,7 @@ export function ProfileScreen() {
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
   const manualSocialKeys = useMemo(() => {
-    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id", faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle", threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle" };
+    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id", faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle", threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle", mastodon: "mastodon_handle", bluesky: "bluesky_handle" };
     const off = new Set(linkDisabled);
     const manualOf: Record<string, string> = { instagram_handle: "instagram", psn_id: "psn", nintendo_fc: "nintendo", ea_id: "ea" };
     const notReady = LINKABLE_PLATFORMS.filter((platform) => !off.has(platform) && !linkedPlatforms.has(platform) && !linkAvailable[platform]).map((platform) => fieldOf[platform]);
@@ -227,6 +227,8 @@ export function ProfileScreen() {
       telegram_handle: u.telegram_handle || "",
       wargaming_handle: u.wargaming_handle || "",
       bungie_handle: u.bungie_handle || "",
+      mastodon_handle: u.mastodon_handle || "",
+      bluesky_handle: u.bluesky_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
       newsletter_consent: Boolean(u.newsletter_consent),
