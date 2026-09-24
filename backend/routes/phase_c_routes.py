@@ -16,7 +16,7 @@ from database import get_db
 from auth import get_current_user, require_club_admin, require_area
 from models import now_utc, new_id
 from badges import compute_profile_completeness, PROFILE_FIELDS, evaluate_user_progress
-from services import dolibarr_applications
+from services import dolibarr_applications, membership_invitations
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 
 router = APIRouter(prefix="/api", tags=["phase-c"])
@@ -166,7 +166,10 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         raise HTTPException(409, "Du hast bereits eine offene Bewerbung.")
     settings, client = await _application_client(db)
     if client is not None:
-        return await _apply_via_dolibarr(db, client, body, me)
+        result = await _apply_via_dolibarr(db, client, body, me)
+        # Einladung (#507): der Antrag ist gestellt - die offene Einladung ist damit erledigt.
+        await membership_invitations.mark_applied(db, me["id"], (result or {}).get("id"))
+        return result
     if not body.motivation or len(body.motivation) < 20:
         raise HTTPException(422, "Bitte beschreibe deine Motivation mit mindestens 20 Zeichen.")
     doc = {
@@ -182,6 +185,7 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
         "decision_note": None,
     }
     await db.membership_applications.insert_one(doc)
+    await membership_invitations.mark_applied(db, me["id"], doc["id"])  # Einladung (#507) erledigt
     # Vorstands-Kanal (#300): nur der Hinweis, keine Namen - Discord ist ein fremder Dienst.
     from services.discord_announcements import notify_board
     await notify_board("membership.application", "📝 Neuer Mitgliedsantrag",

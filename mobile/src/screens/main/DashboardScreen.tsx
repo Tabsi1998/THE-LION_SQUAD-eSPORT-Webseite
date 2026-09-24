@@ -11,6 +11,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
+import { API_BASE_URL } from "../../config";
 import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
 import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
@@ -39,6 +40,7 @@ const emptyDashboard: MobileDashboardData = {
   season: null,
   stats: { my_tournaments: 0, my_events: 0, open_matches: 0, staff_matches: 0, open_actions: 0, news: 0, public_tournaments: 0, public_events: 0, live_streams: 0 },
 };
+const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 const OPEN_MATCH_STATUSES = new Set(["ready", "scheduled", "in_progress", "waiting_result"]);
 
 function normalizeDashboard(payload?: Partial<MobileDashboardData> | null): MobileDashboardData {
@@ -65,6 +67,8 @@ export function DashboardScreen({ navigation }: Props) {
   const { user, refreshMe } = useAuth();
   const { clubName } = useBranding();
   const [data, setData] = useState<MobileDashboardData>(emptyDashboard);
+  // Einladung zum Verein (#507): der Vorstand hat den Mitgliedsantrag für dieses Konto freigeschaltet.
+  const [invitation, setInvitation] = useState<{ open: boolean; note?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -93,6 +97,7 @@ export function DashboardScreen({ navigation }: Props) {
       setOffline(responseFromCache(response));
       if (!isGuest) {
         await refreshMe().catch(() => {});
+        api.get<{ open: boolean; note?: string }>("/membership/invitation/me").then((r) => setInvitation(r.data?.open ? r.data : null)).catch(() => setInvitation(null));
       }
     } catch (err) {
       setError(errorMessage(err, "Dashboard konnte nicht geladen werden."));
@@ -172,6 +177,15 @@ export function DashboardScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >
+        {invitation?.open ? (
+          <Card style={styles.inviteCard} testID="dashboard-invitation">
+            <Heading>Einladung zum Verein</Heading>
+            <Body>Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.{invitation.note ? ` „${invitation.note}“` : ""}</Body>
+            <Pressable accessibilityRole="button" onPress={() => Linking.openURL(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply">
+              <Body style={styles.inviteButtonText}>Antrag ausfüllen</Body>
+            </Pressable>
+          </Card>
+        ) : null}
         {/* Eine Zeile Begrüßung mit den Pills daneben; der Erklärsatz ist weg (#248). */}
         <Card style={styles.heroCard}>
           <View style={styles.heroTop}>
@@ -498,6 +512,23 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 7,
+  },
+  inviteCard: {
+    borderColor: colors.gold,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  inviteButton: {
+    marginTop: 10,
+    alignSelf: "flex-start",
+    backgroundColor: colors.gold,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  inviteButtonText: {
+    color: "#000",
+    fontWeight: "700",
   },
   heroCard: {
     backgroundColor: colors.card,

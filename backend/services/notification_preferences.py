@@ -99,6 +99,7 @@ TEMPLATE_CATEGORY = {
     "prize_picked_up": "prize_updates",
     "prize_expired": "prize_updates",
     "membership_activated": "membership_updates",
+    "membership_invited": "membership_updates",
     "membership_deactivated": "membership_updates",
     "membership_blocked": "membership_updates",
     "membership_approve": "membership_updates",

@@ -48,6 +48,7 @@ from routes.chat_attachment_routes import router as chat_attachment_router
 from routes.sticker_routes import router as sticker_router
 from routes.badge_routes import router as badge_router, admin_router as achievement_admin_router
 from routes.phase_c_routes import router as phase_c_router
+from routes.membership_invitation_routes import router as membership_invitation_router
 from routes.phase_ef_routes import (
     streams_router, admin_streams_router,
     pages_router, admin_pages_router, admin_emailt_router, admin_discord_router,
@@ -261,6 +262,7 @@ app.include_router(sticker_router)
 app.include_router(badge_router)
 app.include_router(achievement_admin_router)
 app.include_router(phase_c_router)
+app.include_router(membership_invitation_router)
 app.include_router(streams_router)
 app.include_router(admin_streams_router)
 app.include_router(pages_router)
