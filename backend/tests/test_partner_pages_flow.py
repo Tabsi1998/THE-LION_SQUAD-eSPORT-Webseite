@@ -248,3 +248,16 @@ async def test_references_belong_to_the_partner_by_tick_or_organizer(flow):
     assert [p["name"] for p in next(item for item in listed if item["id"] == ticked["id"])["partners"]] == ["PineApps eSports"]
     shared = (await flow.get("/api/partners/pineapps-esports")).json()["shared"]
     assert [(r["title"], r["matched_by"], r["placement"]) for r in shared["references"]] == [("PineApps Open", "organizer", 2), ("TFT Cup", "partner", 2)]
+
+
+@pytest.mark.asyncio
+async def test_sitemap_lists_only_active_partner_pages(flow, fake):
+    admin = await flow.add_user(role="superadmin", name="Admin")
+    flow.act_as(admin)
+    created = (await flow.post("/api/partners", json={"name": "Gamers Heaven"})).json()
+    gone = (await flow.post("/api/partners", json={"name": "Alter Partner"})).json()
+    await flow.db.partners.update_one({"id": gone["id"]}, {"$set": {"is_active": False}})
+    flow.act_as(None)
+    xml = (await flow.get("/api/sitemap.xml")).text
+    assert f"/partners/{created['slug']}</loc>" in xml
+    assert "/partners/alter-partner" not in xml

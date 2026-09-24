@@ -54,6 +54,7 @@ class _SitemapDb:
     teams = _Collection()
     references = _Collection()
     gallery_albums = _Collection()
+    partners = _Collection(rows=[{"slug": "pineapps-esports", "updated_at": "2026-09-24T09:00:00Z"}])
 
 
 def test_sitemap_lists_public_tournament_subpages(monkeypatch):
@@ -68,6 +69,7 @@ def test_sitemap_lists_public_tournament_subpages(monkeypatch):
     assert "<loc>https://example.test/tournaments/summer-cup/matches</loc>" in body
     assert "<loc>https://example.test/tournaments/summer-cup/standings</loc>" in body
     assert "<lastmod>2026-05-20</lastmod>" in body
+    assert "<loc>https://example.test/partners/pineapps-esports</loc>" in body
 
 
 def test_static_sitemap_uses_only_canonical_public_paths(monkeypatch):
