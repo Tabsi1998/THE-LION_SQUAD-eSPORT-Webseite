@@ -55,7 +55,6 @@ export const ADMIN_GROUPS = [
     items: [
       { to: "/admin/finance", label: "Finanzübersicht", icon: Wallet, areas: ["finance"] },
       { to: "/admin/dolibarr", label: "Dolibarr-Anbindung", icon: Link2, areas: ["club", "system"] },
-      { to: "/admin/dolibarr?tab=connection", label: "Dolibarr: Verbindung & Modus", icon: Link2, areas: ["system"], searchOnly: true },
       { to: "/admin/dolibarr?tab=preview", label: "Dolibarr: Umstellung", icon: Link2, areas: ["club"], searchOnly: true },
       { to: "/admin/dolibarr?tab=links", label: "Dolibarr: Zuordnungen", icon: Link2, areas: ["club"], searchOnly: true },
       { to: "/admin/dolibarr?tab=policy", label: "Dolibarr: Funktionen und Bereiche", icon: Link2, areas: ["club", "system"], searchOnly: true },
@@ -93,7 +92,9 @@ export const ADMIN_GROUPS = [
     // Wunsch des Betreibers (24.09.): „für alles ein Menü, also TikTok eins usw.“ - je Dienst eine
     // eigene Seite mit Stand, Zugangsdaten, Prüfung und Anleitung.
     label: "Verbindungen",
-    items: INTEGRATIONS.map((integration) => ({ to: `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
+    // Dienste mit Reiter (E-Mail, Google-Login, Analytics, Google Play, Dolibarr) führen direkt dorthin - eine Stelle je Dienst (#508).
+    // Die Wegweiser der Suche auf diese Reiter (Login & Konten, E-Mail, SEO, Branding, Dolibarr-Verbindung) sind damit die Einträge hier.
+    items: INTEGRATIONS.map((integration) => ({ to: integration.tab || `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
   },
   {
     label: "System",
@@ -109,15 +110,11 @@ export const ADMIN_GROUPS = [
       { to: "/admin/setup", label: "Einrichtung", icon: BookOpen, areas: ["system"] },
       // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
       // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
-      { to: "/admin/settings?tab=auth", label: "Einstellungen: Login & Konten", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=email", label: "Einstellungen: E-Mail (Resend)", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=smtp", label: "Einstellungen: SMTP", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=newsletter", label: "Einstellungen: Newsletter", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=queue", label: "Einstellungen: Mail-Queue", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=logs", label: "Einstellungen: Versandlogs", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=brand", label: "Einstellungen: Branding", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=socials", label: "Einstellungen: Socials", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=seo", label: "Einstellungen: SEO & Analytics", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=system", label: "Einstellungen: Systemstatus", icon: SettingsIcon, areas: ["system"], searchOnly: true },
     ],
   },

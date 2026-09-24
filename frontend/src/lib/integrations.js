@@ -1,7 +1,8 @@
 // Verbindungen (Wunsch des Betreibers, 24.09.: „für alles ein Menü, also TikTok eins usw.“): je Dienst
 // eine eigene Seite unter Admin → Verbindungen mit Stand, Zugangsdaten, Rückrufadresse, „prüfen“ und
-// der Anleitung. Die Registrierung hier sagt, welche App (Client ID + Secret), welche Anleitungen und
-// welcher Reiter mit den laufenden Einstellungen dazugehören.
+// der Anleitung. Die Registrierung hier sagt, welche App (Client ID + Secret) und welche Anleitungen
+// dazugehören. Dienste mit `tab` haben keine eigene Seite: Menü und Adresse führen direkt auf den Reiter
+// mit den Feldern (#508, 25.09.: „alles an einem Punkt, nicht weiter verlinken“).
 import { PLATFORM_APPS } from "@/lib/platformLinks";
 import { guideStatus } from "@/lib/setupGuides";
 
