@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
@@ -11,6 +11,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type DolibarrView } from "../../lib/memberArea";
 import type { InvoiceList } from "../../lib/memberDocuments";
+import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, type IdentityState, type SelfService } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -34,16 +35,28 @@ export function MyMembershipScreen({ navigation }: Props) {
   const [error, setError] = useState("");
   const [memberRef, setMemberRef] = useState("");
   const [linkState, setLinkState] = useState<"idle" | "sending" | "sent">("idle");
+  // Vereinsakte (#324 Teil 1) und eigene Daten/Austritt (#329 Teil 2): dieselben Routen wie im Web.
+  const [identity, setIdentity] = useState<IdentityState | null>(null);
+  const [self, setSelf] = useState<SelfService | null>(null);
+  const [code, setCode] = useState("");
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [wishedDay, setWishedDay] = useState("");
+  const [busy, setBusy] = useState<"" | "claim" | "save" | "exit">("");
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const [my, list] = await Promise.all([
+      const [my, list, ident, selfView] = await Promise.all([
         api.get<MembershipMe>("/membership/me"),
         api.get<InvoiceList>("/account/invoices").catch(() => null),
+        api.get<IdentityState>("/membership/me/identity").catch(() => null),
+        api.get<SelfService>("/membership/me/self-service").catch(() => null),
       ]);
       setMe(my.data || null);
       setInvoices(list?.data || null);
+      setIdentity(ident?.data && ident.data.available === true ? ident.data : null);
+      setSelf(selfView?.data && selfView.data.available === true && selfView.data.profile ? selfView.data : null);
+      setDraft({});
     } catch (err) {
       setError(errorMessage(err, "Die Mitgliedschaft konnte nicht geladen werden."));
     } finally {
@@ -66,6 +79,63 @@ export function MyMembershipScreen({ navigation }: Props) {
       setLinkState("idle");
       setError(errorMessage(err, "Die Anfrage ging nicht raus."));
     }
+  };
+
+  const claimCode = async () => {
+    if (!code.trim() || busy) return;
+    setBusy("claim");
+    try {
+      await api.post("/membership/me/identity", { code: code.trim() });
+      setCode("");
+      Alert.alert("Verbunden", "Deine Unterlagen aus der Vereinsakte stehen jetzt unter Vereinsdokumente.");
+      load();
+    } catch (err) {
+      Alert.alert("Das hat nicht geklappt", errorMessage(err, "Der Code wurde nicht angenommen."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  const profile = self?.profile || null;
+  const changeable = self?.changeable || [];
+  const changed = profile ? changedFields(profile, draft, changeable) : {};
+  const saveChanges = async () => {
+    if (!profile || busy || !Object.keys(changed).length) return;
+    setBusy("save");
+    try {
+      const { data } = await api.post<{ status?: string }>("/membership/me/self-service/changes", { version: profile.version, changes: changed });
+      Alert.alert(data?.status === "applied" ? "Übernommen" : "Eingereicht", data?.status === "applied" ? "Deine Daten sind aktuell." : "Der Vorstand prüft die Änderung.");
+      load();
+    } catch (err) {
+      Alert.alert("Das hat nicht geklappt", errorMessage(err, "Die Änderung wurde nicht angenommen."));
+    } finally {
+      setBusy("");
+    }
+  };
+  const sendExit = async () => {
+    setBusy("exit");
+    try {
+      const { data } = await api.post<{ last_day?: string; wished_too_early?: boolean }>("/membership/me/self-service/exit", wishedDay ? { wished_last_day: wishedDay } : {});
+      Alert.alert("Austritt eingegangen", `Letzter Tag der Mitgliedschaft: ${formatDate(data?.last_day)}${data?.wished_too_early ? " – dein Wunschdatum lag vor der Kündigungsfrist." : "."}`);
+      setWishedDay("");
+      load();
+    } catch (err) {
+      Alert.alert("Das hat nicht geklappt", errorMessage(err, "Die Erklärung wurde nicht angenommen."));
+    } finally {
+      setBusy("");
+    }
+  };
+  const askExit = () => {
+    if (busy) return;
+    if (!validWishedDay(wishedDay.trim())) {
+      Alert.alert("Wunschdatum", "Bitte als JJJJ-MM-TT eintragen, z. B. 2026-12-31.");
+      return;
+    }
+    Alert.alert(
+      "Austritt aus dem Verein erklären?",
+      `Die Erklärung geht heute bei der Vereinsverwaltung ein. Wann die Mitgliedschaft endet, ergibt die Kündigungsregel des Vereins${wishedDay ? ` – dein Wunschdatum gilt nur, wenn es nicht davor liegt` : ""}. Das lässt sich in der App nicht zurücknehmen.`,
+      [{ text: "Abbrechen", style: "cancel" }, { text: "Austritt erklären", style: "destructive", onPress: () => { sendExit(); } }],
+    );
   };
 
   const membership = me?.membership || null;
@@ -144,6 +214,91 @@ export function MyMembershipScreen({ navigation }: Props) {
           <Card style={[styles.card, styles.warn]}>
             <Heading>Bitte melde dich beim Verein</Heading>
             <Muted>Zu deinem Konto passen mehrere Einträge in der Mitgliederverwaltung. Die Vereinsverwaltung klärt das.</Muted>
+          </Card>
+        ) : null}
+
+        {identity ? (
+          <Card style={[styles.card, identity.status === "bound" ? styles.ok : styles.info]} testID="membership-identity">
+            <Heading>Vereinsakte</Heading>
+            {identity.status === "bound" ? (
+              <Muted testID="membership-identity-bound">
+                Verbunden seit {formatDate(identity.linked_at)}{identity.capability_labels?.length ? ` (${identity.capability_labels.join(", ")})` : ""}. Deine Unterlagen stehen unter Vereinsdokumente.
+              </Muted>
+            ) : (
+              <>
+                <Muted>
+                  {identity.status === "revoked"
+                    ? "Der Verein hat die Verbindung widerrufen. Mit einem neuen Code vom Vorstand verbindest du dein Konto wieder."
+                    : "Mit einem Einladungscode vom Vorstand siehst du deine persönlichen Unterlagen aus der Vereinsakte. Der Code gilt eine Stunde und genau einmal."}
+                </Muted>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Einladungscode"
+                  placeholderTextColor={colors.muted}
+                  value={code}
+                  onChangeText={setCode}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  testID="membership-identity-code"
+                />
+                <Button label={busy === "claim" ? "Prüfe …" : "Verbinden"} onPress={claimCode} disabled={busy !== "" || !code.trim()} testID="membership-identity-claim" />
+              </>
+            )}
+          </Card>
+        ) : null}
+
+        {self && profile ? (
+          <Card style={styles.card} testID="membership-self">
+            <Heading>Meine Daten</Heading>
+            <Muted testID="membership-self-identity">
+              {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
+            </Muted>
+            <Muted style={styles.hint}>
+              Name und Geburtsdatum ändert nur der Vorstand.{profile.direct?.length ? ` ${profile.direct.map(fieldLabel).join(" und ")} übernimmt der Verein sofort;` : ""} alles andere prüft der Vorstand.
+            </Muted>
+            {changeable.map((key) => (
+              <View key={key} style={styles.field}>
+                <Muted style={styles.factLabel}>{fieldLabel(key)}</Muted>
+                <TextInput
+                  style={styles.input}
+                  value={key in draft ? draft[key] : String((profile as Record<string, unknown>)[key] ?? "")}
+                  onChangeText={(value) => setDraft((current) => ({ ...current, [key]: value }))}
+                  placeholderTextColor={colors.muted}
+                  autoCapitalize={key === "email" ? "none" : "sentences"}
+                  keyboardType={key === "email" ? "email-address" : key.startsWith("phone") ? "phone-pad" : "default"}
+                  testID={`membership-self-field-${key}`}
+                />
+              </View>
+            ))}
+            <Button label={busy === "save" ? "Sende …" : "Änderung senden"} onPress={saveChanges} disabled={busy !== "" || !Object.keys(changed).length} testID="membership-self-save" />
+            {self.requests?.length ? (
+              <View style={styles.requests} testID="membership-self-requests">
+                <Muted style={styles.factLabel}>Eingereicht</Muted>
+                {self.requests.slice().reverse().map((row) => (
+                  <View key={row.external_id} style={styles.request} testID={`membership-self-request-${row.external_id}`}>
+                    <Body>{selfRequestLine(row)}</Body>
+                    <Muted>{row.status_label || row.status || ""}{row.reason ? ` – ${row.reason}` : ""}</Muted>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+            {profile.exit ? (
+              <Muted style={styles.exitPlanned} testID="membership-self-exit-planned">{exitLine(profile)}</Muted>
+            ) : (
+              <View style={styles.exitBox} testID="membership-self-exit">
+                <Muted style={styles.factLabel}>Austritt – Wunschdatum (optional, JJJJ-MM-TT)</Muted>
+                <TextInput
+                  style={styles.input}
+                  placeholder="2026-12-31"
+                  placeholderTextColor={colors.muted}
+                  value={wishedDay}
+                  onChangeText={setWishedDay}
+                  autoCapitalize="none"
+                  testID="membership-self-exit-date"
+                />
+                <Button label="Austritt erklären" variant="secondary" onPress={askExit} disabled={busy !== ""} testID="membership-self-exit-button" />
+              </View>
+            )}
           </Card>
         ) : null}
 
@@ -293,6 +448,36 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: "900",
+  },
+  hint: {
+    fontSize: 12,
+  },
+  field: {
+    gap: 4,
+  },
+  requests: {
+    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 10,
+  },
+  request: {
+    borderLeftColor: "rgba(255, 215, 0, 0.4)",
+    borderLeftWidth: 2,
+    gap: 2,
+    paddingLeft: 10,
+  },
+  exitBox: {
+    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopWidth: 1,
+    gap: 8,
+    paddingTop: 10,
+  },
+  exitPlanned: {
+    borderTopColor: "rgba(255,255,255,0.1)",
+    borderTopWidth: 1,
+    color: colors.white,
+    paddingTop: 10,
   },
   error: {
     color: colors.live,

@@ -1,4 +1,5 @@
 import React from "react";
+import { Alert } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { MyMembershipScreen } from "./MyMembershipScreen";
 
@@ -83,4 +84,74 @@ test("nicht zugeordnet: Zuordnung anfragen, danach „Anfrage eingegangen“", a
   await fireEvent.press(screen.getByText("Zuordnung anfragen"));
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/dolibarr/link-request", { member_ref: "M-0042" }));
   await waitFor(() => expect(screen.getByTestId("membership-link-requested")).toBeTruthy());
+});
+
+// Vereinsakte (#324 Teil 1) und eigene Daten/Austritt (#329 Teil 2) in der App - dieselben Routen wie im Web.
+const SELF = {
+  available: true, changeable: ["address", "zip", "town", "country_code", "phone", "phone_mobile", "email"],
+  profile: { member_id: 12, ref: "12", firstname: "Paula", lastname: "Beispiel", birth: "1990-05-04", address: "Teststraße 1", zip: "6410", town: "Testdorf", country_code: "AT",
+    phone: "", phone_mobile: "+43 660 0000000", email: "paula@example.test", member_type: "Ordentliches Mitglied", status: "active", version: "v1", direct: ["phone", "phone_mobile"], exit: null },
+  requests: [{ external_id: "web-change-1", kind: "change", changes: { address: "Neue Gasse 2" }, status: "received", status_label: "beim Vorstand" }],
+};
+
+function mockAkte(identity: object | null, self: object | null) {
+  mockGet.mockImplementation((path: string) => {
+    if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
+    if (path === "/account/invoices") return Promise.resolve({ data: invoices });
+    if (path === "/membership/me/identity") return identity ? Promise.resolve({ data: identity }) : Promise.reject(new Error("nope"));
+    if (path === "/membership/me/self-service") return self ? Promise.resolve({ data: self }) : Promise.reject(new Error("nope"));
+    return Promise.reject(new Error("nope"));
+  });
+}
+
+test("Vereinsakte: ohne Bindung der Code, danach der Stand", async () => {
+  mockAkte({ available: true, status: "none", capabilities: [] }, null);
+  mockPost.mockResolvedValue({ data: { available: true, status: "bound", capabilities: ["documents"] } });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-identity")).toBeTruthy());
+  expect(screen.queryByTestId("membership-self")).toBeNull();
+  await fireEvent.changeText(screen.getByTestId("membership-identity-code"), " LION-1234 ");
+  await fireEvent.press(screen.getByTestId("membership-identity-claim"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/me/identity", { code: "LION-1234" }));
+  expect(alert).toHaveBeenCalledWith("Verbunden", expect.stringContaining("Vereinsdokumente"));
+  alert.mockRestore();
+});
+
+test("Meine Daten: nur Geändertes geht mit dem Stand raus; Eingereichtes steht darunter", async () => {
+  mockAkte({ available: true, status: "bound", capabilities: ["documents", "profile"], capability_labels: ["Dokumente", "eigene Daten"], linked_at: "2026-09-24T10:00:00Z" }, SELF);
+  mockPost.mockResolvedValue({ data: { status: "applied" } });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-self")).toBeTruthy());
+  expect(screen.getByTestId("membership-identity-bound")).toBeTruthy();
+  expect(screen.getByText(/Paula Beispiel · Ordentliches Mitglied · Nr. 12/)).toBeTruthy();
+  expect(screen.getByTestId("membership-self-request-web-change-1")).toBeTruthy();
+  expect(screen.getByText("Änderung: Straße und Hausnummer: Neue Gasse 2")).toBeTruthy();
+  await fireEvent.changeText(screen.getByTestId("membership-self-field-phone_mobile"), "+43 660 1234567");
+  await fireEvent.press(screen.getByTestId("membership-self-save"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/me/self-service/changes", { version: "v1", changes: { phone_mobile: "+43 660 1234567" } }));
+  expect(alert).toHaveBeenCalledWith("Übernommen", "Deine Daten sind aktuell.");
+  alert.mockRestore();
+});
+
+test("Austritt: erst die Rückfrage, dann die Erklärung; geplant heißt nur noch der Stand", async () => {
+  mockAkte({ available: true, status: "bound", capabilities: ["profile"] }, SELF);
+  mockPost.mockResolvedValue({ data: { kind: "exit", last_day: "2026-12-31", wished_too_early: true } });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation((title, message, buttons) => {
+    const go = Array.isArray(buttons) ? buttons.find((b) => b.text === "Austritt erklären") : undefined;
+    if (go?.onPress) go.onPress();
+  });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-self-exit")).toBeTruthy());
+  await fireEvent.changeText(screen.getByTestId("membership-self-exit-date"), "2026-10-01");
+  await fireEvent.press(screen.getByTestId("membership-self-exit-button"));
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/membership/me/self-service/exit", { wished_last_day: "2026-10-01" }));
+  expect(alert).toHaveBeenCalledWith("Austritt eingegangen", expect.stringContaining("Wunschdatum lag vor der Kündigungsfrist"));
+  alert.mockRestore();
+
+  mockAkte({ available: true, status: "bound", capabilities: ["profile"] }, { ...SELF, profile: { ...SELF.profile, exit: { status: "planned", notice_day: "2026-09-24", last_day: "2026-12-31" } } });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-self-exit-planned")).toBeTruthy());
+  expect(screen.getByText("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026 (Eingang 24.09.2026).")).toBeTruthy();
 });
