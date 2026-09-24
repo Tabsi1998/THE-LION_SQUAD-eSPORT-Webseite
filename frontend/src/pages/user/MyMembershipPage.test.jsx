@@ -224,3 +224,32 @@ test("Austritt geplant: nur noch der Stand, kein Knopf", async () => {
   expect(await screen.findByTestId("membership-self-exit-planned")).toHaveTextContent("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026");
   expect(screen.queryByTestId("membership-self-exit-button")).not.toBeInTheDocument();
 });
+
+test("Mein Website-Profil (#260, Vereine 1.2): Felder des Vereins, nur Geändertes geht raus, der Stand der Einwilligung steht dabei", async () => {
+  const fields = [
+    { code: "gamertag", label: "Gamertag", type: "text", editable: true, value: "LionKing", max_length: 40 },
+    { code: "games", label: "Spiele", type: "text", editable: true, value: "TFT", max_length: 255 },
+    { code: "hauptspiel", label: "Hauptspiel", type: "select", editable: true, value: "tft", options: [{ code: "tft", label: "TFT" }, { code: "rl", label: "Rocket League" }] },
+    { code: "streamer", label: "Streamt", type: "boolean", editable: true, value: false },
+    { code: "dabei_seit", label: "Dabei seit", type: "date", editable: false, value: "2023-01-01" },
+  ];
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/website-profile") return { data: { available: true, consent: "profil", given: false, fields } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  apiMock.put.mockResolvedValue({ data: { available: true, consent: "profil", given: false, fields } });
+  const user = userEvent.setup();
+  renderPage();
+  const card = await screen.findByTestId("membership-website-card");
+  expect(screen.getByTestId("membership-website-state")).toHaveTextContent("erst, wenn du der Nennung zugestimmt hast");
+  expect(screen.getByTestId("membership-website-gamertag")).toHaveValue("LionKing");
+  expect(screen.getByTestId("membership-website-dabei_seit")).toHaveTextContent("2023-01-01");
+  expect(screen.getByTestId("membership-website-save")).toBeDisabled();
+  await user.type(screen.getByTestId("membership-website-games"), ", Rocket League");
+  await user.selectOptions(screen.getByTestId("membership-website-hauptspiel"), "rl");
+  await user.click(screen.getByTestId("membership-website-streamer"));
+  await user.click(screen.getByTestId("membership-website-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/membership/me/website-profile", { fields: { games: "TFT, Rocket League", hauptspiel: "rl", streamer: true } }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Website-Profil gespeichert."));
+  expect(card).toBeInTheDocument();
+});

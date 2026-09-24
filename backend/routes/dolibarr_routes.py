@@ -11,6 +11,8 @@ Wer was sieht:
 """
 from __future__ import annotations
 
+import re
+
 import hmac
 import secrets
 
@@ -27,7 +29,7 @@ from services.dolibarr_client import (
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
-from services.dolibarr_sync import apply_summary, migration_preview, queue_member, run_sync, sync_state
+from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.membership_service import VALID_TYPES
 from services.rate_limit import enforce_rate_limit
 from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
@@ -140,6 +142,9 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
         "website_types": sorted(VALID_TYPES),
         # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): welcher Einwilligungscode den Eintrag steuert.
         "directory_consent_code": settings.get("directory_consent_code") or "",
+        # Feldzuordnung fürs Verzeichnis (Vereine 1.2): welcher Feldcode in Gamertag, Kurztext, Spiele, Plattformen landet.
+        "directory_field_map": {**DEFAULT_FIELD_MAP, **{k: v for k, v in (settings.get("directory_field_map") or {}).items() if k in FIELD_MAP_COLUMNS}},
+        "website_profile_fields": state.get("website_profile_fields") or [],
         "sync": state,
         "links": links,
         "open_links": sum(links.get(status, 0) for status in OPEN_STATUSES),
@@ -271,6 +276,7 @@ class DolibarrSettingsUpdate(BaseModel):
     applications_enabled: bool | None = None
     type_map: dict[str, str] | None = None
     directory_consent_code: str | None = Field(None, max_length=60)
+    directory_field_map: dict[str, str] | None = None
 
 
 @admin_router.get("/consent-texts")
@@ -349,6 +355,16 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         if code and not all(ch.isalnum() or ch in "_-" for ch in code):
             raise HTTPException(400, "Der Einwilligungscode besteht aus Buchstaben, Ziffern, „_“ und „-“.")
         updates["directory_consent_code"] = code
+    if "directory_field_map" in data:
+        cleaned_map: dict[str, str] = {}
+        for column, code in (data["directory_field_map"] or {}).items():
+            if column not in FIELD_MAP_COLUMNS:
+                raise HTTPException(400, f"Unbekannte Spalte: {column}")
+            code = str(code or "").strip()
+            if code and not re.fullmatch(r"[a-z][a-z0-9_]*", code):
+                raise HTTPException(400, "Ein Feldcode besteht aus Kleinbuchstaben, Ziffern und „_“.")
+            cleaned_map[column] = code
+        updates["directory_field_map"] = {**(current.get("directory_field_map") or {}), **cleaned_map}
     if "type_map" in data:
         cleaned = {}
         for type_id, target in (data["type_map"] or {}).items():

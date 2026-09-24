@@ -207,6 +207,8 @@ def _public_profile(doc: dict, detail: bool = False, board_title: str | None = N
     }
     if detail:
         out["bio"] = doc.get("bio") or ""
+        # Weitere Angaben aus den Zusatzfeldern der Vereinsakte (Vereine 1.2), die keiner Spalte zugeordnet sind.
+        out["extra_fields"] = [row for row in (doc.get("extra_fields") or []) if isinstance(row, dict) and row.get("value")]
     return out
 
 
@@ -607,6 +609,26 @@ async def request_self_service_exit(body: SelfServiceExitBody, request: Request,
     await enforce_rate_limit(request, "dolibarr:self-service:exit", limit=5, window_seconds=3600, subject=user["id"])
     try:
         return await dolibarr_self_service.request_exit(get_db(), user, body.wished_last_day)
+    except dolibarr_self_service.SelfServiceError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+class WebsiteProfileBody(BaseModel):
+    # Kürzel → Wert, wie das Modul es erwartet (Text, Zahl, Ja/Nein, Tag, Kürzel, Liste); nur Geändertes senden.
+    fields: dict[str, object]
+
+
+@router.get("/me/website-profile")
+async def my_website_profile(user: dict = Depends(get_current_user)):
+    """Eigenes Website-Profil aus der Vereinsakte (#260) - nur mit Bindung und Fähigkeit „eigene Daten“."""
+    return await dolibarr_self_service.website_profile(get_db(), user)
+
+
+@router.put("/me/website-profile")
+async def save_my_website_profile(body: WebsiteProfileBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:website-profile", limit=20, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_self_service.save_website_profile(get_db(), user, body.fields)
     except dolibarr_self_service.SelfServiceError as exc:
         raise HTTPException(exc.status, exc.detail)
 

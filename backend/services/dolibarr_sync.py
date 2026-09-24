@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import binascii
 import hashlib
+import re
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -45,6 +46,10 @@ HISTORY_NOTE = "Aus der Mitgliederverwaltung übernommen"
 STATUS_MAP = {"draft": "pending", "active": "active", "terminated": "former", "excluded": "former"}
 # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): Einträge, die der Abgleich angelegt hat.
 DIRECTORY_SOURCE = "dolibarr"
+# Website-Profil aus Zusatzfeldern (Vereine 1.2): welche Feldcodes in die Spalten des Verzeichnisses laufen;
+# der Verein ändert das unter Dolibarr → Verbindung. Nach dem Update aus 1.1 heißen die Felder genau so.
+FIELD_MAP_COLUMNS = ("gamertag", "bio", "games", "platforms")
+DEFAULT_FIELD_MAP = {"gamertag": "gamertag", "bio": "bio", "games": "games", "platforms": "platforms"}
 CONSENT_WITHDRAWN = "consent_withdrawn"
 DIRECTORY_CHANGES = ("created", "activated", "deactivated", "updated", "merged")
 DUPLICATE = "duplicate"
@@ -199,6 +204,22 @@ async def _store_member_photo(client: DolibarrClient, member_id: int, photo: dic
     return f"/api/static/uploads/{name}"
 
 
+LEGACY_FIELDS = (("gamertag", "Gamertag", "text", 40), ("bio", "Kurztext", "textarea", 2000), ("games", "Spiele", "text", 255), ("platforms", "Plattformen", "text", 255))
+
+
+def _legacy_fields(data: dict) -> list[dict]:
+    """Vereine 1.1 liefert feste Felder statt `fields` - in die Feldform übersetzt, damit der Abgleich gleich bleibt."""
+    fields = []
+    for code, label, kind, limit in LEGACY_FIELDS:
+        if code not in data:
+            continue
+        value = data.get(code)
+        if isinstance(value, list):
+            value = ", ".join(str(v).strip() for v in value if str(v).strip())
+        fields.append({"code": code, "label": label, "type": kind, "editable": False, "value": str(value or "").strip() or None, "max_length": limit})
+    return fields
+
+
 async def _member_website_profile(client: DolibarrClient, member_id: int) -> dict | None:
     """Das Website-Profil der Mitgliedskarte - nur mit Einwilligung; ein älteres Modul kennt es nicht."""
     try:
@@ -207,7 +228,11 @@ async def _member_website_profile(client: DolibarrClient, member_id: int) -> dic
         if exc.kind not in ("not_found", "module_off"):
             logger.warning("[dolibarr] Website-Profil von Mitglied %s nicht lesbar: %s", member_id, exc.kind)
         return None
-    return data if isinstance(data, dict) and data.get("given") else None
+    if not isinstance(data, dict) or not data.get("given"):
+        return None
+    if "fields" not in data:
+        data = {**data, "fields": _legacy_fields(data)}
+    return data
 
 
 async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, member_id: int, data: dict | None = None) -> bool:
@@ -218,14 +243,25 @@ async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, mem
     if not data:
         return False
     update: dict = {}
-    for key, limit in (("gamertag", 40), ("bio", 2000)):
-        value = str(data.get(key) or "").strip()[:limit]
-        if value and value != (profile.get(key) or ""):
-            update[key] = value
-    for key in ("games", "platforms"):
-        values = [str(v).strip() for v in (data.get(key) or []) if str(v).strip()][:20]
-        if values and values != (profile.get(key) or []):
-            update[key] = values
+    fields = [f for f in (data.get("fields") or []) if isinstance(f, dict) and f.get("code")]
+    field_map = await directory_field_map(db)
+    by_code = {str(f["code"]): f for f in fields}
+    for column, limit in (("gamertag", 40), ("bio", 2000)):
+        field = by_code.get(field_map.get(column) or "")
+        value = _field_text(field)[:limit] if field else ""
+        if value and value != (profile.get(column) or ""):
+            update[column] = value
+    for column in ("games", "platforms"):
+        field = by_code.get(field_map.get(column) or "")
+        values = _field_list(field)[:20] if field else []
+        if values and values != (profile.get(column) or []):
+            update[column] = values
+    mapped = {code for code in field_map.values() if code}
+    extra = [{"code": str(f["code"]), "label": str(f.get("label") or f["code"]), "value": _field_text(f)} for f in fields if str(f["code"]) not in mapped and _field_text(f)]
+    if extra != (profile.get("extra_fields") or []):
+        update["extra_fields"] = extra
+    if fields:
+        await _remember_website_fields(db, fields)
     photo = data.get("photo") if isinstance(data.get("photo"), dict) else None
     if photo and photo.get("sha256") and photo.get("sha256") != profile.get("dolibarr_photo_sha"):
         url = await _store_member_photo(client, member_id, photo, profile["id"])
@@ -237,6 +273,65 @@ async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, mem
     await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
     profile.update(update)
     return True
+
+
+async def directory_field_map(db) -> dict:
+    settings = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "directory_field_map": 1}) or {}
+    chosen = {k: str(v or "").strip() for k, v in (settings.get("directory_field_map") or {}).items() if k in FIELD_MAP_COLUMNS}
+    return {**DEFAULT_FIELD_MAP, **chosen}
+
+
+def _option_label(field: dict, code) -> str:
+    for option in field.get("options") or []:
+        if isinstance(option, dict) and str(option.get("code")) == str(code):
+            return str(option.get("label") or code)
+    return str(code)
+
+
+def _field_text(field: dict | None) -> str:
+    """Der Wert eines Zusatzfelds als Text - so, wie er auf der Website stehen kann."""
+    if not field:
+        return ""
+    value = field.get("value")
+    if value is None or value == "" or value == []:
+        return ""
+    kind = field.get("type")
+    if kind == "boolean":
+        return "Ja" if value else "Nein"
+    if kind == "multi" and isinstance(value, list):
+        return ", ".join(_option_label(field, v) for v in value)
+    if kind == "select":
+        return _option_label(field, value)
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value).strip()
+
+
+def _field_list(field: dict | None) -> list[str]:
+    """Ein Zusatzfeld als Liste: Mehrfachauswahl über die Bezeichnungen, Text getrennt an Komma/Strichpunkt/Zeile."""
+    if not field:
+        return []
+    value = field.get("value")
+    if field.get("type") == "multi" and isinstance(value, list):
+        return [_option_label(field, v) for v in value if str(v).strip()]
+    return [part.strip() for part in re.split(r"[,;\n]+", _field_text(field)) if part.strip()]
+
+
+async def _website_gamertag(db, website: dict | None) -> str:
+    """Der Gamertag aus dem Website-Profil des Moduls - das Feld, das der Verein der Spalte zugeordnet hat."""
+    if not website:
+        return ""
+    code = (await directory_field_map(db)).get("gamertag") or ""
+    field = next((f for f in website.get("fields") or [] if isinstance(f, dict) and str(f.get("code")) == code), None)
+    return _field_text(field)[:40]
+
+
+async def _remember_website_fields(db, fields: list[dict]) -> None:
+    """Welche Felder das Modul fürs Website-Profil kennt - für die Zuordnung im Admin, ohne Werte."""
+    catalog = [{"code": str(f["code"]), "label": str(f.get("label") or f["code"]), "type": str(f.get("type") or "text")} for f in fields]
+    state = await sync_state(db)
+    if state.get("website_profile_fields") != catalog:
+        await _save_state(db, {"website_profile_fields": catalog})
 
 
 def _norm(value) -> str:
@@ -338,9 +433,10 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     name = _full_name(summary)
     listed = state == "given" and active_member
     website = await _member_website_profile(client, member_id) if listed else None
+    website_gamertag = await _website_gamertag(db, website)
     user = (await db.users.find_one({"id": user_id}, {"_id": 0, "username": 1, "display_name": 1, "avatar_url": 1, "favorite_games": 1,
                                      "main_platforms": 1, "gender": 1}) if user_id else None) or {}
-    profile, duplicates = await _find_directory_profile(db, member_id, user_id, name, [(website or {}).get("gamertag") or "", user.get("username") or ""], fuzzy=listed)
+    profile, duplicates = await _find_directory_profile(db, member_id, user_id, name, [website_gamertag, user.get("username") or ""], fuzzy=listed)
     for dup in duplicates:
         await _merge_duplicate_profile(db, profile, dup)
     merged = bool(duplicates)
@@ -354,7 +450,7 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     if listed:
         if profile is None:
             display_name = name or str(user.get("display_name") or user.get("username") or "Mitglied").strip()
-            gamertag = str((website or {}).get("gamertag") or user.get("username") or "").strip()[:40] or None
+            gamertag = str(website_gamertag or user.get("username") or "").strip()[:40] or None
             doc = {
                 "id": new_id(), "display_name": display_name, "gamertag": gamertag, "real_name": name or None,
                 "slug": await _unique_directory_slug(db, gamertag or display_name),

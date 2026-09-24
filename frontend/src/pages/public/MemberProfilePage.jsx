@@ -64,6 +64,17 @@ export default function MemberProfilePage() {
                 <InfoPanel title="Profil">
                   <InfoChips icon={Gamepad2} label="Games" values={profile.games} />
                   <InfoChips icon={Monitor} label="Plattformen" values={profile.platforms} />
+                  {/* Weitere Angaben aus der Vereinsakte (Vereine 1.2): Zusatzfelder, die keiner Spalte zugeordnet sind. */}
+                  {(profile.extra_fields || []).length > 0 && (
+                    <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm" data-testid="member-extra-fields">
+                      {profile.extra_fields.map((row) => (
+                        <div key={row.code} className="flex gap-2">
+                          <dt className="text-white/50 shrink-0">{row.label}:</dt>
+                          <dd className="text-white/85">{row.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                   <LinkedAccountCard account={profile.linked_account} />
                 </InfoPanel>
                 <MemberTwitchEmbed account={profile.linked_account} />

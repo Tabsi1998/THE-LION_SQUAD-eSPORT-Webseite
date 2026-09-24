@@ -315,3 +315,13 @@ async def test_a_member_without_website_account_gets_a_profile(flow, fake):
     fake.member_consents[13]["verzeichnis"]["state"] = "withdrawn"
     assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1
     assert (await flow.db.club_member_profiles.find_one({"dolibarr_member_id": 13}, {"_id": 0}))["is_active"] is False
+
+
+def test_module_1_1_profile_is_read_as_fields():
+    """Vereine 1.1 kennt keine Felder - feste Werte werden in die Feldform übersetzt, Listen als „a, b“."""
+    fields = dolibarr_sync._legacy_fields({"gamertag": "LionKing", "bio": "", "games": ["TFT", "Rocket League"], "photo": None})
+    assert fields == [
+        {"code": "gamertag", "label": "Gamertag", "type": "text", "editable": False, "value": "LionKing", "max_length": 40},
+        {"code": "bio", "label": "Kurztext", "type": "textarea", "editable": False, "value": None, "max_length": 2000},
+        {"code": "games", "label": "Spiele", "type": "text", "editable": False, "value": "TFT, Rocket League", "max_length": 255},
+    ]
