@@ -21,7 +21,7 @@ from services.dolibarr_client import DolibarrClient, DolibarrError, load_setting
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS
 from services.dolibarr_sync import try_auto_link
-from services import dolibarr_identity
+from services import dolibarr_identity, dolibarr_self_service
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
@@ -568,6 +568,39 @@ async def claim_identity(body: IdentityClaimBody, request: Request, user: dict =
     try:
         return await dolibarr_identity.claim(get_db(), user, body.code)
     except dolibarr_identity.ClaimError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+class SelfServiceChangeBody(BaseModel):
+    version: str
+    changes: dict[str, str]
+
+
+class SelfServiceExitBody(BaseModel):
+    wished_last_day: str | None = None
+
+
+@router.get("/me/self-service")
+async def my_self_service(user: dict = Depends(get_current_user)):
+    """Eigene Daten und Einreichungen aus der Vereinsakte (#329 Teil 2) - nur mit Bindung und Fähigkeit „profile“."""
+    return await dolibarr_self_service.overview(get_db(), user)
+
+
+@router.post("/me/self-service/changes")
+async def request_self_service_change(body: SelfServiceChangeBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:self-service:change", limit=20, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_self_service.request_change(get_db(), user, body.version, body.changes)
+    except dolibarr_self_service.SelfServiceError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+@router.post("/me/self-service/exit")
+async def request_self_service_exit(body: SelfServiceExitBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:self-service:exit", limit=5, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_self_service.request_exit(get_db(), user, body.wished_last_day)
+    except dolibarr_self_service.SelfServiceError as exc:
         raise HTTPException(exc.status, exc.detail)
 
 

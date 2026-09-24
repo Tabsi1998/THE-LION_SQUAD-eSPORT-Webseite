@@ -191,6 +191,11 @@ class FakeDolibarr:
         self.identities: dict[str, dict] = {}
         self.published_documents: list[dict] = []
         self.tampered_document_ids: set[int] = set()
+        # Eigene Daten und Austritt (#329 Teil 2): Profil je Mitglied, Einreichungen je Kennung, Kündigungsregel.
+        self.profiles: dict[int, dict] = {}
+        self.profile_requests: dict[str, list[dict]] = {}
+        self.direct_fields = ["phone", "phone_mobile"]
+        self.exit_rule_last_day = "2026-12-31"
         self.tampered_pdf_ids: set[int] = set()  # Fassungen, deren Datei nicht mehr zur Akte passt
         self.board = [
             {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
@@ -254,6 +259,19 @@ class FakeDolibarr:
         if capability and capability not in ident["capabilities"]:
             return None
         return ident
+
+    def profile_for(self, member_id: int) -> dict:
+        """Die eigenen Daten, wie das Modul sie liefert - beim ersten Zugriff aus der Zusammenfassung gebaut."""
+        if member_id not in self.profiles:
+            summary = self.members.get(member_id) or {}
+            email = next((address for address, ids in self.emails.items() if member_id in ids), "")
+            self.profiles[member_id] = {
+                "member_id": member_id, "ref": str(member_id), "firstname": summary.get("firstname") or "Paula", "lastname": summary.get("lastname") or "Beispiel",
+                "birth": "1990-05-04", "address": "Teststraße 1", "zip": "6410", "town": "Testdorf", "country_code": "AT", "phone": "", "phone_mobile": "+43 660 0000000",
+                "email": email, "member_type": (summary.get("type") or {}).get("label") or "Ordentliches Mitglied", "status": "active",
+                "version": "v1", "direct": list(self.direct_fields), "exit": None,
+            }
+        return self.profiles[member_id]
 
     def _visible_documents(self, member_id: int | None) -> list[dict]:
         rows = []
@@ -591,6 +609,59 @@ class FakeDolibarr:
             if ident is None:
                 return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
             return self._document_pdf("/vereine/me/documents/{id}/pdf", self._visible_documents(ident["member_id"]), int(match.group(1)))
+        if path == "/vereine/me/profile" and request.method == "GET":
+            ident = self._identity(params, "profile")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            return self._json("/vereine/me/profile", self.profile_for(ident["member_id"]))
+        if path == "/vereine/me/profile/changes":
+            ident = self._identity(params, "profile")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            rows = self.profile_requests.setdefault(str(params.get("subject")), [])
+            if request.method == "GET":
+                return self._json("/vereine/me/profile/changes", rows)
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema("/vereine/me/profile/changes"))
+            existing = next((row for row in rows if row["external_id"] == body["external_id"]), None)
+            if existing:
+                return self._json_post("/vereine/me/profile/changes", existing)
+            profile = self.profile_for(ident["member_id"])
+            if body["version"] != profile["version"]:
+                return httpx.Response(409, json={"error": {"code": 409, "message": "version changed"}})
+            allowed = ("address", "zip", "town", "country_code", "phone", "phone_mobile", "email")
+            if any(key not in allowed for key in body["changes"]) or not body["changes"]:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "field not allowed"}})
+            direct = {key: value for key, value in body["changes"].items() if key in profile["direct"]}
+            applied = bool(direct) and len(direct) == len(body["changes"])
+            row = {"external_id": body["external_id"], "kind": "change", "changes": dict(body["changes"]), "status": "applied" if applied else "received",
+                   "received_at": "2026-09-24T12:00:00Z"}
+            if applied:
+                profile.update(direct)
+                profile["version"] = f"v{int(profile['version'][1:]) + 1}"
+                row["decided_at"] = "2026-09-24T12:00:00Z"
+            rows.append(row)
+            return self._json_post("/vereine/me/profile/changes", row)
+        if path == "/vereine/me/exit" and request.method == "POST":
+            ident = self._identity(params, "profile")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema("/vereine/me/exit"))
+            rows = self.profile_requests.setdefault(str(params.get("subject")), [])
+            existing = next((row for row in rows if row["external_id"] == body["external_id"]), None)
+            if existing:
+                return self._json_post("/vereine/me/exit", existing)
+            profile = self.profile_for(ident["member_id"])
+            if profile.get("exit"):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "exit already planned"}})
+            wished = str(body.get("wished_last_day") or "")
+            last_day = wished if wished and wished > self.exit_rule_last_day else self.exit_rule_last_day
+            row = {"external_id": body["external_id"], "kind": "exit", "status": "received", "received_at": "2026-09-24T12:00:00Z", "notice_day": "2026-09-24",
+                   "last_day": last_day, "wished_last_day": wished, "wished_too_early": bool(wished and wished < self.exit_rule_last_day)}
+            profile["exit"] = {"status": "planned", "reason": "", "notice_day": "2026-09-24", "last_day": last_day}
+            rows.append(row)
+            return self._json_post("/vereine/me/exit", row)
         if path == "/vereine/documents":
             return self._json("/vereine/documents", self._visible_documents(None))
         match = re.fullmatch(r"/vereine/documents/(\d+)/pdf", path)

@@ -95,12 +95,20 @@ async def claim(db, user: dict, code: str) -> dict:
     if not code or len(code) > 120:
         raise ClaimError(400, "Bitte den Einladungscode eintragen.")
     existing = await binding_for(db, settings, user["id"])
-    if existing and existing.get("status") == "bound":
-        raise ClaimError(409, "Dein Konto ist schon mit der Vereinsakte verbunden.")
     try:
         client = DolibarrClient(settings)
     except DolibarrError as exc:
         raise ClaimError(503, exc.text) from exc
+    if existing and existing.get("status") == "bound":
+        # Gilt die Bindung beim Modul noch? Hat der Verein sie widerrufen und neu eingeladen, darf der neue Code durch.
+        try:
+            await client.identity(existing["subject"])
+        except DolibarrError as exc:
+            if exc.kind not in ("forbidden", "not_found"):
+                raise ClaimError(503, f"Dolibarr antwortet gerade nicht ({exc.text}).") from exc
+            await mark_revoked(db, existing)
+        else:
+            raise ClaimError(409, "Dein Konto ist schon mit der Vereinsakte verbunden.")
     try:
         identity = await client.claim_identity(subject_for(user), code)
     except DolibarrError as exc:

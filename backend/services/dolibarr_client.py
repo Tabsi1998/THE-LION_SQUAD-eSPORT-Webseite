@@ -553,6 +553,35 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Eigene Daten und Austritt (#329 Teil 2), über die Bindung
+    async def my_profile(self, subject: str) -> dict:
+        """Die eigenen Daten der Person mit `version` (Stand der Kontaktdaten) und `direct` (sofort übernommen)."""
+        data = await self._get("/vereine/me/profile", {"subject": subject})
+        if not isinstance(data, dict) or "version" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def my_profile_requests(self, subject: str) -> list[dict]:
+        """Eigene Änderungswünsche und Kündigung mit Stand - nie die Notizen des Vorstands."""
+        data = await self._get("/vereine/me/profile/changes", {"subject": subject})
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def request_profile_change(self, subject: str, payload: dict) -> dict:
+        """Kontaktdaten ändern lassen - mit `external_id` wiederholbar, ohne Wiederholung durch den Client."""
+        data = await self._request("POST", "/vereine/me/profile/changes", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "external_id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def request_exit(self, subject: str, payload: dict) -> dict:
+        """Den Austritt erklären; den letzten Tag ergibt die Kündigungsregel des Vereins, nie die Website."""
+        data = await self._request("POST", "/vereine/me/exit", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "external_id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
         if not isinstance(data, dict) or "id" not in data:

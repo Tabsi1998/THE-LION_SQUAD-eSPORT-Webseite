@@ -104,6 +104,8 @@ export default function MyMembershipPage() {
         {erp?.led_by_dolibarr && <ConsentsCard />}
         {/* Vereinsakte verbinden (#324 Teil 1): Einladungscode vom Vorstand, danach eigene Unterlagen aus der Akte */}
         {erp?.connected && <IdentityCard />}
+        {/* Eigene Daten und Austritt (#329 Teil 2): nur mit Bindung und Fähigkeit „eigene Daten“ */}
+        {erp?.connected && <SelfServiceCard />}
         {erp?.connected && !erp.led_by_dolibarr && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
             <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
@@ -203,6 +205,120 @@ function IdentityCard() {
           </form>
         </>
       )}
+    </div>
+  );
+}
+
+const SELF_FIELD_LABELS = {
+  address: "Straße und Hausnummer", zip: "PLZ", town: "Ort", country_code: "Land (Kürzel, z. B. AT)",
+  phone: "Telefon", phone_mobile: "Mobil", email: "E-Mail",
+};
+
+export function selfRequestLine(row) {
+  if (!row) return "";
+  if (row.kind === "exit") return `Austritt erklärt${row.notice_day ? ` am ${formatDate(row.notice_day)}` : ""} – letzter Tag ${formatDate(row.last_day)}${row.wished_too_early ? " (Wunschdatum lag vor der Kündigungsfrist)" : ""}`;
+  const changes = Object.entries(row.changes || {}).map(([key, value]) => `${SELF_FIELD_LABELS[key] || key}: ${value}`).join(", ");
+  return `Änderung: ${changes}`;
+}
+
+// Eigene Daten und Austritt (#329 Teil 2): die Daten kommen aus der Vereinsakte, Änderungen gehen mit dem
+// gesehenen Stand dorthin (Felder aus `direct` übernimmt der Verein sofort, der Rest liegt beim Vorstand);
+// den letzten Tag des Austritts rechnet der Verein, nie die Website.
+function SelfServiceCard() {
+  const confirm = useConfirm();
+  const [view, setView] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [wishedDay, setWishedDay] = useState("");
+  const [busy, setBusy] = useState("");
+  const load = useCallback(() => {
+    api.get("/membership/me/self-service").then(({ data }) => {
+      setView(data && data.available === true && data.profile ? data : null);
+      setDraft({});
+    }).catch(() => setView(null));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!view) return null;
+  const { profile, changeable, requests } = view;
+  const value = (key) => (key in draft ? draft[key] : profile[key] || "");
+  const changed = Object.fromEntries(changeable.filter((key) => key in draft && draft[key] !== (profile[key] || "")).map((key) => [key, draft[key]]));
+  const directLabels = (profile.direct || []).map((key) => SELF_FIELD_LABELS[key] || key);
+  const save = async (event) => {
+    event.preventDefault();
+    if (busy || !Object.keys(changed).length) return;
+    setBusy("save");
+    try {
+      const { data } = await api.post("/membership/me/self-service/changes", { version: profile.version, changes: changed });
+      toast.success(data.status === "applied" ? "Übernommen – deine Daten sind aktuell." : "Eingereicht – der Vorstand prüft die Änderung.");
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy("");
+    }
+  };
+  const leave = async () => {
+    if (busy) return;
+    const ok = await confirm({
+      title: "Austritt aus dem Verein erklären?",
+      description: `Die Erklärung geht heute bei der Vereinsverwaltung ein. Wann die Mitgliedschaft endet, ergibt die Kündigungsregel des Vereins${wishedDay ? ` – dein Wunschdatum ${formatDate(wishedDay)} gilt nur, wenn es nicht davor liegt` : ""}. Das lässt sich hier nicht zurücknehmen.`,
+      confirmLabel: "Austritt erklären",
+    });
+    if (!ok) return;
+    setBusy("exit");
+    try {
+      const { data } = await api.post("/membership/me/self-service/exit", wishedDay ? { wished_last_day: wishedDay } : {});
+      toast.success(`Austritt eingegangen – letzter Tag: ${formatDate(data.last_day)}${data.wished_too_early ? " (dein Wunschdatum lag vor der Kündigungsfrist)" : ""}.`);
+      load();
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy("");
+    }
+  };
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-self-card">
+      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Meine Daten</h2>
+      <p className="mt-2 text-sm text-white/70" data-testid="membership-self-identity">
+        {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
+      </p>
+      <p className="mt-1 text-xs text-white/45">Name und Geburtsdatum ändert nur der Vorstand. {directLabels.length ? `${directLabels.join(" und ")} übernimmt der Verein sofort; ` : ""}alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht immer den Vorstand.</p>
+      <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-self-form">
+        {changeable.map((key) => (
+          <label key={key} className={`block ${key === "address" ? "sm:col-span-2" : ""}`}>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{SELF_FIELD_LABELS[key] || key}</div>
+            <input value={value(key)} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} maxLength={200} data-testid={`membership-self-field-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          </label>
+        ))}
+        <div className="sm:col-span-2">
+          <button type="submit" disabled={busy === "save" || !Object.keys(changed).length} data-testid="membership-self-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy === "save" ? "Sende…" : "Änderung senden"}</button>
+        </div>
+      </form>
+      {requests.length > 0 && (
+        <div className="mt-5 space-y-2" data-testid="membership-self-requests">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Eingereicht</div>
+          {requests.slice().reverse().map((row) => (
+            <div key={row.external_id} className="text-sm border-l-2 border-[#FFD700]/40 pl-3" data-testid={`membership-self-request-${row.external_id}`}>
+              <div className="text-white/80">{selfRequestLine(row)}</div>
+              <div className="text-xs text-white/45">{row.status_label}{row.reason ? ` – ${row.reason}` : ""}{row.received_at ? ` · ${formatDate(row.received_at)}` : ""}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-5 border-t border-white/10 pt-4">
+        {profile.exit ? (
+          <p className="text-sm text-white/70" data-testid="membership-self-exit-planned">
+            Austritt {profile.exit.status === "done" ? "vollzogen" : "geplant"}: letzter Tag der Mitgliedschaft {formatDate(profile.exit.last_day)}{profile.exit.notice_day ? ` (Eingang ${formatDate(profile.exit.notice_day)})` : ""}.
+          </p>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3" data-testid="membership-self-exit">
+            <label className="block">
+              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Austritt – Wunschdatum (optional)</div>
+              <input type="date" value={wishedDay} onChange={(e) => setWishedDay(e.target.value)} data-testid="membership-self-exit-date" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            </label>
+            <button type="button" onClick={leave} disabled={busy === "exit"} data-testid="membership-self-exit-button" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Austritt erklären</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

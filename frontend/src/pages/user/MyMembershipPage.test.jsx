@@ -171,3 +171,56 @@ test("Vereinsakte (#324): ein falscher Code zeigt die Antwort des Servers, wider
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Der Code passt nicht."));
   expect(screen.getByTestId("membership-identity-form")).toBeInTheDocument();
 });
+
+const SELF = {
+  available: true, changeable: ["address", "zip", "town", "country_code", "phone", "phone_mobile", "email"], status_labels: {},
+  profile: { member_id: 12, ref: "12", firstname: "Paula", lastname: "Beispiel", birth: "1990-05-04", address: "Teststraße 1", zip: "6410", town: "Testdorf", country_code: "AT",
+    phone: "", phone_mobile: "+43 660 0000000", email: "paula@example.test", member_type: "Ordentliches Mitglied", status: "active", version: "v1", direct: ["phone", "phone_mobile"], exit: null },
+  requests: [{ external_id: "web-change-1", kind: "change", changes: { address: "Neue Gasse 2" }, status: "received", status_label: "beim Vorstand", received_at: "2026-09-24T12:00:00Z" }],
+};
+
+function mockSelf(self) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/self-service") return { data: self };
+    if (url === "/membership/me/identity") return { data: { available: true, status: "bound", capabilities: ["documents", "profile"], capability_labels: ["Dokumente", "eigene Daten"], linked_at: "2026-09-24T10:00:00Z" } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+}
+
+test("Meine Daten (#329): nur geänderte Felder gehen mit dem gesehenen Stand raus, Eingereichtes steht darunter", async () => {
+  mockSelf(SELF);
+  apiMock.post.mockResolvedValue({ data: { external_id: "web-change-2", kind: "change", status: "applied", status_label: "übernommen", changes: { phone_mobile: "+43 660 1234567" } } });
+  const user = userEvent.setup();
+  renderPage();
+  const card = await screen.findByTestId("membership-self-card");
+  expect(screen.getByTestId("membership-self-identity")).toHaveTextContent("Paula Beispiel · Ordentliches Mitglied · Nr. 12");
+  expect(card).toHaveTextContent("Telefon und Mobil übernimmt der Verein sofort");
+  expect(screen.getByTestId("membership-self-request-web-change-1")).toHaveTextContent("Änderung: Straße und Hausnummer: Neue Gasse 2");
+  expect(screen.getByTestId("membership-self-request-web-change-1")).toHaveTextContent("beim Vorstand");
+  expect(screen.getByTestId("membership-self-save")).toBeDisabled();
+  const mobile = screen.getByTestId("membership-self-field-phone_mobile");
+  await user.clear(mobile);
+  await user.type(mobile, "+43 660 1234567");
+  await user.click(screen.getByTestId("membership-self-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/self-service/changes", { version: "v1", changes: { phone_mobile: "+43 660 1234567" } }));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Übernommen – deine Daten sind aktuell."));
+});
+
+test("Austritt (#329): nach der Rückfrage geht die Erklärung raus, der letzte Tag kommt vom Verein", async () => {
+  mockSelf(SELF);
+  apiMock.post.mockResolvedValue({ data: { external_id: "web-exit-1", kind: "exit", status: "received", last_day: "2026-12-31", wished_too_early: true, notice_day: "2026-09-24" } });
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByTestId("membership-self-exit");
+  await user.click(screen.getByTestId("membership-self-exit-button"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/self-service/exit", {}));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("31.12.2026")));
+  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Wunschdatum lag vor der Kündigungsfrist"));
+});
+
+test("Austritt geplant: nur noch der Stand, kein Knopf", async () => {
+  mockSelf({ ...SELF, profile: { ...SELF.profile, exit: { status: "planned", reason: "", notice_day: "2026-09-24", last_day: "2026-12-31" } } });
+  renderPage();
+  expect(await screen.findByTestId("membership-self-exit-planned")).toHaveTextContent("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026");
+  expect(screen.queryByTestId("membership-self-exit-button")).not.toBeInTheDocument();
+});
