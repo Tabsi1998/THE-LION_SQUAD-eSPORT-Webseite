@@ -50,8 +50,8 @@ from routes.badge_routes import router as badge_router, admin_router as achievem
 from routes.phase_c_routes import router as phase_c_router
 from routes.phase_ef_routes import (
     streams_router, admin_streams_router,
-    pages_router, admin_pages_router, admin_emailt_router, admin_discord_router,
-    seed_default_pages, seed_email_templates,
+    admin_emailt_router, admin_discord_router,
+    seed_email_templates,
 )
 from routes.phase_fg_routes import (
     media_router, admin_media_router, nav_router, admin_nav_router, seo_router, seo_meta_router,
@@ -120,7 +120,6 @@ async def lifespan(app: FastAPI):
     logger.info("[THE LION SQUAD] Seeding badge catalog...")
     await seed_badges()
     logger.info("[THE LION SQUAD] Seeding CMS pages + email templates...")
-    await seed_default_pages()
     await seed_email_templates()
     await seed_default_nav()
     # Phase 8: start background scheduler (mail queue + reminders + prize expiry)
@@ -263,8 +262,6 @@ app.include_router(achievement_admin_router)
 app.include_router(phase_c_router)
 app.include_router(streams_router)
 app.include_router(admin_streams_router)
-app.include_router(pages_router)
-app.include_router(admin_pages_router)
 app.include_router(admin_emailt_router)
 app.include_router(admin_discord_router)
 app.include_router(media_router)

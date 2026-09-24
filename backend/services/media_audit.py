@@ -37,7 +37,6 @@ TARGETS: list[tuple[str, list[str]]] = [
 ]
 
 TEXT_TARGETS: list[tuple[str, list[str]]] = [
-    ("cms_pages", ["body_md"]),
     ("news_posts", ["content"]),
     ("events", ["description", "program"]),
     ("tournaments", ["description"]),

@@ -565,6 +565,9 @@ async def send_template(
         subject, html = fn(**kwargs)
     except TypeError as e:
         return {"ok": False, "reason": f"template args error: {e}"}
+    # E-Mail-Vorlagen (#437 A): hat der Admin diese Vorlage überschrieben, gilt sein Betreff/HTML mit denselben Werten.
+    from services.mail_catalog import apply_override
+    subject, html = await apply_override(template_key, subject, html, kwargs)
     html = await _with_email_sponsors(html)
     if queue:
         from services.mail_queue import enqueue_mail

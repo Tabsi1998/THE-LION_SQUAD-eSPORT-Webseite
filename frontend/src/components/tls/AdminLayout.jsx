@@ -3,16 +3,7 @@ import { INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import {
-  LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon,
-  CalendarDays, Flag, Building2, Newspaper, LogOut,
-  ExternalLink, Menu, X, Settings as SettingsIcon,
-  ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon,
-  Award, Inbox, UserCheck, Medal,
-  FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing,
-  Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker,
-  Smartphone, Link2, Wallet, BookOpen,
-} from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Settings as SettingsIcon, ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Sidebar-Gruppen (#408): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
@@ -81,7 +72,6 @@ export const ADMIN_GROUPS = [
       { to: "/admin/news", label: "News", icon: Newspaper, areas: ["content"] },
       { to: "/admin/gallery", label: "Galerie", icon: ImageIcon, areas: ["content"] },
       { to: "/admin/media", label: "Medien", icon: FolderOpen, areas: ["content"] },
-      { to: "/admin/cms", label: "CMS-Seiten", icon: FileText, areas: ["content"] },
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
       { to: "/admin/achievements", label: "Achievements", icon: Medal, areas: ["content"] },
       { to: "/admin/stickers", label: "Sticker", icon: Sticker, areas: ["content"] },
@@ -108,6 +98,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
       { to: "/admin/setup", label: "Einrichtung & FAQ", icon: BookOpen, areas: ["system"] },
+      { to: "/admin/email-templates", label: "E-Mail-Vorlagen", icon: Mail, areas: ["system"] },
       // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
       // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
       { to: "/admin/settings?tab=smtp", label: "Einstellungen: SMTP", icon: SettingsIcon, areas: ["system"], searchOnly: true },
@@ -147,7 +138,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/news": ["beitraege", "ankuendigungen"],
   "/admin/gallery": ["bilder", "fotos", "alben"],
   "/admin/media": ["uploads", "dateien", "bilder"],
-  "/admin/cms": ["seiten", "texte", "email"],
+  "/admin/email-templates": ["email", "e-mail", "vorlagen", "templates", "betreff", "mail-text", "testmail"],
   "/admin/nav": ["menue", "navigation"],
   "/admin/achievements": ["badges", "punkte", "level"],
   "/admin/stickers": ["chat", "emoji", "fluent"],

@@ -123,7 +123,7 @@ const SeasonPage = lazy(() => import("@/pages/public/SeasonPage"));
 const PublicProfilePage = lazy(() => import("@/pages/public/PublicProfilePage"));
 const AdminAchievementsPage = lazy(() => import("@/pages/admin/AdminAchievementsPage"));
 const AdminMembershipApplicationsPage = lazy(() => import("@/pages/admin/AdminMembershipApplicationsPage"));
-const AdminCmsPage = lazy(() => import("@/pages/admin/AdminCmsPage"));
+const AdminEmailTemplatesPage = lazy(() => import("@/pages/admin/AdminEmailTemplatesPage"));
 const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
 const AdminNavPage = lazy(() => import("@/pages/admin/AdminNavPage"));
 const MembershipApplyPage = lazy(() => import("@/pages/public/MembershipApplyPage"));
@@ -326,7 +326,9 @@ function App() {
           <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/stickers" element={<ProtectedRoute requireArea="content"><AdminStickersPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireArea="club"><AdminMembershipApplicationsPage /></ProtectedRoute>} />
-          <Route path="/admin/cms" element={<ProtectedRoute requireArea="content"><AdminCmsPage /></ProtectedRoute>} />
+          <Route path="/admin/email-templates" element={<ProtectedRoute requireArea="system"><AdminEmailTemplatesPage /></ProtectedRoute>} />
+          {/* Das Web-CMS ist weg (#437 A): alte Lesezeichen landen bei den E-Mail-Vorlagen, seiner einen verbliebenen Aufgabe. */}
+          <Route path="/admin/cms" element={<Navigate to="/admin/email-templates" replace />} />
           <Route path="/admin/media" element={<ProtectedRoute requireArea="content"><AdminMediaPage /></ProtectedRoute>} />
           <Route path="/admin/nav" element={<ProtectedRoute requireArea="content"><AdminNavPage /></ProtectedRoute>} />
           <Route path="/admin/prizes" element={<ProtectedRoute requireArea="tournaments"><AdminPrizesPage /></ProtectedRoute>} />

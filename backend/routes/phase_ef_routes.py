@@ -137,105 +137,6 @@ async def admin_streams_status(me: dict = Depends(require_area("content"))):
 
 
 # ============= Pages CMS =============
-pages_router = APIRouter(prefix="/api/pages", tags=["cms"])
-admin_pages_router = APIRouter(prefix="/api/admin/pages", tags=["cms-admin"])
-
-# Default seeded pages
-DEFAULT_PAGES = [
-    {"slug": "about",   "title": "Über uns",    "body_md": "# Über THE LION SQUAD\n\nWir sind ein eSports-Verein…",
-     "meta_description": "Lerne THE LION SQUAD eSPORTS kennen.", "is_default": True},
-    {"slug": "values",  "title": "Werte & Ziele", "body_md": "# Werte & Ziele\n\nFairplay · Community · Wachstum.",
-     "meta_description": "Unsere Werte und Ziele.", "is_default": True},
-    {"slug": "imprint", "title": "Impressum",   "body_md": "# Impressum\n\nTHE LION SQUAD — eSPORTS\n…",
-     "meta_description": "Impressum / Anbieterkennzeichnung.", "is_default": True},
-    {"slug": "privacy", "title": "Datenschutz", "body_md": "# Datenschutz\n\nDeine Privatsphäre ist uns wichtig…",
-     "meta_description": "Datenschutzerklärung.", "is_default": True},
-]
-
-
-async def seed_default_pages():
-    db = get_db()
-    for p in DEFAULT_PAGES:
-        await db.cms_pages.update_one(
-            {"slug": p["slug"]},
-            {"$setOnInsert": {**p, "id": p["slug"], "created_at": now_utc().isoformat(),
-                              "updated_at": now_utc().isoformat()}},
-            upsert=True,
-        )
-
-
-@pages_router.get("/{slug}")
-async def public_get_page(slug: str):
-    db = get_db()
-    page = await db.cms_pages.find_one({"slug": slug, "is_published": {"$ne": False}}, {"_id": 0})
-    if not page:
-        raise HTTPException(404, "Seite nicht gefunden.")
-    page["content_embeds"] = await resolve_content_embeds(db, page.get("body_md"), None)
-    return page
-
-
-class PageCreate(BaseModel):
-    slug: Optional[str] = Field(default=None, max_length=80)
-    title: str
-    body_md: str = ""
-    meta_description: Optional[str] = None
-    is_published: bool = True
-
-
-class PagePatch(BaseModel):
-    title: Optional[str] = None
-    body_md: Optional[str] = None
-    meta_description: Optional[str] = None
-    is_published: Optional[bool] = None
-
-
-@admin_pages_router.get("")
-async def admin_list_pages(me: dict = Depends(require_area("content"))):
-    db = get_db()
-    return await db.cms_pages.find({}, {"_id": 0}).sort("slug", 1).to_list(500)
-
-
-@admin_pages_router.post("")
-async def admin_create_page(body: PageCreate, me: dict = Depends(require_area("content"))):
-    db = get_db()
-    doc = body.model_dump()
-    doc["slug"] = await unique_slug(db.cms_pages, doc.get("slug") or doc.get("title"), fallback="seite", max_length=80)
-    doc = {**doc, "id": doc["slug"], "is_default": False,
-           "created_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(),
-           "created_by": me["id"]}
-    await db.cms_pages.insert_one(doc)
-    doc.pop("_id", None)
-    return doc
-
-
-@admin_pages_router.put("/{slug}")
-@admin_pages_router.patch("/{slug}")
-async def admin_update_page(slug: str, body: PagePatch, me: dict = Depends(require_area("content"))):
-    db = get_db()
-    nullable_fields = {"body_md", "meta_description"}
-    raw = body.model_dump(exclude_unset=True)
-    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if not updates:
-        raise HTTPException(400, "Keine Änderungen.")
-    updates["updated_at"] = now_utc().isoformat()
-    res = await db.cms_pages.update_one({"slug": slug}, {"$set": updates})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Seite nicht gefunden.")
-    return await db.cms_pages.find_one({"slug": slug}, {"_id": 0})
-
-
-@admin_pages_router.delete("/{slug}")
-async def admin_delete_page(slug: str, me: dict = Depends(require_area("content"))):
-    db = get_db()
-    p = await db.cms_pages.find_one({"slug": slug})
-    if not p:
-        raise HTTPException(404, "Seite nicht gefunden.")
-    if p.get("is_default"):
-        raise HTTPException(400, "Standard-Seite kann nicht gelöscht werden — nur deaktivieren via is_published=false.")
-    await db.cms_pages.delete_one({"slug": slug})
-    return {"ok": True}
-
-
 # ============= Email Templates =============
 admin_emailt_router = APIRouter(prefix="/api/admin/email-templates", tags=["cms-admin"])
 
@@ -293,26 +194,61 @@ class TemplatePatch(BaseModel):
     name: Optional[str] = None
 
 
+class TemplateDraft(BaseModel):
+    subject: Optional[str] = None
+    html: Optional[str] = None
+
+
 @admin_emailt_router.get("")
 async def admin_list_templates(me: dict = Depends(require_area("system"))):
-    db = get_db()
-    return await db.email_templates.find({}, {"_id": 0}).sort("key", 1).to_list(50)
+    """Alle Mails der Website (#437 A): Zweck, Empfänger, Variablen, Standard oder angepasst."""
+    from services.mail_catalog import list_templates
+    return await list_templates(get_db(), DEFAULT_EMAIL_TEMPLATES)
 
 
 @admin_emailt_router.put("/{key}")
 @admin_emailt_router.patch("/{key}")
 async def admin_patch_template(key: str, body: TemplatePatch, me: dict = Depends(require_area("system"))):
-    db = get_db()
-    nullable_fields = {"subject", "html", "name"}
+    from services.mail_catalog import save_override
     raw = body.model_dump(exclude_unset=True)
-    updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
-    if not updates:
+    if not raw:
         raise HTTPException(400, "Keine Änderungen.")
-    updates["updated_at"] = now_utc().isoformat()
-    res = await db.email_templates.update_one({"key": key}, {"$set": updates})
-    if res.matched_count == 0:
-        raise HTTPException(404, "Template nicht gefunden.")
-    return await db.email_templates.find_one({"key": key}, {"_id": 0})
+    try:
+        return await save_override(get_db(), key, DEFAULT_EMAIL_TEMPLATES, subject=raw.get("subject"), html=raw.get("html"), name=raw.get("name"), actor_id=me.get("id"))
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@admin_emailt_router.post("/{key}/preview")
+async def admin_preview_template(key: str, body: TemplateDraft, me: dict = Depends(require_area("system"))):
+    """Vorschau mit Beispieldaten - eines ungespeicherten Entwurfs oder des geltenden Stands."""
+    from services.mail_catalog import CATALOG, render
+    if key not in CATALOG:
+        raise HTTPException(404, "Diese Vorlage gibt es nicht.")
+    return await render(get_db(), key, subject=body.subject, html=body.html)
+
+
+@admin_emailt_router.post("/{key}/test")
+async def admin_test_template(key: str, body: TemplateDraft, me: dict = Depends(require_area("system"))):
+    """Testmail mit Beispieldaten an die eigene Adresse - über die Mail-Queue wie jede andere Mail."""
+    from services.mail_catalog import CATALOG, render
+    from services.mail_queue import enqueue_mail
+    if key not in CATALOG:
+        raise HTTPException(404, "Diese Vorlage gibt es nicht.")
+    if not me.get("email"):
+        raise HTTPException(400, "Dein Konto hat keine E-Mail-Adresse.")
+    rendered = await render(get_db(), key, subject=body.subject, html=body.html)
+    await enqueue_mail(me["email"], rendered["subject"] or f"Test: {key}", rendered["html"], template_key=key, meta={"test": True, "actor_id": me.get("id")})
+    return {"ok": True, "to": me["email"]}
+
+
+@admin_emailt_router.post("/{key}/reset")
+async def admin_reset_template(key: str, me: dict = Depends(require_area("system"))):
+    from services.mail_catalog import reset_template
+    try:
+        return await reset_template(get_db(), key, DEFAULT_EMAIL_TEMPLATES)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
 
 
 async def render_template(key: str, vars_: dict, fallback_subject: str = "", fallback_html: str = "") -> tuple[str, str]:
