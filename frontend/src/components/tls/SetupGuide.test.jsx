@@ -22,7 +22,7 @@ test("Discord-App: Schritte, Link ins Developer Portal, Rückrufadresse mit der 
   fireEvent.click(screen.getByTestId("setup-copy-discord_app-3"));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/api/platform-links/discord/callback`));
   expect(toastMock.success).toHaveBeenCalledWith("Kopiert.");
-  expect(screen.getByTestId("setup-where-discord_app")).toHaveAttribute("href", "/admin/settings?tab=auth");
+  expect(screen.getByTestId("setup-where-discord_app")).toHaveAttribute("href", "/admin/integrations/discord");
 });
 
 test("jede Anleitung hat Titel, Ort, Schritte - und der Stand folgt den Admin-Daten", () => {

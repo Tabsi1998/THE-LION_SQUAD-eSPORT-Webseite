@@ -19,7 +19,7 @@ export const NOT_LINKABLE = {
 // Die Apps der Website je Plattform (Admin → Login & Konten): welche Felder, wo die Anleitung steht.
 export const PLATFORM_APPS = [
   { key: "discord", label: "Discord", idField: "discord_client_id", secretField: "discord_client_secret", idPlaceholder: "Application ID aus dem Developer Portal", guideKey: "discord_app" },
-  { key: "twitch", label: "Twitch", idField: "twitch_client_id", secretField: "twitch_client_secret", tab: "/admin/settings?tab=twitch", tabLabel: "Twitch", guideKey: "twitch" },
+  { key: "twitch", label: "Twitch", idField: "twitch_client_id", secretField: "twitch_client_secret", tab: "/admin/integrations/twitch", tabLabel: "Twitch", guideKey: "twitch" },
   { key: "steam", label: "Steam", secretField: "steam_api_key", secretLabel: "Steam Web-API-Schlüssel (optional)", secretPlaceholder: "nur für den Anzeigenamen; ohne bleibt die SteamID", guideKey: "steam", optional: true },
   { key: "battlenet", label: "Battle.net", idField: "battlenet_client_id", secretField: "battlenet_client_secret", guideKey: "battlenet", optional: true },
   { key: "x", label: "X", idField: "x_client_id", secretField: "x_client_secret", idLabel: "X Client ID (OAuth 2.0)", guideKey: "x", optional: true },

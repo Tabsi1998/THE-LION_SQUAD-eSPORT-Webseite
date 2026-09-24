@@ -6,8 +6,9 @@ import { PLATFORM_APPS } from "@/lib/platformLinks";
 import { guideStatus } from "@/lib/setupGuides";
 
 export const INTEGRATIONS = [
-  { key: "discord", label: "Discord", app: "discord", guides: ["discord_app", "discord_webhooks", "discord_bot"], tab: "/admin/settings?tab=discord", tabLabel: "Webhooks, Meldungen und Bot" },
-  { key: "twitch", label: "Twitch", app: "twitch", guides: ["twitch"], tab: "/admin/settings?tab=twitch", tabLabel: "Live-Erkennung und Vereinskanal" },
+  // Discord und Twitch tragen ihre laufenden Einstellungen selbst (kein Reiter mehr, 24.09.).
+  { key: "discord", label: "Discord", app: "discord", guides: ["discord_app", "discord_webhooks", "discord_bot"], searchTerms: ["webhook", "bot", "token", "kanal", "meldungen", "rollen abgleichen", "befehle", "betriebs-webhook", "aktivität", "zähler"] },
+  { key: "twitch", label: "Twitch", app: "twitch", guides: ["twitch"], searchTerms: ["helix", "livestream", "live-erkennung", "stream", "vereinskanal", "kanal"] },
   { key: "steam", label: "Steam", app: "steam", guides: ["steam"] },
   { key: "battlenet", label: "Battle.net", app: "battlenet", guides: ["battlenet"] },
   { key: "x", label: "X (Twitter)", app: "x", guides: ["x"] },

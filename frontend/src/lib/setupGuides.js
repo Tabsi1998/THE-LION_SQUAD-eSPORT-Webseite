@@ -7,7 +7,7 @@ export const SETUP_GUIDES = {
   discord_app: {
     key: "discord_app",
     title: "Discord: Konten verknüpfen (OAuth2-App)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/discord", label: "Verbindungen → Discord" },
     summary: "Mitglieder melden sich im Profil einmal bei Discord an, der Name wird eingetragen und trägt „verifiziert“. Dafür braucht die Website Client ID und Client Secret einer Discord-App – am einfachsten dieselbe App wie der Bot.",
     steps: [
       { text: "Discord Developer Portal öffnen und die App des Bots anklicken (oder „New Application“).", link: { href: "https://discord.com/developers/applications", label: "Developer Portal" } },
@@ -23,7 +23,7 @@ export const SETUP_GUIDES = {
   discord_bot: {
     key: "discord_bot",
     title: "Discord-Bot (Aktivität, Rollen, Befehle)",
-    where: { to: "/admin/settings?tab=discord", label: "Einstellungen → Discord" },
+    where: { to: "/admin/integrations/discord", label: "Verbindungen → Discord" },
     summary: "Der Bot zählt Aktivität, gleicht Mitgliederrollen ab und beantwortet Befehle. Er braucht einen Bot-Token, zwei Intents und eine Einladung auf den Server.",
     steps: [
       { text: "Developer Portal → deine App → links „Bot“.", link: { href: "https://discord.com/developers/applications", label: "Developer Portal" } },
@@ -39,7 +39,7 @@ export const SETUP_GUIDES = {
   discord_webhooks: {
     key: "discord_webhooks",
     title: "Discord-Meldungen (Webhooks je Zweck)",
-    where: { to: "/admin/settings?tab=discord", label: "Einstellungen → Discord" },
+    where: { to: "/admin/integrations/discord", label: "Verbindungen → Discord" },
     summary: "News, Events und Turniere, Erfolge, Vorstand und Betriebsalarme gehen über Webhooks in je einen Kanal. Ein Webhook ist eine Adresse, die Discord für einen Kanal erzeugt.",
     steps: [
       { text: "In Discord: Server-Einstellungen → „Integrationen“ → „Webhooks“ → „Neuer Webhook“." },
@@ -52,7 +52,7 @@ export const SETUP_GUIDES = {
   twitch: {
     key: "twitch",
     title: "Twitch: Live-Erkennung und Konten verknüpfen",
-    where: { to: "/admin/settings?tab=twitch", label: "Einstellungen → Twitch" },
+    where: { to: "/admin/integrations/twitch", label: "Verbindungen → Twitch" },
     summary: "Eine Twitch-App (Helix) erkennt, wer gerade live ist, und lässt Mitglieder ihr Twitch-Konto verknüpfen. Das Twitch-Konto, das die App anlegt, braucht Zwei-Faktor.",
     steps: [
       { text: "Twitch Developer Console öffnen (mit dem Vereinskonto anmelden) → „Register Your Application“.", link: { href: "https://dev.twitch.tv/console/apps", label: "Twitch Developer Console" } },
@@ -83,7 +83,7 @@ export const SETUP_GUIDES = {
   steam: {
     key: "steam",
     title: "Steam (optional: Anzeigename statt ID)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/steam", label: "Verbindungen → Steam" },
     summary: "Steam-Verknüpfung braucht keine App. Mit einem Web-API-Schlüssel zeigt die Website den Steam-Anzeigenamen statt der 17-stelligen ID.",
     steps: [
       { text: "Steam Web-API-Schlüssel anfordern (mit einem Steam-Konto, das nicht eingeschränkt ist); als Domain die Website eintragen.", link: { href: "https://steamcommunity.com/dev/apikey", label: "Steam Web API Key" } },
@@ -96,7 +96,7 @@ export const SETUP_GUIDES = {
   battlenet: {
     key: "battlenet",
     title: "Battle.net (BattleTag verknüpfen)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/battlenet", label: "Verbindungen → Battle.net" },
     summary: "Ein Battle.net-Client der Website – Mitglieder verknüpfen ihren BattleTag per Anmeldung bei Blizzard.",
     steps: [
       { text: "Battle.net Developer Portal öffnen (Battle.net-Konto des Vereins) → „Create Client“.", link: { href: "https://develop.battle.net/access/clients", label: "Battle.net – API Access" } },
@@ -109,7 +109,7 @@ export const SETUP_GUIDES = {
   x: {
     key: "x",
     title: "X (Twitter) verknüpfen",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/x", label: "Verbindungen → X (Twitter)" },
     summary: "Eine X-App mit OAuth 2.0 (Free-Tarif reicht). Mitglieder verknüpfen ihren X-Nutzernamen per Anmeldung bei X.",
     steps: [
       { text: "X Developer Portal → Projekt und App anlegen (Free).", link: { href: "https://developer.x.com/en/portal/dashboard", label: "X Developer Portal" } },
@@ -123,7 +123,7 @@ export const SETUP_GUIDES = {
   youtube: {
     key: "youtube",
     title: "YouTube-Kanal verknüpfen (Google)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/youtube", label: "Verbindungen → YouTube" },
     summary: "Über das Google-Projekt des Vereins: Mitglieder melden sich bei Google an, die Website liest nur, welcher YouTube-Kanal dazugehört.",
     steps: [
       { text: "Google Cloud Console → dasselbe Projekt wie beim Google-Login → „APIs & Dienste“ → „YouTube Data API v3“ aktivieren.", link: { href: "https://console.cloud.google.com/apis/library/youtube.googleapis.com", label: "YouTube Data API v3 aktivieren" } },
@@ -137,7 +137,7 @@ export const SETUP_GUIDES = {
   tiktok: {
     key: "tiktok",
     title: "TikTok verknüpfen (Login Kit)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/tiktok", label: "Verbindungen → TikTok" },
     summary: "Eine TikTok-App mit Login Kit. TikTok schaltet die Anmeldung erst nach Prüfung der App frei; vorher geht nur ein Sandbox-Test.",
     steps: [
       { text: "TikTok for Developers → „Manage apps“ → App anlegen (Name, Beschreibung, Website).", link: { href: "https://developers.tiktok.com/", label: "TikTok for Developers" } },
@@ -151,7 +151,7 @@ export const SETUP_GUIDES = {
   riot: {
     key: "riot",
     title: "Riot ID verknüpfen (Riot Sign On)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/riot", label: "Verbindungen → Riot Games" },
     summary: "Riot Sign On (RSO) gibt es nur nach Antrag bei Riot. Danach verknüpfen Mitglieder ihre Riot ID (Name#TAG) per Anmeldung bei Riot.",
     steps: [
       { text: "Riot Developer Portal → mit dem Riot-Konto anmelden → „Register Product“ (Produkt: die Vereinswebsite) und dort RSO beantragen.", link: { href: "https://developer.riotgames.com/", label: "Riot Developer Portal" } },
@@ -164,7 +164,7 @@ export const SETUP_GUIDES = {
   xbox: {
     key: "xbox",
     title: "Xbox-Gamertag verknüpfen (Microsoft)",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/xbox", label: "Verbindungen → Xbox" },
     summary: "Eine App-Registrierung bei Microsoft (Azure). Mitglieder melden sich mit dem Microsoft-Konto an; die Website holt daraus den Gamertag.",
     steps: [
       { text: "Azure-Portal → „App-Registrierungen“ → „Neue Registrierung“.", link: { href: "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade", label: "Azure – App-Registrierungen" } },
@@ -177,7 +177,7 @@ export const SETUP_GUIDES = {
   epic: {
     key: "epic",
     title: "Epic-Games-Konto verknüpfen",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/integrations/epic", label: "Verbindungen → Epic Games" },
     summary: "Epic Account Services: Organisation und Produkt im Epic Developer Portal, eine Anwendung mit Markenprüfung, dann verknüpfen Mitglieder ihren Epic-Anzeigenamen.",
     steps: [
       { text: "Epic Developer Portal → Organisation anlegen → Produkt anlegen (die Vereinswebsite).", link: { href: "https://dev.epicgames.com/portal", label: "Epic Developer Portal" } },

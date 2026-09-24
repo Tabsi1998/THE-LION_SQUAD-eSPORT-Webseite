@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
+import { Navigate, useSearchParams } from "react-router-dom";
+import { api, formatApiError } from "@/lib/api";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { isGoogleMeasurementId, normalizeAnalyticsPayload } from "@/lib/analyticsConfig";
 import { AdminLayout } from "@/components/tls/AdminLayout";
@@ -11,14 +11,11 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, SystemCard } from "./settings/fields";
-import { TwitchTab } from "./settings/TwitchTab";
-import { PlatformLinkSettings } from "./settings/PlatformLinkSettings";
+import { PlatformLinkOverview } from "./settings/PlatformLinkSettings";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { PLATFORM_APP_FIELDS, PLATFORM_SECRET_FIELDS } from "@/lib/platformLinks";
-import { DiscordBotPanel } from "./settings/DiscordBotPanel";
-import { DiscordTargets } from "./settings/DiscordTargets";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, MessageSquare, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Radio, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -75,16 +72,15 @@ const SETTINGS_GROUPS = [
     ["seo", "SEO & Analytics", Search],
     ["legal", "Rechtliches", FileText],
   ] },
-  { label: "Verbindungen", tabs: [
-    ["discord", "Discord", MessageSquare],
-    ["twitch", "Twitch", Radio],
-  ] },
   { label: "System", tabs: [
     ["system", "Status", Activity],
   ] },
 ];
 const SETTINGS_TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs);
 const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
+// Discord und Twitch haben seit 24.09. keine Reiter mehr: alles dazu steht auf ihrer Seite unter
+// Verbindungen („muss das doppelt sein?“). Alte Links und Lesezeichen landen dort.
+const LEGACY_TAB_REDIRECTS = { discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch" };
 const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
 const BANNER_TEMPLATE_PRESETS = {
@@ -206,21 +202,6 @@ function mergedLegacyText(primary, legacy) {
   return [...new Map(values.map((value) => [value.replace(/\s+/g, " ").toLocaleLowerCase(), value])).values()].join("\n\n");
 }
 
-function discordPayload(source) {
-  const payload = { ...(source || {}) };
-  if (!payload.webhook_url) delete payload.webhook_url;
-  if (!payload.ops_webhook_url) delete payload.ops_webhook_url;
-  delete payload.configured;
-  delete payload.webhook_url_masked;
-  delete payload.ops_configured;
-  delete payload.ops_webhook_url_masked;
-  delete payload.last_status;
-  delete payload.last_error;
-  delete payload.last_event_key;
-  delete payload.last_checked_at;
-  return payload;
-}
-
 function hasOriginalSnapshot(ref) {
   return Object.keys(ref.current || {}).length > 0;
 }
@@ -271,7 +252,6 @@ export default function AdminSettingsPage() {
     site_banner_audience: "all", site_banner_link_url: "", site_banner_link_label: "",
     site_banner_starts_at: "", site_banner_ends_at: "",
   });
-  const [discord, setDiscord] = useState({ webhook_url: "", ops_webhook_url: "", username: "", avatar_url: "", enabled: true, configured: false, ops_configured: false, webhook_url_masked: "", ops_webhook_url_masked: "", last_status: "", last_error: "", last_event_key: "", last_checked_at: "" });
   const [authConfig, setAuthConfig] = useState({
     password_login_enabled: true,
     registration_enabled: true,
@@ -283,14 +263,9 @@ export default function AdminSettingsPage() {
   });
   const [savingAuth, setSavingAuth] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
-  const [discordCounters, setDiscordCounters] = useState([]);
-  const [discordCounterQuery, setDiscordCounterQuery] = useState("");
-  const [discordCounterValues, setDiscordCounterValues] = useState({});
-  const [savingDiscordCounter, setSavingDiscordCounter] = useState("");
   const [testEmail, setTestEmail] = useState("");
   const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
-  const [twitchStatus, setTwitchStatus] = useState(null);
   const [siteBanners, setSiteBanners] = useState([]);
   const [bannerForm, setBannerForm] = useState(emptyBannerForm());
   const [editingBannerId, setEditingBannerId] = useState("");
@@ -298,20 +273,14 @@ export default function AdminSettingsPage() {
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [savingBrand, setSavingBrand] = useState(false);
-  const [savingDiscord, setSavingDiscord] = useState(false);
-  const [savingTwitch, setSavingTwitch] = useState(false);
-  const [savingPlatformApps, setSavingPlatformApps] = useState(false);
   const [generatingFavicon, setGeneratingFavicon] = useState(false);
-  const [refreshingTwitch, setRefreshingTwitch] = useState(false);
   const [submittingIndexNow, setSubmittingIndexNow] = useState(false);
   const [indexNowResult, setIndexNowResult] = useState(null);
   const imageUploadBusy = useImageUploadBusy();
   const brandDirtyRef = useRef(false);
-  const discordDirtyRef = useRef(false);
   const originalEmailRef = useRef({});
   const originalSmtpRef = useRef({});
   const originalBrandRef = useRef({});
-  const originalDiscordRef = useRef({});
   const loadSeqRef = useRef(0);
   const loadErrorKeyRef = useRef("");
   const confirm = useConfirm();
@@ -340,21 +309,18 @@ export default function AdminSettingsPage() {
     const requestDefs = [
       { key: "email", label: "E-Mail", critical: true, request: () => api.get("/settings/email") },
       { key: "branding", label: "Branding", critical: true, request: () => api.get("/settings/branding") },
-      { key: "discord", label: "Discord", critical: true, request: () => api.get("/settings/discord") },
       { key: "email_logs", label: "E-Mail-Logs", critical: false, request: () => api.get("/settings/email/logs") },
       { key: "smtp", label: "SMTP", critical: true, request: () => api.get("/settings/smtp") },
       { key: "queue", label: "Mail-Queue", critical: false, request: () => api.get("/settings/mail-queue?limit=100") },
       { key: "queue_stats", label: "Mail-Queue-Statistik", critical: false, request: () => api.get("/settings/mail-queue/stats") },
       { key: "system", label: "Systemstatus", critical: false, request: () => api.get("/admin/system-status") },
-      { key: "twitch", label: "Twitch-Status", critical: false, request: () => api.get("/admin/streams/status") },
-      { key: "discord_counters", label: "Discord-Zähler", critical: false, request: () => api.get("/admin/discord/counters?limit=50") },
       { key: "site_banners", label: "Hinweisleisten", critical: false, request: () => api.get("/settings/site-banners/admin") },
       ...(isSuperadmin ? [{ key: "auth", label: "Login & Google", critical: false, request: () => api.get("/settings/auth") }] : []),
     ];
     const requests = await Promise.allSettled(requestDefs.map((entry) => entry.request()));
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), d = value(2), l = value(3), sm = value(4), q = value(5), qs = value(6), st = value(7), tw = value(8), dc = value(9), sb = value(10), ac = isSuperadmin ? value(11) : null;
+    const e = value(0), b = value(1), l = value(2), sm = value(3), q = value(4), qs = value(5), st = value(6), sb = value(7), ac = isSuperadmin ? value(8) : null;
     if (e) setEmail((prev) => {
       const next = { ...prev, ...e, resend_api_key: "", resend_api_key_masked: e.resend_api_key_masked || "" };
       originalEmailRef.current = emailPayload(next);
@@ -369,11 +335,6 @@ export default function AdminSettingsPage() {
       originalBrandRef.current = brandPayload(next);
       return next;
     });
-    if (d && !discordDirtyRef.current) setDiscord((prev) => {
-      const next = { ...prev, ...d, webhook_url: "", ops_webhook_url: "" };
-      originalDiscordRef.current = discordPayload(next);
-      return next;
-    });
     // Listen nur übernehmen, wenn es welche sind: unten stehen .map und
     // .filter darauf, und ein unerwartet geformter Wert nähme die ganze Seite
     // mit in die Fehlergrenze statt nur diesen einen Bereich leer zu lassen.
@@ -386,8 +347,6 @@ export default function AdminSettingsPage() {
     if (Array.isArray(q)) setQueue(q);
     if (qs) setQueueStats(qs);
     if (st) setSystemStatus(st);
-    if (tw) setTwitchStatus(tw);
-    if (Array.isArray(dc)) setDiscordCounters(dc);
     if (sb) setSiteBanners(Array.isArray(sb) ? sb : []);
     if (ac) setAuthConfig((prev) => ({ ...prev, ...ac }));
     const failed = requests
@@ -412,9 +371,9 @@ export default function AdminSettingsPage() {
   }, [isSuperadmin]);
 
   useEffect(() => { load(); }, [load]);
-  // Warteschlange und Twitch-Status ändern sich ohne Klick: auf diesen
-  // Reitern ohne Strom alle 15 s nachfragen, sonst nur bei Änderung.
-  const liveTab = tab === "queue" || tab === "twitch";
+  // Die Warteschlange ändert sich ohne Klick: auf diesem Reiter ohne Strom
+  // alle 15 s nachfragen, sonst nur bei Änderung.
+  const liveTab = tab === "queue";
   useLiveRefresh(load, ["settings", "users"], { fallbackMs: liveTab ? 15000 : 0 });
 
   const loadNewsletterSources = useCallback(async () => {
@@ -494,27 +453,10 @@ export default function AdminSettingsPage() {
     setBrand((prev) => ({ ...prev, social_links: (prev.social_links || []).filter((_, i) => i !== index) }));
   };
 
-  const setDiscordField = (key, value) => {
-    discordDirtyRef.current = true;
-    setDiscord((prev) => ({ ...prev, [key]: value }));
-  };
-
   const setCanonicalLegalText = (key, legacyKey, value) => {
     brandDirtyRef.current = true;
     setBrand((prev) => ({ ...prev, [key]: value, [legacyKey]: "" }));
   };
-
-  const loadDiscordCounters = useCallback((query = discordCounterQuery) => {
-    api.get(`/admin/discord/counters?q=${encodeURIComponent(query)}&limit=50`)
-      .then(({ data }) => setDiscordCounters(Array.isArray(data) ? data : []))
-      .catch(() => setDiscordCounters([]));
-  }, [discordCounterQuery]);
-
-  useEffect(() => {
-    if (tab !== "discord") return undefined;
-    const id = window.setTimeout(() => loadDiscordCounters(discordCounterQuery), 250);
-    return () => window.clearTimeout(id);
-  }, [tab, discordCounterQuery, loadDiscordCounters]);
 
   const refreshPublicBranding = async () => {
     try {
@@ -665,49 +607,6 @@ export default function AdminSettingsPage() {
       toast.error(formatApiError(e.response?.data?.detail) || "Hinweisleiste konnte nicht gelöscht werden.");
     }
   };
-  const saveTwitch = async () => {
-    if (savingTwitch) return;
-    setSavingTwitch(true);
-    try {
-      const payload = brandPayload({
-        twitch_channel: brand.twitch_channel,
-        twitch_client_id: brand.twitch_client_id,
-        twitch_client_secret: brand.twitch_client_secret,
-        twitch_live_detection: !!brand.twitch_live_detection,
-      });
-      const patch = buildDirtyPayload(payload, originalBrandRef.current);
-      if (!hasPayloadChanges(patch)) {
-        toast.info("Keine Änderungen zum Speichern.");
-        return;
-      }
-      loadSeqRef.current += 1;
-      const { data } = await api.put("/settings/branding", patch);
-      brandDirtyRef.current = false;
-      setBrand((prev) => ({ ...prev, ...data, twitch_client_secret: "" }));
-      toast.success("Twitch-Einstellungen gespeichert.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setSavingTwitch(false); }
-  };
-  // Konten verknüpfen (#260): Discord-App und Steam-Schlüssel liegen in den Branding-Einstellungen wie Twitch.
-  const savePlatformApps = async () => {
-    if (savingPlatformApps) return;
-    setSavingPlatformApps(true);
-    try {
-      // Alle Plattform-Apps außer Twitch (die Helix-App speichert der Twitch-Reiter).
-      const appFields = PLATFORM_APP_FIELDS.filter((field) => !field.startsWith("twitch_"));
-      const payload = brandPayload(Object.fromEntries(appFields.map((field) => [field, brand[field]])));
-      const patch = buildDirtyPayload(payload, originalBrandRef.current);
-      if (!hasPayloadChanges(patch)) { toast.info("Keine Änderungen zum Speichern."); return; }
-      loadSeqRef.current += 1;
-      const { data } = await api.put("/settings/branding", patch);
-      brandDirtyRef.current = false;
-      setBrand((prev) => ({ ...prev, ...data, ...Object.fromEntries(PLATFORM_SECRET_FIELDS.map((field) => [field, ""])) }));
-      toast.success("Plattform-Zugänge gespeichert.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setSavingPlatformApps(false); }
-  };
   // #229: Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen nur den Standard-Favicon.
   // Ist der die Fassung für dunkel (weiß), ist er auf hellen Tableisten unsichtbar - der Server baut
   // eine Fassung, die überall trägt: weißes Logo auf einem Kreis in der Akzentfarbe.
@@ -722,39 +621,6 @@ export default function AdminSettingsPage() {
       toast.success("Standard-Favicon erzeugt und gespeichert.");
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
     finally { setGeneratingFavicon(false); }
-  };
-  const clearBrandSecret = async (field) => {
-    if (!await confirm({ title: "Gespeichertes entfernen?", description: "Das gespeicherte Geheimnis wird gelöscht; die Verknüpfung über diese Plattform geht dann nicht mehr, bis ein neues eingetragen ist.", confirmLabel: "Entfernen" })) return;
-    await api.put("/settings/branding", { [`clear_${field}`]: true });
-    toast.success("Entfernt.");
-    load();
-  };
-  const clearTwitchSecret = async () => {
-    if (!await confirm({ title: "Twitch Secret entfernen?", description: "Client Secret und zwischengespeicherter Twitch-Token werden entfernt.", confirmLabel: "Secret entfernen" })) return;
-    await api.put("/settings/branding", { clear_twitch_client_secret: true });
-    toast.success("Twitch Secret entfernt.");
-    load();
-  };
-  const refreshTwitch = async () => {
-    if (refreshingTwitch) return;
-    setRefreshingTwitch(true);
-    try {
-      const { data } = await api.post("/admin/streams/refresh");
-      if (data?.ok) toast.success(`Twitch geprüft: ${data.live || 0} live von ${data.checked || 0} Kanälen.`);
-      else toast.error(`Twitch nicht geprüft: ${data?.skipped || "unbekannt"}`);
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setRefreshingTwitch(false); }
-  };
-  const saveDiscord = async () => {
-    if (savingDiscord) return;
-    if (imageUploadBusy) return toast.error("Bild-Upload läuft noch. Bitte kurz warten und dann speichern.");
-    const payload = buildDirtyPayload(discordPayload(discord), originalDiscordRef.current);
-    if (!hasPayloadChanges(payload)) return toast.info("Keine Änderungen zum Speichern.");
-    setSavingDiscord(true);
-    try { loadSeqRef.current += 1; await api.put("/settings/discord", payload); discordDirtyRef.current = false; toast.success("Discord gespeichert."); load(); }
-    catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setSavingDiscord(false); }
   };
   const sendTest = async () => {
     if (!testEmail) return toast.error("E-Mail-Adresse eingeben");
@@ -794,70 +660,6 @@ export default function AdminSettingsPage() {
       load();
     } catch (e) { toast.error(formatApiError(e.response?.data?.detail) || "Newsletter-Versand fehlgeschlagen."); }
     finally { setSendingNewsletter(false); }
-  };
-  const sendDiscordTest = async () => {
-    try {
-      const { data } = await api.post("/settings/discord/test");
-      if (data.ok) toast.success(`Discord-Test gesendet${data.status_code ? ` (${data.status_code})` : ""}.`);
-      else toast.error(`Fehler: ${data.error || data.reason || "unbekannt"}`);
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-  };
-  const sendDiscordOpsTest = async () => {
-    try {
-      const { data } = await api.post("/settings/discord/test?target=ops");
-      if (data.ok) toast.success("Testalarm an den Betriebs-Webhook gesendet.");
-      else toast.error(data.reason === "ops_webhook_missing" ? "Kein Betriebs-Webhook hinterlegt." : `Fehler: ${data.error || data.reason}`);
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-  };
-  const clearDiscordOpsWebhook = async () => {
-    if (!await confirm({
-      title: "Betriebs-Webhook entfernen?",
-      description: "Rote Auto-Checks und neue Serverfehler werden danach nicht mehr gemeldet.",
-      confirmLabel: "Entfernen",
-    })) return;
-    try {
-      await api.put("/settings/discord", { clear_ops_webhook: true });
-      toast.success("Betriebs-Webhook entfernt.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-  };
-  const clearDiscordWebhook = async () => {
-    if (!await confirm({
-      title: "Discord Webhook entfernen?",
-      description: "Automatische Discord-Meldungen werden danach nicht mehr versendet.",
-      confirmLabel: "Entfernen",
-    })) return;
-    try {
-      await api.put("/settings/discord", { clear_webhook: true });
-      toast.success("Discord Webhook entfernt.");
-      load();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-  };
-  const changeDiscordCounter = async (user, delta) => {
-    if (!user?.id || savingDiscordCounter) return;
-    setSavingDiscordCounter(`${user.id}:delta`);
-    try {
-      await api.post(`/admin/discord/counter/${user.id}`, { delta });
-      toast.success(delta > 0 ? `+${delta} Discord-Aktivität gezählt.` : `${delta} Discord-Aktivität abgezogen.`);
-      loadDiscordCounters();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setSavingDiscordCounter(""); }
-  };
-  const setDiscordCounter = async (user) => {
-    const raw = discordCounterValues[user.id];
-    if (raw === undefined || raw === "") return toast.error("Zählerwert eingeben.");
-    const total = Number(raw);
-    if (!Number.isFinite(total) || total < 0) return toast.error("Zähler muss 0 oder höher sein.");
-    setSavingDiscordCounter(`${user.id}:set`);
-    try {
-      await api.put(`/admin/discord/counter/${user.id}`, { total: Math.round(total) });
-      toast.success("Discord-Zähler gespeichert.");
-      setDiscordCounterValues((prev) => ({ ...prev, [user.id]: "" }));
-      loadDiscordCounters();
-    } catch (e) { toast.error(formatApiError(e.response?.data?.detail)); }
-    finally { setSavingDiscordCounter(""); }
   };
 
   const saveSmtp = async () => {
@@ -974,7 +776,6 @@ export default function AdminSettingsPage() {
   };
 
   const emailNotConfigured = !email.resend_api_key_masked;
-  const discordNotConfigured = !discord.configured && !discord.webhook_url_masked;
   const filteredQueue = queue.filter((j) => !queueFilter || j.status === queueFilter);
   const queueCounts = queueStats?.counts || {};
   const newsletterOptions = newsletter.kind === "event" ? newsletterSources.events : newsletterSources.news;
@@ -988,17 +789,17 @@ export default function AdminSettingsPage() {
   const emailDirty = hasOriginalSnapshot(originalEmailRef) && hasPayloadChanges(buildDirtyPayload(emailPayload(email), originalEmailRef.current));
   const smtpDirty = hasOriginalSnapshot(originalSmtpRef) && hasPayloadChanges(buildDirtyPayload(smtpPayload(smtp), originalSmtpRef.current));
   const brandDirty = hasOriginalSnapshot(originalBrandRef) && hasPayloadChanges(buildDirtyPayload(brandPayload(brand), originalBrandRef.current));
-  const discordDirty = hasOriginalSnapshot(originalDiscordRef) && hasPayloadChanges(buildDirtyPayload(discordPayload(discord), originalDiscordRef.current));
   const dirtyTabs = new Set([
     emailDirty && "email",
     smtpDirty && "smtp",
-    discordDirty && "discord",
-    brandDirty && "twitch",
     brandDirty && "brand",
     brandDirty && "socials",
     brandDirty && "seo",
     brandDirty && "legal",
   ].filter(Boolean));
+
+  const legacyTarget = LEGACY_TAB_REDIRECTS[searchParams.get("tab")];
+  if (legacyTarget) return <Navigate to={legacyTarget} replace />;
 
   return (
     <AdminLayout>
@@ -1039,7 +840,7 @@ export default function AdminSettingsPage() {
             <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Login & Google</div>
             <p>Steuere zentral, wie sich Nutzer anmelden und registrieren. Google wird direkt über ein Google-Cloud-Projekt des Vereins angebunden; ein Client Secret ist für die Anmeldung nicht erforderlich.</p>
           </div>
-          <PlatformLinkSettings brand={brand} setBrandField={setBrandField} saving={savingPlatformApps} onSave={savePlatformApps} onClearSecret={clearBrandSecret} />
+          <PlatformLinkOverview brand={brand} />
           <SetupGuide guideKey="google_login" />
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
             <div className="flex items-center justify-between gap-4">
@@ -1617,137 +1418,6 @@ export default function AdminSettingsPage() {
               </table>
             </div>
           </div>
-        </div>
-      )}
-
-      {tab === "discord" && (
-        <div className="max-w-4xl space-y-4">
-          <SetupGuide guideKey="discord_webhooks" />
-          <SetupGuide guideKey="discord_bot" />
-          {discordNotConfigured && (
-            <div className="flex items-start gap-3 border border-[#5865F2]/30 bg-[#5865F2]/10 rounded-sm p-4">
-              <MessageSquare className="w-5 h-5 text-[#5865F2] shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <div className="font-bold text-[#5865F2] uppercase tracking-wider text-xs">Kein Webhook konfiguriert</div>
-                <p className="text-white/70 mt-1">Erstelle in deinem Discord-Server einen Webhook (Server-Einstellungen → Integrationen → Webhooks → Neuer Webhook), kopiere die URL und füge sie unten ein. Damit werden Turniere, Spiele und F1-Ergebnisse automatisch im Kanal gepostet.</p>
-              </div>
-            </div>
-          )}
-          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="font-heading font-bold uppercase">Discord Webhook</div>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={discord.enabled} onChange={(e) => setDiscordField("enabled", e.target.checked)} className="accent-[#29B6E8]" data-testid="discord-enabled" />
-                <span>Versand aktiv</span>
-              </label>
-            </div>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Webhook URL {discord.webhook_url_masked && <span className="text-white/40 normal-case">(aktuell: {discord.webhook_url_masked})</span>}</div>
-              <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.webhook_url} onChange={(e) => setDiscordField("webhook_url", e.target.value)} data-testid="discord-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-              <p className="text-xs text-white/40 mt-1">Leer lassen um den bestehenden Webhook beizubehalten. Erlaubt sind https://discord.com/api/webhooks/... URLs.</p>
-            </div>
-            {discord.last_status && (
-              <div className={`border rounded-sm p-3 text-xs ${discord.last_status === "sent" ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`}>
-                <div className="font-bold uppercase tracking-widest mb-1">Letzter Discord Status: {discord.last_status}</div>
-                <div>{discord.last_checked_at ? new Date(discord.last_checked_at).toLocaleString("de-DE") : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
-                {discord.last_error && <div className="mt-1 text-[#FF3B30] break-words">{discord.last_error}</div>}
-              </div>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Bot-Name</div>
-                <input value={discord.username || ""} onChange={(e) => setDiscordField("username", e.target.value)} data-testid="discord-username" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
-              </div>
-              <ImageUpload value={discord.avatar_url || ""} onChange={(v) => setDiscordField("avatar_url", v)} label="Avatar" testId="discord-avatar" variant="square" allowLibrary />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-            <button onClick={saveDiscord} disabled={imageUploadBusy || savingDiscord} data-testid="discord-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingDiscord ? "Speichere..." : "Speichern"}</button>
-              <button onClick={sendDiscordTest} data-testid="discord-test" className="px-4 py-2 border border-[#5865F2] text-[#5865F2] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Test senden</button>
-              {discord.configured && <button onClick={clearDiscordWebhook} data-testid="discord-clear" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm">Webhook entfernen</button>}
-            </div>
-          </div>
-          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="discord-ops">
-            <div className="font-heading font-bold uppercase">Betriebs-Webhook (nur Alarme)</div>
-            <p className="text-xs text-white/50">
-              Eigener Kanal für den Betrieb: rote Auto-Checks und neue Serverfehler (Admin → Betrieb). Der Community-Webhook oben bekommt davon nichts.
-              Leer heißt: keine Alarme.
-            </p>
-            <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Webhook URL {discord.ops_webhook_url_masked && <span className="text-white/40 normal-case">(aktuell: {discord.ops_webhook_url_masked})</span>}</div>
-              <input type="password" placeholder="https://discord.com/api/webhooks/…" value={discord.ops_webhook_url} onChange={(e) => setDiscordField("ops_webhook_url", e.target.value)} data-testid="discord-ops-webhook" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-              <p className="text-xs text-white/40 mt-1">Am besten ein privater Kanal nur für den Vorstand. Speichern über „Speichern“ oben.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button onClick={sendDiscordOpsTest} data-testid="discord-ops-test" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Testalarm senden</button>
-              {discord.ops_configured && <button onClick={clearDiscordOpsWebhook} data-testid="discord-ops-clear" className="px-4 py-2 border border-white/20 text-white/70 font-bold uppercase tracking-wider rounded-sm">Betriebs-Webhook entfernen</button>}
-            </div>
-          </div>
-          <DiscordTargets />
-          <DiscordBotPanel canSystem={user?.role === "superadmin"} />
-          <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
-            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-              <div>
-                <div className="font-heading font-bold uppercase">Discord-Aktivität</div>
-                <p className="mt-1 text-xs text-white/45">Pflege Nachrichten-Zähler für `discord_active` Achievements. Später kann hier ein Bot/Import automatisch schreiben.</p>
-              </div>
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
-                <input value={discordCounterQuery} onChange={(e) => setDiscordCounterQuery(e.target.value)} data-testid="discord-counter-search" placeholder="User, Name, Discord oder E-Mail" className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm" />
-              </div>
-            </div>
-            <div className="border border-white/5 rounded-sm divide-y divide-white/5 overflow-hidden">
-              {discordCounters.map((user) => {
-                const total = user.discord_messages_count || 0;
-                return (
-                  <div key={user.id} className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-3 p-3 items-center">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {user.avatar_url ? (
-                        <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-10 h-10 rounded-sm object-cover border border-white/10" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center text-xs font-black text-white/40">
-                          {(user.display_name || user.username || "?").slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-bold truncate">{user.display_name || user.username}</div>
-                        <div className="text-xs text-white/40 truncate">@{user.username}{user.discord_name ? ` · ${user.discord_name}` : ""}</div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
-                      <div className="px-3 py-2 border border-[#5865F2]/30 bg-[#5865F2]/10 text-[#b8c0ff] text-xs font-bold uppercase tracking-widest rounded-sm">
-                        {total.toLocaleString("de-DE")} Nachrichten
-                      </div>
-                      <button type="button" onClick={() => changeDiscordCounter(user, 1)} disabled={!!savingDiscordCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+1</button>
-                      <button type="button" onClick={() => changeDiscordCounter(user, 10)} disabled={!!savingDiscordCounter} className="px-3 py-2 border border-white/10 hover:border-[#5865F2]/60 text-xs font-bold uppercase tracking-wider rounded-sm">+10</button>
-                      <input type="number" min="0" value={discordCounterValues[user.id] ?? ""} onChange={(e) => setDiscordCounterValues((prev) => ({ ...prev, [user.id]: e.target.value }))} data-testid={`discord-counter-total-${user.id}`} placeholder="Wert" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs" />
-                      <button type="button" onClick={() => setDiscordCounter(user)} disabled={!!savingDiscordCounter} data-testid={`discord-counter-save-${user.id}`} className="px-3 py-2 bg-[#5865F2] text-white text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Setzen</button>
-                    </div>
-                  </div>
-                );
-              })}
-              {!discordCounters.length && (
-                <div className="px-4 py-10 text-center text-sm text-white/40">
-                  Keine Discord-Zähler gefunden. Suche nach einem Benutzer, um den ersten Wert zu setzen.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {tab === "twitch" && (
-        <div className="space-y-4">
-          <SetupGuide guideKey="twitch" />
-        <TwitchTab
-          brand={brand}
-          setBrandField={setBrandField}
-          status={twitchStatus}
-          saving={savingTwitch}
-          refreshing={refreshingTwitch}
-          onSave={saveTwitch}
-          onRefresh={refreshTwitch}
-          onClearSecret={() => clearTwitchSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))}
-        />
         </div>
       )}
 

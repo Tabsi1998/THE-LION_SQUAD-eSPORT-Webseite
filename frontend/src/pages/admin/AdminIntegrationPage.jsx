@@ -5,13 +5,16 @@ import { ArrowLeft, ArrowRight, ExternalLink } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SetupGuide, StatusChip } from "@/components/tls/SetupGuide";
 import { PlatformAppCard } from "@/pages/admin/settings/PlatformLinkSettings";
+import { DiscordSettings } from "@/pages/admin/settings/DiscordSettings";
+import { TwitchSettings } from "@/pages/admin/settings/TwitchSettings";
 import { api, formatRequestError } from "@/lib/api";
 import { INTEGRATIONS, integrationApp, integrationByKey, integrationStatus } from "@/lib/integrations";
 
 // Verbindungen (Wunsch des Betreibers, 24.09.): je Dienst eine eigene Seite - Stand, Zugangsdaten
 // (Client ID + Secret, bei Plattformen zum Verknüpfen), Rückrufadresse, „prüfen“ und die Anleitung
-// aufgeklappt. Laufende Einstellungen (Webhooks, Live-Erkennung, Absender …) bleiben in ihrem
-// Reiter; die Seite verlinkt dorthin.
+// aufgeklappt. Discord und Twitch haben ihre laufenden Einstellungen (Webhooks, Bot, Zähler bzw.
+// Vereinskanal und Live-Erkennung) seit 24.09. nur noch hier („muss das doppelt sein?“); die
+// übrigen Dienste verlinken auf ihren Reiter in den Einstellungen.
 
 const REQUESTS = [
   ["branding", "/settings/branding"], ["discord", "/settings/discord"], ["auth", "/settings/auth"],
@@ -101,9 +104,11 @@ export default function AdminIntegrationPage() {
         {app && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="integration-app">
             <div className="font-heading font-bold uppercase text-sm mb-3">Zugangsdaten und Prüfung</div>
-            <PlatformAppCard app={{ ...app, tab: undefined }} brand={brand} setBrandField={setBrandField} onClearSecret={clearSecret} onSave={save} saving={saving} showGuide={false} />
+            <PlatformAppCard app={{ ...app, tab: undefined }} brand={brand} setBrandField={setBrandField} onClearSecret={clearSecret} onSave={save} saving={saving} showGuide={false} showFields={integration.key !== "twitch"} fieldsNote="Client ID und Secret stehen unten bei der Live-Erkennung." />
           </div>
         )}
+        {integration.key === "discord" && <div data-testid="integration-settings"><DiscordSettings /></div>}
+        {integration.key === "twitch" && <div data-testid="integration-settings"><TwitchSettings /></div>}
         <div className="space-y-3" data-testid="integration-guides">
           {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open />)}
         </div>
