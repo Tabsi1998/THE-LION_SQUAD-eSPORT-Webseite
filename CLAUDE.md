@@ -216,6 +216,68 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Statuten aus Dolibarr (#326 Teil 3; PR #485; Backend + Web; `update.sh`).
+  `dolibarr_client.statutes()`/`statute_pdf(id)` (`/vereine/statutes`,
+  `/vereine/statutes/{id}/pdf`); `club_facts.refresh` liest sie mit
+  (`statutes`, `statutes_fetched_at` bzw. `statutes_error` – ein Modul ohne
+  Statuten-API sperrt Vereinsdaten/Vorstand nicht); `statutes_public(state,
+  switch_on)` (`available` + `reason switch_off|not_published|not_fetched|
+  unavailable` oder `state|current|versions|fetched_at`, Felder
+  `STATUTE_FIELDS` ohne Prüfsumme), `statutes_admin` (in
+  `admin_view.statutes`), `statutes_pdf` (nur eine Fassung aus dem Stand,
+  `sha256` gegen die Vereinsakte, `_PDF_CACHE` je Prüfsumme). Routen `GET
+  /api/board/statutes`, `GET /api/board/statutes/{id}/pdf` (404 unbekannt oder
+  nicht freigegeben, 502 Prüfsumme, 503 Dolibarr weg; `inline;
+  filename="Statuten-Fassung-n.pdf"`). Vertrag `tests/contracts/
+  vereine-openapi.json` + `manifest.json` auf 0.11.0-beta (`bd3dabb`):
+  Statuten-Pfade, `channels` am Verein, `accounts` und Feld-`type` am
+  Antragsformular; Fake `statutes`/`statutes_public`/`tampered_pdf_ids`,
+  `statute_pdf_bytes`. Web `ClubPages.jsx` `StatutesBox` (`board-statutes|
+  board-statutes-current|board-statutes-none|board-statutes-archive|
+  board-statutes-pdf-<id>`, `statuteLine`, `formatDay`), `AdminSettingsPage`
+  `statutesSummary` (`legal-dolibarr-statutes`). Doku `docs/DOLIBARR.md`.
+  Tests `test_club_facts_flow.py` (+1), `ClubPages.test.jsx` (4, neu),
+  `AdminSettingsPage.test.jsx` (+1). Nicht dabei: Mitglieder-Archiv
+  (`/vereine/me/statutes`, #324), App. Hinweis: Modul-`main` hat schon
+  API-Version 2 (#252: ohne `country_profile`, `country_profile_complete`,
+  `register.court`) – beim nächsten Vertrags-Update den Fake anpassen.
+  Nebenbei (#223): Reiter Rechtliches nach `settings/LegalSettings.jsx`
+  (`LegalTab` mit Props `brand|setBrandField|setCanonicalLegalText|saveBrand|
+  saving`, lädt `/admin/dolibarr/public` selbst; `mergedLegacyText`,
+  `statutesSummary`), `LegalTextArea` nach `settings/fields.jsx`;
+  `AdminSettingsPage.jsx` 1926 → 1825 Zeilen.
+- Discord-Bot: Fehler als Klickweg, Neustart von selbst (#302 Nachtrag; PR
+  #484; Backend + Web; `update.sh`). `discord_bot.friendly_bot_error(exc)`
+  (`PrivilegedIntentsRequired` → „Server Members Intent“ im Developer Portal;
+  `LoginFailure` → „Reset Token“; sonst Text gekürzt) in `_run`;
+  `BotRunner.restart_if_down()` (nur, wenn die Aufgabe beendet ist) über den
+  Scheduler-Job `discord_bot_watch` (5 min, je Prozess, bewusst nicht
+  `_single_replica`). Web `setupGuides.discord_bot` verlangt nur den „Server
+  Members Intent“ (Message Content bleibt aus), `DiscordBotPanel` Hinweis
+  `discord-bot-retry` bei „eingeschaltet, nicht verbunden“. Doku
+  `docs/DISCORD.md`. Tests `test_discord_bot_unit.py` (+1),
+  `test_discord_bot_settings_flow.py` (+1), `DiscordBotPanel.test.jsx` (+1).
+- Partnerseiten in Sitemap und App (#469 Nachtrag; PR #483; Backend + App;
+  `update.sh`, App-Build). Sitemap (`setup_routes.sitemap`) führt aktive
+  Partner als `/partners/<slug>` (`lastmod` aus `updated_at`, monthly 0.5).
+  App `InfoCenterScreen.Partners`: Kanäle als Chips
+  (`partner-channel-<id>-<key>`, Symbol/Farbe über `platformIcon`/
+  `platformColor` aus `components/LinkedAccounts`, Website `globe-outline`) und
+  „Partnerseite öffnen“ (`partner-page-<id>` → `${WEB_BASE_URL}/partners/
+  <slug>`, `WEB_BASE_URL` = `API_BASE_URL` ohne `/api`). Tests
+  `test_partner_pages_flow.py` (+1), `InfoCenterScreen.test.tsx` (+1).
+- Partner II Teil 3 (#469; PR #482; Backend + Web; `update.sh`). `partner_ids`
+  an `ReferenceCreate/Update` (`partner_pages.clean_partner_ids`);
+  `_enrich_references` hängt `partners` an (`attach_partners_many`);
+  `shared_for_partner` liefert `references` (Haken oder Veranstalter-Name,
+  `_reference_summary_for_partner` mit `matched_by partner|organizer`, Platz,
+  Medaille, Spiel; nur sichtbare, nach Datum). Web `AdminReferencesPage`
+  (`PartnerPicker` `reference-partner-<id>`), `ReferencesPage` (Chip
+  `reference-partner-<slug>`, Zeile `reference-detail-partner-<slug>`),
+  `PartnerDetailPage` (`partner-reference-<id>`, Kicker „Teilnahme · Platz n ·
+  Spiel“, Titel „Events, Turniere & Teilnahmen“). Tests
+  `test_partner_pages_flow.py` (+1), `AdminReferencesPage.test.jsx` (+1),
+  `ReferencesPage.test.jsx` (+1), `PartnerDetailPage.test.jsx`.
 - App: verknüpfte Konten wie im Web (#459; PR #480; nur App; App-Build).
   `components/LinkedAccounts.tsx` (`LinkedAccountsCard` mit `linked-accounts`/
   `linked-account-<platform>`, `platformColor`, `platformIcon`, `isVerified`,
@@ -2082,10 +2144,11 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build). `main` steht auf `16ca604`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`). `main` steht auf `f1df187`.
 
 ### Offene PRs
-- Derzeit keiner. **Regel seit
+- #486 (#324 Teil 1 Vereinsakte verbinden; Backend + Web + App; Entwurf, voller
+  Check läuft). **Regel seit
   23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
@@ -2094,8 +2157,8 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   angebunden, E-Mail-Vorlagen werden gebraucht – wartet auf die Entscheidung
   A/B des Betreibers), #401 Turnierseite (Reiter auf einer Seite, „Dein
   Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
-  dann Dolibarr III Rest (#326 Teil 2 Vorstandsseite aus Dolibarr – Vorschlag
-  im Issue, Antwort steht aus; #329 Einwilligungen, eigene Daten, Austritt
+  dann Dolibarr III Rest (#326 Teil 2 Vorstandsseite – umgesetzt in #468, Teil 3
+  Statuten – umgesetzt in #485; #329 Einwilligungen, eigene Daten, Austritt
   über `/vereine/me/consents` und `/vereine/members/{id}/consents`; #324
   Dokumente, sobald dolibarr-vereine#157 liefert; #330 Durchläufe) und
   Moderation II (#415–#417, Meilenstein 28, Variante C) nach App 1.0.0; Play
@@ -2172,6 +2235,12 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #482, #483, #484, #485 (24.09.): `update.sh` und App-Build. Discord: im Developer Portal → deine App →
+  Bot → „Privileged Gateway Intents“ den „Server Members Intent“ einschalten, „Save Changes“ –
+  der Bot verbindet sich danach innerhalb von fünf Minuten von selbst (Stand unter Verbindungen →
+  Discord). Dolibarr: Einrichtung → Statuten → Freigabe „Öffentlichkeit“, sonst bleibt der
+  Statuten-Kasten der Vorstandsseite wie bisher; danach Vorstandsseite und Rechtliches (Zeile
+  „Statuten“) ansehen. Referenzen: bei Turnieren mit PineApps den Partner-Haken setzen.
 - Nach #476, #478, #479, #480 (24.09.): `update.sh` (Backend-Image neu: NudeNet/ONNX,
   der Build dauert einmalig länger) und App-Build. Danach: Admin → Moderation →
   Bildprüfung: Anbieter-Stand muss grün sein (NudeNet geladen), Schwellen
