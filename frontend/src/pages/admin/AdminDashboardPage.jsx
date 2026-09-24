@@ -41,29 +41,29 @@ export default function AdminDashboardPage() {
   const queuePending = Number(sys?.mail_queue?.pending || 0);
   const queueFailed = Number(sys?.mail_queue?.failed || 0);
   const liveChips = [
-    { label: "Datenbank", ok: sys?.database?.ok, detail: sys?.database?.ok ? "verbunden" : "Problem", icon: Database, to: "/admin/settings?tab=system" },
-    { label: "Mail / SMTP", ok: sys?.smtp?.ok, detail: sys?.smtp?.ok ? (sys?.smtp?.provider || "aktiv") : "nicht konfiguriert", icon: Mail, to: "/admin/settings?tab=smtp" },
+    { label: "Datenbank", ok: sys?.database?.ok, detail: sys?.database?.ok ? "verbunden" : "Problem", icon: Database, to: "/admin/settings/status" },
+    { label: "Mail / SMTP", ok: sys?.smtp?.ok, detail: sys?.smtp?.ok ? (sys?.smtp?.provider || "aktiv") : "nicht konfiguriert", icon: Mail, to: "/admin/settings/smtp" },
     { label: "Discord", ok: sys?.discord?.ok, detail: sys?.discord?.ok ? "aktiv" : "aus", icon: MessageSquare, to: "/admin/integrations/discord" },
-    { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings?tab=system" },
-    { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings?tab=queue" },
+    { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings/status" },
+    { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings/mail-queue" },
     { label: "Push-Tokens", ok: Number(data?.mobile_push?.active_tokens || 0) > 0 ? true : null, detail: `${data?.mobile_push?.active_tokens ?? 0} aktiv`, icon: BellRing, to: "/admin/mobile-push" },
   ];
 
   const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
   const settingsHub = [
-    { label: "Login & Konten", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
-    { label: "Konten verknüpfen", detail: linkAvail ? `Discord ${linkAvail.discord ? "bereit" : "fehlt"} · Twitch ${linkAvail.twitch ? "bereit" : "fehlt"} · Steam bereit` : "Discord, Twitch, Steam", to: "/admin/setup", icon: Share2, ok: linkAvail ? Boolean(linkAvail.discord && linkAvail.twitch) : undefined },
-    { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings?tab=brand", icon: Palette, ok: undefined },
-    { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings?tab=email", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
-    { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings?tab=smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
-    { label: "Newsletter", detail: "News & Event-Mails", to: "/admin/settings?tab=newsletter", icon: Mail, ok: undefined },
+    { label: "Login & Konten", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings/google", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
+    { label: "Konten verknüpfen", detail: linkAvail ? `Discord ${linkAvail.discord ? "bereit" : "fehlt"} · Twitch ${linkAvail.twitch ? "bereit" : "fehlt"} · Steam bereit` : "Discord, Twitch, Steam", to: "/admin/integrations", icon: Share2, ok: linkAvail ? Boolean(linkAvail.discord && linkAvail.twitch) : undefined },
+    { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings/branding", icon: Palette, ok: undefined },
+    { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings/resend", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
+    { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings/smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
+    { label: "Newsletter", detail: "News & Event-Mails", to: "/admin/settings/newsletter", icon: Mail, ok: undefined },
     { label: "Discord", detail: sys?.discord?.ok ? "Webhook aktiv" : "nicht verbunden", to: "/admin/integrations/discord", icon: MessageSquare, ok: sys?.discord?.ok },
     { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/integrations/twitch", icon: Radio, ok: undefined },
-    { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings?tab=socials", icon: Share2, ok: undefined },
-    { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings?tab=seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
+    { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings/socials", icon: Share2, ok: undefined },
+    { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings/seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
     { label: "Vereinsdaten", detail: "Impressum & Datenschutz", to: "/admin/club", icon: ShieldCheck, ok: undefined },
     { label: "Navigation", detail: "Menüs steuern", to: "/admin/nav", icon: SettingsIcon, ok: undefined },
-    { label: "Systemstatus", detail: "Queue, Uploads, Scheduler", to: "/admin/settings?tab=system", icon: Activity, ok: undefined },
+    { label: "Systemstatus", detail: "Queue, Uploads, Scheduler", to: "/admin/settings/status", icon: Activity, ok: undefined },
   ];
 
 
@@ -226,21 +226,21 @@ export default function AdminDashboardPage() {
     {
       label: "Systemstatus",
       detail: "Mail-Queue, Uploads, Scheduler und Integrationen",
-      to: "/admin/settings?tab=system",
+      to: "/admin/settings/status",
       icon: Activity,
       tone: "#29B6E8",
     },
     {
       label: "Mail-Queue",
       detail: "Fehler, Newsletter und Versandjobs prüfen",
-      to: "/admin/settings?tab=queue",
+      to: "/admin/settings/mail-queue",
       icon: Mail,
       tone: "#29B6E8",
     },
     {
       label: "SEO & Analytics",
       detail: "Domain, IndexNow und Tracking-IDs prüfen",
-      to: "/admin/settings?tab=seo",
+      to: "/admin/settings/seo",
       icon: Search,
       tone: "#29B6E8",
     },
@@ -491,7 +491,7 @@ export default function AdminDashboardPage() {
             <div className="text-[10px] uppercase tracking-[0.28em] text-[#29B6E8] font-bold">Einstellungen-Zentrale</div>
             <h2 className="font-heading font-bold uppercase text-lg mt-1">Alles konfigurieren</h2>
           </div>
-          <Link to="/admin/settings" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>
+          <Link to="/admin/integrations" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Einstellungen</Link>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
           {settingsHub.map((s) => (

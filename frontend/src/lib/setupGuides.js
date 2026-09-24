@@ -68,7 +68,7 @@ export const SETUP_GUIDES = {
   google_login: {
     key: "google_login",
     title: "Google-Login",
-    where: { to: "/admin/settings?tab=auth", label: "Einstellungen → Login & Konten" },
+    where: { to: "/admin/settings/google", label: "Verbindungen → Google" },
     summary: "Anmeldung mit dem Google-Konto über ein Google-Cloud-Projekt des Vereins. Es braucht nur eine Web-Client-ID, kein Secret.",
     steps: [
       { text: "Google Cloud Console → Projekt anlegen oder wählen (z. B. „THE LION SQUAD Website“).", link: { href: "https://console.cloud.google.com/apis/credentials", label: "Google Cloud Console – Anmeldedaten" } },
@@ -191,7 +191,7 @@ export const SETUP_GUIDES = {
   resend: {
     key: "resend",
     title: "E-Mail-Versand über Resend",
-    where: { to: "/admin/settings?tab=email", label: "Einstellungen → E-Mail (Resend)" },
+    where: { to: "/admin/settings/resend", label: "Verbindungen → Resend" },
     summary: "Resend verschickt die Mails der Website (Anmeldung, Mitgliedschaft, Newsletter). Es braucht einen API-Schlüssel und eine bestätigte Absender-Domain.",
     steps: [
       { text: "Bei Resend anmelden → „API Keys“ → „Create API Key“ (Berechtigung „Sending access“). Den Schlüssel kopieren und hier bei „Resend API“ eintragen.", link: { href: "https://resend.com/api-keys", label: "Resend – API Keys" } },
@@ -204,7 +204,7 @@ export const SETUP_GUIDES = {
   smtp: {
     key: "smtp",
     title: "Eigener SMTP-Server (statt Resend)",
-    where: { to: "/admin/settings?tab=smtp", label: "Einstellungen → SMTP" },
+    where: { to: "/admin/settings/smtp", label: "Verbindungen → SMTP" },
     summary: "Wer ein eigenes Postfach beim Hoster hat, kann darüber senden. Die Zugangsdaten kommen vom Mail-Anbieter.",
     steps: [
       { text: "Beim Mail-Anbieter die SMTP-Daten nachsehen: Server (Host), Port (587 mit STARTTLS oder 465 mit SSL), Benutzername (meist die volle Adresse), Passwort." },
@@ -216,7 +216,7 @@ export const SETUP_GUIDES = {
   analytics: {
     key: "analytics",
     title: "Analytics (Google Analytics 4 oder Plausible)",
-    where: { to: "/admin/settings?tab=seo", label: "Einstellungen → SEO & Analytics" },
+    where: { to: "/admin/settings/seo", label: "Auftritt → SEO & Analytics" },
     summary: "Besucherzahlen. Google Analytics braucht eine Mess-ID (G-…), Plausible nur die Domain. Ohne Auswahl wird nichts gezählt.",
     steps: [
       { text: "Google Analytics: Verwaltung → Datenstreams → Web-Stream der Website → „Mess-ID“ (beginnt mit G-) kopieren.", link: { href: "https://analytics.google.com/", label: "Google Analytics" } },
@@ -229,7 +229,7 @@ export const SETUP_GUIDES = {
   search_console: {
     key: "search_console",
     title: "Suchmaschinen: Google Search Console, Bing, IndexNow",
-    where: { to: "/admin/settings?tab=seo", label: "Einstellungen → SEO & Analytics" },
+    where: { to: "/admin/settings/seo", label: "Auftritt → SEO & Analytics" },
     summary: "Damit Google und Bing die Website kennen und neue Seiten schnell aufnehmen.",
     steps: [
       { text: "Google Search Console → „Property hinzufügen“ → „URL-Präfix“ mit der Adresse der Website → Bestätigungsmethode „HTML-Tag“: den Wert aus content=\"…\" kopieren und hier bei „Google Site Verification“ eintragen, speichern, dann in der Console „Bestätigen“.", link: { href: "https://search.google.com/search-console", label: "Google Search Console" } },
@@ -241,7 +241,7 @@ export const SETUP_GUIDES = {
   play_store: {
     key: "play_store",
     title: "Google Play: Link zur LionsAPP",
-    where: { to: "/admin/settings?tab=brand", label: "Einstellungen → Branding" },
+    where: { to: "/admin/settings/branding", label: "Auftritt → Branding" },
     summary: "Der Play-Store-Knopf im Footer erscheint erst, wenn hier der Link steht – und der darf laut Google erst gesetzt werden, wenn der Store-Eintrag öffentlich ist.",
     steps: [
       { text: "Play Console → App → Store-Eintrag veröffentlicht? Dann „Im Google Play Store ansehen“ und die Adresse kopieren.", link: { href: "https://play.google.com/console", label: "Google Play Console" } },

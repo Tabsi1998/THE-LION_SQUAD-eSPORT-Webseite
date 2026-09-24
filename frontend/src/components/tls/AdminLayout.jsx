@@ -1,9 +1,9 @@
 import { hasArea, roleLabel } from "@/lib/permissions";
-import { INTEGRATIONS } from "@/lib/integrations";
+import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Settings as SettingsIcon, ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Send, Palette, Share2, LogIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
@@ -42,6 +42,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
       // Dolibarr ist Mitgliederverwaltung, nicht Finanzen (#512) - die Rechnungen hängen nur mit dran.
       { to: "/admin/dolibarr", label: "Dolibarr", icon: Link2, areas: ["club", "system"] },
+      // Die Dolibarr-Verbindung stand bis #546 in der Gruppe Verbindungen; jetzt ist sie ein Wegweiser wie die anderen Reiter.
+      { to: "/admin/dolibarr?tab=connection", label: "Dolibarr: Verbindung", icon: Link2, areas: ["club", "system"], searchOnly: true },
       { to: "/admin/dolibarr?tab=features", label: "Dolibarr: Funktionen (Schalter)", icon: Link2, areas: ["club", "system"], searchOnly: true },
       { to: "/admin/dolibarr?tab=preview", label: "Dolibarr: Umstellung", icon: Link2, areas: ["club"], searchOnly: true },
       { to: "/admin/dolibarr?tab=links", label: "Dolibarr: Zuordnungen", icon: Link2, areas: ["club"], searchOnly: true },
@@ -82,40 +84,50 @@ export const ADMIN_GROUPS = [
     ],
   },
   {
-    // Wunsch des Betreibers (24.09.): „für alles ein Menü, also TikTok eins usw.“ - je Dienst eine
-    // eigene Seite mit Stand, Zugangsdaten, Prüfung und Anleitung.
+    // Wunsch des Vorstands (24.09., #546): Verbindungen sind Menüeinträge, keine Reiter - ganz oben die
+    // Übersicht mit dem Zustand aller Verbindungen, darunter je Dienst eine Seite.
     label: "Verbindungen",
-    // Dienste mit Reiter (E-Mail, Google-Login, Analytics, Google Play, Dolibarr) führen direkt dorthin - eine Stelle je Dienst (#508).
-    // Die Wegweiser der Suche auf diese Reiter (Login & Konten, E-Mail, SEO, Branding, Dolibarr-Verbindung) sind damit die Einträge hier.
-    items: INTEGRATIONS.map((integration) => ({ to: integration.tab || `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
+    items: [
+      { to: "/admin/integrations", label: "Alle Verbindungen", icon: Link2, end: true, areas: ["system"] },
+      ...MENU_INTEGRATIONS.map((integration) => ({ to: integration.tab || `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
+    ],
+  },
+  {
+    label: "E-Mail",
+    items: [
+      { to: "/admin/settings/newsletter", label: "Newsletter", icon: Mail, areas: ["system"] },
+      { to: "/admin/settings/mail-queue", label: "Mail-Queue", icon: Inbox, areas: ["system"] },
+      { to: "/admin/settings/mail-logs", label: "Versandlogs", icon: Send, areas: ["system"] },
+      { to: "/admin/email-templates", label: "E-Mail-Vorlagen", icon: FileText, areas: ["system"] },
+    ],
+  },
+  {
+    label: "Auftritt",
+    items: [
+      { to: "/admin/settings/branding", label: "Branding", icon: Palette, areas: ["system"] },
+      { to: "/admin/settings/socials", label: "Socials", icon: Share2, areas: ["system"] },
+      { to: "/admin/settings/seo", label: "SEO & Analytics", icon: Search, areas: ["system"] },
+    ],
   },
   {
     label: "System",
     items: [
       { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, areas: ["system"] },
+      { to: "/admin/settings/status", label: "Status", icon: Activity, areas: ["system"] },
       { to: "/admin/logs", label: "Logs", icon: Activity, areas: ["system"] },
       { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, areas: ["system"] },
       { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare, areas: ["moderation"], staff: true },
       { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug, areas: ["system"] },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
-      { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
+      { to: "/admin/settings/zugang", label: "Zugang", icon: LogIn, areas: ["system"] },
       { to: "/admin/setup", label: "Einrichtung & FAQ", icon: BookOpen, areas: ["system"] },
-      { to: "/admin/email-templates", label: "E-Mail-Vorlagen", icon: Mail, areas: ["system"] },
-      // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
-      // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
-      { to: "/admin/settings?tab=smtp", label: "Einstellungen: SMTP", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=newsletter", label: "Einstellungen: Newsletter", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=queue", label: "Einstellungen: Mail-Queue", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=logs", label: "Einstellungen: Versandlogs", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=socials", label: "Einstellungen: Socials", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=system", label: "Einstellungen: Systemstatus", icon: SettingsIcon, areas: ["system"], searchOnly: true },
     ],
   },
 ];
 
 const ADMIN_SEARCH_TERMS = {
-  ...Object.fromEntries(INTEGRATIONS.map((integration) => [`/admin/integrations/${integration.key}`, [integration.label.toLowerCase(), integration.key, "verbindung", "verknüpfen", "anleitung", "einrichten", "app", "client id", "secret", ...(integration.searchTerms || [])]])),
+  "/admin/integrations": ["verbindungen", "alle verbindungen", "übersicht", "aktiv", "fehlt", "nicht lesbar", "schlüssel", "schluessel", "encryption", "settings_encryption_key", "verbindung weg"],
   "/admin": ["home", "start", "control"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
@@ -154,19 +166,19 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/audit": ["logs", "aktionen", "sicherheit"],
   "/admin/mobile-logs": ["app", "fehler", "client", "client-logs", "abstuerze", "abstürze"],
   "/admin/mobile-push": ["push", "notifications", "app", "push-monitoring", "testnachricht"],
-  "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
   "/admin/setup": ["einrichtung", "anleitung", "anleitungen", "setup", "einrichten", "discord app", "twitch app", "google login", "resend", "smtp", "analytics", "search console", "play store", "schritt für schritt", "howto", "how to"],
   "/admin/club": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
-  "/admin/settings?tab=auth": ["login", "anmeldung", "google", "passkey", "passkeys", "fingerabdruck", "registrierung", "zwei-faktor", "2fa", "steam", "discord app", "twitch app", "plattform-konten", "konten verknuepfen", "konten verknüpfen", "verknuepfung", "verknüpfung", "oauth", "rueckruf", "rückruf", "callback", "steam api key", "client id"],
-  "/admin/settings?tab=email": ["resend", "absender", "api key", "mail", "e-mail", "versand"],
-  "/admin/settings?tab=smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
-  "/admin/settings?tab=newsletter": ["newsletter", "rundmail", "empfänger", "abo"],
-  "/admin/settings?tab=queue": ["mail-queue", "warteschlange", "versand", "haengt", "hängt", "failed"],
-  "/admin/settings?tab=logs": ["versandlogs", "mail logs", "zugestellt", "bounce"],
-  "/admin/settings?tab=brand": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke"],
-  "/admin/settings?tab=socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links", "x", "twitter", "threads", "bluesky", "mastodon", "telegram", "kick", "linkedin", "steam", "kanäle", "kanaele"],
-  "/admin/settings?tab=seo": ["seo", "google analytics", "measurement id", "plausible", "analytics", "indexnow", "sitemap", "suchmaschine", "bing", "site verification", "meta"],
-  "/admin/settings?tab=system": ["systemstatus", "status", "datenbank", "scheduler", "uploads", "mail-queue", "smtp test"],
+  "/admin/settings/google": ["login", "anmeldung", "google", "google login", "oauth", "client id", "web-client-id"],
+  "/admin/settings/zugang": ["zugang", "login", "anmeldung", "registrierung", "registrierung offen", "passwort login", "passkey", "passkeys", "fingerabdruck", "zwei-faktor", "2fa"],
+  "/admin/settings/resend": ["resend", "absender", "api key", "mail", "e-mail", "versand"],
+  "/admin/settings/smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
+  "/admin/settings/newsletter": ["newsletter", "rundmail", "empfänger", "abo"],
+  "/admin/settings/mail-queue": ["mail-queue", "warteschlange", "versand", "haengt", "hängt", "failed"],
+  "/admin/settings/mail-logs": ["versandlogs", "mail logs", "zugestellt", "bounce"],
+  "/admin/settings/branding": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke", "play store", "play-store-link"],
+  "/admin/settings/socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links", "x", "twitter", "threads", "bluesky", "mastodon", "telegram", "kick", "linkedin", "steam", "kanäle", "kanaele"],
+  "/admin/settings/seo": ["seo", "google analytics", "measurement id", "plausible", "analytics", "indexnow", "sitemap", "suchmaschine", "bing", "site verification", "meta"],
+  "/admin/settings/status": ["systemstatus", "status", "datenbank", "scheduler", "uploads", "mail-queue", "smtp test"],
   "/admin/dolibarr?tab=connection": ["dolibarr verbindung", "api schluessel", "api schlüssel", "modus", "vorschau", "live", "schreibzugriff", "rechnungen freigeben", "steuersaetze", "steuersätze", "konditionen", "webhook", "beitrittsantraege", "beitrittsanträge", "e-mail zuordnen", "erp"],
   "/admin/dolibarr?tab=preview": ["umstellung", "vorschau", "trockenlauf", "mitgliedsarten", "konten bestätigen", "ohne konto"],
   "/admin/dolibarr?tab=links": ["zuordnungen", "konto mitglied", "verknuepfung", "verknüpfung", "loesen", "lösen"],
@@ -175,6 +187,10 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
   "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "mitgliederverwaltung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };
+for (const integration of INTEGRATIONS) {
+  const path = integration.tab || `/admin/integrations/${integration.key}`;
+  ADMIN_SEARCH_TERMS[path] = [...(ADMIN_SEARCH_TERMS[path] || []), integration.label.toLowerCase(), integration.key, "verbindung", "verknüpfen", "anleitung", "einrichten", "app", "client id", "secret", ...(integration.searchTerms || [])];
+}
 
 function normalizeSearch(value) {
   return String(value || "")

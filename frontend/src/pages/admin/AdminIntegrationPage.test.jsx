@@ -61,12 +61,12 @@ test("TikTok: Stand, Felder, Rückrufadresse, Anleitung offen - Speichern schick
 
 test("E-Mail-Versand, Google-Login, Analytics, Google Play und Dolibarr führen direkt auf ihren Reiter - keine Seite, die nur verlinkt (#508)", async () => {
   mockApi();
-  for (const [key, target] of [["mail", "/admin/settings?tab=email"], ["google", "/admin/settings?tab=auth"], ["analytics", "/admin/settings?tab=seo"], ["play", "/admin/settings?tab=brand"], ["dolibarr", "/admin/dolibarr?tab=connection"]]) {
+  for (const [key, target] of [["resend", "/admin/settings/resend"], ["smtp", "/admin/settings/smtp"], ["google", "/admin/settings/google"], ["analytics", "/admin/settings/seo"], ["play", "/admin/settings/branding"], ["dolibarr", "/admin/dolibarr?tab=connection"]]) {
     const { unmount } = render(
       <MemoryRouter initialEntries={[`/admin/integrations/${key}`]}>
         <Routes>
           <Route path="/admin/integrations/:key" element={<AdminIntegrationPage />} />
-          <Route path="/admin/settings" element={<div data-testid="settings-page" />} />
+          <Route path="/admin/settings/*" element={<div data-testid="settings-page" />} />
           <Route path="/admin/dolibarr" element={<div data-testid="dolibarr-page" />} />
         </Routes>
       </MemoryRouter>

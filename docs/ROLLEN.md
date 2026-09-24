@@ -127,10 +127,13 @@ Finanzen; die Turnierleitung Turniere, Stationen, Strafen und Gewinne; der Admin
 | Finanzen | Finanzübersicht | Finanzen |
 | eSports | Turniere, Fast Lap, Stationen (Turnierleitung, Moderation, Helfer) · Turnier-Leitfaden, Jahreswertung, Spiele, Gewinne, Strafen (Turnierleitung) · Game-Server (System) | Turnierleitung |
 | Content | Events (Turnierleitung) · News, Galerie, Medien, Navigation, Achievements, Sticker (Redaktion) · Downloads & QR (alle) | Redaktion |
-| Verbindungen | je Dienst eine Seite (Discord, Twitch, Steam, …, Google-Login, E-Mail, Analytics, Google Play, Dolibarr) | System |
-| System | Betrieb, Logs, Audit Logs, App-Logs, Push-Tests, App-Versionen, Einstellungen, Einrichtung & FAQ, E-Mail-Vorlagen (System) · Moderation (Moderation) | System |
+| Verbindungen | Alle Verbindungen (Übersicht mit Zustand: aktiv, aus, fehlt, nicht lesbar, Fehler) · je Dienst eine Seite (Google, Resend, SMTP, Discord, Twitch, Steam, …) | System |
+| E-Mail | Newsletter, Mail-Queue, Versandlogs, E-Mail-Vorlagen | System |
+| Auftritt | Branding, Socials, SEO & Analytics | System |
+| System | Betrieb, Status, Logs, Audit Logs, App-Logs, Push-Tests, App-Versionen, Zugang, Einrichtung & FAQ (System) · Moderation (Moderation) | System |
 
-Die Reiter der Einstellungen und der Dolibarr-Seite sind nur über die Suche im Menü erreichbar
-(Wegweiser), damit das Menü nicht länger wird. Eine Seite ohne
+Seit #546 gibt es keine Seite „Einstellungen“ mehr: jeder frühere Reiter ist ein Menüeintrag
+(`/admin/settings/<seite>`), alte Links mit `?tab=` leiten dorthin um. Die Reiter der Dolibarr-Seite
+sind nur über die Suche im Menü erreichbar (Wegweiser), damit das Menü nicht länger wird. Eine Seite ohne
 Bereich führt auf `/403` mit dem fehlenden Bereich und dem Hinweis, wer ihn vergibt. Die Antwort
 des Servers sagt dasselbe („Dafür fehlt der Bereich „Redaktion“ …“).

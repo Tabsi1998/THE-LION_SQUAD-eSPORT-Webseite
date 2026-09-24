@@ -12,7 +12,7 @@ from database import get_db
 from auth import require_admin, require_club_admin, require_super, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from services.auth_settings import is_google_client_id, load_auth_settings
-from services.secret_store import encrypt_secret, secret_is_configured
+from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
 from models import now_utc, new_id
 from email_service import send_template
 
@@ -677,6 +677,161 @@ async def public_legal_page(page: str, response: Response):
     if not doc:
         raise HTTPException(404, "Diese Rechtsseite gibt es nicht.")
     return doc
+
+
+def _secret_state(value) -> str:
+    """„missing“, „ok“ oder „unreadable“: ob ein gespeicherter Schlüssel sich mit dem aktuellen
+    SETTINGS_ENCRYPTION_KEY lesen lässt (#546). Der Wert selbst verlässt diese Funktion nicht."""
+    if not secret_is_configured(value):
+        return "missing"
+    try:
+        decrypt_secret(value)
+        return "ok"
+    except RuntimeError:
+        return "unreadable"
+
+
+GROUP_LOGIN_MAIL = "Anmeldung und E-Mail"
+GROUP_PLATFORMS = "Plattformen zum Verknüpfen"
+GROUP_DISCORD = "Discord"
+GROUP_OTHER = "Weitere Dienste"
+UNREADABLE_TEXT = "gespeichert, aber nicht lesbar – SETTINGS_ENCRYPTION_KEY in der .env prüfen"
+
+
+@settings_router.get("/integrations/overview")
+async def integrations_overview(me: dict = Depends(require_area("system"))):
+    """Alle Verbindungen auf einer Seite (#546): aktiv, aus, fehlt, Fehler - und „gespeichert, aber nicht
+    lesbar“, wenn ein Schlüssel nicht zum aktuellen SETTINGS_ENCRYPTION_KEY passt (nach einem Server-Update
+    die häufigste Ursache für „alle Verbindungen sind weg“). Nie Schlüssel oder Adressen in der Antwort."""
+    from collections import Counter
+    from services.platform_links import PLATFORMS
+    from services.media_scan import SETTINGS_ID as MEDIA_SCAN_ID, load_settings as load_media_scan
+    from services.dolibarr_client import load_settings as load_dolibarr
+    db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0}) or {}
+    email = await db.settings.find_one({"id": "email"}, {"_id": 0}) or {}
+    mail = await db.settings.find_one({"id": "mail"}, {"_id": 0}) or {}
+    discord = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    media_raw = await db.settings.find_one({"id": MEDIA_SCAN_ID}, {"_id": 0}) or {}
+    sync_state = await db.settings.find_one({"id": "dolibarr_sync_state"}, {"_id": 0}) or {}
+    auth = await load_auth_settings(db)
+    media = await load_media_scan(db)
+    dolibarr = await load_dolibarr(db)
+    rows: list[dict] = []
+
+    def add(key: str, label: str, group: str, to: str, state: str, detail: str = ""):
+        rows.append({"key": key, "label": label, "group": group, "to": to, "state": state, "detail": detail})
+
+    # Anmeldung und E-Mail
+    google_on = any(auth.get(k) for k in ("google_login_enabled", "google_registration_enabled", "google_linking_enabled"))
+    if not auth.get("google_configured"):
+        add("google", "Google", GROUP_LOGIN_MAIL, "/admin/settings/google", "missing", "keine Web-Client-ID")
+    else:
+        add("google", "Google", GROUP_LOGIN_MAIL, "/admin/settings/google", "active" if google_on else "off",
+            "Client-ID gespeichert · Anmeldung mit Google an" if google_on else "Client-ID gespeichert · alle Google-Schalter aus")
+    provider = str(mail.get("provider") or ("smtp" if mail.get("smtp_host") else "resend")).strip().lower()
+    enabled = bool(mail.get("enabled", True)) if "enabled" in mail else bool(email.get("enabled", True))
+    key_state = _secret_state(email.get("resend_api_key"))
+    if key_state == "unreadable":
+        add("resend", "Resend", GROUP_LOGIN_MAIL, "/admin/settings/resend", "unreadable", f"API-Key {UNREADABLE_TEXT}")
+    elif key_state == "missing":
+        add("resend", "Resend", GROUP_LOGIN_MAIL, "/admin/settings/resend", "missing", "kein API-Key")
+    elif provider == "resend" and enabled:
+        add("resend", "Resend", GROUP_LOGIN_MAIL, "/admin/settings/resend", "active", "Versandweg der Website")
+    else:
+        add("resend", "Resend", GROUP_LOGIN_MAIL, "/admin/settings/resend", "off", "API-Key gespeichert · Versand läuft über SMTP" if provider == "smtp" else "API-Key gespeichert · Versand ausgeschaltet")
+    pass_state = _secret_state(mail.get("smtp_pass"))
+    if pass_state == "unreadable":
+        add("smtp", "SMTP", GROUP_LOGIN_MAIL, "/admin/settings/smtp", "unreadable", f"Passwort {UNREADABLE_TEXT}")
+    elif not mail.get("smtp_host"):
+        add("smtp", "SMTP", GROUP_LOGIN_MAIL, "/admin/settings/smtp", "missing", "kein Mailserver eingetragen")
+    elif provider == "smtp" and enabled:
+        add("smtp", "SMTP", GROUP_LOGIN_MAIL, "/admin/settings/smtp", "active", f"Versandweg der Website · {mail.get('smtp_host')}")
+    else:
+        add("smtp", "SMTP", GROUP_LOGIN_MAIL, "/admin/settings/smtp", "off", "Mailserver gespeichert · Versand läuft über Resend" if provider == "resend" else "Mailserver gespeichert · Versand ausgeschaltet")
+
+    # Plattformen zum Verknüpfen
+    for key, spec in PLATFORMS.items():
+        to = f"/admin/integrations/{key}"
+        if not spec.get("id_field"):
+            api_state = _secret_state(branding.get("steam_api_key"))
+            if api_state == "unreadable":
+                add(key, spec["label"], GROUP_PLATFORMS, to, "unreadable", f"Steam-API-Schlüssel {UNREADABLE_TEXT}")
+            else:
+                add(key, spec["label"], GROUP_PLATFORMS, to, "active",
+                    "Mitglieder können verknüpfen · mit Steam-API-Schlüssel auch der Anzeigename" if api_state == "ok" else "Mitglieder können verknüpfen · ohne Steam-API-Schlüssel nur die SteamID")
+            continue
+        client_id = str(branding.get(spec["id_field"]) or "").strip()
+        secret_state = _secret_state(branding.get(spec["secret_field"]))
+        if secret_state == "unreadable":
+            add(key, spec["label"], GROUP_PLATFORMS, to, "unreadable", f"Secret {UNREADABLE_TEXT}")
+        elif not client_id and secret_state == "missing":
+            add(key, spec["label"], GROUP_PLATFORMS, to, "missing", "Client-ID und Secret fehlen")
+        elif not client_id:
+            add(key, spec["label"], GROUP_PLATFORMS, to, "missing", "Client-ID fehlt")
+        elif secret_state == "missing":
+            add(key, spec["label"], GROUP_PLATFORMS, to, "missing", "Secret fehlt")
+        else:
+            add(key, spec["label"], GROUP_PLATFORMS, to, "active", "Mitglieder können verknüpfen")
+
+    # Discord: Meldungen (Webhooks) und Bot
+    targets = discord.get("targets") if isinstance(discord.get("targets"), dict) else {}
+    webhooks = [discord.get("webhook_url")] + [(entry or {}).get("webhook_url") for entry in targets.values()]
+    webhook_states = [_secret_state(url) for url in webhooks if secret_is_configured(url)]
+    if "unreadable" in webhook_states:
+        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "unreadable", f"Webhook {UNREADABLE_TEXT}")
+    elif not webhook_states:
+        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "missing", "kein Webhook eingetragen")
+    else:
+        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "active", f"{len(webhook_states)} Webhook(s)")
+    bot_state = _secret_state(discord.get("bot_token"))
+    if bot_state == "unreadable":
+        add("discord_bot", "Discord-Bot", GROUP_DISCORD, "/admin/integrations/discord", "unreadable", f"Bot-Token {UNREADABLE_TEXT}")
+    elif bot_state == "missing":
+        add("discord_bot", "Discord-Bot", GROUP_DISCORD, "/admin/integrations/discord", "missing", "kein Bot-Token")
+    elif discord.get("bot_enabled"):
+        add("discord_bot", "Discord-Bot", GROUP_DISCORD, "/admin/integrations/discord", "active", "Bot läuft")
+    else:
+        add("discord_bot", "Discord-Bot", GROUP_DISCORD, "/admin/integrations/discord", "off", "Token gespeichert · Bot aus")
+
+    # Weitere Dienste
+    analytics = str(branding.get("analytics_provider") or "").strip().lower()
+    add("analytics", "Analytics", GROUP_OTHER, "/admin/settings/seo", "active" if analytics else "off",
+        {"google": "Google Analytics 4", "plausible": "Plausible"}.get(analytics, "kein Statistikdienst"))
+    scan_provider = str(media.get("provider") or "off").strip().lower()
+    if scan_provider == "google_vision":
+        vision_state = _secret_state(media_raw.get("google_api_key"))
+        if vision_state == "unreadable":
+            add("media_scan", "Bildprüfung", GROUP_OTHER, "/admin/moderation", "unreadable", f"Google-Schlüssel {UNREADABLE_TEXT}")
+        elif vision_state == "missing":
+            add("media_scan", "Bildprüfung", GROUP_OTHER, "/admin/moderation", "missing", "Google Cloud Vision gewählt, aber kein Schlüssel")
+        else:
+            add("media_scan", "Bildprüfung", GROUP_OTHER, "/admin/moderation", "active", "Google Cloud Vision")
+    elif scan_provider not in ("", "off"):
+        add("media_scan", "Bildprüfung", GROUP_OTHER, "/admin/moderation", "active", f"eigener Server ({scan_provider})")
+    else:
+        add("media_scan", "Bildprüfung", GROUP_OTHER, "/admin/moderation", "off", "aus")
+    doli_state = _secret_state(dolibarr.get("api_key"))
+    last_error = sync_state.get("last_error") if isinstance(sync_state.get("last_error"), dict) else None
+    if doli_state == "unreadable":
+        add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "unreadable", f"API-Schlüssel {UNREADABLE_TEXT}")
+    elif doli_state == "missing":
+        add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "missing", "kein API-Schlüssel")
+    elif str(dolibarr.get("mode") or "off") == "off":
+        add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "off", "Modus aus")
+    elif last_error:
+        add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "error", f"letzter Abgleich: {last_error.get('kind') or 'Fehler'} {last_error.get('text') or ''}".strip())
+    else:
+        add("dolibarr", "Dolibarr", GROUP_OTHER, "/admin/dolibarr?tab=connection", "active", f"Modus {dolibarr.get('mode')}")
+    add("play", "Google Play", GROUP_OTHER, "/admin/settings/branding", "active" if str(branding.get("play_store_url") or "").strip() else "missing",
+        "Play-Store-Link gesetzt" if str(branding.get("play_store_url") or "").strip() else "kein Play-Store-Link")
+
+    counts = Counter(row["state"] for row in rows)
+    return {
+        "items": rows,
+        "summary": {state: counts.get(state, 0) for state in ("active", "off", "missing", "unreadable", "error")},
+        "groups": [GROUP_LOGIN_MAIL, GROUP_PLATFORMS, GROUP_DISCORD, GROUP_OTHER],
+    }
 
 
 @settings_router.get("/site-banner")

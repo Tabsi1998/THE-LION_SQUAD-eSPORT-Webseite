@@ -46,23 +46,21 @@ test.describe("Einstellungen", () => {
     await mockSettings(page);
   });
 
-  test("die fünf Mail-Reiter stehen zusammen in ihrer Gruppe", async ({ page }) => {
-    await page.goto("/admin/settings?tab=email");
-    await expect(page.getByTestId("settings-tabs")).toBeVisible();
+  test("jede Einstellung ist eine eigene Seite mit Gruppe und Titel; alte Reiter-Links leiten um (#546)", async ({ page }) => {
+    await page.goto("/admin/settings/resend");
+    await expect(page.getByTestId("settings-title")).toHaveText("Resend");
+    await expect(page.getByTestId("settings-eyebrow")).toHaveText("Verbindungen");
+    await expect(page.getByTestId("settings-tabs")).toHaveCount(0);
 
-    const mail = page.getByTestId("settings-group-E-Mail");
-    await expect(mail).toBeVisible();
-    for (const key of ["email", "smtp", "newsletter", "queue", "logs"]) {
-      await expect(mail.getByTestId(`settings-tab-${key}`)).toBeVisible();
-    }
-    await expect(page.getByTestId("settings-group-Auftritt")).toBeVisible();
-    await expect(page.getByTestId("settings-group-Zugang")).toBeVisible();
+    await page.goto("/admin/settings?tab=smtp");
+    await expect(page).toHaveURL(/\/admin\/settings\/smtp$/);
+    await expect(page.getByTestId("settings-title")).toHaveText("SMTP");
   });
 
   test("die Seite läuft am Telefon nicht quer, auch nicht bei der Mail-Queue", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/admin/settings?tab=queue");
-    await expect(page.getByTestId("settings-tabs")).toBeVisible();
+    await page.goto("/admin/settings/mail-queue");
+    await expect(page.getByTestId("settings-title")).toHaveText("Mail-Queue");
 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
