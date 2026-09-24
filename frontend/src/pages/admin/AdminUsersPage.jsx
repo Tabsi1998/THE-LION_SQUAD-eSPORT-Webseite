@@ -63,6 +63,17 @@ export default function AdminUsersPage() {
     try { await api.post(`/users/${id}/role`, { role }); toast.success("Rolle aktualisiert."); load(); }
     catch (e) { toast.error(formatRequestError(e, "Rolle konnte nicht aktualisiert werden.")); }
   };
+  // Einladung zum Mitgliedsantrag (#507): das Konto sieht den Hinweis beim nächsten Besuch und füllt den Antrag aus.
+  const invite = async (u) => {
+    try {
+      const { data } = await api.post("/admin/membership-invitations", { user_id: u.id });
+      const name = u.display_name || u.username;
+      toast.success(data?.existing ? `${name} ist schon eingeladen – die Einladung ist noch offen.` : `${name} ist zum Mitgliedsantrag eingeladen.`);
+    } catch (e) {
+      toast.error(formatRequestError(e, "Einladen fehlgeschlagen."));
+    }
+  };
+
   const toggleBan = async (u) => {
     try {
       await api.post(`/users/${u.id}/${u.is_banned ? "unban" : "ban"}`);
@@ -200,6 +211,11 @@ export default function AdminUsersPage() {
                     <button onClick={() => toggleBan(u)} data-testid={`user-ban-${u.username}`} className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm ${u.is_banned ? "text-[#00FF88] border border-[#00FF88]/40" : "text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/10"}`}>
                       {u.is_banned ? "Entbannen" : "Bannen"}
                     </button>
+                    {!u.is_club_member && !u.is_banned ? (
+                      <button onClick={() => invite(u)} data-testid={`user-invite-${u.username}`} title="Mitgliedsantrag freischalten: das Konto bekommt eine Einladung und sieht den Antrag beim nächsten Besuch" className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-sm text-[#FFD700] border border-[#FFD700]/40 hover:bg-[#FFD700]/10">
+                        Einladen
+                      </button>
+                    ) : null}
                     {isSuperAdmin && (
                       <>
                         <button onClick={() => resendInvite(u)} data-testid={`user-invite-${u.username}`} className="p-1.5 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm hover:bg-[#29B6E8]/10" title="Einladung senden">

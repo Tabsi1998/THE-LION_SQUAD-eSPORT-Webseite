@@ -5,6 +5,7 @@ import { accountLinksFor } from "@/pages/user/profile/constants";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
+import { InvitationBanner } from "@/components/tls/InvitationBanner";
 import { CrownCelebration } from "@/components/tls/CrownCelebration";
 import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
@@ -180,6 +181,8 @@ export function PublicLayout({ children }) {
         )}
       </header>
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
+      {/* Einladung zum Verein (#507): nur für angemeldete Konten, die noch nicht Mitglied sind. */}
+      {user && !isClubMember ? <InvitationBanner pathname={location.pathname} /> : null}
       <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <CrownCelebration />
       <LevelUpCelebration />

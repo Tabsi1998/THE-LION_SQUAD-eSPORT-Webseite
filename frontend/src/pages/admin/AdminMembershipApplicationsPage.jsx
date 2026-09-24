@@ -10,6 +10,7 @@ import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Check, X as XIcon, Inbox, Eye, ExternalLink } from "lucide-react";
+import { InvitationsBox } from "./membership/InvitationsBox";
 
 const TABS = [
   { key: "pending",  label: "Offen",      color: "#29B6E8" },
@@ -72,6 +73,7 @@ export default function AdminMembershipApplicationsPage() {
     <AdminLayout>
       <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitglieder</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex items-center gap-3"><Inbox className="w-6 h-6" /> Mitgliedsbewerbungen</h1>
+      <InvitationsBox />
 
       <div className="mt-6 flex gap-1 border-b border-white/10">
         {TABS.map(t => (

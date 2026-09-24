@@ -59,3 +59,13 @@ test("ohne Superadmin gibt es keine Freigaben zu sehen", async () => {
   await waitFor(() => expect(screen.getByTestId("user-role-helferin")).toBeInTheDocument());
   expect(screen.queryByTestId("user-areas-helferin")).toBeNull();
 });
+
+test("„Einladen“ schaltet den Mitgliedsantrag für ein Konto frei (#507)", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "inv-1", status: "open" } });
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminUsersPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getAllByTestId("user-invite-helferin").length).toBeGreaterThan(0));
+  await user.click(screen.getAllByTestId("user-invite-helferin")[0]);
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/membership-invitations", { user_id: "u-1" }));
+  expect(toastMock.success).toHaveBeenCalledWith("Helferin ist zum Mitgliedsantrag eingeladen.");
+});
