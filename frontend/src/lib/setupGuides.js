@@ -252,7 +252,7 @@ export const SETUP_GUIDES = {
   dolibarr: {
     key: "dolibarr",
     title: "Dolibarr-Anbindung (Mitglieder, Beiträge, Rechnungen)",
-    where: { to: "/admin/dolibarr?tab=connection", label: "Finanzen → Dolibarr-Anbindung" },
+    where: { to: "/admin/dolibarr?tab=connection", label: "Mitglieder → Dolibarr → Verbindung" },
     summary: "Dolibarr mit dem Vereinsmodul führt Mitgliedschaft, Beiträge und Funktionen. Die Website liest den Stand und schreibt Rechnungen – Schritt für Schritt auf der Dolibarr-Seite.",
     steps: [
       { text: "Auf der Dolibarr-Seite den Reiter „Verbindung“ öffnen: Adresse, API-Schlüssel des Website-Benutzers, Umgebung. Die Rechte des Benutzers stehen dort unter „So richtest du es in Dolibarr ein“." },

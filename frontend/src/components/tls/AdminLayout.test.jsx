@@ -28,12 +28,16 @@ test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Ref
   expect(group("Verein").items[0].areas).toEqual(["system"]);
 });
 
-test("Finanzen sind eine eigene Gruppe; Downloads & QR liegen bei Content; Rechte bleiben je Eintrag", () => {
-  expect(group("Finanzen").items.filter((item) => !item.searchOnly).map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"], ["Dolibarr-Anbindung", "/admin/dolibarr"]]);
+test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512); Downloads & QR bei Content; Rechte bleiben je Eintrag", () => {
+  expect(group("Finanzen").items.filter((item) => !item.searchOnly).map((item) => [item.label, item.to])).toEqual([["Finanzübersicht", "/admin/finance"]]);
   expect(group("Finanzen").items[0].areas).toEqual(["finance"]);
   expect(group("Content").items.some((item) => item.to === "/admin/downloads")).toBe(true);
   expect(group("System").items.some((item) => item.to === "/admin/downloads")).toBe(false);
-  expect(group("Mitglieder").items.map((item) => item.label)).toEqual(["Mitglieder", "Mitgliederprofile", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Alle Benutzer"]);
+  expect(group("Mitglieder").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(["Mitglieder", "Mitgliederprofile", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Alle Benutzer", "Dolibarr"]);
+  expect(group("Mitglieder").items.find((item) => item.to === "/admin/dolibarr").areas).toEqual(["club", "system"]);
+  // Menüname = Seitentitel (#512): Jahreswertung, Gewinne, Fast Lap, App-Logs, Push-Tests.
+  expect(group("eSports").items.map((item) => item.label)).toEqual(expect.arrayContaining(["Fast Lap", "Jahreswertung", "Gewinne"]));
+  expect(group("System").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(expect.arrayContaining(["App-Logs", "Push-Tests"]));
   // Jeder Weg genau einmal.
   const routes = ADMIN_GROUPS.flatMap((entry) => entry.items.map((item) => item.to));
   expect(new Set(routes).size).toBe(routes.length);
@@ -54,6 +58,8 @@ test("die Suche findet Reiter: Steam → Login & Konten, Analytics → SEO, Steu
   expect(find("steam")).toContain("/admin/settings?tab=auth");
   expect(find("google analytics")).toContain("/admin/settings?tab=seo");
   expect(find("Steuersätze")).toContain("/admin/dolibarr?tab=connection");
+  expect(find("schalter")).toContain("/admin/dolibarr?tab=features");
+  expect(find("saisons")).toContain("/admin/seasons");
   expect(find("wortfilter")).toContain("/admin/moderation");
   expect(find("vereinsdaten aus dolibarr")).toContain("/admin/club");
 });

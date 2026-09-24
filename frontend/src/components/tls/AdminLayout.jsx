@@ -6,9 +6,10 @@ import { Logo } from "@/components/tls/Logo";
 import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Settings as SettingsIcon, ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-// Sidebar-Gruppen (#408): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
-// Kontakt-Inbox), Mitglieder, Finanzen als eigene Gruppe, eSports, Content (mit Downloads & QR),
-// System. Rechte bleiben je Eintrag wie vorher - nur die Einordnung ändert sich, Links bleiben.
+// Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
+// Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
+// eSports, Content (mit Downloads & QR), Verbindungen, System. Rechte bleiben je Eintrag wie vorher.
+// Regel seit #512: Menüname = Seitentitel, jede Adresse genau einmal.
 export const ADMIN_GROUPS = [
   {
     label: "Übersicht",
@@ -39,16 +40,18 @@ export const ADMIN_GROUPS = [
       { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
       { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
+      // Dolibarr ist Mitgliederverwaltung, nicht Finanzen (#512) - die Rechnungen hängen nur mit dran.
+      { to: "/admin/dolibarr", label: "Dolibarr", icon: Link2, areas: ["club", "system"] },
+      { to: "/admin/dolibarr?tab=features", label: "Dolibarr: Funktionen (Schalter)", icon: Link2, areas: ["club", "system"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=preview", label: "Dolibarr: Umstellung", icon: Link2, areas: ["club"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=links", label: "Dolibarr: Zuordnungen", icon: Link2, areas: ["club"], searchOnly: true },
+      { to: "/admin/dolibarr?tab=policy", label: "Dolibarr: Bereiche (Vorstand → Rechte)", icon: Link2, areas: ["club", "system"], searchOnly: true },
     ],
   },
   {
     label: "Finanzen",
     items: [
       { to: "/admin/finance", label: "Finanzübersicht", icon: Wallet, areas: ["finance"] },
-      { to: "/admin/dolibarr", label: "Dolibarr-Anbindung", icon: Link2, areas: ["club", "system"] },
-      { to: "/admin/dolibarr?tab=preview", label: "Dolibarr: Umstellung", icon: Link2, areas: ["club"], searchOnly: true },
-      { to: "/admin/dolibarr?tab=links", label: "Dolibarr: Zuordnungen", icon: Link2, areas: ["club"], searchOnly: true },
-      { to: "/admin/dolibarr?tab=policy", label: "Dolibarr: Funktionen und Bereiche", icon: Link2, areas: ["club", "system"], searchOnly: true },
     ],
   },
   {
@@ -57,7 +60,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/tournaments", label: "Turniere", icon: Trophy, areas: ["tournaments", "moderation"], staff: true },
       { to: "/admin/tournament-guide", label: "Turnier-Leitfaden", icon: BookOpen, areas: ["tournaments"] },
       { to: "/admin/f1", label: "Fast Lap", icon: Flag, areas: ["tournaments", "moderation"], staff: true },
-      { to: "/admin/seasons", label: "Saisons / Circuit", icon: Trophy, areas: ["tournaments"] },
+      { to: "/admin/seasons", label: "Jahreswertung", icon: Trophy, areas: ["tournaments"] },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
       { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments", "moderation"], staff: true },
       { to: "/admin/game-servers", label: "Game-Server", icon: Server, areas: ["system"] },
@@ -127,12 +130,12 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],
-  "/admin/f1": ["fastlap", "racing", "challenge"],
-  "/admin/seasons": ["wertung", "jahreswertung", "circuit"],
+  "/admin/f1": ["fastlap", "racing", "challenge", "challenges"],
+  "/admin/seasons": ["wertung", "jahreswertung", "circuit", "saisons", "saison"],
   "/admin/games": ["spiele", "games"],
   "/admin/stations": ["geraete", "setup", "event"],
   "/admin/game-servers": ["server", "communityserver"],
-  "/admin/prizes": ["preise", "gewinn"],
+  "/admin/prizes": ["preise", "gewinn", "gewinnabholung", "abholung"],
   "/admin/penalties": ["strafen", "fairplay"],
   "/admin/events": ["termine", "lan", "veranstaltungen"],
   "/admin/news": ["beitraege", "ankuendigungen"],
@@ -149,8 +152,8 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
   "/admin/logs": ["logs", "monitoring", "upload", "mail", "app", "audit", "diagnose"],
   "/admin/audit": ["logs", "aktionen", "sicherheit"],
-  "/admin/mobile-logs": ["app", "fehler", "client"],
-  "/admin/mobile-push": ["push", "notifications", "app"],
+  "/admin/mobile-logs": ["app", "fehler", "client", "client-logs", "abstuerze", "abstürze"],
+  "/admin/mobile-push": ["push", "notifications", "app", "push-monitoring", "testnachricht"],
   "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
   "/admin/setup": ["einrichtung", "anleitung", "anleitungen", "setup", "einrichten", "discord app", "twitch app", "google login", "resend", "smtp", "analytics", "search console", "play store", "schritt für schritt", "howto", "how to"],
   "/admin/club": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
@@ -167,9 +170,10 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/dolibarr?tab=connection": ["dolibarr verbindung", "api schluessel", "api schlüssel", "modus", "vorschau", "live", "schreibzugriff", "rechnungen freigeben", "steuersaetze", "steuersätze", "konditionen", "webhook", "beitrittsantraege", "beitrittsanträge", "e-mail zuordnen", "erp"],
   "/admin/dolibarr?tab=preview": ["umstellung", "vorschau", "trockenlauf", "mitgliedsarten", "konten bestätigen", "ohne konto"],
   "/admin/dolibarr?tab=links": ["zuordnungen", "konto mitglied", "verknuepfung", "verknüpfung", "loesen", "lösen"],
-  "/admin/dolibarr?tab=policy": ["funktionen", "bereich", "vorstand rechte", "freigabe", "vereinsverwaltung", "obmann", "kassier"],
+  "/admin/dolibarr?tab=policy": ["bereiche", "bereich", "vorstand rechte", "freigabe", "vereinsverwaltung", "obmann", "kassier"],
+  "/admin/dolibarr?tab=features": ["funktionen", "schalter", "aus dolibarr", "vereinsdaten aus dolibarr", "kanaele aus dolibarr", "sponsoren aus dolibarr", "beitrittsantraege", "verzeichnis", "einwilligung", "schreibzugriff"],
   "/admin/finance": ["finanzen", "rechnungen", "belege", "zahlungen", "prueffaelle", "erstattung", "auftraege"],
-  "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
+  "/admin/dolibarr": ["dolibarr", "erp", "anbindung", "mitgliederverwaltung", "schreibzugriff", "konditionen", "steuersaetze", "abgleich"],
 };
 
 function normalizeSearch(value) {

@@ -158,7 +158,7 @@ export default function AdminDolibarrPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mitgliederverwaltung</span>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mitglieder</span>
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dolibarr</h1>
           <p className="text-sm text-white/55 mt-2 max-w-2xl">
             Dolibarr mit dem Vereinsmodul führt Mitgliedschaft, Beiträge und Vereinsfunktionen – die Website übernimmt den Stand für

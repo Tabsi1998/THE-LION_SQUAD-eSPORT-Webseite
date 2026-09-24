@@ -303,7 +303,8 @@ function App() {
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireArea="system"><AdminMobilePushPage /></ProtectedRoute>} />
           <Route path="/admin/app-releases" element={<ProtectedRoute requireArea="system"><AdminAppReleasesPage /></ProtectedRoute>} />
           <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
-          <Route path="/admin/widgets" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />
+          {/* Eine Adresse je Seite (#512): Widgets sind Downloads & QR. */}
+          <Route path="/admin/widgets" element={<Navigate to="/admin/downloads" replace />} />
 
           <Route path="/seasons/current" element={<CurrentSeasonRedirect />} />
           <Route path="/seasons/:slug" element={<SeasonPage />} />
