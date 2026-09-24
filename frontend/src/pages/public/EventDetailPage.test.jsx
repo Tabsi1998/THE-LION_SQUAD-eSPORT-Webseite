@@ -56,3 +56,9 @@ test("mehrere Standorte: Zähler im Kopf, je Standort Karte, Zeiten und Adresse"
   expect(screen.getByTitle("Karte Treffpunkt Vereinsheim")).toBeInTheDocument();
   expect(screen.queryByTitle("Karte Vereinsausflug")).not.toBeInTheDocument();
 });
+
+test("Partner II (#469): das Event nennt seine Partner mit Link auf die Partnerseite", async () => {
+  renderPage({ ...base, partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports", logo_url: "" }] });
+  expect(await screen.findByTestId("event-partners")).toHaveTextContent("Gemeinsam mit");
+  expect(screen.getByTestId("event-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
+});

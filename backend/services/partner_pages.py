@@ -249,3 +249,56 @@ async def discord_widget(guild_id) -> dict | None:
         return _remember(("discord", gid), {"enabled": False, "checked_at": _now_iso()}, DISCORD_TTL)
     logger.warning("[partners] discord widget %s: HTTP %s", gid, response.status_code)
     return _remember(("discord", gid), {"enabled": False, "error": f"HTTP {response.status_code}", "checked_at": _now_iso()}, DISCORD_TTL)
+
+
+# ---------- Partner an Events und Turnieren (#469 Teil 2) ----------
+
+def partner_badge(doc: dict) -> dict:
+    return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": doc.get("logo_url"), "kind": doc.get("kind")}
+
+
+async def clean_partner_ids(db, ids) -> list[str]:
+    """Nur echte, aktive Partner - in der Reihenfolge des Formulars, ohne Doppelte."""
+    wanted = list(dict.fromkeys(str(item).strip() for item in (ids or []) if str(item or "").strip()))
+    if not wanted:
+        return []
+    found = {row["id"] for row in await db.partners.find({"id": {"$in": wanted}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(len(wanted))}
+    return [item for item in wanted if item in found]
+
+
+async def attach_partners(db, item: dict) -> None:
+    """`partners` (Kurzform) an ein Event oder Turnier hängen - nur aktive Partner."""
+    ids = [item_id for item_id in (item.get("partner_ids") or []) if item_id]
+    if not ids:
+        item["partners"] = []
+        return
+    rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "kind": 1}).to_list(len(ids))
+    by_id = {row["id"]: partner_badge(row) for row in rows}
+    item["partners"] = [by_id[item_id] for item_id in ids if item_id in by_id]
+
+
+async def shared_for_partner(db, partner_id: str, *, user: dict | None) -> dict:
+    """Events und Turniere mit diesem Partner - nur, was die Person sehen darf; Entwürfe nie."""
+    from services.visibility import user_can_see
+
+    events = []
+    event_rows = await db.events.find(
+        {"partner_ids": partner_id, "status": {"$ne": "draft"}},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "end_date": 1, "status": 1, "visibility": 1, "banner_url": 1, "event_type": 1},
+    ).sort("start_date", -1).limit(30).to_list(30)
+    for event in event_rows:
+        if await user_can_see(user, event.get("visibility") or "public"):
+            events.append(event)
+    tournaments = []
+    tournament_rows = await db.tournaments.find(
+        {"partner_ids": partner_id, "status": {"$ne": "draft"}, "is_public": {"$ne": False}},
+        {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "status": 1, "visibility": 1, "banner_url": 1, "game_id": 1},
+    ).sort("start_date", -1).limit(30).to_list(30)
+    for tournament in tournament_rows:
+        if await user_can_see(user, tournament.get("visibility") or "public"):
+            tournaments.append(tournament)
+    game_ids = list({t.get("game_id") for t in tournaments if t.get("game_id")})
+    games = {g["id"]: g for g in await db.games.find({"id": {"$in": game_ids}}, {"_id": 0, "id": 1, "name": 1, "slug": 1}).to_list(len(game_ids))} if game_ids else {}
+    for tournament in tournaments:
+        tournament["game"] = games.get(tournament.pop("game_id", None))
+    return {"events": events, "tournaments": tournaments}

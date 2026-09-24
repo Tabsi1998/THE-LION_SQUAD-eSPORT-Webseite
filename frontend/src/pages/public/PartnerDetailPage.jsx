@@ -92,7 +92,10 @@ export default function PartnerDetailPage() {
   const live = Boolean(twitch?.live && twitchChannel);
   const since = partner.since || (partner.since_year ? String(partner.since_year) : "");
   const embeddedTool = tools.find((tool) => tool.id === openTool) || null;
-  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0;
+  const shared = partner.shared || {};
+  const sharedEvents = Array.isArray(shared.events) ? shared.events : [];
+  const sharedTournaments = Array.isArray(shared.tournaments) ? shared.tournaments : [];
+  const hasMain = live || Boolean(partner.about) || tools.length > 0 || news.length > 0 || sharedEvents.length > 0 || sharedTournaments.length > 0;
 
   return (
     <PublicLayout>
@@ -164,6 +167,20 @@ export default function PartnerDetailPage() {
               </section>
             )}
 
+            {(sharedEvents.length > 0 || sharedTournaments.length > 0) && (
+              <section data-testid="partner-shared">
+                <SectionTitle icon={Calendar} kicker="Gemeinsam" title="Events & Turniere" />
+                <div className="grid gap-3 md:grid-cols-2">
+                  {sharedEvents.map((event) => (
+                    <SharedCard key={event.id} to={`/events/${event.slug || event.id}`} testId={`partner-event-${event.slug || event.id}`} kicker="Event" title={event.name} date={event.start_date} />
+                  ))}
+                  {sharedTournaments.map((tournament) => (
+                    <SharedCard key={tournament.id} to={`/tournaments/${tournament.slug || tournament.id}`} testId={`partner-tournament-${tournament.slug || tournament.id}`} kicker={tournament.game?.name ? `Turnier · ${tournament.game.name}` : "Turnier"} title={tournament.title} date={tournament.start_date} />
+                  ))}
+                </div>
+              </section>
+            )}
+
             {news.length > 0 && (
               <section data-testid="partner-news">
                 <SectionTitle icon={Newspaper} kicker="Gemeinsam" title="News mit dem Partner" />
@@ -206,6 +223,17 @@ export default function PartnerDetailPage() {
         </div>
       </section>
     </PublicLayout>
+  );
+}
+
+// Gemeinsames Event oder Turnier (#469 Teil 2): Karte mit Art, Titel und Datum, führt zur Seite.
+function SharedCard({ to, testId, kicker, title, date }) {
+  return (
+    <Link to={to} data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] p-3 hover:border-[#29B6E8]/60 transition min-w-0">
+      <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{kicker}</div>
+      <div className="mt-1 font-heading font-bold leading-tight break-words">{title}</div>
+      {formatDate(date) && <div className="mt-1 text-[11px] text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(date)}</div>}
+    </Link>
   );
 }
 

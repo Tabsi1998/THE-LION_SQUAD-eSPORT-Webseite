@@ -3,6 +3,7 @@ import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api, formatApiError, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { FormActions, FormColumns, FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, TextField, SelectField as SelectInput } from "@/components/tls/FormFields";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { BracketTree } from "@/components/tls/BracketTree";
@@ -1555,6 +1556,7 @@ function MatchScheduleControls({ match, stations = [], defaultScheduledAt = null
 function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFormat }) {
   const dt = toDateTimeLocalInput;
   const [games, setGames] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]);
   // Startgeld (#319, #322): eigener Zustand wie beim Event, nur für den Bereich Finanzen sichtbar
   // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
@@ -1567,6 +1569,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     slug: source.slug || "",
     description: source.description || "",
     game_id: source.game_id || "",
+    partner_ids: source.partner_ids || [],
     platform: source.platform || "",
     event_id: source.event_id || "",
     format: source.format || "single_elim",
@@ -1622,6 +1625,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
     slug: tournament.slug || "",
     description: tournament.description || "",
     game_id: tournament.game_id || "",
+    partner_ids: tournament.partner_ids || [],
     platform: tournament.platform || "",
     event_id: tournament.event_id || "",
     format: tournament.format || "single_elim",
@@ -1689,6 +1693,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
   });
   useEffect(() => {
     api.get("/games").then(({ data }) => setGames(data || [])).catch(() => setGames([]));
+    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => setPartners([]));
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data || [])).catch(() => setEvents([]));
   }, []);
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
@@ -1911,6 +1916,7 @@ function TournamentEditForm({ tournament, stages = [], onSaved, onRebuildFromFor
           <p className="text-xs text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>
           <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
           <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>
+          <PartnerPicker partners={partners} value={f.partner_ids} onChange={(v)=>set("partner_ids", v)} testPrefix="tr-edit-partner" hint="Das Turnier erscheint auf der Partnerseite unter „Gemeinsam“, und die Turnierseite nennt den Partner." />
         </FormSection>
 
         <FormSection title="Preise" collapsible accent="#FFD700">

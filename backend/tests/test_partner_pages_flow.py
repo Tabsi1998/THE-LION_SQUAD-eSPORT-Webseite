@@ -191,3 +191,38 @@ async def test_partners_from_dolibarr_and_from_before_get_a_slug(flow):
     listed = (await flow.get("/api/partners")).json()
     assert sorted(p["slug"] for p in listed) == ["alter-partner", "gamma-verein"]
     assert (await flow.db.partners.find_one({"id": "alt"}, {"_id": 0, "slug": 1}))["slug"] == "alter-partner"
+
+
+@pytest.mark.asyncio
+async def test_partners_at_events_and_tournaments_show_up_on_both_sides(flow):
+    """Teil 2: ein Partner am Event oder Turnier - die Seite nennt ihn, die Partnerseite zeigt beides
+    unter „Gemeinsam“; unbekannte Partner fallen weg, Entwürfe erscheinen nicht."""
+    await flow.db.games.insert_one({"id": "g1", "name": "Teamfight Tactics", "slug": "tft"})
+    admin = await flow.add_user(role="superadmin", name="Admin")
+    flow.act_as(admin)
+    partner = (await flow.post("/api/partners", json={"name": "PineApps eSports"})).json()
+    event = (await flow.post("/api/events", json={"name": "TFT-Abend", "status": "scheduled", "visibility": "public", "start_date": "2026-11-05T18:00:00+00:00", "partner_ids": [partner["id"], "gibtsnicht"]})).json()
+    assert event["partner_ids"] == [partner["id"]]
+    await flow.post("/api/events", json={"name": "Geheimplan", "status": "draft", "visibility": "public", "partner_ids": [partner["id"]]})
+    tournament = (await flow.post("/api/tournaments", json={
+        "title": "TFT Open", "game_id": "g1", "status": "registration_open", "visibility": "public", "is_public": True,
+        "format": "single_elim", "team_mode": "solo", "team_size": 1, "max_participants": 8,
+        "start_date": "2026-12-01T18:00:00+00:00", "partner_ids": [partner["id"]],
+    })).json()
+    assert tournament["partner_ids"] == [partner["id"]]
+    cleared = (await flow.patch(f"/api/tournaments/{tournament['id']}", json={"partner_ids": ["gibtsnicht"]})).json()
+    assert cleared["partner_ids"] == []
+    restored = (await flow.patch(f"/api/tournaments/{tournament['id']}", json={"partner_ids": [partner["id"]]})).json()
+    assert restored["partner_ids"] == [partner["id"]]
+    changed = (await flow.patch(f"/api/events/{event['id']}", json={"partner_ids": [partner["id"], partner["id"]]})).json()
+    assert changed["partner_ids"] == [partner["id"]]
+
+    flow.act_as(None)
+    event_page = (await flow.get(f"/api/events/{event['slug']}")).json()
+    assert [p["slug"] for p in event_page["partners"]] == ["pineapps-esports"]
+    tournament_page = (await flow.get(f"/api/tournaments/{tournament['slug']}")).json()
+    assert [p["name"] for p in tournament_page["partners"]] == ["PineApps eSports"]
+    shared = (await flow.get("/api/partners/pineapps-esports")).json()["shared"]
+    assert [e["slug"] for e in shared["events"]] == [event["slug"]]
+    assert [t["slug"] for t in shared["tournaments"]] == [tournament["slug"]]
+    assert shared["tournaments"][0]["game"]["name"] == "Teamfight Tactics"

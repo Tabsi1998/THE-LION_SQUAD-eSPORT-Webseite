@@ -22,7 +22,7 @@ import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio } from "lucide-react";
+import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio, Handshake } from "lucide-react";
 
 // Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
 function eventKindLabel(value) {
@@ -272,6 +272,20 @@ export default function EventDetailPage() {
                   <div className="text-[10px] uppercase tracking-widest text-white/40">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</div>
                   <div className="font-heading font-bold mt-1">{n.title}</div>
                   {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!!(e.partners || []).length && (
+          <div data-testid="event-partners">
+            <h2 className="font-heading text-2xl font-black uppercase mb-5">Gemeinsam mit</h2>
+            <div className="flex flex-wrap gap-3">
+              {e.partners.map((p) => (
+                <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`event-partner-${p.slug || p.id}`} className="inline-flex items-center gap-3 border border-white/10 bg-[#101010] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
+                  {p.logo_url ? <img src={resolveMediaUrl(p.logo_url)} alt="" className="h-8 w-8 object-contain" /> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
+                  <span className="font-heading font-bold uppercase text-sm">{p.name}</span>
                 </Link>
               ))}
             </div>
