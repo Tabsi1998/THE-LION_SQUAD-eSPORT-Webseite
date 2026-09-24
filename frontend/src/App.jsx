@@ -131,6 +131,7 @@ const AboutPage = lazy(() => import("@/pages/public/AboutPage"));
 const ContactPage = lazy(() => import("@/pages/public/ContactPage"));
 const SponsorsPage = lazy(() => import("@/pages/public/SponsorsPage"));
 const PartnersPage = lazy(() => import("@/pages/public/PartnersPage"));
+const PartnerDetailPage = lazy(() => import("@/pages/public/PartnerDetailPage"));
 const ReferencesPage = lazy(() => import("@/pages/public/ReferencesPage"));
 const ReferenceDetailPage = lazy(() => import("@/pages/public/ReferencesPage").then((m) => ({ default: m.ReferenceDetailPage })));
 const PlayersPage = lazy(() => import("@/pages/public/PlayersPage"));
@@ -196,6 +197,7 @@ function App() {
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/sponsors" element={<SponsorsPage />} />
           <Route path="/partners" element={<PartnersPage />} />
+          <Route path="/partners/:slug" element={<PartnerDetailPage />} />
           <Route path="/references" element={<ReferencesPage />} />
           <Route path="/references/:id" element={<ReferenceDetailPage />} />
           <Route path="/community" element={<CommunityPage />} />

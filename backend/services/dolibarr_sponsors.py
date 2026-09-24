@@ -24,6 +24,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from models import new_id, now_utc
+from services.slug_utils import unique_slug
 from services.dolibarr_client import DolibarrClient, DolibarrError
 
 SETTINGS_ID = "sponsor_source"
@@ -238,7 +239,8 @@ async def apply_partners(db, companies: dict[int, dict]) -> dict:
             updated += 1
         else:
             doc = {"id": new_id(), "created_at": stamp, "updated_at": stamp, "kind": company.get("partner_kind") or "verein", "order_index": 0,
-                   "logo_url": None, "description": None, "link": company.get("link"), **values}
+                   "logo_url": None, "description": None, "link": company.get("link"),
+                   "slug": await unique_slug(db.partners, company["name"], fallback="partner"), **values}
             await db.partners.insert_one(doc)
             created += 1
     gone = 0

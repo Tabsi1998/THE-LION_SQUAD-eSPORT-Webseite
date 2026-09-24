@@ -5,7 +5,11 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
+import { ChannelIcon, channelColor } from "@/components/tls/ChannelIcon";
 import { ArrowRight, ExternalLink, Handshake, Star } from "lucide-react";
+
+// Partnerliste: jede Karte führt auf die Partnerseite (#469) - Kanäle, Twitch-Live, Discord,
+// Tools und gemeinsame News stehen dort; die Website bleibt als kleiner Link an der Karte.
 
 export default function PartnersPage() {
   useDocumentTitle(
@@ -16,7 +20,7 @@ export default function PartnersPage() {
   const [partners, setPartners] = useState([]);
 
   const load = useCallback(() => {
-    api.get("/partners").then(({ data }) => setPartners(data || [])).catch(() => setPartners([]));
+    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => setPartners([]));
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -36,7 +40,7 @@ export default function PartnersPage() {
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
               <Star className="h-3.5 w-3.5" /> Sponsoren
             </div>
-            <p className="mt-2 text-sm text-white/55">Unterstuetzer, Tiers und Marken, die Events und Turniere mitmoeglich machen.</p>
+            <p className="mt-2 text-sm text-white/55">Unterstützer, Tiers und Marken, die Events und Turniere mit möglich machen.</p>
             <span className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/35 group-hover:text-[#FFD700]">
               Sponsoren ansehen <ArrowRight className="h-3 w-3" />
             </span>
@@ -60,33 +64,48 @@ export default function PartnersPage() {
           </div>
         ) : (
           <div className="mt-12 space-y-8">
-            {partners.map((p, idx) => (
-              <a
-                key={p.id}
-                href={p.link || undefined}
-                target={p.link ? "_blank" : undefined}
-                rel="noreferrer"
-                className="grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition group"
-              >
-                <div className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
-                  {p.logo_url ? (
-                    <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
-                  ) : (
-                    <Handshake className="w-14 h-14 text-[#29B6E8]" />
-                  )}
-                </div>
-                <div className="p-7 md:p-10 flex flex-col justify-center">
-                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{p.kind || "Partner"}</div>
-                  <h3 className="mt-2 font-heading font-black uppercase text-2xl md:text-3xl leading-tight">{p.name}</h3>
-                  {p.description && <p className="mt-4 text-white/70 leading-relaxed">{p.description}</p>}
-                  {p.link && (
-                    <span className="mt-6 inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold text-[#29B6E8] group-hover:underline">
-                      Website <ExternalLink className="w-3 h-3" />
-                    </span>
-                  )}
-                </div>
-              </a>
-            ))}
+            {partners.map((p, idx) => {
+              const target = `/partners/${encodeURIComponent(p.slug || p.id)}`;
+              const channels = Array.isArray(p.channels) ? p.channels : [];
+              const since = p.since || (p.since_year ? String(p.since_year) : "");
+              return (
+                <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition">
+                  <Link to={target} className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
+                    {p.logo_url ? (
+                      <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
+                    ) : (
+                      <Handshake className="w-14 h-14 text-[#29B6E8]" />
+                    )}
+                  </Link>
+                  <div className="p-7 md:p-10 flex flex-col justify-center min-w-0">
+                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{p.kind || "Partner"}{since ? <span className="text-white/40"> · seit {since}</span> : null}</div>
+                    <h3 className="mt-2 font-heading font-black uppercase text-2xl md:text-3xl leading-tight break-words">
+                      <Link to={target} data-testid={`partner-open-${p.slug || p.id}`} className="hover:text-[#29B6E8] transition">{p.name}</Link>
+                    </h3>
+                    {p.description && <p className="mt-4 text-white/70 leading-relaxed">{p.description}</p>}
+                    {channels.length > 0 && (
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {channels.map((channel) => (
+                          <a key={channel.key} href={channel.url} target="_blank" rel="noopener noreferrer" aria-label={channel.label} title={channel.label} data-testid={`partner-icon-${channel.key}`} className="inline-flex h-9 w-9 items-center justify-center border border-white/10 bg-[#0A0A0A] rounded-sm text-white/60 transition hover:text-[var(--c)] hover:border-[var(--c)]" style={{ "--c": channelColor(channel.key) }}>
+                            <ChannelIcon kind={channel.key} className="w-4 h-4" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-6 flex flex-wrap items-center gap-4">
+                      <Link to={target} className="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">
+                        Partnerseite <ArrowRight className="w-3 h-3" />
+                      </Link>
+                      {p.link && (
+                        <a href={p.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs uppercase tracking-wider font-bold text-white/45 hover:text-white">
+                          Website <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
       </section>

@@ -9,6 +9,7 @@ from auth import require_admin, get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
+from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -788,6 +789,40 @@ def _partner_defaults(doc: dict) -> dict:
     return doc
 
 
+async def _ensure_partner_slug(db, doc: dict) -> dict:
+    """Partner von früher (und aus Dolibarr) haben noch keinen Slug - beim ersten Lesen bekommen sie einen."""
+    if doc.get("slug"):
+        return doc
+    doc["slug"] = await unique_slug(db.partners, doc.get("name"), current_id=doc.get("id"), fallback="partner")
+    await db.partners.update_one({"id": doc["id"]}, {"$set": {"slug": doc["slug"]}})
+    return doc
+
+
+def _public_partner(doc: dict) -> dict:
+    """Öffentliche Sicht (#469): wie beim Sponsor ohne Kontakt und Notizen, dazu die Kanäle."""
+    view = public_sponsor_view(doc)
+    view["channels"] = partner_pages.channels_for(doc)
+    return view
+
+
+async def _partner_news(db, partner: dict, user: dict | None) -> list[dict]:
+    """News, in denen der Partner genannt wird - über den Namen, ohne neues Feld an der News."""
+    name = str(partner.get("name") or "").strip()
+    if len(name) < 3:
+        return []
+    rx = {"$regex": re.escape(name), "$options": "i"}
+    projection = {
+        "_id": 0, "id": 1, "title": 1, "slug": 1, "excerpt": 1, "banner_url": 1, "category": 1,
+        "visibility": 1, "pinned": 1, "published": 1, "published_at": 1, "created_at": 1,
+    }
+    posts = await db.news_posts.find(
+        {"published": True, "$or": [{"title": rx}, {"excerpt": rx}, {"content": rx}]}, projection,
+    ).sort([("published_at", -1), ("created_at", -1)]).to_list(30)
+    posts = [p for p in posts if _published_now(p)]
+    posts = await _filter_visible(posts, user)
+    return posts[:6]
+
+
 def _medal_for_placement(placement: int | None) -> str | None:
     if placement == 1:
         return "gold"
@@ -1235,7 +1270,8 @@ async def list_partners():
     db = get_db()
     partners = await db.partners.find({"is_active": {"$ne": False}}, {"_id": 0}).to_list(500)
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
-    return [public_sponsor_view(p) for p in partners]
+    partners = [await _ensure_partner_slug(db, p) for p in partners]
+    return [_public_partner(p) for p in partners]
 
 
 @router.get("/partners/admin")
@@ -1243,13 +1279,17 @@ async def admin_list_partners(me: dict = Depends(require_area("content"))):
     db = get_db()
     partners = await db.partners.find({}, {"_id": 0}).to_list(500)
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
-    return partners
+    return [await _ensure_partner_slug(db, p) for p in partners]
 
 
 @router.post("/partners")
 async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
-    doc = _partner_defaults(body.model_dump())
+    data = body.model_dump()
+    slug_source = data.pop("slug", None) or data.get("name")
+    doc = _partner_defaults(data)
+    doc.update(partner_pages.normalize_partner_fields(doc))
+    doc["slug"] = await unique_slug(db.partners, slug_source, fallback="partner")
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -1262,7 +1302,10 @@ async def create_partner(body: PartnerCreate, me: dict = Depends(require_area("c
 @router.patch("/partners/{pid}")
 async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(require_area("content"))):
     db = get_db()
-    nullable_fields = {"logo_url", "link", "description"}
+    nullable_fields = {
+        "logo_url", "link", "description", "about", "since", "discord_invite", "discord_guild_id",
+        "twitch_channel", "youtube_url", "x_url", "instagram_url", "tiktok_url",
+    }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     from services import dolibarr_sponsors
@@ -1271,6 +1314,16 @@ async def update_partner(pid: str, body: PartnerUpdate, me: dict = Depends(requi
         raise HTTPException(404, "Partner nicht gefunden.")
     for field in await dolibarr_sponsors.locked_fields(db, current, dolibarr_sponsors.PARTNER_LOCKED_FIELDS):
         updates.pop(field, None)
+    updates.update(partner_pages.normalize_partner_fields(updates))
+    # Slug wie bei den News: ein mitgeschickter alter Slug bei neuem Namen bleibt automatisch,
+    # ein anderer Slug gilt; der alte leitet weiter (slug_history).
+    slug_source = slug_source_for_update(raw, current, "name", fallback="partner")
+    updates.pop("slug", None)
+    if slug_source is not None:
+        new_slug = await unique_slug(db.partners, slug_source, current_id=pid, fallback="partner")
+        if new_slug != current.get("slug"):
+            updates["slug"] = new_slug
+            apply_slug_history(current, updates)
     if not updates:
         return current
     updates["updated_at"] = now_utc().isoformat()
@@ -1283,6 +1336,23 @@ async def delete_partner(pid: str, me: dict = Depends(require_area("content"))):
     db = get_db()
     await db.partners.delete_one({"id": pid})
     return {"ok": True}
+
+
+@router.get("/partners/{slug}")
+async def get_partner_page(slug: str, user: dict | None = Depends(get_optional_user)):
+    """Partnerseite (#469): Kanäle, Twitch-Live-Stand, Discord-Widget, Tools und News mit dem Partner.
+    Steht nach `/partners/admin`, damit „admin“ kein Slug wird."""
+    db = get_db()
+    doc, from_history = await find_by_slug_or_history(db.partners, slug, {"_id": 0})
+    if not doc or doc.get("is_active") is False:
+        raise HTTPException(404, "Partner nicht gefunden.")
+    doc = await _ensure_partner_slug(db, doc)
+    view = _public_partner(doc)
+    view["twitch"] = await partner_pages.twitch_status(doc.get("twitch_channel")) if doc.get("twitch_channel") else None
+    view["discord"] = await partner_pages.discord_widget(doc.get("discord_guild_id")) if doc.get("discord_guild_id") else None
+    view["news"] = await _partner_news(db, doc, user)
+    view["redirected"] = from_history
+    return view
 
 
 # ---------- References ----------
