@@ -6,19 +6,23 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 
 | Seite | Was | Woher |
 |---|---|---|
-| System → Betrieb → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens) | `ops_errors`, 30 Tage |
-| System → Betrieb → **Tempo** | Anfragen über der Schwelle (Route, Dauer) | `ops_slow_requests` |
-| System → Betrieb → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
-| System → Betrieb → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen | `ops_check_runs` |
-| System → Betrieb → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
-| System → Logs | Ereignisse aus mehreren Quellen in einer Liste (Uploads, App-Logs, Versand, Adminaktionen) | Sammelsicht |
-| System → Audit Logs | Jede Adminaktion mit Konto, Zeit und Details | `audit_logs` |
-| System → App-Logs | Fehler und Meldungen der LionsAPP (Gerät, Version, Stufe) | `mobile_client_logs`, 90 Tage |
-| Einstellungen → Versandlogs / Mail-Queue | Jede Mail mit Status; wartende und fehlgeschlagene Sendungen | `email_logs`, `mail_jobs` |
+| System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens) | `ops_errors`, 30 Tage |
+| System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer) | `ops_slow_requests` |
+| System → Betrieb & Logs → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
+| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen | `ops_check_runs` |
+| System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
+| System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
+| System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“ | `GET /api/admin/ops/events` |
+| System → Betrieb & Logs → **App-Logs** | Fehler und Meldungen der LionsAPP (Gerät, Version, Stufe) mit Status und Notiz | `mobile_client_logs`, 90 Tage |
+| E-Mail → Mail-Queue | Wartende und fehlgeschlagene Sendungen, neu einreihen | `mail_jobs` |
+
+Die früheren Seiten Logs, Audit Logs, App-Logs und Versandlogs leiten auf die passenden Reiter um
+(`/admin/logs` → Ereignisse, `/admin/audit` → Ereignisse mit Quelle Adminaktionen, `/admin/mobile-logs`
+→ App-Logs, `/admin/settings/mail-logs` → Ereignisse mit Quelle E-Mail).
 
 ## Alarme (#517)
 
-Unter **System → Betrieb → Alarme** legt der Admin je Ereignisart fest, ob eine Meldung per **Discord**
+Unter **System → Betrieb & Logs → Alarme** legt der Admin je Ereignisart fest, ob eine Meldung per **Discord**
 (Betriebs-Webhook – ein privater Kanal nur für den Vorstand, eingerichtet unter Verbindungen → Discord)
 und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 

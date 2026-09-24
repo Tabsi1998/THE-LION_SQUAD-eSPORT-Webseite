@@ -76,7 +76,7 @@ export const FAQ_TOPICS = [
       { key: "smtp", q: "Kann ich mein eigenes Postfach statt Resend nehmen?", a: "Ja, über SMTP (Host, Port, Benutzer, Passwort). Es gilt immer nur ein Weg – der aktive steht unter Status.", to: "/admin/settings/smtp", label: "Verbindungen → SMTP", guide: "smtp" },
       { key: "newsletter", q: "Wie schicke ich einen Newsletter an die Mitglieder?", a: "E-Mail → Newsletter: Empfängerkreis, Betreff, Text; nur Konten mit Einwilligung bekommen ihn.", to: "/admin/settings/newsletter", label: "E-Mail → Newsletter" },
       { key: "mail_templates", q: "Kann ich die Texte der Mails ändern, die die Website verschickt?", a: "System → E-Mail-Vorlagen: jede Mail mit Zweck, Empfänger und Variablen; Betreff und Text ändern, Vorschau mit Beispieldaten, Testmail an dich, Zurücksetzen auf den Standard.", to: "/admin/email-templates", label: "System → E-Mail-Vorlagen" },
-      { key: "mail_queue", q: "Eine Mail ist nicht angekommen – wo sehe ich, was passiert ist?", a: "E-Mail → Mail-Queue (wartend, fehlgeschlagen) und Versandlogs (jede Mail mit Status). Fehlgeschlagene lassen sich neu einreihen.", to: "/admin/settings/mail-queue", label: "E-Mail → Mail-Queue" },
+      { key: "mail_queue", q: "Eine Mail ist nicht angekommen – wo sehe ich, was passiert ist?", a: "E-Mail → Mail-Queue (wartend, fehlgeschlagen) und Betrieb & Logs → Ereignisse, Quelle „E-Mail“ (jede Mail mit Status). Fehlgeschlagene lassen sich neu einreihen.", to: "/admin/settings/mail-queue", label: "E-Mail → Mail-Queue" },
     ],
   },
   {
@@ -112,7 +112,7 @@ export const FAQ_TOPICS = [
       { key: "play_store", q: "Wie kommt der Play-Store-Link auf die Website?", a: "Auftritt → Branding → Play-Store-Link. Bis zur Veröffentlichung steht „bald bei Google Play“.", to: "/admin/settings/branding", label: "Auftritt → Branding", guide: "play_store" },
       { key: "app_versionen", q: "Wie rolle ich eine neue App-Version aus?", a: "System → App-Versionen: Build hochladen oder Release eintragen, Mindestversion setzen; die App zeigt dann den Hinweis zum Update.", to: "/admin/app-releases", label: "System → App-Versionen" },
       { key: "push", q: "Wie prüfe ich, ob Push-Nachrichten ankommen?", a: "System → Push-Tests: Testnachricht an ein Konto schicken, Zustellung und Fehler je Gerät ansehen.", to: "/admin/mobile-push", label: "System → Push-Tests" },
-      { key: "app_logs", q: "Wo sehe ich Abstürze und Fehler aus der App?", a: "System → App-Logs: Client-Logs mit Gerät, Version und Meldung.", to: "/admin/mobile-logs", label: "System → App-Logs" },
+      { key: "app_logs", q: "Wo sehe ich Abstürze und Fehler aus der App?", a: "System → Betrieb & Logs → App-Logs: Client-Logs mit Gerät, Version und Meldung, mit Status und Notiz je Eintrag.", to: "/admin/ops?tab=app", label: "System → Betrieb & Logs → App-Logs" },
     ],
   },
   {
@@ -120,8 +120,9 @@ export const FAQ_TOPICS = [
     label: "Betrieb und Sicherheit",
     questions: [
       { key: "status", q: "Läuft alles? Wo sehe ich Datenbank, Mail, Scheduler und Uploads?", a: "System → Status: Ampeln für Datenbank, SMTP/Mail, Discord, Uploads, Scheduler, Mail-Queue und die Upload-Pfade.", to: "/admin/settings/status", label: "System → Status" },
-      { key: "betrieb", q: "Wo stehen Serverfehler und Auto-Checks?", a: "System → Betrieb: rote Auto-Checks und neue Serverfehler; mit Betriebs-Webhook auch als Alarm in einen privaten Discord-Kanal.", to: "/admin/ops", label: "System → Betrieb" },
-      { key: "audit", q: "Wer hat was im Admin geändert?", a: "System → Audit Logs: jede Adminaktion mit Konto, Zeit und Details.", to: "/admin/audit", label: "System → Audit Logs" },
+      { key: "ereignisse", q: "Wo sehe ich alle Ereignisse an einem Ort – Fehler, Checks, Mails, Adminaktionen, App?", a: "System → Betrieb & Logs → Ereignisse: eine Liste über alle Quellen (Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot) mit Filter nach Quelle, Schwere, Zeitraum und Text; „Als CSV“ lädt die Auswahl herunter. Der Überblick zeigt je Quelle die Auffälligkeiten und die neuesten Probleme.", to: "/admin/ops?tab=events", label: "System → Betrieb & Logs → Ereignisse" },
+      { key: "betrieb", q: "Wo stehen Serverfehler und Auto-Checks?", a: "System → Betrieb & Logs: rote Auto-Checks und neue Serverfehler; mit Betriebs-Webhook auch als Alarm in einen privaten Discord-Kanal.", to: "/admin/ops", label: "System → Betrieb & Logs" },
+      { key: "audit", q: "Wer hat was im Admin geändert?", a: "System → Betrieb & Logs → Ereignisse, Quelle „Adminaktionen“: jede Adminaktion mit Konto, Zeit und Details – mit Filter nach Aktion, Zeitraum und Text, als CSV exportierbar.", to: "/admin/ops?tab=events&source=audit", label: "System → Betrieb & Logs → Ereignisse" },
       { key: "moderation", q: "Wie moderiere ich Meldungen, Wortfilter und hochgeladene Bilder?", a: "System → Moderation: Meldungen, Wortfilter-Funde, Personen, Verwarnungsstufen und die Bildprüfung (automatisch geprüfte Uploads freigeben oder entfernen).", to: "/admin/moderation", label: "System → Moderation" },
       { key: "zwei_faktor", q: "Warum verlangt der Adminbereich eine Zwei-Faktor-Anmeldung?", a: "Für Admin-, Vorstands- und Turnierleitungs-Konten ist die bestätigte Zwei-Faktor-Anmeldung Pflicht. Einrichten unter Mein Profil → Sicherheit.", to: "/profile", label: "Mein Profil → Sicherheit" },
     ],

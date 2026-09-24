@@ -21,7 +21,7 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
     ["Alle Verbindungen", "/admin/integrations"], ["Google", "/admin/settings/google"], ["Resend", "/admin/settings/resend"], ["SMTP", "/admin/settings/smtp"],
   ]);
   // Keine zweite Reiterleiste mehr: E-Mail, Auftritt und System tragen die früheren Reiter als Einträge.
-  expect(group("E-Mail").items.map((item) => item.to)).toEqual(["/admin/settings/newsletter", "/admin/settings/mail-queue", "/admin/settings/mail-logs", "/admin/email-templates"]);
+  expect(group("E-Mail").items.map((item) => item.to)).toEqual(["/admin/settings/newsletter", "/admin/settings/mail-queue", "/admin/email-templates"]);
   expect(group("Auftritt").items.map((item) => item.to)).toEqual(["/admin/settings/branding", "/admin/settings/socials", "/admin/settings/seo"]);
   expect(group("System").items.map((item) => item.to)).toEqual(expect.arrayContaining(["/admin/settings/status", "/admin/settings/zugang"]));
   expect(ADMIN_GROUPS.flatMap((entry) => entry.items).some((item) => item.to === "/admin/settings" || item.to.includes("/admin/settings?tab="))).toBe(false);
@@ -42,7 +42,9 @@ test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512
   expect(group("Mitglieder").items.find((item) => item.to === "/admin/dolibarr").areas).toEqual(["club", "system"]);
   // Menüname = Seitentitel (#512): Jahreswertung, Gewinne, Fast Lap, App-Logs, Push-Tests.
   expect(group("eSports").items.map((item) => item.label)).toEqual(expect.arrayContaining(["Fast Lap", "Jahreswertung", "Gewinne"]));
-  expect(group("System").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(expect.arrayContaining(["App-Logs", "Push-Tests"]));
+  // Betrieb & Logs (#517 Teil 2) trägt Logs, Audit Logs, App-Logs und Versandlogs als Reiter - keine eigenen Einträge mehr.
+  expect(group("System").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(expect.arrayContaining(["Betrieb & Logs", "Push-Tests"]));
+  expect(ADMIN_GROUPS.flatMap((entry) => entry.items).map((item) => item.to)).not.toEqual(expect.arrayContaining(["/admin/logs", "/admin/audit", "/admin/mobile-logs", "/admin/settings/mail-logs"]));
   // Jeder Weg genau einmal.
   const routes = ADMIN_GROUPS.flatMap((entry) => entry.items.map((item) => item.to));
   expect(new Set(routes).size).toBe(routes.length);
@@ -65,6 +67,8 @@ test("die Suche findet Seiten: Steam → Steam, Analytics → SEO, Registrierung
   expect(find("registrierung")).toContain("/admin/settings/zugang");
   expect(find("nicht lesbar")).toContain("/admin/integrations");
   expect(find("resend")).toContain("/admin/settings/resend");
+  expect(find("audit logs")).toContain("/admin/ops");
+  expect(find("app-logs")).toContain("/admin/ops");
   expect(find("Steuersätze")).toContain("/admin/dolibarr?tab=connection");
   expect(find("schalter")).toContain("/admin/dolibarr?tab=features");
   expect(find("saisons")).toContain("/admin/seasons");

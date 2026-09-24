@@ -205,7 +205,7 @@ export default function AdminDashboardPage() {
     {
       label: "Client-Logs",
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
-      to: "/admin/mobile-logs",
+      to: "/admin/ops?tab=app",
       icon: Bug,
       tone: (data?.client_logs?.critical_open || 0) > 0 ? "#FF3B30" : (data?.client_logs?.open || 0) > 0 ? "#FFD700" : "#00FF88",
     },
@@ -219,7 +219,7 @@ export default function AdminDashboardPage() {
     {
       label: "Audit & Rollen",
       detail: "Rollenwechsel, Staff-Zuweisungen und Adminaktionen",
-      to: "/admin/audit",
+      to: "/admin/ops?tab=events&source=audit",
       icon: ShieldCheck,
       tone: "#29B6E8",
     },
@@ -257,7 +257,7 @@ export default function AdminDashboardPage() {
     if (item.to === "/admin/tournaments?status=registration_open") return pendingRegistrations > 0;
     if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
     if (item.to === "/admin/mobile-push") return pushErrors > 0;
-    if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
+    if (item.to === "/admin/ops?tab=app") return Number(data?.client_logs?.open || 0) > 0;
     // Discord (#303): ein Webhook, der 401/403/404 liefert, ist eine Aufgabe.
     if (item.to === "/admin/integrations/discord") return (data?.discord_broken || []).length > 0;
     // Betrieb (#265): rote oder gelbe Auto-Checks und offene Fehlergruppen sind eine Aufgabe.
@@ -510,7 +510,7 @@ export default function AdminDashboardPage() {
       <div className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="dashboard-audit-log">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="font-heading font-bold uppercase text-lg flex items-center gap-2"><ShieldCheck className="w-4 h-4" /> Letzte Adminaktionen</h2>
-          <Link to="/admin/logs" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
+          <Link to="/admin/ops?tab=events" className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Alle Logs</Link>
         </div>
         <div className="space-y-2 text-sm">
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (

@@ -343,152 +343,150 @@ async def ops_alerts_test(me: dict = Depends(require_area("system"))):
     return await send_test_alert(get_db())
 
 
-@router.get("/logs")
-async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: dict = Depends(require_club_admin())):
-    db = get_db()
-    safe_limit = _safe_log_limit(limit)
+HREFS = {
+    "uploads": "/admin/media", "client": "/admin/ops?tab=app", "audit": "/admin/ops?tab=events&source=audit",
+    "email": "/admin/ops?tab=events&source=email", "mail_queue": "/admin/settings/mail-queue", "server": "/admin/ops?tab=errors",
+    "checks": "/admin/ops?tab=checks", "alerts": "/admin/ops?tab=alerts", "sync": "/admin/dolibarr", "bot": "/admin/integrations/discord",
+}
+SEVERITY_FILTERS = {"problem": {"error", "warn"}, "error": {"error"}, "warn": {"warn"}, "info": {"info"}, "success": {"success"}}
 
-    upload_rows = await db.upload_events.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+
+def _since_iso_hours(hours: int) -> str:
+    from datetime import timedelta
+    return (now_utc() - timedelta(hours=int(hours))).isoformat() if hours else ""
+
+
+async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict]:
+    """Alle Ereignisquellen als eine Liste je Quelle (#517 Teil 2): Uploads, App-Logs, Adminaktionen,
+    E-Mail-Versand, Mail-Queue, Serverfehler, Auto-Checks, Alarme, Dolibarr-Abgleich, Discord-Bot.
+    Ohne Namen, Adressen oder Tokens - so, wie die Quellen es selbst schon halten."""
+    def since(field: str) -> dict:
+        return {field: {"$gte": since_iso}} if since_iso else {}
+
+    upload_rows = await db.upload_events.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     upload_items = [
-        _log_item(
-            "uploads",
-            "Uploads",
-            "/admin/media",
-            row,
-            severity="success" if row.get("status") == "success" else "warn" if row.get("status") == "client_failed" else "error",
-            status=row.get("status") or "",
-            title=row.get("filename") or "Upload",
-            subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
-            detail=row.get("detail") or (row.get("result") or {}).get("url") or "",
-            time_keys=("created_at",),
-        )
+        _log_item("uploads", "Uploads", HREFS["uploads"], row,
+                  severity="success" if row.get("status") == "success" else "warn" if row.get("status") == "client_failed" else "error",
+                  status=row.get("status") or "", title=row.get("filename") or "Upload",
+                  subtitle=" · ".join(filter(None, [row.get("kind"), row.get("media_scope"), row.get("mime")])),
+                  detail=row.get("detail") or (row.get("result") or {}).get("url") or "", time_keys=("created_at",))
         for row in upload_rows
     ]
 
-    client_rows = await db.mobile_client_logs.find({}, {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).limit(safe_limit).to_list(safe_limit)
+    client_rows = await db.mobile_client_logs.find(since("received_at"), {"_id": 0}).sort([("priority_rank", 1), ("received_at", -1)]).limit(safe_limit).to_list(safe_limit)
     client_items = []
     for row in client_rows:
         level = row.get("level") or "info"
         severity = "error" if level in {"fatal", "error"} else "warn" if level == "warn" else "info"
-        client_items.append(_log_item(
-            "client",
-            "App-/Client-Logs",
-            "/admin/mobile-logs",
-            row,
-            severity=severity,
-            status=row.get("status") or level,
-            title=row.get("message") or row.get("error_name") or "Client-Log",
-            subtitle=" · ".join(filter(None, [row.get("source"), row.get("screen"), row.get("display_name") or row.get("username"), row.get("platform")])),
-            detail=row.get("stack") or row.get("context") or "",
-            time_keys=("received_at", "created_at"),
-        ))
+        client_items.append(_log_item("client", "App-Logs", HREFS["client"], row, severity=severity, status=row.get("status") or level,
+                                      title=row.get("message") or row.get("error_name") or "Client-Log",
+                                      subtitle=" · ".join(filter(None, [row.get("source"), row.get("screen"), row.get("display_name") or row.get("username"), row.get("platform")])),
+                                      detail=row.get("stack") or row.get("context") or "", time_keys=("received_at", "created_at")))
 
-    audit_rows = await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    audit_rows = await db.audit_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     audit_items = [
-        _log_item(
-            "audit",
-            "Audit",
-            "/admin/audit",
-            row,
-            severity="info",
-            status="audit",
-            title=row.get("action") or "Admin-Aktion",
-            subtitle=" · ".join(filter(None, [row.get("actor_username") or row.get("actor_id"), row.get("target_id")])),
-            detail=row.get("data") or "",
-            time_keys=("created_at",),
-        )
+        _log_item("audit", "Adminaktionen", HREFS["audit"], row, severity="info", status="audit", title=row.get("action") or "Admin-Aktion",
+                  subtitle=" · ".join(filter(None, [row.get("actor_display_name") or row.get("actor_username") or row.get("actor_id"), row.get("target_id")])),
+                  detail=row.get("data") or "", time_keys=("created_at",))
         for row in audit_rows
     ]
 
-    email_rows = await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    email_rows = await db.email_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     email_items = []
     for row in email_rows:
         status = row.get("status") or ""
         severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
-        channel = row.get("channel") or "email"
-        email_items.append(_log_item(
-            "email",
-            "Mail/Discord",
-            "/admin/settings?tab=logs",
-            row,
-            severity=severity,
-            status=status,
-            title=row.get("template_key") or row.get("event_key") or row.get("subject") or "Versand",
-            subtitle=" · ".join(filter(None, [channel, row.get("to")])),
-            detail=row.get("error") or row.get("message_id") or "",
-            time_keys=("created_at",),
-        ))
+        email_items.append(_log_item("email", "E-Mail-Versand", HREFS["email"], row, severity=severity, status=status,
+                                     title=row.get("template_key") or row.get("event_key") or row.get("subject") or "Versand",
+                                     subtitle=" · ".join(filter(None, [row.get("channel") or "email", row.get("to")])),
+                                     detail=row.get("error") or row.get("message_id") or "", time_keys=("created_at",)))
 
-    queue_rows = await db.mail_jobs.find({}, {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    queue_rows = await db.mail_jobs.find(since("created_at"), {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     queue_items = []
     for row in queue_rows:
         status = row.get("status") or ""
         severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
-        queue_items.append(_log_item(
-            "mail_queue",
-            "Mail-Queue",
-            "/admin/settings?tab=queue",
-            row,
-            severity=severity,
-            status=status,
-            title=row.get("template_key") or row.get("subject") or "Mail-Job",
-            subtitle=" · ".join(filter(None, [row.get("to"), f"{row.get('attempts', 0)} Versuch(e)"])),
-            detail=row.get("last_error") or row.get("next_attempt_at") or row.get("message_id") or "",
-            time_keys=("updated_at", "created_at"),
-        ))
+        queue_items.append(_log_item("mail_queue", "Mail-Queue", HREFS["mail_queue"], row, severity=severity, status=status,
+                                     title=row.get("template_key") or row.get("subject") or "Mail-Job",
+                                     subtitle=" · ".join(filter(None, [row.get("to"), f"{row.get('attempts', 0)} Versuch(e)"])),
+                                     detail=row.get("last_error") or row.get("next_attempt_at") or row.get("message_id") or "", time_keys=("updated_at", "created_at")))
 
-    sources = [
-        _source_summary(
-            "uploads",
-            "Uploads",
-            "/admin/media",
-            total=await db.upload_events.count_documents({}),
-            problem_count=await db.upload_events.count_documents({"status": {"$ne": "success"}}),
-            items=upload_items,
-            tone="warn",
-        ),
-        _source_summary(
-            "client",
-            "App-/Client-Logs",
-            "/admin/mobile-logs",
-            total=await db.mobile_client_logs.count_documents({}),
-            problem_count=await db.mobile_client_logs.count_documents({"status": "open"}),
-            items=client_items,
-            tone="danger",
-        ),
-        _source_summary(
-            "audit",
-            "Audit",
-            "/admin/audit",
-            total=await db.audit_logs.count_documents({}),
-            problem_count=0,
-            items=audit_items,
-            tone="info",
-        ),
-        _source_summary(
-            "email",
-            "Mail/Discord",
-            "/admin/settings?tab=logs",
-            total=await db.email_logs.count_documents({}),
-            problem_count=await db.email_logs.count_documents({"status": {"$in": ["failed", "skipped"]}}),
-            items=email_items,
-            tone="warn",
-        ),
-        _source_summary(
-            "mail_queue",
-            "Mail-Queue",
-            "/admin/settings?tab=queue",
-            total=await db.mail_jobs.count_documents({}),
-            problem_count=await db.mail_jobs.count_documents({"status": "failed"}),
-            items=queue_items,
-            tone="warn",
-        ),
+    # Serverfehler (Gruppen), Auto-Checks, Alarme - bisher nur unter Betrieb, jetzt auch in der Liste.
+    error_rows = await db.ops_errors.find(since("last_seen_at"), {"_id": 0, "stack": 0}).sort("last_seen_at", -1).limit(safe_limit).to_list(safe_limit)
+    server_items = [
+        _log_item("server", "Serverfehler", HREFS["server"], row, severity="info" if row.get("resolved_at") else "error",
+                  status="gelöst" if row.get("resolved_at") else "offen",
+                  title=f"{row.get('error_type') or 'Fehler'} · {row.get('method') or ''} {row.get('route') or ''}".strip(),
+                  subtitle=f"{row.get('count') or 1}× · HTTP {row.get('status_code') or '?'} · {row.get('actor') or ''}".strip(" ·"),
+                  detail=row.get("message") or "", time_keys=("last_seen_at", "first_seen_at"))
+        for row in error_rows
     ]
-    combined = sorted(
-        [item for source in sources for item in source["items"]],
-        key=lambda item: item.get("time") or "",
-        reverse=True,
-    )[:safe_limit * 2]
+
+    check_rows = await db.ops_check_runs.find({**since("at"), "status": {"$ne": "ok"}}, {"_id": 0, "checks": 0}).sort("at", -1).limit(safe_limit).to_list(safe_limit)
+    check_items = [
+        _log_item("checks", "Auto-Checks", HREFS["checks"], row, severity="error" if row.get("status") == "crit" else "warn", status=row.get("status") or "",
+                  title="Auto-Checks rot" if row.get("status") == "crit" else "Auto-Checks gelb",
+                  subtitle=", ".join(row.get("failing") or []),
+                  detail=f"{(row.get('counts') or {}).get('crit', 0)} rot · {(row.get('counts') or {}).get('warn', 0)} gelb · {(row.get('counts') or {}).get('ok', 0)} grün",
+                  time_keys=("at",))
+        for row in check_rows
+    ]
+
+    alert_rows = await db.ops_alert_log.find(since("at"), {"_id": 0}).sort("at", -1).limit(safe_limit).to_list(safe_limit)
+    alert_items = [
+        _log_item("alerts", "Alarme", HREFS["alerts"], row, severity="warn" if row.get("kind") != "test" else "info", status=row.get("kind") or "",
+                  title=row.get("title") or "Alarm",
+                  subtitle=", ".join(row.get("channels") or []) or "kein Weg eingerichtet",
+                  detail=row.get("description") or "", time_keys=("at",))
+        for row in alert_rows
+    ]
+
+    sync_state = await db.settings.find_one({"id": "dolibarr_sync_state"}, {"_id": 0}) or {}
+    sync_items = []
+    last_error = sync_state.get("last_error") if isinstance(sync_state.get("last_error"), dict) else None
+    if last_error:
+        sync_items.append(_log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_run_at") or last_error.get("at")}, severity="error", status="rot",
+                                    title="Dolibarr-Abgleich rot", subtitle=str(last_error.get("kind") or ""), detail=last_error.get("text") or "", time_keys=("at",)))
+    elif sync_state.get("last_ok_at"):
+        sync_items.append(_log_item("sync", "Dolibarr-Abgleich", HREFS["sync"], {"at": sync_state.get("last_ok_at")}, severity="success", status="grün",
+                                    title="Dolibarr-Abgleich grün", subtitle="", detail="", time_keys=("at",)))
+    if since_iso:
+        sync_items = [item for item in sync_items if (item.get("time") or "") >= since_iso]
+
+    bot_state = await db.settings.find_one({"id": "discord_bot_state"}, {"_id": 0}) or {}
+    bot_items = []
+    if bot_state:
+        bot_error = bot_state.get("last_error") or bot_state.get("error")
+        status = str(bot_state.get("status") or ("online" if bot_state.get("running") else ""))
+        if bot_error:
+            bot_items.append(_log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="error", status=status or "fehler", title="Discord-Bot: Fehler",
+                                       subtitle=str(bot_state.get("guild_name") or ""), detail=bot_error, time_keys=("updated_at",)))
+        elif status:
+            bot_items.append(_log_item("bot", "Discord-Bot", HREFS["bot"], bot_state, severity="success" if status == "online" else "info", status=status,
+                                       title=f"Discord-Bot {status}", subtitle=str(bot_state.get("guild_name") or ""), detail="", time_keys=("updated_at",)))
+    if since_iso:
+        bot_items = [item for item in bot_items if (item.get("time") or "") >= since_iso]
+
+    return [
+        _source_summary("server", "Serverfehler", HREFS["server"], total=await db.ops_errors.count_documents({}), problem_count=await db.ops_errors.count_documents({"resolved_at": None}), items=server_items, tone="danger"),
+        _source_summary("checks", "Auto-Checks", HREFS["checks"], total=await db.ops_check_runs.count_documents({}), problem_count=await db.ops_check_runs.count_documents({"status": {"$ne": "ok"}}), items=check_items, tone="danger"),
+        _source_summary("alerts", "Alarme", HREFS["alerts"], total=await db.ops_alert_log.count_documents({}), problem_count=0, items=alert_items, tone="warn"),
+        _source_summary("client", "App-Logs", HREFS["client"], total=await db.mobile_client_logs.count_documents({}), problem_count=await db.mobile_client_logs.count_documents({"status": "open"}), items=client_items, tone="danger"),
+        _source_summary("email", "E-Mail-Versand", HREFS["email"], total=await db.email_logs.count_documents({}), problem_count=await db.email_logs.count_documents({"status": {"$in": ["failed", "skipped"]}}), items=email_items, tone="warn"),
+        _source_summary("mail_queue", "Mail-Queue", HREFS["mail_queue"], total=await db.mail_jobs.count_documents({}), problem_count=await db.mail_jobs.count_documents({"status": "failed"}), items=queue_items, tone="warn"),
+        _source_summary("audit", "Adminaktionen", HREFS["audit"], total=await db.audit_logs.count_documents({}), problem_count=0, items=audit_items, tone="info"),
+        _source_summary("uploads", "Uploads", HREFS["uploads"], total=await db.upload_events.count_documents({}), problem_count=await db.upload_events.count_documents({"status": {"$ne": "success"}}), items=upload_items, tone="warn"),
+        _source_summary("sync", "Dolibarr-Abgleich", HREFS["sync"], total=len(sync_items), problem_count=1 if last_error else 0, items=sync_items, tone="danger"),
+        _source_summary("bot", "Discord-Bot", HREFS["bot"], total=len(bot_items), problem_count=sum(1 for item in bot_items if item["severity"] == "error"), items=bot_items, tone="danger"),
+    ]
+
+
+@router.get("/logs")
+async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: dict = Depends(require_club_admin())):
+    db = get_db()
+    safe_limit = _safe_log_limit(limit)
+    sources = await _log_sources(db, safe_limit)
+    combined = sorted([item for source in sources for item in source["items"]], key=lambda item: item.get("time") or "", reverse=True)[:safe_limit * 2]
     return {
         "sources": sources,
         "combined": combined,
@@ -497,6 +495,52 @@ async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: 
             "problem_count": sum(source["problem_count"] for source in sources),
             "latest_at": max((source["latest_at"] for source in sources), default=""),
         },
+    }
+
+
+@router.get("/ops/events")
+async def ops_events(source: str = "all", severity: str = "all", hours: int = Query(default=168, ge=0, le=24 * 366), q: str = "",
+                     limit: int = Query(default=200, ge=1, le=500), format: str = "json", me: dict = Depends(require_area("system"))):
+    """Ereignisse aller Quellen in einer Liste (#517 Teil 2): Filter nach Quelle, Schwere, Zeitraum und Text;
+    `format=csv` liefert dieselbe Auswahl als Datei. Zustand und Zähler je Quelle kommen mit."""
+    db = get_db()
+    since_iso = _since_iso_hours(hours)
+    sources = await _log_sources(db, _safe_log_limit(min(limit, 200)), since_iso=since_iso)
+    wanted = {part.strip() for part in str(source or "all").split(",") if part.strip()} - {"all", ""}
+    severities = SEVERITY_FILTERS.get(str(severity or "all").lower())
+    needle = str(q or "").strip().lower()
+    items = []
+    for entry in sources:
+        if wanted and entry["key"] not in wanted:
+            continue
+        for item in entry["items"]:
+            if severities and item.get("severity") not in severities:
+                continue
+            if needle and needle not in " ".join(str(item.get(key) or "") for key in ("source_label", "title", "subtitle", "detail", "status")).lower():
+                continue
+            items.append(item)
+    items.sort(key=lambda item: item.get("time") or "", reverse=True)
+    items = items[:limit]
+    if str(format).lower() == "csv":
+        import csv
+        import io
+        from fastapi.responses import Response
+        buffer = io.StringIO()
+        writer = csv.writer(buffer, delimiter=";")
+        writer.writerow(["Zeit", "Schwere", "Quelle", "Status", "Titel", "Details", "Weitere Angaben"])
+        for item in items:
+            writer.writerow([item.get("time"), item.get("severity"), item.get("source_label"), item.get("status"), item.get("title"), item.get("subtitle"), item.get("detail")])
+        return Response(content="﻿" + buffer.getvalue(), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="ereignisse.csv"'})
+    return {
+        "items": items,
+        "sources": [{key: value for key, value in entry.items() if key != "items"} for entry in sources],
+        "summary": {
+            "shown": len(items),
+            "problem_count": sum(source["problem_count"] for source in sources),
+            "latest_at": max((source["latest_at"] for source in sources), default=""),
+        },
+        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": q, "limit": limit},
     }
 
 

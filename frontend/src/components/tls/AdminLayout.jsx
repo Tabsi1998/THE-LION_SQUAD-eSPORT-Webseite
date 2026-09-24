@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, ShieldCheck, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, Bug, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Send, Palette, Share2, LogIn } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
@@ -97,7 +97,6 @@ export const ADMIN_GROUPS = [
     items: [
       { to: "/admin/settings/newsletter", label: "Newsletter", icon: Mail, areas: ["system"] },
       { to: "/admin/settings/mail-queue", label: "Mail-Queue", icon: Inbox, areas: ["system"] },
-      { to: "/admin/settings/mail-logs", label: "Versandlogs", icon: Send, areas: ["system"] },
       { to: "/admin/email-templates", label: "E-Mail-Vorlagen", icon: FileText, areas: ["system"] },
     ],
   },
@@ -112,12 +111,10 @@ export const ADMIN_GROUPS = [
   {
     label: "System",
     items: [
-      { to: "/admin/ops", label: "Betrieb", icon: AlertTriangle, areas: ["system"] },
+      // Betrieb & Logs (#517 Teil 2): Überblick, Ereignisse aller Quellen, Fehler, Tempo, Vitals, Checks, App-Logs, Alarme.
+      { to: "/admin/ops", label: "Betrieb & Logs", icon: AlertTriangle, areas: ["system"] },
       { to: "/admin/settings/status", label: "Status", icon: Activity, areas: ["system"] },
-      { to: "/admin/logs", label: "Logs", icon: Activity, areas: ["system"] },
-      { to: "/admin/audit", label: "Audit Logs", icon: ShieldCheck, areas: ["system"] },
       { to: "/admin/moderation", label: "Moderation", icon: MessagesSquare, areas: ["moderation"], staff: true },
-      { to: "/admin/mobile-logs", label: "App-Logs", icon: Bug, areas: ["system"] },
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings/zugang", label: "Zugang", icon: LogIn, areas: ["system"] },
@@ -129,7 +126,7 @@ export const ADMIN_GROUPS = [
 const ADMIN_SEARCH_TERMS = {
   "/admin/integrations": ["verbindungen", "alle verbindungen", "übersicht", "aktiv", "fehlt", "nicht lesbar", "schlüssel", "schluessel", "encryption", "settings_encryption_key", "verbindung weg"],
   "/admin": ["home", "start", "control"],
-  "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
+  "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme", "logs", "ereignisse", "audit", "audit logs", "aktionen", "adminaktionen", "app-logs", "client-logs", "abstuerze", "abstürze", "versandlogs", "mail logs", "zugestellt", "bounce", "csv", "export", "aufbewahrung", "diagnose"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
   "/admin/members": ["verein", "mitgliedschaft", "beitrag", "verzeichnis", "einwilligung", "dolibarr", "mitgliedsnummer"],
   "/admin/moderation": ["moderation", "wortfilter", "sperre", "gesperrt", "meldungen", "gemeldet", "blockiert", "strikes", "chat"],
@@ -162,9 +159,6 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/references": ["erfolge", "platzierungen", "results"],
   "/admin/contact": ["kontakt", "inbox", "nachrichten"],
   "/admin/downloads": ["downloads", "qr", "pdf", "stationen", "turnier qr", "fastlap qr", "embed", "anzeigen"],
-  "/admin/logs": ["logs", "monitoring", "upload", "mail", "app", "audit", "diagnose"],
-  "/admin/audit": ["logs", "aktionen", "sicherheit"],
-  "/admin/mobile-logs": ["app", "fehler", "client", "client-logs", "abstuerze", "abstürze"],
   "/admin/mobile-push": ["push", "notifications", "app", "push-monitoring", "testnachricht"],
   "/admin/setup": ["einrichtung", "anleitung", "anleitungen", "setup", "einrichten", "discord app", "twitch app", "google login", "resend", "smtp", "analytics", "search console", "play store", "schritt für schritt", "howto", "how to"],
   "/admin/club": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
@@ -174,7 +168,6 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/settings/smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
   "/admin/settings/newsletter": ["newsletter", "rundmail", "empfänger", "abo"],
   "/admin/settings/mail-queue": ["mail-queue", "warteschlange", "versand", "haengt", "hängt", "failed"],
-  "/admin/settings/mail-logs": ["versandlogs", "mail logs", "zugestellt", "bounce"],
   "/admin/settings/branding": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke", "play store", "play-store-link"],
   "/admin/settings/socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links", "x", "twitter", "threads", "bluesky", "mastodon", "telegram", "kick", "linkedin", "steam", "kanäle", "kanaele"],
   "/admin/settings/seo": ["seo", "google analytics", "measurement id", "plausible", "analytics", "indexnow", "sitemap", "suchmaschine", "bing", "site verification", "meta"],

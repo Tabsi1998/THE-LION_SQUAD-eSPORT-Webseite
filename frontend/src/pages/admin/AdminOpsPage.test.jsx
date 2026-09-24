@@ -80,7 +80,7 @@ beforeEach(() => {
 
 test("Fehlergruppen zeigen Zähler und Route und lassen sich als gelöst markieren", async () => {
   const user = userEvent.setup();
-  render(<MemoryRouter><AdminOpsPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
 
   await waitFor(() => expect(screen.getByText("KeyError")).toBeInTheDocument());
   expect(screen.getByText("GET /api/teams/{team_id}")).toBeInTheDocument();
@@ -96,7 +96,7 @@ test("Fehlergruppen zeigen Zähler und Route und lassen sich als gelöst markier
 
 test("Tempo listet die langsamsten Routen", async () => {
   const user = userEvent.setup();
-  render(<MemoryRouter><AdminOpsPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByText("KeyError")).toBeInTheDocument());
 
   await user.click(screen.getByRole("button", { name: "Tempo" }));
@@ -114,7 +114,7 @@ test("die Zusammenfassung für die Tageszentrale ist ein Satz", () => {
 
 test("Vitals zeigt p75 je Route, gefärbt nach Bewertung", async () => {
   const user = userEvent.setup();
-  render(<MemoryRouter><AdminOpsPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByText("KeyError")).toBeInTheDocument());
 
   await user.click(screen.getByRole("button", { name: "Vitals" }));
@@ -130,7 +130,7 @@ test("Checks zeigt die Ampel je Prüfung, und Jetzt prüfen stößt einen Lauf a
   apiMock.post.mockImplementation((url) => Promise.resolve(url.includes("/checks/run")
     ? { data: { ...CHECKS.latest, status: "ok", counts: { ok: 8, warn: 0, crit: 0 }, failing: [], checks: CHECKS.latest.checks.map((c) => ({ ...c, status: "ok" })) } }
     : { data: { ...GROUP, resolved_at: "2026-09-15T18:00:00Z" } }));
-  render(<MemoryRouter><AdminOpsPage /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=errors"]}><AdminOpsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByText("KeyError")).toBeInTheDocument());
   expect(screen.getByText("rot")).toBeInTheDocument();
 
