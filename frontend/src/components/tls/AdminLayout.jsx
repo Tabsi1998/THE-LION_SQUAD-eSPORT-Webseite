@@ -106,7 +106,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/mobile-push", label: "Push-Tests", icon: BellRing, areas: ["system"] },
       { to: "/admin/app-releases", label: "App-Versionen", icon: Smartphone, areas: ["system"] },
       { to: "/admin/settings", label: "Einstellungen", icon: SettingsIcon, areas: ["system"] },
-      { to: "/admin/setup", label: "Einrichtung", icon: BookOpen, areas: ["system"] },
+      { to: "/admin/setup", label: "Einrichtung & FAQ", icon: BookOpen, areas: ["system"] },
       // Wegweiser: die Reiter der Einstellungen sind nur über die Suche sichtbar (searchOnly), damit
       // Steam, Passkey oder Google Analytics zum richtigen Reiter führen, ohne das Menü zu verlängern.
       { to: "/admin/settings?tab=auth", label: "Einstellungen: Login & Konten", icon: SettingsIcon, areas: ["system"], searchOnly: true },

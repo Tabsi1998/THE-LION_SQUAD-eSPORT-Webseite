@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
-// Einrichtung: alle Anleitungen mit Stand aus den Einstellungen - fehlende stehen offen.
+// Einrichtung: FAQ nach Thema (#511) mit eingehängten Anleitungen; der Stand kommt aus den Einstellungen,
+// fehlende Anleitungen stehen offen; die Suche filtert die Fragen.
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
@@ -31,4 +33,21 @@ test("Stand je Dienst: Twitch eingerichtet, Discord-App fehlt, Play Store option
   expect(screen.getByTestId("setup-guide-dolibarr")).toHaveTextContent("Eingerichtet · Modus Live");
   expect(screen.getByTestId("setup-summary")).toHaveTextContent("5 eingerichtet");
   expect(screen.getByTestId("setup-summary")).toHaveTextContent("3 fehlen");
+});
+
+test("FAQ: Themen mit Fragen, Weg zur Stelle, Suche filtert, keine Anleitung geht verloren", async () => {
+  apiMock.get.mockImplementation(async () => ({ data: {} }));
+  const user = userEvent.setup();
+  render(<MemoryRouter><AdminSetupPage /></MemoryRouter>);
+  expect(await screen.findByTestId("setup-topic-dolibarr")).toBeInTheDocument();
+  expect(screen.getByTestId("setup-faq-link-rechnungen")).toHaveAttribute("href", "/admin/dolibarr?tab=connection");
+  expect(screen.getByTestId("setup-faq-discord_bot")).toContainElement(screen.getByTestId("setup-guide-discord_bot"));
+  const before = screen.getByTestId("setup-faq-count").textContent;
+  await user.type(screen.getByTestId("setup-faq-search"), "webhook");
+  await waitFor(() => expect(screen.getByTestId("setup-faq-count")).not.toHaveTextContent(before));
+  expect(screen.getByTestId("setup-faq-webhook")).toHaveAttribute("open");
+  expect(screen.queryByTestId("setup-faq-turnier")).toBeNull();
+  await user.clear(screen.getByTestId("setup-faq-search"));
+  await user.type(screen.getByTestId("setup-faq-search"), "gibt es nicht xyz");
+  expect(await screen.findByTestId("setup-faq-empty")).toBeInTheDocument();
 });
