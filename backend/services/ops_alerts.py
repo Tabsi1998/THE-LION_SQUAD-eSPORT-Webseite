@@ -202,7 +202,8 @@ def schedule_notify(db, kind: str, title: str, description: str = "", fields: li
 
 
 async def recent_alerts(db, limit: int = 30) -> list[dict]:
-    return await db.ops_alert_log.find({}, {"_id": 0}).sort("at", -1).to_list(max(1, min(int(limit), LOG_LIMIT)))
+    # Zweitschlüssel _id: zwei Alarme in derselben Mikrosekunde kamen sonst in zufälliger Reihenfolge (Test flackerte).
+    return await db.ops_alert_log.find({}, {"_id": 0}).sort([("at", -1), ("_id", -1)]).to_list(max(1, min(int(limit), LOG_LIMIT)))
 
 
 async def send_test_alert(db) -> dict:

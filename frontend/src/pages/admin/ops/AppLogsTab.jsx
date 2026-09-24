@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bug, CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
-import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
 const LEVELS = ["", "fatal", "error", "warn", "info", "debug"];
@@ -24,7 +23,8 @@ function badgeClass(level) {
   return "border-white/10 bg-white/5 text-white/60";
 }
 
-export default function AdminMobileLogsPage() {
+// App-Logs (#517 Teil 2): der frühere Menüpunkt ist ein Reiter unter Betrieb & Logs - mit Triage wie bisher.
+export function AppLogsTab() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -74,12 +74,8 @@ export default function AdminMobileLogsPage() {
   };
 
   return (
-    <AdminLayout>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">App-Logs</h1>
-        </div>
+    <div className="space-y-5" data-testid="ops-app-logs">
+      <div className="flex justify-end">
         <button
           onClick={load}
           className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
@@ -194,6 +190,6 @@ export default function AdminMobileLogsPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </div>
   );
 }

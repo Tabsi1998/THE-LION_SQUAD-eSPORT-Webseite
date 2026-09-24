@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Activity, AlertTriangle, CheckCircle2, Gauge, PlayCircle, RefreshCw, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { OpsAlertsPanel } from "./ops/OpsAlertsPanel";
+import { OpsEventsTab } from "./ops/OpsEventsTab";
+import { OpsOverview } from "./ops/OpsOverview";
+import { AppLogsTab } from "./ops/AppLogsTab";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ratingTone } from "@/lib/ops";
 
@@ -12,11 +16,16 @@ import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ra
 // Auto-Checks. Nichts davon kommt über den Änderungsstrom - die Seite fragt
 // alle 30 Sekunden nach, solange sie offen ist.
 
+// Eine Seite für alles (#517 Teil 2): Überblick und Ereignisse über alle Quellen, dazu die bisherigen
+// Reiter und die App-Logs. Der Reiter steht in der Adresse (?tab=), damit alte Seiten hierher umleiten.
 const TABS = [
+  { key: "overview", label: "Überblick" },
+  { key: "events", label: "Ereignisse" },
   { key: "errors", label: "Fehler" },
   { key: "slow", label: "Tempo" },
   { key: "vitals", label: "Vitals" },
   { key: "checks", label: "Checks" },
+  { key: "app", label: "App-Logs" },
   { key: "alerts", label: "Alarme" },
 ];
 const VITAL_COLUMNS = ["LCP", "INP", "CLS", "TTFB"];
@@ -43,7 +52,19 @@ export function describeSummary(summary) {
 }
 
 export default function AdminOpsPage() {
-  const [tab, setTab] = useState("errors");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab = TABS.some((item) => item.key === tabParam) ? tabParam : "overview";
+  const setTab = (next, source = null) => {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current);
+      if (next === "overview") params.delete("tab");
+      else params.set("tab", next);
+      if (source) params.set("source", source);
+      else params.delete("source");
+      return params;
+    }, { replace: true });
+  };
   const [status, setStatus] = useState("open");
   const [summary, setSummary] = useState(null);
   const [errors, setErrors] = useState([]);
@@ -120,11 +141,11 @@ export default function AdminOpsPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Monitoring</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Betrieb</h1>
+          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
+          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="ops-title">Betrieb & Logs</h1>
           <p className="text-sm text-white/55 mt-2 max-w-2xl">
-            Jede unbehandelte Server-Ausnahme und jede Antwort mit Status 5xx wird zu einer Gruppe;
-            jede Anfrage über der Schwelle steht unter Tempo. Ohne Namen, Adressen oder Tokens, 30 Tage lang.
+            Alles, was der Betrieb meldet, an einem Ort: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
+            Adminaktionen und Abgleiche. Ohne Namen, Adressen oder Tokens; Aufbewahrung unter Alarme.
           </p>
         </div>
         <button
@@ -169,7 +190,13 @@ export default function AdminOpsPage() {
         ) : null}
       </div>
 
-      {tab === "alerts" ? (
+      {tab === "overview" ? (
+        <OpsOverview onOpenSource={(source) => setTab("events", source)} />
+      ) : tab === "events" ? (
+        <OpsEventsTab />
+      ) : tab === "app" ? (
+        <AppLogsTab />
+      ) : tab === "alerts" ? (
         <OpsAlertsPanel />
       ) : tab === "vitals" ? (
         <VitalsTab vitals={vitals} loading={loading} />

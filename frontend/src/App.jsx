@@ -102,16 +102,13 @@ const AdminNewsEditPage = lazy(() => import("@/pages/admin/AdminNewsEditPage"));
 const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
 const AdminClubDataPage = lazy(() => import("@/pages/admin/AdminClubDataPage"));
 const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
-const AdminLogsPage = lazy(() => import("@/pages/admin/AdminLogsPage"));
 const AdminOpsPage = lazy(() => import("@/pages/admin/AdminOpsPage"));
 const AdminDolibarrPage = lazy(() => import("@/pages/admin/AdminDolibarrPage"));
 const AdminFinancePage = lazy(() => import("@/pages/admin/AdminFinancePage"));
-const AdminAuditPage = lazy(() => import("@/pages/admin/AdminAuditPage"));
 const AdminModerationPage = lazy(() => import("@/pages/admin/AdminModerationPage"));
 const AdminSetupPage = lazy(() => import("@/pages/admin/AdminSetupPage"));
 const AdminIntegrationPage = lazy(() => import("@/pages/admin/AdminIntegrationPage"));
 const AdminIntegrationsOverviewPage = lazy(() => import("@/pages/admin/AdminIntegrationsOverviewPage"));
-const AdminMobileLogsPage = lazy(() => import("@/pages/admin/AdminMobileLogsPage"));
 const AdminMobilePushPage = lazy(() => import("@/pages/admin/AdminMobilePushPage"));
 const AdminAppReleasesPage = lazy(() => import("@/pages/admin/AdminAppReleasesPage"));
 const AdminWidgetsPage = lazy(() => import("@/pages/admin/AdminWidgetsPage"));
@@ -293,16 +290,16 @@ function App() {
           <Route path="/admin/settings/:section" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
           <Route path="/admin/club" element={<ProtectedRoute requireArea="system"><AdminClubDataPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireArea="tournaments"><AdminSeasonsPage /></ProtectedRoute>} />
-          <Route path="/admin/logs" element={<ProtectedRoute requireArea="system"><AdminLogsPage /></ProtectedRoute>} />
+          <Route path="/admin/logs" element={<Navigate to="/admin/ops?tab=events" replace />} />
           <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />
           <Route path="/admin/dolibarr" element={<ProtectedRoute requireArea={["club", "system"]}><AdminDolibarrPage /></ProtectedRoute>} />
           <Route path="/admin/finance" element={<ProtectedRoute requireArea={["finance"]}><AdminFinancePage /></ProtectedRoute>} />
-          <Route path="/admin/audit" element={<ProtectedRoute requireArea="system"><AdminAuditPage /></ProtectedRoute>} />
+          <Route path="/admin/audit" element={<Navigate to="/admin/ops?tab=events&source=audit" replace />} />
           <Route path="/admin/moderation" element={<ProtectedRoute requireModerator><AdminModerationPage /></ProtectedRoute>} />
           <Route path="/admin/setup" element={<ProtectedRoute requireArea={["system"]}><AdminSetupPage /></ProtectedRoute>} />
           <Route path="/admin/integrations" element={<ProtectedRoute requireArea={["system"]}><AdminIntegrationsOverviewPage /></ProtectedRoute>} />
           <Route path="/admin/integrations/:key" element={<ProtectedRoute requireArea={["system"]}><AdminIntegrationPage /></ProtectedRoute>} />
-          <Route path="/admin/mobile-logs" element={<ProtectedRoute requireArea="system"><AdminMobileLogsPage /></ProtectedRoute>} />
+          <Route path="/admin/mobile-logs" element={<Navigate to="/admin/ops?tab=app" replace />} />
           <Route path="/admin/mobile-push" element={<ProtectedRoute requireArea="system"><AdminMobilePushPage /></ProtectedRoute>} />
           <Route path="/admin/app-releases" element={<ProtectedRoute requireArea="system"><AdminAppReleasesPage /></ProtectedRoute>} />
           <Route path="/admin/downloads" element={<ProtectedRoute requireAdmin><AdminWidgetsPage /></ProtectedRoute>} />

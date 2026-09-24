@@ -60,7 +60,6 @@ export const SETTINGS_SECTIONS = {
   smtp: { tab: "smtp", group: "Verbindungen", label: "SMTP" },
   newsletter: { tab: "newsletter", group: "E-Mail", label: "Newsletter" },
   "mail-queue": { tab: "queue", group: "E-Mail", label: "Mail-Queue" },
-  "mail-logs": { tab: "logs", group: "E-Mail", label: "Versandlogs" },
   branding: { tab: "brand", group: "Auftritt", label: "Branding" },
   socials: { tab: "socials", group: "Auftritt", label: "Socials" },
   seo: { tab: "seo", group: "Auftritt", label: "SEO & Analytics" },
@@ -79,7 +78,7 @@ const ACCESS_SWITCHES = [
 const LEGACY_TAB_REDIRECTS = {
   legal: "/admin/club", discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch",
   auth: "/admin/settings/google", email: "/admin/settings/resend", smtp: "/admin/settings/smtp", newsletter: "/admin/settings/newsletter",
-  queue: "/admin/settings/mail-queue", logs: "/admin/settings/mail-logs", brand: "/admin/settings/branding", socials: "/admin/settings/socials",
+  queue: "/admin/settings/mail-queue", logs: "/admin/ops?tab=events&source=email", brand: "/admin/settings/branding", socials: "/admin/settings/socials",
   seo: "/admin/settings/seo", system: "/admin/settings/status",
 };
 const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
@@ -247,7 +246,6 @@ export default function AdminSettingsPage() {
   const [savingAuth, setSavingAuth] = useState(false);
   const [testingGoogle, setTestingGoogle] = useState(false);
   const [testEmail, setTestEmail] = useState("");
-  const [logs, setLogs] = useState([]);
   const [systemStatus, setSystemStatus] = useState(null);
   const [siteBanners, setSiteBanners] = useState([]);
   const [bannerForm, setBannerForm] = useState(emptyBannerForm());
@@ -273,7 +271,6 @@ export default function AdminSettingsPage() {
     const requestDefs = [
       { key: "email", label: "E-Mail", critical: true, request: () => api.get("/settings/email") },
       { key: "branding", label: "Branding", critical: true, request: () => api.get("/settings/branding") },
-      { key: "email_logs", label: "E-Mail-Logs", critical: false, request: () => api.get("/settings/email/logs") },
       { key: "smtp", label: "SMTP", critical: true, request: () => api.get("/settings/smtp") },
       { key: "queue", label: "Mail-Queue", critical: false, request: () => api.get("/settings/mail-queue?limit=100") },
       { key: "queue_stats", label: "Mail-Queue-Statistik", critical: false, request: () => api.get("/settings/mail-queue/stats") },
@@ -284,7 +281,7 @@ export default function AdminSettingsPage() {
     const requests = await Promise.allSettled(requestDefs.map((entry) => entry.request()));
     if (seq !== loadSeqRef.current) return;
     const value = (i) => requests[i].status === "fulfilled" ? requests[i].value.data : null;
-    const e = value(0), b = value(1), l = value(2), sm = value(3), q = value(4), qs = value(5), st = value(6), sb = value(7), ac = isSuperadmin ? value(8) : null;
+    const e = value(0), b = value(1), sm = value(2), q = value(3), qs = value(4), st = value(5), sb = value(6), ac = isSuperadmin ? value(7) : null;
     if (e) setEmail((prev) => {
       const next = { ...prev, ...e, resend_api_key: "", resend_api_key_masked: e.resend_api_key_masked || "" };
       originalEmailRef.current = emailPayload(next);
@@ -302,7 +299,6 @@ export default function AdminSettingsPage() {
     // Listen nur übernehmen, wenn es welche sind: unten stehen .map und
     // .filter darauf, und ein unerwartet geformter Wert nähme die ganze Seite
     // mit in die Fehlergrenze statt nur diesen einen Bereich leer zu lassen.
-    if (Array.isArray(l)) setLogs(l);
     if (sm) setSmtp((prev) => {
       const next = { ...prev, ...sm, smtp_pass: "", smtp_pass_masked: sm.smtp_pass_masked || "" };
       originalSmtpRef.current = smtpPayload(next);
@@ -728,6 +724,8 @@ export default function AdminSettingsPage() {
 
   const legacyTarget = LEGACY_TAB_REDIRECTS[searchParams.get("tab")];
   if (legacyTarget) return <Navigate to={legacyTarget} replace />;
+  // Versandlogs sind seit #517 Teil 2 die Ereignisse mit Quelle E-Mail unter Betrieb & Logs.
+  if (section === "mail-logs") return <Navigate to="/admin/ops?tab=events&source=email" replace />;
   if (!sectionMeta) return <Navigate to="/admin/integrations" replace />;
   if (sectionMeta.superOnly && !isSuperadmin) return <Navigate to="/admin/integrations" replace />;
 
@@ -1593,33 +1591,6 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {tab === "logs" && (
-        <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[700px]">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
-                <tr><th className="text-left px-4 py-3">Zeit</th><th className="text-left px-4 py-3">An</th><th className="text-left px-4 py-3">Template</th><th className="text-left px-4 py-3">Status</th><th className="text-left px-4 py-3">Details</th></tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {logs.map((l) => (
-                  <tr key={l.id}>
-                    <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(l.created_at).toLocaleString("de-DE")}</td>
-                    <td className="px-4 py-3">{l.to || l.channel || "—"}</td>
-                    <td className="px-4 py-3 text-[#29B6E8] text-xs">{l.template_key || l.event_key || "—"}</td>
-                    <td className="px-4 py-3">
-                      {l.status === "sent" ? <span className="text-[#00FF88] inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> sent</span>
-                        : l.status === "failed" ? <span className="text-[#FF3B30] inline-flex items-center gap-1"><XCircle className="w-3.5 h-3.5" /> failed</span>
-                          : <span className="text-white/50">{l.status}</span>}
-                    </td>
-                    <td className="px-4 py-3 text-white/40 text-xs truncate max-w-xs">{l.error || l.message_id || "—"}</td>
-                  </tr>
-                ))}
-                {logs.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-white/40">Noch keine Nachrichten gesendet.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </AdminLayout>
   );
 }
