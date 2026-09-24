@@ -6,6 +6,7 @@ import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { AwardCard } from "../../components/AwardCard";
+import { LinkedAccountsCard, type LinkedAccount } from "../../components/LinkedAccounts";
 import { BlockedUsersCard } from "../../components/BlockedUsersCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
@@ -134,6 +135,8 @@ export function ProfileScreen() {
   };
   const [prizes, setPrizes] = useState<PrizePickup[]>([]);
   const [standing, setStanding] = useState<ModerationStanding | null>(null);
+  // Verknüpfte Konten (#459): nur lesen; verknüpfen läuft im Web (Rückruf der Plattform im Browser).
+  const [links, setLinks] = useState<LinkedAccount[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [completeness, setCompleteness] = useState<{ score?: number; missing?: string[] }>({});
   const [form, setForm] = useState<Record<string, any>>({});
@@ -198,15 +201,17 @@ export function ProfileScreen() {
       return;
     }
     try {
-      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult, standingResult] = await Promise.all([
+      const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult, standingResult, linksResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
         api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
         api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
         api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
+        api.get<{ links?: LinkedAccount[] }>("/me/platform-links").catch(() => ({ data: { links: [] } })),
       ]);
       setStanding((standingResult.data as ModerationStanding | null) || null);
+      setLinks(Array.isArray(linksResult.data?.links) ? linksResult.data.links : []);
       setAchievements(achievementResult.data || { groups: [], awards: [] });
       setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
       setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
@@ -600,6 +605,10 @@ export function ProfileScreen() {
             <Field label="Bevorzugte Rolle" value={form.preferred_role} onChangeText={(v) => setField(setForm, "preferred_role", v)} />
             <Field label="Eingabegerät" value={form.input_device} onChangeText={(v) => setField(setForm, "input_device", v)} />
             <Heading>Socials & IDs</Heading>
+            <LinkedAccountsCard accounts={links} testID="profile-linked-accounts" />
+            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${WEB_BASE_URL}/profile?tab=socials`)} testID="profile-links-web" style={styles.smallAction}>
+              <Muted style={styles.smallActionText}>{links.length ? "Konten im Web verwalten" : "Konten im Web verknüpfen (Discord, Twitch, Steam …)"}</Muted>
+            </Pressable>
             {["discord_name", "twitch_handle", "youtube_handle", "tiktok_handle", "instagram_handle", "x_handle", "steam_id", "epic_id", "psn_id", "xbox_id", "nintendo_fc", "ea_id", "riot_id", "battlenet_id", "website"].map((key) => (
               <Field key={key} label={labelFor(key)} value={form[key]} onChangeText={(v) => setField(setForm, key, v)} />
             ))}
