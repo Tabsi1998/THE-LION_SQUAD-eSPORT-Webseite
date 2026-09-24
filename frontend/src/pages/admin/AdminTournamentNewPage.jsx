@@ -4,6 +4,7 @@ import { api, formatApiError } from "@/lib/api";
 import { presetFor } from "@/lib/tournamentGuide";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
@@ -71,9 +72,10 @@ export default function AdminTournamentNewPage() {
   // Spielregel-Vorgabe - alles bleibt änderbar, der Rest des Formulars ist wie immer.
   const preset = presetFor(searchParams.get("preset") || "");
   const [games, setGames] = useState([]);
+  const [partners, setPartners] = useState([]);
   const [events, setEvents] = useState([]);
   const [form, setForm] = useState(() => ({
-    title: "", slug: "", description: "", game_id: "",
+    title: "", slug: "", description: "", game_id: "", partner_ids: [],
     platform: "", event_id: "", format: "single_elim", format_label: "",
     team_mode: "solo", team_size: 1,
     max_participants: 16, min_participants: 2,
@@ -104,6 +106,7 @@ export default function AdminTournamentNewPage() {
   const loadSources = useCallback(() => {
     api.get("/games").then(({ data }) => setGames(data));
     api.get("/events?include_drafts=true").then(({ data }) => setEvents(data));
+    api.get("/partners").then(({ data }) => setPartners(Array.isArray(data) ? data : [])).catch(() => setPartners([]));
   }, []);
   useEffect(() => { loadSources(); }, [loadSources]);
   useApiInvalidation(loadSources, ["games", "events"]);
@@ -254,6 +257,7 @@ export default function AdminTournamentNewPage() {
           <MarkdownField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} testId="new-tr-description" />
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} label="Turnier-Banner" testId="new-tr-banner-upload" variant="wide" allowLibrary />
           <MarkdownField label="Regeln" value={form.rules} onChange={(v) => set("rules", v)} testId="new-tr-rules" />
+          <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="new-tr-partner" hint="Das Turnier erscheint auf der Partnerseite unter „Gemeinsam“, und die Turnierseite nennt den Partner." />
         </FormSection>
 
         <FormSection title="Spieloptionen" collapsible>

@@ -12,7 +12,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send } from "lucide-react";
+import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
@@ -177,6 +177,11 @@ export default function TournamentDetailPage() {
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
             <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
             {t.game && <span className="text-white/60 text-sm">· {gameLabel(t.game)}</span>}
+            {(t.partners || []).map((p) => (
+              <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`tournament-partner-${p.slug || p.id}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1 hover:bg-[#29B6E8]/10">
+                <Handshake className="w-3 h-3" /> mit {p.name}
+              </Link>
+            ))}
           </div>
           <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{t.title}</h1>
           {t.description && <div className="mt-4 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.description) }} />}

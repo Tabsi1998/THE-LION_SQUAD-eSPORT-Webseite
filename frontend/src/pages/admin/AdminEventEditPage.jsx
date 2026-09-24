@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/tls/AdminForm";
+import { PartnerPicker } from "@/components/tls/PartnerPicker";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
 import { DiscordPreview } from "@/components/tls/DiscordPreview";
 import { SharePreviewToggle } from "@/components/tls/SharePreviewToggle";
@@ -40,6 +41,7 @@ export default function AdminEventEditPage() {
   const [sponsors, setSponsors] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [f1Challenges, setF1Challenges] = useState([]);
+  const [partners, setPartners] = useState([]);
 
   useEffect(() => {
     api.get("/events/meta").then(({ data }) => setMeta(data)).catch(() => {});
@@ -47,10 +49,12 @@ export default function AdminEventEditPage() {
       api.get("/sponsors/admin"),
       api.get("/tournaments?include_drafts=true"),
       api.get("/f1/challenges?include_drafts=true"),
-    ]).then(([s, t, f]) => {
+      api.get("/partners"),
+    ]).then(([s, t, f, p]) => {
       if (s.status === "fulfilled") setSponsors(s.value.data || []);
       if (t.status === "fulfilled") setTournaments(t.value.data || []);
       if (f.status === "fulfilled") setF1Challenges(f.value.data || []);
+      if (p.status === "fulfilled") setPartners(Array.isArray(p.value.data) ? p.value.data : []);
     });
   }, []);
 
@@ -92,12 +96,12 @@ export default function AdminEventEditPage() {
   }
   return (
     <AdminLayout>
-      <EventForm key={event.id || "new"} event={event} meta={meta} sponsors={sponsors} tournaments={tournaments} f1Challenges={f1Challenges} onDone={() => navigate("/admin/events")} />
+      <EventForm key={event.id || "new"} event={event} meta={meta} sponsors={sponsors} tournaments={tournaments} f1Challenges={f1Challenges} partners={partners} onDone={() => navigate("/admin/events")} />
     </AdminLayout>
   );
 }
 
-function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges = [], onDone }) {
+function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges = [], partners = [], onDone }) {
   const isNew = !event?.id;
   // Kosten und Abrechnung (#315, #322): eigener Zustand, nur für den Bereich Finanzen sichtbar
   // und nur dann Teil des Speicherns - der Server lehnt es sonst mit 403 ab.
@@ -152,6 +156,7 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
     owned_by_club: source.owned_by_club ?? true,
     show_sponsors: source.show_sponsors ?? true,
     sponsor_ids: source.sponsor_ids || [],
+    partner_ids: source.partner_ids || [],
     is_online: source.is_online ?? false,
     is_hybrid: source.is_hybrid ?? false,
     banner_url: source.banner_url || "",
@@ -433,6 +438,7 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
             <p className="mt-2 text-[11px] text-white/40">Hier erscheinen nur Sponsoren mit aktivem Events-Haken. Leer lassen = alle Event-Sponsoren ohne Event-Einschränkung.</p>
           </div>
         )}
+        <PartnerPicker partners={partners} value={form.partner_ids} onChange={(v) => set("partner_ids", v)} testPrefix="event-partner" hint="Das Event erscheint auf der Partnerseite unter „Gemeinsam“, und die Eventseite nennt den Partner." />
       </FormSection>
     </AdminFormPage>
   );

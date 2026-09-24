@@ -9,6 +9,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from auth import require_admin, get_optional_user
 from services.visibility import user_can_see
+from services import partner_pages
 from services.access_links import (
     public_access_link_payload,
     touch_access_link,
@@ -114,6 +115,8 @@ async def _enrich_tournament(t: dict, user: dict | None = None) -> dict:
     if t.get("game_id"):
         g = await db.games.find_one({"id": t["game_id"]}, {"_id": 0})
         t["game"] = await _enrich_game_identity(db, g)
+    # Partner II (#469): Partnervereine am Turnier, Kurzform mit Link auf die Partnerseite.
+    await partner_pages.attach_partners(db, t)
     if t.get("event_id"):
         e = await db.events.find_one({"id": t["event_id"]}, {"_id": 0, "tournaments": 0, "f1_challenges": 0})
         if e and e.get("status") != "draft" and await user_can_see(user, e.get("visibility") or "public"):
@@ -265,6 +268,7 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
             if not await db.games.find_one({"id": body.game_id}):
                 raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
             doc = body.model_dump()
+            doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
             doc["creation_key"] = creation_key
             billing = await tournament_fees.billing_updates(body.model_dump(exclude_unset=True), None, me)
             doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
@@ -315,6 +319,8 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
         raise HTTPException(status_code=400, detail="Spiel nicht gefunden")
     existing = await _ensure_tournament_unlocked(db, tid)
     raw_updates = body.model_dump(exclude_unset=True)
+    if "partner_ids" in raw_updates:
+        raw_updates["partner_ids"] = await partner_pages.clean_partner_ids(db, raw_updates["partner_ids"])
     if "format_label" in raw_updates:
         raw_updates["format_label"] = (raw_updates.get("format_label") or "").strip() or None
     if "award_images" in raw_updates:

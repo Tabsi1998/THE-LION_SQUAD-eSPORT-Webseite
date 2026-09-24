@@ -363,6 +363,7 @@ class EventCreate(BaseModel):
     owned_by_club: bool = True
     show_sponsors: bool = True
     sponsor_ids: List[str] = []
+    partner_ids: List[str] = []  # Partner II (#469): Partnervereine beim Event
     is_online: bool = False
     is_hybrid: bool = False
     banner_url: Optional[str] = None
@@ -406,6 +407,7 @@ class EventUpdate(BaseModel):
     owned_by_club: Optional[bool] = None
     show_sponsors: Optional[bool] = None
     sponsor_ids: Optional[List[str]] = None
+    partner_ids: Optional[List[str]] = None
     is_online: Optional[bool] = None
     is_hybrid: Optional[bool] = None
     banner_url: Optional[str] = None
@@ -469,6 +471,7 @@ class TournamentCreate(BaseModel):
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: str
+    partner_ids: List[str] = []  # Partner II (#469): Partnervereine am Turnier
     platform: Optional[str] = None
     event_id: Optional[str] = None
     format: TournamentFormat = "single_elim"
@@ -535,6 +538,7 @@ class TournamentUpdate(BaseModel):
     slug: Optional[str] = None
     description: Optional[str] = None
     game_id: Optional[str] = None
+    partner_ids: Optional[List[str]] = None
     platform: Optional[str] = None
     event_id: Optional[str] = None
     format: Optional[TournamentFormat] = None

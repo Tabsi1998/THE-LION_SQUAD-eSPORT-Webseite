@@ -27,6 +27,10 @@ const PARTNER = {
   discord: { enabled: true, name: "PineApps", online: 12, invite: "https://discord.gg/pine" },
   tools: [{ id: "t1", title: "TFT Dashboard", url: "https://tft.pineapps.at", description: "Ranglisten", embed: true }, { id: "t2", title: "Discord-Bot", url: "https://bot.pineapps.at", embed: false }],
   news: [{ id: "n1", slug: "tft-abend", title: "TFT-Abend mit PineApps TFT", published_at: "2026-09-01T10:00:00Z" }],
+  shared: {
+    events: [{ id: "e1", slug: "sommer-cup", name: "Sommer-Cup", start_date: "2026-08-10T10:00:00Z" }],
+    tournaments: [{ id: "t1", slug: "tft-open", title: "TFT Open", start_date: "2026-09-05T18:00:00Z", game: { name: "Teamfight Tactics" } }],
+  },
   redirected: false,
 };
 
@@ -68,10 +72,14 @@ test("Kopf, Live-Stream, Kanäle mit Stand, Tools mit Einbetten und News", async
   expect(screen.getByTestId("partner-tool-consent-notice")).toBeInTheDocument();
 
   expect(screen.getByTestId("partner-news-tft-abend")).toHaveAttribute("href", "/news/tft-abend");
+  // Teil 2: gemeinsame Events und Turniere mit Link auf ihre Seite.
+  expect(screen.getByTestId("partner-shared")).toHaveTextContent("Turnier · Teamfight Tactics");
+  expect(screen.getByTestId("partner-event-sommer-cup")).toHaveAttribute("href", "/events/sommer-cup");
+  expect(screen.getByTestId("partner-tournament-tft-open")).toHaveAttribute("href", "/tournaments/tft-open");
 });
 
 test("ohne Stream und Widget bleiben Links; unbekannter Partner zeigt den Hinweis", async () => {
-  apiMock.get.mockResolvedValue({ data: { ...PARTNER, twitch: { configured: false, live: false }, discord: { enabled: false }, tools: [], news: [], about: "" } });
+  apiMock.get.mockResolvedValue({ data: { ...PARTNER, twitch: { configured: false, live: false }, discord: { enabled: false }, tools: [], news: [], about: "", shared: { events: [], tournaments: [] } } });
   renderAt("/partners/pineapps-tft");
   await screen.findByRole("heading", { level: 1 });
   expect(screen.queryByTestId("partner-live-pill")).toBeNull();

@@ -95,3 +95,18 @@ test("unbekannte Kennung: Hinweis mit Weg zurück statt leerem Formular", async 
   expect(await screen.findByTestId("event-missing")).toHaveTextContent("Event nicht gefunden");
   expect(screen.queryByTestId("event-form")).toBeNull();
 });
+
+test("Partner II (#469): der Partner-Haken geht als partner_ids mit", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: EVENTS };
+    if (url === "/partners") return { data: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] };
+    return { data: [] };
+  });
+  apiMock.post.mockResolvedValue({ data: { id: "ev-3" } });
+  renderAt("/admin/events/new");
+  fireEvent.change(await screen.findByTestId("event-name"), { target: { value: "TFT-Abend" } });
+  fireEvent.click(await screen.findByTestId("event-partner-p1"));
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/events", expect.objectContaining({ name: "TFT-Abend", partner_ids: ["p1"] })));
+});

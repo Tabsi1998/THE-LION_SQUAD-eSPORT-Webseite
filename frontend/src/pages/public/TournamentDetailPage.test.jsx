@@ -109,3 +109,10 @@ test("die eigene Anmeldung zeigt den eingefrorenen Preis, Warteliste den Hinweis
   renderPage();
   expect(await screen.findByTestId("tournament-price-pending")).toHaveTextContent("erst, wenn deine Teilnahme bestätigt ist");
 });
+
+test("Partner II (#469): das Turnier nennt seine Partner mit Link auf die Partnerseite", async () => {
+  mockApi({ ...base, partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] });
+  renderPage();
+  expect(await screen.findByTestId("tournament-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
+  expect(screen.getByTestId("tournament-partner-pineapps-esports")).toHaveTextContent("mit PineApps eSports");
+});

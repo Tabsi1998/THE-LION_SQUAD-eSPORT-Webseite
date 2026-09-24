@@ -13,6 +13,7 @@ from services.public_phase import derive_public_phase
 from services.competition_read import load_competition_read_model, observe_structure_read
 from services.competition_standings import standings_for_structure
 from services.sponsor_utils import dedupe_public_sponsors
+from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_locations, pricing
@@ -496,6 +497,8 @@ async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
         }
     if include_sponsors:
         await _attach_event_sponsors(event)
+        # Partner II (#469): Partnervereine beim Event, Kurzform mit Link auf die Partnerseite.
+        await partner_pages.attach_partners(get_db(), event)
     return event
 
 
@@ -953,6 +956,7 @@ async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict |
 async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     db = get_db()
     doc = body.model_dump()
+    doc["partner_ids"] = await partner_pages.clean_partner_ids(db, doc.get("partner_ids"))
     billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
     _apply_locations(doc, body.model_dump(exclude_unset=True))
@@ -999,6 +1003,8 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     }
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    if "partner_ids" in updates:
+        updates["partner_ids"] = await partner_pages.clean_partner_ids(db, updates["partner_ids"])
     billing = await _billing_updates(raw, existing, me)
     if billing is not None:
         updates["billing"] = billing
