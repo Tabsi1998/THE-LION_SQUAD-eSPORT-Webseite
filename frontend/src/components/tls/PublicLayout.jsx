@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { accountLinksFor } from "@/pages/user/profile/constants";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
@@ -143,6 +144,12 @@ export function PublicLayout({ children }) {
                     <Link to="/messages" onClick={closeMobile} data-testid="nav-messages-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
                       <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Nachrichten
                     </Link>
+                    <div className="px-3 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/35">Mein Konto</div>
+                    {accountLinksFor(isClubMember).map((link) => (
+                      <Link key={link.key} to={link.to} onClick={closeMobile} data-testid={`nav-account-${link.key}-mobile`} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                        <link.icon className="w-3.5 h-3.5 inline mr-1.5" /> {link.label}
+                      </Link>
+                    ))}
                     <button
                       type="button"
                       data-testid="nav-logout-mobile"

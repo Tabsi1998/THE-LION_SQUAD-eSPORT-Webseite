@@ -1,4 +1,20 @@
-import { Bell, Eye, Gamepad2, Globe, Medal, Receipt, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Bell, Crown, Eye, Gamepad2, Gift, Globe, LifeBuoy, Medal, Receipt, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+
+// Mein Konto (Wunsch des Betreibers, 24.09.: „wo finde ich meine Rechnungen usw.?“): alles
+// Persönliche an einer Stelle - im Benutzermenü, im Handy-Menü und in der Profil-Seitenleiste.
+// Rechnungen sind ein Reiter des Profils (#320), der Rest sind eigene Seiten.
+export const ACCOUNT_LINKS = [
+  { to: "/profile?tab=invoices", label: "Rechnungen", icon: Receipt, key: "invoices" },
+  { to: "/members/membership", label: "Meine Mitgliedschaft", icon: Crown, key: "membership", memberOnly: true },
+  { to: "/my/penalties", label: "Strafen & Moderation", icon: ShieldAlert, key: "penalties" },
+  { to: "/my/prizes", label: "Gewinne", icon: Gift, key: "prizes" },
+  { to: "/notifications", label: "Benachrichtigungen", icon: Bell, key: "notifications" },
+  { to: "/contact", label: "Hilfe & Kontakt", icon: LifeBuoy, key: "help" },
+];
+
+export function accountLinksFor(isClubMember) {
+  return ACCOUNT_LINKS.filter((link) => !link.memberOnly || isClubMember);
+}
 
 // Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
 // verlinken die Benachrichtigungen mit ?tab=notifications. Die Inbox ist seit

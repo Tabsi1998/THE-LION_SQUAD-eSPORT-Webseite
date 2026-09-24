@@ -1,11 +1,14 @@
-import { TABS } from "./constants";
+import { Link } from "react-router-dom";
+import { TABS, accountLinksFor } from "./constants";
 
 // Am PC ein Seitenmenü links, am Tablet und Handy eine waagrecht scrollbare
 // Reihe - dieselben Knöpfe, nur anders angeordnet (#253). Ein einziges
 // Element, damit jeder Reiter genau einmal im Dokument steht. `badges` hängt
 // an einen Reiter einen Zähler („Freunde (6)“) und einen Punkt für Offenes
 // (#259).
-export function ProfileNav({ tab, onSelect, badges = {} }) {
+export function ProfileNav({ tab, onSelect, badges = {}, isClubMember = false }) {
+  // Unter den Reitern die Seiten, die zum Konto gehören, aber keine Reiter sind (Rechnungen sind einer).
+  const accountLinks = accountLinksFor(isClubMember).filter((link) => link.key !== "invoices");
   return (
     <nav
       aria-label="Profilbereiche"
@@ -29,6 +32,12 @@ export function ProfileNav({ tab, onSelect, badges = {} }) {
           </button>
         );
       })}
+      <div className="hidden lg:block mt-4 pt-3 border-t border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/35">Mein Konto</div>
+      {accountLinks.map((link) => (
+        <Link key={link.key} to={link.to} data-testid={`profile-link-${link.key}`} className="shrink-0 min-h-11 rounded-sm border border-white/10 px-3 py-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-white hover:border-white/30 transition flex items-center gap-2 lg:w-full lg:justify-start lg:border-transparent">
+          <link.icon className="w-3.5 h-3.5" /> {link.label}
+        </Link>
+      ))}
     </nav>
   );
 }

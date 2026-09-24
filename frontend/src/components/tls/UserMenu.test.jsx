@@ -35,6 +35,13 @@ test("das Menue oeffnet sich und fuehrt ins Profil", async () => {
   expect(screen.getByTestId("nav-profile")).toHaveAttribute("href", "/profile");
   expect(screen.getByTestId("nav-dashboard")).toHaveAttribute("href", "/dashboard");
   expect(screen.getByTestId("nav-messages-menu")).toHaveAttribute("href", "/messages");
+  // Mein Konto: alles Persönliche steht im Menü - Mitgliedschaft nur für Mitglieder.
+  expect(screen.getByTestId("nav-account-invoices")).toHaveAttribute("href", "/profile?tab=invoices");
+  expect(screen.getByTestId("nav-account-penalties")).toHaveAttribute("href", "/my/penalties");
+  expect(screen.getByTestId("nav-account-prizes")).toHaveAttribute("href", "/my/prizes");
+  expect(screen.getByTestId("nav-account-notifications")).toHaveAttribute("href", "/notifications");
+  expect(screen.getByTestId("nav-account-help")).toHaveAttribute("href", "/contact");
+  expect(screen.queryByTestId("nav-account-membership")).toBeNull();
   expect(screen.queryByTestId("nav-member-area")).toBeNull();
   expect(screen.queryByTestId("nav-admin")).toBeNull();
 });
@@ -47,6 +54,7 @@ test("Mitglieder sehen den Mitgliederbereich, Admins den Adminbereich", async ()
 
   await user.click(screen.getByTestId("nav-user"));
   expect(screen.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
+  expect(screen.getByTestId("nav-account-membership")).toHaveAttribute("href", "/members/membership");
   expect(screen.getByTestId("nav-admin")).toHaveAttribute("href", "/admin");
   // Gold, Blau und Rot ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss.
   expect(screen.getByTestId("nav-member-area").className).toMatch(/text-\[#FFD700\]/);
