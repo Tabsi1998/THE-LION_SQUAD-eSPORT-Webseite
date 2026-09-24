@@ -285,10 +285,28 @@ async def _normalize_board_assignee(db, assignee_id: str | None) -> str | None:
     return profile["id"] if profile else assignee_id
 
 
-@board_router.get("")
-async def list_board_positions(active_only: bool = False, me=Depends(get_current_user_optional)):
-    """Public list. By default returns active+inactive; ?active_only=true filters."""
+@board_router.get("/source")
+async def board_source():
+    """Führt Dolibarr den Vorstand (#326 Teil 2)? Nur Schalter und Stand - keine Personen."""
+    from services import club_facts
     db = get_db()
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    return await club_facts.board_source(db, branding)
+
+
+@board_router.get("")
+async def list_board_positions(active_only: bool = False, manual: bool = False, me=Depends(get_current_user_optional)):
+    """Public list. By default returns active+inactive; ?active_only=true filters.
+
+    Steht „Vereinsdaten aus Dolibarr“ an und hat Dolibarr einen Vorstand geliefert, kommt die Liste
+    von dort (#326 Teil 2) - ``?manual=true`` liefert die Posten von Hand (für den Admin, Rückfall)."""
+    db = get_db()
+    if not manual:
+        from services import club_facts
+        branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+        from_dolibarr = await club_facts.board_positions(db, branding)
+        if from_dolibarr is not None:
+            return from_dolibarr
     await _ensure_default_board_positions()
     q = {"is_active": True} if active_only else {}
     positions = await db.board_positions.find(q, {"_id": 0}).sort("order_index", 1).to_list(100)

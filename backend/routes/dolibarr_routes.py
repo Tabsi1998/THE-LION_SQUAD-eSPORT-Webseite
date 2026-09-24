@@ -69,8 +69,8 @@ async def _features(db, settings: dict) -> list[dict]:
     return [
         {"key": "members", "label": "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", "enabled": live, "state": mode_state,
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
-        {"key": "club_facts", "label": "Vereinsdaten und Obmann aus Dolibarr", "enabled": bool(branding.get("legal_from_dolibarr")), "state": facts_state,
-         "hint": "Impressum, Kontakt, Datenschutz und „Über uns“ nehmen Name, ZVR, Anschrift, Telefon und Obmann aus dem Vereinsmodul (stündlich).",
+        {"key": "club_facts", "label": "Vereinsdaten, Obmann und Vorstand aus Dolibarr", "enabled": bool(branding.get("legal_from_dolibarr")), "state": facts_state,
+         "hint": "Impressum, Kontakt, Datenschutz, „Über uns“ und die Vorstandsseite nehmen Name, ZVR, Anschrift, Telefon, Obmann und die Vorstandsfunktionen aus dem Vereinsmodul (stündlich); Namen nur mit Einwilligung.",
          "where": "/admin/settings?tab=legal", "where_label": "Einstellungen → Rechtliches"},
         {"key": "sponsors", "label": "Sponsoren und Partner aus Dolibarr", "enabled": bool(source.get("from_dolibarr")), "state": "an" if source.get("from_dolibarr") else "aus",
          "hint": "Geschäftspartner in den Kategorien Sponsor und Partner; Unterkategorie = Stufe, Zusatzfelder = Laufzeit. Ehemalige rutschen von selbst nach unten.",

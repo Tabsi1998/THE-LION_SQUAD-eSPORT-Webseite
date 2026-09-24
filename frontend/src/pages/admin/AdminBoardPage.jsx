@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -14,12 +15,26 @@ export default function AdminBoardPage() {
   const [members, setMembers] = useState([]);
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  // Vorstand aus Dolibarr (#326 Teil 2): führt Dolibarr, ist die Liste hier nur der Rückfall.
+  const [source, setSource] = useState(null);
+  const [dolibarrBoard, setDolibarrBoard] = useState([]);
   const confirm = useConfirm();
 
   const load = useCallback(async () => {
-    const [p, u] = await Promise.all([api.get("/board"), api.get("/board/assignable-users")]);
+    const [p, u, s] = await Promise.all([api.get("/board?manual=true"), api.get("/board/assignable-users"), api.get("/board/source").catch(() => ({ data: null }))]);
     setPositions(p.data);
     setMembers(u.data);
+    setSource(s.data);
+    if (s.data?.dolibarr) {
+      try {
+        const { data } = await api.get("/board?active_only=true");
+        setDolibarrBoard(Array.isArray(data) ? data : []);
+      } catch {
+        setDolibarrBoard([]);
+      }
+    } else {
+      setDolibarrBoard([]);
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["board", "membership"]);
@@ -55,6 +70,35 @@ export default function AdminBoardPage() {
         <button onClick={() => setCreating(true)} data-testid="board-new-btn" className="px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Eigene Position</button>
       </div>
 
+      {source?.dolibarr && (
+        <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="board-dolibarr">
+          <div className="font-heading font-bold uppercase text-[#29B6E8]">Dolibarr führt den Vorstand</div>
+          <p className="text-sm text-white/70">
+            Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/settings?tab=legal" className="text-[#29B6E8] hover:text-white">Einstellungen → Rechtliches</Link>).
+            Die Vorstandsseite, „Über uns“ und die Ansprechpartner auf der Startseite zeigen die Funktionen und Inhaber aus dem Vereinsmodul
+            (Stand {source.fetched_at ? new Date(source.fetched_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
+            Funktionen und Inhaber pflegst du in Dolibarr; ein Name erscheint nur, wenn die Person der Nennung zugestimmt hat; Foto und Profil-Link kommen über den eigenen Eintrag der Person im Mitgliederverzeichnis.
+            Die Liste unten gilt nur, wenn der Schalter aus ist.
+          </p>
+          {dolibarrBoard.length > 0 && (
+            <ul className="text-sm divide-y divide-white/5" data-testid="board-dolibarr-rows">
+              {dolibarrBoard.map((p) => (
+                <li key={p.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid={`board-dolibarr-${p.slug}`}>
+                  <span className="font-bold">{p.display_title}</span>
+                  <span className="text-white/70">{p.user ? p.user.display_name : p.name_withheld ? "Name nicht freigegeben" : "unbesetzt"}</span>
+                  {p.user?.profile_url ? <span className="text-[10px] uppercase tracking-widest text-[#00FF88]">mit Foto und Profil</span> : p.user ? <span className="text-[10px] uppercase tracking-widest text-white/40">nur Name (kein Verzeichnis-Eintrag)</span> : null}
+                  {p.represents && <span className="text-[10px] uppercase tracking-widest text-[#FFD700]">vertritt nach außen</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {source && source.switch_on && !source.has_board && (
+        <div className="mb-6 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/70" data-testid="board-dolibarr-missing">
+          „Vereinsdaten aus Dolibarr“ ist an, aber Dolibarr hat noch keinen Vorstand geliefert – bis dahin gilt die Liste unten. Unter Einstellungen → Rechtliches „Jetzt nachlesen“.
+        </div>
+      )}
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[900px]">
