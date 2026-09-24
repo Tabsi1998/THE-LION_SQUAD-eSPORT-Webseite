@@ -51,7 +51,11 @@ async def test_without_services_the_privacy_page_says_so_and_the_imprint_shows_t
     assert "Crashlytics" in block(privacy, "privacy-app")["text"]
     assert any("eigener Infrastruktur des Vereins" in item for item in block(privacy, "privacy-recipients")["items"])
     # Steam braucht keine App - es ist die einzige Plattform, die ohne Einrichtung verknüpfbar ist.
-    assert block(privacy, "privacy-platform-list")["items"] == ["Steam: SteamID64 und, falls ein Steam-API-Schlüssel hinterlegt ist, der Anzeigename – Betreiber: Valve Corporation, USA"]
+    # Steam und Lichess brauchen keine App - die beiden sind ohne Einrichtung verknüpfbar.
+    assert block(privacy, "privacy-platform-list")["items"] == [
+        "Steam: SteamID64 und, falls ein Steam-API-Schlüssel hinterlegt ist, der Anzeigename – Betreiber: Valve Corporation, USA",
+        "Lichess: Lichess-Nutzername – Betreiber: lichess.org (Verein, Frankreich)",
+    ]
     rows = dict((label, value) for label, value in blocks(privacy, "controller")[0]["rows"])
     assert rows["Verantwortlicher"] == "Testverein Löwen" and rows["Adresse"] == ["Teststraße 1", "6410 Testdorf", "Österreich"]
     assert rows["Datenschutz"] == "[dsgvo@lionsquad-test.at](mailto:dsgvo@lionsquad-test.at)"
@@ -84,7 +88,7 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     platforms = block(privacy, "privacy-platform-list")["items"]
     assert any(item.startswith("Discord:") and "Discord Inc." in item for item in platforms)
     assert any(item.startswith("YouTube:") and "Google Ireland" in item for item in platforms)
-    assert "Discord, Steam, YouTube" in block(privacy, "privacy-platform-links")["text"]
+    assert "Discord, Steam, YouTube, Lichess" in block(privacy, "privacy-platform-links")["text"]
     recipients = block(privacy, "privacy-recipients")["items"]
     assert any("Resend, Inc." in item for item in recipients) and any("Verknüpfung YouTube: Google Ireland Ltd." in item for item in recipients)
     assert block(privacy, "privacy-discord-bot") and block(privacy, "privacy-discord-webhooks")

@@ -91,6 +91,16 @@ class UserUpdate(BaseModel):
     psn_id: Optional[str] = None
     xbox_id: Optional[str] = None
     riot_id: Optional[str] = None
+    # Konten verknüpfen III (#547)
+    faceit_handle: Optional[str] = None
+    startgg_handle: Optional[str] = None
+    roblox_handle: Optional[str] = None
+    osu_handle: Optional[str] = None
+    lichess_handle: Optional[str] = None
+    github_handle: Optional[str] = None
+    kick_handle: Optional[str] = None
+    reddit_handle: Optional[str] = None
+    spotify_handle: Optional[str] = None
     # New socials
     twitch_handle: Optional[str] = None
     youtube_handle: Optional[str] = None
@@ -178,7 +188,8 @@ class MemberBenefitUpdate(BaseModel):
 # ---------- User Socials (separate table for fine-grained visibility) ----------
 SocialPlatform = Literal[
     "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
-    "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website"
+    "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website",
+    "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify"
 ]
 
 

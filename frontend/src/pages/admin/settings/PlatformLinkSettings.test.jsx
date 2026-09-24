@@ -42,9 +42,11 @@ test("ohne Felder zeigt die Karte nur Stand, prüfen und Rückrufadresse", () =>
 
 test("die Übersicht nennt je Plattform den Stand und führt zur eigenen Seite - ohne Felder", () => {
   render(<MemoryRouter><PlatformLinkOverview brand={{ discord_client_id: "123", discord_client_secret_masked: "****" }} /></MemoryRouter>);
-  expect(screen.getByTestId("platform-link-ready-count")).toHaveTextContent(`2 / ${PLATFORM_APPS.length} bereit`);
+  // Discord (eingerichtet), Steam und Lichess (brauchen keine App) sind bereit.
+  expect(screen.getByTestId("platform-link-ready-count")).toHaveTextContent(`3 / ${PLATFORM_APPS.length} bereit`);
   expect(screen.getByTestId("platform-link-discord-state")).toHaveTextContent("bereit");
   expect(screen.getByTestId("platform-link-steam-state")).toHaveTextContent("bereit");
+  expect(screen.getByTestId("platform-link-lichess-state")).toHaveTextContent("bereit");
   expect(screen.getByTestId("platform-link-open-tiktok")).toHaveAttribute("href", "/admin/integrations/tiktok");
   expect(screen.getByTestId("platform-link-open-discord")).toHaveAttribute("href", "/admin/integrations/discord");
   expect(screen.queryByTestId("discord-client-id")).toBeNull();

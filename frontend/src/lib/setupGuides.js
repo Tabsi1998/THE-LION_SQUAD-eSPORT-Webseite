@@ -161,6 +161,121 @@ export const SETUP_GUIDES = {
     notes: ["Ohne Freigabe durch Riot bleibt das Feld getippt.", "Die Website liest nur PUUID und Riot ID (Name#TAG)."],
     checkPlatform: "riot",
   },
+  faceit: {
+    key: "faceit",
+    title: "FACEIT verknüpfen (FACEIT Connect)",
+    where: { to: "/admin/integrations/faceit", label: "Verbindungen → FACEIT" },
+    summary: "Eine App der Website bei FACEIT – Mitglieder verknüpfen ihr FACEIT-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "FACEIT Developer Portal öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://developers.faceit.com/", label: "FACEIT Developer Portal" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/faceit/callback" },
+      { text: "Client ID und Client Secret → hier bei FACEIT eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Die Website liest nur Kennung und Nickname (Scopes openid, profile)."],
+    checkPlatform: "faceit",
+  },
+  startgg: {
+    key: "startgg",
+    title: "start.gg verknüpfen",
+    where: { to: "/admin/integrations/startgg", label: "Verbindungen → start.gg" },
+    summary: "Eine App der Website bei start.gg – Mitglieder verknüpfen ihr start.gg-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "start.gg → Developer Settings öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://start.gg/admin/profile/developer", label: "start.gg → Developer Settings" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/startgg/callback" },
+      { text: "Client ID und Client Secret → hier bei start.gg eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope „user.identity“; die Website liest nur Spieler-Kennung und Gamertag."],
+    checkPlatform: "startgg",
+  },
+  roblox: {
+    key: "roblox",
+    title: "Roblox verknüpfen (OAuth 2.0)",
+    where: { to: "/admin/integrations/roblox", label: "Verbindungen → Roblox" },
+    summary: "Eine App der Website bei Roblox – Mitglieder verknüpfen ihr Roblox-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Roblox Creator Dashboard → Credentials → OAuth 2.0 öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://create.roblox.com/dashboard/credentials", label: "Roblox Creator Dashboard → Credentials → OAuth 2.0" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/roblox/callback" },
+      { text: "Client ID und Client Secret → hier bei Roblox eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scopes openid und profile; bis zur Prüfung durch Roblox dürfen nur eingetragene Tester verknüpfen."],
+    checkPlatform: "roblox",
+  },
+  osu: {
+    key: "osu",
+    title: "osu! verknüpfen",
+    where: { to: "/admin/integrations/osu", label: "Verbindungen → osu!" },
+    summary: "Eine App der Website bei osu! – Mitglieder verknüpfen ihr osu!-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "osu! → Account settings → OAuth → New OAuth Application öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://osu.ppy.sh/home/account/edit#oauth", label: "osu! → Account settings → OAuth → New OAuth Application" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/osu/callback" },
+      { text: "Client ID und Client Secret → hier bei osu! eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope „identify“; die Website liest nur Kennung und Nutzername."],
+    checkPlatform: "osu",
+  },
+  lichess: {
+    key: "lichess",
+    title: "Lichess verknüpfen (ohne App)",
+    where: { to: "/admin/integrations/lichess", label: "Verbindungen → Lichess" },
+    summary: "Lichess erlaubt öffentliche Clients: keine App, kein Secret – Mitglieder verknüpfen ihren Lichess-Namen per Anmeldung bei Lichess.",
+    steps: [
+      { text: "Nichts einzurichten. Die Rückrufadresse ist:", copy: "{origin}/api/platform-links/lichess/callback" },
+    ],
+    notes: ["Die Website liest nur den Lichess-Nutzernamen."],
+    checkPlatform: "lichess",
+  },
+  github: {
+    key: "github",
+    title: "GitHub verknüpfen (OAuth App)",
+    where: { to: "/admin/integrations/github", label: "Verbindungen → GitHub" },
+    summary: "Eine App der Website bei GitHub – Mitglieder verknüpfen ihr GitHub-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "GitHub → Settings → Developer settings → OAuth Apps öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://github.com/settings/developers", label: "GitHub → Settings → Developer settings → OAuth Apps" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/github/callback" },
+      { text: "Client ID und Client Secret → hier bei GitHub eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope „read:user“; die Website liest nur Kennung und Login."],
+    checkPlatform: "github",
+  },
+  kick: {
+    key: "kick",
+    title: "Kick verknüpfen",
+    where: { to: "/admin/integrations/kick", label: "Verbindungen → Kick" },
+    summary: "Eine App der Website bei Kick – Mitglieder verknüpfen ihr Kick-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Kick → Settings → Developer öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://kick.com/settings/developer", label: "Kick → Settings → Developer" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/kick/callback" },
+      { text: "Client ID und Client Secret → hier bei Kick eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope „user:read“ mit PKCE; die Website liest nur Kennung und Name."],
+    checkPlatform: "kick",
+  },
+  reddit: {
+    key: "reddit",
+    title: "Reddit verknüpfen",
+    where: { to: "/admin/integrations/reddit", label: "Verbindungen → Reddit" },
+    summary: "Eine App der Website bei Reddit – Mitglieder verknüpfen ihr Reddit-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Reddit → Preferences → Apps (Typ „web app“) öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://www.reddit.com/prefs/apps", label: "Reddit → Preferences → Apps (Typ „web app“)" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/reddit/callback" },
+      { text: "Client ID und Client Secret → hier bei Reddit eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope „identity“; die Website liest nur Kennung und Nutzername."],
+    checkPlatform: "reddit",
+  },
+  spotify: {
+    key: "spotify",
+    title: "Spotify verknüpfen",
+    where: { to: "/admin/integrations/spotify", label: "Verbindungen → Spotify" },
+    summary: "Eine App der Website bei Spotify – Mitglieder verknüpfen ihr Spotify-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Spotify for Developers → Dashboard öffnen → neue App/OAuth-Anwendung anlegen (Name der Website, Adresse der Website).", link: { href: "https://developer.spotify.com/dashboard", label: "Spotify for Developers → Dashboard" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/spotify/callback" },
+      { text: "Client ID und Client Secret → hier bei Spotify eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Die Website liest nur Kennung und Anzeigename; im Development Mode nur eingetragene Nutzer."],
+    checkPlatform: "spotify",
+  },
   xbox: {
     key: "xbox",
     title: "Xbox-Gamertag verknüpfen (Microsoft)",
@@ -295,7 +410,9 @@ export function guideStatus(key, data = {}) {
     case "steam":
       if (!branding) return unknown;
       return branding.steam_api_key_masked ? ok("Schlüssel da") : optional("Ohne Schlüssel bleibt die ID");
-    case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic":
+    case "lichess":
+      return ok("Keine App nötig");
+    case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic": case "faceit": case "startgg": case "roblox": case "osu": case "github": case "kick": case "reddit": case "spotify":
       if (!links) return unknown;
       return links[key] ? ok("App eingetragen") : optional("Noch nicht angebunden");
     case "resend":

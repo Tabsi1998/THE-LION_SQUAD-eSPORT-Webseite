@@ -147,7 +147,7 @@ def test_privacy_facts_are_computed_from_the_real_switches_without_secrets():
     assert privacy_facts.facts_from({}, {}, {}, {}, {}, media_scan={"provider": "local"})["media_scan"] == {"enabled": True, "provider": "local"}
     # Plattformen (#545): nur eingerichtete, mit Betreiber - nie Client-ID oder Secret.
     rows = privacy_facts.platform_facts({"discord_client_id": "id", "discord_client_secret": "enc", "twitch_client_id": "id"})
-    assert [row["key"] for row in rows] == ["discord", "steam"] and rows[0]["operator"] == "Discord Inc., USA" and "enc" not in str(rows)
+    assert [row["key"] for row in rows] == ["discord", "steam", "lichess"] and rows[0]["operator"] == "Discord Inc., USA" and "enc" not in str(rows)
     assert "geheim" not in str(facts) and "enc" not in str(facts)
     bare = privacy_facts.facts_from({}, {}, {}, {}, {})
     assert bare["analytics"] == "" and bare["google_login"] is False and bare["discord"] == {"webhooks": False, "bot": False} and bare["email_provider"] == "none" and bare["dolibarr"] is False

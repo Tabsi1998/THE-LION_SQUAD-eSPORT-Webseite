@@ -4,9 +4,10 @@
 export const PLATFORM_BY_FIELD = {
   discord_name: "discord", twitch_handle: "twitch", steam_id: "steam", battlenet_id: "battlenet", x_handle: "x",
   youtube_handle: "youtube", tiktok_handle: "tiktok", riot_id: "riot", xbox_id: "xbox", epic_id: "epic",
+  faceit_handle: "faceit", startgg_handle: "startgg", roblox_handle: "roblox", osu_handle: "osu", lichess_handle: "lichess", github_handle: "github", kick_handle: "kick", reddit_handle: "reddit", spotify_handle: "spotify",
 };
 
-export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games" };
+export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games", faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify" };
 
 // Was sich nicht verknüpfen lässt - und warum (steht als Hinweis am Feld).
 export const NOT_LINKABLE = {
@@ -28,6 +29,16 @@ export const PLATFORM_APPS = [
   { key: "riot", label: "Riot Games", idField: "riot_client_id", secretField: "riot_client_secret", guideKey: "riot", optional: true, note: "Riot Sign On gibt es nur nach Antrag bei Riot." },
   { key: "xbox", label: "Xbox (Microsoft)", idField: "xbox_client_id", secretField: "xbox_client_secret", idLabel: "Anwendungs-ID (Client-ID)", secretLabel: "Geheimer Clientschlüssel", guideKey: "xbox", optional: true },
   { key: "epic", label: "Epic Games", idField: "epic_client_id", secretField: "epic_client_secret", guideKey: "epic", optional: true, note: "Braucht die Markenprüfung von Epic für die Anwendung." },
+  // Konten verknüpfen III, Welle 1 (#547).
+  { key: "faceit", label: "FACEIT", idField: "faceit_client_id", secretField: "faceit_client_secret", guideKey: "faceit", optional: true },
+  { key: "startgg", label: "start.gg", idField: "startgg_client_id", secretField: "startgg_client_secret", guideKey: "startgg", optional: true },
+  { key: "roblox", label: "Roblox", idField: "roblox_client_id", secretField: "roblox_client_secret", guideKey: "roblox", optional: true, note: "Bis zur Prüfung durch Roblox dürfen nur eingetragene Tester verknüpfen." },
+  { key: "osu", label: "osu!", idField: "osu_client_id", secretField: "osu_client_secret", guideKey: "osu", optional: true },
+  { key: "lichess", label: "Lichess", guideKey: "lichess", optional: true, note: "Lichess braucht keine App – die Verknüpfung läuft als öffentlicher Client." },
+  { key: "github", label: "GitHub", idField: "github_client_id", secretField: "github_client_secret", guideKey: "github", optional: true },
+  { key: "kick", label: "Kick", idField: "kick_client_id", secretField: "kick_client_secret", guideKey: "kick", optional: true },
+  { key: "reddit", label: "Reddit", idField: "reddit_client_id", secretField: "reddit_client_secret", guideKey: "reddit", optional: true },
+  { key: "spotify", label: "Spotify", idField: "spotify_client_id", secretField: "spotify_client_secret", guideKey: "spotify", optional: true, note: "Im Development Mode dürfen nur eingetragene Nutzer verknüpfen." },
 ];
 export const PLATFORM_APP_FIELDS = PLATFORM_APPS.flatMap((app) => [app.idField, app.secretField].filter(Boolean));
 export const PLATFORM_SECRET_FIELDS = PLATFORM_APPS.map((app) => app.secretField).filter(Boolean);

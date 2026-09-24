@@ -90,6 +90,7 @@ USER_NULLABLE_FIELDS = {
     "discord_id", "switch_code", "steam_id", "epic_id", "psn_id", "xbox_id",
     "riot_id", "twitch_handle", "youtube_handle", "tiktok_handle",
     "instagram_handle", "x_handle", "nintendo_fc", "ea_id", "battlenet_id",
+    "faceit_handle", "startgg_handle", "roblox_handle", "osu_handle", "lichess_handle", "github_handle", "kick_handle", "reddit_handle", "spotify_handle",
     "profile_visibility", "dm_privacy",
 }
 
@@ -109,6 +110,15 @@ def _visibility_aliases(key: str) -> list[str]:
         "ea": "ea_id",
         "riot": "riot_id",
         "battlenet": "battlenet_id",
+        "faceit": "faceit_handle",
+        "startgg": "startgg_handle",
+        "roblox": "roblox_handle",
+        "osu": "osu_handle",
+        "lichess": "lichess_handle",
+        "github": "github_handle",
+        "kick": "kick_handle",
+        "reddit": "reddit_handle",
+        "spotify": "spotify_handle",
     }.get(key, key)
     aliases = [key, source_key]
     if key == "birth_date":
@@ -168,6 +178,15 @@ def _visible_field(user: dict, key: str, profile_public: bool, ctx: dict | None 
         "ea": "ea_id",
         "riot": "riot_id",
         "battlenet": "battlenet_id",
+        "faceit": "faceit_handle",
+        "startgg": "startgg_handle",
+        "roblox": "roblox_handle",
+        "osu": "osu_handle",
+        "lichess": "lichess_handle",
+        "github": "github_handle",
+        "kick": "kick_handle",
+        "reddit": "reddit_handle",
+        "spotify": "spotify_handle",
     }.get(key, key)
     return user.get(source_key)
 
@@ -602,6 +621,15 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
         "ea_id": _visible_field(u, "ea", public, ctx),
         "riot_id": _visible_field(u, "riot", public, ctx),
         "battlenet_id": _visible_field(u, "battlenet", public, ctx),
+        "faceit_handle": _visible_field(u, "faceit", public, ctx),
+        "startgg_handle": _visible_field(u, "startgg", public, ctx),
+        "roblox_handle": _visible_field(u, "roblox", public, ctx),
+        "osu_handle": _visible_field(u, "osu", public, ctx),
+        "lichess_handle": _visible_field(u, "lichess", public, ctx),
+        "github_handle": _visible_field(u, "github", public, ctx),
+        "kick_handle": _visible_field(u, "kick", public, ctx),
+        "reddit_handle": _visible_field(u, "reddit", public, ctx),
+        "spotify_handle": _visible_field(u, "spotify", public, ctx),
         "main_platform": _visible_field(u, "main_platform", public, ctx),
         "main_platforms": (u.get("main_platforms") or []) if _field_visible(u, "main_platforms", public, ctx) else [],
         "input_devices": (u.get("input_devices") or []) if _field_visible(u, "input_devices", public, ctx) else [],

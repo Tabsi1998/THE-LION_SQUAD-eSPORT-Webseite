@@ -1,4 +1,4 @@
-import { Flag, Gamepad2, Globe, Zap } from "lucide-react";
+import { Box, Castle, CircleDot, Crosshair, Flag, Gamepad2, Github, Globe, MessageCircle, Music2, Radio, Trophy, Zap } from "lucide-react";
 
 // Marken der Plattformen an einer Stelle (#527, #521): Kennung, Name, Farbe und Logo je Plattform -
 // für das öffentliche Profil (Kasten „Konten“) und die Knöpfe „Mit … verknüpfen“ im eigenen Profil.
@@ -20,6 +20,15 @@ export function platformMeta(link) {
   if (platform.includes("psn") || platform.includes("playstation")) return { key: "psn", label: "PlayStation", color: "#0070D1" };
   if (platform.includes("nintendo")) return { key: "nintendo", label: "Nintendo", color: "#E60012" };
   if (platform === "ea") return { key: "ea", label: "EA", color: "#FF4747" };
+  if (platform === "faceit") return { key: "faceit", label: "FACEIT", color: "#FF5500" };
+  if (platform === "startgg") return { key: "startgg", label: "start.gg", color: "#3F80FF" };
+  if (platform === "roblox") return { key: "roblox", label: "Roblox", color: "#FFFFFF" };
+  if (platform === "osu") return { key: "osu", label: "osu!", color: "#FF66AA" };
+  if (platform === "lichess") return { key: "lichess", label: "Lichess", color: "#BABABA" };
+  if (platform === "github") return { key: "github", label: "GitHub", color: "#FFFFFF" };
+  if (platform === "kick") return { key: "kick", label: "Kick", color: "#53FC18" };
+  if (platform === "reddit") return { key: "reddit", label: "Reddit", color: "#FF4500" };
+  if (platform === "spotify") return { key: "spotify", label: "Spotify", color: "#1DB954" };
   if (platform.includes("website") || platform.includes("web")) return { key: "website", label: "Website", color: "#29B6E8" };
   return { key: "website", label: link.label || "Link", color: "#29B6E8" };
 }
@@ -36,6 +45,15 @@ export function PlatformIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "riot") return <Zap className={className} />;
   if (kind === "xbox") return <Gamepad2 className={className} />;
   if (kind === "epic") return <Flag className={className} />;
+  if (kind === "faceit") return <Crosshair className={className} />;
+  if (kind === "startgg") return <Trophy className={className} />;
+  if (kind === "roblox") return <Box className={className} />;
+  if (kind === "osu") return <CircleDot className={className} />;
+  if (kind === "lichess") return <Castle className={className} />;
+  if (kind === "github") return <Github className={className} />;
+  if (kind === "kick") return <Radio className={className} />;
+  if (kind === "reddit") return <MessageCircle className={className} />;
+  if (kind === "spotify") return <Music2 className={className} />;
   if (kind === "psn" || kind === "nintendo" || kind === "ea") return <Gamepad2 className={className} />;
   return <Globe className={className} />;
 }
@@ -52,6 +70,15 @@ export const BRAND_BUTTONS = {
   riot: { bg: "#D13639", fg: "#FFFFFF" },
   xbox: { bg: "#107C10", fg: "#FFFFFF" },
   epic: { bg: "#2F2F2F", fg: "#FFFFFF", border: "#C8C8C8" },
+  faceit: { bg: "#FF5500", fg: "#FFFFFF" },
+  startgg: { bg: "#3F80FF", fg: "#FFFFFF" },
+  roblox: { bg: "#000000", fg: "#FFFFFF", border: "#FFFFFF" },
+  osu: { bg: "#FF66AA", fg: "#FFFFFF" },
+  lichess: { bg: "#161512", fg: "#FFFFFF", border: "#BABABA" },
+  github: { bg: "#24292F", fg: "#FFFFFF", border: "#57606A" },
+  kick: { bg: "#53FC18", fg: "#000000" },
+  reddit: { bg: "#FF4500", fg: "#FFFFFF" },
+  spotify: { bg: "#1DB954", fg: "#000000" },
 };
 
 export function brandButtonStyle(key) {

@@ -18,6 +18,16 @@ export const INTEGRATIONS = [
   { key: "riot", label: "Riot Games", app: "riot", guides: ["riot"] },
   { key: "xbox", label: "Xbox", app: "xbox", guides: ["xbox"] },
   { key: "epic", label: "Epic Games", app: "epic", guides: ["epic"] },
+  // Konten verknüpfen III, Welle 1 (#547).
+  { key: "faceit", label: "FACEIT", app: "faceit", guides: ["faceit"] },
+  { key: "startgg", label: "start.gg", app: "startgg", guides: ["startgg"] },
+  { key: "roblox", label: "Roblox", app: "roblox", guides: ["roblox"] },
+  { key: "osu", label: "osu!", app: "osu", guides: ["osu"] },
+  { key: "lichess", label: "Lichess", app: "lichess", guides: ["lichess"] },
+  { key: "github", label: "GitHub", app: "github", guides: ["github"] },
+  { key: "kick", label: "Kick", app: "kick", guides: ["kick"] },
+  { key: "reddit", label: "Reddit", app: "reddit", guides: ["reddit"] },
+  { key: "spotify", label: "Spotify", app: "spotify", guides: ["spotify"] },
   // Seit #546 sind Google, Resend und SMTP eigene Seiten unter Verbindungen; Analytics, Google Play und
   // Dolibarr haben ihre Seite anderswo (Auftritt bzw. Mitglieder) und stehen nur in der Übersicht.
   { key: "google", label: "Google", guides: ["google_login"], tab: "/admin/settings/google", tabLabel: "Client-ID und Login-Schalter", searchTerms: ["google login", "google-login", "anmeldung mit google", "oauth", "web-client-id"] },

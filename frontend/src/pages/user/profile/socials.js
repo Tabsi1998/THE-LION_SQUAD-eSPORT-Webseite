@@ -1,4 +1,4 @@
-import { AtSign, Gamepad, Gamepad2, Globe, Instagram, Joystick, MessageCircle, Music2, Rocket, Swords, Twitch, Twitter, Youtube, Zap } from "lucide-react";
+import { AtSign, Box, Castle, CircleDot, Crosshair, Gamepad, Gamepad2, Github, Globe, Instagram, Joystick, MessageCircle, Music2, Radio, Rocket, Swords, Trophy, Twitch, Twitter, Youtube, Zap } from "lucide-react";
 
 // Socials und Gaming-IDs (#258): je Feld ein Symbol, eine Bereinigung der
 // Eingabe (eine eingefügte Adresse wird zum Nutzernamen) und, wo es eine
@@ -20,6 +20,16 @@ export const SOCIAL_PLATFORMS = [
   { k: "ea_id", l: "EA ID", icon: Gamepad2, placeholder: "EA-ID" },
   { k: "riot_id", l: "Riot ID", icon: Swords, placeholder: "Name#TAG" },
   { k: "battlenet_id", l: "Battle.net", icon: AtSign, placeholder: "Name#1234" },
+  // Konten verknüpfen III, Welle 1 (#547): getippt nur, solange die Website die Plattform nicht eingerichtet hat.
+  { k: "faceit_handle", l: "FACEIT", icon: Crosshair, hosts: ["faceit.com"], skip: ["en", "de", "players"], url: (h) => `https://www.faceit.com/en/players/${h}`, placeholder: "Nickname oder Adresse", handle: true },
+  { k: "startgg_handle", l: "start.gg", icon: Trophy, placeholder: "Gamertag", handle: true },
+  { k: "roblox_handle", l: "Roblox", icon: Box, placeholder: "Nutzername", handle: true },
+  { k: "osu_handle", l: "osu!", icon: CircleDot, placeholder: "Nutzername", handle: true },
+  { k: "lichess_handle", l: "Lichess", icon: Castle, hosts: ["lichess.org"], skip: ["@"], url: (h) => `https://lichess.org/@/${h}`, placeholder: "Nutzername oder Adresse", handle: true },
+  { k: "github_handle", l: "GitHub", icon: Github, hosts: ["github.com"], url: (h) => `https://github.com/${h}`, placeholder: "Login oder Adresse", handle: true },
+  { k: "kick_handle", l: "Kick", icon: Radio, hosts: ["kick.com"], url: (h) => `https://kick.com/${h}`, placeholder: "Kanalname oder Adresse", handle: true },
+  { k: "reddit_handle", l: "Reddit", icon: MessageCircle, hosts: ["reddit.com"], skip: ["user", "u"], url: (h) => `https://www.reddit.com/user/${h}`, placeholder: "u/nutzername oder Adresse", handle: true },
+  { k: "spotify_handle", l: "Spotify", icon: Music2, placeholder: "Anzeigename", handle: true },
   { k: "website", l: "Website", icon: Globe, placeholder: "https://…", website: true },
 ];
 
