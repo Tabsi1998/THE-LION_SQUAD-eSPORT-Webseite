@@ -480,7 +480,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
 | Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; umgesetzt in #386 (Block 42), im Build 73 vom 23.09. |
-| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
+| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen – PR #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
 | Admin sauber I: ein Ort je Thema | Rundgang 25.09.: #508 (#523), #509 (#522), #511 (#524), #513/#514 (#519), #515 (#520) – Block 48.15; #510 Dolibarr-Schalter (#539), #516 Nutzermenü (#540), #512 Adminmenü (#543) – Block 51.7; #546 Einstellungen in die Menüleiste + Alle Verbindungen – umgesetzt in #549 (Block 51.10) – der Meilenstein ist durch |
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518, Block 48.15), #507 Antrag für bestehendes Konto (#526), #506 Konto im Admin verknüpfen (#544, Block 51.8) – der Meilenstein ist durch |
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – umgesetzt in #550 (Block 51.10); #517 geschlossen – der Meilenstein ist durch (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
@@ -782,7 +782,8 @@ zweites Menü, „Verbindungen weg“) und der Wunsch nach allen Plattformen mit
 Bis in die Nacht kamen dazu und wurden gemergt: #548 (Google), #549 (Menü), #550 (Betrieb &
 Logs), #552 (Plattformen Welle 1), #553 (Upload-Inventar), #554/#555 (#223 Teile 1 und 2);
 Welle 2 der Plattformen als PR #556, darauf #559 (#558 Haken je Plattform) und #561 (Welle 3
-Mastodon/Bluesky); dazu #560 (#415 Rest: Prüffälle verbergen) und #562 (#223 Rest: Einstellungen-Seite).
+Mastodon/Bluesky); dazu #560 (#415 Rest: Prüffälle verbergen), #562 (#223 Rest: Einstellungen-Seite) und #563 (#309 GitHub-Releases von selbst,
+Beta/Release-Plakette mit Rückfrage in der App).
 
 ### Was 51.1 gefunden hat (#437 Variante A – PR #530)
 

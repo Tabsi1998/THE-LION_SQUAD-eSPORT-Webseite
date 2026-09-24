@@ -2530,7 +2530,9 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   Unabhängig davon: #560 (#415 Rest: Prüffälle bei Avatar/Banner/Teamlogo in Quarantäne, die
   Adresse liefert einen Platzhalter „Bild wird geprüft“ ohne Cache, nginx `X-TLS-Placeholder`;
   ready), #562 (#223 Rest: `AdminSettingsPage` → `settings/sections/*Section.jsx` +
-  `settings/shared.js`; ready nach dem Check). Offen danach: #239 (natives Modul), App 1.0.0-Rest
+  `settings/shared.js`; ready), #563 (#309 GitHub-Releases von selbst: Token nur lesend,
+  Prüfsumme gegen die .sha256-Datei, Beta/Release-Kanal, Plakette und Rückfrage in der App; ready
+  nach dem Check, App-Build). Offen danach: #239 (natives Modul), App 1.0.0-Rest
   (#412 wartet auf Google, #219 Store-Eintrag), Später-Issues; dann Doku-Stand nach diesen Merges
   (§5-Einträge für #556–#562). Frage an den Betreiber (24.09. abends, offen): welche
   Verbindungen nach dem Server-Update fehlten und ob `.env`/Datenbank zurückgespielt wurden –
@@ -2802,7 +2804,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
 | App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. Offen in #219: Google-Signaturschlüssel in assetlinks/Passkeys eintragen, Store-Eintrag, geschlossener Test, 1.0.0 |
-| Spaeter | #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
+| Spaeter | #309 GitHub-Releases automatisch abgleichen – PR #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 | Web: Design II | #401 Turnierseite (eine Hauptaktion je Phase, „Dein Stand“, Termine einmal, Reiter) – umgesetzt in #532; der Meilenstein ist durch |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | #437 Variante A (Entscheidung des Betreibers 24.09.): totes Web-CMS entfernt, E-Mail-Vorlagen als Seite – umgesetzt in #530; der Meilenstein ist durch |
 | Admin sauber I: ein Ort je Thema | #508 (#523), #509 (#522), #510 Dolibarr-Schalter (#539), #511 FAQ (#524), #512 Adminmenü (#543), #513/#514 (#519), #515 (#520), #516 Nutzermenü (#540) – umgesetzt; #546 Einstellungen in die Menüleiste + Übersicht aller Verbindungen – umgesetzt in #549; Meilenstein geschlossen |
@@ -2853,7 +2855,8 @@ sinnvoll hältst“):
     Google-Prüfung (#548), #546 Einstellungen ins Menü (#549), #517 Teil 2 (#550), #547 Welle 1
     (#552), #537 Upload-Inventar (#553), #223 Teile 1 und 2 (#554, #555) – alle gemergt; die
     Meilensteine „Admin sauber I“, „Mitglieder sauber“ und „Betrieb & Logs“ sind geschlossen.
-    Offen: die PRs #556/#559/#561 (Plattformen, gestapelt), #560 (#415 Rest), #562 (#223 Rest); dann
+    Offen: die PRs #556/#559/#561 (Plattformen, gestapelt), #560 (#415 Rest), #562 (#223 Rest), #563
+    (#309 GitHub-Releases); dann
     #239 und die Später-Issues.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
