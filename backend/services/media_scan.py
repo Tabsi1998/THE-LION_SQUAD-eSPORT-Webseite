@@ -2,7 +2,8 @@
 
 Jedes neue Bild (Chat-Anhang, Profil-/Team-/Galerie-Upload) bekommt einen Eintrag `media_scans` und
 wird im Hintergrund geprüft: `safe` → nichts; `review` → ein Chat-Bild bleibt verborgen, bis ein
-Mensch freigibt (öffentliche Uploads bleiben sichtbar, die Moderation sieht sie in der Warteschlange);
+Mensch freigibt; ein öffentlicher Upload (Avatar, Banner, Teamlogo) geht in die Quarantäne, seine Adresse
+liefert bis zur Entscheidung einen Platzhalter „Bild wird geprüft“ (nicht cachebar), die Verweise bleiben;
 `blocked` → das Bild geht sofort in die Quarantäne, Verweise (Avatar, Banner, Teamlogo) werden
 gelöscht, die Person bekommt einen Treffer für die Verwarnungsstufen (#416) und eine Nachricht.
 Der Anbieter ist ein Schalter: `local` (NudeNet, ONNX im Backend - kein Bild verlässt den Server),
@@ -40,6 +41,9 @@ MAX_ATTEMPTS = 3
 LOCK_SECONDS = 90
 GOOGLE_VISION_URL = "https://vision.googleapis.com/v1/images:annotate"
 PREVIEW_URL = "/api/moderation/media-scan/{id}/preview"
+# Platzhalter statt Bild (#415): was die Adresse eines Uploads liefert, solange er in der Quarantäne liegt.
+PLACEHOLDER_TEXT = {"review": "Bild wird geprüft", "blocked": "Bild entfernt - Moderation"}
+_placeholders: dict[str, bytes] = {}
 STANDING_URL = "/my/penalties"
 
 # Tests hängen hier einen MockTransport (Google Vision) ein und füllen `fake_results`; ohne Ergebnis
@@ -345,7 +349,10 @@ async def _finish(db, doc: dict, state: str, *, error: str | None = None, actor:
         "error": error, "scanned_at": doc.get("scanned_at") or now, "updated_at": now, "lock_until": None,
         "decided_by": actor, "decided_at": now, "note": (note or "").strip() or None,
     }
-    if state == "blocked" and not doc.get("quarantine_key"):
+    # Entfernt: immer in die Quarantäne. Prüfung nötig: ein öffentlicher Upload auch - nginx liefert die Datei
+    # sonst direkt von der Platte, und ein unsicheres Avatar wäre bis zur Entscheidung für alle sichtbar (#415).
+    hide = state == "blocked" or (state == "review" and doc.get("kind") == "upload")
+    if hide and not doc.get("quarantine_key"):
         updates["quarantine_key"] = await asyncio.to_thread(_quarantine, doc)
     await db.media_scans.update_one({"id": doc["id"]}, {"$set": updates})
     finished = {**doc, **updates}
@@ -388,6 +395,41 @@ def _restore(doc: dict) -> bool:
     ensure_directory(target.parent)
     shutil.move(str(source), str(target))
     return True
+
+
+def placeholder_png(state: str) -> bytes:
+    """Ein PNG mit dem Satz, warum hier kein Bild ist - einmal gebaut, dann aus dem Speicher (auch die App
+    zeigt es, denn sie kann kein SVG)."""
+    text = PLACEHOLDER_TEXT.get(state) or PLACEHOLDER_TEXT["review"]
+    cached = _placeholders.get(text)
+    if cached:
+        return cached
+    import io
+    from PIL import Image, ImageDraw, ImageFont
+
+    image = Image.new("RGB", (640, 400), (18, 18, 18))
+    draw = ImageDraw.Draw(image)
+    try:
+        font = ImageFont.load_default(size=30)
+    except TypeError:   # ältere Pillow: nur die kleine Bitmap-Schrift
+        font = ImageFont.load_default()
+    draw.rectangle((16, 16, 623, 383), outline=(41, 182, 232), width=3)
+    box = draw.textbbox((0, 0), text, font=font)
+    draw.text(((640 - (box[2] - box[0])) / 2, (400 - (box[3] - box[1])) / 2), text, fill=(235, 235, 235), font=font)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG", optimize=True)
+    _placeholders[text] = buffer.getvalue()
+    return _placeholders[text]
+
+
+async def placeholder_for(db, url: str) -> bytes | None:
+    """Liegt das Bild hinter dieser Adresse in der Quarantäne (Prüfung nötig oder entfernt), der passende
+    Platzhalter - sonst None, dann gilt 404 wie bisher."""
+    doc = await db.media_scans.find_one({"url": url, "kind": "upload", "state": {"$in": ["review", "blocked"]}},
+                                        {"_id": 0, "state": 1}, sort=[("created_at", -1)])
+    if not doc:
+        return None
+    return placeholder_png(doc["state"])
 
 
 def preview_path(doc: dict) -> Path | None:
@@ -553,7 +595,8 @@ async def purge_quarantine(db, *, now=None) -> int:
     """Entfernte Originale nach der Aufbewahrungsfrist endgültig löschen; der Eintrag bleibt als Verlauf."""
     settings = await load_settings(db)
     cutoff = ((now or now_utc()) - timedelta(days=settings["retention_days"])).isoformat()
-    rows = await db.media_scans.find({"quarantine_key": {"$ne": None}, "decided_at": {"$lt": cutoff}}, {"_id": 0, "id": 1, "quarantine_key": 1}).to_list(500)
+    # Nur Entferntes verfällt - ein Prüffall wartet auf einen Menschen, sein Original bleibt.
+    rows = await db.media_scans.find({"state": "blocked", "quarantine_key": {"$ne": None}, "decided_at": {"$lt": cutoff}}, {"_id": 0, "id": 1, "quarantine_key": 1}).to_list(500)
     removed = 0
     for row in rows:
         path = QUARANTINE_DIR / row["quarantine_key"]

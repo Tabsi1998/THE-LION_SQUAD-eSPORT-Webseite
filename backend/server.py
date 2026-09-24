@@ -9,7 +9,7 @@ import logging
 import time
 from urllib.parse import urlparse
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, FileResponse, Response, StreamingResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
@@ -347,6 +347,13 @@ async def public_upload(filename: str, request: Request, w: int | None = None):
                 })
                 return StreamingResponse(_iter_file_range(path, start, end), status_code=206, media_type=media_type, headers=headers)
             return FileResponse(path, media_type=media_type, headers=headers)
+    # Bildprüfung (#415): liegt das Bild in der Quarantäne (Prüfung nötig oder entfernt), sagt es ein Platzhalter
+    # statt 404 - ohne Cache, damit ein freigegebenes Bild sofort wieder erscheint (nginx: X-TLS-Placeholder).
+    from services.media_scan import placeholder_for
+    placeholder = await placeholder_for(get_db(), f"/api/static/uploads/{filename}")
+    if placeholder:
+        return Response(placeholder, media_type="image/png",
+                        headers={"Cache-Control": "no-store", "X-TLS-Placeholder": "1", "X-Content-Type-Options": "nosniff"})
     raise HTTPException(status_code=404, detail="File not found")
 
 

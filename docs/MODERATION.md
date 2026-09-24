@@ -24,7 +24,10 @@ zählt der höhere Wert aus Nacktheit und Gewalt):
 - `safe` – nichts passiert.
 - `review` – ein **Chat-Bild** bleibt für alle außer dem Absender und der Moderation verborgen
   („Bild wird geprüft“), bis ein Mensch entscheidet. Ein **öffentlicher Upload** (Avatar, Banner,
-  Teamlogo) bleibt sichtbar, steht aber in der Warteschlange – die Moderation kann ihn entfernen.
+  Teamlogo) geht in die Quarantäne; seine Adresse liefert bis zur Entscheidung einen Platzhalter
+  „Bild wird geprüft“ (für alle, auch für die Person selbst), die Verweise bleiben. Freigeben holt
+  das Bild zurück, Entfernen leert die Verweise wie bei `blocked`. Der Platzhalter ist nicht
+  cachebar (nginx `X-TLS-Placeholder`), ein freigegebenes Bild erscheint sofort wieder.
 - `blocked` – das Bild geht sofort in die **Quarantäne** (`uploads/quarantine`, nur die Moderation
   sieht es), Verweise darauf werden geleert (Avatar, Banner, Teamlogo), im Chat steht „Bild entfernt
   – Moderation“, die Person bekommt eine Nachricht und – wenn eingeschaltet – einen **Treffer** für
