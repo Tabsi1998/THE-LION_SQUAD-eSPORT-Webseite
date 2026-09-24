@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from match_rules import participant_source_ids
-from services.competition_snapshot import adapt_legacy_matches, adapt_stage_matches
+from services.competition_snapshot import adapt_stage_matches
 from services.user_notifications import create_user_notification
 
 
@@ -31,8 +31,7 @@ async def _participant_user_ids(db, registrations: list[dict]) -> set[str]:
 
 
 def _canonical_match(match: dict, collection_name: str) -> dict:
-    adapter = adapt_stage_matches if collection_name == "matches_v2" or match.get("slots") else adapt_legacy_matches
-    return adapter([match])[0]
+    return adapt_stage_matches([match])[0]
 
 
 def _rank_sort_key(result: dict) -> tuple[int, str]:
@@ -87,7 +86,7 @@ def _result_summary(match: dict, regs_by_id: dict[str, dict]) -> str:
     return _ranking_result_summary(match, regs_by_id)
 
 
-async def notify_match_result_confirmed(db, match: dict, collection_name: str = "matches", force: bool = False) -> int:
+async def notify_match_result_confirmed(db, match: dict, collection_name: str = "matches_v2", force: bool = False) -> int:
     """Create in-app notifications for all users involved in a confirmed match result."""
     source_match = match
     match = _canonical_match(source_match, collection_name)

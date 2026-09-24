@@ -69,13 +69,14 @@ class FakeDb:
             {"id": "r-own", "user_id": "u1", "status": "approved", "tournament_id": "t1", "display_name": "Lion"},
             {"id": "r-other", "user_id": "u2", "status": "approved", "tournament_id": "t1", "display_name": "Opponent"},
         ])
-        self.matches = FakeCollection([
-            {"id": "m-scheduled", "tournament_id": "t1", "status": "scheduled", "scheduled_at": "2026-08-06T12:00:00+00:00", "participant_a_id": "r-own", "participant_b_id": "r-other", "round": 1},
-            {"id": "m-live", "tournament_id": "t1", "status": "in_progress", "scheduled_at": "2026-08-06T13:00:00+00:00", "participant_a_id": "r-own", "participant_b_id": "r-other", "round": 2},
-            {"id": "m-done", "tournament_id": "t1", "status": "completed", "participant_a_id": "r-own", "participant_b_id": "r-other"},
-            {"id": "m-unrelated", "tournament_id": "t1", "status": "in_progress", "participant_a_id": "r-other", "participant_b_id": "r-x"},
+        # Seit #231 liegt alles im Graph-Speicher; der alte bleibt in der Fake-DB leer.
+        self.matches = FakeCollection()
+        self.matches_v2 = FakeCollection([
+            {"id": "m-scheduled", "tournament_id": "t1", "stage_id": "s1", "match_key": "m-scheduled", "status": "scheduled", "scheduled_at": "2026-08-06T12:00:00+00:00", "slots": [{"slot": 1, "registration_id": "r-own", "status": "filled"}, {"slot": 2, "registration_id": "r-other", "status": "filled"}], "results": [], "advancement": []},
+            {"id": "m-live", "tournament_id": "t1", "stage_id": "s1", "match_key": "m-live", "status": "in_progress", "scheduled_at": "2026-08-06T13:00:00+00:00", "slots": [{"slot": 1, "registration_id": "r-own", "status": "filled"}, {"slot": 2, "registration_id": "r-other", "status": "filled"}], "results": [], "advancement": []},
+            {"id": "m-done", "tournament_id": "t1", "stage_id": "s1", "match_key": "m-done", "status": "completed", "slots": [{"slot": 1, "registration_id": "r-own", "status": "filled"}, {"slot": 2, "registration_id": "r-other", "status": "filled"}], "results": [], "advancement": []},
+            {"id": "m-unrelated", "tournament_id": "t1", "stage_id": "s1", "match_key": "m-unrelated", "status": "in_progress", "slots": [{"slot": 1, "registration_id": "r-other", "status": "filled"}, {"slot": 2, "registration_id": "r-x", "status": "filled"}], "results": [], "advancement": []},
         ])
-        self.matches_v2 = FakeCollection()
         self.tournaments = FakeCollection([{"id": "t1", "title": "Cup", "slug": "cup", "status": "live"}])
         self.teams = FakeCollection()
         self.stations = FakeCollection()

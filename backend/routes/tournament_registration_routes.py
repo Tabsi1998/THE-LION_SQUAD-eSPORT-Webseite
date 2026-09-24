@@ -144,7 +144,7 @@ async def _refresh_stage_previews_after_registration(db, tournament: dict, actor
 
     for stage in stages:
         existing_matches = await db.matches_v2.find({"stage_id": stage["id"]}, {"_id": 0}).to_list(3000)
-        match_plan = _collect_match_plan([], existing_matches)
+        match_plan = _collect_match_plan(existing_matches)
         if existing_matches and not all(match.get("is_preview") for match in existing_matches):
             continue
         if not existing_matches and not registrations:
@@ -208,10 +208,6 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
     stage_count = await db.tournament_stages.count_documents({"tournament_id": tid})
     if stage_count:
         stage_update = await _refresh_stage_previews_after_registration(db, tournament, actor_id)
-        if stage_update:
-            legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-            if legacy_matches and all(match.get("is_preview") for match in legacy_matches):
-                await db.matches.delete_many({"tournament_id": tid})
         return stage_update
 
     return await _create_initial_stage_bracket_preview(db, tournament, actor_id)
@@ -220,16 +216,12 @@ async def _refresh_tournament_previews_after_registration(db, tournament: dict, 
 async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, new_reg: dict,
                                                 actor_id: str | None) -> dict:
     new_reg_id = new_reg["id"]
-    legacy_matches = await db.matches.find({
-        "tournament_id": tid,
-        "$or": [{"participant_a_id": old_reg_id}, {"participant_b_id": old_reg_id}],
-    }, {"_id": 0}).to_list(1000)
     v2_matches = await db.matches_v2.find({
         "tournament_id": tid,
         "slots.registration_id": old_reg_id,
     }, {"_id": 0}).to_list(1000)
     blocked = [
-        m.get("id") for m in [*legacy_matches, *v2_matches]
+        m.get("id") for m in v2_matches
         if m.get("status") in {"completed", "forfeit"}
     ]
     if blocked:
@@ -239,24 +231,6 @@ async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, n
         )
 
     now = now_utc().isoformat()
-    legacy_count = 0
-    for match in legacy_matches:
-        update = {"updated_at": now}
-        if match.get("participant_a_id") == old_reg_id:
-            update["participant_a_id"] = new_reg_id
-        if match.get("participant_b_id") == old_reg_id:
-            update["participant_b_id"] = new_reg_id
-        if match.get("winner_id") == old_reg_id:
-            update["winner_id"] = None
-        if match.get("loser_id") == old_reg_id:
-            update["loser_id"] = None
-        next_a = update.get("participant_a_id", match.get("participant_a_id"))
-        next_b = update.get("participant_b_id", match.get("participant_b_id"))
-        if next_a and next_b and match.get("status") in {"pending", "preview"}:
-            update["status"] = "ready"
-        await db.matches.update_one({"id": match["id"]}, {"$set": update})
-        legacy_count += 1
-
     v2_count = 0
     for match in v2_matches:
         slots = []
@@ -285,9 +259,9 @@ async def _replace_registration_in_open_matches(db, tid: str, old_reg_id: str, n
         "tournament.registration.replace_slots",
         actor_id,
         tid,
-        {"old_registration_id": old_reg_id, "new_registration_id": new_reg_id, "legacy_matches": legacy_count, "v2_matches": v2_count},
+        {"old_registration_id": old_reg_id, "new_registration_id": new_reg_id, "v2_matches": v2_count},
     )
-    return {"legacy_matches": legacy_count, "v2_matches": v2_count}
+    return {"v2_matches": v2_count}
 
 
 async def _apply_late_checkin_hooks(db, tid: str, user_id: str) -> None:
@@ -585,17 +559,12 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         old = await db.tournament_registrations.find_one({"id": old_reg_id, "tournament_id": tid}, {"_id": 0})
         if not old:
             raise HTTPException(status_code=404, detail="Zu ersetzende Anmeldung nicht gefunden")
-        legacy_blocked = await db.matches.count_documents({
-            "tournament_id": tid,
-            "status": {"$in": ["completed", "forfeit"]},
-            "$or": [{"participant_a_id": old_reg_id}, {"participant_b_id": old_reg_id}],
-        })
         v2_blocked = await db.matches_v2.count_documents({
             "tournament_id": tid,
             "status": {"$in": ["completed", "forfeit"]},
             "slots.registration_id": old_reg_id,
         })
-        if legacy_blocked or v2_blocked:
+        if v2_blocked:
             raise HTTPException(
                 status_code=409,
                 detail="Teilnehmer kommt bereits in abgeschlossenen Matches vor. Erst Bracket korrigieren oder neu generieren.",
@@ -761,15 +730,11 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
         raise HTTPException(status_code=403)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if is_staff and (tournament or {}).get("status") == "check_in":
-        legacy_slots = await db.matches.count_documents({
-            "tournament_id": tid,
-            "$or": [{"participant_a_id": reg_id}, {"participant_b_id": reg_id}],
-        })
         v2_slots = await db.matches_v2.count_documents({
             "tournament_id": tid,
             "slots.registration_id": reg_id,
         })
-        if legacy_slots or v2_slots:
+        if v2_slots:
             raise HTTPException(
                 status_code=409,
                 detail="Nach Check-in-Start bleibt der Turnierbaum fix. Teilnehmer als 'Nicht erschienen' markieren und per Ersatzspieler ersetzen.",
@@ -777,17 +742,12 @@ async def delete_registration(tid: str, reg_id: str, me: dict = Depends(get_curr
     if (is_own_registration or is_team_manager) and not is_staff:
         if reg.get("status") == "checked_in" or (tournament or {}).get("status") in {"live", "paused", "completed", "results_published", "archived"}:
             raise HTTPException(status_code=409, detail="Abmeldung ist nach Check-in oder Turnierstart nur über die Turnierleitung möglich.")
-        legacy_blocked = await db.matches.count_documents({
-            "tournament_id": tid,
-            "$or": [{"participant_a_id": reg_id}, {"participant_b_id": reg_id}],
-            "status": {"$nin": ["preview", "pending", "ready", "scheduled", "cancelled"]},
-        })
         v2_blocked = await db.matches_v2.count_documents({
             "tournament_id": tid,
             "slots.registration_id": reg_id,
             "status": {"$nin": ["preview", "pending", "ready", "scheduled", "cancelled"]},
         })
-        if legacy_blocked or v2_blocked:
+        if v2_blocked:
             raise HTTPException(status_code=409, detail="Abmeldung ist nicht mehr möglich, weil bereits Spiele aktiv oder gewertet sind.")
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})

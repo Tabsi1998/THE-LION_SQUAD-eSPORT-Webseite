@@ -49,6 +49,7 @@ os.environ.setdefault("FRONTEND_URL", "http://localhost:3000")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:3000")
 
 from services.competition_read import load_competition_read_model  # noqa: E402
+from services.competition_snapshot import build_structure_snapshot  # noqa: E402
 from services.migration_dryrun import (  # noqa: E402
     census_verdict,
     compare_reports,
@@ -107,8 +108,11 @@ async def collect(db, *, limit: int | None, only: str | None) -> list[dict]:
         tid = tournament.get("id")
         if not tid:
             continue
+        # Die Anwendung liest den alten Speicher nicht mehr (#231); der Trockenlauf tut es absichtlich weiter,
+        # denn er ist das Werkzeug, das nachweist, dass dort nichts mehr liegt.
+        legacy = await db.matches.find({"tournament_id": tid}, {"_id": 0}).sort([("round", 1), ("match_index", 1)]).to_list(3000)
         read_model = await load_competition_read_model(db, tid)
-        snapshot = read_model.structure_snapshot()
+        snapshot = build_structure_snapshot(tid, legacy_matches=legacy, stage_matches=read_model.stage_matches, stages=read_model.stages)
         registrations = await db.tournament_registrations.find(
             {"tournament_id": tid}, {"_id": 0}).to_list(1000)
         groups = []

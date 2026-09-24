@@ -76,18 +76,16 @@ def _db():
     )
 
 
-def test_forfeit_penalties_normalize_legacy_and_stage_results():
+def test_forfeit_penalties_come_from_the_graph_store_only():
     penalties = asyncio.run(load_forfeit_penalties(_db(), {"r2"}))
 
-    assert [item["match_id"] for item in penalties] == ["stage-forfeit", "legacy-forfeit"]
+    assert [item["match_id"] for item in penalties] == ["stage-forfeit"], "der klassische Speicher wird nicht mehr gelesen (#231)"
     assert penalties[0]["reason"] == "Stage no-show"
     assert penalties[0]["issued_by"] == "admin-2"
     assert penalties[0]["source"] == {"engine": "stage", "collection": "matches_v2"}
-    assert penalties[1]["reason"] == "Legacy no-show"
-    assert penalties[1]["source"] == {"engine": "legacy", "collection": "matches"}
 
 
 def test_forfeit_penalties_filter_the_exact_forfeiting_result():
     assert asyncio.run(load_forfeit_penalties(_db(), {"r1"})) == []
     assert asyncio.run(load_forfeit_penalties(_db(), [])) == []
-    assert len(asyncio.run(load_forfeit_penalties(_db()))) == 2
+    assert len(asyncio.run(load_forfeit_penalties(_db()))) == 1

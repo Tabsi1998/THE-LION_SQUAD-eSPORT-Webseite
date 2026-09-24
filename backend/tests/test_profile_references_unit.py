@@ -90,7 +90,8 @@ class FakeDb:
             setattr(self, name, FakeCollection(collections.get(name, [])))
 
 
-def test_tournament_reference_backfills_rank_from_final_placement(monkeypatch):
+def test_tournament_reference_backfills_rank_from_graph_results(monkeypatch):
+    """Seit #231 gibt es nur noch den Graph-Speicher: der Rang kommt aus den Ergebnissen, nicht mehr aus final_position."""
     db = FakeDb(
         tournaments=[
             {
@@ -106,12 +107,22 @@ def test_tournament_reference_backfills_rank_from_final_placement(monkeypatch):
             {"id": "reg-1", "tournament_id": "tour-1", "user_id": "user-1", "status": "approved"},
             {"id": "reg-2", "tournament_id": "tour-1", "user_id": "user-2", "status": "approved"},
         ],
-        matches=[
+        matches_v2=[
             {
+                "id": "final",
                 "tournament_id": "tour-1",
-                "winner_id": "reg-1",
-                "final_position": 2,
+                "stage_id": "s1",
+                "match_key": "F",
                 "status": "completed",
+                "slots": [
+                    {"slot": 1, "registration_id": "reg-2", "status": "filled"},
+                    {"slot": 2, "registration_id": "reg-1", "status": "filled"},
+                ],
+                "results": [
+                    {"registration_id": "reg-2", "rank": 1},
+                    {"registration_id": "reg-1", "rank": 2},
+                ],
+                "advancement": [],
             }
         ],
     )

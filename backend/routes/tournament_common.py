@@ -14,7 +14,7 @@ from services.visibility import user_can_see
 from services.station_labels import attach_station_info
 from services.tournament_permissions import READ_STAFF_ROLES, has_tournament_staff_permission
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
-from services.competition_engine import CLASSIC, GRAPH, preferred_engine
+from services.competition_engine import GRAPH, preferred_engine
 from services.competition_formats import find_format_capability
 from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
@@ -107,14 +107,6 @@ def _can_create_initial_stage_preview(tournament: dict) -> bool:
     return 0 < _estimated_match_count(tournament) <= MAX_INITIAL_PREVIEW_MATCHES
 
 
-def _legacy_plan_key(match: dict) -> tuple:
-    return (
-        "legacy",
-        match.get("bracket") or "",
-        int(match.get("round") or 0),
-        int(match.get("match_index") if match.get("match_index") is not None else match.get("order") or match.get("position") or 0),
-    )
-
 
 def _v2_plan_key(match: dict) -> tuple:
     return (
@@ -127,12 +119,8 @@ def _v2_plan_key(match: dict) -> tuple:
     )
 
 
-def _collect_match_plan(legacy_matches: list[dict] | None = None, v2_matches: list[dict] | None = None) -> dict[tuple, dict]:
+def _collect_match_plan(v2_matches: list[dict] | None = None) -> dict[tuple, dict]:
     plan: dict[tuple, dict] = {}
-    for match in legacy_matches or []:
-        fields = {field: match.get(field) for field in MATCH_PLAN_FIELDS if match.get(field) is not None}
-        if fields:
-            plan[_legacy_plan_key(match)] = fields
     for match in v2_matches or []:
         fields = {field: match.get(field) for field in MATCH_PLAN_FIELDS if match.get(field) is not None}
         if fields:
@@ -221,13 +209,9 @@ def _match_has_minimum_players(match: dict, allow_preview: bool = True) -> bool:
 
 async def _collect_plan_matches(db, tid: str) -> tuple[list[dict], dict]:
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0}) or {}
-    legacy = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    v2 = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    for match in legacy:
-        match["_collection"] = "matches"
-    for match in v2:
+    matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
+    for match in matches:
         match["_collection"] = "matches_v2"
-    matches = legacy + v2
     await attach_station_info(db, matches)
     return sorted(matches, key=_plan_match_sort), tournament
 
@@ -606,18 +590,6 @@ async def _create_initial_stage_bracket_preview(db, tournament: dict, actor_id: 
     }
 
 
-def _legacy_match_can_be_rebuilt(match: dict) -> bool:
-    status = match.get("status") or "pending"
-    if match.get("is_preview") or status in {"pending", "ready", "scheduled", "cancelled"}:
-        return True
-    if status == "completed":
-        a_id = match.get("participant_a_id")
-        b_id = match.get("participant_b_id")
-        winner_id = match.get("winner_id")
-        if bool(a_id) != bool(b_id) and winner_id in {a_id, b_id}:
-            return True
-    return False
-
 
 def _v2_match_can_be_rebuilt(match: dict) -> bool:
     status = match.get("status") or "pending"
@@ -638,18 +610,16 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
     if len(registrations) < 2:
         return None
 
-    legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    match_plan = _collect_match_plan(legacy_matches, v2_matches)
-    locked_legacy = [m.get("id") for m in legacy_matches if not _legacy_match_can_be_rebuilt(m)]
+    match_plan = _collect_match_plan(v2_matches)
     locked_v2 = [m.get("id") for m in v2_matches if not _v2_match_can_be_rebuilt(m)]
-    if locked_legacy or locked_v2:
+    if locked_v2:
         return {
             "ok": False,
             "reason": "matches_started",
             "preview": False,
             "participant_count": len(registrations),
-            "locked_match_count": len(locked_legacy) + len(locked_v2),
+            "locked_match_count": len(locked_v2),
         }
 
     stages = await db.tournament_stages.find(
@@ -657,8 +627,6 @@ async def _rebuild_checkin_bracket_after_staff_change(db, tournament: dict, acto
         {"_id": 0},
     ).sort("number", 1).to_list(200)
     if stages:
-        if legacy_matches:
-            await db.matches.delete_many({"tournament_id": tid})
         if v2_matches:
             match_ids = [match["id"] for match in v2_matches if match.get("id")]
             if match_ids:
@@ -751,13 +719,10 @@ async def _competition_engine(db, tid: str, tournament: dict | None = None) -> s
     round will be written into.
 
     Only a tournament that has nothing yet follows its format, and every format
-    now points at the graph. That is what stops the classic store from filling
-    up again while it is being retired.
+    now points at the graph. The classic store is no longer read at all (#231).
     """
     if await db.tournament_stages.count_documents({"tournament_id": tid}):
         return GRAPH
     if await db.matches_v2.count_documents({"tournament_id": tid}):
         return GRAPH
-    if await db.matches.count_documents({"tournament_id": tid}):
-        return CLASSIC
     return preferred_engine((tournament or {}).get("format"))

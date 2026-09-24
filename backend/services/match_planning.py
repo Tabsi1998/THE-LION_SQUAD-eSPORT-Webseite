@@ -52,16 +52,10 @@ async def ensure_station_slot_available(db, current_match: dict, updates: dict, 
     tournament_id = current_match["tournament_id"]
     current_id = current_match["id"]
     queries = [
-        ("matches", {
-            "tournament_id": tournament_id,
-            "station_id": station_id,
-            "id": {"$ne": current_id if collection_name == "matches" else "__none__"},
-            "status": {"$in": list(ACTIVE_PLANNING_STATUSES)},
-        }),
         ("matches_v2", {
             "tournament_id": tournament_id,
             "station_id": station_id,
-            "id": {"$ne": current_id if collection_name == "matches_v2" else "__none__"},
+            "id": {"$ne": current_id},
             "status": {"$in": list(ACTIVE_PLANNING_STATUSES)},
         }),
     ]

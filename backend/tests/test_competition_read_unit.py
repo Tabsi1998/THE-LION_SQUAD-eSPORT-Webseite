@@ -101,13 +101,14 @@ class FakeDb:
         }])
 
 
-def test_read_model_loads_both_stores_into_one_snapshot():
+def test_read_model_loads_only_the_graph_store_into_the_snapshot():
+    """Der klassische Speicher liegt in der Fake-DB noch voll - gelesen wird er nicht mehr (#231)."""
     model = asyncio.run(load_competition_read_model(FakeDb(), "t1"))
     snapshot = model.structure_snapshot()
 
-    assert [match["id"] for match in snapshot["matches"]] == ["legacy-1", "stage-1"]
-    assert snapshot["source_engines"] == ["legacy", "stage"]
-    assert snapshot["mixed_source"] is True
+    assert [match["id"] for match in snapshot["matches"]] == ["stage-1"]
+    assert snapshot["source_engines"] == ["stage"]
+    assert snapshot["mixed_source"] is False
 
 
 def test_match_source_prefers_stage_and_canonical_detail_keeps_collection():
@@ -130,23 +131,23 @@ def test_structure_read_observation_emits_bounded_metrics(caplog):
 
     metrics = observe_structure_read(model.structure_snapshot(), surface="unit")
 
-    assert metrics["match_count"] == 2
-    assert metrics["source_counts"] == {"legacy": 1, "stage": 1}
+    assert metrics["match_count"] == 1
+    assert metrics["source_counts"] == {"stage": 1}
     assert metrics["integrity_issue_count"] == 0
     assert "surface=unit" in caplog.text
 
 
-def test_registration_read_and_status_counts_cover_both_stores():
+def test_registration_read_and_status_counts_cover_the_graph_store():
     db = FakeDb()
 
     matches = asyncio.run(load_registration_matches(db, {"r1"}))
 
-    assert {match["id"] for match in matches} == {"legacy-1", "stage-1"}
-    assert asyncio.run(count_matches_by_status(db, {"ready", "pending"})) == 2
+    assert {match["id"] for match in matches} == {"stage-1"}
+    assert asyncio.run(count_matches_by_status(db, {"ready", "pending"})) == 1
     assert asyncio.run(count_matches_by_status(db, {"disputed"})) == 0
 
 
-def test_scheduled_match_read_covers_both_stores_and_sorts_canonically():
+def test_scheduled_match_read_sorts_canonically():
     matches = asyncio.run(load_scheduled_matches(
         FakeDb(),
         scheduled_from="2026-08-17T10:00:00+00:00",
@@ -154,14 +155,14 @@ def test_scheduled_match_read_covers_both_stores_and_sorts_canonically():
         statuses={"pending", "ready"},
     ))
 
-    assert [match["id"] for match in matches] == ["stage-1", "legacy-1"]
-    assert [match["collection"] for match in matches] == ["matches_v2", "matches"]
+    assert [match["id"] for match in matches] == ["stage-1"]
+    assert [match["collection"] for match in matches] == ["matches_v2"]
 
 
-def test_compatible_query_read_is_centralized_for_both_stores():
+def test_compatible_query_read_is_centralized():
     matches = asyncio.run(load_matches_by_query(
         FakeDb(),
         {"tournament_id": "t1", "status": {"$in": ["pending", "ready"]}},
     ))
 
-    assert {match["id"] for match in matches} == {"legacy-1", "stage-1"}
+    assert {match["id"] for match in matches} == {"stage-1"}

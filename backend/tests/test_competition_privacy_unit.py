@@ -2,7 +2,6 @@ import asyncio
 
 from services.competition_privacy import (
     anonymize_registration_match_references,
-    anonymized_legacy_match,
     anonymized_stage_match,
     registration_match_snapshot,
 )
@@ -63,14 +62,8 @@ class FakeDb:
 
 
 def test_privacy_projection_preserves_terminal_history_and_anonymizes_open_stage():
-    legacy = anonymized_legacy_match(LEGACY, {"r-delete"}, "now")
     stage = anonymized_stage_match(STAGE, {"r-delete"}, "now")
 
-    assert legacy == {
-        "participant_a_id": None,
-        "winner_id": None,
-        "updated_at": "now",
-    }
     assert stage["status"] == "waiting_result"
     assert stage["slots"][0]["registration_id"] is None
     assert stage["slots"][0]["user_id"] is None
@@ -80,7 +73,8 @@ def test_privacy_projection_preserves_terminal_history_and_anonymizes_open_stage
     assert stage["results"][0]["note"] is None
 
 
-def test_registration_export_and_database_anonymization_cover_both_stores():
+def test_registration_export_and_database_anonymization_cover_the_graph_store():
+    """Der klassische Speicher liegt in der Fake-DB noch voll - Export und Anonymisierung lassen ihn aus (#231)."""
     db = FakeDb()
 
     snapshot = asyncio.run(registration_match_snapshot(db, ["r-delete"]))
@@ -90,10 +84,10 @@ def test_registration_export_and_database_anonymization_cover_both_stores():
         updated_at="now",
     ))
 
-    assert {match["source"]["engine"] for match in snapshot} == {"legacy", "stage"}
+    assert {match["source"]["engine"] for match in snapshot} == {"stage"}
     exported_stage = next(match for match in snapshot if match["source"]["engine"] == "stage")
     assert all(slot["user_id"] is None for slot in exported_stage["slots"])
     assert all(result["note"] is None for result in exported_stage["results"])
-    assert counts == {"legacy_matches": 1, "stage_matches": 1}
-    assert db.matches.updates[0][1]["$set"]["participant_a_id"] is None
+    assert counts == {"stage_matches": 1}
+    assert db.matches.updates == []
     assert db.matches_v2.updates[0][1]["$set"]["slots"][0]["status"] == "anonymized"

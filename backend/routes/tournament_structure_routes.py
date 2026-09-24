@@ -108,7 +108,6 @@ async def _build_tournament_structure_plan(
         decision = decide_rebuild_engine(
             tournament.get("format"),
             preferred=GRAPH if stage_defaults else CLASSIC,
-            legacy_matches=read_model.legacy_matches,
             stage_matches=read_model.stage_matches,
             allow_switch=bool(getattr(body, "allow_engine_switch", False)),
         )
@@ -139,10 +138,7 @@ async def _build_tournament_structure_plan(
     )
     plan_seed = seed_data["seed"]
     rng = random.Random(plan_seed)
-    match_plan = _collect_match_plan(
-        read_model.legacy_matches,
-        read_model.stage_matches,
-    )
+    match_plan = _collect_match_plan(read_model.stage_matches)
     stage = None
 
     if stage_defaults:
@@ -189,7 +185,7 @@ async def _build_tournament_structure_plan(
         planned_structure=planned_structure,
         stage=stage,
     )
-    existing_matches = [*read_model.legacy_matches, *read_model.stage_matches]
+    existing_matches = read_model.stage_matches
     force_required = (
         any(not match.get("is_preview") for match in existing_matches)
         or tournament.get("status") in {
@@ -215,7 +211,6 @@ async def _build_tournament_structure_plan(
             "force_required": force_required,
         },
         "replacement_impact": {
-            "legacy_match_count": len(read_model.legacy_matches),
             "stage_match_count": len(read_model.stage_matches),
             "stage_count": len(read_model.stages),
         },
@@ -335,7 +330,6 @@ async def apply_tournament_structure_plan(
             engine=response["engine"],
             matches=matches,
             stage=stage,
-            previous_legacy_matches=read_model.legacy_matches,
             previous_stage_matches=read_model.stage_matches,
             previous_stages=read_model.stages,
             plan_hash=response["plan_hash"],
@@ -377,9 +371,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     if tournament.get("status") in ("live", "paused", "completed", "results_published", "archived") and not force:
         raise HTTPException(status_code=409, detail="Laufende oder beendete Turniere brauchen force=true.")
 
-    legacy_matches = await db.matches.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
     v2_matches = await db.matches_v2.find({"tournament_id": tid}, {"_id": 0}).to_list(3000)
-    match_plan = _collect_match_plan(legacy_matches, v2_matches)
+    match_plan = _collect_match_plan(v2_matches)
     existing_stage = await db.tournament_stages.find_one({"tournament_id": tid}, {"_id": 0}, sort=[("number", 1)])
     if body is None and existing_stage:
         body = TournamentBracketStructurePayload(
@@ -388,9 +381,8 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             match_type=existing_stage.get("match_type"),
             settings=existing_stage.get("settings") or {},
         )
-    has_real_legacy = any(not match.get("is_preview") for match in legacy_matches)
     has_real_v2 = any(not match.get("is_preview") for match in v2_matches)
-    if (has_real_legacy or has_real_v2) and not force:
+    if has_real_v2 and not force:
         raise HTTPException(status_code=409, detail="Es gibt bereits echte Spiele. Mit force=true neu aufbauen.")
 
     v2_match_ids = [match["id"] for match in v2_matches if match.get("id")]
@@ -400,7 +392,6 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
         decision = decide_rebuild_engine(
             tournament.get("format"),
             preferred=GRAPH if stage_defaults else CLASSIC,
-            legacy_matches=legacy_matches,
             stage_matches=v2_matches,
             allow_switch=allow_engine_switch,
         )
@@ -446,7 +437,6 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
             await db.tournament_stages.delete_one({"id": stage["id"]})
             raise
 
-        await db.matches.delete_many({"tournament_id": tid})
         if v2_match_ids:
             await db.matches_v2.delete_many({"id": {"$in": v2_match_ids}})
             await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
@@ -498,11 +488,9 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
             status_code=409,
             detail="Bracket-Reset für laufende oder beendete Turniere braucht force=true",
         )
-    match_count = await db.matches.count_documents({"tournament_id": tid})
     v2_match_ids = await db.matches_v2.distinct("id", {"tournament_id": tid})
-    if match_count == 0 and not v2_match_ids and t.get("status") == "draft":
+    if not v2_match_ids and t.get("status") == "draft":
         return {"ok": True, "idempotent_replay": True}
-    await db.matches.delete_many({"tournament_id": tid})
     await db.matches_v2.delete_many({"tournament_id": tid})
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
@@ -512,6 +500,6 @@ async def reset_bracket(tid: str, force: bool = False, me: dict = Depends(get_cu
         "tournament.bracket.reset",
         me.get("id"),
         tid,
-        {"previous_status": t.get("status"), "match_count": match_count, "v2_match_count": len(v2_match_ids), "force": force},
+        {"previous_status": t.get("status"), "v2_match_count": len(v2_match_ids), "force": force},
     )
     return {"ok": True, "idempotent_replay": False}

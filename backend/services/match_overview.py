@@ -133,7 +133,7 @@ async def compact_match_overviews(
         tournament = tournament_map.get(match.get("tournament_id") or "") or {}
         summaries.append({
             "id": match.get("id"),
-            "collection": match.get("collection") or "matches",
+            "collection": match.get("collection") or "matches_v2",
             "status": match.get("status"),
             "scheduled_at": match.get("scheduled_at"),
             "tournament_id": match.get("tournament_id"),
