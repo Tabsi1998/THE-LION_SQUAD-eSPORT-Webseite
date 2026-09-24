@@ -8,13 +8,13 @@ from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel, Field
 from database import get_db
-from auth import require_admin, require_club_admin, get_current_user, get_optional_user, require_any_admin
+from auth import require_admin, require_club_admin, get_current_user, get_optional_user, require_any_admin, require_area
 from models import new_id, now_utc
 from services.competition_read import count_matches_by_status
 from services.user_notifications import create_user_notification
 
 from services.ops_monitor import errors_overview, ops_summary, set_error_resolved, slow_overview
-from services.ops_alerts import alert_red_checks
+from services.ops_alerts import ALERT_KINDS, alert_red_checks, load_alert_settings, recent_alerts, save_alert_settings, send_test_alert
 from services.ops_checks import checks_overview, run_checks
 from services.ops_vitals import vitals_overview
 from services.app_releases import delete_release, list_releases, public_release, set_updater_settings, store_release, update_release, updater_settings, upload_token_matches, upload_token_problem, upload_token_status
@@ -308,6 +308,39 @@ async def ops_checks_run(me: dict = Depends(require_club_admin())):
     run = await run_checks(db)
     await alert_red_checks(db, run)
     return run
+
+
+# ---------------------------------------------------------------- Alarme (#517): Regeln je Ereignisart, Testalarm
+
+class OpsAlertSettingsBody(BaseModel):
+    emails: list[str] | str | None = None
+    cooldown_minutes: int | None = None
+    rules: dict[str, dict[str, bool]] | None = None
+    retention_days: dict[str, int] | None = None
+
+
+@router.get("/ops/alerts")
+async def ops_alerts_view(me: dict = Depends(require_club_admin())):
+    db = get_db()
+    return {
+        "settings": await load_alert_settings(db),
+        "kinds": [{"key": key, "label": spec["label"], "hint": spec["hint"], "email_allowed": spec.get("email_allowed", True)} for key, spec in ALERT_KINDS.items()],
+        "recent": await recent_alerts(db),
+    }
+
+
+@router.put("/ops/alerts")
+async def ops_alerts_save(body: OpsAlertSettingsBody, me: dict = Depends(require_area("system"))):
+    try:
+        return await save_alert_settings(get_db(), body.model_dump(exclude_unset=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/ops/alerts/test")
+async def ops_alerts_test(me: dict = Depends(require_area("system"))):
+    """Geht alle Wege, die irgendeine Regel nutzt - ohne Sperrfrist."""
+    return await send_test_alert(get_db())
 
 
 @router.get("/logs")

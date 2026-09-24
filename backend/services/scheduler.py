@@ -29,6 +29,13 @@ _scheduler: AsyncIOScheduler | None = None
 def _log_task_failure(task: str, exc: Exception) -> None:
     """Log operational context without persisting exception payloads."""
     logger.error("[scheduler] %s failed type=%s", task, type(exc).__name__)
+    # Alarm (#517): ein abgebrochener Job ist ein Betriebsereignis - ohne Nutzdaten, nur Job und Fehlerart.
+    try:
+        from database import get_db
+        from services.ops_alerts import schedule_notify
+        schedule_notify(get_db(), "job_failed", f"Hintergrundjob abgebrochen: {task}", f"Fehlerart: {type(exc).__name__}", key=f"job:{task}")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def scheduler_lock_resource(job_id: str) -> str:
@@ -178,11 +185,19 @@ async def _safe_discord_bot_roles():
 
 
 async def _safe_discord_bot_watch():
-    """Bot nach einem Abbruch neu starten (#302) - je Prozess, denn der Bot läuft in jedem."""
+    """Bot nach einem Abbruch neu starten (#302) - je Prozess, denn der Bot läuft in jedem. Bleibt er
+    trotz Einschalten unten, geht ein Alarm raus (#517)."""
     try:
+        from database import get_db
         from services.discord_bot import bot
         if await bot.restart_if_down():
             logger.info("[scheduler] discord_bot_watch: Bot neu gestartet")
+        status = bot.status()
+        settings = await get_db().settings.find_one({"id": "discord"}, {"_id": 0, "bot_enabled": 1, "bot_token": 1}) or {}
+        if settings.get("bot_enabled") and settings.get("bot_token") and not status.get("running"):
+            from services.ops_alerts import notify
+            await notify(get_db(), "discord_bot_offline", "Discord-Bot offline",
+                         status.get("last_error") or "Der Bot läuft nicht, obwohl er eingeschaltet ist.", key="discord:bot")
     except Exception as exc:
         _log_task_failure("discord_bot_watch", exc)
 
@@ -267,7 +282,12 @@ async def _safe_awards_backfill():
 async def _safe_dolibarr_sync():
     try:
         from services.dolibarr_sync import run_sync
-        await run_sync()
+        res = await run_sync()
+        # Alarm (#517): ein roter Abgleich (nicht erreichbar, Schlüssel, Antwort) - einmal je Sperrfrist.
+        if isinstance(res, dict) and res.get("ok") is False and res.get("error"):
+            from database import get_db
+            from services.ops_alerts import notify
+            await notify(get_db(), "dolibarr_sync_failed", "Dolibarr-Abgleich rot", str(res.get("text") or res.get("error")), key="dolibarr:sync")
     except Exception as exc:
         _log_task_failure("dolibarr_sync", exc)
     try:
@@ -334,6 +354,18 @@ async def _safe_media_scan():
             logger.info(f"[scheduler] media_scan processed={result['processed']}")
     except Exception as exc:
         _log_task_failure("media_scan", exc)
+
+
+async def _safe_ops_retention():
+    """Versandlogs und Adminaktionen nach der Frist unter Betrieb → Alarme löschen (#517)."""
+    try:
+        from database import get_db
+        from services.ops_alerts import purge_old_logs
+        removed = await purge_old_logs(get_db())
+        if any(removed.values()):
+            logger.info(f"[scheduler] ops_retention removed={removed}")
+    except Exception as exc:
+        _log_task_failure("ops_retention", exc)
 
 
 async def _safe_media_scan_purge():
@@ -540,6 +572,7 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("ops_retention", _safe_ops_retention, lease_seconds=600.0), IntervalTrigger(hours=24), id="ops_retention", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
                   max_instances=1, coalesce=True)
     # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
