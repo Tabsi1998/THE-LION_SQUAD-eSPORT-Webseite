@@ -216,6 +216,47 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Verbindungen ohne Doppeltes (PR #475; nur Web; `update.sh`).
+  `settings/DiscordSettings.jsx` (Webhook, Betriebs-Webhook, `DiscordTargets`,
+  `DiscordBotPanel`, Aktivitätszähler; eigenes Laden und Speichern,
+  `discordPayload`, `discord-settings`, `discord-load-error`) und
+  `settings/TwitchSettings.jsx` (`twitchPayload`; lädt `/settings/branding` +
+  `/admin/streams/status`, ohne Strom alle 15 s; `twitch-settings`) stehen auf
+  `AdminIntegrationPage` (`integration-settings`); die Twitch-App-Karte dort
+  ohne Felder (`PlatformAppCard showFields={false}`,
+  `platform-app-twitch-elsewhere`). `AdminSettingsPage`: Gruppe „Verbindungen“
+  (Reiter discord/twitch) weg, `LEGACY_TAB_REDIRECTS` → `<Navigate>` auf
+  `/admin/integrations/<key>`; Login & Konten zeigt `PlatformLinkOverview`
+  (`platform-link-overview`, `platform-link-open-<key>`,
+  `platform-link-<key>-state`) statt aller App-Karten. `INTEGRATIONS`
+  discord/twitch ohne `tab`, mit `searchTerms` (AdminLayout nimmt sie in die
+  Suche); Anleitungen `where` → Verbindungen; Dashboard-Kacheln Discord/Twitch →
+  Verbindungen, „Konten verknüpfen“ → `/admin/setup`. Tests
+  `DiscordSettings.test.jsx` (2), `TwitchSettings.test.jsx` (2),
+  `PlatformLinkSettings.test.jsx` (3), `AdminIntegrationPage.test.jsx` (+2).
+- Profilseite neu (PR #474; nur Web; `update.sh`). `PublicProfilePage`: Banner
+  als Banner (`profile-banner`, `object-[50%_30%]`) mit überlappendem Avatar,
+  Kopf `profile-identity` (Level-, Rollen-, Live-Pille `profile-live-pill`, Land,
+  „Dabei seit“), Aktionen `profile-actions` + `highlight-card-open`, Bio
+  `profile-bio`, Level-Fortschritt + `VerifiedChips` (`profile-verified-chips`,
+  `profile-verified-<platform>`), Zahlenleiste `profile-stats` (`profile-stat-
+  points|badges|wins|top3|tournaments|fastlaps|streams`). Fünf Reiter
+  (`profile-tab-overview|badges|awards|references|teams`): Turniere und Fast Lap
+  stecken im Referenzen-Reiter (`profile-reference-stats`, Filter
+  `profile-reference-filter-<all|tournament|fastlap|season>`,
+  `public-profile-references`, „Weitere Teilnahmen“ `public-profile-tournaments`
+  nur für Turniere ohne Referenz, `public-profile-fastlaps`; Status als
+  `StatusBadge`). Übersicht: `podiumHighlights` → `profile-highlights`/
+  `profile-highlight-<id>`, `profile-awards-preview`, `profile-recent-awards`,
+  `profile-references-preview`, `profile-overview-empty`; Seitenleiste
+  `profile-sidebar`: `TwitchChannelCard` (`profile-twitch-offline`) oder links
+  `TwitchLiveCard` (`public-profile-twitch-embed`, nur live), `AccountsCard`
+  (`public-profile-accounts` mit `LinkedAccountsCard embedded` =
+  `public-profile-linked`, `SocialsRow` = `public-profile-socials`,
+  `GamingIdsList` = `public-profile-gaming-ids`), `AboutCard`
+  (`public-profile-info`, ohne Name/Username/Rolle), `SetupCard`
+  (`public-profile-setup`), `TeamsCard` (`public-profile-teams`). Test
+  `PublicProfilePage.test.jsx` (4).
 - News-Detail am PC breit (PR #472; nur Web; `update.sh`). `NewsDetailPage`
   neu: Raster `lg:grid-cols-[minmax(0,1fr)_20rem]`/`xl:…_24rem]` – Artikel
   (`news-article`) in Lesebreite mit großem Bild links, Seitenleiste rechts
@@ -1940,11 +1981,12 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web). `main` steht auf `5e0dcb6`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web). `main` steht auf `7cf7252`.
 
 ### Offene PRs
-- Derzeit keiner; die Profilseite (Umbau, nur Web) ist in Arbeit. App-Gegenstück
-  zu den verknüpften Konten: #459 (App 1.0.0). **Regel seit 23.09. abends:**
+- #476 (Partnerseiten, #469 Teil 1; Backend + Web; bereit, lokal grün).
+  App-Gegenstück zu den verknüpften Konten: #459 (App 1.0.0). **Regel seit
+  23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
   Doku-Stand-PR nach dem Merge; so gibt es die Konflikte zwischen parallelen
@@ -2030,6 +2072,9 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #474, #475 (24.09.): `update.sh`. Danach: Profilseite ansehen (fünf Reiter,
+  Konten-Karte, Twitch nur live); Discord und Twitch nur noch unter Verbindungen
+  (die Einstellungen haben die Reiter nicht mehr, alte Links leiten um).
 - Nach #463, #465–#468, #470, #472 (24.09.): `update.sh` – der Server lief bis dahin ohne
   #463–#466 (kein `update.sh` seit dem Vorabend; die Anleitungen fehlten
   deshalb live). Danach: System → Einrichtung durchgehen (fehlende stehen
@@ -2038,8 +2083,8 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   die Zustimmung zur Nennung je Person setzen, Fotos über den eigenen
   Verzeichnis-Eintrag; App-Build (Moderationskarte, verknüpfte Konten #459).
   Reihenfolge am 24.09. vom Betreiber freigegeben („was Sinn macht“):
-  Profilseite überarbeiten (in Arbeit), dann Partner II (#469), dann #415
-  Bildprüfung.
+  Profilseite (erledigt, #474), Partner II Teil 1 (PR #476), dann #415
+  Bildprüfung, dann Partner II Teil 2 (#469: Partner an Events/Turnieren).
 - Nach #461, #462 (24.09.): `update.sh`. Discord-App (Client ID + Secret aus
   dem Developer Portal, App des Bots, Reiter OAuth2; Rückrufadresse unter
   Redirects) und Twitch-Rückrufadresse in der Developer Console eintragen
