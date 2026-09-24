@@ -29,7 +29,7 @@ def client() -> DolibarrClient:
 # ---------------------------------------------------------------- Vertrag
 
 def test_manifest_names_the_pinned_contract_and_only_paths_that_exist():
-    assert MANIFEST["vereine"]["api_version"] == 1
+    assert MANIFEST["vereine"]["api_version"] == 2
     for path in MANIFEST["vereine"]["used_paths"]:
         assert path in OPENAPI["paths"], path
 
@@ -93,7 +93,7 @@ def test_instance_key_separates_installations():
 @pytest.mark.asyncio
 async def test_reads_use_fixed_paths_and_the_key_stays_in_the_header(fake):
     fake.add(member(12), email="paula@example.test")
-    assert (await client().status())["api_version"] == 1
+    assert (await client().status())["api_version"] == 2
     assert (await client().member_summary(12))["ref"] == "12"
     assert (await client().lookup_by_email(" Paula@example.test "))["id"] == 12
     assert [m["id"] for m in await client().members_page(page=0)] == [12]

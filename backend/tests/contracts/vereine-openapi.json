@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Vereine-API",
-    "version": "1",
+    "version": "2",
     "description": "Schnittstellen des Dolibarr-Moduls Vereine unter Dolibarrs REST-API. Von einem Server aus mit dem API-Schlüssel eines Dolibarr-Benutzers aufrufen; siehe docs/API.md. Clients sollen Felder, die sie nicht kennen, übergehen; info.version ist die api_version und steigt, wenn ein Feld seine Bedeutung ändert oder wegfällt.",
     "license": {
       "name": "GPL-3.0-or-later",
@@ -807,6 +807,108 @@
           ],
           [
             "vereine:application:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/profile": {
+      "get": {
+        "operationId": "getMemberProfile",
+        "summary": "Website-Profil eines Mitglieds – nur mit der gewählten Einwilligung",
+        "description": "Gamertag, Kurztext, Spiele und Plattformen vom Reiter Verein der Mitgliedskarte sowie das Foto der Mitgliedskarte als Prüfsumme. Ohne die Einwilligung, die der Verein dafür gewählt hat, nennt die Antwort nur die Einwilligung und given false. Braucht das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/photo": {
+      "get": {
+        "operationId": "getMemberPhoto",
+        "summary": "Foto eines Mitglieds – nur mit der gewählten Einwilligung",
+        "description": "Das Foto der Mitgliedskarte, base64 mit Prüfsumme. Ohne Einwilligung oder ohne Foto kommt 404, ohne zu sagen, was von beidem fehlt.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das Foto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberPhoto"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
           ]
         ]
       }
@@ -2932,8 +3034,6 @@
         "required": [
           "module_version",
           "api_version",
-          "country_profile",
-          "country_profile_complete",
           "server_time"
         ],
         "properties": {
@@ -2943,24 +3043,12 @@
           "api_version": {
             "type": "integer"
           },
-          "country_profile": {
-            "type": "string",
-            "enum": [
-              "AT"
-            ],
-            "deprecated": true,
-            "description": "Immer AT: Das Modul ist für österreichische Vereine. Entfällt mit 1.0."
-          },
-          "country_profile_complete": {
-            "type": "boolean",
-            "enum": [
-              true
-            ],
-            "deprecated": true,
-            "description": "Immer true. Entfällt mit 1.0."
-          },
           "server_time": {
             "$ref": "#/components/schemas/Moment"
+          },
+          "website_profile_consent": {
+            "type": "string",
+            "description": "Einwilligung, die das Website-Profil der Mitglieder öffnet (Einrichtung → Einwilligungen); leer, wenn keine gewählt ist"
           }
         }
       },
@@ -2968,8 +3056,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "country_profile",
-          "country_profile_complete",
           "name",
           "register",
           "authority",
@@ -2984,22 +3070,6 @@
           "channels"
         ],
         "properties": {
-          "country_profile": {
-            "type": "string",
-            "enum": [
-              "AT"
-            ],
-            "deprecated": true,
-            "description": "Immer AT: Das Modul ist für österreichische Vereine. Entfällt mit 1.0."
-          },
-          "country_profile_complete": {
-            "type": "boolean",
-            "enum": [
-              true
-            ],
-            "deprecated": true,
-            "description": "Immer true. Entfällt mit 1.0."
-          },
           "name": {
             "type": "string"
           },
@@ -3008,8 +3078,7 @@
             "additionalProperties": false,
             "required": [
               "kind",
-              "number",
-              "court"
+              "number"
             ],
             "properties": {
               "kind": {
@@ -3021,14 +3090,6 @@
               },
               "number": {
                 "type": "string"
-              },
-              "court": {
-                "type": "string",
-                "enum": [
-                  ""
-                ],
-                "deprecated": true,
-                "description": "Immer leer. Entfällt mit 1.0."
               }
             }
           },
@@ -5533,6 +5594,115 @@
                 "description": "Bei einer Wahl der Code der gewählten Person, sonst leer"
               }
             }
+          }
+        }
+      },
+      "MemberProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "consent",
+          "given"
+        ],
+        "properties": {
+          "consent": {
+            "type": "string",
+            "description": "Einwilligung, die der Verein für das Website-Profil gewählt hat; leer, wenn keine"
+          },
+          "given": {
+            "type": "boolean",
+            "description": "Hat das Mitglied sie erteilt? Sonst fehlen alle weiteren Felder"
+          },
+          "gamertag": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Kurztext des Vereins über das Mitglied"
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "photo": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": false,
+            "required": [
+              "sha256",
+              "size",
+              "content_type",
+              "updated_at"
+            ],
+            "description": "Das Foto der Mitgliedskarte; null ohne Foto. Die Datei kommt von GET /vereine/members/{id}/photo",
+            "properties": {
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "size": {
+                "type": "integer"
+              },
+              "content_type": {
+                "type": "string",
+                "enum": [
+                  "image/jpeg",
+                  "image/png",
+                  "image/gif",
+                  "image/webp"
+                ]
+              },
+              "updated_at": {
+                "$ref": "#/components/schemas/Moment"
+              }
+            }
+          }
+        }
+      },
+      "MemberPhoto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "filename",
+          "content_type",
+          "filesize",
+          "sha256",
+          "content"
+        ],
+        "properties": {
+          "filename": {
+            "type": "string",
+            "pattern": "\\.(jpe?g|png|gif|webp)$"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/gif",
+              "image/webp"
+            ]
+          },
+          "filesize": {
+            "type": "integer",
+            "description": "Größe in Bytes nach dem Dekodieren"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Prüfsumme der Bytes"
+          },
+          "content": {
+            "type": "string",
+            "description": "Das Bild, base64-kodiert"
           }
         }
       }

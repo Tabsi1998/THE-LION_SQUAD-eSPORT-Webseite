@@ -278,6 +278,14 @@ Mitglied selbst per Opt-in angelegt hat; eine neue Zustimmung holt ihn samt Pfle
 Vorstand gesperrter Eintrag bleibt gesperrt. Ohne ausgewählte Einwilligung ändert der Abgleich am
 Verzeichnis nichts.
 
+**Profil in Dolibarr pflegen (ab Vereine 1.1):** Auf der Mitgliedskarte, Reiter *Verein*, Abschnitt
+*Website-Profil*, pflegt der Vorstand wahlweise Gamertag, Kurztext, Spiele und Plattformen; das Foto
+ist das Foto der Mitgliedskarte. Was dort steht, führt – die Website übernimmt es beim nächsten
+Abgleich (das Foto als Datei unter den Uploads, nur wenn es sich geändert hat); was dort leer bleibt,
+pflegt ihr weiter auf der Website. Die Einwilligung dafür wählt ihr im Modul unter *Einrichtung >
+Einwilligungen*; die Website nimmt dieselbe für das Verzeichnis, wenn hier keine eigene gewählt ist.
+Ein Modul ohne diese Funktion ändert nichts – dann gilt nur, was auf der Website steht.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer
