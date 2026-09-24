@@ -105,3 +105,16 @@ test("nach dem Laden verschwindet der Hinweis", async () => {
   expect(screen.queryByTestId("chat-attachment-error-a-1")).toBeNull();
   expect(get).not.toHaveBeenCalled();
 });
+
+test("Bildprüfung (#415): ein entferntes Bild ist ein Platzhalter, ein ungeprüftes zeigt „wird geprüft“ statt des Fehlers", async () => {
+  get.mockRejectedValue(notFound());
+  await render(<MessageAttachments attachments={[{ ...image, scan_state: "blocked" as const }, { ...other, scan_state: "pending" as const }]} />);
+
+  expect(screen.getByTestId("chat-attachment-removed-a-1")).toBeTruthy();
+  expect(screen.queryByTestId("chat-attachment-image-a-1")).toBeNull();
+  expect(screen.getByText("Bild entfernt – Moderation")).toBeTruthy();
+
+  await fireEvent(screen.getByTestId("chat-attachment-image-b-2"), "error", { nativeEvent: { error: fresco } });
+  await waitFor(() => expect(screen.getByTestId("chat-attachment-error-b-2")).toBeTruthy());
+  expect(screen.getByText("Bild wird geprüft – noch nicht sichtbar.")).toBeTruthy();
+});

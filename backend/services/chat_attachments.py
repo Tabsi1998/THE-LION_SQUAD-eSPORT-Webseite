@@ -26,6 +26,8 @@ from models import new_id, now_utc
 from storage import PRIVATE_CHAT_DIR, ensure_directory
 
 logger = logging.getLogger("tls-arena.chat-attachments")
+# Bildprüfung (#415): wer ein noch ungeprüftes Bild trotzdem sehen darf.
+SCAN_STAFF_ROLES = ("moderator", "tournament_admin", "club_admin", "superadmin")
 
 
 def _int_from_env(name: str, default: int) -> int:
@@ -66,6 +68,8 @@ def public_attachment(doc: dict) -> dict:
         "height": doc.get("height"),
         "url": f"/api/chat-attachments/{doc['id']}",
         "poster_url": f"/api/chat-attachments/{doc['id']}/poster" if doc.get("poster_key") else None,
+        # Bildprüfung (#415): pending/review sieht nur der Absender, blocked niemand mehr.
+        "scan_state": doc.get("scan_state") or "safe",
     }
 
 
@@ -165,6 +169,15 @@ async def store_chat_upload(file: UploadFile, owner: dict, poster: UploadFile | 
         "updated_at": now,
     }
     await get_db().chat_attachments.insert_one(dict(doc))
+    if kind == "image":
+        # Bildprüfung (#415): bis zum Ergebnis sieht nur der Absender das Bild.
+        from services import media_scan
+
+        try:
+            scan = await media_scan.enqueue(get_db(), kind="chat", ref_id=doc["id"], owner_id=owner["id"], path=PRIVATE_CHAT_DIR / storage_key, context={"type": "chat"})
+            doc["scan_state"] = "safe" if scan.get("state") == "failed" else (scan.get("state") or "pending")
+        except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
+            logger.warning("[chat-attachments] Bildprüfung für %s nicht angestoßen: %s", doc["id"], exc)
     return public_attachment(doc)
 
 
@@ -195,6 +208,12 @@ async def claim_attachments(db, owner_id: str, attachment_ids: list[str] | None,
 
 async def can_access(attachment: dict, user: dict | None) -> bool:
     """Wer den Chat lesen darf, darf auch seine Anhänge sehen - niemand sonst."""
+    # Bildprüfung (#415): bis zum Ergebnis nur Absender und Moderation; entfernt sieht hier niemand.
+    scan_state = attachment.get("scan_state") or "safe"
+    if scan_state == "blocked":
+        return False
+    if scan_state in ("pending", "review") and not (user and (user.get("id") == attachment.get("owner_id") or user.get("role") in SCAN_STAFF_ROLES)):
+        return False
     if attachment.get("status") != "attached":
         return bool(user and user.get("id") == attachment.get("owner_id"))
 

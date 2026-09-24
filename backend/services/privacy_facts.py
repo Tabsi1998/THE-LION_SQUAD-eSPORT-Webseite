@@ -28,7 +28,13 @@ def discord_facts(discord_settings: dict | None) -> dict:
     return {"webhooks": webhooks, "bot": bool(doc.get("bot_enabled"))}
 
 
-def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, email: dict | None, dolibarr: dict | None) -> dict:
+def media_scan_facts(settings: dict | None) -> dict:
+    """Bildprüfung (#415): ob und womit Uploads geprüft werden - Google bedeutet, das Bild geht nach draußen."""
+    provider = str((settings or {}).get("provider") or "off").strip().lower()
+    return {"enabled": provider not in ("", "off"), "provider": provider}
+
+
+def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, email: dict | None, dolibarr: dict | None, media_scan: dict | None = None) -> dict:
     """Reine Rechnung aus den Einstellungsdokumenten - ohne Geheimnisse."""
     b = branding or {}
     d = dolibarr or {}
@@ -43,6 +49,7 @@ def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, e
         "dolibarr_billing": bool(d.get("write_enabled")),
         "app": {"push": True, "crash_reports": True, "app_lock": True},   # LionsAPP seit Build 70/72
         "hosting": {"provider": str(b.get("hosting_provider") or "").strip(), "country": str(b.get("hosting_country") or "").strip()},
+        "media_scan": media_scan_facts(media_scan),
     }
 
 
@@ -51,4 +58,5 @@ async def privacy_facts(db) -> dict:
     discord = await db.settings.find_one({"id": "discord"}, {"_id": 0, "webhook_url": 1, "targets": 1, "bot_enabled": 1}) or {}
     email = await db.settings.find_one({"id": "email"}, {"_id": 0, "provider": 1, "smtp_host": 1, "resend_api_key": 1}) or {}
     dolibarr = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "mode": 1, "write_enabled": 1}) or {}
-    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr)
+    from services.media_scan import load_settings as load_media_scan
+    return facts_from(branding, await load_auth_settings(db), discord, email, dolibarr, media_scan=await load_media_scan(db))

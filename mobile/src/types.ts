@@ -549,6 +549,8 @@ export type ChatAttachment = {
   height?: number | null;
   url: string;
   poster_url?: string | null;
+  // Bildprüfung (#415): pending/review lädt nur beim Absender, blocked ist ein Platzhalter.
+  scan_state?: "pending" | "safe" | "review" | "blocked" | "failed" | null;
 };
 
 export type ChatSticker = {

@@ -200,11 +200,15 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
   const [attempt, setAttempt] = useState(0);
   const previewUrl = item.kind === "video" ? item.poster_url : item.url;
   const failed = state.status === "error";
+  // Bildprüfung (#415): entfernt → Platzhalter; noch ungeprüft → beim Empfänger 404 und „wird geprüft“.
+  const blocked = item.scan_state === "blocked";
+  const checking = item.scan_state === "pending" || item.scan_state === "review";
   return (
     <Pressable
-      accessibilityLabel={failed ? "Bild erneut laden" : item.kind === "video" ? "Video abspielen" : "Bild öffnen"}
+      accessibilityLabel={blocked ? "Bild entfernt" : failed ? "Bild erneut laden" : item.kind === "video" ? "Video abspielen" : "Bild öffnen"}
       accessibilityRole="imagebutton"
       onPress={() => {
+        if (blocked) return;
         if (failed) {
           setState({ status: "loading" });
           setAttempt((count) => count + 1);
@@ -214,7 +218,7 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
       }}
       style={[styles.tile, small && styles.tileSmall]}
     >
-      {previewUrl && !failed ? (
+      {previewUrl && !failed && !blocked ? (
         <AuthorizedImage
           url={previewUrl}
           token={token}
@@ -227,7 +231,7 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
         />
       ) : null}
       {!previewUrl ? <Ionicons name="film-outline" size={28} color={colors.muted} /> : null}
-      {previewUrl && state.status === "loading" ? (
+      {previewUrl && !blocked && state.status === "loading" ? (
         <View style={styles.tileState} accessibilityLabel="Bild wird geladen">
           <ActivityIndicator color={colors.cyan} />
         </View>
@@ -235,10 +239,16 @@ function AttachmentTile({ item, token, small, onOpen }: { item: ChatAttachment; 
       {state.status === "error" ? (
         <View style={styles.tileState} testID={`chat-attachment-error-${item.id}`}>
           <Ionicons name="image-outline" size={22} color={colors.muted} />
-          <Muted style={styles.tileStateText} numberOfLines={3}>Bild konnte nicht geladen werden ({state.reason}). Tippen zum Wiederholen.</Muted>
+          <Muted style={styles.tileStateText} numberOfLines={3}>{checking ? "Bild wird geprüft – noch nicht sichtbar." : `Bild konnte nicht geladen werden (${state.reason}). Tippen zum Wiederholen.`}</Muted>
         </View>
       ) : null}
-      {item.kind === "video" && !failed ? (
+      {blocked ? (
+        <View style={styles.tileState} testID={`chat-attachment-removed-${item.id}`}>
+          <Ionicons name="eye-off-outline" size={22} color={colors.muted} />
+          <Muted style={styles.tileStateText}>Bild entfernt – Moderation</Muted>
+        </View>
+      ) : null}
+      {item.kind === "video" && !failed && !blocked ? (
         <View style={styles.playBadge}>
           <Ionicons name="play" size={20} color={colors.white} />
         </View>

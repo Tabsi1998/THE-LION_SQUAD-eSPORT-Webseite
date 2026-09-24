@@ -1,4 +1,4 @@
-import { analyticsText, emailProviderText, hostingText, normalizeFacts, privacySections } from "./privacyFacts";
+import { analyticsText, emailProviderText, hostingText, mediaScanText, normalizeFacts, privacySections } from "./privacyFacts";
 
 // Datenschutzerklärung aus den echten Schaltern (Rechtliches II): welche Abschnitte, welche Worte.
 
@@ -27,4 +27,12 @@ test("die Texte nennen den echten Anbieter statt einer Möglichkeitsform", () =>
   expect(hostingText({ provider: "Eigenhosting", country: "Österreich" })).toBe("Die Website läuft auf eigener Infrastruktur des Vereins (Österreich).");
   expect(hostingText({ provider: "Hetzner", country: "" })).toBe("Die Website wird bei Hetzner betrieben; der Anbieter ist Auftragsverarbeiter.");
   expect(hostingText({})).toBe("");
+});
+
+test("Bildprüfung (#415): der Abschnitt erscheint nur, wenn geprüft wird, und nennt den Weg des Bildes", () => {
+  expect(privacySections({})).not.toContain("media_scan");
+  expect(privacySections({ media_scan: { enabled: true, provider: "local" } })).toContain("media_scan");
+  expect(mediaScanText("local")).toMatch(/eigenen Server/);
+  expect(mediaScanText("google_vision")).toMatch(/Google Cloud Vision/);
+  expect(mediaScanText("off")).toBe("");
 });

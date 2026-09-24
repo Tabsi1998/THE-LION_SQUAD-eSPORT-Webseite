@@ -6,6 +6,7 @@ export const DEFAULT_FACTS = Object.freeze({
   analytics: "", google_login: false, passkeys: true, discord: { webhooks: false, bot: false }, twitch_embed: false,
   email_provider: "none", dolibarr: false, dolibarr_billing: false, app: { push: true, crash_reports: true, app_lock: true },
   hosting: { provider: "", country: "" },
+  media_scan: { enabled: false, provider: "off" },
 });
 
 export function normalizeFacts(raw) {
@@ -16,6 +17,7 @@ export function normalizeFacts(raw) {
     discord: { ...DEFAULT_FACTS.discord, ...(facts.discord || {}) },
     app: { ...DEFAULT_FACTS.app, ...(facts.app || {}) },
     hosting: { ...DEFAULT_FACTS.hosting, ...(facts.hosting || {}) },
+    media_scan: { ...DEFAULT_FACTS.media_scan, ...(facts.media_scan || {}) },
   };
 }
 
@@ -28,6 +30,7 @@ export function privacySections(raw) {
   sections.push("analytics");
   if (f.twitch_embed) sections.push("twitch");
   if (f.dolibarr) sections.push("dolibarr");
+  if (f.media_scan.enabled) sections.push("media_scan");
   sections.push("app");
   return sections;
 }
@@ -60,4 +63,15 @@ export function hostingText(hosting) {
   return provider.toLowerCase().startsWith("eigen")
     ? `Die Website läuft auf eigener Infrastruktur des Vereins${where}.`
     : `Die Website wird bei ${provider}${where} betrieben; der Anbieter ist Auftragsverarbeiter.`;
+}
+
+// Bildprüfung (#415): selbst gehostet bleibt alles im Haus; Google heißt, das Bild geht nach draußen.
+export function mediaScanText(provider) {
+  if (provider === "google_vision") {
+    return "Dafür wird das Bild an Google Cloud Vision (Google Ireland Ltd.; EU-Standardvertragsklauseln) übermittelt und dort bewertet, aber nicht gespeichert.";
+  }
+  if (provider && provider !== "off") {
+    return "Die Prüfung läuft mit einem Erkennungsmodell auf unserem eigenen Server; kein Bild wird dafür an Dritte übermittelt.";
+  }
+  return "";
 }
