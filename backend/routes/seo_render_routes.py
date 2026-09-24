@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from database import get_db
+from services import site_texts
 from services.slug_utils import find_by_slug_or_history
 from services.visibility import user_can_see
 
@@ -95,6 +96,8 @@ async def seo_meta(path: str, request: Request):
     if redirect_url:
         return JSONResponse({"redirect": redirect_url, "canonical": redirect_url})
     meta = await resolve_meta(path, request)
+    # Der volle Seitentext gehört nur in die Crawler-Vorschau, nicht in die Meta-Antwort der Website (#545).
+    meta.pop("body_html", None)
     return JSONResponse(meta)
 
 
@@ -215,6 +218,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
 
     parts = [part for part in path.strip("/").split("/") if part]
     if not parts:
+        # Startseite für Prüfer ohne JavaScript (#545): Zweck, „ohne Anmeldung“, App, Rechtliches.
+        meta["body_html"] = site_texts.page_html(site_texts.home_page(branding, site_name, default_description, str(branding.get("play_store_url") or "").strip()))
         return meta
 
     first = parts[0].lower()
@@ -251,6 +256,10 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
             raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
         if first == "membership":
             raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+        if first in site_texts.PAGES:
+            # Rechtstexte vollständig (#545): Google prüft die Datenschutzerklärung als Crawler - ein Satz reicht nicht.
+            legal, facts = await site_texts.legal_context(db)
+            static["body_html"] = site_texts.page_html(site_texts.legal_page(first, legal, facts))
         return add_breadcrumbs(static, origin, current_label=static.get("breadcrumb_label"))
     raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
 
@@ -740,6 +749,7 @@ def render_preview_html(meta: dict) -> str:
         optional.append(f'<meta name="google-site-verification" content="{escape(str(meta["google_site_verification"]), quote=True)}" />')
     if meta.get("msvalidate_01"):
         optional.append(f'<meta name="msvalidate.01" content="{escape(str(meta["msvalidate_01"]), quote=True)}" />')
+    body = meta.get("body_html") or f"<h1>{title}</h1>\n      <p>{description}</p>"
     return f"""<!doctype html>
 <html lang="de">
   <head>
@@ -769,8 +779,7 @@ def render_preview_html(meta: dict) -> str:
   </head>
   <body>
     <main>
-      <h1>{title}</h1>
-      <p>{description}</p>
+      {body}
       <p><a href="{canonical}">Seite öffnen</a></p>
     </main>
   </body>

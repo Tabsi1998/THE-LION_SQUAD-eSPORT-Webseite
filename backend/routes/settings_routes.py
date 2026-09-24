@@ -623,13 +623,11 @@ async def public_settings(response: Response):
         tagline = "eSports Verein"
     # Vereinsdaten aus Dolibarr (#326) liegen über den Handfeldern, wenn der Schalter gesetzt ist;
     # die Datenschutzerklärung baut sich aus den Schaltern, die wirklich an sind (privacy_facts).
-    from services import club_facts, privacy_facts
-    overlay, legal_source = await club_facts.public_legal_source(db, b)
-    legal_settings = build_public_legal_settings(b, overlay)
+    from services import site_texts
+    legal_settings, facts = await site_texts.legal_context(db)
     legal_settings.pop("contact_ready", None)
     legal_settings.pop("missing_legal_fields", None)
-    legal_settings["legal_source"] = legal_source
-    legal_settings["privacy_facts"] = await privacy_facts.privacy_facts(db)
+    legal_settings["privacy_facts"] = facts
     return {
         "club_name": b.get("club_name", "THE LION SQUAD"),
         "tagline": tagline,
@@ -666,6 +664,19 @@ async def public_settings(response: Response):
         "channels_from_dolibarr": bool(b.get("channels_from_dolibarr")),
         **(await load_auth_settings(db)),
     }
+
+
+@settings_router.get("/public/legal/{page}")
+async def public_legal_page(page: str, response: Response):
+    """Datenschutz, Impressum, Nutzungsbedingungen als fertige Abschnitte (#545) - dieselbe Quelle wie die
+    Crawler-Vorschau, gebaut aus den öffentlichen Vereinsdaten und den Schaltern, die wirklich an sind."""
+    response.headers["Cache-Control"] = "no-store"
+    from services import site_texts
+    legal, facts = await site_texts.legal_context(get_db())
+    doc = site_texts.legal_page(page, legal, facts)
+    if not doc:
+        raise HTTPException(404, "Diese Rechtsseite gibt es nicht.")
+    return doc
 
 
 @settings_router.get("/site-banner")
