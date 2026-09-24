@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, CheckCircle2, Gauge, PlayCircle, RefreshCw, Ro
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { OpsAlertsPanel } from "./ops/OpsAlertsPanel";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ratingTone } from "@/lib/ops";
 
@@ -16,6 +17,7 @@ const TABS = [
   { key: "slow", label: "Tempo" },
   { key: "vitals", label: "Vitals" },
   { key: "checks", label: "Checks" },
+  { key: "alerts", label: "Alarme" },
 ];
 const VITAL_COLUMNS = ["LCP", "INP", "CLS", "TTFB"];
 
@@ -167,7 +169,9 @@ export default function AdminOpsPage() {
         ) : null}
       </div>
 
-      {tab === "vitals" ? (
+      {tab === "alerts" ? (
+        <OpsAlertsPanel />
+      ) : tab === "vitals" ? (
         <VitalsTab vitals={vitals} loading={loading} />
       ) : tab === "checks" ? (
         <ChecksTab checks={checks} loading={loading} running={running} onRun={runChecks} />

@@ -693,6 +693,14 @@ async def _try_send_job(job: dict) -> None:
                 "provider": cfg["provider"],
                 "created_at": now_utc().isoformat(),
             })
+            # Alarm (#517): endgültig nicht zustellbar - nur per Discord, eine Mail darüber käme ja auch nicht an.
+            try:
+                from services.ops_alerts import notify
+                masked = f"{str(job['to'])[:1]}***{str(job['to'])[str(job['to']).find('@'):]}" if "@" in str(job["to"]) else "***"
+                await notify(db, "mail_failed", f"Mail nicht zustellbar: {job.get('subject') or ''}"[:180],
+                             f"An {masked} · Vorlage {job.get('template_key', 'custom')} · {str(exc)[:200]}", key=f"mail:{job.get('template_key', 'custom')}")
+            except Exception:  # noqa: BLE001 - ein Alarm darf den Versand nicht abbrechen
+                logger.warning("[mailqueue] Alarm fehlgeschlagen", exc_info=True)
         else:
             backoff = RETRY_BACKOFF_MIN[min(attempts - 1, len(RETRY_BACKOFF_MIN) - 1)]
             next_at = (now_utc() + timedelta(minutes=backoff)).isoformat()

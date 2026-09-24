@@ -673,6 +673,12 @@ async def create_mobile_client_log(body: MobileClientLogCreate, user: dict = Dep
         "display_name": user.get("display_name"),
     }
     await db.mobile_client_logs.insert_one(row)
+    # Alarm (#517): ein kritischer App-Fehler (Absturz, Login, Push) - einmal je Fingerabdruck und Sperrfrist, ohne Nutzdaten.
+    if priority == "critical":
+        from services.ops_alerts import schedule_notify
+        schedule_notify(db, "client_log_critical", f"App: kritischer Fehler ({level})", message[:300],
+                        [{"name": "Plattform", "value": str(row.get("platform") or "-"), "inline": True}, {"name": "Version", "value": str(row.get("app_version") or "-"), "inline": True}],
+                        key=f"client:{fingerprint}")
     return {"ok": True, "id": row["id"]}
 
 
