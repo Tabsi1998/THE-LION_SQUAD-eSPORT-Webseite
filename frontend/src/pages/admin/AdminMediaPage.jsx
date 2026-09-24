@@ -1,165 +1,31 @@
-/**
- * Phase F.2 — Admin Media Browser.
- * Lists all uploaded files in /api/static/uploads, preview, copy URL, delete.
- */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE, api, formatApiError, formatUploadError, uploadApi } from "@/lib/api";
+import { api, formatApiError, formatUploadError, uploadApi } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { AdminSheet } from "@/components/tls/AdminSheet";
 import { prepareImageForUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { UploadProgressPanel } from "@/components/tls/UploadProgressPanel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useUploadProgress } from "@/hooks/useUploadProgress";
-import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, VIDEO_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
+import { MEDIA_ACCEPT, ORIGINAL_MEDIA_EXTENSIONS, mediaTypeFromFile } from "@/lib/galleryMedia";
 import { logUploadClientFailure } from "@/lib/uploadDiagnostics";
 import { toast } from "sonner";
-import {
-  Image as ImageIcon, FileText, Trash2, Copy, ExternalLink, Search, RefreshCw, Upload,
-  RotateCcw, RotateCw, AlertTriangle, CheckCircle2, Video, Download, Activity,
-} from "lucide-react";
+import { FileText, Search, RefreshCw, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { MediaDetailSheet } from "./media/MediaDetailSheet";
+import { MediaPreview, UploadEventsPanel } from "./media/parts";
+import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./media/shared";
 
-const BACKEND = API_BASE;
-const IMG_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "avif", "bmp"]);
-const VIDEO_EXT = VIDEO_EXTENSIONS;
 const ORIGINAL_EXT = ORIGINAL_MEDIA_EXTENSIONS;
+
 const parseUploadMb = (value, fallback) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
+
 const MAX_VIDEO_UPLOAD_MB = parseUploadMb(import.meta.env.VITE_MAX_VIDEO_UPLOAD_MB, 1536);
+
 const PROXY_UPLOAD_LIMIT_MB = parseUploadMb(import.meta.env.VITE_PROXY_UPLOAD_LIMIT_MB, 1700);
+
 const VIDEO_MAX_BYTES = MAX_VIDEO_UPLOAD_MB * 1024 * 1024;
-const MEDIA_SCOPE_LABELS = {
-  all: "Alle",
-  admin: "Admin/CMS",
-  sponsor: "Sponsor",
-  branding: "Branding",
-  gallery: "Galerie",
-  user: "User",
-  legacy: "Legacy",
-  unused: "Ungenutzt",
-  untracked: "Ungetrackt",
-  duplicate: "Duplikate",
-};
-
-const UPLOAD_STATUS_LABELS = {
-  success: "OK",
-  failed: "Fehler",
-  client_failed: "Browser",
-};
-
-const uploadStatusClass = (status) => {
-  if (status === "success") return "border-[#00FF88]/35 bg-[#00FF88]/10 text-[#00FF88]";
-  if (status === "client_failed") return "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]";
-  return "border-[#FF3B30]/35 bg-[#FF3B30]/10 text-[#FF3B30]";
-};
-
-const fmtDateTime = (value) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString("de-DE");
-};
-
-const fmtBytes = (n) => {
-  if (n == null) return "-";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / 1024 / 1024).toFixed(2)} MB`;
-};
-
-const cacheBustedMediaUrl = (url, item) => {
-  const stamp = encodeURIComponent(item?.mtime || item?.updated_at || item?.size || "");
-  return stamp ? `${url}?v=${stamp}` : url;
-};
-
-function BrokenImageState({ compact = false }) {
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
-      <ImageIcon className={compact ? "w-6 h-6" : "w-10 h-10"} />
-      <span className="text-[9px] uppercase tracking-widest font-bold">Bild nicht erreichbar</span>
-    </div>
-  );
-}
-
-function MediaImage({ src, alt, className, compact = false }) {
-  const [error, setError] = useState(false);
-  useEffect(() => setError(false), [src]);
-  if (error) return <BrokenImageState compact={compact} />;
-  return <img src={src} alt={alt} className={className} loading="lazy" onError={() => setError(true)} />;
-}
-
-function MediaPreview({ item, src, className, compact = false }) {
-  const isVideo = VIDEO_EXT.has(item.ext);
-  if (isVideo) {
-    return (
-      <div className="relative w-full h-full">
-        <video src={src} className={className} muted playsInline preload="metadata" />
-        <span className="absolute left-1 bottom-1 inline-flex items-center gap-1 bg-black/75 px-1.5 py-1 rounded-sm text-[9px] uppercase tracking-widest font-black text-white">
-          <Video className="w-3 h-3" /> Video
-        </span>
-      </div>
-    );
-  }
-  return <MediaImage src={src} alt={item.filename} className={className} compact={compact} />;
-}
-
-function UploadEventsPanel({ events, loading, onRefresh }) {
-  const rows = events.slice(0, 20);
-  return (
-    <div className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4" data-testid="upload-events-panel">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">
-            <Activity className="h-4 w-4" /> Upload-Protokoll
-          </div>
-          <p className="mt-1 text-xs text-white/45">Letzte Medien-Uploads inklusive Serverfehler, Proxy-Abbruch und Browserfehler.</p>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={loading}
-          className="inline-flex items-center gap-2 self-start rounded-sm border border-white/10 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:bg-white/5 disabled:opacity-50"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
-        </button>
-      </div>
-      <div className="mt-3 grid gap-2">
-        {loading && !rows.length ? (
-          <div className="rounded-sm border border-white/10 bg-[#121212] px-3 py-4 text-sm text-white/45">Lade Upload-Protokoll...</div>
-        ) : rows.length === 0 ? (
-          <div className="rounded-sm border border-white/10 bg-[#121212] px-3 py-4 text-sm text-white/45">Noch keine Upload-Versuche protokolliert.</div>
-        ) : rows.map((event) => (
-          <div key={event.id} className="rounded-sm border border-white/10 bg-[#121212] p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-sm border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${uploadStatusClass(event.status)}`}>
-                {UPLOAD_STATUS_LABELS[event.status] || event.status || "?"}
-              </span>
-              <span className="min-w-0 flex-1 break-all font-mono text-xs text-white/75">{event.filename || "upload"}</span>
-              <span className="text-[10px] uppercase tracking-wider text-white/35">{fmtDateTime(event.created_at)}</span>
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-white/45 sm:grid-cols-5">
-              <span>{event.kind || "unknown"} · {MEDIA_SCOPE_LABELS[event.media_scope] || event.media_scope || "Scope"}</span>
-              <span>{fmtBytes(event.size)}</span>
-              <span className="truncate">{event.mime || "-"}</span>
-              <span>HTTP {event.status_code || "-"}</span>
-              <span>{event.duration_ms != null ? `${event.duration_ms} ms` : "-"}</span>
-            </div>
-            {event.detail && (
-              <div className="mt-2 rounded-sm border border-white/10 bg-black/20 px-2 py-1.5 text-xs text-white/65 break-words">
-                {event.detail}
-              </div>
-            )}
-            {event.result?.url && (
-              <code className="mt-2 block break-all text-[10px] text-white/35">{event.result.url}</code>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function AdminMediaPage() {
   const [items, setItems] = useState([]);
@@ -696,105 +562,3 @@ export default function AdminMediaPage() {
 
 // Seitenblatt statt Fenster (#435, letzter Rest): Vorschau, Angaben und „Verwendet in“ im Blatt, die
 // Aktionen in der Leiste unten; die Kacheln bleiben daneben sichtbar.
-function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete }) {
-  const isImg = IMG_EXT.has(item.ext);
-  const isVideo = VIDEO_EXT.has(item.ext);
-  const canRotate = ["png", "jpg", "jpeg", "webp"].includes(item.ext);
-  const fullUrl = `${BACKEND}${item.url}`;
-  const previewUrl = cacheBustedMediaUrl(fullUrl, item);
-  const footer = (
-    <div className="ml-auto flex flex-wrap justify-end gap-2">
-      {isImg && canRotate && (
-        <>
-          <button type="button" onClick={onRotateLeft} data-testid="media-rotate-left" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-            <RotateCcw className="w-3.5 h-3.5" /> Links
-          </button>
-          <button type="button" onClick={onRotateRight} data-testid="media-rotate-right" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-            <RotateCw className="w-3.5 h-3.5" /> Rechts
-          </button>
-        </>
-      )}
-      <button type="button" onClick={onCopy} data-testid="media-copy-url" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-        <Copy className="w-3.5 h-3.5" /> URL kopieren
-      </button>
-      <a href={fullUrl} download={item.original_filename || item.filename} className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-        <Download className="w-3.5 h-3.5" /> Download
-      </a>
-      <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/25 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
-        <Trash2 className="w-3.5 h-3.5" /> Löschen
-      </button>
-    </div>
-  );
-  return (
-    <AdminSheet title={item.filename} eyebrow={isImg ? "Medien · Bild" : isVideo ? "Medien · Video" : "Medien · Datei"} accent="#FFD700" size="xl" onClose={onClose} footer={footer} testId="media-sheet">
-      <div className="bg-[#0A0A0A] rounded-sm p-3 flex items-center justify-center min-h-[240px]" data-testid="media-sheet-preview">
-        {isImg ? (
-          <MediaImage src={previewUrl} alt={item.filename} className="max-h-[50vh] object-contain" />
-        ) : isVideo ? (
-          <video src={previewUrl} controls playsInline className="max-h-[50vh] max-w-full bg-black" />
-        ) : (
-          <div className="flex flex-col items-center gap-3 text-white/50 py-12">
-            <FileText className="w-16 h-16" />
-            <span className="text-sm font-mono uppercase">.{item.ext || "file"}</span>
-            <a href={fullUrl} target="_blank" rel="noreferrer" className="text-[#29B6E8] underline text-xs inline-flex items-center gap-1">
-              <ExternalLink className="w-3 h-3" /> Datei öffnen
-            </a>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 text-xs">
-        <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Größe</div>
-          <div className="text-white/80">{fmtBytes(item.size)}</div>
-        </div>
-        <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
-          <div className="text-white/80">{new Date(item.mtime).toLocaleString("de-DE")}</div>
-        </div>
-        <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>
-          <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || item.media_scope || "Legacy"}</div>
-        </div>
-        <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Nutzung</div>
-          <div className="text-white/80">{item.usage_count || 0} Referenz(en){item.tracked ? "" : " · ungetrackt"}</div>
-        </div>
-        {item.original_filename && (
-          <div className="col-span-2">
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Originalname</div>
-            <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
-          </div>
-        )}
-        {item.duplicate_count > 1 && (
-          <div className="col-span-2">
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Duplikate</div>
-            <div className="mt-1 flex flex-wrap gap-1">
-              {(item.duplicate_filenames || []).map((name) => (
-                <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono text-[10px] text-[#FFD700]">{name}</span>
-              ))}
-            </div>
-          </div>
-        )}
-        <div className="col-span-2">
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">URL</div>
-          <code className="text-white/80 font-mono text-[11px] break-all">{fullUrl}</code>
-        </div>
-      </div>
-
-      {(item.references || []).length > 0 && (
-        <div className="border border-white/10 rounded-sm p-3" data-testid="media-sheet-references">
-          <div className="uppercase text-[10px] text-white/40 tracking-widest font-bold mb-2">Verwendet in</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            {item.references.map((ref, idx) => (
-              <div key={`${ref.collection}-${ref.id}-${ref.field}-${idx}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-                <div className="font-bold text-white/75">{ref.label || ref.id || ref.collection}</div>
-                <div className="text-white/40 font-mono break-all">{ref.collection}.{ref.field}{ref.text_reference ? " · Text" : ""}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </AdminSheet>
-  );
-}
