@@ -338,7 +338,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} isClubMember={isClubMember} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
+          <ProfileNav tab={tab} onSelect={setTab} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}

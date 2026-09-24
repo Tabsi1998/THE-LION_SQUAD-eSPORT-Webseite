@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { SOCIAL_ICONS } from "@/lib/socialIcons";
 import { useAuth } from "@/context/AuthContext";
-import { accountLinksFor } from "@/pages/user/profile/constants";
+import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
+import { useAccountBadges } from "@/hooks/useAccountBadges";
 import { Logo } from "@/components/tls/Logo";
 import { MainNav, MobileNav } from "@/components/tls/MainNav";
 import { NotificationBell } from "@/components/tls/NotificationBell";
@@ -15,7 +16,7 @@ import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Settings, Smartphone } from "lucide-react";
+import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
 import { useCallback, useMemo, useState, useEffect } from "react";
 
@@ -57,6 +58,7 @@ export function PublicLayout({ children }) {
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
   }, []);
   const nav = useNavigate();
+  const mobileBadges = useAccountBadges(user?.id, mobileOpen);
   const closeMobile = () => setMobileOpen(false);
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const clubName = branding?.club_name || "THE LION SQUAD";
@@ -139,17 +141,9 @@ export function PublicLayout({ children }) {
                 )}
                 {user ? (
                   <>
-                    <Link to="/dashboard" onClick={closeMobile} data-testid="nav-dashboard-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Dashboard</Link>
-                    <Link to="/profile" onClick={closeMobile} data-testid="nav-profile-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
-                      <Settings className="w-3.5 h-3.5 inline mr-1.5" /> Mein Profil
-                    </Link>
-                    <Link to="/messages" onClick={closeMobile} data-testid="nav-messages-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
-                      <MessageSquare className="w-3.5 h-3.5 inline mr-1.5" /> Nachrichten
-                    </Link>
-                    <div className="px-3 pt-2 text-[10px] font-bold uppercase tracking-widest text-white/35">Mein Konto</div>
-                    {accountLinksFor(isClubMember).map((link) => (
-                      <Link key={link.key} to={link.to} onClick={closeMobile} data-testid={`nav-account-${link.key}-mobile`} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
-                        <link.icon className="w-3.5 h-3.5 inline mr-1.5" /> {link.label}
+                    {userMenuEntries({ username: user.username, isClubMember, badges: mobileBadges }).map((entry) => (
+                      <Link key={entry.key} to={entry.to} onClick={closeMobile} data-testid={userMenuTestId(entry.key, "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                        <entry.icon className="w-3.5 h-3.5 inline mr-1.5" /> {entry.label}
                       </Link>
                     ))}
                     <button

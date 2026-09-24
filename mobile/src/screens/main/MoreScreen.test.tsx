@@ -51,9 +51,12 @@ test("Zeilen statt Karten: jedes Ziel einmal; Mitglieder sehen die goldene Karte
   await render(<MoreScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(mockGet).toHaveBeenCalled());
 
-  for (const title of ["Nachrichten", "Benachrichtigungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Sponsoren", "Partner"]) {
+  for (const title of ["Nachrichten", "Benachrichtigungen", "Meine Mitgliedschaft", "Meine Rechnungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Sponsoren", "Partner"]) {
     expect(screen.getAllByText(title)).toHaveLength(1);
   }
+  // Dieselbe Reihenfolge wie im Web-Benutzermenü (#516): Mitgliedschaft vor den Rechnungen.
+  await fireEvent.press(screen.getByText("Meine Mitgliedschaft"));
+  expect(navigate).toHaveBeenCalledWith("MyMembership");
   // Mitgliedervorteile liegen im Mitgliederbereich (#340).
   expect(screen.queryByText("Mitgliedervorteile")).toBeNull();
   await fireEvent.press(screen.getByTestId("more-member-area"));

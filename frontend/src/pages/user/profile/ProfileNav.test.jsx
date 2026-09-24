@@ -33,15 +33,11 @@ test("ein Zaehler und ein Punkt haengen am Reiter Freunde", () => {
   expect(screen.queryByTestId("profile-tab-privacy-alert")).toBeNull();
 });
 
-// Mein Konto unter den Reitern: Strafen, Gewinne, Benachrichtigungen, Hilfe - Mitgliedschaft nur für Mitglieder.
-test("die Konto-Seiten stehen unter den Reitern, Mitgliedschaft nur für Mitglieder", () => {
+// Die Konto-Seiten stehen seit #516 nur noch im Benutzermenü - hier gab es sie doppelt.
+test("kein zweites „Mein Konto“ unter den Reitern; Benachrichtigungen heißen hier „einstellen“", () => {
   render(<ProfileNav tab="basic" onSelect={() => {}} />);
-  expect(screen.getByTestId("profile-link-penalties")).toHaveAttribute("href", "/my/penalties");
-  expect(screen.getByTestId("profile-link-prizes")).toHaveAttribute("href", "/my/prizes");
-  expect(screen.getByTestId("profile-link-help")).toHaveAttribute("href", "/contact");
-  expect(screen.queryByTestId("profile-link-invoices")).toBeNull();
-  expect(screen.queryByTestId("profile-link-membership")).toBeNull();
-  render(<ProfileNav tab="basic" onSelect={() => {}} isClubMember />);
-  expect(screen.getByTestId("profile-link-membership")).toHaveAttribute("href", "/members/membership");
+  expect(screen.queryByText("Mein Konto")).toBeNull();
+  expect(screen.queryByTestId("profile-link-penalties")).toBeNull();
+  expect(screen.queryByTestId("profile-link-help")).toBeNull();
+  expect(screen.getByTestId("profile-tab-notifications")).toHaveTextContent("Benachrichtigungen einstellen");
 });
-
