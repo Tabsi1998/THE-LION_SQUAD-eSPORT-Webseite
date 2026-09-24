@@ -61,7 +61,7 @@ export default function AdminDashboardPage() {
     { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/integrations/twitch", icon: Radio, ok: undefined },
     { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings?tab=socials", icon: Share2, ok: undefined },
     { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings?tab=seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
-    { label: "Rechtliches", detail: "Impressum & Datenschutz", to: "/admin/settings?tab=legal", icon: ShieldCheck, ok: undefined },
+    { label: "Vereinsdaten", detail: "Impressum & Datenschutz", to: "/admin/club", icon: ShieldCheck, ok: undefined },
     { label: "Navigation", detail: "Menüs steuern", to: "/admin/nav", icon: SettingsIcon, ok: undefined },
     { label: "Systemstatus", detail: "Queue, Uploads, Scheduler", to: "/admin/settings?tab=system", icon: Activity, ok: undefined },
   ];

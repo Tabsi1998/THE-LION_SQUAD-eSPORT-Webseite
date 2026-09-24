@@ -19,7 +19,7 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
 
 test("Verein bündelt Vereinsdaten, Über uns, Vorstand, Sponsoren, Partner, Referenzen und Kontakt-Inbox", () => {
   expect(group("Verein").items.map((item) => item.label)).toEqual(["Vereinsdaten", "Über uns", "Vorstand", "Sponsoren", "Partner", "Referenzen", "Kontakt-Inbox"]);
-  expect(group("Verein").items[0].to).toBe("/admin/settings?tab=legal");
+  expect(group("Verein").items[0].to).toBe("/admin/club");
   expect(group("Verein").items[0].areas).toEqual(["system"]);
 });
 
@@ -50,7 +50,7 @@ test("die Suche findet Reiter: Steam → Login & Konten, Analytics → SEO, Steu
   expect(find("google analytics")).toContain("/admin/settings?tab=seo");
   expect(find("Steuersätze")).toContain("/admin/dolibarr?tab=connection");
   expect(find("wortfilter")).toContain("/admin/moderation");
-  expect(find("vereinsdaten aus dolibarr")).toContain("/admin/settings?tab=legal");
+  expect(find("vereinsdaten aus dolibarr")).toContain("/admin/club");
 });
 
 test("Wegweiser respektieren die Bereiche: die Turnierleitung sieht keine Einstellungen", () => {

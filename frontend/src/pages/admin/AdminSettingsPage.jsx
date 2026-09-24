@@ -11,13 +11,12 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { BrandField, BrandSelect, LegalTextArea, SystemCard } from "./settings/fields";
-import { LegalTab } from "./settings/LegalSettings";
 import { SOCIAL_PLATFORM_OPTIONS, SocialsTab } from "./settings/SocialSettings";
 import { PlatformLinkOverview } from "./settings/PlatformLinkSettings";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { PLATFORM_APP_FIELDS, PLATFORM_SECRET_FIELDS } from "@/lib/platformLinks";
 import { toast } from "sonner";
-import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, Server, Inbox, RefreshCw, Trash2, FileText, Activity, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
+import { Mail, Palette, Send, CheckCircle2, XCircle, AlertTriangle, Server, Inbox, RefreshCw, Trash2, Activity, Eye, Search, Plus, Share2, LogIn } from "lucide-react";
 
 const MAIL_TEMPLATE_LABELS = {
   user_invite: "Einladungsmail",
@@ -72,7 +71,6 @@ const SETTINGS_GROUPS = [
     ["brand", "Branding", Palette],
     ["socials", "Socials", Share2],
     ["seo", "SEO & Analytics", Search],
-    ["legal", "Rechtliches", FileText],
   ] },
   { label: "System", tabs: [
     ["system", "Status", Activity],
@@ -82,7 +80,7 @@ const SETTINGS_TABS = SETTINGS_GROUPS.flatMap((group) => group.tabs);
 const SETTINGS_TAB_KEYS = new Set(SETTINGS_TABS.map(([key]) => key));
 // Discord und Twitch haben seit 24.09. keine Reiter mehr: alles dazu steht auf ihrer Seite unter
 // Verbindungen („muss das doppelt sein?“). Alte Links und Lesezeichen landen dort.
-const LEGACY_TAB_REDIRECTS = { discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch" };
+const LEGACY_TAB_REDIRECTS = { legal: "/admin/club", discord: "/admin/integrations/discord", twitch: "/admin/integrations/twitch" };
 const INDEXNOW_DEFAULT_PATHS = ["/", "/sitemap.xml", "/sitemap-news.xml", "/news", "/events", "/esports", "/tournaments", "/fastlap", "/galerie", "/members"];
 
 const BANNER_TEMPLATE_PRESETS = {
@@ -416,11 +414,6 @@ export default function AdminSettingsPage() {
   const removeSocialLink = (index) => {
     brandDirtyRef.current = true;
     setBrand((prev) => ({ ...prev, social_links: (prev.social_links || []).filter((_, i) => i !== index) }));
-  };
-
-  const setCanonicalLegalText = (key, legacyKey, value) => {
-    brandDirtyRef.current = true;
-    setBrand((prev) => ({ ...prev, [key]: value, [legacyKey]: "" }));
   };
 
   const refreshPublicBranding = async () => {
@@ -760,7 +753,6 @@ export default function AdminSettingsPage() {
     brandDirty && "brand",
     brandDirty && "socials",
     brandDirty && "seo",
-    brandDirty && "legal",
   ].filter(Boolean));
 
   const legacyTarget = LEGACY_TAB_REDIRECTS[searchParams.get("tab")];
@@ -1610,7 +1602,6 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {tab === "legal" && <LegalTab brand={brand} setBrandField={setBrandField} setCanonicalLegalText={setCanonicalLegalText} saveBrand={saveBrand} saving={imageUploadBusy || savingBrand} />}
 
       {tab === "system" && (
         <div className="space-y-4">

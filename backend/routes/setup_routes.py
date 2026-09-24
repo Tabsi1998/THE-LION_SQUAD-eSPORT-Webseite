@@ -65,7 +65,7 @@ def _setup_checks(s: dict, branding: dict, mail: dict, legacy_email: dict, has_a
         {"key": "club_name", "label": "Vereinsname gepflegt", "ok": bool(branding.get("club_name")), "target": "/admin/settings?tab=brand"},
         {"key": "domain", "label": "Öffentliche Domain gesetzt", "ok": bool(branding.get("domain")), "target": "/admin/settings?tab=brand"},
         {"key": "contact_email", "label": "Kontakt-E-Mail gesetzt", "ok": public_legal["contact_ready"], "target": "/admin/settings?tab=brand"},
-        {"key": "legal", "label": "Impressum/Datenschutz vollständig", "ok": public_legal["legal_ready"], "target": "/admin/settings?tab=legal"},
+        {"key": "legal", "label": "Impressum/Datenschutz vollständig", "ok": public_legal["legal_ready"], "target": "/admin/club"},
         {"key": "mail", "label": "E-Mail-Versand konfiguriert", "ok": _truthy_mail_config(mail, legacy_email), "target": "/admin/settings?tab=smtp"},
     ]
 

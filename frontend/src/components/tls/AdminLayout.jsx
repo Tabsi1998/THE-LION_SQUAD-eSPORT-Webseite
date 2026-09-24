@@ -29,7 +29,7 @@ export const ADMIN_GROUPS = [
     label: "Verein",
     items: [
       // Vereinsdaten sind der Reiter „Rechtliches“ der Einstellungen (Stammdaten, Dolibarr-Schalter, Rechtstexte).
-      { to: "/admin/settings?tab=legal", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
+      { to: "/admin/club", label: "Vereinsdaten", icon: Building2, areas: ["system"] },
       // Über uns (#406): die Leitbild-Texte der Seite „Über den Verein“; Zahlen, Spiele, Vorstand kommen aus den Daten.
       { to: "/admin/about", label: "Über uns", icon: BookOpen, areas: ["content"] },
       { to: "/admin/board", label: "Vorstand", icon: UserCheck, areas: ["club"] },
@@ -165,7 +165,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/mobile-push": ["push", "notifications", "app"],
   "/admin/settings": ["einstellungen", "system", "smtp", "branding", "resend", "mail", "queue", "discord", "twitch", "socials", "seo", "analytics", "indexnow", "recht", "legal"],
   "/admin/setup": ["einrichtung", "anleitung", "anleitungen", "setup", "einrichten", "discord app", "twitch app", "google login", "resend", "smtp", "analytics", "search console", "play store", "schritt für schritt", "howto", "how to"],
-  "/admin/settings?tab=legal": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
+  "/admin/club": ["vereinsdaten", "impressum", "datenschutz", "zvr", "anschrift", "obmann", "dolibarr", "recht", "legal", "vereinsdaten aus dolibarr"],
   "/admin/settings?tab=auth": ["login", "anmeldung", "google", "passkey", "passkeys", "fingerabdruck", "registrierung", "zwei-faktor", "2fa", "steam", "discord app", "twitch app", "plattform-konten", "konten verknuepfen", "konten verknüpfen", "verknuepfung", "verknüpfung", "oauth", "rueckruf", "rückruf", "callback", "steam api key", "client id"],
   "/admin/settings?tab=email": ["resend", "absender", "api key", "mail", "e-mail", "versand"],
   "/admin/settings?tab=smtp": ["smtp", "mailserver", "postausgang", "port", "tls"],
