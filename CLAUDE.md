@@ -216,6 +216,79 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- App: Vereinsakte, eigene Daten und Austritt in „Meine Mitgliedschaft“ (#324/
+  #329 App-Teil; PR #490; nur App; App-Build). `lib/selfService.ts`
+  (`IdentityState`, `SelfProfile`, `SelfRequest`, `SelfService`,
+  `SELF_FIELD_LABELS`, `fieldLabel`, `changedFields`, `selfRequestLine`,
+  `exitLine`, `validWishedDay`); `MyMembershipScreen` lädt
+  `/membership/me/identity` und `/membership/me/self-service` mit (fehlen sie,
+  bleiben die Karten weg): Karte `membership-identity` (Code
+  `membership-identity-code|claim`, Stand `membership-identity-bound`), Karte
+  `membership-self` (`membership-self-identity|field-<key>|save|requests|
+  request-<external_id>|exit|exit-date|exit-button|exit-planned`; Rückfrage
+  vor dem Austritt per `Alert`). Tests `selfService.test.ts` (3),
+  `MyMembershipScreen.test.tsx` (+3).
+- App: Expo-Pakete auf die vom SDK erwarteten Patch-Versionen (PR #489; nur
+  App; App-Build). Expo veröffentlichte am 24.09. Patch-Versionen; `expo
+  install --check` (harter Schritt im Check und in der CI) verlangte sie:
+  `expo` 57.0.25, `expo-calendar` 57.0.5, `expo-image-picker` 57.0.20,
+  `expo-notifications` 57.0.21, `expo-sharing` 57.0.22, `expo-video` 57.0.5
+  (`npx expo install --fix` in `mobile/`).
+- Meine Daten und Austritt (#329 Teil 2; PR #488; Backend + Web; `update.sh`).
+  `services/dolibarr_self_service.py`: `_access` (live, Bindung `bound`,
+  Fähigkeit `profile`; sonst `not_connected|not_bound|no_capability` mit
+  `REASON_TEXTS`), `overview` (Profil `PROFILE_FIELDS` aus `me/profile` +
+  Einreichungen aus `me/profile/changes`, `changeable`, `status_labels`),
+  `request_change(db, user, version, changes)` (nur `CHANGEABLE`, `version`
+  Pflicht, `external_id` aus Konto + Inhalt = derselbe Auftrag; 409 „inzwischen
+  geändert“, 403 → `mark_revoked`), `request_exit(db, user, wished_last_day)`
+  (Datum JJJJ-MM-TT, `external_id` je Tag und Wunsch; 409 „schon geplant“);
+  `_request_view` (+`status_label`). `dolibarr_client`: `my_profile|
+  my_profile_requests|request_profile_change|request_exit`;
+  `dolibarr_identity.claim` fragt bei bestehender Bindung erst `identity()`
+  (widerrufen → neuer Code gilt). Routen `GET /api/membership/me/self-service`,
+  `POST …/self-service/changes` (`SelfServiceChangeBody`, 20/h), `POST
+  …/self-service/exit` (`SelfServiceExitBody`, 5/h). Fake `profiles`/
+  `profile_for`, `profile_requests`, `direct_fields`, `exit_rule_last_day`.
+  Web `MyMembershipPage` `SelfServiceCard` (`membership-self-card|identity|
+  form|field-<key>|save|requests|request-<external_id>|exit|exit-date|
+  exit-button|exit-planned`, `selfRequestLine`, `SELF_FIELD_LABELS`). Doku
+  `docs/DOLIBARR.md`. Tests `test_member_self_service_flow.py` (2),
+  `MyMembershipPage.test.jsx` (+3). Nicht dabei: SEPA-Mandat.
+- Vereinsakte verbinden (#324 Teil 1; PR #486; Backend + Web + App; `update.sh`,
+  App-Build). `services/dolibarr_identity.py`: Bindung je Konto und
+  Installation in `dolibarr_identities` (`subject` = Konto-ID, `member_id`,
+  `capabilities`, `proof`, `linked_at`, `status bound|revoked`); `claim(db,
+  user, code)` → `client.claim_identity` (`POST /vereine/identities/claim`,
+  Schreib-Schlüssel, ohne Wiederholung; `ClaimError` 400/403/409/503 mit
+  Klickweg – auch „darf noch nicht für Personen handeln“), `state`,
+  `public_state` (+`capability_labels`), `documents_for` (mit Bindung
+  `me/documents`, sonst `documents`; Kurzspeicher 60 s je `me:<subject>`/
+  `public`; 403 → `mark_revoked` und sofort nur Öffentliches),
+  `document_view` (`id dolibarr-<document_id>`, `source dolibarr`,
+  `personal`, `category` aus `KIND_CATEGORY`, Beschreibung aus `WHAT_LABELS`/
+  `AUDIENCE_LABELS`, `view_url|download_url` wie eigene Dateien),
+  `parse_doc_id`, `document_pdf` (je Abruf aus Dolibarr, Bytes gegen `sha256`
+  geprüft, kein Speicher – das Modul prüft je Abruf, wer darf).
+  `dolibarr_client`: `claim_identity|identity|my_documents|my_document_pdf|
+  public_documents|public_document_pdf`; `CAPABILITIES_V1`
+  `verified_identities`/`documents` True. Routen `GET/POST
+  /api/membership/me/identity` (`IdentityClaimBody`, Rate-Limit
+  `dolibarr:identity:claim` 10/15 min); `GET /api/documents` hängt die
+  Akten-Dokumente für Mitglieder an (Kategorie-Filter gilt mit), `GET
+  /api/documents/dolibarr-<id>/view|download` → `_dolibarr_file` (403 kein
+  Mitglied, 404 fremd/unbekannt, 502 Prüfsumme, 503 weg). Vertrag: Manifest
+  ohne `verified_identities|documents` in `waiting_for`, Pfade ergänzt; Fake
+  `invite|publish|revoke_identity|identity_right|tampered_document_ids`,
+  `document_pdf_bytes`, `published_document`. Web `MyMembershipPage`
+  `IdentityCard` (`membership-identity-card|hint|form|code|claim|bound|
+  documents`), `MemberDocumentsPage` (`docs-identity-hint`, `doc-source-<id>`,
+  Dokumentarten `resolution|audit_report|account|payout|letter|ballot`),
+  `lib/dolibarr.js` Fähigkeitsnamen. App `memberDocuments.ts` (`source`,
+  `personal`, Dokumentarten), `MemberDocumentsScreen` `document-source-<id>`.
+  Doku `docs/DOLIBARR.md` „Vereinsakte verbinden“. Tests
+  `test_dolibarr_identity_flow.py` (3), `MyMembershipPage.test.jsx` (+2),
+  `MemberDocumentsPage.test.jsx` (3, neu), `memberDocuments.test.ts` (+1).
 - Statuten aus Dolibarr (#326 Teil 3; PR #485; Backend + Web; `update.sh`).
   `dolibarr_client.statutes()`/`statute_pdf(id)` (`/vereine/statutes`,
   `/vereine/statutes/{id}/pdf`); `club_facts.refresh` liest sie mit
@@ -2144,11 +2217,10 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`). `main` steht auf `f1df187`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build). `main` steht auf `5fed184`.
 
 ### Offene PRs
-- #486 (#324 Teil 1 Vereinsakte verbinden; Backend + Web + App; Entwurf, voller
-  Check läuft). **Regel seit
+- Derzeit keiner. **Regel seit
   23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
@@ -2158,7 +2230,7 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   A/B des Betreibers), #401 Turnierseite (Reiter auf einer Seite, „Dein
   Stand“, Termine einmal – Antwort des Betreibers zu Reitern steht noch aus),
   dann Dolibarr III Rest (#326 Teil 2 Vorstandsseite – umgesetzt in #468, Teil 3
-  Statuten – umgesetzt in #485; #329 Einwilligungen, eigene Daten, Austritt
+  Statuten – umgesetzt in #485; #324 Teil 1 Vereinsakte – umgesetzt in #486; #329 Teil 2 eigene Daten und Austritt – umgesetzt in #488; #329 Rest (Mandat), #324 Rest (Mitglieder-Archiv der Statuten, Rechnungen)
   über `/vereine/me/consents` und `/vereine/members/{id}/consents`; #324
   Dokumente, sobald dolibarr-vereine#157 liefert; #330 Durchläufe) und
   Moderation II (#415–#417, Meilenstein 28, Variante C) nach App 1.0.0; Play
@@ -2235,6 +2307,12 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #486, #488, #489, #490 (25.09.): `update.sh` und App-Build. Im Vereinsmodul:
+  dem Website-Benutzer das Recht „Für Personen handeln“ geben; unter Einrichtung →
+  Externe Identitäten eine Einladung für dich erzeugen (Fähigkeiten „Dokumente“ und
+  „eigene Daten“) und den Code unter Meine Mitgliedschaft → Vereinsakte einlösen;
+  Kündigungsregel und „sofort“-Felder prüfen. Danach: Vereinsdokumente und „Meine
+  Daten“ ansehen (Web und App).
 - Nach #482, #483, #484, #485 (24.09.): `update.sh` und App-Build. Discord: im Developer Portal → deine App →
   Bot → „Privileged Gateway Intents“ den „Server Members Intent“ einschalten, „Save Changes“ –
   der Bot verbindet sich danach innerhalb von fünf Minuten von selbst (Stand unter Verbindungen →
