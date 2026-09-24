@@ -74,3 +74,10 @@ test("Abmelden ruft die Abmeldung auf und schliesst das Menue", async () => {
   expect(authState.logout).toHaveBeenCalledTimes(1);
   expect(screen.queryByTestId("nav-user-menu")).toBeNull();
 });
+
+test("fuehrt aufs eigene oeffentliche Profil (#514)", async () => {
+  const user = userEvent.setup();
+  renderMenu();
+  await user.click(screen.getByTestId("nav-user"));
+  expect(screen.getByTestId("nav-public-profile")).toHaveAttribute("href", "/u/lionfan");
+});

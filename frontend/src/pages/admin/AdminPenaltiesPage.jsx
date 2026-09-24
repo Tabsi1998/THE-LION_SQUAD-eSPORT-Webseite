@@ -43,7 +43,7 @@ export default function AdminPenaltiesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">P0 — Transparenz</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">eSports</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Strafen-Inbox</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
         Alle Strafzeiten, ungültigen Runden, Forfeits und Vorfälle — sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen".

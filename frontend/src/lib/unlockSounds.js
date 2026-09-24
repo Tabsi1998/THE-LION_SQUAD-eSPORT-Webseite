@@ -110,8 +110,15 @@ const SEQUENCES = {
   },
 };
 
+/** Browser starten Ton erst nach einer Geste (Klick, Taste); vorher würde die Konsole jede Seite warnen. */
+function userHasInteracted() {
+  if (typeof navigator === "undefined") return true;
+  const activation = navigator.userActivation;
+  return !activation || activation.hasBeenActive !== false;
+}
+
 export function playUnlockSound(level = 1) {
-  if (isSoundMuted()) return;
+  if (isSoundMuted() || !userHasInteracted()) return;
   const context = getCtx();
   if (!context) return;
   const lvl = Math.min(5, Math.max(1, Number(level) || 1));

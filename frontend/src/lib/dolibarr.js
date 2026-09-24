@@ -58,8 +58,8 @@ export const CAPABILITY_LABELS = {
   membership_fees: "Mitgliedsarten und Beiträge",
   webhook_member_changed: "Benachrichtigung bei Änderung",
   verified_identities: "Persönlicher Zugriff: Vereinsakte verbinden (ab Vereine 0.11)",
-  change_feed: "Änderungsfeed mit Revisionen (#154)",
-  signed_webhooks: "Signierte Webhooks (#155)",
+  change_feed: "Änderungsfeed mit Revisionen",
+  signed_webhooks: "Signierte Webhooks",
   documents: "Dokumente aus der Vereinsakte (ab Vereine 0.11)",
 };
 
