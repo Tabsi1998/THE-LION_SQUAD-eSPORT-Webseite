@@ -444,7 +444,8 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     if profile is not None:
         if profile.get("dolibarr_member_id") != member_id:
             claim["dolibarr_member_id"] = member_id
-        if user_id and not profile.get("user_id"):
+        # Ein vom Vorstand gelöstes Konto hängt der Abgleich nicht wieder an (#506).
+        if user_id and not profile.get("user_id") and profile.get("account_unlinked_user_id") != user_id:
             claim["user_id"] = user_id
 
     if listed:

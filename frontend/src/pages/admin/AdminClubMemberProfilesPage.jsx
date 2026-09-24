@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, FieldLabel, SelectField, TextField } from "@/components/tls/FormFields";
+import { AccountBox } from "./members/AccountBox";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
@@ -69,7 +70,6 @@ function toForm(profile) {
 
 export function ClubMemberProfilesAdminContent() {
   const [profiles, setProfiles] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState(null);
@@ -78,12 +78,8 @@ export function ClubMemberProfilesAdminContent() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [profilesRes, usersRes] = await Promise.all([
-        api.get("/membership/profiles/admin/all"),
-        api.get("/users"),
-      ]);
-      setProfiles(profilesRes.data || []);
-      setUsers(usersRes.data || []);
+      const { data } = await api.get("/membership/profiles/admin/all");
+      setProfiles(data || []);
     } catch (e) {
       toast.error(formatRequestError(e, "Mitgliederprofile konnten nicht geladen werden."));
     } finally {
@@ -119,6 +115,7 @@ export function ClubMemberProfilesAdminContent() {
           <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Vereinsmitglieder</h1>
           <p className="text-sm text-white/60 mt-1 max-w-3xl">
             Redaktionelle Mitgliederübersicht mit festen Profilen, großen Bildern, Bio, Games und Plattformen. Funktionen wie Obmann/Kassier kommen automatisch aus dem Vorstand.
+            Ein Profil ist kein Konto und keine Mitgliedschaft: „Profil erstellen“ legt nur das Vereinsprofil an – das Website-Konto verknüpfst du im Profil unter „Konto“ (optional).
           </p>
         </div>
         <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-black uppercase tracking-wider hover:bg-[#e8c200]">
@@ -194,7 +191,7 @@ export function ClubMemberProfilesAdminContent() {
       {editing && (
         <ProfileModal
           entry={editing}
-          users={users}
+          profiles={profiles}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
         />
@@ -211,7 +208,7 @@ export default function AdminClubMemberProfilesPage() {
   );
 }
 
-function ProfileModal({ entry, users = [], onClose, onSaved }) {
+function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
   const [form, setForm] = useState(entry.form);
   const [saving, setSaving] = useState(false);
   const isEdit = !!entry.profile;
@@ -271,10 +268,10 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
           <TextField label="URL-Slug" value={form.slug} onChange={(v) => set("slug", v)} placeholder="wird aus Gamertag erstellt" className="font-mono" />
           <GermanDateField id="member-birth-date" label="Geburtsdatum" value={form.birth_date} onChange={(v) => set("birth_date", v)} testId="member-birth-date" />
           <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} />
-          <SelectField label="Plattform-Konto" value={form.user_id || ""} onChange={(v) => set("user_id", v)} options={[["", "Kein Account verknüpft"], ...users.map((u) => [u.id, `${u.display_name || u.username} · @${u.username}`])]} />
           <TextField label="Games" value={form.games} onChange={(v) => set("games", v)} placeholder="F1 25, Valorant, Rocket League" />
           <TextField label="Plattformen" value={form.platforms} onChange={(v) => set("platforms", v)} placeholder="PC, PS5, Xbox" />
         </FormGrid>
+        <AccountBox form={form} set={set} profile={entry.profile} profiles={profiles} />
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
           Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
