@@ -211,12 +211,58 @@ function IdentityCard() {
   );
 }
 
-const WEBSITE_FIELDS = [
-  ["gamertag", "Gamertag", "z. B. LionKing"], ["games", "Spiele", "TFT, Rocket League"], ["platforms", "Plattformen", "PC, PS5"],
-];
+// Eigenes Website-Profil (#260, Vereine 1.2): die Felder, die der Verein in der Vereinsakte dafür gewählt hat.
+// Der Vorstand sieht sie auf der Mitgliedskarte, die Website zeigt sie im Mitgliederverzeichnis – aber nur,
+// wenn die Person der Nennung zugestimmt hat. Welche Felder das Mitglied selbst ändert, sagt `editable`.
+export function websiteFieldText(field) {
+  const value = field?.value;
+  if (value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length)) return "";
+  const label = (code) => (field.options || []).find((o) => o.code === code)?.label || code;
+  if (field.type === "boolean") return value ? "Ja" : "Nein";
+  if (field.type === "multi" && Array.isArray(value)) return value.map(label).join(", ");
+  if (field.type === "select") return label(value);
+  return String(value);
+}
 
-// Eigenes Website-Profil (#260): liegt in der Vereinsakte, der Vorstand sieht es auf der Mitgliedskarte, die
-// Website zeigt es im Mitgliederverzeichnis – aber nur, wenn die Person der Nennung zugestimmt hat.
+export function websiteStateLine(view) {
+  if (!view?.consent) return "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern.";
+  return view.given
+    ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
+    : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen).";
+}
+
+const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+function WebsiteFieldInput({ field, value, onChange }) {
+  const base = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
+  const testId = `membership-website-${field.code}`;
+  if (field.type === "textarea") return <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={3} maxLength={field.max_length || 2000} data-testid={testId} className={base} />;
+  if (field.type === "boolean") return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} data-testid={testId} className="w-4 h-4 accent-[#FFD700]" />;
+  if (field.type === "select") {
+    return (
+      <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} data-testid={testId} className={base}>
+        <option value="">– keine Angabe –</option>
+        {(field.options || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+      </select>
+    );
+  }
+  if (field.type === "multi") {
+    const chosen = Array.isArray(value) ? value : [];
+    return (
+      <div className="flex flex-wrap gap-2" data-testid={testId}>
+        {(field.options || []).map((o) => (
+          <label key={o.code} className={`px-2 py-1 border rounded-sm text-xs cursor-pointer ${chosen.includes(o.code) ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/60"}`}>
+            <input type="checkbox" className="sr-only" checked={chosen.includes(o.code)} onChange={(e) => onChange(e.target.checked ? [...chosen, o.code] : chosen.filter((c) => c !== o.code))} data-testid={`${testId}-${o.code}`} />
+            {o.label}
+          </label>
+        ))}
+      </div>
+    );
+  }
+  const type = field.type === "number" ? "number" : field.type === "date" ? "date" : "text";
+  return <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} maxLength={field.max_length || 255} data-testid={testId} className={base} />;
+}
+
 function WebsiteProfileCard() {
   const [view, setView] = useState(null);
   const [draft, setDraft] = useState({});
@@ -229,15 +275,15 @@ function WebsiteProfileCard() {
   }, []);
   useEffect(() => { load(); }, [load]);
   if (!view) return null;
-  const current = (key) => (key === "games" || key === "platforms" ? (view[key] || []).join(", ") : view[key] || "");
-  const value = (key) => (key in draft ? draft[key] : current(key));
-  const changed = Object.fromEntries(["gamertag", "bio", "games", "platforms"].filter((key) => key in draft && draft[key] !== current(key)).map((key) => [key, draft[key]]));
+  const fields = view.fields || [];
+  const value = (field) => (field.code in draft ? draft[field.code] : field.value);
+  const changed = Object.fromEntries(fields.filter((f) => f.editable && f.code in draft && !sameValue(draft[f.code], f.value)).map((f) => [f.code, draft[f.code]]));
   const save = async (event) => {
     event.preventDefault();
     if (busy || !Object.keys(changed).length) return;
     setBusy(true);
     try {
-      const { data } = await api.put("/membership/me/website-profile", changed);
+      const { data } = await api.put("/membership/me/website-profile", { fields: changed });
       setView(data);
       setDraft({});
       toast.success("Website-Profil gespeichert.");
@@ -250,27 +296,22 @@ function WebsiteProfileCard() {
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-website-card">
       <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Crown className="w-4 h-4 text-[#FFD700]" /> Mein Website-Profil</h2>
-      <p className="mt-2 text-sm text-white/70" data-testid="membership-website-state">
-        {!view.consent
-          ? "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern."
-          : view.given
-            ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
-            : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen)."}
-      </p>
+      <p className="mt-2 text-sm text-white/70" data-testid="membership-website-state">{websiteStateLine(view)}</p>
+      {!fields.length && <p className="mt-3 text-sm text-white/50" data-testid="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</p>}
       <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-website-form">
-        {WEBSITE_FIELDS.map(([key, label, placeholder]) => (
-          <label key={key} className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-            <input value={value(key)} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} maxLength={key === "gamertag" ? 40 : 255} placeholder={placeholder} data-testid={`membership-website-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        {fields.map((field) => (
+          <label key={field.code} className={`block ${field.type === "textarea" ? "sm:col-span-2" : ""}`}>
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}{!field.editable && <span className="ml-2 normal-case tracking-normal text-white/35">pflegt der Verein</span>}</div>
+            {field.editable
+              ? <WebsiteFieldInput field={field} value={value(field)} onChange={(v) => setDraft((d) => ({ ...d, [field.code]: v }))} />
+              : <div className="text-sm text-white/80" data-testid={`membership-website-${field.code}`}>{websiteFieldText(field) || "–"}</div>}
           </label>
         ))}
-        <label className="block sm:col-span-2">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Kurztext</div>
-          <textarea value={value("bio")} onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))} rows={3} maxLength={2000} data-testid="membership-website-bio" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        </label>
-        <div className="sm:col-span-2">
-          <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
-        </div>
+        {fields.some((f) => f.editable) && (
+          <div className="sm:col-span-2">
+            <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
+          </div>
+        )}
       </form>
     </div>
   );

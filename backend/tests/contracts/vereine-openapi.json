@@ -815,7 +815,7 @@
       "get": {
         "operationId": "getMemberProfile",
         "summary": "Website-Profil eines Mitglieds – nur mit der gewählten Einwilligung",
-        "description": "Gamertag, Kurztext, Spiele und Plattformen vom Reiter Verein der Mitgliedskarte sowie das Foto der Mitgliedskarte als Prüfsumme. Ohne die Einwilligung, die der Verein dafür gewählt hat, nennt die Antwort nur die Einwilligung und given false. Braucht das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
+        "description": "Die Felder, die der Verein unter Einrichtung > Einwilligungen für das Website-Profil gewählt hat (Zusatzfelder am Mitglied), je mit Bezeichnung, Art und Wert, sowie das Foto der Mitgliedskarte als Prüfsumme. Ohne die Einwilligung, die der Verein dafür gewählt hat, nennt die Antwort nur die Einwilligung und given false. Braucht das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen.",
         "parameters": [
           {
             "name": "id",
@@ -2977,7 +2977,7 @@
       "get": {
         "operationId": "getMyWebsiteProfile",
         "summary": "Eigenes Website-Profil lesen",
-        "description": "Gamertag, Kurztext, Spiele und Plattformen, auch ohne Einwilligung, dazu ob sie erteilt ist. Braucht die Fähigkeit profile.",
+        "description": "Alle Felder des Website-Profils mit Wert und editable, auch ohne Einwilligung, dazu ob sie erteilt ist. Braucht die Fähigkeit profile.",
         "parameters": [
           {
             "name": "subject",
@@ -3026,7 +3026,7 @@
       "put": {
         "operationId": "putMyWebsiteProfile",
         "summary": "Eigenes Website-Profil speichern",
-        "description": "Nur gesendete Felder ändern sich, die anderen bleiben; Spiele und Plattformen als Liste (bevorzugt) oder Text mit Komma/Zeile. Zu lang: 400 mit dem Feldnamen. Unabhängig von der Einwilligung.",
+        "description": "Body {\"fields\": {Kürzel: Wert}}. Nur gesendete Felder ändern sich, null leert ein Feld. Ein Feld außerhalb des Profils, eines, das der Verein pflegt (editable false), oder ein Wert, der nicht zur Art passt: 400 mit dem Kürzel in error.field. Unabhängig von der Einwilligung.",
         "parameters": [
           {
             "name": "subject",
@@ -3045,29 +3045,16 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "fields"
+                ],
                 "properties": {
-                  "gamertag": {
-                    "type": "string",
-                    "maxLength": 40
-                  },
-                  "bio": {
-                    "type": "string",
-                    "maxLength": 2000
-                  },
-                  "games": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "platforms": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
+                  "fields": {
+                    "type": "object",
+                    "description": "Kürzel => Wert wie in WebsiteProfileField.value; Mehrfachauswahl als Liste von Kürzeln"
                   }
-                },
-                "additionalProperties": false
+                }
               }
             }
           }
@@ -3156,6 +3143,10 @@
               },
               "message": {
                 "type": "string"
+              },
+              "field": {
+                "type": "string",
+                "description": "Bei 400 von PUT /vereine/me/website-profile: Kürzel des ersten abgelehnten Feldes"
               }
             }
           }
@@ -5744,25 +5735,13 @@
           },
           "given": {
             "type": "boolean",
-            "description": "Hat das Mitglied sie erteilt? Sonst fehlen alle weiteren Felder"
+            "description": "Hat das Mitglied sie erteilt? Sonst fehlen fields und photo"
           },
-          "gamertag": {
-            "type": "string"
-          },
-          "bio": {
-            "type": "string",
-            "description": "Kurztext des Vereins über das Mitglied"
-          },
-          "games": {
+          "fields": {
             "type": "array",
+            "description": "Die Felder, die der Verein für das Website-Profil gewählt hat, in ihrer Reihenfolge",
             "items": {
-              "type": "string"
-            }
-          },
-          "platforms": {
-            "type": "array",
-            "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/WebsiteProfileField"
             }
           },
           "photo": {
@@ -5845,10 +5824,7 @@
         "required": [
           "consent",
           "given",
-          "gamertag",
-          "bio",
-          "games",
-          "platforms"
+          "fields"
         ],
         "properties": {
           "consent": {
@@ -5859,22 +5835,78 @@
             "type": "boolean",
             "description": "Nur mit erteilter Einwilligung zeigt die Website das Profil"
           },
-          "gamertag": {
-            "type": "string"
-          },
-          "bio": {
-            "type": "string"
-          },
-          "games": {
+          "fields": {
             "type": "array",
+            "description": "Alle Felder des Website-Profils; editable sagt, welche das Mitglied selbst ändert",
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/WebsiteProfileField"
             }
+          }
+        }
+      },
+      "WebsiteProfileField": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "label",
+          "type",
+          "editable",
+          "value"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Kürzel des Zusatzfelds am Mitglied; bleibt gleich, solange der Verein das Feld nicht löscht"
           },
-          "platforms": {
+          "label": {
+            "type": "string",
+            "description": "Bezeichnung, wie der Verein sie vergeben hat"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "textarea",
+              "number",
+              "date",
+              "boolean",
+              "select",
+              "multi"
+            ],
+            "description": "Text, langer Text, Zahl, Datum, Ja/Nein, eine Option, mehrere Optionen – wie beim Mitgliedsantrag"
+          },
+          "editable": {
+            "type": "boolean",
+            "description": "Darf das Mitglied das Feld selbst ändern (PUT /vereine/me/website-profile)?"
+          },
+          "value": {
+            "nullable": true,
+            "description": "null, wenn leer; sonst Text, Zahl, true/false, Tag JJJJ-MM-TT, ein Options-Kürzel oder bei Mehrfachauswahl eine Liste von Kürzeln"
+          },
+          "max_length": {
+            "type": "integer",
+            "description": "Bei Text und langem Text: höchstens so viele Zeichen"
+          },
+          "options": {
             "type": "array",
+            "description": "Bei Auswahl und Mehrfachauswahl: die Optionen; Wert und Änderung nennen das Kürzel",
             "items": {
-              "type": "string"
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "code",
+                "label"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
             }
           }
         }

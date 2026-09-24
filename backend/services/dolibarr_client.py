@@ -111,14 +111,25 @@ def network_error_kind(exc: BaseException) -> str:
 
 
 class DolibarrError(Exception):
-    def __init__(self, kind: str, status: int | None = None):
+    def __init__(self, kind: str, status: int | None = None, detail: dict | None = None):
         self.kind = kind if kind in ERROR_TEXTS else "invalid_response"
         self.status = status
+        # Was das Modul zum Fehler sagt (`error.message`, bei 400 auch `error.field`) - für Sätze mit Feldname.
+        self.detail = detail if isinstance(detail, dict) else None
         super().__init__(self.text)
 
     @property
     def text(self) -> str:
         return ERROR_TEXTS[self.kind]
+
+
+def _error_detail(response) -> dict | None:
+    """`error` aus der Antwort des Moduls, wenn es eins gibt - für Sätze mit Feldname (400: `error.field`)."""
+    try:
+        body = response.json()
+    except ValueError:
+        return None
+    return body.get("error") if isinstance(body, dict) and isinstance(body.get("error"), dict) else None
 
 
 def clean_base_url(value: str | None, *, environment: str = "production") -> str:
@@ -236,7 +247,7 @@ class DolibarrClient:
                     except ValueError as exc:
                         raise DolibarrError("invalid_response", 200) from exc
                 if response.status_code in STATUS_KINDS:
-                    raise DolibarrError(STATUS_KINDS[response.status_code], response.status_code)
+                    raise DolibarrError(STATUS_KINDS[response.status_code], response.status_code, _error_detail(response))
                 if 300 <= response.status_code < 400:
                     raise DolibarrError("redirect", response.status_code)
                 logger.warning("[dolibarr] %s antwortet mit %s", path, response.status_code)

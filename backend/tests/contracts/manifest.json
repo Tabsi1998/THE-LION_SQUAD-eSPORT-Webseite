@@ -2,8 +2,8 @@
   "comment": "Festgehaltener API-Vertrag der Dolibarr-Module, gegen den die Website-Tests pruefen (#330). Die Module pruefen ihre echten Antworten in Dolibarr 22, 23 und 24 selbst gegen dieselbe Datei.",
   "vereine": {
     "repository": "Tabsi1998/dolibarr-vereine",
-    "module_version": "1.1.0 + #260 (eigenes Website-Profil)",
-    "commit": "485b583",
+    "module_version": "1.2.0 (Vorabstand 644c2c7, Tag folgt)",
+    "commit": "644c2c7",
     "api_version": 2,
     "openapi": "vereine-openapi.json",
     "used_paths": [
