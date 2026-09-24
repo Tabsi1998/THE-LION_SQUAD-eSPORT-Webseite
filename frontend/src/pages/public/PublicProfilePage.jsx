@@ -22,7 +22,7 @@ import {
   Trophy, Flag, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -30,7 +30,8 @@ import { toast } from "sonner";
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste, fünf Reiter (Übersicht, Achievements,
 // Auszeichnungen, Referenzen mit Turnieren und Fast Laps, Teams). Die Übersicht zeigt links die
 // Erfolge (Podestplätze, Auszeichnungen, Achievements, Referenzen) und rechts eine Konten-Karte,
-// „Über“, Setup und Teams; der Twitch-Player steht nur, wenn der Stream gerade läuft.
+// „Über“, Setup und Teams; der Twitch-Player steht nur, wenn der Stream gerade läuft. Konten stehen
+// genau einmal - im Kasten „Konten“ (#527), oben nur ein Zähler.
 
 function normalizeTwitchChannel(value) {
   const raw = String(value || "").trim();
@@ -181,33 +182,6 @@ function socialUrl(platform, value) {
   return "";
 }
 
-function publicSocialLinks(profile, twitchUrl) {
-  const links = [
-    profile.discord_name && { platform: "discord", label: "Discord", value: profile.discord_name, verified: isVerified(profile, "discord") },
-    twitchUrl && { platform: "twitch", label: "Twitch", value: normalizeTwitchChannel(profile.twitch_handle), url: twitchUrl, verified: isVerified(profile, "twitch") },
-    profile.youtube_handle && { platform: "youtube", label: "YouTube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle), verified: isVerified(profile, "youtube") },
-    profile.instagram_handle && { platform: "instagram", label: "Instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
-    profile.tiktok_handle && { platform: "tiktok", label: "TikTok", value: cleanHandle(profile.tiktok_handle), url: socialUrl("tiktok", profile.tiktok_handle), verified: isVerified(profile, "tiktok") },
-    profile.x_handle && { platform: "x", label: "X", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle), verified: isVerified(profile, "x") },
-    profile.website && { platform: "website", label: "Website", value: profile.website, url: externalUrl(profile.website) },
-  ].filter(Boolean);
-
-  const extra = (profile.socials || []).map((social) => ({
-    platform: String(social.platform || "").toLowerCase(),
-    label: social.platform,
-    value: social.value || social.url,
-    url: social.url || socialUrl(social.platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : ""),
-  })).filter((social) => social.value);
-
-  const seen = new Set();
-  return [...links, ...extra].filter((link) => {
-    const key = `${String(link.platform || link.label).toLowerCase()}:${String(link.url || link.value).toLowerCase()}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 function socialMeta(link) {
   const platform = String(link.platform || link.label || "").toLowerCase();
   if (platform.includes("discord")) return { key: "discord", label: "Discord", color: "#5865F2" };
@@ -221,6 +195,9 @@ function socialMeta(link) {
   if (platform.includes("riot")) return { key: "riot", label: "Riot Games", color: "#D13639" };
   if (platform.includes("xbox")) return { key: "xbox", label: "Xbox", color: "#107C10" };
   if (platform.includes("epic")) return { key: "epic", label: "Epic Games", color: "#C8C8C8" };
+  if (platform.includes("psn") || platform.includes("playstation")) return { key: "psn", label: "PlayStation", color: "#0070D1" };
+  if (platform.includes("nintendo")) return { key: "nintendo", label: "Nintendo", color: "#E60012" };
+  if (platform === "ea") return { key: "ea", label: "EA", color: "#FF4747" };
   if (platform.includes("website") || platform.includes("web")) return { key: "website", label: "Website", color: "#29B6E8" };
   return { key: "website", label: link.label || "Link", color: "#29B6E8" };
 }
@@ -237,6 +214,7 @@ function SocialIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "riot") return <Zap className={className} />;
   if (kind === "xbox") return <Gamepad2 className={className} />;
   if (kind === "epic") return <Flag className={className} />;
+  if (kind === "psn" || kind === "nintendo" || kind === "ea") return <Gamepad2 className={className} />;
   return <Globe className={className} />;
 }
 
@@ -245,17 +223,94 @@ function isVerified(profile, platform) {
   return Array.isArray(profile?.verified_platforms) && profile.verified_platforms.includes(platform);
 }
 
-function publicGamingIds(profile) {
-  return [
-    profile.steam_id && { label: "Steam", value: profile.steam_id, url: socialUrl("steam", profile.steam_id), verified: isVerified(profile, "steam") },
-    profile.epic_id && { label: "Epic", value: profile.epic_id, verified: isVerified(profile, "epic") },
-    profile.psn_id && { label: "PSN", value: profile.psn_id },
-    profile.xbox_id && { label: "Xbox", value: profile.xbox_id, url: `https://www.xbox.com/play/user/${encodeURIComponent(profile.xbox_id)}`, verified: isVerified(profile, "xbox") },
-    profile.nintendo_fc && { label: "Nintendo", value: profile.nintendo_fc },
-    profile.ea_id && { label: "EA", value: profile.ea_id },
-    profile.riot_id && { label: "Riot", value: profile.riot_id, verified: isVerified(profile, "riot") },
-    profile.battlenet_id && { label: "Battle.net", value: profile.battlenet_id, verified: isVerified(profile, "battlenet") },
-  ].filter(Boolean);
+// Konten einmal sauber (#527): zwei Gruppen, jedes Konto genau einmal. Ein per Anmeldung bestätigtes
+// Konto (linked_accounts) ersetzt den von Hand eingetragenen Namen derselben Plattform; das Häkchen
+// kommt vom Server, nie aus dem Text. Was privat ist, fehlt hier ganz - der Server schickt das Feld
+// dann gar nicht erst mit.
+const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "website"];
+const GAME_PLATFORMS = ["steam", "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet"];
+const MANUAL_FIELDS = {
+  discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", instagram: "instagram_handle",
+  tiktok: "tiktok_handle", x: "x_handle", website: "website", steam: "steam_id", epic: "epic_id", psn: "psn_id",
+  xbox: "xbox_id", nintendo: "nintendo_fc", ea: "ea_id", riot: "riot_id", battlenet: "battlenet_id",
+};
+
+function manualUrl(platform, value) {
+  if (platform === "website") return externalUrl(value);
+  if (platform === "twitch") return normalizeTwitchChannel(value) ? `https://www.twitch.tv/${normalizeTwitchChannel(value)}` : "";
+  if (platform === "xbox") return `https://www.xbox.com/play/user/${encodeURIComponent(String(value).trim())}`;
+  return socialUrl(platform, value);
+}
+
+function linkedEntry(account) {
+  const meta = socialMeta(account);
+  // Ohne Steam-API-Schlüssel ist der Anzeigename die 17-stellige ID - dann steht „Steam-Profil“ groß und die ID klein.
+  const numericName = /^\d{17}$/.test(String(account.display_name || ""));
+  const title = numericName ? `${meta.label}-Profil` : (account.display_name || account.handle || meta.label);
+  const since = formatLinkedAt(account.linked_at);
+  const showHandle = Boolean(account.handle) && (numericName || account.handle !== account.display_name);
+  return {
+    platform: String(account.platform || "").toLowerCase(), key: meta.key, label: meta.label, color: meta.color, title,
+    detail: [meta.label, showHandle ? account.handle : null, since ? `seit ${since}` : null].filter(Boolean).join(" · "),
+    value: account.handle || account.display_name || "", url: account.url || "", verified: true, since,
+  };
+}
+
+// Ein getippter Wert kann noch eine ganze Adresse sein (alte Eingaben): im Kasten steht der Name, nie die Adresse.
+const HANDLE_SKIP = new Set(["c", "channel", "user", "id", "profiles", "www"]);
+function handleFromValue(raw) {
+  const value = String(raw || "").trim();
+  if (!/^[a-z]+:[/][/]/i.test(value) && !/^(www[.])?[a-z0-9.-]+[.][a-z]{2,}[/]/i.test(value)) return cleanHandle(value);
+  try {
+    const url = new URL(/^[a-z]+:[/][/]/i.test(value) ? value : `https://${value}`);
+    const segments = url.pathname.split("/").filter(Boolean).map((segment) => decodeURIComponent(segment));
+    const meaningful = segments.filter((segment) => !HANDLE_SKIP.has(segment.toLowerCase()));
+    return (meaningful[0] || url.hostname).replace(/^@/, "");
+  } catch {
+    return cleanHandle(value);
+  }
+}
+
+function manualEntry(platform, rawValue, profile) {
+  const meta = socialMeta({ platform });
+  let value = String(rawValue || "").trim();
+  if (platform === "twitch") value = normalizeTwitchChannel(rawValue);
+  else if (platform === "website") value = value.replace(/^https?:\/\/(www\.)?/i, "").replace(/\/$/, "");
+  else if (SOCIAL_PLATFORMS.includes(platform)) value = handleFromValue(rawValue);
+  if (!value) return null;
+  return { platform, key: meta.key, label: meta.label, color: meta.color, title: value, detail: meta.label, value, url: manualUrl(platform, rawValue), verified: isVerified(profile, platform), since: "" };
+}
+
+export function accountGroups(profile) {
+  if (!profile) return { socials: [], games: [], verifiedCount: 0 };
+  const linked = new Map();
+  for (const account of Array.isArray(profile.linked_accounts) ? profile.linked_accounts : []) {
+    if (account && account.platform) linked.set(String(account.platform).toLowerCase(), linkedEntry(account));
+  }
+  const build = (platforms) => platforms
+    .map((platform) => (linked.has(platform) ? linked.get(platform) : manualEntry(platform, profile[MANUAL_FIELDS[platform]], profile)))
+    .filter(Boolean);
+  const socials = build(SOCIAL_PLATFORMS);
+  const games = build(GAME_PLATFORMS);
+  // Weitere Socials (eigene Einträge unter Mein Profil → Socials) - ohne Doppelung zu den festen Feldern.
+  const seen = new Set([...socials, ...games].map((entry) => `${entry.key}:${String(entry.url || entry.value).toLowerCase()}`));
+  for (const social of profile.socials || []) {
+    const platform = String(social.platform || "").toLowerCase();
+    const value = social.value || social.url;
+    if (!value || linked.has(platform)) continue;
+    const meta = socialMeta({ platform, label: social.platform });
+    const url = social.url || socialUrl(platform, social.value) || (/^https?:\/\//i.test(String(social.value || "")) ? externalUrl(social.value) : "");
+    const dedupe = `${meta.key}:${String(url || value).toLowerCase()}`;
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+    socials.push({ platform, key: meta.key, label: meta.label, color: meta.color, title: cleanHandle(value) || value, detail: meta.label, value, url, verified: false, since: "" });
+  }
+  // Bestätigte Konten neuer Plattformen, die noch keine feste Gruppe haben, stehen bei den Socials.
+  for (const [platform, entry] of linked) {
+    if (!SOCIAL_PLATFORMS.includes(platform) && !GAME_PLATFORMS.includes(platform)) socials.push(entry);
+  }
+  const verifiedCount = [...socials, ...games].filter((entry) => entry.verified).length;
+  return { socials, games, verifiedCount };
 }
 
 // Podestplätze zuerst nach Rang, dann nach Datum - die drei besten stehen als Highlights oben.
@@ -320,9 +375,7 @@ export default function PublicProfilePage() {
   const liveStream = twitchChannel
     ? liveStreams.find((stream) => stream.twitch_login === twitchChannel || stream.username === profile.username || stream.user_id === profile.id)
     : null;
-  const socialLinks = publicSocialLinks(profile, twitchUrl);
-  const linkedAccounts = Array.isArray(profile?.linked_accounts) ? profile.linked_accounts : [];
-  const gamingIds = publicGamingIds(profile);
+  const accounts = accountGroups(profile);
   const profileReferences = Array.isArray(profile.references)
     ? { items: profile.references, stats: { total: profile.references.length, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } }
     : (profile.references || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
@@ -543,7 +596,12 @@ export default function PublicProfilePage() {
             <div data-testid="profile-level-progress">
               <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
             </div>
-            {linkedAccounts.length > 0 && <VerifiedChips accounts={linkedAccounts} />}
+            {accounts.verifiedCount > 0 && (
+              <a href="#konten" onClick={() => setTab("overview")} data-testid="profile-accounts-count"
+                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end text-xs font-bold uppercase tracking-wider text-[#00FF88] hover:text-white">
+                <BadgeCheck className="w-4 h-4" /> {accounts.verifiedCount === 1 ? "1 Konto verknüpft" : `${accounts.verifiedCount} Konten verknüpft`}
+              </a>
+            )}
           </div>
 
           <div className="mt-6 pb-6 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3" data-testid="profile-stats">
@@ -639,9 +697,7 @@ export default function PublicProfilePage() {
 
             <aside className="space-y-4 min-w-0" data-testid="profile-sidebar">
               {showTwitchChannel && <TwitchChannelCard channel={twitchChannel} url={twitchUrl} stats={s} />}
-              {(linkedAccounts.length > 0 || socialLinks.length > 0 || gamingIds.length > 0) && (
-                <AccountsCard linked={linkedAccounts} socials={socialLinks} ids={gamingIds} />
-              )}
+              {(accounts.socials.length > 0 || accounts.games.length > 0) && <AccountsCard groups={accounts} />}
               <AboutCard profile={profile} joinedDate={joinedDate} />
               <SetupCard profile={profile} />
               {teams.length > 0 && <TeamsCard teams={teams} />}
@@ -786,37 +842,6 @@ function SectionTitle({ icon: Icon, color = "#29B6E8", kicker, title, action = n
   );
 }
 
-// Verknüpfte Konten im Kopf: ein Chip je bestätigtem Konto mit Plattformfarbe und Häkchen.
-function VerifiedChips({ accounts }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2" data-testid="profile-verified-chips">
-      <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88]" /> Verknüpft</span>
-      {accounts.map((account) => {
-        const meta = socialMeta(account);
-        const numericName = /^\d{17}$/.test(String(account.display_name || ""));
-        const text = numericName ? meta.label : (account.display_name || account.handle || meta.label);
-        const className = "inline-flex items-center gap-1.5 border rounded-sm px-2.5 py-1.5 text-xs font-bold bg-[#0A0A0A] border-[var(--social-color)]/60 text-white shadow-[0_0_14px_-6px_var(--social-color)] transition";
-        const style = { "--social-color": meta.color };
-        const inner = (
-          <>
-            <SocialIcon kind={meta.key} className="w-3.5 h-3.5 text-[var(--social-color)]" />
-            <span className="truncate max-w-[10rem]">{text}</span>
-            <BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" aria-label="verifiziert" />
-          </>
-        );
-        if (account.url) {
-          return (
-            <a key={account.platform} href={account.url} target="_blank" rel="noopener noreferrer" title={`${meta.label}-Konto öffnen`} data-testid={`profile-verified-${account.platform}`} className={`${className} hover:border-[var(--social-color)] hover:bg-white/[0.03]`} style={style}>
-              {inner}
-            </a>
-          );
-        }
-        return <span key={account.platform} data-testid={`profile-verified-${account.platform}`} className={className} style={style}>{inner}</span>;
-      })}
-    </div>
-  );
-}
-
 function TwitchLiveCard({ channel, url, stream, hasConsent }) {
   return (
     <section data-testid="public-profile-twitch-embed" className="border border-[#9146FF]/40 rounded-sm bg-[#121212] overflow-hidden min-w-0">
@@ -908,17 +933,53 @@ function HighlightCard({ item }) {
   return <Link to={target} className="block h-full">{body}</Link>;
 }
 
-function AccountsCard({ linked, socials, ids }) {
+// Konten (#527): ein Kasten, zwei Gruppen. Rahmen in Plattformfarbe, Haken bei bestätigten Konten mit
+// „verknüpft seit“, Link zum echten Konto - oder Kopieren, wenn die Plattform keine Profiladresse hat.
+export function AccountsCard({ groups }) {
   return (
-    <section className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4" data-testid="public-profile-accounts">
-      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
-        <Globe className="w-4 h-4 text-[#29B6E8]" /> Konten
-      </h2>
-      {linked.length > 0 && <LinkedAccountsCard accounts={linked} embedded />}
-      {socials.length > 0 && <SocialsRow links={socials} />}
-      {ids.length > 0 && <GamingIdsList ids={ids} />}
+    <section id="konten" className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4 scroll-mt-24" data-testid="public-profile-accounts">
+      <div>
+        <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
+        <p className="text-[11px] text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
+      </div>
+      {groups.socials.length > 0 && <AccountGroup title="Socials" icon={Globe} color="#29B6E8" entries={groups.socials} testId="public-profile-socials" />}
+      {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color="#FFD700" entries={groups.games} testId="public-profile-gaming-ids" />}
     </section>
   );
+}
+
+function AccountGroup({ title, icon: Icon, color, entries, testId }) {
+  return (
+    <div data-testid={testId}>
+      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
+      <div className="grid gap-2">{entries.map((entry) => <AccountRow key={`${entry.key}:${entry.value}`} entry={entry} />)}</div>
+    </div>
+  );
+}
+
+function AccountRow({ entry }) {
+  const verifiedTitle = entry.since ? `verifiziert · verknüpft seit ${entry.since}` : "verifiziert";
+  const inner = (
+    <>
+      <span className={`w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 text-[var(--social-color)] bg-black/40 ${entry.verified ? "border-[var(--social-color)]" : "border-[var(--social-color)]/40"}`}>
+        <SocialIcon kind={entry.key} className="w-5 h-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 font-bold text-white text-sm">
+          <span className="truncate">{entry.title}</span>
+          {entry.verified && <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
+        </span>
+        <span className="block text-[11px] text-white/50 truncate">{entry.detail}</span>
+      </span>
+      {entry.url ? <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" /> : <Copy className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />}
+    </>
+  );
+  const className = `flex items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] transition text-left w-full ${entry.verified ? "border-[var(--social-color)]/60 shadow-[0_0_18px_-6px_var(--social-color)]" : "border-white/10 hover:border-[var(--social-color)]/50"}`;
+  const style = { "--social-color": entry.color };
+  if (entry.url) {
+    return <a href={entry.url} target="_blank" rel="noopener noreferrer" title={`${entry.label} öffnen`} data-testid={`profile-account-${entry.key}`} className={className} style={style}>{inner}</a>;
+  }
+  return <button type="button" onClick={() => copyText(entry.value, `${entry.label} kopiert.`)} title={`${entry.label} kopieren`} data-testid={`profile-account-${entry.key}`} className={className} style={style}>{inner}</button>;
 }
 
 function AboutCard({ profile, joinedDate }) {
@@ -1079,128 +1140,6 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
     >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
       <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-// Verknüpfte Konten (#260): jedes per Anmeldung bestätigte Konto bekommt einen Rahmen in der
-// Plattformfarbe, den Anzeigenamen, das Datum und die offizielle Adresse - man sieht, dass es echt
-// ist und wohin es geht. `embedded` stellt die Liste als Abschnitt in die Konten-Karte.
-export function LinkedAccountsCard({ accounts, embedded = false }) {
-  return (
-    <div className={embedded ? "" : "border border-[#00FF88]/25 rounded-sm bg-[#121212] p-4"} data-testid="public-profile-linked">
-      <h3 className={`${embedded ? "text-[10px] uppercase tracking-widest text-[#00FF88]" : "font-heading text-xl uppercase"} font-bold mb-1 flex items-center gap-2`}>
-        <BadgeCheck className="w-4 h-4 text-[#00FF88]" /> Verknüpfte Konten
-      </h3>
-      <p className="text-[11px] text-white/45 mb-3">Per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
-      <div className="grid gap-2">
-        {accounts.map((account) => {
-          const meta = socialMeta(account);
-          const since = formatLinkedAt(account.linked_at);
-          // Ohne Steam-API-Schlüssel ist der Anzeigename die 17-stellige ID - dann steht „Steam-Profil“ groß und die ID klein.
-          const numericName = /^\d{17}$/.test(String(account.display_name || ""));
-          const title = numericName ? `${meta.label}-Profil` : (account.display_name || account.handle);
-          const detail = [meta.label, account.handle && (numericName || account.handle !== account.display_name) ? account.handle : null, since ? `seit ${since}` : null].filter(Boolean).join(" · ");
-          const inner = (
-            <>
-              <span className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 border-[var(--social-color)] text-[var(--social-color)] bg-black/40">
-                <SocialIcon kind={meta.key} className="w-5 h-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5 font-bold text-white text-sm">
-                  <span className="truncate">{title}</span>
-                  <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`linked-account-${account.platform}-verified`} />
-                </span>
-                <span className="block text-[11px] text-white/50 truncate">{detail}</span>
-              </span>
-              {account.url && <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />}
-            </>
-          );
-          const className = "flex items-center gap-3 border rounded-sm px-3 py-2.5 border-[var(--social-color)]/50 bg-[#0A0A0A] shadow-[0_0_18px_-6px_var(--social-color)] transition";
-          const style = { "--social-color": meta.color };
-          if (account.url) {
-            return (
-              <a key={account.platform} href={account.url} target="_blank" rel="noopener noreferrer" title={`${meta.label}-Konto öffnen`} data-testid={`linked-account-${account.platform}`} className={`${className} hover:border-[var(--social-color)] hover:bg-white/[0.03]`} style={style}>
-                {inner}
-              </a>
-            );
-          }
-          return <div key={account.platform} data-testid={`linked-account-${account.platform}`} className={className} style={style}>{inner}</div>;
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SocialsRow({ links }) {
-  return (
-    <div data-testid="public-profile-socials">
-      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Globe className="w-3.5 h-3.5 text-[#29B6E8]" /> Socials</h3>
-      <div className="flex flex-wrap gap-2">
-        {links.map((link) => {
-          const meta = socialMeta(link);
-          const key = `${meta.key}:${link.url || link.value}`;
-          const className = `relative inline-flex h-10 w-10 items-center justify-center border bg-[#0A0A0A] rounded-sm transition hover:bg-white/[0.03] ${link.verified ? "border-[var(--social-color)] text-[var(--social-color)] shadow-[0_0_14px_-4px_var(--social-color)]" : "border-white/10 text-white/70"}`;
-          const style = { "--social-color": meta.color };
-          if (link.url) {
-            return (
-              <a
-                key={key}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${meta.label} öffnen`}
-                title={`${meta.label} öffnen`}
-                data-testid={`profile-social-${meta.key}`}
-                className={`${className} hover:border-[var(--social-color)] hover:text-[var(--social-color)]`}
-                style={style}
-              >
-                <SocialIcon kind={meta.key} />
-                {link.verified && <BadgeCheck className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[#00FF88] bg-[#0A0A0A] rounded-full" aria-label="verifiziert" data-testid={`profile-social-${meta.key}-verified`} />}
-              </a>
-            );
-          }
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => copyText(link.value, `${meta.label} kopiert.`)}
-              aria-label={`${meta.label} kopieren`}
-              title={`${meta.label} kopieren`}
-              data-testid={`profile-social-${meta.key}`}
-              className={`${className} border-[var(--social-color)]/40 text-[var(--social-color)] hover:border-[var(--social-color)]`}
-              style={style}
-            >
-              <SocialIcon kind={meta.key} />
-              {link.verified && <BadgeCheck className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[#00FF88] bg-[#0A0A0A] rounded-full" aria-label="verifiziert" data-testid={`profile-social-${meta.key}-verified`} />}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function GamingIdsList({ ids }) {
-  return (
-    <div data-testid="public-profile-gaming-ids">
-      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Gamepad2 className="w-3.5 h-3.5 text-[#FFD700]" /> Gaming-IDs</h3>
-      <div className="grid gap-2">
-        {ids.map((id) => (
-          <div key={`${id.label}:${id.value}`} className="border border-white/10 bg-[#0A0A0A] px-3 py-2 rounded-sm flex items-center justify-between gap-3 min-w-0">
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold inline-flex items-center gap-1">{id.label}{id.verified && <BadgeCheck className="w-3 h-3 text-[#00FF88]" aria-label="verifiziert" data-testid={`profile-gaming-${id.label.toLowerCase()}-verified`} />}</div>
-              {id.url ? (
-                <a href={id.url} target="_blank" rel="noopener noreferrer" className="mt-0.5 flex max-w-full items-center gap-1 text-sm text-white/85 hover:text-[#29B6E8]">
-                  <span className="truncate">{id.value}</span><ExternalLink className="w-3 h-3 shrink-0" />
-                </a>
-              ) : (
-                <div className="mt-0.5 text-sm text-white/85 break-all">{id.value}</div>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

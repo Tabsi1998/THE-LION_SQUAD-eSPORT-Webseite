@@ -478,12 +478,14 @@ test("public profile social links render as icons without raw values", async ({ 
   await page.goto("/u/tabsi98");
   await acceptCookies(page);
 
+  // Konten einmal sauber (#527): jede Plattform genau eine Zeile im Kasten, Namen statt roher Adressen.
   const socials = page.getByTestId("public-profile-socials");
   await expect(socials).toBeVisible();
   for (const key of ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "website"]) {
-    await expect(socials.getByTestId(`profile-social-${key}`)).toBeVisible();
+    await expect(socials.getByTestId(`profile-account-${key}`)).toHaveCount(1);
   }
-  await expect(socials).not.toContainText(/twitch\.tv|youtube\.com|instagram\.com|tiktok\.com|lionsquad\.at|tabsi98#1234/i);
+  await expect(socials).not.toContainText(/https?:\/\/|twitch\.tv\/|youtube\.com\/|instagram\.com\/|tiktok\.com\//i);
+  await expect(page.getByTestId("profile-verified-chips")).toHaveCount(0);
 });
 
 test("public profile renders references from profile payload", async ({ page }) => {
