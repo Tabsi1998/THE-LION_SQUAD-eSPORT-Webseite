@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextInput, View } from "react-native";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
@@ -11,7 +11,7 @@ import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatDateTime } from "../../lib/format";
 import { feeCard, formatMoney, linkPrompt, STATUS_LABELS, TYPE_LABELS, type DolibarrView } from "../../lib/memberArea";
 import type { InvoiceList } from "../../lib/memberDocuments";
-import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, type IdentityState, type SelfService } from "../../lib/selfService";
+import { changedFields, exitLine, fieldLabel, selfRequestLine, validWishedDay, changedWebsiteFields, websiteFieldText, websiteStateLine, type IdentityState, type SelfService, type WebsiteField, type WebsiteProfile } from "../../lib/selfService";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -41,22 +41,28 @@ export function MyMembershipScreen({ navigation }: Props) {
   const [code, setCode] = useState("");
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [wishedDay, setWishedDay] = useState("");
-  const [busy, setBusy] = useState<"" | "claim" | "save" | "exit">("");
+  const [busy, setBusy] = useState<"" | "claim" | "save" | "exit" | "website">("");
+  // Eigenes Website-Profil (#260): liegt in der Vereinsakte, sichtbar nur mit Einwilligung.
+  const [website, setWebsite] = useState<WebsiteProfile | null>(null);
+  const [websiteDraft, setWebsiteDraft] = useState<Record<string, unknown>>({});
 
   const load = useCallback(async () => {
     setError("");
     try {
-      const [my, list, ident, selfView] = await Promise.all([
+      const [my, list, ident, selfView, websiteView] = await Promise.all([
         api.get<MembershipMe>("/membership/me"),
         api.get<InvoiceList>("/account/invoices").catch(() => null),
         api.get<IdentityState>("/membership/me/identity").catch(() => null),
         api.get<SelfService>("/membership/me/self-service").catch(() => null),
+        api.get<WebsiteProfile>("/membership/me/website-profile").catch(() => null),
       ]);
       setMe(my.data || null);
       setInvoices(list?.data || null);
       setIdentity(ident?.data && ident.data.available === true ? ident.data : null);
       setSelf(selfView?.data && selfView.data.available === true && selfView.data.profile ? selfView.data : null);
       setDraft({});
+      setWebsite(websiteView?.data && websiteView.data.available === true ? websiteView.data : null);
+      setWebsiteDraft({});
     } catch (err) {
       setError(errorMessage(err, "Die Mitgliedschaft konnte nicht geladen werden."));
     } finally {
@@ -125,6 +131,61 @@ export function MyMembershipScreen({ navigation }: Props) {
       setBusy("");
     }
   };
+  const websiteChanged = website ? changedWebsiteFields(website, websiteDraft) : {};
+  const websiteValue = (field: WebsiteField) => (field.code in websiteDraft ? websiteDraft[field.code] : field.value);
+  const saveWebsite = async () => {
+    if (!website || busy || !Object.keys(websiteChanged).length) return;
+    setBusy("website");
+    try {
+      const { data } = await api.put<WebsiteProfile>("/membership/me/website-profile", { fields: websiteChanged });
+      setWebsite(data && data.available === true ? data : website);
+      setWebsiteDraft({});
+      Alert.alert("Gespeichert", "Dein Website-Profil ist aktualisiert.");
+    } catch (err) {
+      Alert.alert("Das hat nicht geklappt", errorMessage(err, "Das Profil wurde nicht angenommen."));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  // Eingabe je Feldart (Vereine 1.2): Text, langer Text, Zahl, Datum, Ja/Nein, eine Option, mehrere Optionen.
+  const renderWebsiteField = (field: WebsiteField) => {
+    const testID = `membership-website-${field.code}`;
+    const value = websiteValue(field);
+    const set = (next: unknown) => setWebsiteDraft((current) => ({ ...current, [field.code]: next }));
+    if (!field.editable) return <Muted testID={testID}>{websiteFieldText(field) || "–"}</Muted>;
+    if (field.type === "boolean") return <Switch value={!!value} onValueChange={set} testID={testID} />;
+    if (field.type === "select" || field.type === "multi") {
+      const chosen = field.type === "multi" ? (Array.isArray(value) ? (value as string[]) : []) : value ? [String(value)] : [];
+      return (
+        <View style={styles.chips} testID={testID}>
+          {(field.options ?? []).map((option) => {
+            const active = chosen.includes(option.code);
+            const next = field.type === "multi" ? (active ? chosen.filter((c) => c !== option.code) : [...chosen, option.code]) : active ? null : option.code;
+            return (
+              <Pressable key={option.code} onPress={() => set(next)} style={[styles.chip, active && styles.chipActive]} testID={`${testID}-${option.code}`}>
+                <Muted style={active ? styles.chipTextActive : undefined}>{option.label}</Muted>
+              </Pressable>
+            );
+          })}
+        </View>
+      );
+    }
+    return (
+      <TextInput
+        style={[styles.input, field.type === "textarea" && styles.multiline]}
+        value={value === null || value === undefined ? "" : String(value)}
+        onChangeText={set}
+        placeholder={field.type === "date" ? "JJJJ-MM-TT" : undefined}
+        placeholderTextColor={colors.muted}
+        multiline={field.type === "textarea"}
+        keyboardType={field.type === "number" ? "numeric" : "default"}
+        maxLength={field.max_length ?? (field.type === "textarea" ? 2000 : 255)}
+        testID={testID}
+      />
+    );
+  };
+
   const askExit = () => {
     if (busy) return;
     if (!validWishedDay(wishedDay.trim())) {
@@ -302,6 +363,23 @@ export function MyMembershipScreen({ navigation }: Props) {
           </Card>
         ) : null}
 
+        {website ? (
+          <Card style={styles.card} testID="membership-website">
+            <Heading>Mein Website-Profil</Heading>
+            <Muted testID="membership-website-state">{websiteStateLine(website)}</Muted>
+            {!(website.fields ?? []).length ? <Muted testID="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</Muted> : null}
+            {(website.fields ?? []).map((field) => (
+              <View key={field.code} style={styles.field}>
+                <Muted style={styles.factLabel}>{field.label}{field.editable ? "" : " · pflegt der Verein"}</Muted>
+                {renderWebsiteField(field)}
+              </View>
+            ))}
+            {(website.fields ?? []).some((field) => field.editable) ? (
+              <Button label={busy === "website" ? "Sende …" : "Profil speichern"} onPress={saveWebsite} disabled={busy !== "" || !Object.keys(websiteChanged).length} testID="membership-website-save" />
+            ) : null}
+          </Card>
+        ) : null}
+
         <Card style={styles.card} testID="membership-invoices">
           <Heading>Belege</Heading>
           {invoices?.summary?.open_count ? (
@@ -448,6 +526,28 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontWeight: "900",
+  },
+  chips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  chipActive: {
+    borderColor: colors.gold,
+  },
+  chipTextActive: {
+    color: colors.gold,
+  },
+  multiline: {
+    minHeight: 80,
+    textAlignVertical: "top",
   },
   hint: {
     fontSize: 12,

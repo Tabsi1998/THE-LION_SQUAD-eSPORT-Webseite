@@ -100,3 +100,54 @@ export function exitLine(profile: SelfProfile): string {
 export function validWishedDay(value: string): boolean {
   return value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
+
+export type WebsiteFieldOption = { code: string; label: string };
+
+export type WebsiteField = {
+  code: string;
+  label: string;
+  type: "text" | "textarea" | "number" | "date" | "boolean" | "select" | "multi";
+  editable: boolean;
+  value: unknown;
+  max_length?: number;
+  options?: WebsiteFieldOption[];
+};
+
+export type WebsiteProfile = {
+  available?: boolean;
+  reason?: string;
+  text?: string;
+  consent?: string;
+  given?: boolean;
+  fields?: WebsiteField[];
+};
+
+/** Der Wert eines Feldes als Text - Ja/Nein, Options-Bezeichnungen, Listen mit Komma. */
+export function websiteFieldText(field: WebsiteField): string {
+  const value = field.value;
+  if (value === null || value === undefined || value === "" || (Array.isArray(value) && !value.length)) return "";
+  const label = (code: unknown) => field.options?.find((o) => o.code === String(code))?.label ?? String(code);
+  if (field.type === "boolean") return value ? "Ja" : "Nein";
+  if (field.type === "multi" && Array.isArray(value)) return value.map(label).join(", ");
+  if (field.type === "select") return label(value);
+  return String(value);
+}
+
+/** Der Satz zur Sichtbarkeit - wie im Web. */
+export function websiteStateLine(profile: WebsiteProfile): string {
+  if (!profile.consent) return "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern.";
+  return profile.given
+    ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
+    : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen).";
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/** Nur änderbare Felder, deren Entwurf vom Stand abweicht - das geht als PUT raus. */
+export function changedWebsiteFields(profile: WebsiteProfile, draft: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of profile.fields ?? []) {
+    if (field.editable && field.code in draft && !same(draft[field.code], field.value)) out[field.code] = draft[field.code];
+  }
+  return out;
+}

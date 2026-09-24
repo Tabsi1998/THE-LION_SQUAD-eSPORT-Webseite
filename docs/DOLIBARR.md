@@ -294,6 +294,19 @@ beim nächsten Abgleich in der gepflegten auf. Ein Website-Konto braucht es nich
 zugestimmt hat, bekommt seine Karte aus der Vereinsakte allein („Mitglied Nr. … · ohne Konto“ im
 Admin); das Konto verknüpft der Vorstand später.
 
+**Ab Vereine 1.2 besteht das Website-Profil aus Zusatzfeldern, die der Verein wählt** (Modul →
+Einrichtung → Vereine → Website-Profil): Text, langer Text, Zahl, Datum, Ja/Nein, eine oder mehrere
+Optionen – und je Feld, ob das Mitglied es selbst ändern darf. Nach dem Update aus 1.1 heißen die
+alten Felder `gamertag`, `bio`, `games`, `platforms`. Auf der Website legst du unter Dolibarr →
+Verbindung → „Felder des Website-Profils“ fest, welches Feld als Gamertag, Kurztext, Spiele und
+Plattformen erscheint; alle anderen Felder stehen auf dem Profil unter „Weitere Angaben“.
+
+**Mitglieder pflegen es selbst:** Unter *Meine Mitgliedschaft → Mein Website-Profil* (Web und App)
+ändert ein Mitglied mit Verbindung und Fähigkeit „eigene Daten“ die Felder, die der Verein dafür
+freigegeben hat – gespeichert wird in der Vereinsakte, der Vorstand sieht es auf der Mitgliedskarte,
+und die Website liest das Mitglied gleich nach, damit das Verzeichnis den neuen Stand zeigt. Sichtbar
+wird das Profil weiterhin nur mit der Einwilligung zur Nennung; der Kasten sagt, ob sie erteilt ist.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer
