@@ -54,7 +54,8 @@ export function AchievementCatchUp() {
     setTiers([]);
   };
 
-  if (pathname.startsWith("/display")) return null;
+  // Nicht im Adminbereich und nicht auf Anzeige-Seiten: dort stört das Fenster die Arbeit; es kommt beim nächsten Besuch der Website.
+  if (pathname.startsWith("/display") || pathname.startsWith("/admin")) return null;
 
   return (
     <AchievementUnlockOverlay

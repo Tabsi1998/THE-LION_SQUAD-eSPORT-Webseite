@@ -332,7 +332,8 @@ export default function ProfilePage() {
               <span>Community-Spieler</span>
             )}
             <span className="mx-2 text-white/20">·</span>
-            <span>@{user.username}</span>
+            <Link to={`/u/${user.username}`} data-testid="profile-public-link" className="hover:text-white underline underline-offset-2" title="Öffentliches Profil ansehen">@{user.username}</Link>
+            <Link to={`/u/${user.username}`} data-testid="profile-public-button" className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 text-[11px] uppercase tracking-wider hover:border-[#29B6E8] hover:text-[#29B6E8]">Öffentliches Profil ansehen</Link>
           </div>
         </div>
 

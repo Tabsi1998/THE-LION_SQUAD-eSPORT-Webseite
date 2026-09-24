@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronDown, Crown, LayoutDashboard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
+import { ChevronDown, Crown, Eye, LayoutDashboard, LogOut, MessageSquare, Settings, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { resolveMediaUrl } from "@/lib/api";
 import { accountLinksFor } from "@/pages/user/profile/constants";
@@ -85,6 +85,8 @@ export function UserMenu() {
           </div>
           <Link to="/dashboard" role="menuitem" onClick={close} data-testid="nav-dashboard" className={itemClass}><LayoutDashboard className="w-3.5 h-3.5" /> Dashboard</Link>
           <Link to="/profile" role="menuitem" onClick={close} data-testid="nav-profile" className={itemClass}><Settings className="w-3.5 h-3.5" /> Mein Profil</Link>
+          {/* Der Weg aufs eigene öffentliche Profil (#514): so, wie andere es sehen. */}
+          <Link to={`/u/${user.username}`} role="menuitem" onClick={close} data-testid="nav-public-profile" className={itemClass}><Eye className="w-3.5 h-3.5" /> Öffentliches Profil</Link>
           <Link to="/messages" role="menuitem" onClick={close} data-testid="nav-messages-menu" className={itemClass}><MessageSquare className="w-3.5 h-3.5" /> Nachrichten</Link>
           {/* Mein Konto: Rechnungen, Mitgliedschaft, Strafen, Gewinne, Benachrichtigungen, Hilfe - sonst fand man sie nicht. */}
           <div className="px-3 pt-2 pb-1 border-t border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/35">Mein Konto</div>

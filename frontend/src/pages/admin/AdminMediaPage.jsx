@@ -414,7 +414,7 @@ export default function AdminMediaPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Phase F</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Medien-Browser</h1>
       <p className="mt-2 text-white/55 text-sm max-w-2xl">
         Alle hochgeladenen Bilder und Dateien an einem Ort. Vorschau, URL kopieren oder löschen — keine SFTP nötig.

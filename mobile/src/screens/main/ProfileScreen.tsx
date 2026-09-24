@@ -367,7 +367,7 @@ export function ProfileScreen() {
   const sharePublicProfile = useCallback(() => {
     const username = user?.username;
     if (!username) return;
-    Share.share({ message: `${API_BASE_URL}/u/${username}` }).catch(() => {});
+    Share.share({ message: `${WEB_BASE_URL}/u/${username}` }).catch(() => {});
   }, [user?.username]);
 
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);

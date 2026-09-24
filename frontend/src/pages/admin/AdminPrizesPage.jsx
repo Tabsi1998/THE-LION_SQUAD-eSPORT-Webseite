@@ -149,7 +149,7 @@ export default function AdminPrizesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Phase 9</span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
       <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-2">Preise & Gewinnabholung</h1>
       <p className="text-white/60 text-sm mb-6 max-w-2xl">
         Bei jedem auf <em>Ergebnisse veröffentlicht</em> gesetzten Turnier oder Fast Lap werden Gewinne automatisch

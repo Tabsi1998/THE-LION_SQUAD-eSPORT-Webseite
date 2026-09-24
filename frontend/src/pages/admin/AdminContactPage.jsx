@@ -103,8 +103,8 @@ export default function AdminContactPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Phase D · Kontakt</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-4">Inbox</h1>
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
+      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-4">Kontakt-Inbox</h1>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         {Object.entries(STATUS_LABEL).map(([k, v]) => (

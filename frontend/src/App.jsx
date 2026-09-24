@@ -29,7 +29,10 @@ function RouteFallback() {
 
 function MeRedirect() {
   const { user } = useAuth();
-  if (!user) return <Navigate to="/login?next=/profile" replace />;
+  // Solange die Sitzung noch geladen wird (user undefined), nicht zum Login schicken - sonst landet jeder
+  // angemeldete Klick auf /u/me auf der Login-Seite.
+  if (user === undefined) return null;
+  if (!user) return <Navigate to="/login?next=/u/me" replace />;
   return <Navigate to={`/u/${user.username}`} replace />;
 }
 

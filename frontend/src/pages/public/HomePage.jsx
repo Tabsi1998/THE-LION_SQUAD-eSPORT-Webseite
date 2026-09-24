@@ -224,10 +224,11 @@ function useHomeStructuredData(state) {
 
 // Der Verein in Zahlen (#407, #425): nur Zähler über null, sonst gar keine Leiste. „Turnier-
 // teilnahmen“ sind die Referenzen; die Zahlen zählen hoch, sobald der Block sichtbar wird.
-const NUMBER_LABELS = [["members", "Mitglieder"], ["tournaments", "Veranstaltete Turniere"], ["events", "Veranstaltete Events"], ["participations", "Turnierteilnahmen"]];
+const NUMBER_LABELS = [["members", "Mitglieder", "Mitglied"], ["tournaments", "Veranstaltete Turniere", "Veranstaltetes Turnier"], ["events", "Veranstaltete Events", "Veranstaltetes Event"], ["participations", "Turnierteilnahmen"]];
 
 function ClubNumbers({ numbers }) {
-  const items = NUMBER_LABELS.map(([key, label]) => [key, label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
+  // Einzahl, wenn es genau eins ist („1 Mitglied“ statt „1 Mitglieder“).
+  const items = NUMBER_LABELS.map(([key, label, single]) => [key, Number(numbers?.[key] || 0) === 1 && single ? single : label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
   if (!items.length) return null;
   return (
     <section className="border-b border-white/10 bg-[#080808]/35" data-testid="home-numbers">

@@ -17,7 +17,7 @@ import { ArrowRight, Heart, Users, Trophy, Gamepad2, Mountain, Landmark, Medal, 
 // Admin → Verein → Über uns. Was leer ist, bleibt weg: kein Block mit Platzhaltern.
 
 const PILLAR_ICONS = [Heart, Users, Trophy, Gamepad2];
-const NUMBER_LABELS = [["members", "Mitglieder"], ["tournaments", "Veranstaltete Turniere"], ["events", "Veranstaltete Events"], ["participations", "Turnierteilnahmen"], ["achievements", "Vergebene Auszeichnungen"]];
+const NUMBER_LABELS = [["members", "Mitglieder", "Mitglied"], ["tournaments", "Veranstaltete Turniere", "Veranstaltetes Turnier"], ["events", "Veranstaltete Events", "Veranstaltetes Event"], ["participations", "Turnierteilnahmen"], ["achievements", "Vergebene Auszeichnungen"]];
 
 export default function AboutPage() {
   useDocumentTitle(
@@ -224,7 +224,8 @@ export function Paragraphs({ text, className = "" }) {
 }
 
 function ClubNumbers({ numbers }) {
-  const items = NUMBER_LABELS.map(([key, label]) => [key, label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
+  // Einzahl, wenn es genau eins ist („1 Mitglied“ statt „1 Mitglieder“).
+  const items = NUMBER_LABELS.map(([key, label, single]) => [key, Number(numbers?.[key] || 0) === 1 && single ? single : label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
   if (!items.length) return null;
   return (
     <section className="border-b border-white/10 bg-[#080808]/35" data-testid="about-numbers">

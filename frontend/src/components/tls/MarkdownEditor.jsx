@@ -313,6 +313,10 @@ export function MarkdownEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        // StarterKit 3 bringt Link und Underline selbst mit - unsere eigenen Einstellungen unten gelten, sonst
+        // meldet tiptap „Duplicate extension names found“ auf jeder Seite mit Editor.
+        link: false,
+        underline: false,
       }),
       Underline,
       Link.configure({
