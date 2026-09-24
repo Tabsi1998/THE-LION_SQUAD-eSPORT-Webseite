@@ -31,33 +31,43 @@ WEBSITE_TYPES = ("text", "textarea", "number", "date", "boolean", "select", "mul
 REASON_TEXTS = {
     "not_connected": "Die Mitgliederverwaltung ist nicht live angebunden.",
     "module_too_old": "Das Vereinsmodul kennt das eigene Website-Profil noch nicht (ab Vereine 1.2).",
-    "not_bound": "Dafür muss dein Konto mit der Vereinsakte verbunden sein (Einladungscode unter Meine Mitgliedschaft).",
+    "not_bound": "Dafür muss dein Konto mit deinem Mitgliedseintrag verbunden sein – das passiert von selbst über die bestätigte "
+                 "E-Mail-Adresse oder durch den Vorstand (Dolibarr → Zuordnungen); alternativ mit einem Einladungscode unter Meine Mitgliedschaft.",
+    "right_missing": dolibarr_identity.MEMBER_RIGHT_TEXT,
     "no_capability": "Deine Verbindung erlaubt das Ändern eigener Daten noch nicht – der Vorstand schaltet die Fähigkeit „eigene Daten“ in Dolibarr ein.",
 }
 
 
 class SelfServiceError(Exception):
-    def __init__(self, status: int, detail: str):
+    def __init__(self, status: int, detail: str, reason: str | None = None):
         super().__init__(detail)
         self.status = status
         self.detail = detail
+        self.reason = reason
 
 
 async def _access(db, user: dict):
-    """Anbindung live, Bindung gültig, Fähigkeit ``profile`` - sonst der Grund."""
+    """Anbindung live und ein Weg zur Akte: ab Vereine 1.4.0 die bestätigte Zuordnung (``member_id``, #531), sonst
+    die Bindung per Einladungscode mit Fähigkeit ``profile`` - sonst der Grund."""
     settings = await load_settings(db)
     if settings.get("mode") != "live":
         return settings, None, None, "not_connected"
-    binding = await dolibarr_identity.binding_for(db, settings, user["id"])
-    if not binding or binding.get("status") != "bound":
-        return settings, binding, None, "not_bound"
-    if "profile" not in (binding.get("capabilities") or []):
-        return settings, binding, None, "no_capability"
+    access = await dolibarr_identity.access_for(db, settings, user["id"])
+    if not access:
+        return settings, None, None, "not_bound"
+    if access["mode"] == "subject" and "profile" not in access["capabilities"]:
+        return settings, access, None, "no_capability"
     try:
         client = DolibarrClient(settings)
     except DolibarrError as exc:
-        return settings, binding, None, exc.kind
-    return settings, binding, client, None
+        return settings, access, None, exc.kind
+    return settings, access, client, None
+
+
+async def _denied(db, access: dict) -> str:
+    """403 vom Modul: über die Bindung ist sie widerrufen, über die Mitgliedsnummer fehlt das Recht."""
+    await dolibarr_identity.forbidden(db, access)
+    return "right_missing" if access["mode"] == "member" else "not_bound"
 
 
 def _request_view(row: dict) -> dict:
@@ -71,11 +81,12 @@ def _external_id(prefix: str, user_id: str, *parts) -> str:
     return f"web-{prefix}-{str(user_id)[:8]}-{digest}"[:64]
 
 
-def _raise_for(exc: DolibarrError, *, conflict: str) -> None:
+def _raise_for(exc: DolibarrError, *, conflict: str, denied: str = "not_bound") -> None:
     if exc.kind == "conflict":
         raise SelfServiceError(409, conflict) from exc
     if exc.kind == "forbidden":
-        raise SelfServiceError(403, "Die Verbindung zur Vereinsakte gilt nicht mehr – bitte einen neuen Einladungscode einlösen.") from exc
+        text = REASON_TEXTS["right_missing"] if denied == "right_missing" else "Die Verbindung zur Vereinsakte gilt nicht mehr – bitte einen neuen Einladungscode einlösen."
+        raise SelfServiceError(403, text, reason=denied) from exc
     if exc.kind == "bad_request":
         raise SelfServiceError(400, "Die Mitgliederverwaltung hat das abgewiesen (Feld oder Wert passt nicht).") from exc
     raise SelfServiceError(503, f"Dolibarr antwortet gerade nicht ({exc.text}).") from exc
@@ -83,17 +94,18 @@ def _raise_for(exc: DolibarrError, *, conflict: str) -> None:
 
 async def overview(db, user: dict) -> dict:
     """Die eigenen Daten und alle Einreichungen - oder warum es hier nichts gibt."""
-    settings, binding, client, reason = await _access(db, user)
+    settings, access, client, reason = await _access(db, user)
     if reason:
         return {"available": False, "reason": reason, "text": REASON_TEXTS.get(reason, "")}
     try:
-        profile = await client.my_profile(binding["subject"])
-        requests = await client.my_profile_requests(binding["subject"])
+        profile = await client.my_profile(access["params"])
+        requests = await client.my_profile_requests(access["params"])
     except DolibarrError as exc:
         if exc.kind == "forbidden":
-            await dolibarr_identity.mark_revoked(db, binding)
-            return {"available": False, "reason": "not_bound", "text": REASON_TEXTS["not_bound"]}
+            reason = await _denied(db, access)
+            return {"available": False, "reason": reason, "text": REASON_TEXTS[reason]}
         return {"available": False, "reason": exc.kind, "text": f"Dolibarr antwortet gerade nicht ({exc.text})."}
+    await dolibarr_identity.member_call_ok(db, access)
     return {
         "available": True, "profile": {key: profile.get(key) for key in PROFILE_FIELDS}, "changeable": list(CHANGEABLE),
         "requests": [_request_view(row) for row in requests if isinstance(row, dict)], "status_labels": dict(STATUS_LABELS),
@@ -102,9 +114,9 @@ async def overview(db, user: dict) -> dict:
 
 async def request_change(db, user: dict, version: str, changes: dict) -> dict:
     """Kontaktdaten ändern lassen: nur die erlaubten Felder, nur mit dem gesehenen Stand."""
-    settings, binding, client, reason = await _access(db, user)
+    settings, access, client, reason = await _access(db, user)
     if reason:
-        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."))
+        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."), reason=reason)
     clean: dict[str, str] = {}
     for key, value in (changes or {}).items():
         if key not in CHANGEABLE:
@@ -119,11 +131,10 @@ async def request_change(db, user: dict, version: str, changes: dict) -> dict:
         raise SelfServiceError(400, "Der Stand der Daten fehlt – bitte die Seite neu laden.")
     payload = {"external_id": _external_id("change", user["id"], version, clean), "version": version, "changes": clean}
     try:
-        row = await client.request_profile_change(binding["subject"], payload)
+        row = await client.request_profile_change(access["params"], payload)
     except DolibarrError as exc:
-        if exc.kind == "forbidden":
-            await dolibarr_identity.mark_revoked(db, binding)
-        _raise_for(exc, conflict="Deine Daten haben sich in der Mitgliederverwaltung inzwischen geändert – bitte neu laden und noch einmal prüfen.")
+        denied = await _denied(db, access) if exc.kind == "forbidden" else "not_bound"
+        _raise_for(exc, denied=denied, conflict="Deine Daten haben sich in der Mitgliederverwaltung inzwischen geändert – bitte neu laden und noch einmal prüfen.")
     return _request_view(row)
 
 
@@ -132,18 +143,17 @@ async def request_exit(db, user: dict, wished_last_day: str | None) -> dict:
     wished = str(wished_last_day or "").strip()
     if wished and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", wished):
         raise SelfServiceError(400, "Das Wunschdatum braucht die Form JJJJ-MM-TT.")
-    settings, binding, client, reason = await _access(db, user)
+    settings, access, client, reason = await _access(db, user)
     if reason:
-        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."))
+        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."), reason=reason)
     payload: dict = {"external_id": _external_id("exit", user["id"], now_utc().date().isoformat(), wished)}
     if wished:
         payload["wished_last_day"] = wished
     try:
-        row = await client.request_exit(binding["subject"], payload)
+        row = await client.request_exit(access["params"], payload)
     except DolibarrError as exc:
-        if exc.kind == "forbidden":
-            await dolibarr_identity.mark_revoked(db, binding)
-        _raise_for(exc, conflict="Ein Austritt ist schon geplant – der Stand steht bei deinen Daten.")
+        denied = await _denied(db, access) if exc.kind == "forbidden" else "not_bound"
+        _raise_for(exc, denied=denied, conflict="Ein Austritt ist schon geplant – der Stand steht bei deinen Daten.")
     return _request_view(row)
 
 
@@ -226,28 +236,30 @@ def clean_website_fields(fields: dict, known: list[dict]) -> dict:
     return out
 
 
-async def _website_current(db, client, binding: dict) -> dict:
+async def _website_current(db, client, access: dict) -> dict:
     try:
-        return _website_view(await client.my_website_profile(binding["subject"]))
+        view = _website_view(await client.my_website_profile(access["params"]))
     except DolibarrError as exc:
         if exc.kind == "forbidden":
-            await dolibarr_identity.mark_revoked(db, binding)
-            raise SelfServiceError(403, REASON_TEXTS["not_bound"]) from exc
+            reason = await _denied(db, access)
+            raise SelfServiceError(403, REASON_TEXTS[reason], reason=reason) from exc
         if exc.kind in ("not_found", "module_off"):
-            raise SelfServiceError(503, REASON_TEXTS["module_too_old"]) from exc
+            raise SelfServiceError(503, REASON_TEXTS["module_too_old"], reason="module_too_old") from exc
         raise SelfServiceError(503, f"Dolibarr antwortet gerade nicht ({exc.text}).") from exc
+    await dolibarr_identity.member_call_ok(db, access)
+    return view
 
 
 async def website_profile(db, user: dict) -> dict:
     """Das eigene Website-Profil aus Dolibarr - oder warum es hier nichts gibt."""
-    settings, binding, client, reason = await _access(db, user)
+    settings, access, client, reason = await _access(db, user)
     if reason:
         return {"available": False, "reason": reason, "text": REASON_TEXTS.get(reason, "")}
     try:
-        return await _website_current(db, client, binding)
+        return await _website_current(db, client, access)
     except SelfServiceError as exc:
-        if exc.status == 403:
-            return {"available": False, "reason": "not_bound", "text": REASON_TEXTS["not_bound"]}
+        if exc.reason:
+            return {"available": False, "reason": exc.reason, "text": exc.detail}
         if exc.detail == REASON_TEXTS["module_too_old"]:
             return {"available": False, "reason": "module_too_old", "text": REASON_TEXTS["module_too_old"]}
         return {"available": False, "reason": "unavailable", "text": exc.detail}
@@ -256,25 +268,24 @@ async def website_profile(db, user: dict) -> dict:
 async def save_website_profile(db, user: dict, fields: dict) -> dict:
     """Die gesendeten Felder nach Dolibarr schreiben (nur was das Mitglied ändern darf); danach das Mitglied
     zum Nachlesen einreihen, damit das Verzeichnis der Website den neuen Stand gleich übernimmt."""
-    settings, binding, client, reason = await _access(db, user)
+    settings, access, client, reason = await _access(db, user)
     if reason:
-        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."))
-    current = await _website_current(db, client, binding)
+        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."), reason=reason)
+    current = await _website_current(db, client, access)
     clean = clean_website_fields(fields, current["fields"])
     labels = {f["code"]: f["label"] for f in current["fields"]}
     try:
-        data = await client.put_website_profile(binding["subject"], {"fields": clean})
+        data = await client.put_website_profile(access["params"], {"fields": clean})
     except DolibarrError as exc:
-        if exc.kind == "forbidden":
-            await dolibarr_identity.mark_revoked(db, binding)
+        denied = await _denied(db, access) if exc.kind == "forbidden" else "not_bound"
         if exc.kind in ("not_found", "module_off"):
             raise SelfServiceError(503, REASON_TEXTS["module_too_old"]) from exc
         if exc.kind == "bad_request":
             field = (exc.detail or {}).get("field")
             message = str((exc.detail or {}).get("message") or "Wert passt nicht.")
             raise SelfServiceError(400, f"{labels.get(field, field)}: {message}" if field else f"Die Mitgliederverwaltung hat das abgewiesen: {message}") from exc
-        _raise_for(exc, conflict="Das Profil wurde gerade anderswo geändert – bitte neu laden.")
-    if binding.get("member_id"):
+        _raise_for(exc, denied=denied, conflict="Das Profil wurde gerade anderswo geändert – bitte neu laden.")
+    if access.get("member_id"):
         from services import dolibarr_sync
-        await dolibarr_sync.queue_member(db, settings, int(binding["member_id"]))
+        await dolibarr_sync.queue_member(db, settings, int(access["member_id"]))
     return _website_view(data)

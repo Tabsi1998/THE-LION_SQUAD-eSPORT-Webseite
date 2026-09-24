@@ -194,6 +194,7 @@ class FakeDolibarr:
         self.statutes_members = False        # … oder nur für Mitglieder (über die Bindung, Fähigkeit documents)
         # Persönlicher Zugriff (#324): Einladungen je Code, Bindungen je Kennung, veröffentlichte Dokumente der Akte.
         self.identity_right = True           # die Website darf „für Personen handeln“ (Recht im Modul)
+        self.members_act_right = True        # … „im Namen jedes Mitglieds handeln“ (Vereine 1.4.0: member_id statt subject, #531)
         self.invitations: dict[str, dict] = {}
         self.identities: dict[str, dict] = {}
         self.published_documents: list[dict] = []
@@ -286,6 +287,27 @@ class FakeDolibarr:
         if capability and capability not in ident["capabilities"]:
             return None
         return ident
+
+    def _person(self, params: dict, capability: str | None = None) -> tuple[dict | None, httpx.Response | None]:
+        """Für wen der Aufruf gilt: subject (Bindung) oder ab 1.4.0 member_id (Recht „im Namen jedes Mitglieds handeln“).
+        Beides zusammen 400, altes Modul 400 „subject is needed“, fehlendes Recht 403, unbekanntes Mitglied 404."""
+        subject, member_id = str(params.get("subject") or ""), str(params.get("member_id") or "")
+        if member_id:
+            if subject:
+                return None, httpx.Response(400, json={"error": {"code": 400, "message": "subject and member_id are exclusive"}})
+            version = tuple(int("".join(ch for ch in piece if ch.isdigit()) or 0) for piece in str(self.module_version).split(".")[:3])
+            if version < (1, 4, 0):
+                return None, httpx.Response(400, json={"error": {"code": 400, "message": "subject is needed"}})
+            if not self.members_act_right:
+                return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to act for members"}})
+            if not member_id.isdigit() or int(member_id) not in self.members:
+                return None, httpx.Response(404, json={"error": {"code": 404, "message": "Member not found"}})
+            return {"subject": None, "member_id": int(member_id), "application_id": None,
+                    "capabilities": ["documents", "consents", "votes", "meetings", "profile", "events", "accounts", "website"]}, None
+        ident = self._identity(params, capability)
+        if ident is None:
+            return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+        return ident, None
 
     def profile_for(self, member_id: int) -> dict:
         """Die eigenen Daten, wie das Modul sie liefert - beim ersten Zugriff aus der Zusammenfassung gebaut."""
@@ -659,20 +681,20 @@ class FakeDolibarr:
                 return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
             return self._json("/vereine/identities/me", {k: v for k, v in ident.items() if k != "revoked"})
         if path == "/vereine/me/documents":
-            ident = self._identity(params, "documents")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "documents")
+            if denied:
+                return denied
             return self._json("/vereine/me/documents", self._visible_documents(ident["member_id"]))
         match = re.fullmatch(r"/vereine/me/documents/(\d+)/pdf", path)
         if match:
-            ident = self._identity(params, "documents")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "documents")
+            if denied:
+                return denied
             return self._document_pdf("/vereine/me/documents/{id}/pdf", self._visible_documents(ident["member_id"]), int(match.group(1)))
         if path == "/vereine/me/website-profile":
-            ident = self._identity(params, "profile")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "profile")
+            if denied:
+                return denied
             member_id = ident["member_id"]
             fields = self._website_fields(member_id)
             if request.method == "PUT":
@@ -704,15 +726,15 @@ class FakeDolibarr:
             given = bool(code) and (self.member_consents.get(member_id, {}).get(code) or {}).get("state") == "given"
             return self._json("/vereine/me/website-profile", {"consent": code, "given": given, "fields": fields})
         if path == "/vereine/me/profile" and request.method == "GET":
-            ident = self._identity(params, "profile")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "profile")
+            if denied:
+                return denied
             return self._json("/vereine/me/profile", self.profile_for(ident["member_id"]))
         if path == "/vereine/me/profile/changes":
-            ident = self._identity(params, "profile")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
-            rows = self.profile_requests.setdefault(str(params.get("subject")), [])
+            ident, denied = self._person(params, "profile")
+            if denied:
+                return denied
+            rows = self.profile_requests.setdefault(f"m{ident['member_id']}", [])
             if request.method == "GET":
                 return self._json("/vereine/me/profile/changes", rows)
             body = json.loads(request.content.decode("utf-8"))
@@ -737,12 +759,12 @@ class FakeDolibarr:
             rows.append(row)
             return self._json_post("/vereine/me/profile/changes", row)
         if path == "/vereine/me/exit" and request.method == "POST":
-            ident = self._identity(params, "profile")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "profile")
+            if denied:
+                return denied
             body = json.loads(request.content.decode("utf-8"))
             validate(body, request_schema("/vereine/me/exit"))
-            rows = self.profile_requests.setdefault(str(params.get("subject")), [])
+            rows = self.profile_requests.setdefault(f"m{ident['member_id']}", [])
             existing = next((row for row in rows if row["external_id"] == body["external_id"]), None)
             if existing:
                 return self._json_post("/vereine/me/exit", existing)
@@ -762,15 +784,15 @@ class FakeDolibarr:
         if match:
             return self._document_pdf("/vereine/documents/{id}/pdf", self._visible_documents(None), int(match.group(1)))
         if path == "/vereine/me/statutes":
-            ident = self._identity(params, "documents")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "documents")
+            if denied:
+                return denied
             return self._json("/vereine/me/statutes", self._statutes_payload(self.statutes_public or self.statutes_members))
         match = re.fullmatch(r"/vereine/me/statutes/(" + chr(92) + "d+)/pdf", path)
         if match:
-            ident = self._identity(params, "documents")
-            if ident is None:
-                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            ident, denied = self._person(params, "documents")
+            if denied:
+                return denied
             return self._statute_pdf("/vereine/me/statutes/{id}/pdf", int(match.group(1)), self.statutes_public or self.statutes_members)
         if path == "/vereine/statutes":
             payload = self.statutes if self.statutes_public else {"state": "not_published", "current": None, "versions": []}

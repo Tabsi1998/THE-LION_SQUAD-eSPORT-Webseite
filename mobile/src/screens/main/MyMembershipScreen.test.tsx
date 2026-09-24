@@ -120,6 +120,14 @@ test("Vereinsakte: ohne Bindung der Code, danach der Stand", async () => {
   alert.mockRestore();
 });
 
+test("Vereinsakte (#531): über die Mitgliedsnummer verbunden – kein Code nötig", async () => {
+  mockAkte({ available: true, status: "bound", via: "member", member_ref: "12", linked: true, capabilities: ["documents", "profile"], capability_labels: [], right_missing: false }, null);
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-identity-bound")).toBeTruthy());
+  expect(screen.getByText(/Mitgliedsnummer 12 verbunden/)).toBeTruthy();
+  expect(screen.queryByTestId("membership-identity-code")).toBeNull();
+});
+
 test("Meine Daten: nur Geändertes geht mit dem Stand raus; Eingereichtes steht darunter", async () => {
   mockAkte({ available: true, status: "bound", capabilities: ["documents", "profile"], capability_labels: ["Dokumente", "eigene Daten"], linked_at: "2026-09-24T10:00:00Z" }, SELF);
   mockPost.mockResolvedValue({ data: { status: "applied" } });

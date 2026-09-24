@@ -307,6 +307,25 @@ freigegeben hat – gespeichert wird in der Vereinsakte, der Vorstand sieht es a
 und die Website liest das Mitglied gleich nach, damit das Verzeichnis den neuen Stand zeigt. Sichtbar
 wird das Profil weiterhin nur mit der Einwilligung zur Nennung; der Kasten sagt, ob sie erteilt ist.
 
+## Vereinsakte ohne Einladungscode (Vereine ab 1.4.0, #531)
+
+Seit Vereinsmodul **1.4.0** braucht ein Mitglied keinen Einladungscode mehr: Ist sein Website-Konto
+unter *Dolibarr → Zuordnungen* seinem Mitgliedseintrag zugeordnet (bestätigt – von selbst über die
+bestätigte E-Mail-Adresse oder durch den Vorstand), ruft die Website die Akte mit der
+Mitgliedsnummer auf (`?member_id=` statt `?subject=`). Unterlagen, Statuten für Mitglieder,
+„Meine Daten“ samt Änderung und Austritt sowie das eigene Website-Profil kommen dann von selbst.
+
+Dafür braucht der API-Benutzer der Website im Vereinsmodul das Recht **„Über die API im Namen jedes
+Mitglieds handeln“** (Benutzer → Rechte → Vereine). Fehlt es, antwortet das Modul 403: das Mitglied
+sieht nur das Öffentliche, unter *Meine Mitgliedschaft → Vereinsakte* steht der Grund, und *Dolibarr
+→ Stand* zeigt bei „Vereinsakte ohne Einladungscode“ **Recht fehlt**. Sobald das Recht gesetzt ist,
+geht der nächste Abruf durch – ohne weiteren Schritt auf der Website.
+
+Die Modulversion merkt sich die Website beim Verbindungstest und bei jedem Abgleich. Ist das Modul
+älter als 1.4.0, zeigt *Stand* das an („braucht Vereine 1.4.0“), und für die Mitglieder bleibt der
+Einladungscode der Weg – der Abschnitt unten gilt dann unverändert. Hat ein Konto beides
+(Zuordnung und alte Bindung), zählt ab 1.4.0 die Zuordnung.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer
@@ -330,8 +349,9 @@ Mitglieder freigegebene über die Verbindung.
 Ohne Verbindung sehen Mitglieder nur, was der Verein unter *Mitglieder > Verein > Vereinsakte* für
 die **Öffentlichkeit** veröffentlicht hat. Widerruft ihr eine Verbindung im Modul, wirkt das beim
 nächsten Abruf: die Website merkt sich „widerrufen“, das Mitglied sieht wieder nur Öffentliches und
-kann mit einem neuen Code neu verbinden. E-Mail-Adresse, Mitgliedsnummer oder die bestätigte
-Zuordnung der Website ersetzen den Code nie – so will es das Modul, und so bleibt es.
+kann mit einem neuen Code neu verbinden. Bei Modulen vor 1.4.0 ersetzen E-Mail-Adresse,
+Mitgliedsnummer oder die bestätigte Zuordnung der Website den Code nicht; ab 1.4.0 reicht die
+Zuordnung (Abschnitt oben).
 
 **Eigene Daten und Austritt (#329 Teil 2):** Trägt die Einladung auch die Fähigkeit **„eigene
 Daten“**, zeigt *Meine Mitgliedschaft* den Kasten „Meine Daten“ aus der Vereinsakte: Anschrift,

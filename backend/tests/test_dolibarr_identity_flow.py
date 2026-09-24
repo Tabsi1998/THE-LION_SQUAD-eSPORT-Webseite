@@ -65,7 +65,8 @@ async def test_member_binds_with_an_invitation_code_and_sees_own_documents(flow,
     flow.act_as(paula)
 
     # Vor der Bindung: Stand „none“, in den Vereinsdokumenten nur das Öffentliche aus der Akte.
-    assert (await flow.get("/api/membership/me/identity")).json() == {"available": True, "status": "none", "capabilities": []}
+    before = (await flow.get("/api/membership/me/identity")).json()
+    assert before["available"] is True and before["status"] == "none" and before["capabilities"] == [] and before["linked"] is False
     assert [d["id"] for d in (await flow.get("/api/documents")).json()] == ["dolibarr-1"]
 
     bad = await flow.post("/api/membership/me/identity", json={"code": "FALSCH"})

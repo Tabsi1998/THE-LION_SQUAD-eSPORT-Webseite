@@ -172,6 +172,34 @@ test("Vereinsakte (#324): ein falscher Code zeigt die Antwort des Servers, wider
   expect(screen.getByTestId("membership-identity-form")).toBeInTheDocument();
 });
 
+test("Vereinsakte (#531): mit bestätigter Zuordnung und Modul 1.4.0 ist alles ohne Code verbunden", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/identity") return { data: { available: true, status: "bound", via: "member", member_ref: "12", linked: true, capabilities: ["documents", "profile", "website"], capability_labels: ["Dokumente", "eigene Daten", "Website-Profil"], linked_at: "2026-09-24T10:00:00Z", right_missing: false } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  renderPage();
+  expect(await screen.findByTestId("membership-identity-bound")).toHaveTextContent("über deine Mitgliedsnummer 12");
+  expect(screen.queryByTestId("membership-identity-form")).toBeNull();
+  expect(screen.queryByTestId("membership-identity-right-missing")).toBeNull();
+});
+
+test("Vereinsakte (#531): fehlt dem API-Benutzer das Recht, steht es beim Mitglied; altes Modul lässt den Code offen", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/identity") return { data: { available: true, status: "bound", via: "member", member_ref: "12", linked: true, capabilities: [], linked_at: "2026-09-24T10:00:00Z", right_missing: true } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  renderPage();
+  expect(await screen.findByTestId("membership-identity-right-missing")).toHaveTextContent("noch nicht im Namen der Mitglieder");
+
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/membership/me/identity") return { data: { available: true, status: "none", linked: true, member_ref: "12", module_too_old: true, capabilities: [] } };
+    return { data: { membership, is_active_member: true, dolibarr: { connected: true, led_by_dolibarr: false, link: { status: "verified" } } } };
+  });
+  renderPage();
+  expect(await screen.findByText(/Vereinsmodul ab 1.4.0/)).toBeInTheDocument();
+  expect(screen.getAllByTestId("membership-identity-form").length).toBeGreaterThan(0);
+});
+
 const SELF = {
   available: true, changeable: ["address", "zip", "town", "country_code", "phone", "phone_mobile", "email"], status_labels: {},
   profile: { member_id: 12, ref: "12", firstname: "Paula", lastname: "Beispiel", birth: "1990-05-04", address: "Teststraße 1", zip: "6410", town: "Testdorf", country_code: "AT",

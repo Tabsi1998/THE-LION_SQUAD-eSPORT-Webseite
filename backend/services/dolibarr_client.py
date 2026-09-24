@@ -534,15 +534,17 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def my_documents(self, subject: str) -> list[dict]:
+    # `who` sagt, für wen die Website spricht: {"subject": …} über die Bindung per Einladungscode oder ab
+    # Vereine 1.4.0 {"member_id": …} über die bestätigte Zuordnung (#531) - das Modul prüft beides selbst.
+    async def my_documents(self, who: dict) -> list[dict]:
         """Was der Verein für diese Person veröffentlicht hat - das Modul prüft die Bindung selbst."""
-        data = await self._get("/vereine/me/documents", {"subject": subject})
+        data = await self._get("/vereine/me/documents", dict(who))
         if not isinstance(data, list):
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
-    async def my_document_pdf(self, subject: str, document_id: int, revision: int | None = None) -> dict:
-        params: dict = {"subject": subject}
+    async def my_document_pdf(self, who: dict, document_id: int, revision: int | None = None) -> dict:
+        params: dict = dict(who)
         if revision:
             params["revision"] = int(revision)
         data = await self._get(f"/vereine/me/documents/{int(document_id)}/pdf", params)
@@ -565,43 +567,43 @@ class DolibarrClient:
         return data
 
     # ------------------------------------------------ Eigene Daten und Austritt (#329 Teil 2), über die Bindung
-    async def my_profile(self, subject: str) -> dict:
+    async def my_profile(self, who: dict) -> dict:
         """Die eigenen Daten der Person mit `version` (Stand der Kontaktdaten) und `direct` (sofort übernommen)."""
-        data = await self._get("/vereine/me/profile", {"subject": subject})
+        data = await self._get("/vereine/me/profile", dict(who))
         if not isinstance(data, dict) or "version" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def my_profile_requests(self, subject: str) -> list[dict]:
+    async def my_profile_requests(self, who: dict) -> list[dict]:
         """Eigene Änderungswünsche und Kündigung mit Stand - nie die Notizen des Vorstands."""
-        data = await self._get("/vereine/me/profile/changes", {"subject": subject})
+        data = await self._get("/vereine/me/profile/changes", dict(who))
         if not isinstance(data, list):
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
-    async def request_profile_change(self, subject: str, payload: dict) -> dict:
+    async def request_profile_change(self, who: dict, payload: dict) -> dict:
         """Kontaktdaten ändern lassen - mit `external_id` wiederholbar, ohne Wiederholung durch den Client."""
-        data = await self._request("POST", "/vereine/me/profile/changes", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        data = await self._request("POST", "/vereine/me/profile/changes", params=dict(who), payload=payload, key=self._write_key, retries=0)
         if not isinstance(data, dict) or "external_id" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def request_exit(self, subject: str, payload: dict) -> dict:
+    async def request_exit(self, who: dict, payload: dict) -> dict:
         """Den Austritt erklären; den letzten Tag ergibt die Kündigungsregel des Vereins, nie die Website."""
-        data = await self._request("POST", "/vereine/me/exit", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        data = await self._request("POST", "/vereine/me/exit", params=dict(who), payload=payload, key=self._write_key, retries=0)
         if not isinstance(data, dict) or "external_id" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def my_statutes(self, subject: str) -> dict:
+    async def my_statutes(self, who: dict) -> dict:
         """Die Statuten, wie der Verein sie für Mitglieder freigibt - über die Bindung (Fähigkeit `documents`)."""
-        data = await self._get("/vereine/me/statutes", {"subject": subject})
+        data = await self._get("/vereine/me/statutes", dict(who))
         if not isinstance(data, dict) or "state" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def my_statute_pdf(self, subject: str, version_id: int) -> dict:
-        data = await self._get(f"/vereine/me/statutes/{int(version_id)}/pdf", {"subject": subject})
+    async def my_statute_pdf(self, who: dict, version_id: int) -> dict:
+        data = await self._get(f"/vereine/me/statutes/{int(version_id)}/pdf", dict(who))
         if not isinstance(data, dict) or "content" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
@@ -623,16 +625,16 @@ class DolibarrClient:
         return data
 
     # ------------------------------------------------ Eigenes Website-Profil (#260, Vereine ab 1.2), über die Bindung
-    async def my_website_profile(self, subject: str) -> dict:
+    async def my_website_profile(self, who: dict) -> dict:
         """Gamertag, Kurztext, Spiele und Plattformen, wie die Person sie selbst pflegt - plus die Einwilligung."""
-        data = await self._get("/vereine/me/website-profile", {"subject": subject})
+        data = await self._get("/vereine/me/website-profile", dict(who))
         if not isinstance(data, dict) or "given" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    async def put_website_profile(self, subject: str, payload: dict) -> dict:
+    async def put_website_profile(self, who: dict, payload: dict) -> dict:
         """Nur die gesendeten Felder ändern sich; zu lange Werte weist das Modul ab (400)."""
-        data = await self._request("PUT", "/vereine/me/website-profile", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        data = await self._request("PUT", "/vereine/me/website-profile", params=dict(who), payload=payload, key=self._write_key, retries=0)
         if not isinstance(data, dict) or "given" not in data:
             raise DolibarrError("invalid_response", 200)
         return data
