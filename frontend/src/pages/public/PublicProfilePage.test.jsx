@@ -69,7 +69,8 @@ test("Kopf mit Banner, Pillen, verknüpftem Konto und Zahlen; fünf Reiter; High
   expect(screen.getByTestId("profile-banner").querySelector("img")).toHaveAttribute("src", "/api/static/banner.jpg");
   expect(screen.getByTestId("profile-identity")).toHaveTextContent("@paula");
   expect(screen.getByTestId("profile-identity")).toHaveTextContent("Moderator");
-  expect(screen.getByTestId("profile-verified-twitch")).toHaveAttribute("href", "https://www.twitch.tv/paula_racing");
+  expect(screen.getByTestId("profile-accounts-count")).toHaveTextContent("1 Konto verknüpft");
+  expect(screen.queryByTestId("profile-verified-chips")).toBeNull();
   expect(screen.getByTestId("profile-stat-points")).toHaveTextContent("2590");
   expect(screen.getByTestId("profile-stat-streams")).toHaveTextContent("7");
   // Fünf Reiter: Turniere und Fast Lap stecken in den Referenzen.
@@ -83,11 +84,14 @@ test("Kopf mit Banner, Pillen, verknüpftem Konto und Zahlen; fünf Reiter; High
   expect(highlights).toHaveTextContent("Spring Cup");
   expect(screen.queryByTestId("profile-highlight-ref-fast")).toBeNull();
   expect(highlights.querySelectorAll("[data-testid^='profile-highlight-']")[0]).toHaveTextContent("#1");
-  // Eine Konten-Karte: verknüpft, Socials, Gaming-IDs.
+  // Ein Kasten Konten (#527): Twitch genau einmal (bestätigt, bei den Socials), YouTube daneben, Steam bei den Spielkonten.
   const accounts = screen.getByTestId("public-profile-accounts");
-  expect(accounts).toContainElement(screen.getByTestId("linked-account-twitch"));
-  expect(accounts).toContainElement(screen.getByTestId("profile-social-youtube"));
-  expect(accounts).toContainElement(screen.getByTestId("public-profile-gaming-ids"));
+  expect(screen.getByTestId("profile-account-twitch")).toHaveAttribute("href", "https://www.twitch.tv/paula_racing");
+  expect(screen.getByTestId("public-profile-socials")).toContainElement(screen.getByTestId("profile-account-twitch"));
+  expect(screen.getByTestId("profile-account-twitch-verified")).toBeInTheDocument();
+  expect(accounts).toContainElement(screen.getByTestId("profile-account-youtube"));
+  expect(screen.getByTestId("public-profile-gaming-ids")).toContainElement(screen.getByTestId("profile-account-steam"));
+  expect(screen.getAllByText("Paula Racing").length).toBe(1);
   expect(screen.getByTestId("public-profile-info")).toHaveTextContent("Ordentliches Mitglied");
   expect(screen.getByTestId("public-profile-setup")).toHaveTextContent("Lenkrad");
   expect(screen.getByTestId("public-profile-teams")).toHaveTextContent("Lion Racing");

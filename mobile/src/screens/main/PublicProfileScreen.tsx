@@ -8,7 +8,7 @@ import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
-import { LinkedAccountsCard, isVerified, platformColor, type LinkedAccount } from "../../components/LinkedAccounts";
+import { AccountsCard, accountGroups, type LinkedAccount } from "../../components/LinkedAccounts";
 import { ReportSheet, type ReportDraft } from "../../components/ReportSheet";
 import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
@@ -161,8 +161,8 @@ export function PublicProfileScreen({ navigation, route }: Props) {
     load();
   }, [load]);
 
-  const socialLinks = useMemo(() => publicSocialLinks(profile), [profile]);
-  const gamingIds = useMemo(() => publicGamingIds(profile), [profile]);
+  // Konten einmal sauber (#527): ein Kasten mit Socials und Spielkonten, jedes Konto genau einmal.
+  const accounts = useMemo(() => accountGroups(profile), [profile]);
   const liveStream = useMemo(() => {
     const twitch = cleanHandle(profile?.twitch_handle).toLowerCase();
     if (!profile || !twitch) return null;
@@ -296,42 +296,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               <ProfileStreamCard profile={profile} stream={liveStream} />
             ) : null}
 
-            <LinkedAccountsCard accounts={profile.linked_accounts} />
-
-            {socialLinks.length || gamingIds.length ? (
-              <Card style={styles.card}>
-                <Heading>Socials & IDs</Heading>
-                {socialLinks.map((link) => (
-                  <Pressable key={`${link.label}:${link.value}`} onPress={() => link.url ? Linking.openURL(link.url).catch(() => {}) : undefined} style={({ pressed }) => [styles.linkRow, pressed && styles.pressed]}>
-                    <View style={styles.linkIcon}>
-                      <Ionicons name={iconForSocial(link.label)} color={isVerified(profile.verified_platforms, link.platform) ? platformColor(link.platform) : colors.cyan} size={17} />
-                    </View>
-                    <View style={styles.flex}>
-                      <View style={styles.nameRow}>
-                        <Body style={styles.strong}>{link.label}</Body>
-                        {isVerified(profile.verified_platforms, link.platform) ? <Ionicons name="checkmark-circle" color={colors.success} size={15} testID={`profile-social-verified-${link.platform}`} /> : null}
-                      </View>
-                      <Muted>{link.value}</Muted>
-                    </View>
-                    {link.url ? <Ionicons name="open-outline" color={colors.muted} size={17} /> : null}
-                  </Pressable>
-                ))}
-                {gamingIds.map((entry) => (
-                  <View key={entry.label} style={styles.linkRow}>
-                    <View style={styles.linkIcon}>
-                      <Ionicons name="game-controller-outline" color={isVerified(profile.verified_platforms, entry.platform) ? platformColor(entry.platform) : colors.gold} size={17} />
-                    </View>
-                    <View style={styles.flex}>
-                      <View style={styles.nameRow}>
-                        <Body style={styles.strong}>{entry.label}</Body>
-                        {isVerified(profile.verified_platforms, entry.platform) ? <Ionicons name="checkmark-circle" color={colors.success} size={15} testID={`profile-gaming-verified-${entry.platform}`} /> : null}
-                      </View>
-                      <Muted>{entry.value}</Muted>
-                    </View>
-                  </View>
-                ))}
-              </Card>
-            ) : null}
+            <AccountsCard groups={accounts} />
           </>
         ) : null}
 
@@ -514,45 +479,6 @@ function Pill({ label, tone = "default" }: { label: string; tone?: "default" | "
   );
 }
 
-function publicSocialLinks(profile: PublicProfilePayload | null) {
-  if (!profile) return [];
-  const base = [
-    profile.discord_name && { label: "Discord", platform: "discord", value: profile.discord_name, url: "" },
-    profile.twitch_handle && { label: "Twitch", platform: "twitch", value: cleanHandle(profile.twitch_handle), url: `https://www.twitch.tv/${cleanHandle(profile.twitch_handle)}` },
-    profile.youtube_handle && { label: "YouTube", platform: "youtube", value: cleanHandle(profile.youtube_handle), url: socialUrl("youtube", profile.youtube_handle) },
-    profile.instagram_handle && { label: "Instagram", platform: "instagram", value: cleanHandle(profile.instagram_handle), url: socialUrl("instagram", profile.instagram_handle) },
-    profile.x_handle && { label: "X", platform: "x", value: cleanHandle(profile.x_handle), url: socialUrl("x", profile.x_handle) },
-    profile.website && { label: "Website", platform: "website", value: profile.website, url: externalUrl(profile.website) },
-  ].filter(Boolean) as Array<{ label: string; platform: string; value: string; url?: string }>;
-  const extra = (profile.socials || []).map((social) => ({
-    label: social.platform || "Link",
-    platform: String(social.platform || "").toLowerCase(),
-    value: social.value || social.url || "",
-    url: social.url || socialUrl(social.platform, social.value),
-  })).filter((social) => social.value);
-  const seen = new Set<string>();
-  return [...base, ...extra].filter((link) => {
-    const key = `${link.label}:${link.value}`.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function publicGamingIds(profile: PublicProfilePayload | null) {
-  if (!profile) return [];
-  return [
-    ["Steam", "steam", profile.steam_id],
-    ["Epic", "epic", profile.epic_id],
-    ["PSN", "psn", profile.psn_id],
-    ["Xbox", "xbox", profile.xbox_id],
-    ["Nintendo", "nintendo", profile.nintendo_fc],
-    ["EA", "ea", profile.ea_id],
-    ["Riot", "riot", profile.riot_id],
-    ["Battle.net", "battlenet", profile.battlenet_id],
-  ].filter(([, , value]) => value).map(([label, platform, value]) => ({ label: String(label), platform: String(platform), value: String(value) }));
-}
-
 function cleanHandle(value?: string | null) {
   return String(value || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?/i, "").replace(/^twitch\.tv\//i, "").split(/[/?#]/)[0];
 }
@@ -583,16 +509,6 @@ function membershipLabel(profile: PublicProfilePayload) {
   const membershipType = String(profile.membership?.membership_type || "").replace(/_/g, " ");
   if (membershipType) return membershipType;
   return profile.is_club_member ? "Vereinsmitglied" : "";
-}
-
-function iconForSocial(label: string) {
-  const lower = label.toLowerCase();
-  if (lower.includes("discord")) return "chatbubble-ellipses-outline";
-  if (lower.includes("twitch")) return "radio-outline";
-  if (lower.includes("youtube")) return "logo-youtube";
-  if (lower.includes("instagram")) return "logo-instagram";
-  if (lower === "x" || lower.includes("twitter")) return "logo-twitter";
-  return "link-outline";
 }
 
 const styles = StyleSheet.create({
