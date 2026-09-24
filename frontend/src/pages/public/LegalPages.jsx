@@ -118,11 +118,12 @@ export function LegalPage({ page }) {
   const load = useCallback(async () => {
     try {
       const { data } = await api.get(`/settings/public/legal/${page}`);
-      setDoc(data || null);
+      // Nur eine Antwort mit Abschnitten ist eine Rechtsseite - alles andere zeigt die leere Seite mit Titel.
+      setDoc(data && Array.isArray(data.sections) ? data : { ...meta, legal_ready: data?.legal_ready, sections: [] });
     } catch {
       setDoc((current) => current || { sections: [] });
     }
-  }, [page]);
+  }, [page, meta]);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["settings", "branding"]);
 

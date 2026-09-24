@@ -319,11 +319,44 @@ test("password reset validates confirmation and keeps an API error visible", asy
   expect(submissions).toBe(1);
 });
 
+// Rechtstexte kommen seit #545 fertig als Abschnitte vom Backend - aus denselben öffentlichen Daten.
+// Der Test stellt sie so nach, wie das Backend sie aus `canonicalPublicSettings` bauen würde.
+function legalPageFixture(pageKey, settings) {
+  const mail = (email) => (email ? `[${email}](mailto:${email})` : "");
+  const contact = settings.contact_email;
+  const privacy = settings.privacy_contact_email || contact;
+  const ready = settings.legal_ready !== false;
+  if (pageKey === "imprint") {
+    return {
+      page: "imprint", title: "Impressum", intro: "Anbieterkennzeichnung, Offenlegung und Kontaktinformationen des Vereins.", updated_at: settings.legal_updated_at || null, legal_ready: ready,
+      sections: [
+        { id: "operator", title: "Medieninhaber und Betreiber", blocks: [{ type: "info", rows: [["Verein", settings.legal_name || settings.club_name || "THE LION SQUAD"], ...(contact ? [["E-Mail", mail(contact)]] : [])] }] },
+        ...(privacy ? [{ id: "privacy-contact", title: "Datenschutzkontakt", blocks: [{ type: "p", text: `Datenschutzanfragen können an ${mail(privacy)} gerichtet werden.` }] }] : []),
+      ],
+    };
+  }
+  return {
+    page: pageKey, title: pageKey === "privacy" ? "Datenschutzerklärung" : "Nutzungsbedingungen", intro: "Informationen zur Verarbeitung personenbezogener Daten auf dieser Vereinsplattform.", updated_at: settings.legal_updated_at || null, legal_ready: ready,
+    sections: [
+      { id: "controller", title: "Verantwortlicher", blocks: [{ type: "info", rows: [["Verantwortlicher", settings.legal_name || settings.club_name || "THE LION SQUAD"], ...(contact ? [["Kontakt", mail(contact)]] : []), ...(privacy ? [["Datenschutz", mail(privacy)]] : [])] }] },
+      { id: "rights", title: "Betroffenenrechte", blocks: [{ type: "p", text: privacy ? `Zur Ausübung nutze bitte ${mail(privacy)}.` : "Zur Ausübung nutze bitte [das Kontaktformular](/contact)." }] },
+    ],
+  };
+}
+
+async function mockLegalPages(page, settings) {
+  await page.route("**/api/settings/public/legal/*", (route) => {
+    const pageKey = new URL(route.request().url()).pathname.split("/").pop();
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(legalPageFixture(pageKey, settings)) });
+  });
+}
+
 test("contact and legal pages share one configured public data source", async ({ page }) => {
   await page.route("**/api/settings/public**", (route) => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify(canonicalPublicSettings),
   }));
+  await mockLegalPages(page, canonicalPublicSettings);
   await page.route("**/api/contact/topics", (route) => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify([{ value: "general", label: "Allgemein" }]),
@@ -352,6 +385,7 @@ test("missing public settings never create a fake email or internal placeholder"
     contentType: "application/json",
     body: JSON.stringify({ club_name: "THE LION SQUAD", legal_ready: false }),
   }));
+  await mockLegalPages(page, { club_name: "THE LION SQUAD", legal_ready: false });
   await page.route("**/api/contact/topics", (route) => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify([{ value: "general", label: "Allgemein" }]),
