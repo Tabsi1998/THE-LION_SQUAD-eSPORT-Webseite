@@ -595,6 +595,22 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Website-Profil je Mitglied (#255, Vereine ab 1.1)
+    async def member_profile(self, member_id: int) -> dict:
+        """Was der Verein in Dolibarr am Website-Profil pflegt - nur mit der dort gewählten Einwilligung
+        (`given`), sonst nur deren Name."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/profile")
+        if not isinstance(data, dict) or "given" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def member_photo(self, member_id: int) -> dict:
+        """Das Foto der Mitgliedskarte, base64 mit Prüfsumme - 404 ohne Einwilligung oder Foto."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/photo")
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
         if not isinstance(data, dict) or "id" not in data:

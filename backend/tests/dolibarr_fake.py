@@ -170,7 +170,7 @@ class FakeDolibarr:
         self.bank_readable = True
         # Vereinsdaten und Vorstand (#326) - Testwerte, keine echten Personen.
         self.organization = {
-            "country_profile": "AT", "country_profile_complete": True, "name": "Testverein Löwen", "register": {"kind": "ZVR", "number": "123456789", "court": ""},
+            "name": "Testverein Löwen", "register": {"kind": "ZVR", "number": "123456789"},
             "authority": "Bezirkshauptmannschaft Testbezirk", "address": {"street": "Teststraße 1", "zip": "6410", "town": "Testdorf", "country_code": "AT"},
             "email": "office@runtime-verein.test", "phone": "+43 5262 0", "url": "https://runtime-verein.test", "founded": "2019-03-01",
             "nonprofit": True, "purpose": "Förderung des eSports", "fiscal_year_start_month": 1,
@@ -203,6 +203,9 @@ class FakeDolibarr:
         self.profile_requests: dict[str, list[dict]] = {}
         self.direct_fields = ["phone", "phone_mobile"]
         self.exit_rule_last_day = "2026-12-31"
+        # Website-Profil je Mitglied (#255): was der Verein in Dolibarr pflegt, und das Foto der Mitgliedskarte.
+        self.website_profile_consent = ""
+        self.member_profiles: dict[int, dict] = {}
         self.tampered_pdf_ids: set[int] = set()  # Fassungen, deren Datei nicht mehr zur Akte passt
         self.board = [
             {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
@@ -569,6 +572,28 @@ class FakeDolibarr:
         if path == "/status":
             # Dolibarrs eigener Weg (Kern). Der Website-Benutzer hat dafür keine Rechte.
             return httpx.Response(self.core_status, json={"error": {"code": self.core_status, "message": "x"}})
+        match = re.fullmatch(r"/vereine/members/(\d+)/(profile|photo)", path)
+        if match and request.method == "GET":
+            member_id, what = int(match.group(1)), match.group(2)
+            if member_id not in self.members:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "No member with this id"}})
+            code = self.website_profile_consent
+            given = bool(code) and (self.member_consents.get(member_id, {}).get(code) or {}).get("state") == "given"
+            stored = self.member_profiles.get(member_id) or {}
+            photo_bytes = stored.get("photo")
+            if what == "photo":
+                if not given or not photo_bytes:
+                    return httpx.Response(404, json={"error": {"code": 404, "message": "No photo for this member the website may show"}})
+                return self._json("/vereine/members/{id}/photo", {
+                    "filename": stored.get("photo_name") or "photo.png", "content_type": stored.get("photo_type") or "image/png", "filesize": len(photo_bytes),
+                    "sha256": hashlib.sha256(photo_bytes).hexdigest(), "content": base64.b64encode(photo_bytes).decode()})
+            payload = {"consent": code, "given": given}
+            if given:
+                payload.update({"gamertag": stored.get("gamertag") or "", "bio": stored.get("bio") or "", "games": list(stored.get("games") or []),
+                                "platforms": list(stored.get("platforms") or []),
+                                "photo": {"sha256": hashlib.sha256(photo_bytes).hexdigest(), "size": len(photo_bytes), "content_type": stored.get("photo_type") or "image/png",
+                                          "updated_at": "2026-09-25T10:00:00Z"} if photo_bytes else None})
+            return self._json("/vereine/members/{id}/profile", payload)
         match = re.fullmatch(r"/vereine/members/(\d+)/consents", path)
         if match and request.method == "GET":
             member_id = int(match.group(1))
@@ -716,8 +741,9 @@ class FakeDolibarr:
             return self._json("/vereine/board", self.board)
         if path == "/vereine/status":
             return self._json("/vereine/status", {
-                "module_version": self.module_version, "api_version": 1, "country_profile": "AT",
-                "country_profile_complete": True, "server_time": self.server_time,
+                "module_version": self.module_version, "api_version": 2, "server_time": self.server_time,
+                # Website-Profil (#255): welche Einwilligung es öffnet - leer, wenn keine gewählt ist.
+                "website_profile_consent": self.website_profile_consent,
             })
         if path == "/vereine/members":
             page, limit = int(params.get("page", 0)), int(params.get("limit", 100))

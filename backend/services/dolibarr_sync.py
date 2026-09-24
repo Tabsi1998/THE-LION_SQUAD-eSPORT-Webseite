@@ -14,6 +14,9 @@ Was dieser Abgleich nie tut:
 """
 from __future__ import annotations
 
+import base64
+import binascii
+import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 
@@ -22,6 +25,7 @@ from models import new_id, now_utc
 from services.dolibarr_client import DolibarrClient, DolibarrError, capabilities_for, instance_key, load_settings
 from services.dolibarr_links import close_link, note_candidate, verified_link_for_member, verify_link
 from services.slug_utils import slugify
+from storage import UPLOAD_DIR
 from services.membership_service import ACTIVE_STATUSES, VALID_TYPES, end_self_directory_entry
 
 logger = logging.getLogger("tls.dolibarr.sync")
@@ -42,6 +46,10 @@ STATUS_MAP = {"draft": "pending", "active": "active", "terminated": "former", "e
 # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): Einträge, die der Abgleich angelegt hat.
 DIRECTORY_SOURCE = "dolibarr"
 CONSENT_WITHDRAWN = "consent_withdrawn"
+DIRECTORY_CHANGES = ("created", "activated", "deactivated", "updated")
+# Foto der Mitgliedskarte (#255): als Datei unter den Uploads, benannt nach Profil und Prüfsumme.
+PHOTO_PREFIX = "member-photo-"
+PHOTO_TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp"}
 
 
 # ---------------------------------------------------------------- Abbildung
@@ -169,6 +177,60 @@ async def _unique_directory_slug(db, source: str) -> str:
     return candidate
 
 
+async def _store_member_photo(client: DolibarrClient, member_id: int, photo: dict, profile_id: str) -> str | None:
+    """Das Foto der Mitgliedskarte holen, gegen die Prüfsumme prüfen und unter den Uploads ablegen."""
+    try:
+        data = await client.member_photo(member_id)
+    except DolibarrError as exc:
+        logger.warning("[dolibarr] Foto von Mitglied %s nicht lesbar: %s", member_id, exc.kind)
+        return None
+    try:
+        content = base64.b64decode(str(data.get("content") or ""), validate=True)
+    except (ValueError, binascii.Error):
+        return None
+    expected = str(photo.get("sha256") or "")
+    extension = PHOTO_TYPES.get(str(data.get("content_type") or ""))
+    if not content or not extension or hashlib.sha256(content).hexdigest() != expected:
+        return None
+    name = f"{PHOTO_PREFIX}{profile_id}-{expected[:12]}.{extension}"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    (UPLOAD_DIR / name).write_bytes(content)
+    return f"/api/static/uploads/{name}"
+
+
+async def _apply_dolibarr_profile(db, client: DolibarrClient, profile: dict, member_id: int) -> bool:
+    """Was der Verein in Dolibarr am Website-Profil pflegt (Gamertag, Kurztext, Spiele, Plattformen, Foto),
+    führt; was dort leer ist, lässt den Stand der Website stehen. Liefert True, wenn sich etwas geändert hat."""
+    try:
+        data = await client.member_profile(member_id)
+    except DolibarrError as exc:
+        if exc.kind not in ("not_found", "module_off"):  # ein älteres Modul kennt das Website-Profil nicht
+            logger.warning("[dolibarr] Website-Profil von Mitglied %s nicht lesbar: %s", member_id, exc.kind)
+        return False
+    if not data.get("given"):
+        return False
+    update: dict = {}
+    for key, limit in (("gamertag", 40), ("bio", 2000)):
+        value = str(data.get(key) or "").strip()[:limit]
+        if value and value != (profile.get(key) or ""):
+            update[key] = value
+    for key in ("games", "platforms"):
+        values = [str(v).strip() for v in (data.get(key) or []) if str(v).strip()][:20]
+        if values and values != (profile.get(key) or []):
+            update[key] = values
+    photo = data.get("photo") if isinstance(data.get("photo"), dict) else None
+    if photo and photo.get("sha256") and photo.get("sha256") != profile.get("dolibarr_photo_sha"):
+        url = await _store_member_photo(client, member_id, photo, profile["id"])
+        if url:
+            update.update({"photo_url": url, "dolibarr_photo_sha": photo["sha256"]})
+    if not update:
+        return False
+    update.update({"dolibarr_profile_at": now_utc().isoformat(), "updated_at": now_utc().isoformat(), "updated_by": ACTOR})
+    await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
+    profile.update(update)
+    return True
+
+
 async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link: dict, summary: dict) -> str:
     """Ein Eintrag im Mitgliederverzeichnis folgt der Einwilligung in Dolibarr (Code `directory_consent_code`):
     „given“ legt ihn an oder schaltet ihn frei - Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto,
@@ -176,9 +238,15 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
     Mitgliederverwaltung nur, solange der Vorstand ihn nicht selbst geändert hat (etwa nur der Vorname, wenn
     der Nachname nicht öffentlich stehen soll); leer heißt wieder aus Dolibarr. „withdrawn“ nimmt ihn
     offline, auch einen Eintrag, den das Mitglied selbst angelegt hat. Ohne Code passiert nichts.
-    Liefert `created|activated|deactivated|unchanged|skipped`."""
+    Ist auf der Website kein Code gewählt, gilt der, den das Modul für das Website-Profil nennt. Mit
+    Einwilligung führt außerdem, was der Verein in Dolibarr am Website-Profil pflegt (#255).
+    Liefert `created|activated|deactivated|updated|unchanged|skipped`."""
+    if settings.get("mode") != "live":
+        return "skipped"
     code = str(settings.get("directory_consent_code") or "").strip()
-    if not code or settings.get("mode") != "live":
+    if not code:
+        code = str((await sync_state(db)).get("website_profile_consent") or "").strip()
+    if not code:
         return "skipped"
     try:
         rows = await client.member_consents(int(summary["id"]))
@@ -211,6 +279,7 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
             }
             await db.club_member_profiles.insert_one(doc)
             logger.info("[dolibarr] Verzeichnis-Eintrag angelegt für Mitglied %s", summary.get("id"))
+            await _apply_dolibarr_profile(db, client, doc, int(summary["id"]))
             return "created"
         update: dict = {"consent": consent_info}
         previous_name = profile.get("dolibarr_name")
@@ -223,11 +292,12 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
                       and (profile.get("deactivated_reason") == CONSENT_WITHDRAWN or profile.get("source") == DIRECTORY_SOURCE))
         if reactivate:
             update.update({"is_active": True, "deactivated_reason": None})
+        changed = await _apply_dolibarr_profile(db, client, profile, int(summary["id"]))
         if (profile.get("consent") or {}) == consent_info and not {k: v for k, v in update.items() if k != "consent"}:
-            return "unchanged"
+            return "updated" if changed else "unchanged"
         update.update({"updated_at": now, "updated_by": ACTOR})
         await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
-        return "activated" if reactivate else "unchanged"
+        return "activated" if reactivate else ("updated" if changed else "unchanged")
 
     if profile is None:
         return "unchanged"
@@ -299,6 +369,9 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
     try:
         client = DolibarrClient(settings)
         status = await client.status()
+        # Website-Profil (#255): die Einwilligung, die das Modul dafür nennt, gleich merken - der Verzeichnis-Abgleich
+        # in diesem Lauf greift darauf zurück, wenn auf der Website kein eigener Code gewählt ist.
+        await _save_state(db, {"website_profile_consent": str(status.get("website_profile_consent") or "")})
         cursor = None if full else state.get("cursor")
         seen_ids: set[int] = set()
         page = 0
@@ -315,7 +388,7 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
                     continue
                 if live:
                     counts[await apply_summary(db, settings, link, summary)] += 1
-                    if await sync_directory_entry(db, settings, client, link, summary) in ("created", "activated", "deactivated"):
+                    if await sync_directory_entry(db, settings, client, link, summary) in DIRECTORY_CHANGES:
                         counts["directory"] += 1
             page += 1
             if page >= MAX_PAGES:
@@ -333,7 +406,7 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
                         counts["gone"] += 1
                     continue
                 counts[await apply_summary(db, settings, link, summary)] += 1
-                if await sync_directory_entry(db, settings, client, link, summary) in ("created", "activated", "deactivated"):
+                if await sync_directory_entry(db, settings, client, link, summary) in DIRECTORY_CHANGES:
                     counts["directory"] += 1
     except DolibarrError as exc:
         await _save_state(db, {"last_run_at": started, "ok": False, "last_error": {"kind": exc.kind, "status": exc.status, "text": exc.text, "at": started}})
@@ -344,6 +417,8 @@ async def run_sync(db=None, *, full: bool | None = None) -> dict:
         "cursor": status.get("server_time"), "counts": counts, "was_full": bool(full), "applied_live": live,
         "module_version": status.get("module_version"), "api_version": status.get("api_version"),
         "capabilities": capabilities_for(status),
+        # Website-Profil (#255): welche Einwilligung das Modul dafür nennt - Rückfall für das Verzeichnis.
+        "website_profile_consent": str(status.get("website_profile_consent") or ""),
     }
     if full:
         fields["last_full_at"] = fields["last_ok_at"]
