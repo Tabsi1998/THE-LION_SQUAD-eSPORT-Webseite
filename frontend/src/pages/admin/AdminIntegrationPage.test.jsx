@@ -10,6 +10,9 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback) => fallback }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("sonner", () => ({ toast: toastMock }));
+// Discord und Twitch tragen ihre laufenden Einstellungen selbst (eigene Tests); hier nur, dass sie da sind.
+vi.mock("@/pages/admin/settings/DiscordSettings", () => ({ DiscordSettings: () => <div data-testid="discord-settings-stub" /> }));
+vi.mock("@/pages/admin/settings/TwitchSettings", () => ({ TwitchSettings: () => <div data-testid="twitch-settings-stub" /> }));
 
 const AdminIntegrationPage = (await import("./AdminIntegrationPage")).default;
 
@@ -71,4 +74,25 @@ test("unbekannte Verbindung führt zur Einrichtung", async () => {
   mockApi();
   renderAt("/admin/integrations/gibtsnicht");
   expect(await screen.findByTestId("integration-missing")).toHaveTextContent("Zur Einrichtung");
+});
+
+test("Discord trägt seine laufenden Einstellungen selbst - kein Reiter mehr, nichts doppelt", async () => {
+  mockApi();
+  renderAt("/admin/integrations/discord");
+  expect(await screen.findByTestId("integration-title")).toHaveTextContent("Discord");
+  expect(screen.getByTestId("integration-settings")).toContainElement(screen.getByTestId("discord-settings-stub"));
+  expect(screen.queryByTestId("integration-tab-link")).toBeNull();
+  expect(screen.getByTestId("discord-client-id")).toBeInTheDocument();
+});
+
+test("Twitch: Client ID und Secret stehen nur bei der Live-Erkennung; die Karte behält Stand, prüfen und Rückrufadresse", async () => {
+  mockApi({ twitch_client_id: "abc", twitch_client_secret_masked: "****" });
+  renderAt("/admin/integrations/twitch");
+  expect(await screen.findByTestId("integration-title")).toHaveTextContent("Twitch");
+  expect(screen.getByTestId("twitch-settings-stub")).toBeInTheDocument();
+  expect(screen.getByTestId("platform-app-twitch-elsewhere")).toHaveTextContent("Live-Erkennung");
+  expect(screen.queryByTestId("twitch-client-id")).toBeNull();
+  expect(screen.queryByTestId("platform-app-save-twitch")).toBeNull();
+  expect(screen.getByTestId("platform-check-twitch")).toBeInTheDocument();
+  expect(screen.getByTestId("integration-app")).toHaveTextContent("/api/platform-links/twitch/callback");
 });

@@ -118,15 +118,13 @@ export const ADMIN_GROUPS = [
       { to: "/admin/settings?tab=brand", label: "Einstellungen: Branding", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=socials", label: "Einstellungen: Socials", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=seo", label: "Einstellungen: SEO & Analytics", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=discord", label: "Einstellungen: Discord", icon: SettingsIcon, areas: ["system"], searchOnly: true },
-      { to: "/admin/settings?tab=twitch", label: "Einstellungen: Twitch", icon: SettingsIcon, areas: ["system"], searchOnly: true },
       { to: "/admin/settings?tab=system", label: "Einstellungen: Systemstatus", icon: SettingsIcon, areas: ["system"], searchOnly: true },
     ],
   },
 ];
 
 const ADMIN_SEARCH_TERMS = {
-  ...Object.fromEntries(INTEGRATIONS.map((integration) => [`/admin/integrations/${integration.key}`, [integration.label.toLowerCase(), integration.key, "verbindung", "verknüpfen", "anleitung", "einrichten", "app", "client id", "secret"]])),
+  ...Object.fromEntries(INTEGRATIONS.map((integration) => [`/admin/integrations/${integration.key}`, [integration.label.toLowerCase(), integration.key, "verbindung", "verknüpfen", "anleitung", "einrichten", "app", "client id", "secret", ...(integration.searchTerms || [])]])),
   "/admin": ["home", "start", "control"],
   "/admin/ops": ["fehler", "tempo", "langsam", "monitoring", "betrieb", "errors", "vitals", "checks", "ampel", "alarme"],
   "/admin/app-releases": ["app", "apk", "release", "version", "update", "build", "lionsapp"],
@@ -177,8 +175,6 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/settings?tab=brand": ["branding", "logo", "favicon", "farbe", "akzentfarbe", "maskottchen", "banner", "share bild", "marke"],
   "/admin/settings?tab=socials": ["socials", "instagram", "tiktok", "youtube", "facebook", "whatsapp", "discord link", "social links"],
   "/admin/settings?tab=seo": ["seo", "google analytics", "measurement id", "plausible", "analytics", "indexnow", "sitemap", "suchmaschine", "bing", "site verification", "meta"],
-  "/admin/settings?tab=discord": ["discord", "webhook", "bot", "token", "kanal", "meldungen", "rollen abgleichen", "befehle"],
-  "/admin/settings?tab=twitch": ["twitch", "helix", "livestream", "live-erkennung", "stream"],
   "/admin/settings?tab=system": ["systemstatus", "status", "datenbank", "scheduler", "uploads", "mail-queue", "smtp test"],
   "/admin/dolibarr?tab=connection": ["dolibarr verbindung", "api schluessel", "api schlüssel", "modus", "vorschau", "live", "schreibzugriff", "rechnungen freigeben", "steuersaetze", "steuersätze", "konditionen", "webhook", "beitrittsantraege", "beitrittsanträge", "e-mail zuordnen", "erp"],
   "/admin/dolibarr?tab=preview": ["umstellung", "vorschau", "trockenlauf", "mitgliedsarten", "konten bestätigen", "ohne konto"],

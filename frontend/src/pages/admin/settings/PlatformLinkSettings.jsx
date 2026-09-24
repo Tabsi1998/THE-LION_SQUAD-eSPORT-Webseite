@@ -1,16 +1,16 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Link2, ShieldQuestion, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Link2, ShieldQuestion, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { SetupGuide } from "@/components/tls/SetupGuide";
 import { PLATFORM_APPS } from "@/lib/platformLinks";
 
 // Plattform-Konten verknüpfen (#260): je Plattform die App der Website (Client ID + Secret), die
-// Rückrufadresse zum Kopieren, „prüfen“ und die Anleitung. Twitch nimmt die Helix-App aus dem
-// Twitch-Reiter, Steam braucht keine App. Die Schlüssel werden verschlüsselt gespeichert und nie
-// wieder angezeigt; leer lassen heißt behalten. `PlatformAppCard` steht auch auf der eigenen Seite
-// je Verbindung (Admin → Verbindungen).
+// Rückrufadresse zum Kopieren, „prüfen“ und die Anleitung. Steam braucht keine App. Die Schlüssel
+// werden verschlüsselt gespeichert und nie wieder angezeigt; leer lassen heißt behalten.
+// `PlatformAppCard` steht auf der Seite je Verbindung (Admin → Verbindungen) - und nur dort: der
+// Reiter Login & Konten zeigt seit 24.09. („muss das doppelt sein?“) nur noch die Übersicht.
 
 const CHECK_ICON = { ok: [CheckCircle2, "text-[#00FF88]"], fail: [XCircle, "text-[#FF3B30]"], warn: [ShieldQuestion, "text-[#FFD700]"] };
 
@@ -50,7 +50,19 @@ export function appReady(app, brand) {
   return Boolean(brand[app.idField] && (brand[app.secretField] || brand[`${app.secretField}_masked`]));
 }
 
-export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSave = null, saving = false, guideOpen = false, showGuide = true }) {
+function appStateLabel(app, ready) {
+  if (ready) return "bereit";
+  return app.optional ? "optional" : "fehlt";
+}
+
+function appStateClass(app, ready) {
+  if (ready) return "text-[#00FF88]";
+  return app.optional ? "text-white/40" : "text-[#FFD700]";
+}
+
+// `showFields` aus: Client ID und Secret stehen woanders auf derselben Seite (Twitch: bei der
+// Live-Erkennung) - die Karte zeigt dann nur Stand, „prüfen“ und Rückrufadresse.
+export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSave = null, saving = false, guideOpen = false, showGuide = true, showFields = true, fieldsNote = "" }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
@@ -72,15 +84,17 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="font-bold text-sm">{app.label}</div>
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] font-bold uppercase tracking-wider ${isReady ? "text-[#00FF88]" : app.optional ? "text-white/40" : "text-[#FFD700]"}`} data-testid={`platform-link-${app.key}-state`}>{isReady ? "bereit" : app.optional ? "optional" : "fehlt"}</span>
+          <span className={`text-[10px] font-bold uppercase tracking-wider ${appStateClass(app, isReady)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, isReady)}</span>
           <button type="button" onClick={runCheck} disabled={checking} data-testid={`platform-check-${app.key}`} className="px-3 py-1 border border-white/20 text-white/80 rounded-sm text-[10px] font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8] disabled:opacity-40">
             {checking ? "Prüfe …" : "prüfen"}
           </button>
         </div>
       </div>
       {app.note && <p className="text-xs text-white/45">{app.note}</p>}
-      {app.tab && !onSave ? (
-        <p className="text-xs text-white/55">Client ID und Secret stehen im Reiter <Link to={app.tab} className="text-[#29B6E8] hover:text-white">{app.tabLabel}</Link>.</p>
+      {!showFields ? (
+        <p className="text-xs text-white/55" data-testid={`platform-app-${app.key}-elsewhere`}>{fieldsNote || "Client ID und Secret stehen weiter unten auf dieser Seite."}</p>
+      ) : app.tab && !onSave ? (
+        <p className="text-xs text-white/55">Client ID und Secret stehen auf der Seite <Link to={app.tab} className="text-[#29B6E8] hover:text-white">{app.tabLabel}</Link>.</p>
       ) : (
         <div className="grid md:grid-cols-2 gap-3">
           {app.idField && (
@@ -99,7 +113,7 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
         <code className="text-[#29B6E8] break-all">{origin}/api/platform-links/{app.key}/callback</code>
       </div>
       <CheckResult platform={app.key} result={result} />
-      {onSave && (
+      {onSave && showFields && (
         <button type="button" onClick={onSave} disabled={saving} data-testid={`platform-app-save-${app.key}`} className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
       )}
       {showGuide && <SetupGuide guideKey={app.guideKey} open={guideOpen} />}
@@ -107,25 +121,35 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
   );
 }
 
-export function PlatformLinkSettings({ brand, setBrandField, saving, onSave, onClearSecret }) {
+// Übersicht im Reiter Login & Konten: je Plattform der Stand und der Weg zur eigenen Seite unter
+// Verbindungen. Felder, „prüfen“ und Anleitung stehen nur dort - nichts doppelt.
+export function PlatformLinkOverview({ brand }) {
   const readyCount = PLATFORM_APPS.filter((app) => appReady(app, brand)).length;
   return (
-    <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="platform-link-settings">
+    <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="platform-link-overview">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#29B6E8]" /> Konten verknüpfen</div>
-          <p className="text-xs text-white/50 mt-1">Mitglieder melden sich im Profil einmal bei der Plattform an – der Eintrag wird befüllt und als „verifiziert“ markiert. Dafür braucht die Website je Plattform eine eigene App (Client ID + Secret). Jede Plattform hat auch eine eigene Seite unter <Link to="/admin/integrations/discord" className="text-[#29B6E8] hover:text-white">Admin → Verbindungen</Link>. Steam braucht keine App; PlayStation, Nintendo und EA bieten keine Anmeldung für Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App.</p>
+          <p className="text-xs text-white/50 mt-1">Mitglieder melden sich im Profil einmal bei der Plattform an – der Eintrag wird befüllt und als „verifiziert“ markiert. Client ID, Secret, Rückrufadresse, „prüfen“ und die Anleitung stehen je Plattform auf ihrer Seite unter <Link to="/admin/integrations/discord" className="text-[#29B6E8] hover:text-white">Admin → Verbindungen</Link>. PlayStation, Nintendo und EA bieten keine Anmeldung für Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App.</p>
         </div>
         <div className="text-[10px] font-bold uppercase tracking-wider text-right shrink-0" data-testid="platform-link-ready-count">
           <span className="text-[#00FF88]">{readyCount}</span><span className="text-white/40"> / {PLATFORM_APPS.length} bereit</span>
         </div>
       </div>
-      <div className="grid gap-3">
-        {PLATFORM_APPS.map((app) => (
-          <PlatformAppCard key={app.key} app={app} brand={brand} setBrandField={setBrandField} onClearSecret={onClearSecret} />
-        ))}
+      <div className="grid sm:grid-cols-2 gap-2">
+        {PLATFORM_APPS.map((app) => {
+          const ready = appReady(app, brand);
+          return (
+            <Link key={app.key} to={`/admin/integrations/${app.key}`} data-testid={`platform-link-open-${app.key}`} className="flex items-center justify-between gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
+              <span className="font-bold text-sm">{app.label}</span>
+              <span className="inline-flex items-center gap-2">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${appStateClass(app, ready)}`} data-testid={`platform-link-${app.key}-state`}>{appStateLabel(app, ready)}</span>
+                <ArrowRight className="w-3.5 h-3.5 text-white/40" />
+              </span>
+            </Link>
+          );
+        })}
       </div>
-      <button type="button" onClick={onSave} disabled={saving} data-testid="platform-link-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
     </div>
   );
 }

@@ -43,7 +43,7 @@ export default function AdminDashboardPage() {
   const liveChips = [
     { label: "Datenbank", ok: sys?.database?.ok, detail: sys?.database?.ok ? "verbunden" : "Problem", icon: Database, to: "/admin/settings?tab=system" },
     { label: "Mail / SMTP", ok: sys?.smtp?.ok, detail: sys?.smtp?.ok ? (sys?.smtp?.provider || "aktiv") : "nicht konfiguriert", icon: Mail, to: "/admin/settings?tab=smtp" },
-    { label: "Discord", ok: sys?.discord?.ok, detail: sys?.discord?.ok ? "aktiv" : "aus", icon: MessageSquare, to: "/admin/settings?tab=discord" },
+    { label: "Discord", ok: sys?.discord?.ok, detail: sys?.discord?.ok ? "aktiv" : "aus", icon: MessageSquare, to: "/admin/integrations/discord" },
     { label: "Scheduler", ok: sys?.scheduler?.running, detail: sys?.scheduler?.running ? `${(sys?.scheduler?.jobs || []).length} Jobs` : "gestoppt", icon: Activity, to: "/admin/settings?tab=system" },
     { label: "Mail-Queue", ok: queueFailed ? false : queuePending ? null : true, detail: `${queuePending} offen · ${queueFailed} Fehler`, icon: Server, to: "/admin/settings?tab=queue" },
     { label: "Push-Tokens", ok: Number(data?.mobile_push?.active_tokens || 0) > 0 ? true : null, detail: `${data?.mobile_push?.active_tokens ?? 0} aktiv`, icon: BellRing, to: "/admin/mobile-push" },
@@ -52,13 +52,13 @@ export default function AdminDashboardPage() {
   const onFlag = (v) => v === true ? "an" : v === false ? "aus" : "—";
   const settingsHub = [
     { label: "Login & Konten", detail: authFlags ? `${onFlag(authFlags.google_login_enabled)} · Reg. ${onFlag(authFlags.registration_enabled)}` : "Login-Optionen", to: "/admin/settings?tab=auth", icon: LogIn, ok: authFlags ? (authFlags.password_login_enabled || authFlags.google_login_enabled) : undefined },
-    { label: "Konten verknüpfen", detail: linkAvail ? `Discord ${linkAvail.discord ? "bereit" : "fehlt"} · Twitch ${linkAvail.twitch ? "bereit" : "fehlt"} · Steam bereit` : "Discord, Twitch, Steam", to: "/admin/settings?tab=auth", icon: Share2, ok: linkAvail ? Boolean(linkAvail.discord && linkAvail.twitch) : undefined },
+    { label: "Konten verknüpfen", detail: linkAvail ? `Discord ${linkAvail.discord ? "bereit" : "fehlt"} · Twitch ${linkAvail.twitch ? "bereit" : "fehlt"} · Steam bereit` : "Discord, Twitch, Steam", to: "/admin/setup", icon: Share2, ok: linkAvail ? Boolean(linkAvail.discord && linkAvail.twitch) : undefined },
     { label: "Branding", detail: publicCfg?.club_name || "Logo, Farben, Name", to: "/admin/settings?tab=brand", icon: Palette, ok: undefined },
     { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings?tab=email", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
     { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings?tab=smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
     { label: "Newsletter", detail: "News & Event-Mails", to: "/admin/settings?tab=newsletter", icon: Mail, ok: undefined },
-    { label: "Discord", detail: sys?.discord?.ok ? "Webhook aktiv" : "nicht verbunden", to: "/admin/settings?tab=discord", icon: MessageSquare, ok: sys?.discord?.ok },
-    { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/settings?tab=twitch", icon: Radio, ok: undefined },
+    { label: "Discord", detail: sys?.discord?.ok ? "Webhook aktiv" : "nicht verbunden", to: "/admin/integrations/discord", icon: MessageSquare, ok: sys?.discord?.ok },
+    { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/integrations/twitch", icon: Radio, ok: undefined },
     { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings?tab=socials", icon: Share2, ok: undefined },
     { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings?tab=seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
     { label: "Rechtliches", detail: "Impressum & Datenschutz", to: "/admin/settings?tab=legal", icon: ShieldCheck, ok: undefined },
@@ -198,7 +198,7 @@ export default function AdminDashboardPage() {
       detail: (data?.discord_broken || []).length
         ? `Webhook gestört: ${data.discord_broken.map((entry) => `${entry.label} (${entry.status_code})`).join(", ")}`
         : "Alle Webhooks in Ordnung",
-      to: "/admin/settings?tab=discord",
+      to: "/admin/integrations/discord",
       icon: AlertTriangle,
       tone: (data?.discord_broken || []).length ? "#FF3B30" : "#00FF88",
     },
@@ -259,7 +259,7 @@ export default function AdminDashboardPage() {
     if (item.to === "/admin/mobile-push") return pushErrors > 0;
     if (item.to === "/admin/mobile-logs") return Number(data?.client_logs?.open || 0) > 0;
     // Discord (#303): ein Webhook, der 401/403/404 liefert, ist eine Aufgabe.
-    if (item.to === "/admin/settings?tab=discord") return (data?.discord_broken || []).length > 0;
+    if (item.to === "/admin/integrations/discord") return (data?.discord_broken || []).length > 0;
     // Betrieb (#265): rote oder gelbe Auto-Checks und offene Fehlergruppen sind eine Aufgabe.
     if (item.to === "/admin/ops") return ["crit", "warn"].includes(data?.ops?.checks?.status) || Number(data?.ops?.open_error_groups || 0) > 0;
     return false;
