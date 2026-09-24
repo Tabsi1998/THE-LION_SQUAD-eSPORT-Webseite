@@ -74,7 +74,7 @@ async def _features(db, settings: dict) -> list[dict]:
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
         {"key": "club_facts", "label": "Vereinsdaten, Obmann und Vorstand aus Dolibarr", "enabled": bool(branding.get("legal_from_dolibarr")), "state": facts_state,
          "hint": "Impressum, Kontakt, Datenschutz, „Über uns“ und die Vorstandsseite nehmen Name, ZVR, Anschrift, Telefon, Obmann und die Vorstandsfunktionen aus dem Vereinsmodul (stündlich); Namen nur mit Einwilligung.",
-         "where": "/admin/settings?tab=legal", "where_label": "Einstellungen → Rechtliches"},
+         "where": "/admin/club", "where_label": "Verein → Vereinsdaten"},
         {"key": "sponsors", "label": "Sponsoren und Partner aus Dolibarr", "enabled": bool(source.get("from_dolibarr")), "state": "an" if source.get("from_dolibarr") else "aus",
          "hint": "Geschäftspartner in den Kategorien Sponsor und Partner; Unterkategorie = Stufe, Zusatzfelder = Laufzeit. Ehemalige rutschen von selbst nach unten.",
          "where": "/admin/sponsors", "where_label": "Verein → Sponsoren"},

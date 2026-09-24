@@ -97,6 +97,7 @@ const AdminEventEditPage = lazy(() => import("@/pages/admin/AdminEventEditPage")
 const AdminNewsPage = lazy(() => import("@/pages/admin/AdminNewsPage"));
 const AdminNewsEditPage = lazy(() => import("@/pages/admin/AdminNewsEditPage"));
 const AdminSettingsPage = lazy(() => import("@/pages/admin/AdminSettingsPage"));
+const AdminClubDataPage = lazy(() => import("@/pages/admin/AdminClubDataPage"));
 const AdminSeasonsPage = lazy(() => import("@/pages/admin/AdminSeasonsPage"));
 const AdminLogsPage = lazy(() => import("@/pages/admin/AdminLogsPage"));
 const AdminOpsPage = lazy(() => import("@/pages/admin/AdminOpsPage"));
@@ -285,6 +286,7 @@ function App() {
           <Route path="/admin/gallery" element={<ProtectedRoute requireArea="content"><AdminGalleryPage /></ProtectedRoute>} />
           <Route path="/admin/documents" element={<ProtectedRoute requireArea="club"><AdminDocumentsPage /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute requireArea="system"><AdminSettingsPage /></ProtectedRoute>} />
+          <Route path="/admin/club" element={<ProtectedRoute requireArea="system"><AdminClubDataPage /></ProtectedRoute>} />
           <Route path="/admin/seasons" element={<ProtectedRoute requireArea="tournaments"><AdminSeasonsPage /></ProtectedRoute>} />
           <Route path="/admin/logs" element={<ProtectedRoute requireArea="system"><AdminLogsPage /></ProtectedRoute>} />
           <Route path="/admin/ops" element={<ProtectedRoute requireArea="system"><AdminOpsPage /></ProtectedRoute>} />

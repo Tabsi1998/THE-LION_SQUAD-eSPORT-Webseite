@@ -74,7 +74,7 @@ export default function AdminBoardPage() {
         <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="board-dolibarr">
           <div className="font-heading font-bold uppercase text-[#29B6E8]">Dolibarr führt den Vorstand</div>
           <p className="text-sm text-white/70">
-            Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/settings?tab=legal" className="text-[#29B6E8] hover:text-white">Einstellungen → Rechtliches</Link>).
+            Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>).
             Die Vorstandsseite, „Über uns“ und die Ansprechpartner auf der Startseite zeigen die Funktionen und Inhaber aus dem Vereinsmodul
             (Stand {source.fetched_at ? new Date(source.fetched_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
             Funktionen und Inhaber pflegst du in Dolibarr; ein Name erscheint nur, wenn die Person der Nennung zugestimmt hat; Foto und Profil-Link kommen über den eigenen Eintrag der Person im Mitgliederverzeichnis.
