@@ -229,6 +229,8 @@ def _admin_profile(doc: dict) -> dict:
         "dolibarr_profile_at": doc.get("dolibarr_profile_at"),
         # Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich das Profil wieder - nie ein zweites.
         "dolibarr_member_id": doc.get("dolibarr_member_id"),
+        # Konto vom Vorstand gelöst (#506): dann hängt der Abgleich es nicht wieder an.
+        "account_unlinked_at": doc.get("account_unlinked_at"),
     })
     return out
 
@@ -408,30 +410,14 @@ def _dolibarr_view(membership: dict | None, link: dict | None, settings: dict) -
     return view
 
 
-async def _activate_linked_membership(profile: dict, actor_id: str):
-    user_id = profile.get("user_id")
-    if not user_id or profile.get("is_active") is False:
-        return
-    # Profilpflege ist Redaktion. Führt Dolibarr die Mitgliedschaft, darf sie
-    # weder einen Austritt rückgängig machen noch die Mitgliedsart setzen (#295).
-    if await _led_by_dolibarr(user_id):
-        return
-    existing = await get_membership(user_id)
-    payload = {}
-    if not existing or existing.get("member_status") not in ACTIVE_STATUSES:
-        payload["member_status"] = "active"
-    if not existing or not existing.get("membership_type"):
-        payload["membership_type"] = "ordinary"
-    if not payload:
-        return
-    try:
-        await upsert_membership(
-            user_id=user_id,
-            actor_id=actor_id,
-            **payload,
-        )
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
+async def _board_profile_for(db, user_id: str) -> dict | None:
+    """Das vom Vorstand geführte Profil dieses Mitglieds ohne Konto - gefunden über die bestätigte
+    Dolibarr-Zuordnung (Mitgliedsnummer, #506). So legt ein Mitglied kein zweites Profil an."""
+    settings = await load_dolibarr_settings(db)
+    link = await verified_link(db, settings, user_id)
+    if not link or not link.get("member_id"):
+        return None
+    return await db.club_member_profiles.find_one({"dolibarr_member_id": int(link["member_id"]), "user_id": None}, {"_id": 0})
 
 
 async def _unique_profile_slug(db, slug: str, current_id: str | None = None) -> str:
@@ -920,8 +906,7 @@ async def admin_create_member_profile(body: ClubMemberProfileCreate, me: dict = 
         "created_by": me["id"],
     }
     await db.club_member_profiles.insert_one(doc)
-    await _activate_linked_membership(doc, me["id"])
-    await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name})
+    await _audit(me["id"], "club_member_profile.create", doc["id"], {"display_name": name, "user_id": doc.get("user_id")})
     doc.pop("_id", None)
     item = _admin_profile(doc)
     return (await _attach_linked_accounts(db, [doc], [item], public_only=False, admin=True))[0]
@@ -960,6 +945,14 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
         update["gender"] = _clean_gender(update.get("gender"))
     if "user_id" in update:
         update["user_id"] = await _normalize_linked_user_id(db, update.get("user_id"), profile_id)
+        # Löst der Vorstand ein Konto, merkt sich das Profil das (#506): der Abgleich und das Mitglied selbst
+        # hängen es nicht wieder an - bis der Vorstand ein Konto verknüpft.
+        if update["user_id"] is None and existing.get("user_id"):
+            update["account_unlinked_user_id"] = existing["user_id"]
+            update["account_unlinked_at"] = now_utc().isoformat()
+        elif update["user_id"]:
+            update["account_unlinked_user_id"] = None
+            update["account_unlinked_at"] = None
     if update.get("directory_blocked"):
         # Sperren heißt: sofort offline, und das Mitglied kann es nicht selbst zurückdrehen.
         update["is_active"] = False
@@ -969,7 +962,6 @@ async def admin_update_member_profile(profile_id: str, body: ClubMemberProfileUp
     await db.club_member_profiles.update_one({"id": profile_id}, {"$set": update})
     await _audit(me["id"], "club_member_profile.update", profile_id, update)
     row = await db.club_member_profiles.find_one({"id": profile_id}, {"_id": 0})
-    await _activate_linked_membership(row, me["id"])
     item = _admin_profile(row)
     return (await _attach_linked_accounts(db, [row], [item], public_only=False, admin=True))[0]
 
@@ -1033,6 +1025,15 @@ async def update_my_directory_entry(body: DirectoryEntryUpdate, me: dict = Depen
     if not is_active_member(membership):
         raise HTTPException(403, "Ins Mitgliederverzeichnis können sich nur aktive Vereinsmitglieder eintragen.")
     profile = await db.club_member_profiles.find_one({"user_id": user["id"]}, {"_id": 0})
+    if profile is None:
+        # Führt der Vorstand schon ein Profil für dieses Mitglied (#506), gehört es der Person - kein zweites.
+        board = await _board_profile_for(db, user["id"])
+        if board and board.get("account_unlinked_user_id") == user["id"]:
+            raise HTTPException(409, "Der Vorstand führt dein Vereinsprofil und hat dein Konto davon gelöst – bitte beim Vorstand melden.")
+        if board:
+            await db.club_member_profiles.update_one({"id": board["id"]}, {"$set": {"user_id": user["id"], "updated_at": now_utc().isoformat()}})
+            await _audit(user["id"], "club_member_profile.self_claim", board["id"], {"dolibarr_member_id": board.get("dolibarr_member_id")})
+            profile = {**board, "user_id": user["id"]}
     if profile and profile.get("directory_blocked"):
         raise HTTPException(403, "Dein Eintrag ist von der Vereinsverwaltung gesperrt - bitte beim Vorstand melden.")
     raw = body.model_dump(exclude_unset=True)
