@@ -119,7 +119,8 @@ test.describe("Adminmenü", () => {
     await expect(page.getByTestId("admin-nav-search")).toBeVisible();
     const before = await navMetrics(page);
 
-    for (const group of ["Mitglieder", "Content", "Verein", "System", "eSports"]) {
+    // Verbindungen ist seit #547 die längste Gruppe (je Plattform ein Eintrag) - zugeklappt zählt sie mit.
+    for (const group of ["Mitglieder", "Content", "Verein", "System", "eSports", "Verbindungen"]) {
       await page.getByTestId(`admin-nav-group-${group}`).click();
     }
 
