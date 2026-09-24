@@ -53,7 +53,6 @@ IMAGE_REFERENCE_FIELDS = [
 ]
 
 TEXT_IMAGE_REFERENCE_FIELDS = [
-    ("cms_pages", ["body_md"]),
     ("news_posts", ["content"]),
     ("events", ["description", "program"]),
     ("tournaments", ["description"]),
@@ -682,7 +681,6 @@ async def robots():
 seo_meta_router = APIRouter(prefix="/api/seo", tags=["seo"])
 
 
-@seo_meta_router.get("/page/{slug}")
 async def page_meta(slug: str):
     """Return SEO JSON-LD + meta-tags hint for a public page (used by frontend)."""
     db = get_db()

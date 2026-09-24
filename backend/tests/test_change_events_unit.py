@@ -46,19 +46,6 @@ def test_only_global_staff_roles_receive_internal_stream_scope():
     assert change_events.visibility_scope_for_user({"role": "superadmin"}) == "staff"
 
 
-def test_admin_cms_mutation_maps_to_public_resource_without_admin_path():
-    event = change_events._build_api_change_event(
-        "PUT",
-        "/api/admin/pages/private-draft-slug",
-        200,
-    )
-
-    public_event = change_events._event_for_scope(event, "public")
-
-    assert public_event["entity_type"] == "pages"
-    assert public_event["path"] == "/api/pages"
-    assert "admin" not in json.dumps(public_event)
-    assert "private-draft-slug" not in json.dumps(public_event)
 
 
 def test_private_mutation_is_visible_to_staff_only():

@@ -35,7 +35,6 @@ PUBLIC_RESOURCES = frozenset({
     "matches-v2",
     "nav",
     "news",
-    "pages",
     "partners",
     "references",
     "seasons",
@@ -47,7 +46,6 @@ PUBLIC_RESOURCES = frozenset({
 })
 PUBLIC_RESOURCE_ALIASES = {
     "admin/nav": "nav",
-    "admin/pages": "pages",
     "admin/streams": "streams",
     "settings/branding": "settings",
     "settings/site-banners/admin": "settings",

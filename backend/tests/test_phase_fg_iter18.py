@@ -106,16 +106,3 @@ def test_robots_txt():
     assert r.status_code == 200
     assert "User-agent" in r.text
 
-
-def test_seo_meta_for_about_page():
-    r = requests.get(f"{API}/seo/page/about", timeout=10)
-    assert r.status_code == 200
-    data = r.json()
-    assert "title" in data
-    assert "json_ld" in data
-    assert data["json_ld"]["@type"] == "WebPage"
-
-
-def test_seo_meta_404_unknown_slug():
-    r = requests.get(f"{API}/seo/page/does-not-exist-xyz", timeout=10)
-    assert r.status_code == 404
