@@ -1000,24 +1000,57 @@ class SponsorUpdate(BaseModel):
     order_index: Optional[int] = None
 
 
+class PartnerTool(BaseModel):
+    """Ein Tool oder Projekt des Partners (#469): Link, Beschreibung, Bild; `embed` bettet die Seite ein."""
+    id: Optional[str] = None
+    title: str
+    url: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    embed: bool = False
+
+
 class PartnerCreate(BaseModel):
     name: str
+    slug: Optional[str] = None
     logo_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     kind: str = "verein"
     is_active: bool = True
     order_index: int = 0
+    # Partnerseite (#469): Text, seit wann, Kanäle, Discord-Server (Widget), Tools und Projekte
+    about: Optional[str] = None
+    since: Optional[str] = None
+    discord_invite: Optional[str] = None
+    discord_guild_id: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    youtube_url: Optional[str] = None
+    x_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    tiktok_url: Optional[str] = None
+    tools: list[PartnerTool] = []
 
 
 class PartnerUpdate(BaseModel):
     name: Optional[str] = None
+    slug: Optional[str] = None
     logo_url: Optional[str] = None
     link: Optional[str] = None
     description: Optional[str] = None
     kind: Optional[str] = None
     is_active: Optional[bool] = None
     order_index: Optional[int] = None
+    about: Optional[str] = None
+    since: Optional[str] = None
+    discord_invite: Optional[str] = None
+    discord_guild_id: Optional[str] = None
+    twitch_channel: Optional[str] = None
+    youtube_url: Optional[str] = None
+    x_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    tiktok_url: Optional[str] = None
+    tools: Optional[list[PartnerTool]] = None
 
 
 # ---------- External tournament references ----------
