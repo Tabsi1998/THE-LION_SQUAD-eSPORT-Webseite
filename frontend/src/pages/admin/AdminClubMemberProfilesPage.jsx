@@ -276,6 +276,13 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
         <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 text-xs text-white/60 rounded-sm">
           Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
+        {/* Profil aus Dolibarr (#496): was dort gepflegt ist, setzt der Abgleich hier wieder - der Vorstand soll das sehen, bevor er tippt. */}
+        {entry.profile?.dolibarr_profile_at && (
+          <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2 text-xs text-white/60 rounded-sm" data-testid="club-member-dolibarr-hint">
+            Gamertag, Biografie, Games, Plattformen und Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {new Date(entry.profile.dolibarr_profile_at).toLocaleString("de-DE")}).
+            Was dort gepflegt ist, setzt der nächste Abgleich hier wieder; leere Felder in Dolibarr lassen deine Eingaben stehen. Vor- und Nachname sowie Realname bleiben deine Sache.
+          </div>
+        )}
         <FieldLabel label="Biografie">
           <MarkdownEditor value={form.bio} onChange={(v) => set("bio", v)} rows={8} testId="club-member-bio" />
         </FieldLabel>

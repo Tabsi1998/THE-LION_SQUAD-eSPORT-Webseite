@@ -205,3 +205,7 @@ async def test_profile_fields_and_photo_come_from_dolibarr_when_the_club_keeps_t
     fake.member_consents[12]["profil"]["state"] = "withdrawn"
     assert (await dolibarr_sync.run_sync(flow.db, full=True))["directory"] == 1
     assert (await profile_of(flow, paula))["is_active"] is False
+    admin = await flow.add_user(role="superadmin", name="admin2")
+    flow.act_as(admin)
+    row = next(r for r in (await flow.get("/api/membership/profiles/admin/all")).json() if r["user_id"] == paula["id"])
+    assert row["dolibarr_profile_at"], "der Admin sieht, dass das Profil aus Dolibarr kam"
