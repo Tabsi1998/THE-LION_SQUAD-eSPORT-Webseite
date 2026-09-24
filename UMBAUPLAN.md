@@ -472,7 +472,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398, Teil 2 Vorstandsseite aus Dolibarr – umgesetzt in #468 (Block 48.6) (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 3 Statuten aus Dolibarr (dolibarr-vereine#158, Modul 0.11) – umgesetzt in #485 (Block 48.7). #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), #324 Teil 1 Vereinsakte verbinden und eigene Unterlagen – umgesetzt in #486 (Block 48.8); #329 Teil 2 Meine Daten und Austritt – umgesetzt in #488 (Block 48.9); App-Teil – umgesetzt in #490 (Block 48.10); offen: #329 Mandat (dolibarr-vereine#125), #324 Rest (Mitglieder-Archiv der Statuten, Rechnungen über die Bindung) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398, Teil 2 Vorstandsseite aus Dolibarr – umgesetzt in #468 (Block 48.6) (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 3 Statuten aus Dolibarr (dolibarr-vereine#158, Modul 0.11) – umgesetzt in #485 (Block 48.7). #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), #324 Teil 1 Vereinsakte verbinden und eigene Unterlagen – umgesetzt in #486 (Block 48.8); #329 Teil 2 Meine Daten und Austritt – umgesetzt in #488 (Block 48.9); App-Teil – umgesetzt in #490 (Block 48.10); #326 Teil 4 Kanäle des Vereins + #324 Statuten-Archiv – umgesetzt in #492 (Block 48.11); Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag) – umgesetzt in #493 (Block 48.12); offen: #329 Mandat (dolibarr-vereine#125), Rechnungen über die Bindung, Mitgliedsfoto aus Dolibarr (dolibarr-vereine#255) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
 | Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; Anleitungen und Prüfung – umgesetzt in #465 (Block 50.5); App-Karte verknüpfte Konten (#459) – umgesetzt in #480; Konten verknüpfen II (Battle.net, X, YouTube, TikTok, Riot, Xbox, Epic) – umgesetzt in #467 (Block 50.7); Menügruppe Verbindungen – umgesetzt in #470 (Block 50.8); Verbindungen ohne Doppeltes – umgesetzt in #475 (Block 50.9); offen: #459 App-Karte; Bot-Fehler als Klickweg und Neustart von selbst – umgesetzt in #484 (Block 50.10) |
 | Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – umgesetzt in #463 (Block 49.2); #415 Bildprüfung – umgesetzt in #478 (Block 49.3); offen: AWS Rekognition als dritter Anbieter |
@@ -944,6 +944,24 @@ ein früherer Wunsch wird nicht übernommen.
 Jetzt stehen dieselben Karten in „Meine Mitgliedschaft“ der App, über dieselben Routen: Code einlösen,
 Anschrift/Telefon/E-Mail ändern (nur Geändertes geht mit dem gesehenen Stand raus), Eingereichtes mit
 Stand, Austritt mit Rückfrage. Fehlen die Routen auf dem Server noch, bleiben die Karten einfach weg.
+
+### Was 48.11 gefunden hat (Kanäle und Statuten-Archiv – PR #492)
+
+**Die Kanäle des Vereins standen zweimal – im Modul und noch einmal von Hand auf der Website.** Mit
+dem Haken „Kanäle aus Dolibarr übernehmen“ nehmen Footer und Suchmaschinen sie aus dem Modul, in der
+Reihenfolge des Vereins; stehen dort keine, bleibt die Liste von Hand. Die Statutenfassungen stehen für
+Mitglieder jetzt auch unter Vereinsdokumente – öffentliche für jedes Mitglied, nur für Mitglieder
+freigegebene über die Bindung, das PDF über denselben Öffnen-Weg. Nebenbei ist der Reiter Social Links
+aus der großen Einstellungsseite heraus (#223).
+
+### Was 48.12 gefunden hat (Verzeichnis aus der Einwilligung – PR #493)
+
+**Wer ins Mitgliederverzeichnis wollte, musste sich selbst eintragen – der Betreiber will es zentral
+pflegen.** Jetzt reicht die Einwilligung in Dolibarr: Der Abgleich legt für jedes zugeordnete Mitglied mit
+Zustimmung das Vereinsprofil an (Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto), der
+Vorstand ergänzt Foto und Bio im Admin, und der nächste Abgleich lässt das stehen. Ein Widerruf nimmt den
+Eintrag offline – auch einen selbst angelegten –, eine neue Zustimmung holt ihn zurück; Gesperrtes bleibt
+gesperrt. Das Mitgliedsfoto aus Dolibarr fehlt noch (dolibarr-vereine#255).
 
 ### Was 48.7 gefunden hat (Statuten – PR #485)
 
