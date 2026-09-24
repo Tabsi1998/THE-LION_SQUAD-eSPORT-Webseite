@@ -6,16 +6,10 @@ import { BrandField, BrandSelect } from "./fields";
 // Footer und die Social-Erkennung - und seit #326 Teil 4 der Stand, ob die öffentlichen Kanäle aus Dolibarr
 // kommen (der Schalter liegt seit #510 unter Dolibarr → Funktionen). Der Entwurf (`brand`) und das Speichern bleiben bei der Seite.
 
-export const SOCIAL_PLATFORM_OPTIONS = [
-  ["discord", "Discord"],
-  ["whatsapp", "WhatsApp Kanal"],
-  ["facebook", "Facebook"],
-  ["instagram", "Instagram"],
-  ["tiktok", "TikTok"],
-  ["youtube", "YouTube"],
-  ["twitch", "Twitch"],
-  ["custom", "Eigener Link"],
-];
+import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
+
+// Die Plattformen kommen aus lib/socialIcons.js - dieselbe Liste wie Footer, Partnerseiten und App.
+export const SOCIAL_PLATFORM_OPTIONS = SOCIAL_PLATFORMS;
 
 export function SocialsTab({ brand, setSocialLink, addSocialLink, removeSocialLink, saveBrand, saving }) {
   return (

@@ -49,7 +49,10 @@ OVERLAY_FIELDS = ("legal_name", "zvr_number", "register_authority", "street_addr
                   "representative_name", "representative_role")
 # Netzwerk-Kürzel aus Dolibarrs Wörterbuch → Plattform-Schlüssel der Website (Symbole in `lib/socialIcons.js`).
 CHANNEL_PLATFORMS = {"twitter": "x", "x": "x", "youtube": "youtube", "twitch": "twitch", "discord": "discord", "instagram": "instagram",
-                     "tiktok": "tiktok", "facebook": "facebook", "whatsapp": "whatsapp"}
+                     "tiktok": "tiktok", "facebook": "facebook", "whatsapp": "whatsapp", "telegram": "telegram", "threads": "threads",
+                     "bluesky": "bluesky", "mastodon": "mastodon", "kick": "kick", "linkedin": "linkedin", "reddit": "reddit", "steam": "steam",
+                     "github": "github", "snapchat": "snapchat", "pinterest": "pinterest", "vimeo": "vimeo", "spotify": "spotify",
+                     "website": "website", "email": "email"}
 # Was die Website von einer Statutenfassung nach außen gibt - keine Prüfsummen, keine Quelle.
 STATUTE_FIELDS = ("id", "version", "decided_on", "valid_from", "valid_to", "state", "size")
 # PDF je Prüfsumme: eine beschlossene Fassung ändert sich nie, ihre Prüfsumme auch nicht.
