@@ -32,6 +32,7 @@ from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clea
 from services import dolibarr_identity
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.membership_service import VALID_TYPES
+from services.permissions import user_has_area
 from services.rate_limit import enforce_rate_limit
 from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
 
@@ -57,12 +58,14 @@ async def _features(db, settings: dict) -> list[dict]:
     """Was Dolibarr auf der Website übernimmt - je Funktion: an oder aus, und wo der Schalter liegt.
     Der Betreiber wollte das an einer Stelle sehen, weil die Schalter über mehrere Seiten verteilt sind."""
     from services import club_facts, dolibarr_sponsors
-    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1}) or {}
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "legal_from_dolibarr": 1, "channels_from_dolibarr": 1}) or {}
     source = await dolibarr_sponsors.load_source_settings(db)
     facts = await club_facts.snapshot(db)
     mode = settings.get("mode") or "off"
     live = mode == "live"
     connection = "/admin/dolibarr?tab=connection"
+    # Ein Ort für alle Schalter (#510): wer eine Funktion an- oder ausschalten will, tut es unter Dolibarr → Funktionen.
+    features_tab = "/admin/dolibarr?tab=features"
     state = await sync_state(db)
     # Vereinsakte ohne Einladungscode (#531): Modul ab 1.4.0 und das Recht „im Namen jedes Mitglieds handeln“.
     member_mode = dolibarr_identity.module_supports_member_id(state)
@@ -91,14 +94,18 @@ async def _features(db, settings: dict) -> list[dict]:
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
         {"key": "club_facts", "label": "Vereinsdaten, Obmann und Vorstand aus Dolibarr", "enabled": bool(branding.get("legal_from_dolibarr")), "state": facts_state,
          "hint": "Impressum, Kontakt, Datenschutz, „Über uns“ und die Vorstandsseite nehmen Name, ZVR, Anschrift, Telefon, Obmann und die Vorstandsfunktionen aus dem Vereinsmodul (stündlich); Namen nur mit Einwilligung.",
-         "where": "/admin/club", "where_label": "Verein → Vereinsdaten"},
+         "switch": {"on": bool(branding.get("legal_from_dolibarr"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
+        {"key": "channels", "label": "Kanäle des Vereins aus Dolibarr (Footer, Suchmaschinen)", "enabled": bool(branding.get("channels_from_dolibarr")),
+         "state": "an" if branding.get("channels_from_dolibarr") else "aus",
+         "hint": "Discord, Instagram, YouTube usw. kommen aus dem Vereinsmodul (Einrichtung → Vereine → Kanäle und Konten) statt aus der Liste unter Einstellungen → Socials.",
+         "switch": {"on": bool(branding.get("channels_from_dolibarr"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "sponsors", "label": "Sponsoren und Partner aus Dolibarr", "enabled": bool(source.get("from_dolibarr")), "state": "an" if source.get("from_dolibarr") else "aus",
          "hint": "Geschäftspartner in den Kategorien Sponsor und Partner; Unterkategorie = Stufe, Zusatzfelder = Laufzeit. Ehemalige rutschen von selbst nach unten.",
-         "where": "/admin/sponsors", "where_label": "Verein → Sponsoren"},
+         "switch": {"on": bool(source.get("from_dolibarr"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "applications", "label": "Beitrittsanträge nach Dolibarr", "enabled": live and bool(settings.get("applications_enabled")),
          "state": "an" if live and settings.get("applications_enabled") else ("Haken gesetzt, wirkt erst im Modus Live" if settings.get("applications_enabled") else "aus"),
          "hint": "Braucht in Dolibarr das API-Recht „Beitrittsanträge über die API anlegen“ und die Pflichtfelder unter Einrichtung › Vereine › Mitgliedsantrag.",
-         "where": connection, "where_label": "Verbindung → Beitrittsanträge"},
+         "switch": {"on": bool(settings.get("applications_enabled"))}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "consents", "label": "Einwilligungen unter „Meine Mitgliedschaft“", "enabled": live, "state": "an (Modus Live)" if live else "erst im Modus Live",
          "hint": "Läuft von selbst mit Vereinsmodul ab 0.8.0; das API-Recht für Beitrittsanträge deckt es mit ab.",
          "where": connection, "where_label": "Verbindung → Modus"},
@@ -110,10 +117,10 @@ async def _features(db, settings: dict) -> list[dict]:
          "state": (f"Einwilligung „{directory_code}“{' (aus dem Modul)' if directory_code and not settings.get('directory_consent_code') else ''} · "
                    f"{directory_entries} Einträge aus Dolibarr" + (f", davon {directory_without_account} ohne Konto" if directory_without_account else "")) if live and directory_code else ("erst im Modus Live" if directory_code else "aus (keine Einwilligung gewählt)"),
          "hint": "Wer in Dolibarr dieser Einwilligung zugestimmt hat, bekommt sein Vereinsprofil von selbst; Gamertag, Kurztext, Spiele und Foto kommen von der Mitgliedskarte (Reiter Verein), wenn sie dort gepflegt sind. Widerruf nimmt den Eintrag offline.",
-         "where": connection, "where_label": "Verbindung → Mitgliederverzeichnis"},
+         "switch": {"on": live and bool(directory_code), "kind": "select"}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "invoices", "label": "Rechnungen und Geschäftspartner in Dolibarr anlegen", "enabled": bool(settings.get("write_enabled")), "state": "an" if settings.get("write_enabled") else "aus",
          "hint": "Schreibzugriff einschalten; Belege werden erst mit vollständigen Konditionen und geprüften Steuersätzen von selbst freigegeben.",
-         "where": connection, "where_label": "Verbindung → Schreibzugriff"},
+         "switch": {"on": bool(settings.get("write_enabled")), "system_only": True}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
         {"key": "webhook", "label": "Benachrichtigung aus Dolibarr (Webhook)", "enabled": secret_is_configured(settings.get("webhook_token")), "state": "eingerichtet" if secret_is_configured(settings.get("webhook_token")) else "aus (Abgleich alle 10 Minuten)",
          "hint": "Optional: Dolibarr meldet Änderungen sofort, sonst holt der Abgleich alle 10 Minuten auf.",
          "where": connection, "where_label": "Verbindung → Webhook"},
@@ -218,13 +225,10 @@ async def dolibarr_sponsors(me: dict = Depends(require_area("content", "system")
     return await dolibarr_sponsors.admin_view(get_db())
 
 
-@admin_router.patch("/sponsors")
-async def update_sponsor_source(body: SponsorSourceUpdate, me: dict = Depends(require_area("content", "system"))):
+async def _set_sponsor_source(db, me: dict, updates: dict) -> dict:
     """Schalter und Kategorienamen. Einschalten liest sofort nach, damit die Listen nicht eine Stunde leer bleiben."""
     from services import dolibarr_sponsors
-    db = get_db()
     current = await dolibarr_sponsors.load_source_settings(db)
-    updates = {key: value for key, value in body.model_dump(exclude_unset=True).items() if value is not None}
     for key in ("sponsor_category", "partner_category"):
         if key in updates and not str(updates[key]).strip():
             raise HTTPException(422, "Der Kategoriename darf nicht leer sein.")
@@ -246,6 +250,12 @@ async def update_sponsor_source(body: SponsorSourceUpdate, me: dict = Depends(re
             except DolibarrError as exc:
                 result = {"ok": False, "kind": exc.kind, "text": exc.text}
     return {"ok": True, "result": result, "view": await dolibarr_sponsors.admin_view(db)}
+
+
+@admin_router.patch("/sponsors")
+async def update_sponsor_source(body: SponsorSourceUpdate, me: dict = Depends(require_area("content", "system"))):
+    updates = {key: value for key, value in body.model_dump(exclude_unset=True).items() if value is not None}
+    return await _set_sponsor_source(get_db(), me, updates)
 
 
 @admin_router.post("/sponsors/refresh")
@@ -422,6 +432,60 @@ async def clear_dolibarr_key(me: dict = Depends(require_area("system"))):
     await db.settings.update_one({"id": SETTINGS_ID}, {"$set": {"api_key": "", "mode": "off", "updated_at": now_utc().isoformat()}})
     await _audit(me["id"], "dolibarr.key_removed", SETTINGS_ID)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- Funktionen (#510): alle Schalter an einem Ort
+
+class FeatureUpdate(BaseModel):
+    key: str = Field(max_length=40)
+    on: bool | None = None
+    options: dict | None = None
+
+
+@admin_router.put("/features")
+async def update_feature(body: FeatureUpdate, me: dict = Depends(require_area("club", "system"))):
+    """Ein Ort für alle Dolibarr-Schalter (#510). Die Werte bleiben in ihren Einstellungen (Branding,
+    Sponsorenquelle, Dolibarr-Einstellungen); hier werden sie nur zusammen gelesen und gesetzt."""
+    db = get_db()
+    key = body.key
+    options = body.options or {}
+    if key in ("club_facts", "channels"):
+        if body.on is None:
+            raise HTTPException(400, "An oder aus fehlt.")
+        from routes.settings_routes import BrandingSettings, update_branding
+        field = "legal_from_dolibarr" if key == "club_facts" else "channels_from_dolibarr"
+        await update_branding(BrandingSettings(**{field: bool(body.on)}), me)
+    elif key == "sponsors":
+        updates: dict = {}
+        if body.on is not None:
+            updates["from_dolibarr"] = bool(body.on)
+        for name in ("sponsor_category", "partner_category"):
+            if options.get(name) is not None:
+                updates[name] = str(options[name])
+        if not updates:
+            raise HTTPException(400, "Nichts zu ändern.")
+        await _set_sponsor_source(db, me, updates)
+    elif key in ("applications", "invoices", "members", "directory"):
+        patch: dict = {}
+        if key == "applications" and body.on is not None:
+            patch["applications_enabled"] = bool(body.on)
+        if key == "invoices" and body.on is not None:
+            patch["write_enabled"] = bool(body.on)
+        if key == "members" and "auto_link_verified_email" in options:
+            patch["auto_link_verified_email"] = bool(options["auto_link_verified_email"])
+        if key == "directory":
+            if "directory_consent_code" in options:
+                patch["directory_consent_code"] = str(options["directory_consent_code"] or "")
+            if isinstance(options.get("directory_field_map"), dict):
+                patch["directory_field_map"] = options["directory_field_map"]
+        if not patch:
+            raise HTTPException(400, "Nichts zu ändern.")
+        if "write_enabled" in patch and not await user_has_area(me, "system"):
+            raise HTTPException(403, "Den Schreibzugriff für Rechnungen schaltet nur „System“ (Schlüssel und Geld).")
+        await update_dolibarr_settings(DolibarrSettingsUpdate(**patch), me)
+    else:
+        raise HTTPException(404, "Diese Funktion hat keinen Schalter – sie läuft mit dem Modus oder dem Modul.")
+    return {"ok": True, "features": await _features(db, await load_settings(db))}
 
 
 @admin_router.get("/invoice-options")

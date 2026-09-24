@@ -8,12 +8,13 @@ import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { InvoiceTermsPanel } from "@/components/tls/InvoiceTermsPanel";
 import { CAPABILITY_LABELS, DOLIBARR_STATUS_LABELS, LINK_STATUS_LABELS, MODE_HINTS, MODE_LABELS, PREVIEW_STATE_LABELS, describeSync, formatDate, needsManualChoice, splitWithoutAccount } from "@/lib/dolibarr";
+import { Empty, Field, Panel, Tile } from "./dolibarr/parts";
+import { FeaturesTab } from "./dolibarr/FeaturesTab";
 
-// Dolibarr (#316, #295, #297, #330). Wer was sieht: Verbindung und Schlüssel nur
+// Dolibarr (#316, #295, #297, #330, #510). Wer was sieht: Verbindung und Schlüssel nur
 // „System“, Zuordnungen und Umstellung die Vereinsverwaltung, die Freigabe
-// „Funktion → Bereich“ nur der Superadmin. Der Schlüssel kommt nie zurück.
+// „Vorstand → Bereiche“ nur der Superadmin, die Schalter unter „Funktionen“ beide. Der Schlüssel kommt nie zurück.
 
-const TONES = { ok: "border-[#00FF88]/25", warn: "border-[#FFD700]/30", danger: "border-[#FF3B30]/40", plain: "border-white/10" };
 const TYPE_LABELS = { ordinary: "Ordentlich", supporting: "Unterstützend", honorary: "Ehrenmitglied", youth: "Jugend", guest: "Gast", former: "Ehemalig" };
 
 export default function AdminDolibarrPage() {
@@ -21,10 +22,12 @@ export default function AdminDolibarrPage() {
   const confirm = useConfirm();
   const canSystem = can("system");
   const canClub = can("club");
+  // Reiter „Funktionen“ (#510): alle „aus Dolibarr“-Schalter an einem Ort; „Bereiche“ ist die Freigabe Vorstand → Bereich.
   const tabs = [
     { key: "overview", label: "Stand" },
+    { key: "features", label: "Funktionen" },
     ...(canClub ? [{ key: "links", label: "Zuordnungen" }, { key: "preview", label: "Umstellung" }] : []),
-    { key: "policy", label: "Funktionen" },
+    { key: "policy", label: "Bereiche" },
     ...(canSystem ? [{ key: "connection", label: "Verbindung" }] : []),
   ];
   // Reiter per ?tab= ansteuerbar (Admin-Suche, Links aus anderen Seiten); unbekannte oder nicht erlaubte Reiter fallen auf „Stand“.
@@ -59,7 +62,7 @@ export default function AdminDolibarrPage() {
   const load = useCallback(async () => {
     try {
       const { data } = await api.get("/admin/dolibarr/status");
-      if (canSystem && data?.mode && data.mode !== "off") {
+      if (data?.mode && data.mode !== "off") {
         api.get("/admin/dolibarr/consent-texts").then((result) => setConsentTexts(Array.isArray(result?.data) ? result.data : [])).catch(() => setConsentTexts([]));
       }
       setStatus(data);
@@ -72,7 +75,7 @@ export default function AdminDolibarrPage() {
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
-  }, [canClub, canSystem]);
+  }, [canClub]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -192,7 +195,7 @@ export default function AdminDolibarrPage() {
           {/* Wunsch des Betreibers: an einer Stelle sehen, welche Dolibarr-Funktion an ist und wo ihr Schalter liegt. */}
           <div className="lg:col-span-2">
             <Panel title="Dolibarr auf der Website – was läuft, was fehlt, wo es steht">
-              <p className="text-xs text-white/45 mb-2">Die Schalter liegen auf mehreren Seiten. Hier steht je Funktion, ob sie an ist und wo sie eingestellt wird.</p>
+              <p className="text-xs text-white/45 mb-2">Je Funktion: ob sie an ist und was sie braucht. Ein- und ausgeschaltet wird alles im Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
               {(status?.features || []).length === 0 ? <Empty text="Noch kein Stand geladen." /> : (
                 <ul className="divide-y divide-white/5" data-testid="dolibarr-features">
                   {status.features.map((feature) => (
@@ -355,8 +358,12 @@ export default function AdminDolibarrPage() {
         </div>
       )}
 
+      {tab === "features" && (
+        <FeaturesTab status={status} busy={busy} run={run} consentTexts={consentTexts} canSystem={canSystem} />
+      )}
+
       {tab === "policy" && (
-        <Panel title="Funktion → Bereich">
+        <Panel title="Vorstand → Bereiche">
           <p className="text-xs text-white/45 mb-3">
             Einmal festlegen, danach läuft es von selbst: Beginnt eine Funktion in Dolibarr, öffnet sich der Bereich; endet sie, ist er weg.
             Ableitbar ist nur die Vereinsverwaltung – nie System, Moderation, Rollenvergabe oder Geldfreigaben. Zwei-Faktor bleibt Pflicht.
@@ -445,10 +452,7 @@ export default function AdminDolibarrPage() {
             <Panel title="Schreibzugriff für Rechnungen">
               <div className="space-y-3 text-sm" data-testid="dolibarr-write">
                 <p className="text-xs text-white/55">Rechnungen und Geschäftspartner legt die Website mit dem Website-Benutzer an, sobald der Haken gesetzt ist und der Modus auf „Live“ steht. Ohne Haken schreibt sie nichts – Rechnungsaufträge bleiben in der Finanzübersicht stehen, nichts geht verloren. Ein eigener Schlüssel für einen zweiten Benutzer ist möglich, aber nicht nötig.</p>
-                <label className="inline-flex items-center gap-2">
-                  <input type="checkbox" checked={Boolean(status?.write_enabled)} disabled={!!busy || !(status?.api_key_configured || status?.write_api_key_configured)} onChange={(e) => saveSettings({ write_enabled: e.target.checked }, e.target.checked ? "Schreibzugriff eingeschaltet." : "Schreibzugriff ausgeschaltet.")} data-testid="dolibarr-write-enabled" />
-                  Schreibzugriff einschalten (Kunden und Rechnungen anlegen)
-                </label>
+                <p className="text-xs text-white/60">Ein- und ausgeschaltet wird der Schreibzugriff unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline" data-testid="dolibarr-write-to-features">Funktionen</button>; hier stehen Steuersätze, Konditionen und der optionale zweite Schlüssel.</p>
                 {/* Steuersätze (#322): kein stiller Automatismus - erst wenn jemand sie geprüft hat, darf die Website Belege von selbst freigeben. */}
                 <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="dolibarr-tax">
                   <div className="text-[11px] uppercase tracking-wider font-bold text-white/70">Steuersätze je Profil</div>
@@ -498,60 +502,7 @@ export default function AdminDolibarrPage() {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 flex items-start gap-3 text-sm">
-                <input type="checkbox" id="dolibarr-auto-link" checked={!!status?.auto_link_verified_email} disabled={!!busy} onChange={(e) => saveSettings({ auto_link_verified_email: e.target.checked })} className="mt-1 accent-[#29B6E8]" data-testid="dolibarr-auto-link" />
-                <div>
-                  <label htmlFor="dolibarr-auto-link" className="font-bold">Konten über die bestätigte E-Mail von selbst zuordnen</label>
-                  <div className="text-xs text-white/45">Nur bei genau einem Treffer und wenn das Mitglied noch keinem Konto gehört. Aus heißt: Jede Zuordnung bestätigt die Vereinsverwaltung.</div>
-                </div>
-              </div>
-              {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag) */}
-              <div className="mt-4 border-t border-white/10 pt-4 text-sm" data-testid="dolibarr-directory">
-                <div className="font-bold">Mitgliederverzeichnis aus der Einwilligung</div>
-                <div className="text-xs text-white/45 mt-1 max-w-2xl">Hat ein Mitglied in Dolibarr dieser Einwilligung zugestimmt, legt der Abgleich seinen Eintrag im Mitgliederverzeichnis an – Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto, den Rest pflegst du unter Verein → Mitgliederprofile. Ein Widerruf nimmt den Eintrag offline. Leer heißt: nur Einträge von Hand oder per Opt-in des Mitglieds.</div>
-                <select value={status?.directory_consent_code || ""} disabled={!!busy} data-testid="dolibarr-directory-consent"
-                  onChange={(e) => saveSettings({ directory_consent_code: e.target.value }, e.target.value ? "Das Verzeichnis folgt jetzt dieser Einwilligung." : "Das Verzeichnis folgt keiner Einwilligung mehr.")}
-                  className="mt-2 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50">
-                  <option value="">– keine (aus) –</option>
-                  {consentTexts.map((text) => <option key={text.code} value={text.code}>{text.label} ({text.code})</option>)}
-                  {status?.directory_consent_code && !consentTexts.some((text) => text.code === status.directory_consent_code) && (
-                    <option value={status.directory_consent_code}>{status.directory_consent_code} (im Modul nicht mehr gefunden)</option>
-                  )}
-                </select>
-                {!consentTexts.length && <div className="text-xs text-[#FFD700] mt-1">Keine Einwilligungstexte gelesen – im Modul unter Einrichtung → Vereine → Einwilligungen anlegen (z. B. „Nennung im Mitgliederverzeichnis“).</div>}
-              </div>
-              {/* Website-Profil aus Zusatzfeldern (Vereine 1.2): welcher Feldcode in welche Spalte des Verzeichnisses läuft; der Rest steht als „Weitere Angaben“. */}
-              <div className="mt-4 border-t border-white/10 pt-4 text-sm" data-testid="dolibarr-directory-fields">
-                <div className="font-bold">Felder des Website-Profils → Spalten des Verzeichnisses</div>
-                <div className="text-xs text-white/45 mt-1 max-w-2xl">Das Modul (ab Vereine 1.2) liefert die Zusatzfelder, die der Verein fürs Website-Profil gewählt hat. Hier legst du fest, welches Feld als Gamertag, Kurztext, Spiele und Plattformen erscheint – alle anderen Felder stehen auf dem Profil unter „Weitere Angaben“.</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 max-w-2xl">
-                  {[["gamertag", "Gamertag"], ["bio", "Kurztext"], ["games", "Spiele"], ["platforms", "Plattformen"]].map(([column, label]) => {
-                    const current = status?.directory_field_map?.[column] ?? column;
-                    const known = status?.website_profile_fields || [];
-                    return (
-                      <label key={column} className="text-xs">
-                        <span className="block text-white/60 mb-1">{label}</span>
-                        <select value={current} disabled={!!busy} data-testid={`dolibarr-directory-field-${column}`}
-                          onChange={(e) => saveSettings({ directory_field_map: { [column]: e.target.value } }, "Zuordnung gespeichert – gilt ab dem nächsten Abgleich.")}
-                          className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50">
-                          <option value="">– nicht übernehmen –</option>
-                          {known.map((field) => <option key={field.code} value={field.code}>{field.label} ({field.code})</option>)}
-                          {current && !known.some((field) => field.code === current) && <option value={current}>{current}</option>}
-                        </select>
-                      </label>
-                    );
-                  })}
-                </div>
-                {!(status?.website_profile_fields || []).length && <div className="text-xs text-white/40 mt-1">Noch keine Felder aus dem Modul gelesen – sie erscheinen nach dem nächsten Abgleich (Vereine ab 1.2).</div>}
-              </div>
-              {/* Beitrittsanträge nach Dolibarr (#328): nur im Modus Live wirksam; aus = Antrag und Entscheidung bleiben auf der Website. */}
-              <div className="mt-4 flex items-start gap-3 text-sm">
-                <input type="checkbox" id="dolibarr-applications" checked={!!status?.applications_enabled} disabled={!!busy} onChange={(e) => saveSettings({ applications_enabled: e.target.checked }, e.target.checked ? "Beitrittsanträge gehen nach Dolibarr." : "Beitrittsanträge bleiben auf der Website.")} className="mt-1 accent-[#29B6E8]" data-testid="dolibarr-applications-enabled" />
-                <div>
-                  <label htmlFor="dolibarr-applications" className="font-bold">Beitrittsanträge nach Dolibarr senden</label>
-                  <div className="text-xs text-white/45">„Mitglied werden“ fragt dann die Pflichtfelder, Mitgliedsarten und Einwilligungstexte aus Dolibarr ab und legt den Antrag dort als Mitglied im Entwurf an. Aufgenommen oder abgelehnt wird nur in Dolibarr; die Website zeigt den Stand und schaltet das Konto bei der Aufnahme frei. Wirkt nur im Modus „Live“{status?.mode !== "live" ? " – der steht gerade nicht" : ""}. Der API-Benutzer braucht das Recht „Beitrittsanträge über die API anlegen“.</div>
-                </div>
-              </div>
+              <p className="mt-4 text-xs text-white/45">Zuordnung per E-Mail, Mitgliederverzeichnis, Feldzuordnung und Beitrittsanträge: Reiter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>.</p>
             </Panel>
             <Panel title="Benachrichtigung aus Dolibarr (Webhook)">
               <p className="text-xs text-white/45 mb-3">Optional. Dolibarr meldet, dass sich ein Mitglied geändert hat; die Website liest dann nach. Ohne Webhook holt der Abgleich alle 10 Minuten auf. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
@@ -562,38 +513,5 @@ export default function AdminDolibarrPage() {
         </div>
       )}
     </AdminLayout>
-  );
-}
-
-function Tile({ label, value, detail, tone = "plain", testId }) {
-  return (
-    <div className={`border rounded-sm bg-[#121212] p-4 ${TONES[tone] || TONES.plain}`} data-testid={testId}>
-      <div className="text-[10px] uppercase tracking-widest text-white/50 font-bold">{label}</div>
-      <div className="mt-1 font-heading text-xl font-black">{value}</div>
-      {detail && <div className="mt-1 text-xs text-white/50 break-words">{detail}</div>}
-    </div>
-  );
-}
-
-function Panel({ title, children }) {
-  return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <h2 className="font-heading font-bold uppercase mb-3">{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Empty({ text }) {
-  return <div className="text-sm text-white/40 py-4">{text}</div>;
-}
-
-function Field({ label, value, onChange, placeholder = "", type = "text", testId }) {
-  return (
-    <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
-      <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} data-testid={testId} autoComplete="off"
-        className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-    </label>
   );
 }

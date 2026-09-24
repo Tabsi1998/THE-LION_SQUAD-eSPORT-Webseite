@@ -20,7 +20,10 @@ const AdminDolibarrPage = (await import("./AdminDolibarrPage")).default;
 
 const STATUS = {
   features: [
-    { key: "club_facts", label: "Vereinsdaten und Obmann aus Dolibarr", enabled: false, state: "aus · noch nie gelesen", hint: "Impressum und Kontakt aus dem Vereinsmodul.", where: "/admin/settings?tab=legal", where_label: "Einstellungen → Rechtliches" },
+    { key: "club_facts", label: "Vereinsdaten und Obmann aus Dolibarr", enabled: false, state: "aus · noch nie gelesen", hint: "Impressum und Kontakt aus dem Vereinsmodul.", switch: { on: false }, where: "/admin/dolibarr?tab=features", where_label: "Dolibarr → Funktionen" },
+    { key: "directory", label: "Mitgliederverzeichnis und Profile aus Dolibarr", enabled: false, state: "erst im Modus Live", hint: "Wer zustimmt, bekommt sein Profil.", switch: { on: false, kind: "select" }, where: "/admin/dolibarr?tab=features", where_label: "Dolibarr → Funktionen" },
+    { key: "invoices", label: "Rechnungen in Dolibarr anlegen", enabled: false, state: "aus", hint: "Schreibzugriff.", switch: { on: false, system_only: true }, where: "/admin/dolibarr?tab=features", where_label: "Dolibarr → Funktionen" },
+    { key: "webhook", label: "Benachrichtigung aus Dolibarr (Webhook)", enabled: false, state: "nicht eingerichtet", hint: "Optional.", where: "/admin/dolibarr?tab=connection", where_label: "Verbindung → Webhook" },
     { key: "members", label: "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", enabled: false, state: "Modus Vorschau (liest, übernimmt nichts)", hint: "", where: "/admin/dolibarr?tab=connection", where_label: "Verbindung → Modus" },
   ],
   mode: "preview", environment: "production", instance: "verein", entity: 1, base_url: "https://erp.example.test",
@@ -66,7 +69,7 @@ beforeEach(() => {
 
 const renderPage = () => render(<MemoryRouter><AdminDolibarrPage /></MemoryRouter>);
 
-test("die Vereinsverwaltung sieht Zuordnungen und Umstellung, aber nicht die Verbindung", async () => {
+test("die Vereinsverwaltung sieht Zuordnungen, Umstellung und Funktionen, aber nicht die Verbindung", async () => {
   renderPage();
   await waitFor(() => expect(screen.getByTestId("dolibarr-mode")).toHaveTextContent("Vorschau"));
   expect(screen.getByTestId("dolibarr-sync-tile")).toHaveTextContent("nichts übernommen (Vorschau)");
@@ -190,17 +193,41 @@ test("der Reiter Stand zeigt je Dolibarr-Funktion, ob sie an ist und wo sie eing
   const row = await screen.findByTestId("dolibarr-feature-club_facts");
   expect(row).toHaveTextContent("Vereinsdaten und Obmann aus Dolibarr");
   expect(row).toHaveTextContent("aus · noch nie gelesen");
-  expect(screen.getByTestId("dolibarr-feature-club_facts-where")).toHaveAttribute("href", "/admin/settings?tab=legal");
+  expect(screen.getByTestId("dolibarr-feature-club_facts-where")).toHaveAttribute("href", "/admin/dolibarr?tab=features");
   expect(screen.getByTestId("dolibarr-feature-members")).toHaveTextContent("Modus Vorschau");
 });
 
-test("Mitgliederverzeichnis aus der Einwilligung (#410): die Auswahl auf „Verbindung“ speichert den Code", async () => {
-  authState.areas = ["system"];
+test("Mitgliederverzeichnis aus der Einwilligung (#410, seit #510 unter Funktionen): die Auswahl speichert den Code", async () => {
   const user = userEvent.setup();
   renderPage();
-  await user.click(await screen.findByTestId("dolibarr-tab-connection"));
+  await user.click(await screen.findByTestId("dolibarr-tab-features"));
   const select = await screen.findByTestId("dolibarr-directory-consent");
   expect(screen.getByTestId("dolibarr-directory")).toHaveTextContent("legt der Abgleich seinen Eintrag");
   await user.selectOptions(select, "verzeichnis");
-  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { directory_consent_code: "verzeichnis" }));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/features", { key: "directory", options: { directory_consent_code: "verzeichnis" } }));
+});
+
+// Alle Schalter an einem Ort (#510): der Reiter Funktionen schaltet, die Vereinsverwaltung darf - nur den
+// Schreibzugriff nicht; was keinen Schalter hat, zeigt nur den Weg.
+test("Funktionen: ein Haken je Funktion, Schreibzugriff nur für System, Webhook ohne Schalter", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-features"));
+  const box = await screen.findByTestId("dolibarr-switch-club_facts");
+  expect(box).not.toBeChecked();
+  await user.click(box);
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/features", { key: "club_facts", on: true }));
+  expect(screen.getByTestId("dolibarr-switch-invoices")).toBeDisabled();
+  expect(screen.getByTestId("dolibarr-row-invoices")).toHaveTextContent("Schaltet nur „System“");
+  expect(screen.queryByTestId("dolibarr-switch-webhook")).toBeNull();
+  expect(screen.getByTestId("dolibarr-row-webhook")).toHaveTextContent("Verbindung → Webhook");
+  expect(screen.queryByTestId("dolibarr-switch-directory")).toBeNull();
+  // Zuordnung per E-Mail hängt an der Mitgliedschaft.
+  await user.click(screen.getByTestId("dolibarr-auto-link"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/features", { key: "members", options: { auto_link_verified_email: true } }));
+
+  authState.areas = ["system"];
+  renderPage();
+  await user.click((await screen.findAllByTestId("dolibarr-tab-features")).at(-1));
+  await waitFor(() => expect(screen.getAllByTestId("dolibarr-switch-invoices").at(-1)).not.toBeDisabled());
 });

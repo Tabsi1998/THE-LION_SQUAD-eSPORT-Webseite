@@ -219,7 +219,7 @@ test("Branding: „Aus Logo und Akzentfarbe erzeugen“ ruft den Server, überni
 });
 
 // Kanäle aus Dolibarr (#326 Teil 4): der Haken auf „Social Links“ speichert das Feld mit.
-test("Social Links: der Haken „Kanäle aus Dolibarr übernehmen“ lässt sich setzen und wird gespeichert", async () => {
+test("Social Links: der Stand „Kanäle aus Dolibarr“ steht da, geschaltet wird auf der Dolibarr-Seite", async () => {
   apiMock.get.mockImplementation((url) => Promise.resolve(responseFor(url)));
   render(
     <ConfirmDialogProvider>
@@ -228,13 +228,11 @@ test("Social Links: der Haken „Kanäle aus Dolibarr übernehmen“ lässt sich
       </MemoryRouter>
     </ConfirmDialogProvider>
   );
-  const box = await screen.findByTestId("channels-from-dolibarr");
-  expect(box).not.toBeChecked();
-  await userEvent.click(box);
-  expect(box).toBeChecked();
+  // Seit #510 liegt der Schalter unter Dolibarr → Funktionen; hier steht der Stand und der Weg dorthin.
+  expect(await screen.findByTestId("socials-dolibarr-title")).toHaveTextContent("Kanäle von Hand");
+  expect(screen.getByTestId("socials-dolibarr-features")).toHaveAttribute("href", "/admin/dolibarr?tab=features");
+  expect(screen.queryByTestId("channels-from-dolibarr")).toBeNull();
   expect(screen.getByTestId("socials-dolibarr")).toHaveTextContent("Kanäle und Konten");
-  await userEvent.click(screen.getByTestId("socials-save"));
-  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/branding", expect.objectContaining({ channels_from_dolibarr: true })));
 });
 
 test("der alte Link auf den Reiter Rechtliches landet auf der Seite Vereinsdaten (#509)", async () => {

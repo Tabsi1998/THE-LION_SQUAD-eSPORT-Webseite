@@ -31,7 +31,7 @@ folgen mit „Dolibarr II“, Abrechnung mit „Abrechnung I/II“.
 | --- | --- |
 | **System** (Club-Admin, Superadmin) | Adresse, API-Schlüssel (nur „gespeichert“, nie der Wert), Modus, Webhook |
 | **Vereinsverwaltung** | Stand des Abgleichs, Zuordnungen Konto ↔ Mitglied, Vorschau der Umstellung |
-| **Superadmin** | Freigabe „Funktion → Bereich“, weil sie Rechte vergibt |
+| **Superadmin** | Freigabe „Vorstand → Bereiche“, weil sie Rechte vergibt |
 | Redaktion, Turnierleitung, Moderation | nichts davon |
 | Das Mitglied selbst | eigener Beitragsstand und eigene Funktionen unter „Meine Mitgliedschaft“ |
 
@@ -223,7 +223,8 @@ Inhabern (`/vereine/board`; Namen nur, wo die Person der Nennung zugestimmt hat)
 liest beides stündlich und hält den Stand mit Zeitpunkt. Ein Ausfall ändert nichts: Der letzte
 Stand bleibt, der Fehler steht daneben.
 
-**Einschalten:** Admin → Einstellungen → Rechtliches → „Jetzt nachlesen“ (zeigt, was Dolibarr
+**Einschalten:** Admin → Dolibarr → Funktionen (seit #510 liegen alle „aus Dolibarr“-Schalter dort;
+die Seite Vereinsdaten zeigt nur noch den Stand) → „Jetzt nachlesen“ (zeigt, was Dolibarr
 liefert), dann Haken **„Vereinsdaten aus Dolibarr übernehmen“** und speichern. Danach kommen
 Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person aus Dolibarr –
 die Felder stehen im Reiter nur lesbar da. Von Hand bleiben: Rechtsform, Sitz, Bundesland,
@@ -264,7 +265,7 @@ dass ein Mitglied etwas tun muss:
 1. Im Vereinsmodul unter *Einrichtung > Vereine > Einwilligungen* einen Text anlegen, etwa
    „Nennung im Mitgliederverzeichnis“, und ihn den Mitgliedern zur Zustimmung geben (beim
    Beitritt oder in der Mitgliederverwaltung).
-2. Auf der Website unter *Dolibarr → Verbindung → Mitgliederverzeichnis aus der Einwilligung*
+2. Auf der Website unter *Dolibarr → Funktionen → Mitgliederverzeichnis aus der Einwilligung*
    diesen Text auswählen.
 
 Ab dann legt jeder Abgleich für ein Mitglied mit bestätigter Zuordnung und erteilter Einwilligung
@@ -298,7 +299,7 @@ Admin); das Konto verknüpft der Vorstand später.
 Einrichtung → Vereine → Website-Profil): Text, langer Text, Zahl, Datum, Ja/Nein, eine oder mehrere
 Optionen – und je Feld, ob das Mitglied es selbst ändern darf. Nach dem Update aus 1.1 heißen die
 alten Felder `gamertag`, `bio`, `games`, `platforms`. Auf der Website legst du unter Dolibarr →
-Verbindung → „Felder des Website-Profils“ fest, welches Feld als Gamertag, Kurztext, Spiele und
+Funktionen → „Felder des Website-Profils“ fest, welches Feld als Gamertag, Kurztext, Spiele und
 Plattformen erscheint; alle anderen Felder stehen auf dem Profil unter „Weitere Angaben“.
 
 **Mitglieder pflegen es selbst:** Unter *Meine Mitgliedschaft → Mein Website-Profil* (Web und App)

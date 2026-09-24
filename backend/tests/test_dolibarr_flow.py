@@ -76,9 +76,11 @@ async def test_connection_is_system_only_and_the_key_never_comes_back(flow, fake
     assert API_KEY not in status.text
     # Die Übersicht „was läuft, wo es steht“: jede Funktion mit Schalterort - hier ist noch nichts an.
     features = {row["key"]: row for row in status.json()["features"]}
-    assert set(features) == {"members", "club_facts", "sponsors", "applications", "consents", "member_access", "directory", "invoices", "webhook"}
-    assert features["club_facts"]["enabled"] is False and features["club_facts"]["where"] == "/admin/club"
-    assert features["members"]["state"].startswith("Modus Vorschau") and features["sponsors"]["where"] == "/admin/sponsors"
+    assert set(features) == {"members", "club_facts", "channels", "sponsors", "applications", "consents", "member_access", "directory", "invoices", "webhook"}
+    # Alle Schalter an einem Ort (#510): jede schaltbare Funktion zeigt auf den Reiter Funktionen.
+    assert features["club_facts"]["enabled"] is False and features["club_facts"]["where"] == "/admin/dolibarr?tab=features"
+    assert features["members"]["state"].startswith("Modus Vorschau") and features["sponsors"]["where"] == "/admin/dolibarr?tab=features"
+    assert features["club_facts"]["switch"] == {"on": False} and features["invoices"]["switch"]["system_only"] is True and "switch" not in features["webhook"]
     assert all(row["where_label"] and row["hint"] for row in features.values())
     stored = await flow.db.settings.find_one({"id": "dolibarr"})
     assert stored["api_key"].startswith("enc:v1:")
@@ -576,3 +578,49 @@ def test_a_function_starts_on_the_clubs_day_not_the_servers(monkeypatch):
     starts_tomorrow = [{"code": "kassier", "label": "Kassier:in", "since": "2026-10-02"}]
     assert [g["area"] for g in dolibarr_policy.areas_from_functions(starts_today, {"kassier": ["club"]})] == ["club"]
     assert dolibarr_policy.areas_from_functions(starts_tomorrow, {"kassier": ["club"]}) == []
+
+
+# ---------------------------------------------------------------- Alle Schalter an einem Ort (#510)
+
+@pytest.mark.asyncio
+async def test_every_dolibarr_switch_is_set_from_the_features_endpoint(flow, fake):
+    """Dolibarr → Funktionen setzt Vereinsdaten, Kanäle, Sponsoren, Beitrittsanträge, Zuordnung per E-Mail, Verzeichnis
+    und Schreibzugriff - jeweils dort, wo der Wert schon immer lag. Den Schreibzugriff schaltet nur „System“."""
+    admin = await flow.add_user(role="club_admin")
+    flow.act_as(admin)
+    assert (await flow.put("/api/admin/dolibarr/settings", json={"base_url": BASE_URL, "api_key": API_KEY, "instance": "verein", "mode": "preview"})).status_code == 200
+
+    async def feature(key):
+        rows = (await flow.get("/api/admin/dolibarr/status")).json()["features"]
+        return next(row for row in rows if row["key"] == key)
+
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "club_facts", "on": True})).status_code == 200
+    branding = await flow.db.settings.find_one({"id": "branding"}, {"_id": 0})
+    assert branding["legal_from_dolibarr"] is True and (await feature("club_facts"))["switch"] == {"on": True}
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "channels", "on": True})).json()["ok"] is True
+    assert (await flow.db.settings.find_one({"id": "branding"}, {"_id": 0}))["channels_from_dolibarr"] is True
+
+    sponsors = await flow.put("/api/admin/dolibarr/features", json={"key": "sponsors", "on": True, "options": {"sponsor_category": "Gönner"}})
+    assert sponsors.status_code == 200 and (await feature("sponsors"))["enabled"] is True
+    assert (await flow.get("/api/admin/dolibarr/sponsors")).json()["sponsor_category"] == "Gönner"
+
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "applications", "on": True})).status_code == 200
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "members", "options": {"auto_link_verified_email": True}})).status_code == 200
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "directory", "options": {"directory_consent_code": "verzeichnis", "directory_field_map": {"gamertag": "nick"}}})).status_code == 200
+    status = (await flow.get("/api/admin/dolibarr/status")).json()
+    assert status["applications_enabled"] is True and status["auto_link_verified_email"] is True
+    assert status["directory_consent_code"] == "verzeichnis" and status["directory_field_map"]["gamertag"] == "nick"
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "invoices", "on": True})).status_code == 200
+    assert status["write_enabled"] is False and (await flow.get("/api/admin/dolibarr/status")).json()["write_enabled"] is True
+
+    # Was keinen Schalter hat, sagt es; ohne Inhalt gibt es 400.
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "webhook", "on": True})).status_code == 404
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "members"})).status_code == 400
+
+    # Die Vereinsverwaltung darf schalten - nur nicht den Schreibzugriff (Schlüssel und Geld).
+    vorstand = await person(flow, "vorstand", areas=["club"])
+    flow.act_as(vorstand)
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "club_facts", "on": False})).status_code == 200
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "invoices", "on": False})).status_code == 403
+    flow.act_as(await person(flow, "redaktion", areas=["content"]))
+    assert (await flow.put("/api/admin/dolibarr/features", json={"key": "sponsors", "on": False})).status_code == 403
