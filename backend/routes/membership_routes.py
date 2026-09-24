@@ -223,6 +223,8 @@ def _admin_profile(doc: dict) -> dict:
         # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): warum ein Eintrag da oder offline ist.
         "consent": doc.get("consent"),
         "deactivated_reason": doc.get("deactivated_reason"),
+        # Profil aus Dolibarr (#496): wann der Abgleich zuletzt Gamertag, Kurztext, Spiele oder Foto von dort genommen hat.
+        "dolibarr_profile_at": doc.get("dolibarr_profile_at"),
     })
     return out
 
