@@ -665,6 +665,20 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Eigene Rechnungen über die Bindung (#324, Vereine ab 1.4.0)
+    async def my_invoices(self, who: dict, *, page: int = 0) -> list[dict]:
+        """Die Rechnungen der Person selbst - über die Bindung (Fähigkeit „Rechnungen“) oder die Mitgliedsnummer."""
+        data = await self._get("/vereine/me/invoices", {**who, "limit": PAGE_LIMIT, "page": int(page)})
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def my_invoice_pdf(self, who: dict, invoice_id: int) -> dict:
+        data = await self._get(f"/vereine/me/invoices/{int(invoice_id)}/pdf", dict(who))
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def members_page(self, *, page: int, changed_since: str | None = None) -> list[dict]:
         params: dict = {"limit": PAGE_LIMIT, "page": int(page)}
         if changed_since:

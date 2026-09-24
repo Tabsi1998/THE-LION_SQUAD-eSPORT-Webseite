@@ -208,6 +208,7 @@ class FakeDolibarr:
         self.website_profile_consent = ""
         self.member_profiles: dict[int, dict] = {}
         self.tampered_pdf_ids: set[int] = set()  # Fassungen, deren Datei nicht mehr zur Akte passt
+        self.tampered_invoice_ids: set[int] = set()  # Rechnungen, deren PDF nicht mehr zur Prüfsumme passt (1.4.0)
         self.board = [
             {"code": "obmann", "label": "Obmann", "board": True, "represents": True, "auditor": False, "holders": [{"name": "Otto Obmann", "since": "2024-04-01"}]},
             {"code": "kassier", "label": "Kassier:in", "board": True, "represents": False, "auditor": False, "holders": [{"name": None, "since": "2024-04-01"}]},
@@ -249,6 +250,15 @@ class FakeDolibarr:
     @staticmethod
     def pdf_bytes(invoice_id: int) -> bytes:
         return b"%PDF-1.7\n%fake-invoice-" + str(invoice_id).encode() + b"\n%%EOF\n"
+
+    def _invoice_pdf(self, template: str, invoice_id: int) -> httpx.Response:
+        """Das PDF mit Prüfsumme (Vereine 1.4.0) - eine manipulierte Datei passt nicht mehr dazu."""
+        content = self.pdf_bytes(invoice_id)
+        digest = hashlib.sha256(content).hexdigest()
+        if invoice_id in self.tampered_invoice_ids:
+            content = b"%PDF-1.7" + NL_BYTES + b"%tampered" + NL_BYTES + b"%%EOF" + NL_BYTES
+        return self._json(template, {"filename": f"FA-{invoice_id}.pdf", "content_type": "application/pdf", "filesize": len(content),
+                                     "sha256": digest, "content": base64.b64encode(content).decode()})
 
     def invite(self, code: str, member_id: int, capabilities: tuple[str, ...] = ("documents",)) -> None:
         """Einrichtung > Externe Identitäten: eine Einladung für ein Mitglied, einmal einlösbar."""
@@ -303,7 +313,7 @@ class FakeDolibarr:
             if not member_id.isdigit() or int(member_id) not in self.members:
                 return None, httpx.Response(404, json={"error": {"code": 404, "message": "Member not found"}})
             return {"subject": None, "member_id": int(member_id), "application_id": None,
-                    "capabilities": ["documents", "consents", "votes", "meetings", "profile", "events", "accounts", "website"]}, None
+                    "capabilities": ["documents", "consents", "votes", "meetings", "profile", "events", "accounts", "website", "invoices"]}, None
         ident = self._identity(params, capability)
         if ident is None:
             return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
@@ -855,11 +865,28 @@ class FakeDolibarr:
                 return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
             if invoice_id in self.pdf_failures:
                 return httpx.Response(500, json={"error": {"code": 500, "message": "x"}})
-            content = self.pdf_bytes(invoice_id)
-            return self._json("/vereine/members/{id}/invoices/{invoice}/pdf", {
-                "filename": f"FA-{invoice_id}.pdf", "content_type": "application/pdf",
-                "filesize": len(content), "content": __import__("base64").b64encode(content).decode(),
-            })
+            return self._invoice_pdf("/vereine/members/{id}/invoices/{invoice}/pdf", invoice_id)
+        # Eigene Rechnungen über die Bindung oder die Mitgliedsnummer (Vereine 1.4.0, #324).
+        if path == "/vereine/me/invoices":
+            ident, denied = self._person(params, "invoices")
+            if denied:
+                return denied
+            page, limit = int(params.get("page", 0)), int(params.get("limit", 100))
+            if not 1 <= limit <= 100 or page < 0:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "x"}})
+            rows = sorted(self.invoices.get(ident["member_id"], []), key=lambda r: (r["date"], r["id"]), reverse=True)
+            return self._json("/vereine/me/invoices", rows[page * limit:(page + 1) * limit])
+        match = re.fullmatch(r"/vereine/me/invoices/(" + chr(92) + "d+)/pdf", path)
+        if match:
+            ident, denied = self._person(params, "invoices")
+            if denied:
+                return denied
+            invoice_id = int(match.group(1))
+            if not any(r["id"] == invoice_id for r in self.invoices.get(ident["member_id"], [])):
+                return httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
+            if invoice_id in self.pdf_failures:
+                return httpx.Response(500, json={"error": {"code": 500, "message": "x"}})
+            return self._invoice_pdf("/vereine/me/invoices/{invoice}/pdf", invoice_id)
         match = re.fullmatch(r"/vereine/members/(\d+)/summary", path)
         if match:
             summary = self.members.get(int(match.group(1)))

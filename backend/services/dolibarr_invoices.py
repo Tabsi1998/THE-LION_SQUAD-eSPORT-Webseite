@@ -8,6 +8,8 @@ Rechnung, damit niemand erfährt, ob es eine fremde gibt.
 
 - Eine beendete Mitgliedschaft nimmt niemandem seine alten Belege: es zählt die Zuordnung, nicht
   der Status.
+- Ohne bestätigte Zuordnung, aber mit Bindung per Einladungscode (Fähigkeit „Rechnungen“, Vereine ab
+  1.4.0, #324): dieselben Belege über ``GET /vereine/me/invoices`` - das Modul prüft die Bindung.
 - PDFs werden durchgereicht und nie gespeichert (sie tragen Name und Anschrift). Die Bytes bleiben,
   wie Dolibarr sie liefert; der SHA-256 geht im Header mit.
 - Der Zahlungslink kommt aus Dolibarr und wird erst im Moment des Klicks frisch nachgelesen und
@@ -32,6 +34,7 @@ from database import get_db
 from models import now_utc
 from services.dolibarr_billing import booking_facts, source_label
 from services.dolibarr_client import DolibarrClient, DolibarrError, PAGE_LIMIT, load_settings
+from services.dolibarr_identity import binding_for
 from services.dolibarr_links import verified_link
 from services.dolibarr_policy import CLUB_TZ
 
@@ -178,6 +181,10 @@ def _pdf_payload(payload: dict, invoice_id: int) -> dict:
         raise DolibarrError("invalid_response", 200) from exc
     if not content.startswith(b"%PDF") or len(content) > MAX_PDF_BYTES:
         raise DolibarrError("invalid_response", 200)
+    # Ab Vereine 1.4.0 nennt das Modul die Prüfsumme der Datei - passt sie nicht, gibt es die Datei nicht.
+    expected = str(payload.get("sha256") or "")
+    if expected and hashlib.sha256(content).hexdigest() != expected:
+        raise DolibarrError("invalid_response", 200)
     filename = "".join(ch for ch in str(payload.get("filename") or "") if ch.isalnum() or ch in "._-") or f"rechnung-{invoice_id}.pdf"
     if not filename.lower().endswith(".pdf"):
         filename += ".pdf"
@@ -195,20 +202,27 @@ def summarize(invoices: list[dict]) -> dict:
     }
 
 
-async def _access(db, user: dict) -> tuple[dict, int | None]:
-    """Einstellungen und - wenn bestätigt zugeordnet - die Mitglieds-ID. Ohne Live-Betrieb gibt es nichts."""
+async def _access(db, user: dict) -> tuple[dict, int | None, dict | None]:
+    """Einstellungen und der Weg zu den Belegen: die Mitglieds-ID der bestätigten Zuordnung - oder, ohne
+    Zuordnung, die Bindung per Einladungscode mit Fähigkeit „Rechnungen“ (``{"subject": …}``). Ohne
+    Live-Betrieb gibt es nichts."""
     settings = await load_settings(db)
     if settings["mode"] != "live":
         raise InvoiceAccessError()
     link = await verified_link(db, settings, user["id"])
     member_id = int(link["member_id"]) if link and link.get("member_id") else None
-    return settings, member_id
+    who = None
+    if member_id is None:
+        binding = await binding_for(db, settings, user["id"])
+        if binding and binding.get("status") == "bound" and "invoices" in (binding.get("capabilities") or []):
+            who = {"subject": binding["subject"]}
+    return settings, member_id, who
 
 
-async def _fetch_all(client: DolibarrClient, member_id: int) -> list[dict]:
+async def _fetch_all(client: DolibarrClient, member_id: int | None, who: dict | None = None) -> list[dict]:
     rows: list[dict] = []
     for page in range(MAX_PAGES):
-        batch = await client.member_invoices(member_id, page=page)
+        batch = await (client.member_invoices(member_id, page=page) if member_id is not None else client.my_invoices(who or {}, page=page))
         if not batch:
             break
         rows.extend(batch)
@@ -227,15 +241,15 @@ async def list_invoices(user: dict, db=None) -> dict:
     db = db if db is not None else get_db()
     empty = {"connected": False, "available": True, "invoices": [], "summary": summarize([]), "currency": "EUR", "member": False, "sources": {}}
     try:
-        settings, member_id = await _access(db, user)
+        settings, member_id, who = await _access(db, user)
     except InvoiceAccessError:
         return empty
     context = await _order_context(db, user["id"])
-    if member_id is None and not context:
+    if member_id is None and who is None and not context:
         return empty
     client = DolibarrClient(settings)
     try:
-        invoices = [view_invoice(row, settings) for row in (await _fetch_all(client, member_id) if member_id else [])]
+        invoices = [view_invoice(row, settings) for row in (await _fetch_all(client, member_id, who) if (member_id is not None or who) else [])]
         seen = {parse_invoice_key(row["key"]) for row in invoices}
         for invoice_id in context:
             if invoice_id in seen:
@@ -257,7 +271,7 @@ async def list_invoices(user: dict, db=None) -> dict:
         return {
             "connected": True, "available": False, "reason": exc.kind, "reason_text": exc.text,
             "as_of": cached.get("as_of"), "invoices": invoices, "summary": summarize(invoices), "currency": "EUR",
-            "member": member_id is not None, "sources": _sources(invoices),
+            "member": member_id is not None or who is not None, "sources": _sources(invoices),
         }
     invoices = _sorted(_with_context(invoices, context))
     now = now_utc()
@@ -267,7 +281,7 @@ async def list_invoices(user: dict, db=None) -> dict:
         upsert=True,
     )
     return {"connected": True, "available": True, "as_of": now.isoformat(), "invoices": invoices,
-            "summary": summarize(invoices), "currency": "EUR", "member": member_id is not None, "sources": _sources(invoices)}
+            "summary": summarize(invoices), "currency": "EUR", "member": member_id is not None or who is not None, "sources": _sources(invoices)}
 
 
 async def invoice_pdf(user: dict, key: str, db=None) -> dict:
@@ -277,11 +291,12 @@ async def invoice_pdf(user: dict, key: str, db=None) -> dict:
     Vorgang und Dolibarrs Dokument-API - für Belege ohne Mitglied (#320)."""
     db = db if db is not None else get_db()
     invoice_id = parse_invoice_key(key)
-    settings, member_id = await _access(db, user)
+    settings, member_id, who = await _access(db, user)
     client = DolibarrClient(settings)
-    if member_id is not None:
+    if member_id is not None or who is not None:
         try:
-            return _pdf_payload(await client.member_invoice_pdf(member_id, invoice_id), invoice_id)
+            payload = await (client.member_invoice_pdf(member_id, invoice_id) if member_id is not None else client.my_invoice_pdf(who, invoice_id))
+            return _pdf_payload(payload, invoice_id)
         except DolibarrError as exc:
             if exc.kind != "not_found":
                 raise
@@ -303,9 +318,9 @@ async def payment_target(user: dict, key: str, db=None) -> str:
     """Zahlungslink im Moment des Klicks: frisch gelesen, eigener Beleg, noch offen, zulässiges Ziel."""
     db = db if db is not None else get_db()
     invoice_id = parse_invoice_key(key)
-    settings, member_id = await _access(db, user)
-    if member_id is not None:
-        raw = await _fetch_all(DolibarrClient(settings), member_id)
+    settings, member_id, who = await _access(db, user)
+    if member_id is not None or who is not None:
+        raw = await _fetch_all(DolibarrClient(settings), member_id, who)
         match = next((row for row in raw if int(row.get("id") or 0) == invoice_id), None)
         if match:
             if not view_invoice(match, settings)["can_pay"]:
