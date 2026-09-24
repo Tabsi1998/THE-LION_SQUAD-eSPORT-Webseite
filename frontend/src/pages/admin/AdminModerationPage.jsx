@@ -5,6 +5,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { formatMoment } from "@/components/tls/ModerationStandingCard";
+import ImageScanTab from "@/pages/admin/moderation/ImageScanTab";
 
 // Moderation (#417): drei Reiter - die Meldungen der Community, die Funde des Wortfilters
 // (zurückgehalten wartet auf eine Entscheidung, markiert steht nur da) und die Wortliste selbst.
@@ -12,7 +13,7 @@ import { formatMoment } from "@/components/tls/ModerationStandingCard";
 // „Berechtigt“ (#416) erledigt die Meldung und zählt als Treffer für die Stufen.
 const STATUS = ["open", "reviewing", "resolved", "justified", "dismissed"];
 const STATUS_LABEL = { open: "Offen", reviewing: "In Prüfung", resolved: "Erledigt", justified: "Berechtigt (zählt als Treffer)", dismissed: "Verworfen" };
-const TABS = [["reports", "Meldungen"], ["items", "Wortfilter-Funde"], ["filter", "Wortfilter"], ["people", "Personen"], ["levels", "Stufen"]];
+const TABS = [["reports", "Meldungen"], ["items", "Wortfilter-Funde"], ["filter", "Wortfilter"], ["people", "Personen"], ["levels", "Stufen"], ["images", "Bildprüfung"]];
 const SANCTION_ACTIONS = [["notice", "Hinweis"], ["warning", "Verwarnung mit Chat-Sperre"], ["suspension", "Sperre bis zur Entscheidung"]];
 const SANCTION_STATUS = { active: "läuft", lifted: "aufgehoben", expired: "abgelaufen", superseded: "durch höhere Stufe ersetzt" };
 const ACTION_LABEL = { hold: "zurückhalten", flag: "nur markieren" };
@@ -41,6 +42,7 @@ export default function AdminModerationPage() {
       {tab === "filter" && <WordFilterTab />}
       {tab === "people" && <PeopleTab />}
       {tab === "levels" && <LevelsTab />}
+      {tab === "images" && <ImageScanTab />}
     </AdminLayout>
   );
 }

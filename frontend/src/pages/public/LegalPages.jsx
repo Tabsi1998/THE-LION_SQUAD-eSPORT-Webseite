@@ -3,7 +3,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
-import { analyticsText, emailProviderText, hostingText, normalizeFacts, privacySections } from "@/lib/privacyFacts";
+import { analyticsText, emailProviderText, hostingText, mediaScanText, normalizeFacts, privacySections } from "@/lib/privacyFacts";
 
 function formatLegalDate(value) {
   if (!value) return "";
@@ -399,6 +399,19 @@ export function PrivacyPage() {
           trennen; sie ist Teil des Datenexports und wird bei der Anonymisierung gelöscht.
         </p>
       </Section>
+
+      {shows("media_scan") && (
+        <Section title="Automatische Bildprüfung">
+          <p data-testid="privacy-media-scan">
+            Bilder, die Nutzer hochladen (Chat-Anhänge, Profil- und Teambilder), werden automatisch auf
+            Nacktheit und Gewalt geprüft, bevor oder kurz nachdem sie sichtbar werden.{" "}
+            {mediaScanText(facts.media_scan.provider)} Auffällige Bilder sieht nur die Moderation des
+            Vereins; entfernte Originale werden nach einer Aufbewahrungsfrist endgültig gelöscht. Grundlage
+            sind unser berechtigtes Interesse an einer sicheren Community und der Jugendschutz (Art. 6 Abs. 1
+            lit. f DSGVO); gegen eine Entscheidung kann man sich bei der Moderation melden.
+          </p>
+        </Section>
+      )}
 
       {shows("dolibarr") && (
         <Section title="Mitgliederverwaltung">

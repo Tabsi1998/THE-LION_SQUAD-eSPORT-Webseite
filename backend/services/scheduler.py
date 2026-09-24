@@ -316,6 +316,27 @@ async def _safe_chat_attachment_cleanup():
         _log_task_failure("chat_attachment_cleanup", exc)
 
 
+async def _safe_media_scan():
+    try:
+        from services.media_scan import process_pending
+        result = await process_pending(limit=10)
+        if result.get("processed"):
+            logger.info(f"[scheduler] media_scan processed={result['processed']}")
+    except Exception as exc:
+        _log_task_failure("media_scan", exc)
+
+
+async def _safe_media_scan_purge():
+    try:
+        from database import get_db
+        from services.media_scan import purge_quarantine
+        removed = await purge_quarantine(get_db())
+        if removed:
+            logger.info(f"[scheduler] media_scan_purge removed={removed}")
+    except Exception as exc:
+        _log_task_failure("media_scan_purge", exc)
+
+
 async def _safe_ops_checks():
     """Auto-Checks für den Betrieb (#265): Ampel speichern, rote Checks melden."""
     try:
@@ -509,6 +530,11 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("chat_attachment_cleanup", _safe_chat_attachment_cleanup), IntervalTrigger(hours=1), id="chat_attachment_cleanup",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("ops_checks", _safe_ops_checks), IntervalTrigger(minutes=5), id="ops_checks",
+                  max_instances=1, coalesce=True)
+    # Bildprüfung (#415): Sammler für alles, was die sofortige Prüfung nach dem Upload nicht erwischt hat.
+    sched.add_job(_single_replica("media_scan", _safe_media_scan, lease_seconds=120.0), IntervalTrigger(seconds=20), id="media_scan",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("media_scan_purge", _safe_media_scan_purge, lease_seconds=300.0), IntervalTrigger(hours=24), id="media_scan_purge",
                   max_instances=1, coalesce=True)
     sched.start()
     _scheduler = sched

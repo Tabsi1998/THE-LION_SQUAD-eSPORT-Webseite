@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from typing import Literal
 
@@ -10,7 +10,7 @@ from auth import get_current_user, require_role, require_area
 from database import get_db
 from models import new_id, now_utc
 from services.rate_limit import enforce_rate_limit
-from services import moderation_standing, word_filter
+from services import media_scan, moderation_standing, word_filter
 
 router = APIRouter(prefix="/api/moderation", tags=["moderation"])
 
@@ -403,3 +403,71 @@ async def my_appeal(body: AppealBody, request: Request, me: dict = Depends(get_c
     await enforce_rate_limit(request, "moderation:appeal", limit=5, window_seconds=86400, subject=me["id"])
     await moderation_standing.submit_appeal(get_db(), me["id"], body.sanction_id, body.message)
     return {"ok": True, "standing": await moderation_standing.standing_for(get_db(), me["id"])}
+
+
+# ---------- Bildprüfung (#415) ----------
+# Anbieter, Schwellen und Schalter; die Warteschlange mit Vorschau (nur hier sichtbar); Freigeben oder
+# Entfernen durch einen Menschen - alles im Audit-Log.
+
+class MediaScanSettingsBody(BaseModel):
+    provider: str | None = None
+    review_threshold: float | None = None
+    block_threshold: float | None = None
+    strike_on_block: bool | None = None
+    retention_days: int | None = None
+    google_api_key: str | None = None
+    clear_google_api_key: bool | None = None
+
+
+class MediaScanDecision(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+@router.get("/media-scan/settings")
+async def media_scan_settings(me: dict = Depends(require_area("moderation"))):
+    return await media_scan.load_settings(get_db())
+
+
+@router.put("/media-scan/settings")
+async def update_media_scan_settings(body: MediaScanSettingsBody, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    saved = await media_scan.save_settings(db, body.model_dump(exclude_unset=True))
+    await _audit(me["id"], "media_scan.settings", None, {k: v for k, v in saved.items() if k != "google_api_key_masked"})
+    return saved
+
+
+@router.get("/media-scan/status")
+async def media_scan_status(me: dict = Depends(require_area("moderation"))):
+    return await media_scan.status(get_db())
+
+
+@router.get("/media-scan/queue")
+async def media_scan_queue(state: str = "review", limit: int = 100, me: dict = Depends(require_area("moderation"))):
+    if state not in ("all", *media_scan.STATES):
+        raise HTTPException(400, "Unbekannter Stand.")
+    return await media_scan.queue(get_db(), state=state, limit=limit)
+
+
+@router.get("/media-scan/{scan_id}/preview")
+async def media_scan_preview(scan_id: str, me: dict = Depends(require_area("moderation"))):
+    doc = await media_scan.get_scan(get_db(), scan_id)
+    path = media_scan.preview_path(doc)
+    if path is None:
+        raise HTTPException(404, "Kein Bild mehr vorhanden (Aufbewahrung abgelaufen).")
+    return FileResponse(path, headers={"X-Content-Type-Options": "nosniff", "Content-Disposition": "inline", "Cache-Control": "private, no-store"})
+
+
+@router.post("/media-scan/{scan_id}/approve")
+async def media_scan_approve(scan_id: str, body: MediaScanDecision | None = None, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    doc = await media_scan.approve(db, scan_id, moderator_id=me["id"], note=body.note if body else None)
+    await _audit(me["id"], "media_scan.approved", scan_id, {"kind": doc.get("kind"), "owner_id": doc.get("owner_id"), "note": doc.get("note")})
+    return doc
+
+
+@router.post("/media-scan/{scan_id}/remove")
+async def media_scan_remove(scan_id: str, body: MediaScanDecision | None = None, me: dict = Depends(require_area("moderation"))):
+    db = get_db()
+    doc = await media_scan.remove(db, scan_id, moderator_id=me["id"], note=body.note if body else None)
+    await _audit(me["id"], "media_scan.removed", scan_id, {"kind": doc.get("kind"), "owner_id": doc.get("owner_id"), "note": doc.get("note")})
+    return doc

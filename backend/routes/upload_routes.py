@@ -566,9 +566,10 @@ async def _upload_image_impl(
     # Abruf von der Platte liefert (#232).
     schedule_variants(path)
     url = f"/api/static/uploads/{filename}"
+    upload_id = new_id()
     try:
         await get_db().media_uploads.insert_one({
-            "id": new_id(),
+            "id": upload_id,
             "filename": filename,
             "url": url,
             "size": len(data),
@@ -589,6 +590,13 @@ async def _upload_image_impl(
         })
     except Exception as exc:
         logger.warning("[uploads] media metadata write failed for %s: %s", filename, exc)
+    # Bildprüfung (#415): im Hintergrund; ein entferntes Bild verliert Avatar-, Banner- und Teamlogo-Verweise.
+    try:
+        from services import media_scan
+
+        await media_scan.enqueue(get_db(), kind="upload", ref_id=upload_id, owner_id=me.get("id"), path=path, url=url, context={"media_scope": media_scope})
+    except Exception as exc:  # noqa: BLE001 - der Upload gilt; der Sammler holt die Prüfung nach
+        logger.warning("[uploads] Bildprüfung für %s nicht angestoßen: %s", filename, exc)
     return {
         "url": url,
         "filename": filename,

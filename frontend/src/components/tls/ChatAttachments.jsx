@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Film, Loader2, Paperclip, X } from "lucide-react";
+import { Film, ImageOff, Loader2, Paperclip, X } from "lucide-react";
 import { api } from "@/lib/api";
 import {
   CHAT_ATTACHMENT_ACCEPT,
@@ -187,6 +187,40 @@ export function ChatAttachmentDrafts({ drafts, onRemove }) {
   );
 }
 
+// Bildprüfung (#415): ein entferntes Bild ist ein Platzhalter; ein noch ungeprüftes lädt nur beim
+// Absender - alle anderen bekommen vom Server 404 und sehen „wird geprüft“.
+function ScanPlaceholder({ item, text }) {
+  return (
+    <div className="flex h-24 items-center justify-center gap-2 rounded-sm border border-dashed border-white/15 bg-white/[0.03] px-3 text-center text-[11px] text-white/45" data-testid={`chat-attachment-${item.scan_state}-${item.id}`}>
+      <ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" /> {text}
+    </div>
+  );
+}
+
+function ScanAwareImage({ item }) {
+  const [failed, setFailed] = useState(false);
+  const state = item.scan_state || "safe";
+  if (state === "blocked") return <ScanPlaceholder item={item} text="Bild entfernt – Moderation" />;
+  if (failed && (state === "pending" || state === "review")) {
+    return <ScanPlaceholder item={item} text={state === "review" ? "Bild wird von der Moderation geprüft" : "Bild wird geprüft"} />;
+  }
+  return (
+    <a href={chatAttachmentSrc(item.url)} target="_blank" rel="noopener noreferrer" className="block">
+      <img
+        src={chatAttachmentSrc(item.url, 400)}
+        srcSet={`${chatAttachmentSrc(item.url, 400)} 400w, ${chatAttachmentSrc(item.url, 800)} 800w`}
+        sizes="(max-width: 640px) 70vw, 320px"
+        loading="lazy"
+        alt="Bild im Chat"
+        width={item.width || undefined}
+        height={item.height || undefined}
+        onError={() => setFailed(true)}
+        className="h-auto max-h-72 w-full rounded-sm border border-white/10 object-cover"
+      />
+    </a>
+  );
+}
+
 export function ChatMessageAttachments({ attachments }) {
   const items = Array.isArray(attachments) ? attachments : [];
   if (!items.length) return null;
@@ -206,18 +240,7 @@ export function ChatMessageAttachments({ attachments }) {
           className="max-h-72 w-full rounded-sm border border-white/10 bg-black"
         />
       ) : (
-        <a key={item.id} href={chatAttachmentSrc(item.url)} target="_blank" rel="noopener noreferrer" className="block">
-          <img
-            src={chatAttachmentSrc(item.url, 400)}
-            srcSet={`${chatAttachmentSrc(item.url, 400)} 400w, ${chatAttachmentSrc(item.url, 800)} 800w`}
-            sizes="(max-width: 640px) 70vw, 320px"
-            loading="lazy"
-            alt="Bild im Chat"
-            width={item.width || undefined}
-            height={item.height || undefined}
-            className="h-auto max-h-72 w-full rounded-sm border border-white/10 object-cover"
-          />
-        </a>
+        <ScanAwareImage key={item.id} item={item} />
       )))}
     </div>
   );
