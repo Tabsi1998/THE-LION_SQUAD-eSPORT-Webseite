@@ -158,17 +158,24 @@ test("Austritt: erst die Rückfrage, dann die Erklärung; geplant heißt nur noc
   expect(screen.getByText("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026 (Eingang 24.09.2026).")).toBeTruthy();
 });
 
-test("Mein Website-Profil (#260): nur Geändertes geht raus, der Sichtbarkeitssatz steht dabei", async () => {
-  const website = { available: true, consent: "profil", given: true, gamertag: "LionKing", bio: "", games: ["TFT"], platforms: [] };
+test("Mein Website-Profil (#260, Vereine 1.2): Felder des Vereins, nur Geändertes geht raus", async () => {
+  const fields = [
+    { code: "gamertag", label: "Gamertag", type: "text", editable: true, value: "LionKing", max_length: 40 },
+    { code: "hauptspiel", label: "Hauptspiel", type: "select", editable: true, value: "tft", options: [{ code: "tft", label: "TFT" }, { code: "rl", label: "Rocket League" }] },
+    { code: "dabei_seit", label: "Dabei seit", type: "date", editable: false, value: "2023-01-01" },
+  ];
+  const website = { available: true, consent: "profil", given: true, fields };
   mockAkte({ available: true, status: "bound", capabilities: ["documents", "profile"] }, null, website);
-  mockPut.mockResolvedValue({ data: { ...website, games: ["TFT", "Rocket League"] } });
+  mockPut.mockResolvedValue({ data: website });
   const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("membership-website")).toBeTruthy());
   expect(screen.getByTestId("membership-website-state")).toHaveTextContent(/zeigt dieses Profil/);
-  await fireEvent.changeText(screen.getByTestId("membership-website-games"), "TFT, Rocket League");
+  expect(screen.getByTestId("membership-website-dabei_seit")).toHaveTextContent("2023-01-01");
+  await fireEvent.changeText(screen.getByTestId("membership-website-gamertag"), "LionQueen");
+  await fireEvent.press(screen.getByTestId("membership-website-hauptspiel-rl"));
   await fireEvent.press(screen.getByTestId("membership-website-save"));
-  await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/membership/me/website-profile", { games: "TFT, Rocket League" }));
+  await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/membership/me/website-profile", { fields: { gamertag: "LionQueen", hauptspiel: "rl" } }));
   expect(alert).toHaveBeenCalledWith("Gespeichert", expect.any(String));
   alert.mockRestore();
 });

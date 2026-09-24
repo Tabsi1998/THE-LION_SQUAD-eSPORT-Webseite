@@ -281,7 +281,7 @@ function ProfileModal({ entry, users = [], onClose, onSaved }) {
         {/* Profil aus Dolibarr (#496): was dort gepflegt ist, setzt der Abgleich hier wieder - der Vorstand soll das sehen, bevor er tippt. */}
         {entry.profile?.dolibarr_profile_at && (
           <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2 text-xs text-white/60 rounded-sm" data-testid="club-member-dolibarr-hint">
-            Gamertag, Biografie, Games, Plattformen und Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {new Date(entry.profile.dolibarr_profile_at).toLocaleString("de-DE")}).
+            Die zugeordneten Felder des Website-Profils (Dolibarr → Verbindung → Feldzuordnung) und das Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {new Date(entry.profile.dolibarr_profile_at).toLocaleString("de-DE")}).
             Was dort gepflegt ist, setzt der nächste Abgleich hier wieder; leere Felder in Dolibarr lassen deine Eingaben stehen. Vor- und Nachname sowie Realname bleiben deine Sache.
           </div>
         )}

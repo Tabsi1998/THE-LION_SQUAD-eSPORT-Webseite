@@ -262,6 +262,23 @@ class FakeDolibarr:
         if subject in self.identities:
             self.identities[subject]["revoked"] = True
 
+    def _website_fields(self, member_id: int) -> list[dict]:
+        """Die Felder des Website-Profils (Vereine 1.2). Alt gespeicherte Werte (gamertag/bio/games/platforms) erscheinen
+        wie nach dem Update des Moduls: Textfelder mit denselben Codes, Listen als „a, b“."""
+        stored = self.member_profiles.get(member_id) or {}
+        if isinstance(stored.get("fields"), list):
+            return [dict(f) for f in stored["fields"]]
+        legacy = [("gamertag", "Gamertag", "text", 40), ("bio", "Kurztext", "textarea", 2000), ("games", "Spiele", "text", 255), ("platforms", "Plattformen", "text", 255)]
+        fields = []
+        for code, label, kind, limit in legacy:
+            if code not in stored:
+                continue
+            value = stored.get(code)
+            if isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            fields.append({"code": code, "label": label, "type": kind, "editable": False, "value": str(value).strip() or None if value is not None else None, "max_length": limit})
+        return fields
+
     def _identity(self, params: dict, capability: str | None = None) -> dict | None:
         ident = self.identities.get(str(params.get("subject") or ""))
         if not ident or ident.get("revoked"):
@@ -589,8 +606,7 @@ class FakeDolibarr:
                     "sha256": hashlib.sha256(photo_bytes).hexdigest(), "content": base64.b64encode(photo_bytes).decode()})
             payload = {"consent": code, "given": given}
             if given:
-                payload.update({"gamertag": stored.get("gamertag") or "", "bio": stored.get("bio") or "", "games": list(stored.get("games") or []),
-                                "platforms": list(stored.get("platforms") or []),
+                payload.update({"fields": self._website_fields(member_id),
                                 "photo": {"sha256": hashlib.sha256(photo_bytes).hexdigest(), "size": len(photo_bytes), "content_type": stored.get("photo_type") or "image/png",
                                           "updated_at": "2026-09-25T10:00:00Z"} if photo_bytes else None})
             return self._json("/vereine/members/{id}/profile", payload)
@@ -658,25 +674,35 @@ class FakeDolibarr:
             if ident is None:
                 return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
             member_id = ident["member_id"]
-            stored = self.member_profiles.setdefault(member_id, {})
+            fields = self._website_fields(member_id)
             if request.method == "PUT":
                 body = json.loads(request.content.decode("utf-8"))
                 validate(body, request_schema("/vereine/me/website-profile", "put"))
-                limits = {"gamertag": 40, "bio": 2000, "games": 255, "platforms": 255}
-                for key, value in body.items():
-                    if key in ("games", "platforms"):
-                        items = value if isinstance(value, list) else [v.strip() for v in re.split(r"[,;\n]+", str(value)) if v.strip()]
-                        if len(", ".join(items)) > limits[key]:
-                            return httpx.Response(400, json={"error": {"code": 400, "message": f"{key} may have at most {limits[key]} characters"}})
-                        stored[key] = items
-                    else:
-                        if len(str(value)) > limits[key]:
-                            return httpx.Response(400, json={"error": {"code": 400, "message": f"{key} may have at most {limits[key]} characters"}})
-                        stored[key] = str(value).strip()
+                by_code = {f["code"]: f for f in fields}
+                for code, value in body["fields"].items():
+                    field = by_code.get(code)
+                    if field is None:
+                        return httpx.Response(400, json={"error": {"code": 400, "message": "Unknown field", "field": code}})
+                    if not field.get("editable"):
+                        return httpx.Response(400, json={"error": {"code": 400, "message": "Field is not editable", "field": code}})
+                    if value in (None, "", []):
+                        field["value"] = None
+                        continue
+                    kind = field.get("type", "text")
+                    codes = [o["code"] for o in field.get("options") or []]
+                    if kind in ("text", "textarea") and field.get("max_length") and len(str(value)) > field["max_length"]:
+                        return httpx.Response(400, json={"error": {"code": 400, "message": f"At most {field['max_length']} characters", "field": code}})
+                    if kind == "select" and value not in codes:
+                        return httpx.Response(400, json={"error": {"code": 400, "message": "Not an option", "field": code}})
+                    if kind == "multi" and (not isinstance(value, list) or any(v not in codes for v in value)):
+                        return httpx.Response(400, json={"error": {"code": 400, "message": "Not an option", "field": code}})
+                    if kind == "date" and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(value)):
+                        return httpx.Response(400, json={"error": {"code": 400, "message": "Not a day", "field": code}})
+                    field["value"] = str(value).strip() if kind in ("text", "textarea", "select", "date") else value
+                self.member_profiles.setdefault(member_id, {})["fields"] = fields
             code = self.website_profile_consent
             given = bool(code) and (self.member_consents.get(member_id, {}).get(code) or {}).get("state") == "given"
-            return self._json("/vereine/me/website-profile", {"consent": code, "given": given, "gamertag": stored.get("gamertag") or "", "bio": stored.get("bio") or "",
-                                                              "games": list(stored.get("games") or []), "platforms": list(stored.get("platforms") or [])})
+            return self._json("/vereine/me/website-profile", {"consent": code, "given": given, "fields": fields})
         if path == "/vereine/me/profile" and request.method == "GET":
             ident = self._identity(params, "profile")
             if ident is None:

@@ -1,4 +1,4 @@
-import { changedFields, exitLine, selfRequestLine, validWishedDay, websiteFieldText, websiteStateLine } from "./selfService";
+import { changedFields, changedWebsiteFields, exitLine, selfRequestLine, validWishedDay, websiteFieldText, websiteStateLine } from "./selfService";
 
 // Vereinsakte in der App (#324/#329): nur Geändertes geht raus, Sätze wie im Web.
 
@@ -21,10 +21,15 @@ test("Wunschdatum nur als JJJJ-MM-TT", () => {
   expect(validWishedDay("31.12.2026")).toBe(false);
 });
 
-test("Website-Profil (#260): Feldtext und Sichtbarkeitssatz", () => {
-  expect(websiteFieldText({ games: ["TFT", "F1 25"] }, "games")).toBe("TFT, F1 25");
-  expect(websiteFieldText({ gamertag: "LionKing" }, "gamertag")).toBe("LionKing");
+test("Website-Profil (#260, Vereine 1.2): Feldtext, Sichtbarkeitssatz, nur Geändertes", () => {
+  const select = { code: "hauptspiel", label: "Hauptspiel", type: "select" as const, editable: true, value: "rl", options: [{ code: "tft", label: "TFT" }, { code: "rl", label: "Rocket League" }] };
+  expect(websiteFieldText(select)).toBe("Rocket League");
+  expect(websiteFieldText({ ...select, type: "multi", value: ["tft", "rl"] })).toBe("TFT, Rocket League");
+  expect(websiteFieldText({ code: "s", label: "S", type: "boolean", editable: true, value: false })).toBe("Nein");
+  expect(websiteFieldText({ code: "g", label: "G", type: "text", editable: true, value: null })).toBe("");
   expect(websiteStateLine({ consent: "", given: false })).toMatch(/keine Einwilligung/);
   expect(websiteStateLine({ consent: "profil", given: false })).toMatch(/erst, wenn du/);
   expect(websiteStateLine({ consent: "profil", given: true })).toMatch(/zeigt dieses Profil/);
+  const profile = { fields: [select, { code: "dabei", label: "Dabei", type: "date" as const, editable: false, value: "2023-01-01" }, { code: "g", label: "G", type: "text" as const, editable: true, value: "a" }] };
+  expect(changedWebsiteFields(profile, { hauptspiel: "rl", dabei: "2024-01-01", g: "b" })).toEqual({ g: "b" });
 });

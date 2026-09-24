@@ -520,6 +520,30 @@ export default function AdminDolibarrPage() {
                 </select>
                 {!consentTexts.length && <div className="text-xs text-[#FFD700] mt-1">Keine Einwilligungstexte gelesen – im Modul unter Einrichtung → Vereine → Einwilligungen anlegen (z. B. „Nennung im Mitgliederverzeichnis“).</div>}
               </div>
+              {/* Website-Profil aus Zusatzfeldern (Vereine 1.2): welcher Feldcode in welche Spalte des Verzeichnisses läuft; der Rest steht als „Weitere Angaben“. */}
+              <div className="mt-4 border-t border-white/10 pt-4 text-sm" data-testid="dolibarr-directory-fields">
+                <div className="font-bold">Felder des Website-Profils → Spalten des Verzeichnisses</div>
+                <div className="text-xs text-white/45 mt-1 max-w-2xl">Das Modul (ab Vereine 1.2) liefert die Zusatzfelder, die der Verein fürs Website-Profil gewählt hat. Hier legst du fest, welches Feld als Gamertag, Kurztext, Spiele und Plattformen erscheint – alle anderen Felder stehen auf dem Profil unter „Weitere Angaben“.</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 max-w-2xl">
+                  {[["gamertag", "Gamertag"], ["bio", "Kurztext"], ["games", "Spiele"], ["platforms", "Plattformen"]].map(([column, label]) => {
+                    const current = status?.directory_field_map?.[column] ?? column;
+                    const known = status?.website_profile_fields || [];
+                    return (
+                      <label key={column} className="text-xs">
+                        <span className="block text-white/60 mb-1">{label}</span>
+                        <select value={current} disabled={!!busy} data-testid={`dolibarr-directory-field-${column}`}
+                          onChange={(e) => saveSettings({ directory_field_map: { [column]: e.target.value } }, "Zuordnung gespeichert – gilt ab dem nächsten Abgleich.")}
+                          className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50">
+                          <option value="">– nicht übernehmen –</option>
+                          {known.map((field) => <option key={field.code} value={field.code}>{field.label} ({field.code})</option>)}
+                          {current && !known.some((field) => field.code === current) && <option value={current}>{current}</option>}
+                        </select>
+                      </label>
+                    );
+                  })}
+                </div>
+                {!(status?.website_profile_fields || []).length && <div className="text-xs text-white/40 mt-1">Noch keine Felder aus dem Modul gelesen – sie erscheinen nach dem nächsten Abgleich (Vereine ab 1.2).</div>}
+              </div>
               {/* Beitrittsanträge nach Dolibarr (#328): nur im Modus Live wirksam; aus = Antrag und Entscheidung bleiben auf der Website. */}
               <div className="mt-4 flex items-start gap-3 text-sm">
                 <input type="checkbox" id="dolibarr-applications" checked={!!status?.applications_enabled} disabled={!!busy} onChange={(e) => saveSettings({ applications_enabled: e.target.checked }, e.target.checked ? "Beitrittsanträge gehen nach Dolibarr." : "Beitrittsanträge bleiben auf der Website.")} className="mt-1 accent-[#29B6E8]" data-testid="dolibarr-applications-enabled" />
