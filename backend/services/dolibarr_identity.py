@@ -16,7 +16,8 @@ E-Mail, Mitgliedsnummer oder eine bestätigte Zuordnung der Website gelten dem M
 Nachweis; deshalb ersetzt nichts davon den Code.
 
 Dokumente aus der Akte erscheinen in der gemeinsamen Liste ``GET /api/documents`` mit der Kennung
-``dolibarr-<document_id>`` und ``source: dolibarr``; ihr PDF kommt über denselben Weg
+``dolibarr-<document_id>`` und ``source: dolibarr`` - die Statutenfassungen (``me/statutes`` mit
+Bindung, sonst die öffentlichen) als ``dolibarr-statute-<id>`` unter „Statuten“; ihr PDF kommt über denselben Weg
 ``/api/documents/<id>/view`` - Web und App brauchen dafür keinen zweiten Betrachter. Die Bytes
 müssen zur Prüfsumme passen, die das Modul mitschickt; sonst gibt es die Datei nicht.
 """
@@ -35,6 +36,8 @@ logger = logging.getLogger("tls.dolibarr.identity")
 
 COLLECTION = "dolibarr_identities"
 DOC_PREFIX = "dolibarr-"
+STATUTE_PREFIX = "dolibarr-statute-"
+STATUTE_STATE_LABELS = {"in_force": "gilt", "future": "gilt ab", "repealed": "aufgehoben", "ambiguous": "Geltung unklar"}
 LIST_TTL_SECONDS = 60.0
 # Welche Dokumentart der Akte welcher Kategorie der Website entspricht (Web und App kennen die Kürzel).
 KIND_CATEGORY = {"statute": "statutes", "minutes": "minutes", "resolution": "resolution", "audit_report": "audit_report",
@@ -159,8 +162,56 @@ def document_view(row: dict) -> dict:
 
 
 def parse_doc_id(doc_id: str) -> int | None:
-    rest = str(doc_id or "")[len(DOC_PREFIX):] if str(doc_id or "").startswith(DOC_PREFIX) else ""
+    """`dolibarr-12` → 12; Statutenfassungen (`dolibarr-statute-3`) gehören zu `parse_statute_id`."""
+    value = str(doc_id or "")
+    if value.startswith(STATUTE_PREFIX) or not value.startswith(DOC_PREFIX):
+        return None
+    rest = value[len(DOC_PREFIX):]
     return int(rest) if rest.isdigit() else None
+
+
+def parse_statute_id(doc_id: str) -> int | None:
+    value = str(doc_id or "")
+    rest = value[len(STATUTE_PREFIX):] if value.startswith(STATUTE_PREFIX) else ""
+    return int(rest) if rest.isdigit() else None
+
+
+def _day(value) -> str:
+    text = str(value or "")
+    return f"{text[8:10]}.{text[5:7]}.{text[0:4]}" if len(text) >= 10 else text
+
+
+def statute_view(row: dict) -> dict:
+    """Eine Statutenfassung in der Form der Vereinsdokumente (Kategorie „Statuten“, geltende Fassung angepinnt)."""
+    doc_id = f"{STATUTE_PREFIX}{int(row['id'])}"
+    state = str(row.get("state") or "")
+    label = STATUTE_STATE_LABELS.get(state, state)
+    if state == "future":
+        label = f"gilt ab {_day(row.get('valid_from'))}"
+    elif state == "repealed":
+        label = f"galt {_day(row.get('valid_from'))} bis {_day(row.get('valid_to'))}"
+    elif state == "in_force":
+        label = f"gilt seit {_day(row.get('valid_from'))}"
+    return {
+        "id": doc_id, "source": "dolibarr", "title": f"Statuten – Fassung {row.get('version')}", "description": f"{label} · beschlossen am {_day(row.get('decided_on'))}",
+        "category": "statutes", "kind": "statute", "what": row.get("source"), "audience": "members", "personal": False, "revision": row.get("version"),
+        "statute_state": state, "visibility": "members", "original_filename": f"Statuten-Fassung-{row.get('version')}.pdf", "mime": "application/pdf",
+        "file_size": row.get("size"), "pinned": state == "in_force", "allow_download": True,
+        "view_url": f"/api/documents/{doc_id}/view", "download_url": f"/api/documents/{doc_id}/download",
+        "created_at": row.get("decided_on"), "updated_at": row.get("valid_from"),
+    }
+
+
+async def _statutes_rows(client: DolibarrClient, binding: dict | None, bound: bool) -> list[dict]:
+    """Die Fassungen, die die Person sehen darf: mit Bindung die für Mitglieder freigegebenen, sonst die öffentlichen."""
+    try:
+        data = await client.my_statutes(binding["subject"]) if bound else await client.statutes()
+    except DolibarrError as exc:
+        logger.warning("[dolibarr] Statuten nicht lesbar: %s", exc.kind)
+        return []
+    if not isinstance(data, dict) or data.get("state") == "not_published":
+        return []
+    return [row for row in data.get("versions") or [] if isinstance(row, dict) and row.get("id")]
 
 
 async def documents_for(db, user: dict) -> list[dict]:
@@ -188,6 +239,7 @@ async def documents_for(db, user: dict) -> list[dict]:
         logger.warning("[dolibarr] Dokumente nicht lesbar: %s", exc.kind)
         return []
     docs = [document_view(row) for row in rows if isinstance(row, dict) and row.get("document_id")]
+    docs.extend(statute_view(row) for row in await _statutes_rows(client, binding, bound))
     _LIST_CACHE[key] = (time.monotonic(), docs)
     return [dict(doc) for doc in docs]
 
@@ -203,6 +255,31 @@ async def document_pdf(db, user: dict, document_id: int) -> tuple[bytes, dict]:
     client = DolibarrClient(settings)
     try:
         data = await client.my_document_pdf(binding["subject"], document_id) if bound else await client.public_document_pdf(document_id)
+    except DolibarrError as exc:
+        if bound and exc.kind == "forbidden":
+            await mark_revoked(db, binding)
+        raise
+    expected = str(data.get("sha256") or "")
+    try:
+        content = base64.b64decode(str(data.get("content") or ""), validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise DolibarrError("invalid_response", 200) from exc
+    if not content or not expected or hashlib.sha256(content).hexdigest() != expected:
+        raise DolibarrError("invalid_response", 200)
+    return content, data
+
+
+async def statute_pdf(db, user: dict, version_id: int) -> tuple[bytes, dict]:
+    """Das PDF einer Statutenfassung: mit Bindung über die Person, sonst die öffentliche Freigabe; Bytes gegen
+    die mitgeschickte Prüfsumme geprüft."""
+    settings = await load_settings(db)
+    if settings.get("mode") != "live":
+        raise DolibarrError("not_configured")
+    binding = await binding_for(db, settings, user["id"])
+    bound = bool(binding and binding.get("status") == "bound")
+    client = DolibarrClient(settings)
+    try:
+        data = await client.my_statute_pdf(binding["subject"], version_id) if bound else await client.statute_pdf(version_id)
     except DolibarrError as exc:
         if bound and exc.kind == "forbidden":
             await mark_revoked(db, binding)

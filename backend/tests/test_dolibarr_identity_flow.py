@@ -10,7 +10,7 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, document_pdf_bytes, member  # noqa: E402
+from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, document_pdf_bytes, member, statute_pdf_bytes  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from services import dolibarr_client, dolibarr_identity  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
@@ -48,6 +48,7 @@ def publish_examples(fake):
     fake.publish(2, title="Protokoll Generalversammlung 2026", kind="minutes", audience="members")
     fake.publish(3, title="Beitrittsbestätigung Paula", kind="letter", audience="person", member_id=12)
     fake.publish(4, title="Beitrittsbestätigung Max", kind="letter", audience="person", member_id=13)
+    fake.statutes_public = False  # die Statutenfassungen prüft ein eigener Test
 
 
 async def club_member(flow, name):
@@ -141,3 +142,39 @@ async def test_without_the_right_or_without_live_mode_the_code_cannot_be_used(fl
     assert (await flow.get("/api/membership/me/identity")).json() == {"available": False, "status": "none", "capabilities": []}
     assert (await flow.post("/api/membership/me/identity", json={"code": "LION-1234"})).status_code == 409
     assert (await flow.get("/api/documents")).json() == []
+
+
+@pytest.mark.asyncio
+async def test_statute_versions_join_the_documents_for_members_and_bound_people(flow, fake):
+    """Statuten-Archiv (#324 Rest): die Fassungen stehen unter „Statuten“ in den Vereinsdokumenten - öffentliche für
+    jedes Mitglied, nur für Mitglieder freigegebene über die Bindung; das PDF kommt über denselben Öffnen-Weg."""
+    await connect(flow)
+    publish_examples(fake)
+    fake.statutes_public = True
+    paula = await club_member(flow, "paula")
+    flow.act_as(paula)
+
+    # Öffentlich freigegeben: auch ohne Bindung dabei, die geltende Fassung angepinnt.
+    docs = (await flow.get("/api/documents")).json()
+    statutes = [d for d in docs if d["id"].startswith("dolibarr-statute-")]
+    assert [d["id"] for d in statutes] == ["dolibarr-statute-5", "dolibarr-statute-3", "dolibarr-statute-1"]
+    current = next(d for d in statutes if d["id"] == "dolibarr-statute-3")
+    assert current["title"] == "Statuten – Fassung 2" and current["pinned"] is True and current["statute_state"] == "in_force"
+    assert current["description"] == "gilt seit 20.04.2026 · beschlossen am 14.03.2026" and current["view_url"] == "/api/documents/dolibarr-statute-3/view"
+    assert next(d for d in statutes if d["id"] == "dolibarr-statute-1")["description"].startswith("galt 01.03.2019 bis 19.04.2026")
+    pdf = await flow.get("/api/documents/dolibarr-statute-3/view")
+    assert pdf.status_code == 200 and pdf.content == statute_pdf_bytes(3) and "Statuten-2.pdf" in pdf.headers["content-disposition"]
+    assert [d["id"] for d in (await flow.get("/api/documents?category=statutes")).json()] == ["dolibarr-1", "dolibarr-statute-5", "dolibarr-statute-3", "dolibarr-statute-1"], "das Dokument „Statuten 2026“ zählt zur Kategorie mit"
+
+    # Nur für Mitglieder freigegeben: ohne Bindung nichts, mit Bindung alles.
+    fake.statutes_public = False
+    fake.statutes_members = True
+    dolibarr_identity.reset_cache()
+    assert [d for d in (await flow.get("/api/documents")).json() if d["id"].startswith("dolibarr-statute-")] == []
+    assert (await flow.get("/api/documents/dolibarr-statute-3/view")).status_code == 404
+    assert (await flow.post("/api/membership/me/identity", json={"code": "LION-1234"})).json()["status"] == "bound"
+    assert [d["id"] for d in (await flow.get("/api/documents")).json() if d["id"].startswith("dolibarr-statute-")] == ["dolibarr-statute-5", "dolibarr-statute-3", "dolibarr-statute-1"]
+    assert (await flow.get("/api/documents/dolibarr-statute-3/download")).content == statute_pdf_bytes(3)
+    fake.tampered_pdf_ids.add(5)
+    assert (await flow.get("/api/documents/dolibarr-statute-5/view")).status_code == 502
+    assert (await flow.get("/api/documents/dolibarr-statute-99/view")).status_code == 404

@@ -16,6 +16,11 @@ die vertretungsbefugte Person, wie sie von Hand eingetragen ist; nie aus anderen
 rekonstruieren. Vorstandsnamen aus einem Stand, der älter ist als ``NAME_MAX_AGE_HOURS``, werden
 zurückgehalten, damit ein Widerruf zeitnah wirkt.
 
+Kanäle (Teil 4): ``organization.channels`` sind die öffentlichen Kanäle des Vereins, wie er sie im
+Modul unter *Einrichtung > Vereine > Kanäle und Konten* pflegt (Twitch, YouTube, Discord …, in seiner
+Reihenfolge). Mit dem Schalter ``channels_from_dolibarr`` nimmt der Footer sie statt der Liste von Hand
+(``channels_public``) - stehen dort keine, bleibt die Liste von Hand.
+
 Statuten (Teil 3): ``/vereine/statutes`` liefert die beschlossenen Fassungen mit Stand (geltend,
 künftig, aufgehoben) - nur, wenn der Verein sie im Modul für die Öffentlichkeit freigibt, und nie den
 Entwurf. Die Website hält sie im selben Stand (``statutes``), zeigt sie mit demselben Schalter auf der
@@ -42,6 +47,9 @@ REPRESENTATIVE_CODES = ("obmann", "obfrau", "praesident", "vorsitz")
 # Felder, die der Schalter aus Dolibarr übernimmt - alles andere bleibt von Hand.
 OVERLAY_FIELDS = ("legal_name", "zvr_number", "register_authority", "street_address", "postal_code", "city", "country", "phone",
                   "representative_name", "representative_role")
+# Netzwerk-Kürzel aus Dolibarrs Wörterbuch → Plattform-Schlüssel der Website (Symbole in `lib/socialIcons.js`).
+CHANNEL_PLATFORMS = {"twitter": "x", "x": "x", "youtube": "youtube", "twitch": "twitch", "discord": "discord", "instagram": "instagram",
+                     "tiktok": "tiktok", "facebook": "facebook", "whatsapp": "whatsapp"}
 # Was die Website von einer Statutenfassung nach außen gibt - keine Prüfsummen, keine Quelle.
 STATUTE_FIELDS = ("id", "version", "decided_on", "valid_from", "valid_to", "state", "size")
 # PDF je Prüfsumme: eine beschlossene Fassung ändert sich nie, ihre Prüfsumme auch nicht.
@@ -118,12 +126,29 @@ def board_public(board: list[dict] | None, *, fetched_at=None, now: datetime | N
     return rows
 
 
+def channels_public(organization: dict | None) -> list[dict]:
+    """Die öffentlichen Kanäle des Vereins aus Dolibarr in der Form der Social Links: nur mit Adresse, in der
+    Reihenfolge des Vereins; das Netzwerk-Kürzel wird zum Plattform-Schlüssel der Website."""
+    out = []
+    for row in (organization or {}).get("channels") or []:
+        if not isinstance(row, dict) or not str(row.get("url") or "").strip():
+            continue
+        network = str(row.get("network") or "").strip().lower()
+        platform = CHANNEL_PLATFORMS.get(network, network or "custom")
+        out.append({
+            "platform": platform, "label": str(row.get("label") or row.get("network_label") or platform).strip(),
+            "url": str(row["url"]).strip(), "enabled": True, "stream": bool(row.get("stream")), "live_url": str(row.get("live_url") or ""),
+        })
+    return out
+
+
 def organization_public(organization: dict | None) -> dict:
-    """Was vom Verein öffentlich ist - für die Vereinsseite: Name, Gründung, Zweck, gemeinnützig, Website."""
+    """Was vom Verein öffentlich ist - für die Vereinsseite: Name, Gründung, Zweck, gemeinnützig, Website, Kanäle."""
     org = organization or {}
     return {
         "name": org.get("name") or "", "founded": org.get("founded") or None, "purpose": org.get("purpose") or "",
         "nonprofit": bool(org.get("nonprofit")), "url": org.get("url") or "", "email": org.get("email") or "",
+        "channels": channels_public(org),
     }
 
 
@@ -371,4 +396,5 @@ async def admin_view(db, branding: dict) -> dict:
         "organization": organization_public(state.get("organization")) if has_data else None,
         "fields": list(OVERLAY_FIELDS),
         "statutes": statutes_admin(state),
+        "channels": channels_public(state.get("organization")) if has_data else [],
     }

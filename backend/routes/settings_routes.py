@@ -98,6 +98,9 @@ class BrandingSettings(BaseModel):
     # Vereinsdaten aus Dolibarr (#326): Name, ZVR, Behörde, Anschrift, Telefon und die vertretungsbefugte
     # Person kommen aus dem Vereinsmodul; von Hand gepflegte Werte bleiben Rückfall.
     legal_from_dolibarr: Optional[bool] = None
+    # Kanäle aus Dolibarr (#326 Teil 4): Footer und Suchmaschinen nehmen die öffentlichen Kanäle des Vereins
+    # aus dem Vereinsmodul; stehen dort keine, gilt die Liste von Hand.
+    channels_from_dolibarr: Optional[bool] = None
     legal_extra: Optional[str] = None
     privacy_extra: Optional[str] = None
     terms_of_use: Optional[str] = None
@@ -347,6 +350,16 @@ def _social_links_from_branding(settings: dict) -> list[dict]:
         if normalized:
             links.append(normalized)
     return links
+
+
+async def _public_social_links(db, b: dict) -> list[dict]:
+    """Footer-Kanäle: aus Dolibarr, wenn der Schalter an ist und der Verein dort welche pflegt; sonst von Hand."""
+    if b.get("channels_from_dolibarr"):
+        from services import club_facts
+        channels = club_facts.channels_public((await club_facts.snapshot(db)).get("organization"))
+        if channels:
+            return channels
+    return _social_links_from_branding(b)
 
 
 def _sync_legacy_social_fields(updates: dict) -> None:
@@ -649,7 +662,8 @@ async def public_settings(response: Response):
         "instagram_url": b.get("instagram_url") or "https://instagram.com/thelionsquadesports",
         "tiktok_url": b.get("tiktok_url") or "https://www.tiktok.com/@thelionsquadesports",
         "youtube_url": b.get("youtube_url") or "https://www.youtube.com/@TheLionSquadeSports",
-        "social_links": _social_links_from_branding(b),
+        "social_links": await _public_social_links(db, b),
+        "channels_from_dolibarr": bool(b.get("channels_from_dolibarr")),
         **(await load_auth_settings(db)),
     }
 

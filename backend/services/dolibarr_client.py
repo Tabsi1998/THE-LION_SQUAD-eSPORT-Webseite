@@ -582,6 +582,19 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    async def my_statutes(self, subject: str) -> dict:
+        """Die Statuten, wie der Verein sie für Mitglieder freigibt - über die Bindung (Fähigkeit `documents`)."""
+        data = await self._get("/vereine/me/statutes", {"subject": subject})
+        if not isinstance(data, dict) or "state" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def my_statute_pdf(self, subject: str, version_id: int) -> dict:
+        data = await self._get(f"/vereine/me/statutes/{int(version_id)}/pdf", {"subject": subject})
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
         if not isinstance(data, dict) or "id" not in data:
