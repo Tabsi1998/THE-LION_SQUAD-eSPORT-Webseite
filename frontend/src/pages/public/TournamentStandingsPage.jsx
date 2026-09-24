@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { API, api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { TournamentTabs } from "@/components/tls/tournament/TournamentTabs";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonDetailHeader, SkeletonTable } from "@/components/tls/Skeleton";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -71,6 +72,7 @@ export default function TournamentStandingsPage() {
           className="mb-3"
         />
         <Link to={tournamentUrl} className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← {t.title}</Link>
+        <TournamentTabs tournament={t} accessToken={accessToken} className="mt-3 mb-4" />
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
           <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
           {PUBLIC_RESULT_STATUSES.has(t.status) && (

@@ -359,7 +359,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
         if r.get("team_id"):
             t = teams.get(r["team_id"]) or {}
             r["team"] = {"id": t.get("id"), "name": t.get("name"), "tag": t.get("tag"),
-                         "logo_url": t.get("logo_url")}
+                         "logo_url": t.get("logo_url"), "member_count": len(t.get("member_ids") or [])}
             if user and r.get("team_id") in user_team_ids:
                 r["is_mine"] = True
     return regs
