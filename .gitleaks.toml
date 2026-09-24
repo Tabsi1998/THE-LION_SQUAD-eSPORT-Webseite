@@ -49,3 +49,10 @@ condition = "AND"
 paths = ['''^backend/tests/test_login_comfort_flow\.py$''']
 regexTarget = "secret"
 regexes = ['''^Ein-langes-Testpasswort-42$''']
+
+[[allowlists]]
+description = "The made-up Discord server id of the partner tests (#469): eighteen digits in a row look like a Discord client id to the scanner; the value is only asserted, nothing is real."
+condition = "AND"
+paths = ['''^(backend/tests/test_partner_pages_flow\.py|frontend/src/pages/admin/AdminPartnersPage\.test\.jsx)$''']
+regexTarget = "secret"
+regexes = ['''^123456789012345678$''']
