@@ -60,6 +60,9 @@ async def _features(db, settings: dict) -> list[dict]:
     mode = settings.get("mode") or "off"
     live = mode == "live"
     connection = "/admin/dolibarr?tab=connection"
+    # Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): eigener Code oder der des Moduls fürs Website-Profil.
+    directory_code = str(settings.get("directory_consent_code") or (await sync_state(db)).get("website_profile_consent") or "").strip()
+    directory_entries = await db.club_member_profiles.count_documents({"source": "dolibarr"})
     facts_state = "an" if branding.get("legal_from_dolibarr") else "aus"
     if facts.get("fetched_at"):
         facts_state += f" · Stand {str(facts['fetched_at'])[:16].replace('T', ' ')}"
@@ -82,6 +85,11 @@ async def _features(db, settings: dict) -> list[dict]:
         {"key": "consents", "label": "Einwilligungen unter „Meine Mitgliedschaft“", "enabled": live, "state": "an (Modus Live)" if live else "erst im Modus Live",
          "hint": "Läuft von selbst mit Vereinsmodul ab 0.8.0; das API-Recht für Beitrittsanträge deckt es mit ab.",
          "where": connection, "where_label": "Verbindung → Modus"},
+        {"key": "directory", "label": "Mitgliederverzeichnis und Profile aus Dolibarr", "enabled": live and bool(directory_code),
+         "state": (f"Einwilligung „{directory_code}“{' (aus dem Modul)' if directory_code and not settings.get('directory_consent_code') else ''} · "
+                   f"{directory_entries} Einträge aus Dolibarr") if live and directory_code else ("erst im Modus Live" if directory_code else "aus (keine Einwilligung gewählt)"),
+         "hint": "Wer in Dolibarr dieser Einwilligung zugestimmt hat, bekommt sein Vereinsprofil von selbst; Gamertag, Kurztext, Spiele und Foto kommen von der Mitgliedskarte (Reiter Verein), wenn sie dort gepflegt sind. Widerruf nimmt den Eintrag offline.",
+         "where": connection, "where_label": "Verbindung → Mitgliederverzeichnis"},
         {"key": "invoices", "label": "Rechnungen und Geschäftspartner in Dolibarr anlegen", "enabled": bool(settings.get("write_enabled")), "state": "an" if settings.get("write_enabled") else "aus",
          "hint": "Schreibzugriff einschalten; Belege werden erst mit vollständigen Konditionen und geprüften Steuersätzen von selbst freigegeben.",
          "where": connection, "where_label": "Verbindung → Schreibzugriff"},

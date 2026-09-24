@@ -125,6 +125,9 @@ async def test_directory_entry_follows_the_consent_in_dolibarr(flow, fake):
     rows = {row["user_id"]: row for row in (await flow.get("/api/membership/profiles/admin/all")).json()}
     assert rows[paula["id"]]["source"] == "dolibarr" and rows[paula["id"]]["consent"]["state"] == "given"
     assert rows[max_["id"]]["deactivated_reason"] == "consent_withdrawn"
+    features = {row["key"]: row for row in (await flow.get("/api/admin/dolibarr/status")).json()["features"]}
+    assert features["directory"]["enabled"] is True and features["directory"]["state"] == "Einwilligung „verzeichnis“ · 1 Einträge aus Dolibarr"
+    assert features["directory"]["where"] == "/admin/dolibarr?tab=connection"
 
 
 @pytest.mark.asyncio
@@ -169,6 +172,11 @@ async def test_profile_fields_and_photo_come_from_dolibarr_when_the_club_keeps_t
     stored = tmp_path / profile["photo_url"].rsplit("/", 1)[-1]
     assert stored.read_bytes() == PNG and stored.suffix == ".png"
     assert (await dolibarr_sync.sync_state(flow.db))["website_profile_consent"] == "profil"
+    admin = await flow.add_user(role="superadmin", name="admin")
+    flow.act_as(admin)
+    features = {row["key"]: row for row in (await flow.get("/api/admin/dolibarr/status")).json()["features"]}
+    assert features["directory"]["state"] == "Einwilligung „profil“ (aus dem Modul) · 1 Einträge aus Dolibarr"
+    flow.act_as(paula)
 
     # Zweiter Lauf: nichts neu, das Foto wird nicht noch einmal geholt.
     photo_calls = len([call for call in fake.calls if call[0].endswith("/photo")])
