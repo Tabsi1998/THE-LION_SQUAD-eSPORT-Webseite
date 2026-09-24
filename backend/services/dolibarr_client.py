@@ -611,6 +611,21 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Eigenes Website-Profil (#260, Vereine ab 1.2), über die Bindung
+    async def my_website_profile(self, subject: str) -> dict:
+        """Gamertag, Kurztext, Spiele und Plattformen, wie die Person sie selbst pflegt - plus die Einwilligung."""
+        data = await self._get("/vereine/me/website-profile", {"subject": subject})
+        if not isinstance(data, dict) or "given" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def put_website_profile(self, subject: str, payload: dict) -> dict:
+        """Nur die gesendeten Felder ändern sich; zu lange Werte weist das Modul ab (400)."""
+        data = await self._request("PUT", "/vereine/me/website-profile", params={"subject": subject}, payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "given" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def member_summary(self, member_id: int) -> dict:
         data = await self._get(f"/vereine/members/{int(member_id)}/summary")
         if not isinstance(data, dict) or "id" not in data:

@@ -2972,6 +2972,139 @@
           ]
         ]
       }
+    },
+    "/vereine/me/website-profile": {
+      "get": {
+        "operationId": "getMyWebsiteProfile",
+        "summary": "Eigenes Website-Profil lesen",
+        "description": "Gamertag, Kurztext, Spiele und Plattformen, auch ohne Einwilligung, dazu ob sie erteilt ist. Braucht die Fähigkeit profile.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das eigene Website-Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnWebsiteProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      },
+      "put": {
+        "operationId": "putMyWebsiteProfile",
+        "summary": "Eigenes Website-Profil speichern",
+        "description": "Nur gesendete Felder ändern sich, die anderen bleiben; Spiele und Plattformen als Liste (bevorzugt) oder Text mit Komma/Zeile. Zu lang: 400 mit dem Feldnamen. Unabhängig von der Einwilligung.",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": true,
+            "description": "Kennung der Person bei dieser Anwendung; stabil, nie eine E-Mail-Adresse allein",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gamertag": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "bio": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "games": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "platforms": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Das eigene Website-Profil",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnWebsiteProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use"
+          ]
+        ]
+      }
     }
   },
   "components": {
@@ -5703,6 +5836,46 @@
           "content": {
             "type": "string",
             "description": "Das Bild, base64-kodiert"
+          }
+        }
+      },
+      "OwnWebsiteProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "consent",
+          "given",
+          "gamertag",
+          "bio",
+          "games",
+          "platforms"
+        ],
+        "properties": {
+          "consent": {
+            "type": "string",
+            "description": "Einwilligung, die der Verein für das Website-Profil gewählt hat; leer, wenn keine"
+          },
+          "given": {
+            "type": "boolean",
+            "description": "Nur mit erteilter Einwilligung zeigt die Website das Profil"
+          },
+          "gamertag": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "games": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "platforms": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       }

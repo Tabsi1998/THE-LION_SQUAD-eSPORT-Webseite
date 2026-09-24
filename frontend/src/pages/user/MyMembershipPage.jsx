@@ -106,6 +106,8 @@ export default function MyMembershipPage() {
         {erp?.connected && <IdentityCard />}
         {/* Eigene Daten und Austritt (#329 Teil 2): nur mit Bindung und Fähigkeit „eigene Daten“ */}
         {erp?.connected && <SelfServiceCard />}
+        {/* Eigenes Website-Profil (#260): Gamertag, Kurztext, Spiele, Plattformen in der Vereinsakte, Anzeige nur mit Einwilligung */}
+        {erp?.connected && <WebsiteProfileCard />}
         {erp?.connected && !erp.led_by_dolibarr && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-link-card">
             <h2 className="font-heading text-lg font-black uppercase">Bist du Vereinsmitglied?</h2>
@@ -205,6 +207,71 @@ function IdentityCard() {
           </form>
         </>
       )}
+    </div>
+  );
+}
+
+const WEBSITE_FIELDS = [
+  ["gamertag", "Gamertag", "z. B. LionKing"], ["games", "Spiele", "TFT, Rocket League"], ["platforms", "Plattformen", "PC, PS5"],
+];
+
+// Eigenes Website-Profil (#260): liegt in der Vereinsakte, der Vorstand sieht es auf der Mitgliedskarte, die
+// Website zeigt es im Mitgliederverzeichnis – aber nur, wenn die Person der Nennung zugestimmt hat.
+function WebsiteProfileCard() {
+  const [view, setView] = useState(null);
+  const [draft, setDraft] = useState({});
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    api.get("/membership/me/website-profile").then(({ data }) => {
+      setView(data && data.available === true ? data : null);
+      setDraft({});
+    }).catch(() => setView(null));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (!view) return null;
+  const current = (key) => (key === "games" || key === "platforms" ? (view[key] || []).join(", ") : view[key] || "");
+  const value = (key) => (key in draft ? draft[key] : current(key));
+  const changed = Object.fromEntries(["gamertag", "bio", "games", "platforms"].filter((key) => key in draft && draft[key] !== current(key)).map((key) => [key, draft[key]]));
+  const save = async (event) => {
+    event.preventDefault();
+    if (busy || !Object.keys(changed).length) return;
+    setBusy(true);
+    try {
+      const { data } = await api.put("/membership/me/website-profile", changed);
+      setView(data);
+      setDraft({});
+      toast.success("Website-Profil gespeichert.");
+    } catch (err) {
+      toast.error(formatApiError(err?.response?.data?.detail) || "Das hat nicht geklappt.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-website-card">
+      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Crown className="w-4 h-4 text-[#FFD700]" /> Mein Website-Profil</h2>
+      <p className="mt-2 text-sm text-white/70" data-testid="membership-website-state">
+        {!view.consent
+          ? "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern."
+          : view.given
+            ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
+            : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen)."}
+      </p>
+      <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-website-form">
+        {WEBSITE_FIELDS.map(([key, label, placeholder]) => (
+          <label key={key} className="block">
+            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+            <input value={value(key)} onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))} maxLength={key === "gamertag" ? 40 : 255} placeholder={placeholder} data-testid={`membership-website-${key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+          </label>
+        ))}
+        <label className="block sm:col-span-2">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Kurztext</div>
+          <textarea value={value("bio")} onChange={(e) => setDraft((d) => ({ ...d, bio: e.target.value }))} rows={3} maxLength={2000} data-testid="membership-website-bio" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+        </label>
+        <div className="sm:col-span-2">
+          <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
+        </div>
+      </form>
     </div>
   );
 }

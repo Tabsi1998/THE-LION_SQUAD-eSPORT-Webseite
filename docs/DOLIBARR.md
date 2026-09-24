@@ -294,6 +294,13 @@ beim nächsten Abgleich in der gepflegten auf. Ein Website-Konto braucht es nich
 zugestimmt hat, bekommt seine Karte aus der Vereinsakte allein („Mitglied Nr. … · ohne Konto“ im
 Admin); das Konto verknüpft der Vorstand später.
 
+**Mitglieder pflegen es selbst (ab Vereine 1.2):** Unter *Meine Mitgliedschaft → Mein
+Website-Profil* (Web und App) ändert ein Mitglied mit Verbindung und Fähigkeit „eigene Daten“
+Gamertag, Kurztext, Spiele und Plattformen selbst – gespeichert wird in der Vereinsakte, der Vorstand
+sieht es auf der Mitgliedskarte, und die Website liest das Mitglied gleich nach, damit das
+Verzeichnis den neuen Stand zeigt. Sichtbar wird das Profil weiterhin nur mit der Einwilligung zur
+Nennung; der Kasten sagt, ob sie erteilt ist.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer

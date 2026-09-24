@@ -8,9 +8,10 @@ import { MyMembershipScreen } from "./MyMembershipScreen";
 
 const mockGet = jest.fn();
 const mockPost = jest.fn();
+const mockPut = jest.fn();
 const mockOpenInvoice = jest.fn();
 jest.mock("../../lib/api", () => ({
-  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args) },
+  api: { get: (...args: unknown[]) => mockGet(...args), post: (...args: unknown[]) => mockPost(...args), put: (...args: unknown[]) => mockPut(...args) },
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("../../lib/memberDocuments", () => ({ openInvoice: (...args: unknown[]) => mockOpenInvoice(...args) }));
@@ -94,12 +95,13 @@ const SELF = {
   requests: [{ external_id: "web-change-1", kind: "change", changes: { address: "Neue Gasse 2" }, status: "received", status_label: "beim Vorstand" }],
 };
 
-function mockAkte(identity: object | null, self: object | null) {
+function mockAkte(identity: object | null, self: object | null, website: object | null = null) {
   mockGet.mockImplementation((path: string) => {
     if (path === "/membership/me") return Promise.resolve({ data: ledByDolibarr });
     if (path === "/account/invoices") return Promise.resolve({ data: invoices });
     if (path === "/membership/me/identity") return identity ? Promise.resolve({ data: identity }) : Promise.reject(new Error("nope"));
     if (path === "/membership/me/self-service") return self ? Promise.resolve({ data: self }) : Promise.reject(new Error("nope"));
+    if (path === "/membership/me/website-profile") return website ? Promise.resolve({ data: website }) : Promise.reject(new Error("nope"));
     return Promise.reject(new Error("nope"));
   });
 }
@@ -154,4 +156,19 @@ test("Austritt: erst die Rückfrage, dann die Erklärung; geplant heißt nur noc
   await render(<MyMembershipScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("membership-self-exit-planned")).toBeTruthy());
   expect(screen.getByText("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026 (Eingang 24.09.2026).")).toBeTruthy();
+});
+
+test("Mein Website-Profil (#260): nur Geändertes geht raus, der Sichtbarkeitssatz steht dabei", async () => {
+  const website = { available: true, consent: "profil", given: true, gamertag: "LionKing", bio: "", games: ["TFT"], platforms: [] };
+  mockAkte({ available: true, status: "bound", capabilities: ["documents", "profile"] }, null, website);
+  mockPut.mockResolvedValue({ data: { ...website, games: ["TFT", "Rocket League"] } });
+  const alert = jest.spyOn(Alert, "alert").mockImplementation(() => undefined);
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-website")).toBeTruthy());
+  expect(screen.getByTestId("membership-website-state")).toHaveTextContent(/zeigt dieses Profil/);
+  await fireEvent.changeText(screen.getByTestId("membership-website-games"), "TFT, Rocket League");
+  await fireEvent.press(screen.getByTestId("membership-website-save"));
+  await waitFor(() => expect(mockPut).toHaveBeenCalledWith("/membership/me/website-profile", { games: "TFT, Rocket League" }));
+  expect(alert).toHaveBeenCalledWith("Gespeichert", expect.any(String));
+  alert.mockRestore();
 });

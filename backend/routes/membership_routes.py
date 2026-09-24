@@ -611,6 +611,28 @@ async def request_self_service_exit(body: SelfServiceExitBody, request: Request,
         raise HTTPException(exc.status, exc.detail)
 
 
+class WebsiteProfileBody(BaseModel):
+    gamertag: str | None = None
+    bio: str | None = None
+    games: list[str] | str | None = None
+    platforms: list[str] | str | None = None
+
+
+@router.get("/me/website-profile")
+async def my_website_profile(user: dict = Depends(get_current_user)):
+    """Eigenes Website-Profil aus der Vereinsakte (#260) - nur mit Bindung und Fähigkeit „eigene Daten“."""
+    return await dolibarr_self_service.website_profile(get_db(), user)
+
+
+@router.put("/me/website-profile")
+async def save_my_website_profile(body: WebsiteProfileBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:website-profile", limit=20, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_self_service.save_website_profile(get_db(), user, body.model_dump(exclude_unset=True))
+    except dolibarr_self_service.SelfServiceError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
 @router.get("/me")
 async def my_membership(user: dict = Depends(get_current_user)):
     """Return logged-in user's membership record (or None)."""

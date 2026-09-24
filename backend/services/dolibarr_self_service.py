@@ -26,8 +26,12 @@ PROFILE_FIELDS = ("member_id", "ref", "firstname", "lastname", "birth", "address
                   "member_type", "status", "version", "direct", "exit")
 REQUEST_FIELDS = ("external_id", "kind", "changes", "status", "reason", "received_at", "decided_at", "notice_day", "last_day", "wished_last_day", "wished_too_early")
 STATUS_LABELS = {"received": "beim Vorstand", "applied": "übernommen", "rejected": "abgelehnt"}
+WEBSITE_FIELDS = {"gamertag": 40, "bio": 2000, "games": 255, "platforms": 255}
+WEBSITE_LISTS = ("games", "platforms")
+WEBSITE_LABELS = {"gamertag": "Gamertag", "bio": "Kurztext", "games": "Spiele", "platforms": "Plattformen"}
 REASON_TEXTS = {
     "not_connected": "Die Mitgliederverwaltung ist nicht live angebunden.",
+    "module_too_old": "Das Vereinsmodul kennt das eigene Website-Profil noch nicht (ab Vereine 1.2).",
     "not_bound": "Dafür muss dein Konto mit der Vereinsakte verbunden sein (Einladungscode unter Meine Mitgliedschaft).",
     "no_capability": "Deine Verbindung erlaubt das Ändern eigener Daten noch nicht – der Vorstand schaltet die Fähigkeit „eigene Daten“ in Dolibarr ein.",
 }
@@ -142,3 +146,81 @@ async def request_exit(db, user: dict, wished_last_day: str | None) -> dict:
             await dolibarr_identity.mark_revoked(db, binding)
         _raise_for(exc, conflict="Ein Austritt ist schon geplant – der Stand steht bei deinen Daten.")
     return _request_view(row)
+
+
+# ---------------------------------------------------------------- Eigenes Website-Profil (#260): das Mitglied pflegt es selbst
+
+def _website_view(data: dict) -> dict:
+    return {
+        "available": True, "consent": str(data.get("consent") or ""), "given": bool(data.get("given")),
+        "gamertag": str(data.get("gamertag") or ""), "bio": str(data.get("bio") or ""),
+        "games": [str(v) for v in data.get("games") or [] if str(v).strip()], "platforms": [str(v) for v in data.get("platforms") or [] if str(v).strip()],
+    }
+
+
+def clean_website_fields(fields: dict) -> dict:
+    """Nur die vier Felder, Listen als Liste (Text mit Komma oder Zeile geht auch), Längen wie im Modul - zu lang
+    heißt 400 mit dem Feldnamen, nie stilles Abschneiden."""
+    out: dict = {}
+    for key, value in (fields or {}).items():
+        if key not in WEBSITE_FIELDS:
+            raise SelfServiceError(400, f"Das Feld „{key}“ gibt es im Website-Profil nicht.")
+        limit = WEBSITE_FIELDS[key]
+        if key in WEBSITE_LISTS:
+            raw = value if isinstance(value, list) else re.split(r"[,;\n]+", str(value or ""))
+            items: list[str] = []
+            for item in raw:
+                text = str(item or "").strip()
+                if text and text not in items:
+                    items.append(text)
+            if len(", ".join(items)) > limit:
+                raise SelfServiceError(400, f"{WEBSITE_LABELS[key]}: zusammen höchstens {limit} Zeichen.")
+            out[key] = items
+        else:
+            text = str(value or "").strip()
+            if len(text) > limit:
+                raise SelfServiceError(400, f"{WEBSITE_LABELS[key]}: höchstens {limit} Zeichen.")
+            out[key] = text
+    if not out:
+        raise SelfServiceError(400, "Nichts geändert.")
+    return out
+
+
+async def website_profile(db, user: dict) -> dict:
+    """Das eigene Website-Profil aus Dolibarr - oder warum es hier nichts gibt."""
+    settings, binding, client, reason = await _access(db, user)
+    if reason:
+        return {"available": False, "reason": reason, "text": REASON_TEXTS.get(reason, "")}
+    try:
+        data = await client.my_website_profile(binding["subject"])
+    except DolibarrError as exc:
+        if exc.kind == "forbidden":
+            await dolibarr_identity.mark_revoked(db, binding)
+            return {"available": False, "reason": "not_bound", "text": REASON_TEXTS["not_bound"]}
+        if exc.kind in ("not_found", "module_off"):
+            return {"available": False, "reason": "module_too_old", "text": REASON_TEXTS["module_too_old"]}
+        return {"available": False, "reason": exc.kind, "text": f"Dolibarr antwortet gerade nicht ({exc.text})."}
+    return _website_view(data)
+
+
+async def save_website_profile(db, user: dict, fields: dict) -> dict:
+    """Die gesendeten Felder nach Dolibarr schreiben; danach das Mitglied zum Nachlesen einreihen, damit das
+    Verzeichnis der Website den neuen Stand gleich übernimmt."""
+    clean = clean_website_fields(fields)
+    settings, binding, client, reason = await _access(db, user)
+    if reason:
+        raise SelfServiceError(409 if reason == "no_capability" else 403, REASON_TEXTS.get(reason, "Nicht möglich."))
+    try:
+        data = await client.put_website_profile(binding["subject"], clean)
+    except DolibarrError as exc:
+        if exc.kind == "forbidden":
+            await dolibarr_identity.mark_revoked(db, binding)
+        if exc.kind in ("not_found", "module_off"):
+            raise SelfServiceError(503, REASON_TEXTS["module_too_old"]) from exc
+        if exc.kind == "bad_request":
+            raise SelfServiceError(400, "Die Mitgliederverwaltung hat das abgewiesen (zu lang oder unbekanntes Feld).") from exc
+        _raise_for(exc, conflict="Das Profil wurde gerade anderswo geändert – bitte neu laden.")
+    if binding.get("member_id"):
+        from services import dolibarr_sync
+        await dolibarr_sync.queue_member(db, settings, int(binding["member_id"]))
+    return _website_view(data)

@@ -100,3 +100,33 @@ export function exitLine(profile: SelfProfile): string {
 export function validWishedDay(value: string): boolean {
   return value === "" || /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
+
+export type WebsiteProfile = {
+  available?: boolean;
+  reason?: string;
+  text?: string;
+  consent?: string;
+  given?: boolean;
+  gamertag?: string;
+  bio?: string;
+  games?: string[];
+  platforms?: string[];
+};
+
+export const WEBSITE_FIELDS: Array<[keyof WebsiteProfile & string, string, string]> = [
+  ["gamertag", "Gamertag", "z. B. LionKing"], ["games", "Spiele", "TFT, Rocket League"], ["platforms", "Plattformen", "PC, PS5"], ["bio", "Kurztext", ""],
+];
+
+/** Der Stand eines Feldes als Text - Listen mit Komma. */
+export function websiteFieldText(profile: WebsiteProfile, key: string): string {
+  const value = (profile as Record<string, unknown>)[key];
+  return Array.isArray(value) ? value.join(", ") : String(value ?? "");
+}
+
+/** Der Satz zur Sichtbarkeit - wie im Web. */
+export function websiteStateLine(profile: WebsiteProfile): string {
+  if (!profile.consent) return "Der Verein hat noch keine Einwilligung für das Website-Profil gewählt – dein Profil bleibt vorerst intern.";
+  return profile.given
+    ? "Du hast der Nennung zugestimmt: Der Verein zeigt dieses Profil im Mitgliederverzeichnis."
+    : "Sichtbar wird das Profil erst, wenn du der Nennung zugestimmt hast (siehe Einwilligungen).";
+}
