@@ -216,6 +216,107 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- App: verknüpfte Konten wie im Web (#459; PR #480; nur App; App-Build).
+  `components/LinkedAccounts.tsx` (`LinkedAccountsCard` mit `linked-accounts`/
+  `linked-account-<platform>`, `platformColor`, `platformIcon`, `isVerified`,
+  `accountTitle` (Steam-ID → „Steam-Profil“), `accountDetail`);
+  `PublicProfileScreen` (Typ `verified_platforms`/`linked_accounts`, Karte über
+  „Socials & IDs“, Häkchen `profile-social-verified-<platform>`/
+  `profile-gaming-verified-<platform>` und Plattformfarbe, `platform`-Schlüssel
+  in `publicSocialLinks`/`publicGamingIds`); `ProfileScreen` (`links` aus
+  `/me/platform-links`, Karte `profile-linked-accounts`, `profile-links-web` →
+  `${WEB_BASE_URL}/profile?tab=socials`). Test `LinkedAccounts.test.tsx` (2).
+  Hinweis: `@testing-library/react-native` hier verlangt `await render(...)`.
+- Partner II Teil 2 (#469; PR #479; Backend + Web; `update.sh`). `partner_ids`
+  an `EventCreate/Update` und `TournamentCreate/Update`;
+  `partner_pages.clean_partner_ids` (nur echte, aktive Partner, ohne
+  Doppelte), `attach_partners` (`partners` Kurzform id|slug|name|logo_url|kind
+  in `_decorate_event(include_sponsors=True)` und `_enrich_tournament`),
+  `shared_for_partner(db, partner_id, user)` (Events ohne Entwurf, Turniere
+  ohne Entwurf/`is_public False`, je `user_can_see`, `game` am Turnier) →
+  Partnerseite `shared`. Web `components/tls/PartnerPicker.jsx` (`<prefix>-
+  picker`, `<prefix>-<id>`) in `AdminEventEditPage` (Prop `partners` an
+  `EventForm`, `event-partner-*`), `AdminTournamentNewPage` (`new-tr-partner-*`),
+  `AdminTournamentEditPage` (Darstellung, `tr-edit-partner-*`);
+  `EventDetailPage` `event-partners`/`event-partner-<slug>`,
+  `TournamentDetailPage` `tournament-partner-<slug>`, `PartnerDetailPage`
+  `partner-shared`/`partner-event-<slug>`/`partner-tournament-<slug>`
+  (`SharedCard`). Nicht dabei: „Spieler bei beiden Vereinen“ (braucht Daten des
+  Partners). Tests `test_partner_pages_flow.py` (+1),
+  `PartnerDetailPage.test.jsx`, `EventDetailPage.test.jsx` (+1),
+  `TournamentDetailPage.test.jsx` (+1), `AdminEventEditPage.test.jsx` (+1).
+- Bildprüfung (#415; PR #478; Backend + Web + App; `update.sh` – Backend-Image
+  mit NudeNet/ONNX –, App-Build). `services/media_scan.py`: Einstellungen
+  `settings id media_scan` (`provider off|local|google_vision` (+`fake` im Test),
+  `review_threshold` 0,6, `block_threshold` 0,85, `strike_on_block`,
+  `retention_days` 90, Google-Schlüssel verschlüsselt; `normalize_settings`,
+  `load_settings`, `save_settings`); Warteschlange `media_scans` (`enqueue(db,
+  kind chat|upload, ref_id, owner_id, path, url, context)` setzt `scan_state`
+  am Anhang bzw. `media_uploads`; im Betrieb `schedule_scan` sofort, Job
+  `media_scan` alle 20 s; `process_pending` sperrt per `update_one`
+  (mongomock-tauglich), `process_one` → `run_provider` (`local` NudeNet in
+  `asyncio.to_thread`, Klassen `NUDITY_LABELS`/`RACY_LABELS`; `google_vision`
+  SafeSearch über `LIKELIHOOD`; `off`; `fake` aus `fake_results`), `decide`
+  (höherer Wert aus nudity/violence), `_finish` → `_quarantine`
+  (`storage.QUARANTINE_DIR`, Varianten weg), `_mark_ref`, `_on_blocked`
+  (`_clear_references` users avatar/banner + teams logo/banner, Treffer
+  `moderation_standing.add_strike(source="image_scan")`, Nachricht an die
+  Person, `_notify_moderators`), nach `MAX_ATTEMPTS` 3 `failed` = fail-open;
+  `approve` (Rückholen aus der Quarantäne, `revoke_strike`), `remove`,
+  `queue` (Owner, `context_label` aus dem Anhang, `preview_url`), `status`
+  (`provider_health`, Zähler 30 Tage), `purge_quarantine` (Job
+  `media_scan_purge` 24 h). Chat: `public_attachment.scan_state`, `can_access`
+  (pending/review nur Absender + `SCAN_STAFF_ROLES`, blocked niemand);
+  Upload: `_upload_image_impl` reiht ein (`upload_id`). Routen
+  `/api/moderation/media-scan/settings|status|queue|{id}/preview|{id}/approve|
+  {id}/remove` (Bereich moderation, Audit `media_scan.settings|approved|
+  removed`). `privacy_facts.media_scan` (`media_scan_facts`). Web
+  `moderation/ImageScanTab.jsx` (Reiter `images`: `image-scan-status|provider|
+  review-open|settings|provider-select|google-key|review|block|retention|strike|
+  save|filter-<state>|queue|row-<id>|preview-<id>|state-<id>|note-<id>|
+  approve-<id>|remove-<id>|empty`, `settingsPayload` Prozent → Bruch),
+  `ChatAttachments` `ScanAwareImage`/`ScanPlaceholder`
+  (`chat-attachment-<state>-<id>`), `privacyFacts.mediaScanText`, Abschnitt
+  `privacy-media-scan`; App `ChatAttachment.scan_state`, Kachel
+  `chat-attachment-removed-<id>`, „Bild wird geprüft“. Abhängigkeiten
+  `nudenet 3.4.2`, `onnxruntime 1.30.0`, `opencv-python-headless 5.0.0.93`,
+  Dockerfile `libglib2.0-0`. Doku `docs/MODERATION.md`. Tests
+  `test_media_scan_flow.py` (4), `ImageScanTab.test.jsx` (3),
+  `ChatAttachments.test.jsx` (1), `privacyFacts.test.js` (+1), App
+  `ChatAttachments.test.tsx` (+1). Offen in #415: AWS Rekognition; `review`
+  bei öffentlichen Uploads bleibt sichtbar.
+- Partnerseiten (#469 Teil 1; PR #476; Backend + Web; `update.sh`).
+  `services/partner_pages.py`: `clean_url|clean_discord_invite|clean_guild_id|
+  clean_twitch_channel|clean_tools`, `normalize_partner_fields` (nur die
+  mitgeschickten Felder), `channels_for`, `twitch_status(login)` (Helix über
+  `twitch_service._get_credentials/_get_app_token`; `configured|live|title|
+  viewer_count|game_name|thumbnail_url`), `discord_widget(guild_id)`
+  (`guilds/{id}/widget.json` → `enabled|name|online|invite`), Kurzspeicher
+  (`TWITCH_TTL` 120 s, `DISCORD_TTL` 300 s, `reset_cache`), `_transport` für
+  Tests. `models`: `PartnerTool`, `PartnerCreate/Update` + `slug|about|since|
+  discord_invite|discord_guild_id|twitch_channel|youtube_url|x_url|instagram_url|
+  tiktok_url|tools`. `news_routes`: `_ensure_partner_slug` (alte und Dolibarr-
+  Partner beim ersten Lesen), `_public_partner` (+`channels`), `_partner_news`
+  (Name in Titel/Excerpt/Content, veröffentlicht und sichtbar, 6), `GET
+  /api/partners/{slug}` (nach `/partners/admin`; `find_by_slug_or_history`,
+  `redirected`, inaktiv 404); Anlegen/Ändern mit `unique_slug`,
+  `slug_source_for_update`, `apply_slug_history`; `dolibarr_sponsors.
+  apply_partners` setzt den Slug. Web `PartnerDetailPage` (`/partners/:slug`;
+  `partner-page|hero|live-pill|channel-icons|icon-<key>|twitch-live|
+  twitch-consent-notice|about|tools|tool-<id>|tool-embed-<id>|tool-open-<id>|
+  tool-embed|tool-consent-notice|news|news-<slug>|empty|sidebar|channels|
+  channel-<key>|cooperation|missing`; `channelDetail`), `PartnersPage` (Karten →
+  Seite, `partner-card-<slug>`, `partner-open-<slug>`, `partner-icon-<key>`),
+  `AdminPartnersPage` (`formFromPartner`, `partnerPayload`, Abschnitte
+  `partner-page-section|channels-section|tools-section`, Felder `partner-slug|
+  since|about|discord-invite|discord-guild|twitch-channel|youtube|x|instagram|
+  tiktok`, `ToolsEditor` `partner-tool-add|tool-<i>|tool-title-<i>|tool-url-<i>|
+  tool-description-<i>|tool-image-<i>|tool-embed-<i>|tool-remove-<i>`,
+  `partner-page-<id>`), `lib/socialIcons.js` (`SOCIAL_ICONS` aus PublicLayout
+  herausgelöst, + `color`, + `x`), `components/tls/ChannelIcon.jsx`
+  (`ChannelIcon`, `channelColor`). Tests `test_partner_pages_flow.py` (4),
+  `PartnerDetailPage.test.jsx` (3), `PartnersPage.test.jsx` (1),
+  `AdminPartnersPage.test.jsx` (4).
 - Verbindungen ohne Doppeltes (PR #475; nur Web; `update.sh`).
   `settings/DiscordSettings.jsx` (Webhook, Betriebs-Webhook, `DiscordTargets`,
   `DiscordBotPanel`, Aktivitätszähler; eigenes Laden und Speichern,
@@ -1981,11 +2082,10 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web). `main` steht auf `7cf7252`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build). `main` steht auf `16ca604`.
 
 ### Offene PRs
-- #476 (Partnerseiten, #469 Teil 1; Backend + Web; bereit, lokal grün).
-  App-Gegenstück zu den verknüpften Konten: #459 (App 1.0.0). **Regel seit
+- Derzeit keiner. **Regel seit
   23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
   (§5-Eintrag, §9, UMBAUPLAN-Block und -Zeile) kommt gebündelt im
@@ -2072,6 +2172,14 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #476, #478, #479, #480 (24.09.): `update.sh` (Backend-Image neu: NudeNet/ONNX,
+  der Build dauert einmalig länger) und App-Build. Danach: Admin → Moderation →
+  Bildprüfung: Anbieter-Stand muss grün sein (NudeNet geladen), Schwellen
+  lassen, die Warteschlange gelegentlich ansehen; Admin → Partner: bei PineApps
+  Kanäle (Discord-Einladung + Server-ID mit eingeschaltetem Widget, Twitch-Kanal,
+  YouTube), „seit“, Text und das TFT-Dashboard als Tool eintragen; bei Events und
+  Turnieren mit PineApps den Partner-Haken setzen;
+  offen aus #415: AWS Rekognition (bei Bedarf).
 - Nach #474, #475 (24.09.): `update.sh`. Danach: Profilseite ansehen (fünf Reiter,
   Konten-Karte, Twitch nur live); Discord und Twitch nur noch unter Verbindungen
   (die Einstellungen haben die Reiter nicht mehr, alte Links leiten um).
@@ -2083,8 +2191,11 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   die Zustimmung zur Nennung je Person setzen, Fotos über den eigenen
   Verzeichnis-Eintrag; App-Build (Moderationskarte, verknüpfte Konten #459).
   Reihenfolge am 24.09. vom Betreiber freigegeben („was Sinn macht“):
-  Profilseite (erledigt, #474), Partner II Teil 1 (PR #476), dann #415
-  Bildprüfung, dann Partner II Teil 2 (#469: Partner an Events/Turnieren).
+  Profilseite (erledigt, #474), Partner II Teil 1 (erledigt, #476), #415
+  Bildprüfung (erledigt, #478), Partner II Teil 2 (erledigt, #479), App-Karte
+  #459 (erledigt, #480). Danach offen: #437 (CMS A/B) und #401 (Turnierseite) warten
+  auf Antworten des Betreibers; #231 auf den Trockenlauf; #239 braucht ein
+  eigenes Android-Modul.
 - Nach #461, #462 (24.09.): `update.sh`. Discord-App (Client ID + Secret aus
   dem Developer Portal, App des Bots, Reiter OAuth2; Rückrufadresse unter
   Redirects) und Twitch-Rückrufadresse in der Developer Console eintragen
