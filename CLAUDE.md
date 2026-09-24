@@ -216,6 +216,28 @@ Seit dem 15. September gilt:
   (`dolibarr-tax-confirmed`), Dashboard-Aufgabe `billing-cases` nur mit
   `can("finance")`. Tests `test_billing_cases_flow.py` (8), `billing.test.js` (4),
   `AdminFinancePage.test.jsx` (5). Doku `docs/ABRECHNUNG.md`.
+- Mitgliederprofil aus Dolibarr (#410 Nachtrag, dolibarr-vereine#255; PR #496;
+  nur Backend; `update.sh`; braucht Vereine ≥ 1.1). `dolibarr_client.
+  member_profile|member_photo` (`/vereine/members/{id}/profile|photo`);
+  `dolibarr_sync._apply_dolibarr_profile` (nur bei `given`: Gamertag, Kurztext,
+  Spiele, Plattformen – gefüllt in Dolibarr führt, leer lässt die Website stehen;
+  Foto bei neuer `sha256` über `_store_member_photo` als
+  `UPLOAD_DIR/member-photo-<profil>-<sha12>.<ext>`, `photo_url`,
+  `dolibarr_photo_sha`; `dolibarr_profile_at`), Ergebnis `updated` zählt im
+  `directory`-Zähler (`DIRECTORY_CHANGES`); Einwilligungscode fürs Verzeichnis
+  fällt auf `website_profile_consent` aus `GET /vereine/status` zurück
+  (im Abgleichstand gespeichert, vor der Schleife). Vertrag
+  `contracts/vereine-openapi.json` vom Modul-Branch (Vereine 1.0 + #255,
+  **API-Version 2**: Status/Organisation ohne `country_profile`, `register` ohne
+  `court`), Manifest `api_version` 2 + neue Pfade; Fake `member_profiles`,
+  `website_profile_consent`, Foto. Doku `docs/DOLIBARR.md`. Tests
+  `test_member_directory_consent_flow.py` (+1), `test_dolibarr_client_unit.py`.
+- Mitgliederverzeichnis: ein vom Vorstand gesetzter Klarname bleibt beim Abgleich
+  stehen (#410 Nachtrag, Wunsch vom 25.09.; PR #495; nur Backend; `update.sh`).
+  `sync_directory_entry` merkt sich `dolibarr_name` (zuletzt aus Dolibarr);
+  `real_name` folgt Dolibarr nur, wenn er leer ist oder dem letzten Dolibarr-Namen
+  entspricht – hat der Vorstand ihn selbst gesetzt (z. B. nur Vorname), bleibt er;
+  leer holt ihn wieder. Test `test_member_directory_consent_flow.py` erweitert.
 - Mitgliederverzeichnis aus der Dolibarr-Einwilligung (#410 Nachtrag, Wunsch
   vom 25.09.; PR #493; Backend + Web; `update.sh`).
   `dolibarr_sync.sync_directory_entry(db, settings, client, link, summary)` aus
@@ -2261,7 +2283,7 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build), #491 (Doku-Stand nach #490), #492 (Kanäle aus Dolibarr, Statuten-Archiv, Reiter Social Links; `update.sh`), #493 (Mitgliederverzeichnis aus der Dolibarr-Einwilligung; `update.sh`). `main` steht auf `d686c5c`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build), #491 (Doku-Stand nach #490), #492 (Kanäle aus Dolibarr, Statuten-Archiv, Reiter Social Links; `update.sh`), #493 (Mitgliederverzeichnis aus der Dolibarr-Einwilligung; `update.sh`), #494 (Doku-Stand nach #493), #495 (Klarname bleibt beim Abgleich; `update.sh`), #496 (Mitgliederprofil aus Dolibarr; `update.sh`, Vereine ≥ 1.1). `main` steht auf `1b1a6dc`.
 
 ### Offene PRs
 - Derzeit keiner. **Regel seit
@@ -2351,6 +2373,11 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #495, #496 (25.09.): `update.sh`. Im Vereinsmodul (ab 1.1.0): unter Einrichtung →
+  Einwilligungen die Einwilligung für das Website-Profil wählen (die Website nimmt dieselbe
+  fürs Verzeichnis, wenn dort keine gewählt ist); auf der Mitgliedskarte (Reiter Verein →
+  Website-Profil) Gamertag, Kurztext, Spiele eintragen – das Foto ist das der Mitgliedskarte.
+  Auf der Website: bei Mitgliedern ohne öffentlichen Nachnamen den Klarnamen selbst setzen.
 - Nach #492, #493 (25.09.): `update.sh`. Im Vereinsmodul: die öffentlichen Kanäle unter
   Einrichtung → Vereine → Kanäle und Konten pflegen, dann auf der Website unter Social Links
   den Haken „Kanäle aus Dolibarr übernehmen“ setzen; einen Einwilligungstext „Nennung im
