@@ -47,6 +47,11 @@ export const VISIBILITY_GROUPS = [
       { k: "ea", l: "EA ID" },
       { k: "riot", l: "Riot ID" },
       { k: "battlenet", l: "Battle.net" },
+      { k: "faceit", l: "FACEIT" },
+      { k: "startgg", l: "start.gg" },
+      { k: "roblox", l: "Roblox" },
+      { k: "osu", l: "osu!" },
+      { k: "lichess", l: "Lichess" },
     ],
   },
   {
@@ -57,6 +62,10 @@ export const VISIBILITY_GROUPS = [
       { k: "youtube", l: "YouTube" },
       { k: "instagram", l: "Instagram" },
       { k: "x", l: "X / Twitter" },
+      { k: "github", l: "GitHub" },
+      { k: "kick", l: "Kick" },
+      { k: "reddit", l: "Reddit" },
+      { k: "spotify", l: "Spotify" },
     ],
   },
   {

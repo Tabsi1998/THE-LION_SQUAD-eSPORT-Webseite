@@ -108,6 +108,51 @@ class FakePlatforms:
             return httpx.Response(200, json={"access_token": "e"}) if request.headers.get("Authorization") == self.basic("epic-app", "epic-geheim") else httpx.Response(401, json={"error": "invalid_client"})
         if url == platform_links.EPIC_USERINFO:
             return httpx.Response(200, json={"sub": "e-1", "preferred_username": "PaulaEpic"})
+        if url == platform_links.FACEIT_TOKEN:
+            return httpx.Response(200, json={"access_token": "f"}) if request.headers.get("Authorization") == self.basic("faceit-app", "faceit-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.FACEIT_USERINFO:
+            return httpx.Response(200, json={"guid": "g-1", "nickname": "paulaf"})
+        if url == platform_links.STARTGG_TOKEN:
+            payload = json.loads(body)
+            return httpx.Response(200, json={"access_token": "s"}) if payload.get("client_secret") == "startgg-geheim" and payload.get("scope") == "user.identity" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.STARTGG_GQL:
+            assert "currentUser" in json.loads(body)["query"]
+            return httpx.Response(200, json={"data": {"currentUser": {"id": 5150, "slug": "user/abc", "player": {"gamerTag": "PaulaGG"}}}})
+        if url == platform_links.ROBLOX_TOKEN:
+            return httpx.Response(200, json={"access_token": "rb"}) if form.get("client_secret") == "roblox-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.ROBLOX_USERINFO:
+            return httpx.Response(200, json={"sub": "4242", "preferred_username": "paula_rbx", "name": "Paula"})
+        if url == platform_links.OSU_TOKEN:
+            if form.get("grant_type") == "client_credentials":
+                return httpx.Response(200, json={"access_token": "cc"}) if form.get("client_secret") == "osu-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+            return httpx.Response(200, json={"access_token": "o"}) if form.get("client_secret") == "osu-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.OSU_ME:
+            return httpx.Response(200, json={"id": 777, "username": "paulaosu"})
+        if url == platform_links.LICHESS_TOKEN:
+            assert form.get("code_verifier") and form.get("client_id") == platform_links.LICHESS_CLIENT_ID and "client_secret" not in form
+            return httpx.Response(200, json={"access_token": "l"})
+        if url == platform_links.LICHESS_ACCOUNT:
+            return httpx.Response(200, json={"id": "paulachess", "username": "paulachess"})
+        if url == platform_links.GITHUB_TOKEN:
+            return httpx.Response(200, json={"access_token": "gh"}) if form.get("client_secret") == "github-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.GITHUB_USER:
+            return httpx.Response(200, json={"id": 99, "login": "paula-dev", "name": "Paula"})
+        if url == platform_links.KICK_TOKEN:
+            if form.get("grant_type") == "client_credentials":
+                return httpx.Response(200, json={"access_token": "cc"}) if form.get("client_secret") == "kick-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+            assert form.get("code_verifier")
+            return httpx.Response(200, json={"access_token": "k"}) if form.get("client_secret") == "kick-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.KICK_USERS:
+            return httpx.Response(200, json={"data": [{"user_id": 31, "name": "paulakick"}]})
+        if url == platform_links.REDDIT_TOKEN:
+            assert request.headers.get("User-Agent", "").startswith("lionsquad-website")
+            return httpx.Response(200, json={"access_token": "rd"}) if request.headers.get("Authorization") == self.basic("reddit-app", "reddit-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.REDDIT_ME:
+            return httpx.Response(200, json={"id": "t2_1", "name": "paula_r"})
+        if url == platform_links.SPOTIFY_TOKEN:
+            return httpx.Response(200, json={"access_token": "sp"}) if request.headers.get("Authorization") == self.basic("spotify-app", "spotify-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.SPOTIFY_ME:
+            return httpx.Response(200, json={"id": "sp-1", "display_name": "Paula S."})
         if url == platform_links.STEAM_OPENID:
             assert form.get("openid.mode") == "check_authentication"
             return httpx.Response(200, text="ns:http://specs.openid.net/auth/2.0\nis_valid:true\n" if self.steam_valid else "is_valid:false\n")
@@ -136,6 +181,7 @@ MORE_APPS = {
     "youtube_client_id": "youtube-app", "youtube_client_secret": "youtube-geheim", "tiktok_client_key": "tiktok-app", "tiktok_client_secret": "tiktok-geheim",
     "riot_client_id": "riot-app", "riot_client_secret": "riot-geheim", "xbox_client_id": "xbox-app", "xbox_client_secret": "xbox-geheim",
     "epic_client_id": "epic-app", "epic_client_secret": "epic-geheim",
+    "faceit_client_id": "faceit-app", "faceit_client_secret": "faceit-geheim", "startgg_client_id": "startgg-app", "startgg_client_secret": "startgg-geheim", "roblox_client_id": "roblox-app", "roblox_client_secret": "roblox-geheim", "osu_client_id": "osu-app", "osu_client_secret": "osu-geheim", "github_client_id": "github-app", "github_client_secret": "github-geheim", "kick_client_id": "kick-app", "kick_client_secret": "kick-geheim", "reddit_client_id": "reddit-app", "reddit_client_secret": "reddit-geheim", "spotify_client_id": "spotify-app", "spotify_client_secret": "spotify-geheim",
 }
 
 
@@ -174,7 +220,9 @@ async def test_start_needs_a_configured_app_and_signs_the_state(flow):
     paula = await person(flow, "paula")
     flow.act_as(paula)
     overview = (await flow.get("/api/me/platform-links")).json()
-    assert overview["available"]["steam"] is True and all(value is False for key, value in overview["available"].items() if key != "steam")
+    # Steam (OpenID) und Lichess (öffentlicher Client) brauchen keine App - alle anderen schon.
+    assert overview["available"]["steam"] is True and overview["available"]["lichess"] is True
+    assert all(value is False for key, value in overview["available"].items() if key not in ("steam", "lichess"))
     assert set(overview["available"]) == set(platform_links.PLATFORMS)
     assert overview["platforms"]["discord"]["field"] == "discord_name" and "Discord-Kennung" in overview["platforms"]["discord"]["delivers"]
     assert (await flow.post("/api/me/platform-links/discord/start")).status_code == 409
@@ -377,6 +425,16 @@ EXPECTED_LINKS = {
     "riot": ("Paula#EUW", "riot_id", ""),
     "xbox": ("PaulaGT", "xbox_id", "https://www.xbox.com/play/user/PaulaGT"),
     "epic": ("PaulaEpic", "epic_id", ""),
+    # Welle 1 (#547)
+    "faceit": ("paulaf", "faceit_handle", "https://www.faceit.com/en/players/paulaf"),
+    "startgg": ("PaulaGG", "startgg_handle", ""),
+    "roblox": ("paula_rbx", "roblox_handle", "https://www.roblox.com/users/4242/profile"),
+    "osu": ("paulaosu", "osu_handle", "https://osu.ppy.sh/users/777"),
+    "lichess": ("paulachess", "lichess_handle", "https://lichess.org/@/paulachess"),
+    "github": ("paula-dev", "github_handle", "https://github.com/paula-dev"),
+    "kick": ("paulakick", "kick_handle", "https://kick.com/paulakick"),
+    "reddit": ("paula_r", "reddit_handle", "https://www.reddit.com/user/paula_r"),
+    "spotify": ("Paula S.", "spotify_handle", "https://open.spotify.com/user/sp-1"),
 }
 
 
@@ -388,8 +446,10 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     for platform, (handle, field, url) in EXPECTED_LINKS.items():
         flow.act_as(paula)
         start = (await flow.post(f"/api/me/platform-links/{platform}/start")).json()["url"]
-        if platform == "x":
+        if platform in ("x", "kick", "lichess"):
             assert "code_challenge=" in start and "code_challenge_method=S256" in start
+        if platform == "lichess":
+            assert f"client_id={platform_links.LICHESS_CLIENT_ID}" in start
         state = state_of(start)
         flow.act_as(None)
         landed = target(await flow.get(f"/api/platform-links/{platform}/callback?code=gut&state={state}"))
@@ -418,6 +478,10 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     assert good["checks"][0]["state"] == "ok" and good["checks"][1]["key"] == "redirect"
     riot = (await flow.post("/api/settings/platform-links/riot/check")).json()
     assert riot["checks"][0]["state"] == "warn" and "echten Verknüpfung" in riot["checks"][0]["text"]
+    lichess = (await flow.post("/api/settings/platform-links/lichess/check")).json()
+    assert lichess["ok"] is True and "keine App" in lichess["checks"][0]["text"]
+    osu = (await flow.post("/api/settings/platform-links/osu/check")).json()
+    assert osu["checks"][0]["state"] == "ok"
     await configure(flow, epic_client_secret=encrypt_secret("falsch"))
     bad = (await flow.post("/api/settings/platform-links/epic/check")).json()
     assert bad["ok"] is False and bad["checks"][0]["state"] == "fail"

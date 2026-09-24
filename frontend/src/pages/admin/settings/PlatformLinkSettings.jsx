@@ -46,7 +46,7 @@ function CheckResult({ platform, result }) {
 }
 
 export function appReady(app, brand) {
-  if (!app || app.key === "steam") return true;
+  if (!app || app.key === "steam" || !app.idField) return true;
   return Boolean(brand[app.idField] && (brand[app.secretField] || brand[`${app.secretField}_masked`]));
 }
 

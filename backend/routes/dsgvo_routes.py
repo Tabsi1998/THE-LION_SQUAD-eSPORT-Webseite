@@ -68,6 +68,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
             "first_name": None, "last_name": None, "nickname": None, "birth_date": None, "gender": None,
             "bio": None, "discord_name": None, "discord_id": None, "switch_code": None, "steam_id": None,
             "epic_id": None, "psn_id": None, "xbox_id": None, "riot_id": None, "game_ids": {},
+            "faceit_handle": None, "startgg_handle": None, "roblox_handle": None, "osu_handle": None, "lichess_handle": None, "github_handle": None, "kick_handle": None, "reddit_handle": None, "spotify_handle": None,
             "country": None, "state": None, "city": None, "avatar_url": None, "banner_url": None,
             "twitch_handle": None, "youtube_handle": None, "instagram_handle": None,
             "newsletter_consent": False, "notification_preferences": {}, "privacy_public_profile": False,

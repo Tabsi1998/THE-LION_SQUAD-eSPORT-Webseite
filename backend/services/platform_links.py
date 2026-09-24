@@ -65,6 +65,25 @@ PLATFORMS = {
              "id_field": "xbox_client_id", "secret_field": "xbox_client_secret", "official": "https://www.xbox.com/play/user/{handle}"},
     "epic": {"label": "Epic Games", "operator": "Epic Games, Inc., USA", "field": "epic_id", "visibility": "epic", "delivers": "Epic-Kennung und Anzeigename",
              "id_field": "epic_client_id", "secret_field": "epic_client_secret", "official": ""},
+    # Konten verknüpfen III, Welle 1 (#547): Standard-OAuth2; Lichess braucht keine App (öffentlicher Client mit PKCE).
+    "faceit": {"label": "FACEIT", "operator": "FACEIT Ltd., Vereinigtes Königreich", "field": "faceit_handle", "visibility": "faceit", "delivers": "FACEIT-Kennung und Nickname",
+             "id_field": 'faceit_client_id', "secret_field": 'faceit_client_secret', "official": "https://www.faceit.com/en/players/{handle}"},
+    "startgg": {"label": "start.gg", "operator": "start.gg, Inc., USA", "field": "startgg_handle", "visibility": "startgg", "delivers": "Spieler-Kennung und Gamertag",
+             "id_field": 'startgg_client_id', "secret_field": 'startgg_client_secret', "official": ""},
+    "roblox": {"label": "Roblox", "operator": "Roblox Corporation, USA", "field": "roblox_handle", "visibility": "roblox", "delivers": "Roblox-Kennung und Nutzername",
+             "id_field": 'roblox_client_id', "secret_field": 'roblox_client_secret', "official": "https://www.roblox.com/users/{external_id}/profile"},
+    "osu": {"label": "osu!", "operator": "ppy Pty Ltd, Australien", "field": "osu_handle", "visibility": "osu", "delivers": "osu!-Kennung und Nutzername",
+             "id_field": 'osu_client_id', "secret_field": 'osu_client_secret', "official": "https://osu.ppy.sh/users/{external_id}"},
+    "lichess": {"label": "Lichess", "operator": "lichess.org (Verein, Frankreich)", "field": "lichess_handle", "visibility": "lichess", "delivers": "Lichess-Nutzername",
+             "id_field": None, "secret_field": None, "official": "https://lichess.org/@/{handle}"},
+    "github": {"label": "GitHub", "operator": "GitHub, Inc. (Microsoft), USA", "field": "github_handle", "visibility": "github", "delivers": "GitHub-Kennung und Login",
+             "id_field": 'github_client_id', "secret_field": 'github_client_secret', "official": "https://github.com/{handle}"},
+    "kick": {"label": "Kick", "operator": "Kick Streaming Pty Ltd, Australien", "field": "kick_handle", "visibility": "kick", "delivers": "Kick-Kennung und Name",
+             "id_field": 'kick_client_id', "secret_field": 'kick_client_secret', "official": "https://kick.com/{handle}"},
+    "reddit": {"label": "Reddit", "operator": "Reddit, Inc., USA", "field": "reddit_handle", "visibility": "reddit", "delivers": "Reddit-Kennung und Nutzername",
+             "id_field": 'reddit_client_id', "secret_field": 'reddit_client_secret', "official": "https://www.reddit.com/user/{handle}"},
+    "spotify": {"label": "Spotify", "operator": "Spotify AB, Schweden", "field": "spotify_handle", "visibility": "spotify", "delivers": "Spotify-Kennung und Anzeigename",
+             "id_field": 'spotify_client_id', "secret_field": 'spotify_client_secret', "official": "https://open.spotify.com/user/{external_id}"},
 }
 
 DISCORD_AUTHORIZE = "https://discord.com/oauth2/authorize"
@@ -100,6 +119,35 @@ XSTS_AUTH = "https://xsts.auth.xboxlive.com/xsts/authorize"
 EPIC_AUTHORIZE = "https://www.epicgames.com/id/authorize"
 EPIC_TOKEN = "https://api.epicgames.dev/epic/oauth/v2/token"
 EPIC_USERINFO = "https://api.epicgames.dev/epic/oauth/v2/userInfo"
+FACEIT_AUTHORIZE = "https://accounts.faceit.com/accounts"
+FACEIT_TOKEN = "https://api.faceit.com/auth/v1/oauth/token"
+FACEIT_USERINFO = "https://api.faceit.com/auth/v1/resources/userinfo"
+STARTGG_AUTHORIZE = "https://start.gg/oauth/authorize"
+STARTGG_TOKEN = "https://api.start.gg/oauth/access_token"
+STARTGG_GQL = "https://api.start.gg/gql/alpha"
+ROBLOX_AUTHORIZE = "https://apis.roblox.com/oauth/v1/authorize"
+ROBLOX_TOKEN = "https://apis.roblox.com/oauth/v1/token"
+ROBLOX_USERINFO = "https://apis.roblox.com/oauth/v1/userinfo"
+OSU_AUTHORIZE = "https://osu.ppy.sh/oauth/authorize"
+OSU_TOKEN = "https://osu.ppy.sh/oauth/token"
+OSU_ME = "https://osu.ppy.sh/api/v2/me"
+LICHESS_AUTHORIZE = "https://lichess.org/oauth"
+LICHESS_TOKEN = "https://lichess.org/api/token"
+LICHESS_ACCOUNT = "https://lichess.org/api/account"
+LICHESS_CLIENT_ID = "lionsquad-website"   # Lichess: öffentlicher Client, jede eindeutige Kennung reicht
+GITHUB_AUTHORIZE = "https://github.com/login/oauth/authorize"
+GITHUB_TOKEN = "https://github.com/login/oauth/access_token"
+GITHUB_USER = "https://api.github.com/user"
+KICK_AUTHORIZE = "https://id.kick.com/oauth/authorize"
+KICK_TOKEN = "https://id.kick.com/oauth/token"
+KICK_USERS = "https://api.kick.com/public/v1/users"
+REDDIT_AUTHORIZE = "https://www.reddit.com/api/v1/authorize"
+REDDIT_TOKEN = "https://www.reddit.com/api/v1/access_token"
+REDDIT_ME = "https://oauth.reddit.com/api/v1/me"
+SPOTIFY_AUTHORIZE = "https://accounts.spotify.com/authorize"
+SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
+SPOTIFY_ME = "https://api.spotify.com/v1/me"
+USER_AGENT = "lionsquad-website/1.0 (+https://lionsquad.at)"   # Reddit lehnt Standard-Kennungen ab
 
 
 class LinkError(Exception):
@@ -226,11 +274,33 @@ def authorize_url(platform: str, branding: dict, state: str) -> str:
         return f"{MS_AUTHORIZE}?" + urlencode({**common, "scope": "XboxLive.signin", "response_mode": "query"})
     if platform == "epic":
         return f"{EPIC_AUTHORIZE}?" + urlencode({**common, "scope": "basic_profile"})
+    if platform == "faceit":
+        return f"{FACEIT_AUTHORIZE}?" + urlencode({**common, "scope": "openid profile", "redirect_popup": "true"})
+    if platform == "startgg":
+        return f"{STARTGG_AUTHORIZE}?" + urlencode({**common, "scope": "user.identity"})
+    if platform == "roblox":
+        return f"{ROBLOX_AUTHORIZE}?" + urlencode({**common, "scope": "openid profile"})
+    if platform == "osu":
+        return f"{OSU_AUTHORIZE}?" + urlencode({**common, "scope": "identify"})
+    if platform == "lichess":
+        nonce = str(read_state_payload(state, platform).get("nonce") or "")
+        challenge = _pkce_challenge(_pkce_verifier(nonce))
+        return f"{LICHESS_AUTHORIZE}?" + urlencode({"client_id": LICHESS_CLIENT_ID, "redirect_uri": redirect, "response_type": "code", "state": state, "code_challenge": challenge, "code_challenge_method": "S256"})
+    if platform == "github":
+        return f"{GITHUB_AUTHORIZE}?" + urlencode({**common, "scope": "read:user"})
+    if platform == "kick":
+        nonce = str(read_state_payload(state, platform).get("nonce") or "")
+        challenge = _pkce_challenge(_pkce_verifier(nonce))
+        return f"{KICK_AUTHORIZE}?" + urlencode({**common, "scope": "user:read", "code_challenge": challenge, "code_challenge_method": "S256"})
+    if platform == "reddit":
+        return f"{REDDIT_AUTHORIZE}?" + urlencode({**common, "scope": "identity", "duration": "temporary"})
+    if platform == "spotify":
+        return f"{SPOTIFY_AUTHORIZE}?" + urlencode(common)
     raise LinkError("unknown")
 
 
 def _client() -> httpx.AsyncClient:
-    return httpx.AsyncClient(timeout=TIMEOUT, transport=_transport)
+    return httpx.AsyncClient(timeout=TIMEOUT, transport=_transport, headers={"User-Agent": USER_AGENT})
 
 
 def _json(response: httpx.Response) -> dict:
@@ -275,6 +345,25 @@ async def fetch_identity(platform: str, branding: dict, query: dict, state_paylo
             return await _xbox_identity(branding, code)
         if platform == "epic":
             return await _epic_identity(branding, code)
+        nonce = str((state_payload or {}).get("nonce") or "")
+        if platform == "faceit":
+            return await _faceit_identity(branding, code)
+        if platform == "startgg":
+            return await _startgg_identity(branding, code)
+        if platform == "roblox":
+            return await _roblox_identity(branding, code)
+        if platform == "osu":
+            return await _osu_identity(branding, code)
+        if platform == "lichess":
+            return await _lichess_identity(code, nonce)
+        if platform == "github":
+            return await _github_identity(branding, code)
+        if platform == "kick":
+            return await _kick_identity(branding, code, nonce)
+        if platform == "reddit":
+            return await _reddit_identity(branding, code)
+        if platform == "spotify":
+            return await _spotify_identity(branding, code)
     except httpx.HTTPError as exc:
         logger.warning("[platform-links] %s: %s", platform, exc)
         # Nur die Fehlerart nach außen - die Meldung könnte die Adresse samt Code enthalten.
@@ -428,6 +517,120 @@ async def _epic_identity(branding: dict, code: str) -> dict:
 
 # ---------------------------------------------------------------- Einrichtung prüfen (Admin)
 
+async def _faceit_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("faceit", branding)
+    async with _client() as client:
+        token = await _token(client, FACEIT_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("faceit")}, auth=(client_id, secret))
+        info = await client.get(FACEIT_USERINFO, headers={"Authorization": f"Bearer {token}"})
+        data = _json(info) if info.status_code == 200 else {}
+        if not data.get("guid"):
+            raise LinkError("exchange_failed", f"userinfo {info.status_code}")
+    nick = str(data.get("nickname") or "")
+    return {"external_id": str(data["guid"]), "handle": nick, "display_name": nick}
+
+
+async def _startgg_identity(branding: dict, code: str) -> dict:
+    """start.gg nimmt das Token-Formular als JSON und nennt die Person nur über GraphQL."""
+    client_id, secret = _credentials("startgg", branding)
+    async with _client() as client:
+        response = await client.post(STARTGG_TOKEN, json={"grant_type": "authorization_code", "client_id": client_id, "client_secret": secret, "code": code,
+                                                          "redirect_uri": redirect_uri("startgg"), "scope": "user.identity"}, headers={"Accept": "application/json"})
+        token = _json(response).get("access_token") if response.status_code == 200 else None
+        if not token:
+            raise LinkError("exchange_failed", f"token {response.status_code}")
+        me = await client.post(STARTGG_GQL, json={"query": "{ currentUser { id slug player { gamerTag } } }"}, headers={"Authorization": f"Bearer {token}"})
+        user = ((_json(me).get("data") or {}).get("currentUser") or {}) if me.status_code == 200 else {}
+        if not user.get("id"):
+            raise LinkError("exchange_failed", f"currentUser {me.status_code}")
+    tag = str((user.get("player") or {}).get("gamerTag") or user.get("slug") or "")
+    return {"external_id": str(user["id"]), "handle": tag, "display_name": tag}
+
+
+async def _roblox_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("roblox", branding)
+    async with _client() as client:
+        token = await _token(client, ROBLOX_TOKEN, data={"client_id": client_id, "client_secret": secret, "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("roblox")})
+        info = await client.get(ROBLOX_USERINFO, headers={"Authorization": f"Bearer {token}"})
+        data = _json(info) if info.status_code == 200 else {}
+        if not data.get("sub"):
+            raise LinkError("exchange_failed", f"userinfo {info.status_code}")
+    handle = str(data.get("preferred_username") or "")
+    return {"external_id": str(data["sub"]), "handle": handle, "display_name": str(data.get("name") or handle)}
+
+
+async def _osu_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("osu", branding)
+    async with _client() as client:
+        token = await _token(client, OSU_TOKEN, data={"client_id": client_id, "client_secret": secret, "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("osu")})
+        me = await client.get(OSU_ME, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    name = str(data.get("username") or "")
+    return {"external_id": str(data["id"]), "handle": name, "display_name": name}
+
+
+async def _lichess_identity(code: str, nonce: str) -> dict:
+    """Lichess: öffentlicher Client ohne Secret, PKCE ist Pflicht."""
+    async with _client() as client:
+        token = await _token(client, LICHESS_TOKEN, data={"grant_type": "authorization_code", "code": code, "code_verifier": _pkce_verifier(nonce), "redirect_uri": redirect_uri("lichess"), "client_id": LICHESS_CLIENT_ID})
+        account = await client.get(LICHESS_ACCOUNT, headers={"Authorization": f"Bearer {token}"})
+        data = _json(account) if account.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"account {account.status_code}")
+    name = str(data.get("username") or data["id"])
+    return {"external_id": str(data["id"]), "handle": name, "display_name": name}
+
+
+async def _github_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("github", branding)
+    async with _client() as client:
+        token = await _token(client, GITHUB_TOKEN, data={"client_id": client_id, "client_secret": secret, "code": code, "redirect_uri": redirect_uri("github")})
+        user = await client.get(GITHUB_USER, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"})
+        data = _json(user) if user.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"user {user.status_code}")
+    login = str(data.get("login") or "")
+    return {"external_id": str(data["id"]), "handle": login, "display_name": str(data.get("name") or login)}
+
+
+async def _kick_identity(branding: dict, code: str, nonce: str) -> dict:
+    client_id, secret = _credentials("kick", branding)
+    async with _client() as client:
+        token = await _token(client, KICK_TOKEN, data={"grant_type": "authorization_code", "client_id": client_id, "client_secret": secret, "redirect_uri": redirect_uri("kick"), "code_verifier": _pkce_verifier(nonce), "code": code})
+        users = await client.get(KICK_USERS, headers={"Authorization": f"Bearer {token}"})
+        rows = _json(users).get("data") if users.status_code == 200 else None
+        if not rows or not (rows[0] or {}).get("user_id"):
+            raise LinkError("exchange_failed", f"users {users.status_code}")
+    data = rows[0]
+    name = str(data.get("name") or "")
+    return {"external_id": str(data["user_id"]), "handle": name, "display_name": name}
+
+
+async def _reddit_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("reddit", branding)
+    async with _client() as client:
+        token = await _token(client, REDDIT_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("reddit")}, auth=(client_id, secret))
+        me = await client.get(REDDIT_ME, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("name"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    name = str(data["name"])
+    return {"external_id": str(data.get("id") or name), "handle": name, "display_name": name}
+
+
+async def _spotify_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("spotify", branding)
+    async with _client() as client:
+        token = await _token(client, SPOTIFY_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("spotify")}, auth=(client_id, secret))
+        me = await client.get(SPOTIFY_ME, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    display = str(data.get("display_name") or data["id"])
+    return {"external_id": str(data["id"]), "handle": display, "display_name": display}
+
+
 def _check(key: str, state: str, text: str) -> dict:
     return {"key": key, "state": state, "text": text}
 
@@ -442,6 +645,10 @@ CLIENT_CREDENTIALS = {
     "tiktok": (TIKTOK_TOKEN, "form_key", {}),
     "epic": (EPIC_TOKEN, "basic", {}),
     "xbox": (MS_TOKEN, "form", {"scope": "https://graph.microsoft.com/.default"}),
+    "osu": (OSU_TOKEN, "form", {"scope": "public"}),
+    "kick": (KICK_TOKEN, "form", {}),
+    "reddit": (REDDIT_TOKEN, "basic", {}),
+    "spotify": (SPOTIFY_TOKEN, "basic", {}),
 }
 REDIRECT_HINTS = {
     "twitch": "Twitch bestätigt Redirects nicht per API: {redirect} muss in der Developer Console unter „OAuth Redirect URLs“ stehen (genau so, ohne Schrägstrich am Ende), Client Type „Confidential“.",
@@ -452,6 +659,14 @@ REDIRECT_HINTS = {
     "riot": "Riot: {redirect} muss beim RSO-Client als Redirect URI stehen; Riot Sign On gibt es nur nach Antrag im Developer Portal.",
     "xbox": "Microsoft: {redirect} muss in der Azure-App-Registrierung unter „Redirect URIs“ (Web) stehen; Kontotyp „Personal Microsoft accounts“.",
     "epic": "Epic: {redirect} muss beim Client im Developer Portal als Redirect URL stehen; die Anwendung muss die Markenprüfung bestanden haben.",
+    "faceit": "FACEIT: {redirect} muss bei der App im Developer Portal unter „Redirect URIs“ stehen (FACEIT Connect).",
+    "startgg": "start.gg: {redirect} muss bei der Anwendung unter Developer Settings als Redirect URI stehen; Scope „user.identity“.",
+    "roblox": "Roblox: {redirect} muss bei der OAuth-2.0-App im Creator Dashboard als Redirect URL stehen (Scopes openid, profile); vor der Prüfung durch Roblox dürfen nur eingetragene Tester verknüpfen.",
+    "osu": "osu!: {redirect} muss bei der OAuth-Anwendung als Application Callback URL stehen.",
+    "github": "GitHub: {redirect} muss bei der OAuth App als Authorization callback URL stehen.",
+    "kick": "Kick: {redirect} muss bei der App unter Redirect URI stehen; Scope „user:read“.",
+    "reddit": "Reddit: {redirect} muss bei der App (Typ „web app“) als redirect uri stehen.",
+    "spotify": "Spotify: {redirect} muss bei der App im Dashboard unter Redirect URIs stehen; im Development Mode dürfen nur eingetragene Nutzer verknüpfen.",
 }
 
 
@@ -475,6 +690,10 @@ async def check_provider(platform: str, branding: dict, *, bot_token: str | None
             else:
                 checks.append(_check("api_key", "warn", "Ohne Steam-API-Schlüssel zeigt das Profil die 17-stellige ID statt des Anzeigenamens (optional)."))
             return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
+
+        if platform == "lichess":
+            checks.append(_check("credentials", "ok", "Lichess braucht keine App – die Verknüpfung läuft als öffentlicher Client mit PKCE."))
+            return {"platform": platform, "ok": True, "redirect_uri": redirect, "checks": checks}
 
         client_id, secret = _credentials(platform, branding)
         if not client_id or not secret:

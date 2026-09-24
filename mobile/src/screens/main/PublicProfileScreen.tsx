@@ -54,6 +54,15 @@ type PublicProfilePayload = {
   ea_id?: string | null;
   riot_id?: string | null;
   battlenet_id?: string | null;
+  faceit_handle?: string | null;
+  startgg_handle?: string | null;
+  roblox_handle?: string | null;
+  osu_handle?: string | null;
+  lichess_handle?: string | null;
+  github_handle?: string | null;
+  kick_handle?: string | null;
+  reddit_handle?: string | null;
+  spotify_handle?: string | null;
   website?: string | null;
   main_platform?: string | null;
   main_platforms?: string[];

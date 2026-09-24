@@ -93,8 +93,10 @@ test.describe("Adminmenü", () => {
     // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste),
     // 64 seit die Einstellungen im Menü liegen (#546: Alle Verbindungen, Google, Resend, SMTP,
     // E-Mail und Auftritt als Gruppen, Status und Zugang unter System - „Einstellungen“ selbst weg).
-    // 60 seit „Betrieb & Logs“ (#517 Teil 2): Logs, Audit Logs, App-Logs und Versandlogs sind Reiter dort.
-    expect((await navMetrics(page)).entries).toBe(60);
+    // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste),
+    // 64 seit die Einstellungen im Menü liegen (#546), 60 seit „Betrieb & Logs“ (#517 Teil 2),
+    // 69 mit den neun Plattformen aus Konten verknüpfen III, Welle 1 (#547).
+    expect((await navMetrics(page)).entries).toBe(69);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

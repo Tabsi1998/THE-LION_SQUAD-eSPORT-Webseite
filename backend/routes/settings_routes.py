@@ -155,6 +155,30 @@ class BrandingSettings(BaseModel):
     epic_client_id: Optional[str] = None
     epic_client_secret: Optional[str] = None
     clear_epic_client_secret: Optional[bool] = None
+    faceit_client_id: Optional[str] = None
+    faceit_client_secret: Optional[str] = None
+    clear_faceit_client_secret: Optional[bool] = None
+    startgg_client_id: Optional[str] = None
+    startgg_client_secret: Optional[str] = None
+    clear_startgg_client_secret: Optional[bool] = None
+    roblox_client_id: Optional[str] = None
+    roblox_client_secret: Optional[str] = None
+    clear_roblox_client_secret: Optional[bool] = None
+    osu_client_id: Optional[str] = None
+    osu_client_secret: Optional[str] = None
+    clear_osu_client_secret: Optional[bool] = None
+    github_client_id: Optional[str] = None
+    github_client_secret: Optional[str] = None
+    clear_github_client_secret: Optional[bool] = None
+    kick_client_id: Optional[str] = None
+    kick_client_secret: Optional[str] = None
+    clear_kick_client_secret: Optional[bool] = None
+    reddit_client_id: Optional[str] = None
+    reddit_client_secret: Optional[str] = None
+    clear_reddit_client_secret: Optional[bool] = None
+    spotify_client_id: Optional[str] = None
+    spotify_client_secret: Optional[str] = None
+    clear_spotify_client_secret: Optional[bool] = None
     site_banner_enabled: Optional[bool] = None
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
@@ -296,9 +320,11 @@ class AuthSettings(BaseModel):
 
 
 SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key",
-                               "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret"}
+                               "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret",
+                               "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret"}
 # Geheimnisse der Branding-Einstellungen: nie zurückgeben, nur „gespeichert“ melden (#260 dazu: Discord, Steam).
-BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key", "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret")
+BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key", "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret",
+                           "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret")
 
 
 def _hide_branding_secrets(settings: dict) -> dict:
@@ -753,6 +779,9 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
     # Plattformen zum Verknüpfen
     for key, spec in PLATFORMS.items():
         to = f"/admin/integrations/{key}"
+        if not spec.get("id_field") and key != "steam":
+            add(key, spec["label"], GROUP_PLATFORMS, to, "active", "Mitglieder können verknüpfen · keine App nötig")
+            continue
         if not spec.get("id_field"):
             api_state = _secret_state(branding.get("steam_api_key"))
             if api_state == "unreadable":

@@ -143,7 +143,7 @@ export function ProfileScreen() {
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
   const manualSocialKeys = useMemo(() => {
-    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id" };
+    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id", faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle" };
     const notReady = LINKABLE_PLATFORMS.filter((platform) => !linkedPlatforms.has(platform) && !linkAvailable[platform]).map((platform) => fieldOf[platform]);
     return [...notReady, "instagram_handle", "psn_id", "nintendo_fc", "ea_id", "website"];
   }, [linkAvailable, linkedPlatforms]);
@@ -205,6 +205,15 @@ export function ProfileScreen() {
       ea_id: u.ea_id || "",
       riot_id: u.riot_id || "",
       battlenet_id: u.battlenet_id || "",
+      faceit_handle: u.faceit_handle || "",
+      startgg_handle: u.startgg_handle || "",
+      roblox_handle: u.roblox_handle || "",
+      osu_handle: u.osu_handle || "",
+      lichess_handle: u.lichess_handle || "",
+      github_handle: u.github_handle || "",
+      kick_handle: u.kick_handle || "",
+      reddit_handle: u.reddit_handle || "",
+      spotify_handle: u.spotify_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
       newsletter_consent: Boolean(u.newsletter_consent),
@@ -779,6 +788,10 @@ function labelFor(key: string) {
     .replace("discord_name", "Discord")
     .replace("nintendo_fc", "Nintendo Friend Code")
     .replace("battlenet", "Battle.net")
+    .replace("faceit", "FACEIT")
+    .replace("startgg", "start.gg")
+    .replace("osu", "osu!")
+    .replace("github", "GitHub")
     .replace(/_/g, " ")
     .replace(/^\w/, (char) => char.toUpperCase());
 }
