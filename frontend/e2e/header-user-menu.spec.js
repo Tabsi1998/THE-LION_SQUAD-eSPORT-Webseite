@@ -37,6 +37,11 @@ test("das Benutzermenü führt ins Profil; ein Mitglied sieht den Mitgliederbere
     await expect(page.getByTestId("nav-admin")).toHaveCount(0);
     await page.getByTestId("nav-user").click();
     await expect(page.getByTestId("nav-member-area")).toHaveAttribute("href", "/members/area");
+    // Reihenfolge nach Häufigkeit (#516): Mitgliedschaft vor Rechnungen, keine Strafen ohne Strafe.
+    await expect(page.getByTestId("nav-account-membership")).toHaveAttribute("href", "/members/membership");
+    await expect(page.getByTestId("nav-account-notifications")).toHaveAttribute("href", "/notifications");
+    await expect(page.getByTestId("nav-account-penalties")).toHaveCount(0);
+    await expect(page.getByTestId("nav-account-join")).toHaveCount(0);
     await expect(page.getByTestId("nav-logout")).toBeVisible();
     await page.getByTestId("nav-profile").click();
   }
@@ -57,5 +62,8 @@ test("ohne Mitgliedschaft gibt es keinen Mitgliederbereich im Menü, und das Das
     await page.getByTestId("nav-user").click();
     await expect(page.getByTestId("nav-member-area")).toHaveCount(0);
     await expect(page.getByTestId("nav-admin")).toHaveCount(0);
+    // Wer kein Mitglied ist, sieht den Weg dorthin (#516).
+    await expect(page.getByTestId("nav-account-join")).toHaveAttribute("href", "/membership/join");
+    await expect(page.getByTestId("nav-account-membership")).toHaveCount(0);
   }
 });

@@ -1,19 +1,34 @@
-import { Bell, Crown, Eye, Gamepad2, Gift, Globe, LifeBuoy, Medal, Receipt, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Bell, Crown, Eye, Gamepad2, Gift, Globe, LayoutDashboard, LifeBuoy, Medal, MessageSquare, Receipt, Settings, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 
-// Mein Konto (Wunsch des Betreibers, 24.09.: „wo finde ich meine Rechnungen usw.?“): alles
-// Persönliche an einer Stelle - im Benutzermenü, im Handy-Menü und in der Profil-Seitenleiste.
-// Rechnungen sind ein Reiter des Profils (#320), der Rest sind eigene Seiten.
-export const ACCOUNT_LINKS = [
-  { to: "/profile?tab=invoices", label: "Rechnungen", icon: Receipt, key: "invoices" },
-  { to: "/members/membership", label: "Meine Mitgliedschaft", icon: Crown, key: "membership", memberOnly: true },
-  { to: "/my/penalties", label: "Strafen & Moderation", icon: ShieldAlert, key: "penalties" },
-  { to: "/my/prizes", label: "Gewinne", icon: Gift, key: "prizes" },
-  { to: "/notifications", label: "Benachrichtigungen", icon: Bell, key: "notifications" },
-  { to: "/contact", label: "Hilfe & Kontakt", icon: LifeBuoy, key: "help" },
-];
+// Das Benutzermenü (#282, #516): eine Liste für den Kopf am PC und das Handy-Menü - jeder Eintrag
+// genau ein Ziel, Reihenfolge nach Häufigkeit. Strafen und Gewinne erscheinen nur, wenn es welche
+// gibt (Zähler aus useAccountBadges); wer kein Mitglied ist, sieht „Mitglied werden“ statt
+// „Meine Mitgliedschaft“. Rechnungen sind ein Reiter des Profils (#320), der Rest eigene Seiten.
+// Die Profil-Seitenleiste führt diese Liste seit #516 nicht mehr doppelt.
+export function userMenuEntries({ username = "", isClubMember = false, badges = {} } = {}) {
+  const penalties = Number(badges.penalties || 0);
+  const prizes = Number(badges.prizes || 0);
+  return [
+    { key: "dashboard", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "profile", to: "/profile", label: "Mein Profil", icon: Settings },
+    { key: "public-profile", to: `/u/${username}`, label: "Öffentliches Profil", icon: Eye },
+    { key: "messages", to: "/messages", label: "Nachrichten", icon: MessageSquare },
+    { key: "notifications", to: "/notifications", label: "Benachrichtigungen", icon: Bell },
+    isClubMember
+      ? { key: "membership", to: "/members/membership", label: "Meine Mitgliedschaft", icon: Crown }
+      : { key: "join", to: "/membership/join", label: "Mitglied werden", icon: UserPlus },
+    { key: "invoices", to: "/profile?tab=invoices", label: "Rechnungen", icon: Receipt },
+    ...(penalties > 0 ? [{ key: "penalties", to: "/my/penalties", label: `Meine Strafen (${penalties})`, icon: ShieldAlert }] : []),
+    ...(prizes > 0 ? [{ key: "prizes", to: "/my/prizes", label: `Gewinne (${prizes})`, icon: Gift }] : []),
+    { key: "help", to: "/contact", label: "Hilfe & Kontakt", icon: LifeBuoy },
+  ];
+}
 
-export function accountLinksFor(isClubMember) {
-  return ACCOUNT_LINKS.filter((link) => !link.memberOnly || isClubMember);
+// Die vier Einträge im Kopf des Menüs behalten ihre alten Kennungen (Smoke-Tests, Links aus Mails).
+export const USER_MENU_TEST_IDS = { dashboard: "nav-dashboard", profile: "nav-profile", "public-profile": "nav-public-profile", messages: "nav-messages-menu" };
+export function userMenuTestId(key, suffix = "") {
+  const base = USER_MENU_TEST_IDS[key] || `nav-account-${key}`;
+  return suffix ? `${base}${suffix}` : base;
 }
 
 // Privatsphäre und Benachrichtigungen sind seit #257 zwei Reiter; Mails
@@ -29,7 +44,8 @@ export const TABS = [
   // Rechnungen gehören zum Konto, nicht zum Vereinsbereich (#320, Entscheidung vom 23.09.).
   { k: "invoices", label: "Rechnungen", icon: Receipt },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
-  { k: "notifications", label: "Benachrichtigungen", icon: Bell },
+  // „Benachrichtigungen“ ist die Liste unter /notifications; hier werden sie eingestellt (#516).
+  { k: "notifications", label: "Benachrichtigungen einstellen", icon: Bell },
   // Sicherheit bündelt seit #258 Passwort, Passkeys, Zwei-Faktor, Google und
   // die Geräte (vorher eigener Reiter „Sitzungen“; ?tab=sessions landet hier).
   { k: "security", label: "Sicherheit", icon: ShieldCheck },

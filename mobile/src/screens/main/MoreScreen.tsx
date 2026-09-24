@@ -26,7 +26,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices";
+  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices" | "MyMembership";
   ownPublicProfile?: boolean;
 };
 
@@ -35,17 +35,20 @@ type SocialLink = { platform?: string; label?: string; url?: string; enabled?: b
 // Wer noch nicht Mitglied ist, landet auf der Beitrittsseite der Website (#340).
 export const JOIN_URL = `${API_BASE_URL}/membership/join`;
 
+// Konto in derselben Reihenfolge wie das Benutzermenü im Web (#516): Nachrichten, Benachrichtigungen,
+// Meine Mitgliedschaft (Mitglieder), Rechnungen, öffentliches Profil. „Mitglied werden“ ist die Karte oben.
+export function kontoEntries(isClubMember: boolean): Entry[] {
+  return [
+    { title: "Nachrichten", icon: "chatbubbles-outline", screen: "DirectMessages" },
+    { title: "Benachrichtigungen", icon: "notifications-outline", screen: "Notifications" },
+    ...(isClubMember ? [{ title: "Meine Mitgliedschaft", icon: "ribbon-outline" as const, screen: "MyMembership" as const }] : []),
+    // Meine Rechnungen (#320): für alle Konten - Event- und Turnierrechnungen auch ohne Mitgliedschaft.
+    { title: "Meine Rechnungen", icon: "receipt-outline", screen: "MyInvoices" },
+    { title: "Öffentliches Profil", icon: "open-outline", ownPublicProfile: true },
+  ];
+}
+
 const GROUPS: Array<{ title: string; entries: Entry[] }> = [
-  {
-    title: "Konto",
-    entries: [
-      { title: "Nachrichten", icon: "chatbubbles-outline", screen: "DirectMessages" },
-      { title: "Benachrichtigungen", icon: "notifications-outline", screen: "Notifications" },
-      // Meine Rechnungen (#320): für alle Konten - Event- und Turnierrechnungen auch ohne Mitgliedschaft.
-      { title: "Meine Rechnungen", icon: "receipt-outline", screen: "MyInvoices" },
-      { title: "Öffentliches Profil", icon: "open-outline", ownPublicProfile: true },
-    ],
-  },
   {
     // Nur Ziele ohne eigenen Tab: Fast Laps und Turniere haben den Events-Tab (#242).
     title: "Gaming",
@@ -161,7 +164,7 @@ export function MoreScreen({ navigation }: Props) {
           )
         ) : null}
 
-        {GROUPS.map((group) => {
+        {[{ title: "Konto", entries: kontoEntries(Boolean(user && !isGuestUser(user) && user.is_club_member)) }, ...GROUPS].map((group) => {
           return (
             <View key={group.title} style={styles.group}>
               <Heading>{group.title}</Heading>

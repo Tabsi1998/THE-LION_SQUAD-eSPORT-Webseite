@@ -88,6 +88,31 @@ Benachrichtigungen ab. Es hängt nicht am Newsletter.
 - Mitgliederdaten, Dokumente und Einstellungen sind ohne bestätigte Zwei-Faktor-Anmeldung nicht
   erreichbar – auch nicht für Club-Admins.
 
+## Benutzermenü und Konto-Seiten (#516)
+
+Das Benutzermenü im Kopf (am Handy im Hauptmenü, in der App unter „Mehr → Konto“) hat je Eintrag
+genau ein Ziel, in der Reihenfolge, wie oft man es braucht:
+
+| Eintrag | Ziel | Wer |
+| --- | --- | --- |
+| Dashboard | `/dashboard` | jedes Konto |
+| Mein Profil | `/profile` (Reiter, darunter „Benachrichtigungen einstellen“) | jedes Konto |
+| Öffentliches Profil | `/u/<name>` – so, wie andere es sehen | jedes Konto |
+| Nachrichten | `/messages` | jedes Konto |
+| Benachrichtigungen | `/notifications` (die Liste) | jedes Konto |
+| Meine Mitgliedschaft | `/members/membership` | Mitglieder |
+| Mitglied werden | `/membership/join` | wer kein Mitglied ist |
+| Rechnungen | `/profile?tab=invoices` | jedes Konto |
+| Meine Strafen (n) | `/my/penalties` – nur, wenn es Strafen oder eine laufende Maßnahme gibt | betroffene Konten |
+| Gewinne (n) | `/my/prizes` – nur mit offenem Gewinn | Gewinner |
+| Hilfe & Kontakt | `/contact` | jedes Konto |
+| Mitgliederbereich | `/members/area` (Mitgliedschaft, Karte, Vorteile, Dokumente, interne News, Vorstand, Discord) | Mitglieder |
+| Admin | `/admin` | wer einen Bereich hat |
+| Abmelden | – | jedes Konto |
+
+Gäste sehen statt des Menüs „Anmelden“ und „Mitglied werden“. Die Profil-Seitenleiste führt nur
+die Reiter des Profils - die Konto-Seiten stehen nicht ein zweites Mal dort.
+
 ## Wer sieht was im Adminbereich
 
 Das Menü zeigt nur Gruppen und Einträge, für die ein Bereich vorhanden ist. Eine Seite ohne
