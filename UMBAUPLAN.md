@@ -472,10 +472,10 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398 (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), Teil 2 (Kontaktänderung, Austritt, Mandat) wartet auf dolibarr-vereine#164/#125; #324 Dokumente (wartet auf #157) |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398, Teil 2 Vorstandsseite aus Dolibarr – umgesetzt in #468 (Block 48.6) (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 2 (Vorstandsseite aus `/vereine/board`) als Vorschlag im Issue, Antwort steht aus; Statuten warten auf dolibarr-vereine#158. #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), Teil 2 (Kontaktänderung, Austritt, Mandat) wartet auf dolibarr-vereine#164/#125; #324 Dokumente (wartet auf #157) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; offen: #459 App-Karte |
-| Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – PR #463 (Block 49.2); offen: #415 Bildprüfung |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; Anleitungen und Prüfung – umgesetzt in #465 (Block 50.5); Konten verknüpfen II (Battle.net, X, YouTube, TikTok, Riot, Xbox, Epic) – umgesetzt in #467 (Block 50.7); Menügruppe Verbindungen – PR #470 (Block 50.8); offen: #459 App-Karte |
+| Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – umgesetzt in #463 (Block 49.2); offen: #415 Bildprüfung |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
@@ -759,7 +759,44 @@ Der Betreiber sah sein verifiziertes Steam-Konto im öffentlichen Profil nicht. 
 bestimmt jetzt je Aufruf, wer schaut (eingeloggt, Mitglied, Admin-Team, die Person selbst), und
 jedes Feld folgt seiner Stufe – samt Häkchen und der Karte „Verknüpfte Konten“.
 
+### Was 50.5 gefunden hat (Einrichtung – PR #465)
+
+**Anleitungen fehlten für fast jeden Dienst; die Discord-Verknüpfung scheiterte still an Secret oder
+Rückrufadresse.** Jetzt hat jeder Dienst eine Anleitung mit Links und Werten zum Kopieren – in seinem
+Reiter und gesammelt unter System → Einrichtung mit Stand; „prüfen“ sagt bei Discord, Twitch und
+Steam, was fehlt. Der Betreiber sah davon zunächst nichts, weil `update.sh` seit dem Vorabend fehlte.
+
+### Was 50.6 gefunden hat (Mein Konto – PR #466)
+
+**Rechnungen, Strafen, Gewinne und Mitgliedschaft hatten keinen gemeinsamen Einstieg.** Ein Block
+„Mein Konto“ im Benutzermenü, im Handy-Menü und in der Profil-Seitenleiste führt zu allem
+Persönlichen – aus einer Liste, damit nichts auseinanderläuft.
+
+### Was 50.7 gefunden hat (Konten verknüpfen II – PR #467)
+
+**„Alles, was verlinkbar ist, verknüpfen.“** Discord, Twitch und Steam waren Sonderfälle; jetzt ist
+jede Plattform eine Registrierung, und Battle.net, X, YouTube, TikTok, Riot, Xbox und Epic lassen
+sich per Anmeldung verifizieren. PlayStation, Nintendo, EA und Instagram bleiben getippt – mit dem
+Grund am Feld. Riot, TikTok und Epic brauchen eine Freigabe der Plattform.
+
+### Was 50.8 gefunden hat (Menügruppe Verbindungen – PR #470)
+
+**„Für alles ein Menü, also TikTok eins.“** Jeder Dienst hat einen eigenen Menüpunkt unter
+Verbindungen und eine eigene Seite: Stand, Zugangsdaten, Rückrufadresse, „prüfen“, Anleitung offen,
+Weg zu den laufenden Einstellungen im Reiter.
+
 ## Block 49 — Moderation II, Teil 1: Wortfilter
+
+### Was 49.2 gefunden hat (#416 – PR #463)
+
+**Es gab Meldungen, Wortfilter und Wettkampfstrafen, aber keine Stufen.** Jetzt zählt jeder
+zurückgewiesene Wortfilter-Fund, jede als „berechtigt“ erledigte Meldung und jeder Treffer von
+Hand; nach Stufen (Standard: 1 Hinweis, 2 Verwarnung mit 24 h Chat-Sperre, 3 Sperre bis zur
+Entscheidung) entsteht die Maßnahme von selbst, mit Benachrichtigung und Mail. Die Person sieht
+ihren Stand unter „Meine Strafen“ und im Profil der App und legt dort Einspruch ein; die
+Moderation sieht die Historie je Person, setzt oder hebt Stufen und exportiert für den Vorstand.
+Bewusst: die Wettkampfstrafen bleiben getrennt (kein Chat prüfte sie); Stufe 3 hebt nur ein
+Mensch auf; nach außen ist nichts sichtbar.
 
 ### Was 49.1 gefunden hat (#417 – PR #453)
 
@@ -809,6 +846,15 @@ Konto), die Verwaltung kann sperren, und endet die Mitgliedschaft – durch den 
 Dolibarr – geht der Eintrag offline. Die Community-Seite erklärt Accounts und Mitglieder und zählt aus
 der Mitgliederverwaltung. Notiert, nicht geändert: Legt die Verwaltung ein Profil mit verknüpftem Konto
 an, aktiviert das ohne Dolibarr still die Mitgliedschaft (`_activate_linked_membership`).
+
+### Was 48.6 gefunden hat (#326 Teil 2 – PR #468)
+
+**„Der Vorstand wird ja aus Dolibarr genommen – warum kann ich noch alles von Hand?“** Teil 1 nahm
+nur die Vereinsdaten fürs Impressum; die Vorstandsseite zog weiter die Posten von Hand. Jetzt folgt
+sie demselben Schalter: Funktionen und Inhaber aus dem Vereinsmodul, nur Vorstand (keine
+Rechnungsprüfer), Name nur mit Einwilligung, Foto und Profil nur über den eigenen Verzeichnis-
+Eintrag, unbesetzt heißt unbesetzt. Admin → Vorstand zeigt, dass Dolibarr führt, und behält die
+Liste von Hand als Rückfall. Statuten folgen mit dolibarr-vereine#158.
 
 ### Was 48.5 gefunden hat (#329 Teil 1 – PR #452)
 
