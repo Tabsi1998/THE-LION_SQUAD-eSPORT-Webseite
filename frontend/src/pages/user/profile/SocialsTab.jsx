@@ -13,7 +13,7 @@ import { PlatformIcon, brandButtonStyle, linkButtonLabel, platformMeta } from "@
 // nicht eingerichtet hat. Die Sichtbarkeit je Konto regelt der Reiter Privatsphäre - auch für den
 // verknüpften Namen.
 const TEST_IDS = { discord_name: "profile-discord", twitch_handle: "profile-twitch", steam_id: "profile-steam" };
-const LINK_ORDER = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify"];
+const LINK_ORDER = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie"];
 const FIELD_BY_PLATFORM = Object.fromEntries(Object.entries(PLATFORM_BY_FIELD).map(([field, key]) => [key, field]));
 const MANUAL_ROWS = [["instagram_handle", "psn_id"], ["nintendo_fc", "ea_id"]];
 

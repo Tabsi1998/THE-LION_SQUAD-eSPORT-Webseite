@@ -20,8 +20,8 @@ test("unterschiedliche Stufen in einer Gruppe heissen gemischt", () => {
   expect(groupLevel({ email: "private" }, contact)).toBe("mixed");
 });
 
-test("jedes der 29 Felder steht in genau einer Gruppe", () => {
+test("jedes der 37 Felder steht in genau einer Gruppe", () => {
   const keys = VISIBILITY_GROUPS.flatMap((group) => group.fields.map((field) => field.k));
   expect(new Set(keys).size).toBe(keys.length);
-  expect(keys).toHaveLength(29);
+  expect(keys).toHaveLength(37);
 });

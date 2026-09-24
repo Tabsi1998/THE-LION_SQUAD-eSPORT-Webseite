@@ -28,6 +28,15 @@ export const INTEGRATIONS = [
   { key: "kick", label: "Kick", app: "kick", guides: ["kick"] },
   { key: "reddit", label: "Reddit", app: "reddit", guides: ["reddit"] },
   { key: "spotify", label: "Spotify", app: "spotify", guides: ["spotify"] },
+  // Welle 2 (#547).
+  { key: "threads", label: "Threads", app: "threads", guides: ["threads"] },
+  { key: "facebook", label: "Facebook", app: "facebook", guides: ["facebook"] },
+  { key: "linkedin", label: "LinkedIn", app: "linkedin", guides: ["linkedin"] },
+  { key: "snapchat", label: "Snapchat", app: "snapchat", guides: ["snapchat"] },
+  { key: "pinterest", label: "Pinterest", app: "pinterest", guides: ["pinterest"] },
+  { key: "telegram", label: "Telegram", app: "telegram", guides: ["telegram"] },
+  { key: "wargaming", label: "Wargaming.net", app: "wargaming", guides: ["wargaming"] },
+  { key: "bungie", label: "Bungie.net", app: "bungie", guides: ["bungie"] },
   // Seit #546 sind Google, Resend und SMTP eigene Seiten unter Verbindungen; Analytics, Google Play und
   // Dolibarr haben ihre Seite anderswo (Auftritt bzw. Mitglieder) und stehen nur in der Übersicht.
   { key: "google", label: "Google", guides: ["google_login"], tab: "/admin/settings/google", tabLabel: "Client-ID und Login-Schalter", searchTerms: ["google login", "google-login", "anmeldung mit google", "oauth", "web-client-id"] },

@@ -8,6 +8,8 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import jwt
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -153,6 +155,46 @@ class FakePlatforms:
             return httpx.Response(200, json={"access_token": "sp"}) if request.headers.get("Authorization") == self.basic("spotify-app", "spotify-geheim") else httpx.Response(401, json={"error": "invalid_client"})
         if url == platform_links.SPOTIFY_ME:
             return httpx.Response(200, json={"id": "sp-1", "display_name": "Paula S."})
+        if url == platform_links.THREADS_TOKEN:
+            return httpx.Response(200, json={"access_token": "th", "user_id": "th-1"}) if form.get("client_secret") == "threads-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.THREADS_ME:
+            return httpx.Response(200, json={"id": "th-1", "username": "paula.threads"})
+        if url == platform_links.FACEBOOK_TOKEN:
+            if form.get("grant_type") == "client_credentials":
+                return httpx.Response(200, json={"access_token": "app|token"}) if form.get("client_secret") == "facebook-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+            return httpx.Response(200, json={"access_token": "fb"}) if form.get("client_secret") == "facebook-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.FACEBOOK_ME:
+            return httpx.Response(200, json={"id": "fb-1", "name": "Paula Beispiel"})
+        if url == platform_links.LINKEDIN_TOKEN:
+            return httpx.Response(200, json={"access_token": "li"}) if form.get("client_secret") == "linkedin-geheim" else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.LINKEDIN_USERINFO:
+            return httpx.Response(200, json={"sub": "li-1", "name": "Paula Beispiel", "given_name": "Paula"})
+        if url == platform_links.SNAPCHAT_TOKEN:
+            return httpx.Response(200, json={"access_token": "sn"}) if request.headers.get("Authorization") == self.basic("snapchat-app", "snapchat-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.SNAPCHAT_ME:
+            return httpx.Response(200, json={"data": {"me": {"externalId": "sn-1", "displayName": "PaulaSnap"}}})
+        if url == platform_links.PINTEREST_TOKEN:
+            return httpx.Response(200, json={"access_token": "pi"}) if request.headers.get("Authorization") == self.basic("pinterest-app", "pinterest-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.PINTEREST_ME:
+            return httpx.Response(200, json={"id": "pi-1", "username": "paulapins"})
+        if url == platform_links.TELEGRAM_TOKEN:
+            assert form.get("code_verifier") and form.get("client_id") == "telegram-app"
+            if form.get("client_secret") != "telegram-geheim":
+                return httpx.Response(401, json={"error": "invalid_client"})
+            id_token = jwt.encode({"sub": "tg-1", "id": 4242, "name": "Paula", "preferred_username": "paula_tg", "aud": "telegram-app", "iss": "https://oauth.telegram.org"}, TELEGRAM_PEM, algorithm="RS256", headers={"kid": "tg-1"})
+            return httpx.Response(200, json={"access_token": "tg", "id_token": id_token})
+        if url == platform_links.TELEGRAM_JWKS:
+            return httpx.Response(200, json={"keys": [telegram_jwk()]})
+        if url == platform_links.WARGAMING_ACCOUNT_INFO:
+            params = dict(request.url.params)
+            assert params.get("application_id") == "wg-app" and params.get("access_token") == "wg-token"
+            return httpx.Response(200, json={"status": "ok", "data": {"555": {"nickname": "PaulaTank"}}})
+        if url == platform_links.BUNGIE_TOKEN:
+            assert request.headers.get("X-API-Key") == "bungie-key"
+            return httpx.Response(200, json={"access_token": "bn"}) if request.headers.get("Authorization") == self.basic("bungie-app", "bungie-geheim") else httpx.Response(401, json={"error": "invalid_client"})
+        if url == platform_links.BUNGIE_MEMBERSHIPS:
+            assert request.headers.get("X-API-Key") == "bungie-key"
+            return httpx.Response(200, json={"Response": {"bungieNetUser": {"membershipId": "9001", "uniqueName": "Paula#1234", "displayName": "Paula"}}})
         if url == platform_links.STEAM_OPENID:
             assert form.get("openid.mode") == "check_authentication"
             return httpx.Response(200, text="ns:http://specs.openid.net/auth/2.0\nis_valid:true\n" if self.steam_valid else "is_valid:false\n")
@@ -182,11 +224,13 @@ MORE_APPS = {
     "riot_client_id": "riot-app", "riot_client_secret": "riot-geheim", "xbox_client_id": "xbox-app", "xbox_client_secret": "xbox-geheim",
     "epic_client_id": "epic-app", "epic_client_secret": "epic-geheim",
     "faceit_client_id": "faceit-app", "faceit_client_secret": "faceit-geheim", "startgg_client_id": "startgg-app", "startgg_client_secret": "startgg-geheim", "roblox_client_id": "roblox-app", "roblox_client_secret": "roblox-geheim", "osu_client_id": "osu-app", "osu_client_secret": "osu-geheim", "github_client_id": "github-app", "github_client_secret": "github-geheim", "kick_client_id": "kick-app", "kick_client_secret": "kick-geheim", "reddit_client_id": "reddit-app", "reddit_client_secret": "reddit-geheim", "spotify_client_id": "spotify-app", "spotify_client_secret": "spotify-geheim",
+    "threads_client_id": "threads-app", "threads_client_secret": "threads-geheim", "facebook_client_id": "facebook-app", "facebook_client_secret": "facebook-geheim", "linkedin_client_id": "linkedin-app", "linkedin_client_secret": "linkedin-geheim", "snapchat_client_id": "snapchat-app", "snapchat_client_secret": "snapchat-geheim", "pinterest_client_id": "pinterest-app", "pinterest_client_secret": "pinterest-geheim", "telegram_client_id": "telegram-app", "telegram_client_secret": "telegram-geheim", "bungie_client_id": "bungie-app", "bungie_client_secret": "bungie-geheim",
+    "wargaming_application_id": "wg-app", "bungie_api_key": "bungie-key",
 }
 
 
 async def configure(flow, **extra):
-    more = {key: (encrypt_secret(value) if key.endswith("_secret") else value) for key, value in MORE_APPS.items()}
+    more = {key: (encrypt_secret(value) if key.endswith(("_secret", "_api_key")) else value) for key, value in MORE_APPS.items()}
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {
         "id": "branding", "discord_client_id": "discord-app", "discord_client_secret": encrypt_secret("discord-geheim"),
         "twitch_client_id": "twitch-app", "twitch_client_secret": encrypt_secret("twitch-geheim"), **more, **extra,
@@ -205,7 +249,9 @@ def state_of(url: str) -> str:
     query = parse_qs(urlparse(url).query)
     if "state" in query:
         return query["state"][0]
-    return parse_qs(urlparse(query["openid.return_to"][0]).query)["state"][0]
+    # Steam (OpenID) und Wargaming hängen den state an die Rückrufadresse.
+    inner = query.get("openid.return_to") or query["redirect_uri"]
+    return parse_qs(urlparse(inner[0]).query)["state"][0]
 
 
 def target(response) -> dict:
@@ -435,7 +481,32 @@ EXPECTED_LINKS = {
     "kick": ("paulakick", "kick_handle", "https://kick.com/paulakick"),
     "reddit": ("paula_r", "reddit_handle", "https://www.reddit.com/user/paula_r"),
     "spotify": ("Paula S.", "spotify_handle", "https://open.spotify.com/user/sp-1"),
+    # Welle 2 (#547)
+    "threads": ("paula.threads", "threads_handle", "https://www.threads.com/@paula.threads"),
+    "facebook": ("Paula Beispiel", "facebook_handle", "https://www.facebook.com/fb-1"),
+    "linkedin": ("Paula Beispiel", "linkedin_handle", ""),
+    "snapchat": ("PaulaSnap", "snapchat_handle", ""),
+    "pinterest": ("paulapins", "pinterest_handle", "https://www.pinterest.com/paulapins/"),
+    "telegram": ("paula_tg", "telegram_handle", "https://t.me/paula_tg"),
+    "wargaming": ("PaulaTank", "wargaming_handle", ""),
+    "bungie": ("Paula#1234", "bungie_handle", "https://www.bungie.net/7/en/User/Profile/254/9001"),
 }
+# Wie die Plattform zurückruft: OAuth-Code oder (Wargaming) die Antwort mit Token und Konto.
+CALLBACK_QUERY = {"wargaming": "status=ok&access_token=wg-token&nickname=PaulaTank&account_id=555&expires_at=1"}
+
+TELEGRAM_KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+TELEGRAM_PEM = TELEGRAM_KEY.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+
+
+def telegram_jwk() -> dict:
+    numbers = TELEGRAM_KEY.public_key().public_numbers()
+
+    def b64(value: int) -> str:
+        import base64
+        raw = value.to_bytes((value.bit_length() + 7) // 8, "big")
+        return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+    return {"kty": "RSA", "kid": "tg-1", "use": "sig", "alg": "RS256", "n": b64(numbers.n), "e": b64(numbers.e)}
 
 
 @pytest.mark.asyncio
@@ -446,13 +517,15 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     for platform, (handle, field, url) in EXPECTED_LINKS.items():
         flow.act_as(paula)
         start = (await flow.post(f"/api/me/platform-links/{platform}/start")).json()["url"]
-        if platform in ("x", "kick", "lichess"):
+        if platform in ("x", "kick", "lichess", "telegram"):
             assert "code_challenge=" in start and "code_challenge_method=S256" in start
+        if platform == "wargaming":
+            assert start.startswith(platform_links.WARGAMING_LOGIN) and "application_id=wg-app" in start
         if platform == "lichess":
             assert f"client_id={platform_links.LICHESS_CLIENT_ID}" in start
         state = state_of(start)
         flow.act_as(None)
-        landed = target(await flow.get(f"/api/platform-links/{platform}/callback?code=gut&state={state}"))
+        landed = target(await flow.get(f"/api/platform-links/{platform}/callback?{CALLBACK_QUERY.get(platform, 'code=gut')}&state={state}"))
         assert landed == {"tab": "socials", "linked": platform}, (platform, landed)
         user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
         assert user[field] == handle and user["platform_verified"][platform] is True, platform
@@ -465,6 +538,7 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     assert set(public["verified_platforms"]) == set(EXPECTED_LINKS)
     accounts = {row["platform"]: row for row in public["linked_accounts"]}
     assert accounts["xbox"]["display_name"] == "PaulaGT" and accounts["riot"]["handle"] == "Paula#EUW" and accounts["youtube"]["url"] == "https://www.youtube.com/@paulaplays"
+    assert accounts["telegram"]["display_name"] == "Paula" and accounts["bungie"]["display_name"] == "Paula" and accounts["wargaming"]["handle"] == "PaulaTank"
 
     # Von Hand geändert: das Häkchen fällt - auch bei den neuen Plattformen.
     flow.act_as(paula)
@@ -482,6 +556,12 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     assert lichess["ok"] is True and "keine App" in lichess["checks"][0]["text"]
     osu = (await flow.post("/api/settings/platform-links/osu/check")).json()
     assert osu["checks"][0]["state"] == "ok"
+    wargaming = (await flow.post("/api/settings/platform-links/wargaming/check")).json()
+    assert wargaming["ok"] is True and wargaming["checks"][0]["state"] == "warn" and "Application ID" in wargaming["checks"][0]["text"]
+    await configure(flow, bungie_api_key="")
+    bungie = (await flow.post("/api/settings/platform-links/bungie/check")).json()
+    assert bungie["ok"] is False and bungie["checks"][0]["key"] == "api_key"
+    await configure(flow)
     await configure(flow, epic_client_secret=encrypt_secret("falsch"))
     bad = (await flow.post("/api/settings/platform-links/epic/check")).json()
     assert bad["ok"] is False and bad["checks"][0]["state"] == "fail"

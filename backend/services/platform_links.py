@@ -84,6 +84,24 @@ PLATFORMS = {
              "id_field": 'reddit_client_id', "secret_field": 'reddit_client_secret', "official": "https://www.reddit.com/user/{handle}"},
     "spotify": {"label": "Spotify", "operator": "Spotify AB, Schweden", "field": "spotify_handle", "visibility": "spotify", "delivers": "Spotify-Kennung und Anzeigename",
              "id_field": 'spotify_client_id', "secret_field": 'spotify_client_secret', "official": "https://open.spotify.com/user/{external_id}"},
+    # Welle 2 (#547): Meta/LinkedIn/Snap/Pinterest brauchen ein App-Review, Telegram läuft als OIDC, Wargaming nur mit
+    # Application ID (kein Secret), Bungie mit API Key zusätzlich zu Client ID und Secret.
+    "threads": {"label": "Threads", "operator": "Meta Platforms Ireland Ltd.", "field": "threads_handle", "visibility": "threads", "delivers": "Threads-Kennung und Nutzername",
+             "id_field": 'threads_client_id', "secret_field": 'threads_client_secret', "official": "https://www.threads.com/@{handle}"},
+    "facebook": {"label": "Facebook", "operator": "Meta Platforms Ireland Ltd.", "field": "facebook_handle", "visibility": "facebook", "delivers": "Facebook-Kennung und Name",
+             "id_field": 'facebook_client_id', "secret_field": 'facebook_client_secret', "official": "https://www.facebook.com/{external_id}"},
+    "linkedin": {"label": "LinkedIn", "operator": "LinkedIn Ireland Unlimited Company", "field": "linkedin_handle", "visibility": "linkedin", "delivers": "LinkedIn-Kennung und Name",
+             "id_field": 'linkedin_client_id', "secret_field": 'linkedin_client_secret', "official": ""},
+    "snapchat": {"label": "Snapchat", "operator": "Snap Inc., USA", "field": "snapchat_handle", "visibility": "snapchat", "delivers": "Snapchat-Kennung und Anzeigename",
+             "id_field": 'snapchat_client_id', "secret_field": 'snapchat_client_secret', "official": ""},
+    "pinterest": {"label": "Pinterest", "operator": "Pinterest Europe Ltd.", "field": "pinterest_handle", "visibility": "pinterest", "delivers": "Pinterest-Kennung und Nutzername",
+             "id_field": 'pinterest_client_id', "secret_field": 'pinterest_client_secret', "official": "https://www.pinterest.com/{handle}/"},
+    "telegram": {"label": "Telegram", "operator": "Telegram FZ-LLC, VAE", "field": "telegram_handle", "visibility": "telegram", "delivers": "Telegram-Kennung und Nutzername",
+             "id_field": 'telegram_client_id', "secret_field": 'telegram_client_secret', "official": "https://t.me/{handle}"},
+    "wargaming": {"label": "Wargaming.net", "operator": "Wargaming Group Ltd., Zypern", "field": "wargaming_handle", "visibility": "wargaming", "delivers": "Konto-Kennung und Nickname (World of Tanks/Warships)",
+             "id_field": 'wargaming_application_id', "secret_field": None, "official": ""},
+    "bungie": {"label": "Bungie.net", "operator": "Bungie, Inc., USA", "field": "bungie_handle", "visibility": "bungie", "delivers": "Bungie-Kennung und Anzeigename (Destiny)",
+             "id_field": 'bungie_client_id', "secret_field": 'bungie_client_secret', "extra_field": 'bungie_api_key', "official": "https://www.bungie.net/7/en/User/Profile/254/{external_id}"},
 }
 
 DISCORD_AUTHORIZE = "https://discord.com/oauth2/authorize"
@@ -148,6 +166,29 @@ SPOTIFY_AUTHORIZE = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN = "https://accounts.spotify.com/api/token"
 SPOTIFY_ME = "https://api.spotify.com/v1/me"
 USER_AGENT = "lionsquad-website/1.0 (+https://lionsquad.at)"   # Reddit lehnt Standard-Kennungen ab
+THREADS_AUTHORIZE = "https://threads.com/oauth/authorize"
+THREADS_TOKEN = "https://graph.threads.com/oauth/access_token"
+THREADS_ME = "https://graph.threads.com/v1.0/me"
+FACEBOOK_AUTHORIZE = "https://www.facebook.com/v25.0/dialog/oauth"
+FACEBOOK_TOKEN = "https://graph.facebook.com/v25.0/oauth/access_token"
+FACEBOOK_ME = "https://graph.facebook.com/v25.0/me"
+LINKEDIN_AUTHORIZE = "https://www.linkedin.com/oauth/v2/authorization"
+LINKEDIN_TOKEN = "https://www.linkedin.com/oauth/v2/accessToken"
+LINKEDIN_USERINFO = "https://api.linkedin.com/v2/userinfo"
+SNAPCHAT_AUTHORIZE = "https://accounts.snapchat.com/accounts/oauth2/auth"
+SNAPCHAT_TOKEN = "https://accounts.snapchat.com/accounts/oauth2/token"
+SNAPCHAT_ME = "https://kit.snapchat.com/v1/me"
+PINTEREST_AUTHORIZE = "https://www.pinterest.com/oauth/"
+PINTEREST_TOKEN = "https://api.pinterest.com/v5/oauth/token"
+PINTEREST_ME = "https://api.pinterest.com/v5/user_account"
+TELEGRAM_AUTHORIZE = "https://oauth.telegram.org/auth"
+TELEGRAM_TOKEN = "https://oauth.telegram.org/token"
+TELEGRAM_JWKS = "https://oauth.telegram.org/.well-known/jwks.json"
+WARGAMING_LOGIN = "https://api.worldoftanks.eu/wot/auth/login/"
+WARGAMING_ACCOUNT_INFO = "https://api.worldoftanks.eu/wot/account/info/"
+BUNGIE_AUTHORIZE = "https://www.bungie.net/en/OAuth/Authorize"
+BUNGIE_TOKEN = "https://www.bungie.net/platform/app/oauth/token/"
+BUNGIE_MEMBERSHIPS = "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/"
 
 
 class LinkError(Exception):
@@ -176,15 +217,21 @@ def providers_configured(branding: dict | None) -> dict[str, bool]:
     for key, spec in PLATFORMS.items():
         if not spec["id_field"]:
             out[key] = True
-        else:
-            out[key] = bool(branding.get(spec["id_field"]) and branding.get(spec["secret_field"]))
+            continue
+        ready = bool(branding.get(spec["id_field"]))
+        if spec.get("secret_field"):
+            ready = ready and bool(branding.get(spec["secret_field"]))
+        if spec.get("extra_field"):
+            ready = ready and bool(branding.get(spec["extra_field"]))
+        out[key] = ready
     return out
 
 
 def _credentials(platform: str, branding: dict) -> tuple[str, str]:
     spec = PLATFORMS[platform]
     client_id = str(branding.get(spec["id_field"]) or "")
-    secret = decrypt_secret(branding[spec["secret_field"]]) if branding.get(spec["secret_field"]) else ""
+    secret_field = spec.get("secret_field")
+    secret = decrypt_secret(branding[secret_field]) if secret_field and branding.get(secret_field) else ""
     return client_id, secret
 
 
@@ -296,6 +343,25 @@ def authorize_url(platform: str, branding: dict, state: str) -> str:
         return f"{REDDIT_AUTHORIZE}?" + urlencode({**common, "scope": "identity", "duration": "temporary"})
     if platform == "spotify":
         return f"{SPOTIFY_AUTHORIZE}?" + urlencode(common)
+    if platform == "threads":
+        return f"{THREADS_AUTHORIZE}?" + urlencode({**common, "scope": "threads_basic"})
+    if platform == "facebook":
+        return f"{FACEBOOK_AUTHORIZE}?" + urlencode({**common, "scope": "public_profile"})
+    if platform == "linkedin":
+        return f"{LINKEDIN_AUTHORIZE}?" + urlencode({**common, "scope": "openid profile"})
+    if platform == "snapchat":
+        return f"{SNAPCHAT_AUTHORIZE}?" + urlencode({**common, "scope": "https://auth.snapchat.com/oauth2/api/user.display_name https://auth.snapchat.com/oauth2/api/user.external_id"})
+    if platform == "pinterest":
+        return f"{PINTEREST_AUTHORIZE}?" + urlencode({**common, "scope": "user_accounts:read"})
+    if platform == "telegram":
+        nonce = str(read_state_payload(state, platform).get("nonce") or "")
+        challenge = _pkce_challenge(_pkce_verifier(nonce))
+        return f"{TELEGRAM_AUTHORIZE}?" + urlencode({**common, "scope": "openid profile", "code_challenge": challenge, "code_challenge_method": "S256"})
+    if platform == "wargaming":
+        # Wargaming (OpenID-artig): kein Secret, der state hängt an der Rückrufadresse wie bei Steam.
+        return f"{WARGAMING_LOGIN}?" + urlencode({"application_id": client_id, "redirect_uri": f"{redirect}?{urlencode({'state': state})}", "display": "page"})
+    if platform == "bungie":
+        return f"{BUNGIE_AUTHORIZE}?" + urlencode({"client_id": client_id, "response_type": "code", "state": state})
     raise LinkError("unknown")
 
 
@@ -324,6 +390,8 @@ async def fetch_identity(platform: str, branding: dict, query: dict, state_paylo
     try:
         if platform == "steam":
             return await _steam_identity(branding, query)
+        if platform == "wargaming":
+            return await _wargaming_identity(branding, query)
         code = str(query.get("code") or "")
         if not code:
             raise LinkError("denied", "kein code")
@@ -364,6 +432,20 @@ async def fetch_identity(platform: str, branding: dict, query: dict, state_paylo
             return await _reddit_identity(branding, code)
         if platform == "spotify":
             return await _spotify_identity(branding, code)
+        if platform == "threads":
+            return await _threads_identity(branding, code)
+        if platform == "facebook":
+            return await _facebook_identity(branding, code)
+        if platform == "linkedin":
+            return await _linkedin_identity(branding, code)
+        if platform == "snapchat":
+            return await _snapchat_identity(branding, code)
+        if platform == "pinterest":
+            return await _pinterest_identity(branding, code)
+        if platform == "telegram":
+            return await _telegram_identity(branding, code, nonce)
+        if platform == "bungie":
+            return await _bungie_identity(branding, code)
     except httpx.HTTPError as exc:
         logger.warning("[platform-links] %s: %s", platform, exc)
         # Nur die Fehlerart nach außen - die Meldung könnte die Adresse samt Code enthalten.
@@ -631,6 +713,128 @@ async def _spotify_identity(branding: dict, code: str) -> dict:
     return {"external_id": str(data["id"]), "handle": display, "display_name": display}
 
 
+async def _threads_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("threads", branding)
+    async with _client() as client:
+        token = await _token(client, THREADS_TOKEN, data={"client_id": client_id, "client_secret": secret, "grant_type": "authorization_code", "redirect_uri": redirect_uri("threads"), "code": code})
+        me = await client.get(THREADS_ME, params={"fields": "id,username"}, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    name = str(data.get("username") or "")
+    return {"external_id": str(data["id"]), "handle": name, "display_name": name}
+
+
+async def _facebook_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("facebook", branding)
+    async with _client() as client:
+        token = await _token(client, FACEBOOK_TOKEN, data={"client_id": client_id, "client_secret": secret, "redirect_uri": redirect_uri("facebook"), "code": code})
+        me = await client.get(FACEBOOK_ME, params={"fields": "id,name"}, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("id"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    name = str(data.get("name") or "")
+    return {"external_id": str(data["id"]), "handle": name, "display_name": name}
+
+
+async def _linkedin_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("linkedin", branding)
+    async with _client() as client:
+        token = await _token(client, LINKEDIN_TOKEN, data={"grant_type": "authorization_code", "code": code, "client_id": client_id, "client_secret": secret, "redirect_uri": redirect_uri("linkedin")})
+        info = await client.get(LINKEDIN_USERINFO, headers={"Authorization": f"Bearer {token}"})
+        data = _json(info) if info.status_code == 200 else {}
+        if not data.get("sub"):
+            raise LinkError("exchange_failed", f"userinfo {info.status_code}")
+    name = str(data.get("name") or "")
+    return {"external_id": str(data["sub"]), "handle": name, "display_name": name}
+
+
+async def _snapchat_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("snapchat", branding)
+    async with _client() as client:
+        token = await _token(client, SNAPCHAT_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("snapchat")}, auth=(client_id, secret))
+        me = await client.post(SNAPCHAT_ME, json={"query": "{ me { externalId displayName } }"}, headers={"Authorization": f"Bearer {token}"})
+        user = ((_json(me).get("data") or {}).get("me") or {}) if me.status_code == 200 else {}
+        if not user.get("externalId"):
+            raise LinkError("exchange_failed", f"me {me.status_code}")
+    name = str(user.get("displayName") or "")
+    return {"external_id": str(user["externalId"]), "handle": name, "display_name": name}
+
+
+async def _pinterest_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("pinterest", branding)
+    async with _client() as client:
+        token = await _token(client, PINTEREST_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("pinterest")}, auth=(client_id, secret))
+        me = await client.get(PINTEREST_ME, headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("username"):
+            raise LinkError("exchange_failed", f"user_account {me.status_code}")
+    name = str(data["username"])
+    return {"external_id": str(data.get("id") or name), "handle": name, "display_name": name}
+
+
+async def _telegram_identity(branding: dict, code: str, nonce: str) -> dict:
+    """Telegram (OpenID Connect): kein userinfo - die Person steht im signierten ID-Token, geprüft gegen die JWKS."""
+    client_id, secret = _credentials("telegram", branding)
+    async with _client() as client:
+        response = await client.post(TELEGRAM_TOKEN, data={"grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("telegram"),
+                                                          "client_id": client_id, "client_secret": secret, "code_verifier": _pkce_verifier(nonce)},
+                                     headers={"Accept": "application/json"})
+        body = _json(response) if response.status_code == 200 else {}
+        id_token = str(body.get("id_token") or "")
+        if not id_token:
+            raise LinkError("exchange_failed", f"token {response.status_code}")
+        jwks = await client.get(TELEGRAM_JWKS)
+        keys = (_json(jwks).get("keys") or []) if jwks.status_code == 200 else []
+    try:
+        header = jwt.get_unverified_header(id_token)
+        jwk = next((k for k in keys if k.get("kid") == header.get("kid")), keys[0] if keys else None)
+        if not jwk:
+            raise LinkError("exchange_failed", "jwks leer")
+        alg = str(header.get("alg") or jwk.get("alg") or "RS256")
+        claims = jwt.decode(id_token, jwt.PyJWK(jwk, algorithm=alg).key, algorithms=[alg], audience=client_id)
+    except jwt.PyJWTError as exc:
+        raise LinkError("exchange_failed", f"id_token: {type(exc).__name__}")
+    external_id = str(claims.get("sub") or claims.get("id") or "")
+    if not external_id:
+        raise LinkError("exchange_failed", "id_token ohne sub")
+    handle = str(claims.get("preferred_username") or "")
+    display = str(claims.get("name") or handle or external_id)
+    return {"external_id": external_id, "handle": handle or display, "display_name": display}
+
+
+async def _wargaming_identity(branding: dict, query: dict) -> dict:
+    """Wargaming schickt Nickname und Konto-Kennung mit dem Rückruf - geprüft wird das Token bei Wargaming selbst."""
+    if str(query.get("status") or "") != "ok":
+        raise LinkError("denied", str(query.get("message") or query.get("status") or "abgebrochen"))
+    account_id = str(query.get("account_id") or "")
+    access_token = str(query.get("access_token") or "")
+    if not account_id or not access_token:
+        raise LinkError("denied", "kein Konto")
+    client_id, _secret = _credentials("wargaming", branding)
+    async with _client() as client:
+        info = await client.get(WARGAMING_ACCOUNT_INFO, params={"application_id": client_id, "account_id": account_id, "access_token": access_token, "fields": "nickname"})
+        body = _json(info) if info.status_code == 200 else {}
+        row = ((body.get("data") or {}).get(account_id) or {}) if body.get("status") == "ok" else {}
+        if not row:
+            raise LinkError("exchange_failed", f"account/info {info.status_code}: {(body.get('error') or {}).get('message') or ''}".strip(": "))
+    nick = str(row.get("nickname") or query.get("nickname") or "")
+    return {"external_id": account_id, "handle": nick, "display_name": nick}
+
+
+async def _bungie_identity(branding: dict, code: str) -> dict:
+    client_id, secret = _credentials("bungie", branding)
+    api_key = decrypt_secret(branding["bungie_api_key"]) if branding.get("bungie_api_key") else ""
+    async with _client() as client:
+        token = await _token(client, BUNGIE_TOKEN, data={"grant_type": "authorization_code", "code": code}, auth=(client_id, secret), headers={"X-API-Key": api_key})
+        me = await client.get(BUNGIE_MEMBERSHIPS, headers={"Authorization": f"Bearer {token}", "X-API-Key": api_key})
+        user = ((_json(me).get("Response") or {}).get("bungieNetUser") or {}) if me.status_code == 200 else {}
+        if not user.get("membershipId"):
+            raise LinkError("exchange_failed", f"memberships {me.status_code}")
+    name = str(user.get("uniqueName") or user.get("displayName") or "")
+    return {"external_id": str(user["membershipId"]), "handle": name, "display_name": str(user.get("displayName") or name)}
+
+
 def _check(key: str, state: str, text: str) -> dict:
     return {"key": key, "state": state, "text": text}
 
@@ -649,6 +853,8 @@ CLIENT_CREDENTIALS = {
     "kick": (KICK_TOKEN, "form", {}),
     "reddit": (REDDIT_TOKEN, "basic", {}),
     "spotify": (SPOTIFY_TOKEN, "basic", {}),
+    "facebook": (FACEBOOK_TOKEN, "form", {}),
+    "pinterest": (PINTEREST_TOKEN, "basic", {}),
 }
 REDIRECT_HINTS = {
     "twitch": "Twitch bestätigt Redirects nicht per API: {redirect} muss in der Developer Console unter „OAuth Redirect URLs“ stehen (genau so, ohne Schrägstrich am Ende), Client Type „Confidential“.",
@@ -667,6 +873,14 @@ REDIRECT_HINTS = {
     "kick": "Kick: {redirect} muss bei der App unter Redirect URI stehen; Scope „user:read“.",
     "reddit": "Reddit: {redirect} muss bei der App (Typ „web app“) als redirect uri stehen.",
     "spotify": "Spotify: {redirect} muss bei der App im Dashboard unter Redirect URIs stehen; im Development Mode dürfen nur eingetragene Nutzer verknüpfen.",
+    "threads": "Threads: {redirect} muss in der Meta-App (Threads API) unter Redirect Callback URLs stehen; ohne App-Review dürfen nur Tester verknüpfen.",
+    "facebook": "Facebook: {redirect} muss in der Meta-App unter Facebook Login → Valid OAuth Redirect URIs stehen; ohne App-Review dürfen nur Tester verknüpfen.",
+    "linkedin": "LinkedIn: {redirect} muss bei der App unter Auth → Authorized redirect URLs stehen; Produkt „Sign In with LinkedIn using OpenID Connect“ freischalten.",
+    "snapchat": "Snapchat: {redirect} muss bei der App im Snap Kit Portal unter Redirect URIs stehen; ohne Review nur Tester.",
+    "pinterest": "Pinterest: {redirect} muss bei der App unter Redirect URIs stehen; die App braucht den Standard-Zugang von Pinterest.",
+    "telegram": "Telegram: {redirect} muss bei BotFather als Allowed URL eingetragen sein (Client ID und Secret kommen von BotFather).",
+    "wargaming": "Wargaming: die Website-Adresse muss beim Application-Eintrag im Developer Room hinterlegt sein; ein Secret gibt es nicht.",
+    "bungie": "Bungie: {redirect} muss bei der Anwendung als Redirect URL stehen, OAuth Client Type „Confidential“; zusätzlich der API Key der Anwendung.",
 }
 
 
@@ -696,6 +910,15 @@ async def check_provider(platform: str, branding: dict, *, bot_token: str | None
             return {"platform": platform, "ok": True, "redirect_uri": redirect, "checks": checks}
 
         client_id, secret = _credentials(platform, branding)
+        if not spec.get("secret_field"):
+            # Nur eine Kennung (Wargaming): kein Secret, das sich prüfen ließe.
+            if client_id:
+                checks.append(_check("credentials", "warn", f"Application ID eingetragen; {spec['label']} bestätigt sie erst bei einer echten Verknüpfung (Profil → Socials)."))
+            else:
+                checks.append(_check("credentials", "fail", f"Application ID fehlt – aus dem Developer Room von {spec['label']} eintragen und speichern."))
+            return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
+        if spec.get("extra_field") and not branding.get(spec["extra_field"]):
+            checks.append(_check("api_key", "fail", f"API Key fehlt – aus der Anwendung bei {spec['label']} eintragen und speichern."))
         if not client_id or not secret:
             checks.append(_check("credentials", "fail", f"Client ID oder Client Secret fehlt – beides aus der Entwickler-Konsole von {spec['label']} eintragen und speichern."))
         elif platform in CLIENT_CREDENTIALS:

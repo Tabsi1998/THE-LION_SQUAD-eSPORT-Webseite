@@ -56,6 +56,7 @@ export default function AdminIntegrationPage() {
       const payload = {};
       if (app.idField) payload[app.idField] = (brand[app.idField] || "").trim();
       if (app.secretField && brand[app.secretField]) payload[app.secretField] = brand[app.secretField];
+      if (app.extraField && brand[app.extraField]) payload[app.extraField] = brand[app.extraField];
       await api.put("/settings/branding", payload);
       toast.success(`${app.label}: gespeichert.`);
       await load();
