@@ -172,7 +172,9 @@ async def _unique_directory_slug(db, source: str) -> str:
 async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link: dict, summary: dict) -> str:
     """Ein Eintrag im Mitgliederverzeichnis folgt der Einwilligung in Dolibarr (Code `directory_consent_code`):
     „given“ legt ihn an oder schaltet ihn frei - Name aus der Mitgliederverwaltung, Foto und Spiele vom Konto,
-    alles Weitere pflegt der Vorstand und bleibt beim nächsten Abgleich stehen; „withdrawn“ nimmt ihn
+    alles Weitere pflegt der Vorstand und bleibt beim nächsten Abgleich stehen. Der Klarname folgt der
+    Mitgliederverwaltung nur, solange der Vorstand ihn nicht selbst geändert hat (etwa nur der Vorname, wenn
+    der Nachname nicht öffentlich stehen soll); leer heißt wieder aus Dolibarr. „withdrawn“ nimmt ihn
     offline, auch einen Eintrag, den das Mitglied selbst angelegt hat. Ohne Code passiert nichts.
     Liefert `created|activated|deactivated|unchanged|skipped`."""
     code = str(settings.get("directory_consent_code") or "").strip()
@@ -204,20 +206,24 @@ async def sync_directory_entry(db, settings: dict, client: DolibarrClient, link:
                 "gender": user.get("gender") if user.get("gender") in ("male", "female", "diverse") else None,
                 "games": [str(g).strip() for g in (user.get("favorite_games") or []) if str(g).strip()][:20],
                 "platforms": [str(p).strip() for p in (user.get("main_platforms") or []) if str(p).strip()][:20],
-                "user_id": user_id, "order_index": 0, "is_active": True, "source": DIRECTORY_SOURCE, "consent": consent_info,
+                "user_id": user_id, "order_index": 0, "is_active": True, "source": DIRECTORY_SOURCE, "consent": consent_info, "dolibarr_name": name or None,
                 "created_at": now, "created_by": ACTOR, "updated_at": now, "updated_by": ACTOR,
             }
             await db.club_member_profiles.insert_one(doc)
             logger.info("[dolibarr] Verzeichnis-Eintrag angelegt für Mitglied %s", summary.get("id"))
             return "created"
         update: dict = {"consent": consent_info}
-        if name and profile.get("source") == DIRECTORY_SOURCE and profile.get("real_name") != name:
-            update["real_name"] = name  # der Name aus der Mitgliederverwaltung führt bei automatischen Einträgen
+        previous_name = profile.get("dolibarr_name")
+        if name and name != previous_name:
+            update["dolibarr_name"] = name
+        overridden = bool(profile.get("real_name")) and profile.get("real_name") != previous_name
+        if name and profile.get("real_name") != name and not overridden:
+            update["real_name"] = name  # der Klarname folgt Dolibarr, solange der Vorstand ihn nicht selbst gesetzt hat
         reactivate = (not profile.get("is_active", True) and not profile.get("directory_blocked")
                       and (profile.get("deactivated_reason") == CONSENT_WITHDRAWN or profile.get("source") == DIRECTORY_SOURCE))
         if reactivate:
             update.update({"is_active": True, "deactivated_reason": None})
-        if (profile.get("consent") or {}) == consent_info and len(update) == 1:
+        if (profile.get("consent") or {}) == consent_info and not {k: v for k, v in update.items() if k != "consent"}:
             return "unchanged"
         update.update({"updated_at": now, "updated_by": ACTOR})
         await db.club_member_profiles.update_one({"id": profile["id"]}, {"$set": update})
