@@ -399,17 +399,20 @@ export function linkButtonLabel(platform: string): string {
   return platform === "steam" ? `Mit ${label} anmelden` : `Mit ${label} verknüpfen`;
 }
 
-export function PlatformLinkRows({ links, available, onLink, onUnlink, testID = "profile-link-rows" }: {
+export function PlatformLinkRows({ links, available, onLink, onUnlink, disabled = [], testID = "profile-link-rows" }: {
   links: LinkedAccount[];
   available: Record<string, boolean>;
   onLink: (platform: string) => void;
   onUnlink: (platform: string) => void;
+  disabled?: string[];
   testID?: string;
 }) {
   const byPlatform = new Map(links.filter((row) => row && row.platform).map((row) => [platformKey(row.platform), row]));
+  // Abgehakt vom Verein (#558): die Plattform erscheint nirgends.
+  const off = new Set(disabled || []);
   return (
     <View testID={testID} style={styles.group}>
-      {LINKABLE_PLATFORMS.map((platform) => {
+      {LINKABLE_PLATFORMS.filter((platform) => !off.has(platform)).map((platform) => {
         const link = byPlatform.get(platform) || null;
         const color = platformColor(platform);
         const label = PLATFORM_LABELS[platform] || platform;

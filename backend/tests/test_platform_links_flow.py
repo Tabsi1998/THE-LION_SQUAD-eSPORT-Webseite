@@ -576,3 +576,49 @@ async def test_every_oauth_platform_fills_its_field_and_verifies(flow, fake):
     named = {row["key"] for row in (await flow.get("/api/settings/public")).json()["privacy_facts"]["platforms"]}
     assert {"bungie", "wargaming", "lichess", "telegram"} <= named
 
+
+@pytest.mark.asyncio
+async def test_the_club_can_switch_platforms_off_and_they_disappear_everywhere(flow, fake):
+    """#558: abgehakt heißt nirgends - eigene Liste, Start, öffentliches Profil, Datenschutz, Übersicht;
+    wieder anhaken bringt Name und Häkchen zurück, denn gelöscht wurde nichts."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    state = state_of((await flow.post("/api/me/platform-links/twitch/start")).json()["url"])
+    flow.act_as(None)
+    assert target(await flow.get(f"/api/platform-links/twitch/callback?code=gut&state={state}"))["linked"] == "twitch"
+    flow.act_as(paula)
+    assert (await flow.patch("/api/users/me", json={"psn_id": "Paula998"})).status_code == 200
+
+    chef = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(chef)
+    bad = await flow.put("/api/settings/branding", json={"disabled_platforms": ["twitch", "nope"]})
+    assert bad.status_code == 400 and "nope" in bad.json()["detail"]
+    assert (await flow.put("/api/settings/branding", json={"disabled_platforms": ["twitch", "psn"]})).status_code == 200
+    overview = (await flow.get("/api/settings/integrations/overview")).json()
+    twitch_row = next(row for row in overview["items"] if row["key"] == "twitch")
+    assert twitch_row["state"] == "off" and "abgeschaltet" in twitch_row["detail"]
+    catalog = {row["key"]: row for row in overview["platforms"]}
+    assert catalog["twitch"]["enabled"] is False and catalog["psn"] == {"key": "psn", "label": "PlayStation Network", "field": "psn_id", "group": "game", "linkable": False, "enabled": False}
+    assert catalog["discord"]["enabled"] is True and catalog["discord"]["group"] == "social"
+    assert (await flow.get("/api/settings/public")).json()["disabled_platforms"] == ["psn", "twitch"]
+
+    flow.act_as(paula)
+    mine = (await flow.get("/api/me/platform-links")).json()
+    assert mine["disabled"] == ["psn", "twitch"] and mine["available"]["twitch"] is False
+    assert "twitch" not in {row["platform"] for row in mine["links"]}
+    start = await flow.post("/api/me/platform-links/twitch/start")
+    assert start.status_code == 409 and "abgeschaltet" in start.json()["detail"]
+    flow.act_as(None)
+    public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
+    assert public["twitch_handle"] is None and public["psn_id"] is None and "twitch" not in public["verified_platforms"]
+    assert all(row["platform"] != "twitch" for row in public["linked_accounts"])
+    facts = (await flow.get("/api/settings/public")).json()["privacy_facts"]
+    assert "twitch" not in {row["key"] for row in facts["platforms"]} and "discord" in {row["key"] for row in facts["platforms"]}
+
+    # Wieder anhaken: nichts war gelöscht.
+    flow.act_as(chef)
+    assert (await flow.put("/api/settings/branding", json={"disabled_platforms": []})).status_code == 200
+    flow.act_as(None)
+    public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
+    assert public["twitch_handle"] and public["psn_id"] == "Paula998" and "twitch" in public["verified_platforms"]

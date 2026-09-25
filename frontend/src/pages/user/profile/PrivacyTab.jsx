@@ -2,14 +2,15 @@ import { MessageSquare, ShieldCheck } from "lucide-react";
 import { DIRECT_MESSAGE_PRIVACY } from "./constants";
 import { Section } from "./fields";
 import { AutosaveStatus, SwitchRow } from "./SwitchRow";
-import { QUICK_VISIBILITY, VISIBILITY_GROUPS, VISIBILITY_LEVELS, fieldLevel, groupLevel } from "./visibility";
+import { QUICK_VISIBILITY, VISIBILITY_LEVELS, fieldLevel, groupLevel, visibilityGroupsFor } from "./visibility";
 
 // Privatsphäre in drei Karten (#257): öffentliches Profil, Direktnachrichten
 // und die Sichtbarkeit der Felder in Gruppen mit Schnellwahl. Newsletter und
 // Benachrichtigungen haben ihren eigenen Reiter. Alles hier speichert von
 // selbst, deshalb gibt es keinen Speichern-Knopf mehr.
-export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autosave }) {
+export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autosave, disabled = [] }) {
   const visibility = form.profile_visibility || {};
+  const groups = visibilityGroupsFor(disabled);
   const publicProfile = !!form.privacy_public_profile;
   return (
     <Section>
@@ -67,7 +68,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
           ))}
         </dl>
         <div className="space-y-3">
-          {VISIBILITY_GROUPS.map((group) => {
+          {groups.map((group) => {
             const current = groupLevel(visibility, group);
             return (
               <div key={group.k} className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={`profile-vis-group-${group.k}`}>

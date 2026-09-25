@@ -40,8 +40,10 @@ async def my_platform_links(me: dict = Depends(get_current_user)):
     db = get_db()
     branding = await _branding(db)
     return {
-        "links": await platform_links.links_for(db, me["id"]),
+        "links": await platform_links.links_for(db, me["id"], branding),
         "available": platform_links.providers_configured(branding),
+        # Abgehakt vom Verein (#558): Web und App zeigen diese Plattformen nirgends.
+        "disabled": sorted(platform_links.disabled_platforms(branding)),
         "platforms": {key: {"label": spec["label"], "field": spec["field"], "delivers": spec["delivers"]} for key, spec in PLATFORMS.items()},
     }
 
@@ -57,6 +59,8 @@ async def start_platform_link(platform: str, me: dict = Depends(get_current_user
     try:
         url = platform_links.authorize_url(platform, branding, platform_links.make_state(me["id"], platform))
     except LinkError as exc:
+        if exc.code == "disabled":
+            raise HTTPException(409, f"{PLATFORMS[platform]['label']} bietet der Verein nicht an – unter Verbindungen → Alle Verbindungen abgeschaltet.")
         if exc.code == "not_configured":
             raise HTTPException(409, f"{PLATFORMS[platform]['label']} ist auf der Website noch nicht eingerichtet (Einstellungen → Twitch/Discord).")
         raise HTTPException(400, str(exc))

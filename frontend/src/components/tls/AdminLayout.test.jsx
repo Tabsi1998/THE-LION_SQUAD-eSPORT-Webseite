@@ -81,3 +81,10 @@ test("Wegweiser respektieren die Bereiche: die Turnierleitung sieht keine Einste
   expect(items.some((item) => item.to.startsWith("/admin/settings"))).toBe(false);
 });
 
+// Abgehakte Plattformen (#558) fehlen im Menü Verbindungen; Alle Verbindungen bleibt.
+test("abgehakte Plattformen fehlen im Menü, Alle Verbindungen bleibt", () => {
+  const targets = navGroupsFor(SYSTEM_USER, "", ["twitch", "psn"]).flatMap((entry) => entry.items).map((item) => item.to);
+  expect(targets).not.toContain("/admin/integrations/twitch");
+  expect(targets).toContain("/admin/integrations/discord");
+  expect(targets).toContain("/admin/integrations");
+});

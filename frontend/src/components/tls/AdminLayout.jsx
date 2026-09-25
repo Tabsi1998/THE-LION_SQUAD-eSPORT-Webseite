@@ -5,6 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
 // Sidebar-Gruppen (#408, #512): Verein (Vereinsdaten, Vorstand, Sponsoren, Partner, Referenzen,
 // Kontakt-Inbox), Mitglieder (mit Dolibarr - die Seite nennt sich Mitgliederverwaltung), Finanzen,
@@ -89,7 +90,7 @@ export const ADMIN_GROUPS = [
     label: "Verbindungen",
     items: [
       { to: "/admin/integrations", label: "Alle Verbindungen", icon: Link2, end: true, areas: ["system"] },
-      ...MENU_INTEGRATIONS.map((integration) => ({ to: integration.tab || `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, areas: ["system"] })),
+      ...MENU_INTEGRATIONS.map((integration) => ({ to: integration.tab || `/admin/integrations/${integration.key}`, label: integration.label, icon: Link2, platform: integration.app || null, areas: ["system"] })),
     ],
   },
   {
@@ -207,11 +208,14 @@ function itemMatchesQuery(item, groupLabel, query) {
 
 // Was jemand im Menü sieht: nur seine Bereiche (#287); Wegweiser-Einträge (searchOnly)
 // nur, wenn die Suche sie trifft.
-export function navGroupsFor(user, query) {
+export function navGroupsFor(user, query, disabledPlatforms = []) {
   const searchQuery = normalizeSearch(query);
+  // Abgehakte Plattformen (#558) fehlen im Menü - einschalten geht unter Alle Verbindungen.
+  const off = new Set(Array.isArray(disabledPlatforms) ? disabledPlatforms : []);
   return ADMIN_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
+      if (item.platform && off.has(item.platform)) return false;
       const allowed = hasArea(user, ...(item.areas || [])) || (item.staff && Boolean(user?.is_tournament_staff));
       if (item.searchOnly && !searchQuery) return false;
       return allowed && itemMatchesQuery(item, group.label, searchQuery);
@@ -264,6 +268,8 @@ export function AdminLayout({ children }) {
   const location = useLocation();
   const [openMobile, setOpenMobile] = useState(false);
   const [navQuery, setNavQuery] = useState("");
+  const site = usePublicSiteSettings();
+  const disabledPlatforms = site?.disabled_platforms;
 
   const searchQuery = normalizeSearch(navQuery);
 
@@ -280,7 +286,7 @@ export function AdminLayout({ children }) {
   // Rechte nach Bereichen (#287): ein Eintrag erscheint, wenn die Person einen
   // seiner Bereiche hat; die Seiten der Turnierleitung auch für zugewiesene
   // Helfer (staff). Wer nichts davon hat, sieht kein Menü.
-  const visibleGroups = useMemo(() => navGroupsFor(user, navQuery), [navQuery, user]);
+  const visibleGroups = useMemo(() => navGroupsFor(user, navQuery, disabledPlatforms), [disabledPlatforms, navQuery, user]);
 
   const activeGroup = groupLabelForPath(location.pathname);
   const [collapsedGroups, setCollapsedGroups] = useState(() => {

@@ -84,3 +84,10 @@ test("PlatformLinkRows: Knopf nur, wo die Website eingerichtet ist; verknüpft n
   expect(screen.getAllByText("auf der Website noch nicht eingerichtet").length).toBeGreaterThan(0);
   expect(linkButtonLabel("steam")).toBe("Mit Steam anmelden");
 });
+
+// Abgehakt vom Verein (#558): die Zeile fehlt ganz.
+test("PlatformLinkRows: abgehakte Plattformen fehlen", async () => {
+  await render(<PlatformLinkRows links={[]} available={{ discord: true, twitch: true }} disabled={["twitch"]} onLink={jest.fn()} onUnlink={jest.fn()} />);
+  expect(screen.getByTestId("profile-link-discord")).toBeTruthy();
+  expect(screen.queryByTestId("profile-link-twitch")).toBeNull();
+});

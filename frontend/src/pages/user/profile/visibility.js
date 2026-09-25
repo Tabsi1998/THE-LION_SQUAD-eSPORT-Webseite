@@ -109,3 +109,12 @@ export function applyGroupLevel(visibility, group, level) {
   for (const field of group.fields) next[field.k] = level;
   return next;
 }
+
+// Abgehakte Plattformen (#558) fehlen auch in der Sichtbarkeit; eine Gruppe ohne Felder fällt weg.
+export function visibilityGroupsFor(disabled = []) {
+  const off = new Set(Array.isArray(disabled) ? disabled : []);
+  if (off.size === 0) return VISIBILITY_GROUPS;
+  return VISIBILITY_GROUPS
+    .map((group) => ({ ...group, fields: group.fields.filter((field) => !off.has(field.k)) }))
+    .filter((group) => group.fields.length > 0);
+}

@@ -3,7 +3,7 @@ import { BadgeCheck, ExternalLink, Lock, Unlink } from "lucide-react";
 import { Row, Section } from "./fields";
 import { ProfileSwitch } from "./SwitchRow";
 import { SOCIAL_PLATFORMS, normalizeSocialInput, socialProfileUrl } from "./socials";
-import { NOT_LINKABLE, PLATFORM_BY_FIELD, PLATFORM_LABELS, formatLinkedAt, linkForField } from "@/lib/platformLinks";
+import { MANUAL_PLATFORM_OF, NOT_LINKABLE, PLATFORM_BY_FIELD, PLATFORM_LABELS, formatLinkedAt, linkForField, platformsOff } from "@/lib/platformLinks";
 import { PlatformIcon, brandButtonStyle, linkButtonLabel, platformMeta } from "@/lib/platformBrand";
 
 // Socials (#258, #260, #521): Wo die Plattform eine Anmeldung bietet, gibt es nur noch den offiziellen
@@ -125,6 +125,12 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
   const available = links?.available || {};
   const delivers = links?.platforms || {};
   const linkedRows = links?.links || [];
+  // Abgehakt vom Verein (#558): weder Zeile noch Textfeld.
+  const off = platformsOff(links?.disabled);
+  const linkOrder = LINK_ORDER.filter((platformKey) => !off.has(platformKey));
+  const manualKeys = MANUAL_ROWS.flat().filter((key) => !off.has(MANUAL_PLATFORM_OF[key]));
+  const manualRows = [];
+  for (let index = 0; index < manualKeys.length; index += 2) manualRows.push(manualKeys.slice(index, index + 2));
   const twitchLinked = Boolean(linkForField(linkedRows, "twitch_handle"));
   return (
     <Section>
@@ -136,7 +142,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
       </div>
 
       <div className="space-y-2" data-testid="profile-link-rows">
-        {LINK_ORDER.map((platformKey) => (
+        {linkOrder.map((platformKey) => (
           <LinkRow
             key={platformKey}
             platformKey={platformKey}
@@ -169,7 +175,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
       <div>
         <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-2">Von Hand – diese Plattformen bieten keine Anmeldung</div>
         <div className="space-y-4">
-          {MANUAL_ROWS.map((keys) => (
+          {manualRows.map((keys) => (
             <Row key={keys.join("+")}>
               {keys.map((key) => (
                 <ManualField key={key} platform={byKey[key]} value={form[key]} onChange={(v) => set(key, v)} note={NOT_LINKABLE[key] || ""} />
