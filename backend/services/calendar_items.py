@@ -8,7 +8,9 @@ internen Termine, kein „angemeldet“.
 """
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
@@ -19,6 +21,9 @@ INACTIVE_TOURNAMENT_REGISTRATION = ("cancelled", "rejected", "withdrawn", "no_sh
 FINISHED = {"completed", "results_published", "archived", "cancelled"}
 # Ein Termin ohne Ende dauert im Feed zwei Stunden - wie „In meinen Kalender“ (#216).
 DEFAULT_DURATION = timedelta(hours=2)
+# Die ICS je Termin (#580) erinnert eine Stunde vorher.
+ALARM_MINUTES = 60
+VIENNA = ZoneInfo("Europe/Vienna")
 
 _EVENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "end_date": 1, "status": 1,
                  "visibility": 1, "location": 1, "city": 1, "event_type": 1}
@@ -69,6 +74,39 @@ def _item(kind: str, doc: dict, *, title: str, path: str, start, end=None, locat
     }
 
 
+def event_item(doc: dict, *, mine: bool = False) -> dict | None:
+    place = ", ".join(part for part in (doc.get("location"), doc.get("city")) if part)
+    return _item("event", doc, title=doc.get("name") or "Event", path=f"/events/{doc.get('slug') or doc.get('id')}",
+                 start=doc.get("start_date"), end=doc.get("end_date"), location=place, mine=mine)
+
+
+def tournament_item(doc: dict, *, mine: bool = False) -> dict | None:
+    return _item("tournament", doc, title=doc.get("title") or "Turnier", path=f"/tournaments/{doc.get('slug') or doc.get('id')}",
+                 start=doc.get("start_date"), end=doc.get("end_date"), location=doc.get("game_name"), mine=mine)
+
+
+def vienna(value, *, with_time: bool = True) -> str:
+    """Zeit so, wie sie im Verein gilt - mit „Uhr“."""
+    dt = _dt(value)
+    if not dt:
+        return ""
+    local = dt.astimezone(VIENNA)
+    return local.strftime("%d.%m.%Y, %H:%M Uhr") if with_time else local.strftime("%d.%m.%Y")
+
+
+def check_in_note(doc: dict) -> str | None:
+    """Turniere mit Check-in (#580): der Termin ist der Start, der Check-in steht im Text."""
+    opens = _dt(doc.get("check_in_from"))
+    if not opens:
+        return None
+    closes = _dt(doc.get("check_in_until"))
+    note = f"Check-in ab {vienna(opens)}"
+    if closes and closes > opens:
+        same_day = closes.astimezone(VIENNA).date() == opens.astimezone(VIENNA).date()
+        note += f" bis {closes.astimezone(VIENNA).strftime('%H:%M')} Uhr" if same_day else f" bis {vienna(closes)}"
+    return note
+
+
 async def collect(db, user: dict | None) -> list[dict]:
     """Alle sichtbaren Termine, nach Beginn sortiert - Vergangenes bleibt drin (Vormonat)."""
     events = await db.events.find({"status": {"$ne": "draft"}}, _EVENT_FIELDS).to_list(2000)
@@ -87,17 +125,14 @@ async def collect(db, user: dict | None) -> list[dict]:
     for ev in events:
         if not await user_can_see(user, ev.get("visibility")):
             continue
-        place = ", ".join(part for part in (ev.get("location"), ev.get("city")) if part)
-        item = _item("event", ev, title=ev.get("name") or "Event", path=f"/events/{ev.get('slug') or ev.get('id')}",
-                     start=ev.get("start_date"), end=ev.get("end_date"), location=place, mine=ev.get("id") in my_events)
+        item = event_item(ev, mine=ev.get("id") in my_events)
         if item:
             items.append(item)
     for t in tournaments:
         if not await user_can_see(user, t.get("visibility")):
             continue
         path = f"/tournaments/{t.get('slug') or t.get('id')}"
-        item = _item("tournament", t, title=t.get("title") or "Turnier", path=path, start=t.get("start_date"),
-                     end=t.get("end_date"), location=t.get("game_name"), mine=t.get("id") in my_tournaments)
+        item = tournament_item(t, mine=t.get("id") in my_tournaments)
         if item:
             items.append(item)
         # Der Anmeldeschluss als eigener Eintrag, solange das Turnier noch nicht vorbei ist (#402).
@@ -146,38 +181,66 @@ def _fold(line: str) -> list[str]:
     return [out[0]] + [f" {rest}" for rest in out[1:]]
 
 
+def _vevent(item: dict, *, origin: str, now: datetime, alarm_minutes: int | None = None, extra_detail: str | None = None) -> list[str]:
+    """Ein VEVENT - Feed und Einzeltermin (#580) bauen ihn gleich; der Einzeltermin trägt die Erinnerung."""
+    start = _dt(item.get("start"))
+    if not start:
+        return []
+    end = _dt(item.get("end"))
+    if not end or end <= start:
+        end = start + DEFAULT_DURATION
+    detail = [KIND_LABELS.get(item["kind"], item["kind"])]
+    if item.get("phase", {}) and item["phase"].get("label"):
+        detail.append(item["phase"]["label"])
+    if extra_detail:
+        detail.append(extra_detail)
+    lines = [
+        "BEGIN:VEVENT",
+        f"UID:{item['kind']}-{item['id']}@lionsquad.at",
+        f"DTSTAMP:{_stamp(now)}",
+        f"DTSTART:{_stamp(start)}",
+        f"DTEND:{_stamp(end)}",
+        f"SUMMARY:{_ics_text(item['title'])}",
+        f"DESCRIPTION:{_ics_text(' · '.join(detail))}",
+        f"URL:{origin}{item['path']}",
+    ]
+    if item.get("location"):
+        lines.append(f"LOCATION:{_ics_text(item['location'])}")
+    if item.get("status") == "cancelled":
+        lines.append("STATUS:CANCELLED")
+    if alarm_minutes:
+        lines += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_ics_text(item['title'])}", f"TRIGGER:-PT{int(alarm_minutes)}M", "END:VALARM"]
+    lines.append("END:VEVENT")
+    return lines
+
+
+def _calendar(lines: list[str], *, name: str | None = None) -> str:
+    head = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//THE LION SQUAD//Website//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"]
+    if name:
+        head.append(f"X-WR-CALNAME:{_ics_text(name)}")
+    head.append("X-WR-TIMEZONE:Europe/Vienna")
+    folded = [piece for line in head + lines + ["END:VCALENDAR"] for piece in _fold(line)]
+    return "\r\n".join(folded) + "\r\n"
+
+
 def ics_feed(items: list[dict], *, origin: str, now: datetime | None = None, name: str = "THE LION SQUAD Termine") -> str:
     """Der öffentliche Feed - nur was `collect(db, None)` liefert, ohne `mine`."""
     now = now or datetime.now(timezone.utc)
-    lines = [
-        "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//THE LION SQUAD//Website//DE", "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH", f"X-WR-CALNAME:{_ics_text(name)}", "X-WR-TIMEZONE:Europe/Vienna",
-    ]
+    lines: list[str] = []
     for item in items:
-        start = _dt(item.get("start"))
-        if not start:
-            continue
-        end = _dt(item.get("end"))
-        if not end or end <= start:
-            end = start + DEFAULT_DURATION
-        detail = [KIND_LABELS.get(item["kind"], item["kind"])]
-        if item.get("phase", {}) and item["phase"].get("label"):
-            detail.append(item["phase"]["label"])
-        lines += [
-            "BEGIN:VEVENT",
-            f"UID:{item['kind']}-{item['id']}@lionsquad.at",
-            f"DTSTAMP:{_stamp(now)}",
-            f"DTSTART:{_stamp(start)}",
-            f"DTEND:{_stamp(end)}",
-            f"SUMMARY:{_ics_text(item['title'])}",
-            f"DESCRIPTION:{_ics_text(' · '.join(detail))}",
-            f"URL:{origin}{item['path']}",
-        ]
-        if item.get("location"):
-            lines.append(f"LOCATION:{_ics_text(item['location'])}")
-        if item.get("status") == "cancelled":
-            lines.append("STATUS:CANCELLED")
-        lines.append("END:VEVENT")
-    lines.append("END:VCALENDAR")
-    folded = [piece for line in lines for piece in _fold(line)]
-    return "\r\n".join(folded) + "\r\n"
+        lines += _vevent(item, origin=origin, now=now)
+    return _calendar(lines, name=name)
+
+
+def ics_single(item: dict, *, origin: str, now: datetime | None = None, alarm_minutes: int | None = ALARM_MINUTES, extra_detail: str | None = None) -> str:
+    """Ein Termin als ICS-Datei (#580): gleiche Felder wie im Feed, Erinnerung eine Stunde vorher."""
+    now = now or datetime.now(timezone.utc)
+    return _calendar(_vevent(item, origin=origin, now=now, alarm_minutes=alarm_minutes, extra_detail=extra_detail))
+
+
+def ics_filename(item: dict) -> str:
+    """Dateiname aus dem Titel - wie „In meinen Kalender“ im Web (ASCII, Bindestriche)."""
+    base = str(item.get("title") or "termin")
+    base = base.replace("ß", "ss").replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("Ä", "Ae").replace("Ö", "Oe").replace("Ü", "Ue")
+    base = re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-")
+    return f"{base or 'termin'}.ics"

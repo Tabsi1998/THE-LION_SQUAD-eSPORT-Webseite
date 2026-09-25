@@ -199,7 +199,7 @@ export default function TournamentDetailPage() {
   const STATUS_ORDER = { checked_in: 0, approved: 1, pending: 2, waitlist: 3, rejected: 4, no_show: 5 };
   const sortedRegs = [...regs].sort((a, b) => ((STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9)) || ((a.seed ?? 999) - (b.seed ?? 999)));
   const calendarItem = {
-    id: t.id, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
+    id: t.id, slug: t.slug, kind: "tournament", title: t.title, start: t.start_date, end: t.end_date,
     location: t.location || null, detail: [t.game ? gameLabel(t.game) : null, formatTournamentDisplay(t)].filter(Boolean).join(" · "),
     url: typeof window !== "undefined" && t.slug ? `${window.location.origin}/tournaments/${t.slug}` : null,
   };
