@@ -14,6 +14,7 @@ vi.mock("./DiscordBotPanel", () => ({ DiscordBotPanel: ({ canSystem }) => <div d
 vi.mock("./DiscordTargets", () => ({ DiscordTargets: () => <div data-testid="discord-targets" /> }));
 vi.mock("./DiscordSamplesPanel", () => ({ DiscordSamplesPanel: () => <div data-testid="discord-samples" /> }));
 vi.mock("./DiscordEmbedsPanel", () => ({ DiscordEmbedsPanel: () => <div data-testid="discord-embeds" /> }));
+vi.mock("./DiscordScheduledPanel", () => ({ DiscordScheduledPanel: () => <div data-testid="discord-scheduled" /> }));
 
 const { DiscordSettings, discordPayload } = await import("./DiscordSettings");
 
@@ -40,6 +41,7 @@ test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort
   expect(screen.getByTestId("discord-targets")).toBeInTheDocument();
   expect(screen.getByTestId("discord-samples")).toBeInTheDocument();
   expect(screen.getByTestId("discord-embeds")).toBeInTheDocument();
+  expect(screen.getByTestId("discord-scheduled")).toBeInTheDocument();
   expect(screen.getByTestId("discord-last-status")).toHaveTextContent("tournament.live");
   expect(screen.queryByTestId("discord-not-configured")).toBeNull();
   expect(screen.getByTestId("discord-settings")).not.toHaveTextContent("Webhook");

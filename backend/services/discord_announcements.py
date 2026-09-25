@@ -130,7 +130,13 @@ async def preview(kind: str, item: dict) -> dict:
         reason = "no_channel"
     embed = await build_embed(message["title"], message["description"], color=message["color"], url=message["url"],
                               fields=message["fields"], image_url=message["image_url"])
-    return {"embed": embed, "would_send": reason is None, "reason": reason, "target": resolved["target"]}
+    out = {"embed": embed, "would_send": reason is None, "reason": reason, "target": resolved["target"]}
+    if kind == "event":
+        # Discord-Termin (#570): so erscheint der Termin - oder warum nicht.
+        from database import get_db
+        from services.discord_scheduled import preview_for
+        out["scheduled_event"] = await preview_for(get_db(), "event", item)
+    return out
 
 
 async def _announce(collection, item: dict, message: dict, published_at) -> str:

@@ -525,6 +525,94 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         return {"ok": True}
 
+    async def create_scheduled_event(self, payload: dict) -> dict:
+        """Einen Discord-Termin anlegen (#570) - „extern“ mit Ort oder Link; braucht „Events verwalten“."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+        from services.discord_scheduled import _dt
+
+        guild = self._guild()
+        if guild is None:
+            return {"ok": False, "reason": "no_guild"}
+        try:
+            event = await guild.create_scheduled_event(
+                name=payload["name"], description=payload.get("description") or "", start_time=_dt(payload["start"]), end_time=_dt(payload["end"]),
+                entity_type=discord.EntityType.external, location=payload.get("location") or payload.get("url") or "Website",
+                privacy_level=discord.PrivacyLevel.guild_only, reason="LION Website: Termin",
+            )
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden", "error": "Der Bot darf keine Termine anlegen – Rolle braucht „Events verwalten“."}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Termin „{payload['name'][:40]}“ angelegt ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "event_id": str(event.id)}
+
+    async def _scheduled_event(self, event_id: str):
+        import discord
+
+        guild = self._guild()
+        if guild is None:
+            return None, {"ok": False, "reason": "no_guild"}
+        try:
+            return await guild.fetch_scheduled_event(int(event_id)), None
+        except (discord.NotFound, ValueError):
+            return None, {"ok": False, "reason": "unknown_event"}
+        except discord.Forbidden:
+            return None, {"ok": False, "reason": "forbidden"}
+        except Exception as exc:  # noqa: BLE001
+            return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+
+    async def edit_scheduled_event(self, event_id: str, payload: dict) -> dict:
+        """Einen Discord-Termin nachziehen (#570); ist er weg, kommt ``unknown_event`` - dann wird neu angelegt."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+        from services.discord_scheduled import _dt
+
+        event, problem = await self._scheduled_event(event_id)
+        if problem:
+            return problem
+        try:
+            await event.edit(name=payload["name"], description=payload.get("description") or "", start_time=_dt(payload["start"]), end_time=_dt(payload["end"]),
+                             location=payload.get("location") or payload.get("url") or "Website", reason="LION Website: Termin geändert")
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        return {"ok": True, "event_id": str(event.id)}
+
+    async def cancel_scheduled_event(self, event_id: str) -> dict:
+        """Einen Discord-Termin absagen (#570); läuft er schon, wird er beendet bzw. gelöscht."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        event, problem = await self._scheduled_event(event_id)
+        if problem:
+            return problem
+        try:
+            if event.status is discord.EventStatus.scheduled:
+                await event.cancel(reason="LION Website: abgesagt")
+            elif event.status is discord.EventStatus.active:
+                await event.end(reason="LION Website: beendet")
+            else:
+                await event.delete(reason="LION Website: entfernt")
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        return {"ok": True}
+
     async def send_dm(self, discord_user_id: str, embed: dict) -> dict:
         """Eine Direktnachricht an ein verknüpftes Konto (#567). Geschlossene Direktnachrichten melden „forbidden“."""
         client = self._client

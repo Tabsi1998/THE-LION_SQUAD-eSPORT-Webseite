@@ -196,6 +196,18 @@ async def _safe_discord_embeds_full():
         _log_task_failure("discord_embeds_full", exc)
 
 
+async def _safe_discord_scheduled_events():
+    """Discord-Termine (#570): alle fünf Minuten Events und Turniere mit den Terminen im Server abgleichen."""
+    try:
+        from database import get_db
+        from services.discord_scheduled import sync
+        res = await sync(get_db())
+        if res.get("created") or res.get("updated") or res.get("cancelled") or res.get("errors"):
+            logger.info(f"[scheduler] discord_scheduled_events {res}")
+    except Exception as exc:
+        _log_task_failure("discord_scheduled_events", exc)
+
+
 async def _safe_discord_bot_roles():
     """Discord-Rollen abgleichen (#302) - nur wenn der Bot verbunden ist."""
     try:
@@ -631,6 +643,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_discord_bot_watch, IntervalTrigger(minutes=5), id="discord_bot_watch", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_scheduled_events", _safe_discord_scheduled_events, lease_seconds=300.0), IntervalTrigger(minutes=5), id="discord_scheduled_events",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_embeds", _safe_discord_embeds), IntervalTrigger(seconds=60), id="discord_embeds",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_embeds_full", _safe_discord_embeds_full, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_embeds_full",

@@ -47,6 +47,7 @@ export const SETUP_GUIDES = {
       { text: "Hier unter „Kanäle je Zweck“ je Ziel den Kanal aus der Liste wählen (die Liste zeigt, wo der Bot schreiben darf) und speichern. Ist der Bot gerade nicht verbunden: Kanal-ID eintragen (Rechtsklick auf den Kanal → „Kanal-ID kopieren“, Entwicklermodus)." },
       { text: "Mit „Test“ je Ziel prüfen; unter „Was gemeldet wird“ je Ereignis ein- oder ausschalten." },
       { text: "Unter „Einbettungen“ je Art (Rangliste, Nächste Events, Live jetzt) einen Kanal wählen und einschalten – der Bot postet eine Nachricht, pinnt sie und hält sie aktuell." },
+      { text: "Unter „Discord-Termine“ einschalten: öffentliche Events und Turniere erscheinen als Termine im Server (Bot-Rolle braucht „Events verwalten“); „auch interne“ nur, wenn der Server intern ist." },
       { text: "Unter „Vorschau“ jede Meldungsart als Discord-Nachbildung ansehen – und echt in den privaten Testkanal (Ziel „Test“, etwa #bot-test) oder an dich als Direktnachricht schicken. Tests tragen den Vermerk „Test“ und zählen nicht als Meldung." },
     ],
     notes: ["Vorstand, Betrieb und Test fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
