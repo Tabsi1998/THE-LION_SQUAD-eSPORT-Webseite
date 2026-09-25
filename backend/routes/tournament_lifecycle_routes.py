@@ -322,6 +322,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         except Exception:
             pass
 
+    # Bracket im Discord (#571): ab „live“ eine Einbettung, nach dem Ende ein letztes Mal als Endstand.
+    if prev != status and status in ("live", "completed", "results_published"):
+        try:
+            from services.discord_bracket import request_refresh
+            request_refresh(tid, final=status in ("completed", "results_published"))
+        except Exception:  # noqa: BLE001
+            pass
     # Discord trigger
     is_public_discord_status = (
         t.get("is_public") is not False

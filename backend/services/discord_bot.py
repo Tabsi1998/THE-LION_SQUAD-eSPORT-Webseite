@@ -361,17 +361,19 @@ class BotRunner:
         except Exception:
             base_url = ""
 
+        # Antworten auf Slash-Befehle sieht nur die fragende Person (Wunsch des Betreibers, 25.09.): sie
+        # gelten nur ihr, und die Kanäle bleiben frei - was für alle gilt, steht in den gepinnten Einbettungen (#569).
         @tree.command(name="naechstes-event", description="Wann ist das nächste Event?")
         async def naechstes_event(interaction):
             events = await db.events.find({"status": {"$nin": ["draft", "cancelled"]}, "visibility": "public", "start_date": {"$gte": now_utc().isoformat()}},
                                           {"_id": 0, "name": 1, "title": 1, "slug": 1, "start_date": 1, "location": 1, "city": 1}).sort("start_date", 1).to_list(5)
-            await interaction.response.send_message(next_event_text(events, base_url))
+            await interaction.response.send_message(next_event_text(events, base_url), ephemeral=True)
 
         @tree.command(name="turniere", description="Welche Turnier-Anmeldungen sind offen?")
         async def turniere(interaction):
             rows = await db.tournaments.find({"status": "registration_open", "is_public": {"$ne": False}, "visibility": "public"},
                                              {"_id": 0, "title": 1, "slug": 1, "start_date": 1, "status": 1}).to_list(20)
-            await interaction.response.send_message(open_tournaments_text(rows, base_url))
+            await interaction.response.send_message(open_tournaments_text(rows, base_url), ephemeral=True)
 
         @tree.command(name="meine-erfolge", description="Deine Erfolge auf der Website (nur mit verknüpftem Konto)")
         async def meine_erfolge(interaction):
