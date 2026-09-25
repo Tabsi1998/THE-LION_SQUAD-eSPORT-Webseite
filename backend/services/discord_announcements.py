@@ -217,6 +217,28 @@ def fast_lap_message(challenge: dict, *, driver: str, track: str, time_text: str
     }
 
 
+def stream_live_message(tournament: dict, stream: dict) -> dict:
+    """„Turnier live“ (#579): ein Teilnehmer streamt, während das Turnier läuft - einmal je Stream-Start."""
+    name = stream.get("display_name") or stream.get("username") or "Ein Teilnehmer"
+    title = tournament.get("title") or "Turnier"
+    lines = []
+    if stream.get("title"):
+        lines.append(f"„{plain_text(stream['title'], 200)}“")
+    lines.append(f"Jetzt zuschauen: {stream.get('stream_url') or ''}".rstrip())
+    fields = [{"name": "Turnier", "value": title, "inline": True}]
+    if stream.get("game_name"):
+        fields.append({"name": "Spiel", "value": str(stream["game_name"]), "inline": True})
+    return {
+        "event_key": "tournament.stream_live",
+        "title": f"🔴 {name} streamt den {title}",
+        "description": "\n".join(lines),
+        "color": 0x9146FF,
+        "url": stream.get("stream_url") or f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+        "fields": fields,
+        "image_url": stream.get("thumbnail_url") or None,
+    }
+
+
 # ---------------------------------------------------------------- Vorstand (privates Ziel)
 
 # Titel und Ziel je Vorstands-Hinweis - Namen und Texte stehen nie drin, die sind im Admin.

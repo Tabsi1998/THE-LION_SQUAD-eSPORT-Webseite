@@ -49,6 +49,16 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
               <span>Aktiv</span>
             </label>
           </div>
+          <div className="flex items-center justify-between gap-3 border-t border-white/5 pt-3">
+            <div>
+              <div className="font-heading font-bold uppercase text-sm">Clips auf der Startseite</div>
+              <p className="mt-1 text-xs text-white/45">Stündlich die meistgesehenen Clips des Vereinskanals aus den letzten 30 Tagen, bis zu sechs als Kachel; der Player lädt erst nach Zustimmung zu externen Medien.</p>
+            </div>
+            <label className="flex items-center gap-2 text-sm whitespace-nowrap">
+              <input type="checkbox" checked={brand.twitch_clips_enabled === true} onChange={(e) => setBrandField("twitch_clips_enabled", e.target.checked)} className="accent-[#9146FF]" data-testid="twitch-clips-enabled" />
+              <span>Aktiv</span>
+            </label>
+          </div>
           <div className="grid md:grid-cols-2 gap-3">
             <BrandField label="TLS Twitch Channel" value={brand.twitch_channel} onChange={(v) => setBrandField("twitch_channel", v)} testId="twitch-channel" />
             <BrandField label="Twitch Client ID" value={brand.twitch_client_id} onChange={(v) => setBrandField("twitch_client_id", v)} testId="twitch-client-id" />
@@ -73,6 +83,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
           <SystemCard title="Letzte Abfrage" ok={poll.ok} detail={poll.detail} problem={poll.problem} testId="twitch-card-poll" />
           <SystemCard title="Kanäle" ok={(status?.channels_visible || 0) > 0} detail={`${status?.checked_users || 0} Accounts mit Twitch-Feld, ${status?.channels_visible || 0} davon kämen auf die Startseite`} testId="twitch-card-channels" />
           <SystemCard title="Live" ok={(status?.live_count || 0) > 0} detail={`${status?.live_count || 0} Stream(s) aktuell live`} />
+          <SystemCard title="Clips" ok={Boolean(status?.clips?.enabled) && !status?.clips?.error} detail={status?.clips?.error || (status?.clips?.enabled ? `${status?.clips?.count || 0} Clips abgelegt${status?.clips?.fetched_at ? `, zuletzt ${new Date(status.clips.fetched_at).toLocaleString("de-DE")}` : ""}` : "aus – Schalter oben")} problem={status?.clips?.error ? "error" : undefined} testId="twitch-card-clips" />
         </div>
       </div>
       {status?.live_streams?.length > 0 && (

@@ -54,7 +54,21 @@ async def list_live_streams():
     return linked_streams
 
 
+@streams_router.get("/clips")
+async def list_clips():
+    """Clips des Vereinskanals (#579) - nur mit Schalter, nur was der stündliche Abruf abgelegt hat."""
+    from services.twitch_clips import clips_for_site
+    return await clips_for_site(get_db())
+
+
 admin_streams_router = APIRouter(prefix="/api/admin/streams", tags=["streams-admin"])
+
+
+@admin_streams_router.post("/clips/refresh")
+async def admin_clips_refresh(me: dict = Depends(require_area("content"))):
+    """„Clips jetzt laden“ - auch bei ausgeschaltetem Schalter, damit der Admin sieht, was käme."""
+    from services.twitch_clips import fetch_clips
+    return await fetch_clips(get_db(), force=True)
 
 
 @admin_streams_router.post("/refresh")
@@ -81,6 +95,7 @@ async def admin_streams_status(me: dict = Depends(require_area("content"))):
     # Mitgliedschaft und Kontostatus sind Vereinsdaten - den genauen Grund
     # sieht nur, wer die Vereinsverwaltung hat.
     from services.secret_store import decrypt_secret
+    from services.twitch_clips import clips_status
     from services.twitch_service import poll_state
 
     detailed = await user_has_area(me, "club")
@@ -133,6 +148,7 @@ async def admin_streams_status(me: dict = Depends(require_area("content"))):
         "live_streams": live_streams,
         "latest_session": latest_session,
         "token_expires_at": token.get("expires_at"),
+        "clips": await clips_status(db),
     }
 
 

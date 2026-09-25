@@ -11,6 +11,7 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: (callback) =>
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/LiveStreamSlider", () => ({ LiveStreamSlider: () => null }));
+vi.mock("@/components/tls/TwitchClips", () => ({ TwitchClips: () => null }));
 vi.mock("@/components/tls/SponsorTicker", () => ({ SponsorTicker: () => null }));
 vi.mock("@/components/tls/SeasonPassWidget", () => ({ SeasonPassWidget: () => null }));
 vi.mock("@/components/tls/Logo", () => ({ MascotBadge: () => null }));

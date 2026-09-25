@@ -13,6 +13,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
+import { TwitchClips } from "@/components/tls/TwitchClips";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
@@ -97,6 +98,7 @@ export default function HomePage() {
 
       <ClubNumbers numbers={state?.club_numbers} />
       <LiveStreamSlider />
+      <TwitchClips />
       <SponsorTicker placement="home" spotlight />
 
       {!state && (

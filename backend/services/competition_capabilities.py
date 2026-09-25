@@ -51,7 +51,7 @@ def _c(key, label, endpoints, engines, note="", gap=""):
 CAPABILITIES: tuple[Capability, ...] = (
     # ---------- Turnier-Lebenszyklus (engine-neutral) ----------
     _c("tournament.browse", "Turniere ansehen",
-       ["GET /api/tournaments", "GET /api/tournaments/{slug_or_id}"], [ENGINE_NEUTRAL]),
+       ["GET /api/tournaments", "GET /api/tournaments/{slug_or_id}", "GET /api/tournaments/{slug_or_id}/streams"], [ENGINE_NEUTRAL]),
     _c("tournament.create", "Turnier anlegen",
        ["POST /api/tournaments"], [ENGINE_NEUTRAL]),
     _c("tournament.edit", "Turnier bearbeiten",

@@ -17,6 +17,7 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () =>
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("@/components/tls/Breadcrumbs", () => ({ Breadcrumbs: () => null }));
 vi.mock("@/components/tls/StreamEmbed", () => ({ StreamEmbed: () => null }));
+vi.mock("@/components/tls/tournament/TournamentLiveStreams", () => ({ TournamentLiveStreams: () => <div data-testid="tournament-live-streams-stub" /> }));
 vi.mock("@/components/tls/PrizeList", () => ({ PrizeList: () => null }));
 vi.mock("@/components/tls/AddToCalendar", () => ({ AddToCalendar: () => <div data-testid="add-to-calendar" /> }));
 vi.mock("@/components/tls/MentionTextarea", () => ({ MentionTextarea: () => null }));

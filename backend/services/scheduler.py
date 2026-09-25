@@ -342,6 +342,18 @@ async def _safe_steam_presence():
         _log_task_failure("steam_presence", exc)
 
 
+async def _safe_twitch_clips():
+    """Clips des Vereinskanals (#579): stündlich die Top-Clips der letzten 30 Tage - aus = kein Abruf."""
+    try:
+        from database import get_db
+        from services.twitch_clips import fetch_clips
+        res = await fetch_clips(get_db())
+        if res.get("error"):
+            logger.info(f"[scheduler] twitch_clips {res}")
+    except Exception as exc:
+        _log_task_failure("twitch_clips", exc)
+
+
 async def _safe_twitch_poll():
     try:
         from services.twitch_service import twitch_poll_loop
@@ -568,6 +580,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("twitch_clips", _safe_twitch_clips, lease_seconds=300.0), IntervalTrigger(hours=1), id="twitch_clips",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_poll", _safe_twitch_poll), IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)
