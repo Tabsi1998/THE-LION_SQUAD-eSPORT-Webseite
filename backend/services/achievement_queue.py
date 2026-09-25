@@ -116,20 +116,19 @@ async def flush_awards() -> dict:
     db = get_db()
     cutoff = (now_utc() - timedelta(seconds=BUNDLE_WINDOW_SECONDS)).isoformat()
     ripe_users = {row["user_id"] async for row in db.achievement_outbox.find({"created_at": {"$lte": cutoff}}, {"_id": 0, "user_id": 1})}
-    sent = notified = 0
+    notified = 0
     for user_id in ripe_users:
         rows = await db.achievement_outbox.find({"user_id": user_id}, {"_id": 0}).sort("created_at", 1).to_list(200)
         if not rows:
             continue
         await db.achievement_outbox.delete_many({"id": {"$in": [row["id"] for row in rows]}})
         try:
+            # Seit #566 erfährt nur die Person davon (In-App, Push, mit #568 als Gratulation vom Bot) - kein Kanal mehr.
             if await _notify_user(user_id, rows):
                 notified += 1
-            if await _announce(db, user_id, rows):
-                sent += 1
         except Exception:  # noqa: BLE001 - eine Meldung darf die nächste nicht aufhalten
-            logger.warning("[achievements] announcement failed", exc_info=True)
-    return {"users": len(ripe_users), "discord": sent, "notified": notified}
+            logger.warning("[achievements] notification failed", exc_info=True)
+    return {"users": len(ripe_users), "notified": notified}
 
 
 def _points(rows: list[dict]) -> int:
@@ -149,35 +148,3 @@ async def _notify_user(user_id: str, rows: list[dict]) -> bool:
         meta={"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}"},
     )
     return created is not None
-
-
-async def _announce(db, user_id: str, rows: list[dict]) -> bool:
-    """Nur öffentliche Gruppen und nur für ein öffentliches Profil - sonst erfährt der Discord nichts."""
-    public_rows = [row for row in rows if row.get("group_public")]
-    if not public_rows:
-        return False
-    user = await db.users.find_one(
-        {"id": user_id, "is_active": True, "is_banned": {"$ne": True}, "privacy_public_profile": True},
-        {"_id": 0, "username": 1, "display_name": 1},
-    )
-    if not user:
-        return False
-    from discord_service import send_event
-
-    name = user.get("display_name") or user.get("username") or "Spieler"
-    url = f"/u/{user['username']}" if user.get("username") else None
-    top = max(public_rows, key=lambda row: (row.get("level", 1), row.get("points", 0)))
-    if len(public_rows) == 1:
-        row = public_rows[0]
-        title = f"🏆 {row.get('group_name')} · {row.get('tier_name')}"
-        description = f"**{name}** hat **{row.get('tier_name')}** freigeschaltet!\n_{row.get('tier_description')}_"
-    else:
-        title = f"🏆 {len(public_rows)} Erfolge freigeschaltet"
-        lines = "\n".join(f"• **{row.get('tier_name')}** ({row.get('group_name')})" for row in public_rows[:10])
-        more = f"\n… und {len(public_rows) - 10} weitere" if len(public_rows) > 10 else ""
-        description = f"**{name}** räumt ab:\n{lines}{more}"
-    result = await send_event(
-        "achievement.awarded", title, description, color=LEVEL_COLORS.get(top.get("level", 1), 0x29B6E8), url=url,
-        fields=[{"name": "Punkte", "value": f"+{_points(public_rows)}", "inline": True}],
-    )
-    return bool(result.get("ok"))

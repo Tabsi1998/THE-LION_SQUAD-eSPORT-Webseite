@@ -23,7 +23,7 @@ Die früheren Seiten Logs, Audit Logs, App-Logs und Versandlogs leiten auf die p
 ## Alarme (#517)
 
 Unter **System → Betrieb & Logs → Alarme** legt der Admin je Ereignisart fest, ob eine Meldung per **Discord**
-(Betriebs-Webhook – ein privater Kanal nur für den Vorstand, eingerichtet unter Verbindungen → Discord)
+(der Bot schickt in den Betriebskanal – ein privater Kanal nur für den Vorstand, gewählt unter Verbindungen → Discord; Bot aus = kein Alarm)
 und/oder per **E-Mail** an die eingetragenen Empfänger geht.
 
 | Ereignis | Wann |

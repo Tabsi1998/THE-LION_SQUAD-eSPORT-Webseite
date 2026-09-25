@@ -305,17 +305,10 @@ async def _newsletter_source(kind: str, source_id: str) -> dict:
 
 
 class DiscordSettings(BaseModel):
-    webhook_url: Optional[str] = None
-    clear_webhook: Optional[bool] = None
-    # Eigener Kanal für den Betrieb (#265): Alarme gehen nie in den Community-Kanal.
-    ops_webhook_url: Optional[str] = None
-    clear_ops_webhook: Optional[bool] = None
-    username: Optional[str] = None
-    avatar_url: Optional[str] = None
     enabled: bool = True
-    # Ein Webhook je Zweck (#300): news, events, achievements, board. Je Ziel
-    # `webhook_url` (leer lassen = behalten), `clear` und ein eigener Name.
-    targets: Optional[dict[str, dict]] = None
+    # Ein Kanal je Zweck (#566): community, news, events, board, ops → Kanal-ID; "" entfernt den Kanal.
+    # Der Bot schickt alles - Webhook-Adressen gibt es seit Discord III nicht mehr.
+    channels: Optional[dict[str, str]] = None
     # Schalter je Ereignis; die Schlüssel stehen in discord_service.EVENTS.
     events: Optional[dict[str, bool]] = None
     # Discord-Bot (#302): Token verschlüsselt (leer lassen = behalten), Schalter, Server, Rollennamen.
@@ -344,7 +337,7 @@ class AuthSettings(BaseModel):
     google_client_id: Optional[str] = None
 
 
-SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key",
+SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "twitch_client_secret", "discord_client_secret", "steam_api_key",
                                "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret",
                                "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret",
                                "threads_client_secret", "facebook_client_secret", "linkedin_client_secret", "snapchat_client_secret", "pinterest_client_secret", "telegram_client_secret", "bungie_client_secret", "bungie_api_key"}
@@ -847,16 +840,15 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
         else:
             add(key, spec["label"], GROUP_PLATFORMS, to, "active", "Mitglieder können verknüpfen")
 
-    # Discord: Meldungen (Webhooks) und Bot
-    targets = discord.get("targets") if isinstance(discord.get("targets"), dict) else {}
-    webhooks = [discord.get("webhook_url")] + [(entry or {}).get("webhook_url") for entry in targets.values()]
-    webhook_states = [_secret_state(url) for url in webhooks if secret_is_configured(url)]
-    if "unreadable" in webhook_states:
-        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "unreadable", f"Webhook {UNREADABLE_TEXT}")
-    elif not webhook_states:
-        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "missing", "kein Webhook eingetragen")
+    # Discord: Meldungen über den Bot (#566) - je Zweck ein Kanal; ohne Bot keine Meldung
+    channels = discord.get("channels") if isinstance(discord.get("channels"), dict) else {}
+    chosen = [name for name, value in channels.items() if str(value or "").strip()]
+    if not chosen:
+        add("discord_channels", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "missing", "kein Kanal gewählt")
+    elif not discord.get("bot_enabled"):
+        add("discord_channels", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "off", f"{len(chosen)} Kanal/Kanäle gewählt · Bot aus – ohne Bot keine Meldung")
     else:
-        add("discord_webhooks", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "active", f"{len(webhook_states)} Webhook(s)")
+        add("discord_channels", "Discord-Meldungen", GROUP_DISCORD, "/admin/integrations/discord", "active", f"{len(chosen)} Kanal/Kanäle, Versand über den Bot")
     bot_state = _secret_state(discord.get("bot_token"))
     if bot_state == "unreadable":
         add("discord_bot", "Discord-Bot", GROUP_DISCORD, "/admin/integrations/discord", "unreadable", f"Bot-Token {UNREADABLE_TEXT}")
@@ -1470,27 +1462,18 @@ async def email_logs(me: dict = Depends(require_club_admin())):
     return await db.email_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
 
 
-# ---- Discord webhook ----
+# ---- Discord: Meldungen über den Bot (#566) ----
 @settings_router.get("/discord")
 async def get_discord(me: dict = Depends(require_club_admin())):
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
-    s["configured"] = bool(s.get("webhook_url"))
-    if s.get("webhook_url"):
-        s["webhook_url_masked"] = "https://discord.com/api/webhooks/…"
-        s.pop("webhook_url", None)
-    s["ops_configured"] = bool(s.get("ops_webhook_url"))
-    if s.get("ops_webhook_url"):
-        s["ops_webhook_url_masked"] = "https://discord.com/api/webhooks/…"
-        s.pop("ops_webhook_url", None)
-    # Ziele und Schalter (#300). Eine Webhook-Adresse verlässt den Server nie.
-    from discord_service import EVENTS, EXTRA_TARGETS, event_enabled, event_field, target_status
-    stored_targets = s.pop("targets", None) or {}
-    s["targets"] = {
-        name: {"configured": bool((stored_targets.get(name) or {}).get("webhook_url")),
-               "username": (stored_targets.get(name) or {}).get("username") or ""}
-        for name in EXTRA_TARGETS
-    }
+    for legacy in ("webhook_url", "ops_webhook_url", "username", "avatar_url", "targets"):
+        s.pop(legacy, None)
+    # Kanäle je Ziel und Schalter je Ereignis (#300, #566).
+    from discord_service import EVENTS, TARGETS, event_enabled, event_field, target_status
+    stored_channels = s.get("channels") if isinstance(s.get("channels"), dict) else {}
+    s["channels"] = {name: str(stored_channels.get(name) or "").strip() for name in TARGETS}
+    s["configured"] = any(s["channels"].values())
     stored_events = s.get("events") or {}
     switches = {key: stored_events.get(event_field(key)) for key in EVENTS}
     s["events"] = [
@@ -1501,6 +1484,7 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     # Discord-Bot (#302): Stand ohne Token.
     from services import discord_bot
     s["bot"] = {**discord_bot.bot_settings(s), **await discord_bot.read_state(db), **discord_bot.bot.status()}
+    s["bot"].pop("channels", None)  # die Kanalliste kommt über /discord/channels
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     last = await db.email_logs.find_one(
@@ -1520,24 +1504,7 @@ async def get_discord(me: dict = Depends(require_club_admin())):
 async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_admin())):
     db = get_db()
     updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
-    from discord_service import is_valid_discord_webhook_url
     unset = {}
-    if updates.pop("clear_webhook", False):
-        unset["webhook_url"] = ""
-    if updates.pop("clear_ops_webhook", False):
-        unset["ops_webhook_url"] = ""
-    for field in ("webhook_url", "ops_webhook_url"):
-        if field in updates:
-            updates[field] = str(updates[field]).strip()
-            if not updates[field]:
-                updates.pop(field)
-                continue
-            if not is_valid_discord_webhook_url(updates[field]):
-                raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
-            updates[field] = encrypt_secret(updates[field])
-    for key in ("username", "avatar_url"):
-        if key in updates and isinstance(updates[key], str):
-            updates[key] = updates[key].strip()
     # Discord-Bot (#302): Token nur, wenn neu eingetippt; Rollennamen nur die drei bekannten.
     from services.discord_bot import ROLE_KEYS
     if updates.pop("clear_bot_token", False):
@@ -1560,21 +1527,19 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
                 raise HTTPException(400, f"Unbekannte Rolle: {key}")
             updates[f"bot_roles.{key}"] = str(value or "").strip()[:100]
     current = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
-    from discord_service import EVENTS, EXTRA_TARGETS, event_field
-    incoming_targets = updates.pop("targets", None)
-    if incoming_targets is not None:
-        for name, entry in incoming_targets.items():
-            if name not in EXTRA_TARGETS or not isinstance(entry, dict):
+    from discord_service import EVENTS, TARGETS, channel_id_valid, event_field
+    incoming_channels = updates.pop("channels", None)
+    if incoming_channels is not None:
+        for name, value in incoming_channels.items():
+            if name not in TARGETS:
                 raise HTTPException(400, f"Unbekanntes Discord-Ziel: {name}")
-            if entry.get("clear"):
-                unset[f"targets.{name}.webhook_url"] = ""
-            elif str(entry.get("webhook_url") or "").strip():
-                url = str(entry["webhook_url"]).strip()
-                if not is_valid_discord_webhook_url(url):
-                    raise HTTPException(400, "Ungültige Discord Webhook URL. Erlaubt sind https://discord.com/api/webhooks/... URLs.")
-                updates[f"targets.{name}.webhook_url"] = encrypt_secret(url)
-            if "username" in entry:
-                updates[f"targets.{name}.username"] = str(entry.get("username") or "").strip()[:80]
+            channel_id = str(value or "").strip()
+            if channel_id and not channel_id_valid(channel_id):
+                raise HTTPException(400, "Eine Kanal-ID ist eine Zahl mit 17 bis 20 Stellen (Discord: Rechtsklick auf den Kanal → „Kanal-ID kopieren“, Entwicklermodus).")
+            if channel_id:
+                updates[f"channels.{name}"] = channel_id
+            else:
+                unset[f"channels.{name}"] = ""
     incoming_events = updates.pop("events", None)
     if incoming_events is not None:
         for key, value in incoming_events.items():
@@ -1582,9 +1547,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
                 raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
             updates[f"events.{event_field(key)}"] = bool(value)
     flat_current = dict(current)
-    for name, entry in (current.get("targets") or {}).items():
-        for field, value in (entry or {}).items():
-            flat_current[f"targets.{name}.{field}"] = value
+    for name, value in (current.get("channels") or {}).items():
+        flat_current[f"channels.{name}"] = value
     for key, value in (current.get("events") or {}).items():
         flat_current[f"events.{key}"] = value
     for key, value in (current.get("bot_roles") or {}).items():
@@ -1714,24 +1678,20 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
 
 
 @settings_router.post("/discord/test")
-async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|achievements|board|ops)$"), me: dict = Depends(require_club_admin())):
-    from discord_service import TARGET_LABELS, send_discord, send_ops_discord, send_to
-    if target not in ("community", "ops"):
-        return await send_to(
-            target, f"{TARGET_LABELS[target]} · Testnachricht",
-            "Diese Nachricht bestätigt, dass der Webhook für dieses Ziel funktioniert."
-            + (" Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen." if target == "board" else ""),
-            event_key="test",
-        )
-    if target == "ops":
-        return await send_ops_discord(
-            "Betrieb · Testnachricht",
-            "Diese Nachricht bestätigt, dass der Betriebs-Webhook funktioniert. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
-            event_key="test",
-        )
-    res = await send_discord(
-        "THE LION SQUAD · Testnachricht",
-        "Diese Nachricht bestätigt, dass dein Discord-Webhook korrekt funktioniert. 🦁",
-        event_key="test",
-    )
-    return res
+async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops)$"), me: dict = Depends(require_club_admin())):
+    """Testmeldung über den Bot in den Kanal des Ziels - privat bleibt privat, ohne Kanal kommt der Grund zurück (#566)."""
+    from discord_service import TARGET_LABELS, send_to
+    texts = {
+        "community": "Diese Nachricht bestätigt, dass der Bot hier schreiben darf. 🦁",
+        "ops": "Diese Nachricht bestätigt, dass der Bot im Betriebskanal schreiben darf. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
+        "board": "Diese Nachricht bestätigt, dass der Bot im Vorstandskanal schreiben darf. Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen.",
+    }
+    title = "THE LION SQUAD · Testnachricht" if target == "community" else f"{TARGET_LABELS[target]} · Testnachricht"
+    return await send_to(target, title, texts.get(target, "Diese Nachricht bestätigt, dass der Bot in diesem Kanal schreiben darf."), event_key="test")
+
+
+@settings_router.get("/discord/channels")
+async def discord_channels(me: dict = Depends(require_club_admin())):
+    """Die Textkanäle des Servers mit dem, was der Bot dort darf - für die Kanalwahl je Ziel (#566)."""
+    from services.discord_bot import bot
+    return await bot.list_channels()

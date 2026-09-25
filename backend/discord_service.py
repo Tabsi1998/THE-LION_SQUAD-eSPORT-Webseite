@@ -1,39 +1,37 @@
-"""Discord webhook notifications. Reads webhook URLs from settings 'discord' doc.
-Silent failure if not configured.
+"""Discord-Meldungen - über den Bot (#566).
 
-Ein Webhook je Zweck (#300). Öffentliche Ziele - ``news``, ``events``,
-``achievements`` - fallen ohne eigenen Webhook auf ``community`` zurück. Private
-Ziele - ``board`` (Vorstand) und ``ops`` (Betrieb, #265) - fallen **nie**
-zurück: fehlt ihr Webhook, wird nichts gesendet. Und was nur Mitglieder oder
-der Vorstand sehen dürfen, geht nie an ein öffentliches Ziel, egal welcher
-Schalter an ist. Beides entscheidet ``send_event`` an einer Stelle.
+Seit Discord III schickt die Website alles über den Vereins-Bot: je Ziel ein Kanal aus
+``settings.discord.channels`` statt einer Webhook-Adresse. Öffentliche Ziele - ``news``,
+``events`` - fallen ohne eigenen Kanal auf ``community`` zurück. Private Ziele - ``board``
+(Vorstand) und ``ops`` (Betrieb, #265) - fallen **nie** zurück: fehlt ihr Kanal, wird nichts
+gesendet. Und was nur Mitglieder oder der Vorstand sehen dürfen, geht nie an ein öffentliches
+Ziel, egal welcher Schalter an ist. Beides entscheidet ``send_event`` an einer Stelle.
+
+Ist der Bot aus oder nicht verbunden, wird nichts gesendet - kein Rückfall auf einen Webhook
+(Entscheidung des Betreibers, 25.09.). Das Versand-Log (``email_logs``, channel ``discord``)
+hält jeden Versuch fest, mit Kanal und Nachrichten-ID, damit spätere Pakete Nachrichten
+bearbeiten können.
 """
 import logging
 import os
-import httpx
 from urllib.parse import urlparse
+
 from database import get_db
-from models import now_utc, new_id
-from services.secret_store import decrypt_secret
+from models import new_id, now_utc
 
 logger = logging.getLogger("tls-arena.discord")
-VALID_WEBHOOK_HOSTS = {"discord.com", "discordapp.com", "canary.discord.com", "ptb.discord.com"}
 PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
-OPS_BOT_NAME = "LION Betrieb"
-BOARD_BOT_NAME = "LION Vorstand"
 
-PUBLIC_TARGETS = ("community", "news", "events", "achievements")
+PUBLIC_TARGETS = ("community", "news", "events")
 PRIVATE_TARGETS = ("board", "ops")
 TARGETS = PUBLIC_TARGETS + PRIVATE_TARGETS
-# Ziele mit eigenem Eintrag unter settings.discord.targets; Community und
-# Betrieb behalten ihre Felder von früher (webhook_url, ops_webhook_url).
-EXTRA_TARGETS = ("news", "events", "achievements", "board")
 TARGET_LABELS = {
     "community": "Community (Standard)", "news": "News", "events": "Events und Turniere",
-    "achievements": "Erfolge", "board": "Vorstand (privat)", "ops": "Betrieb (privat)",
+    "board": "Vorstand (privat)", "ops": "Betrieb (privat)",
 }
-# Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der
-# Betreiber sie einschaltet; was es vor #300 schon gab, bleibt an.
+# Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der Betreiber sie
+# einschaltet; was es vor #300 schon gab, bleibt an. Erfolge gehen seit #566 in keinen Kanal
+# mehr - die Person selbst bekommt die Gratulation (#568).
 EVENTS = {
     "news.published": {"target": "news", "label": "News veröffentlicht", "default": False},
     "event.announced": {"target": "events", "label": "Event angekündigt", "default": False},
@@ -42,10 +40,21 @@ EVENTS = {
     "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True},
     "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True},
     "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True},
-    "achievement.awarded": {"target": "achievements", "label": "Erfolg freigeschaltet", "default": True},
     "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
     "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},
 }
+# Warum nichts ankam - in Worten mit Klickweg, für Versand-Log, Admin und Betrieb & Logs.
+REASON_TEXTS = {
+    "disabled": "Discord-Meldungen sind ausgeschaltet (Verbindungen → Discord → „Versand aktiv“).",
+    "bot_off": "Der Bot ist aus – ohne Bot keine Meldung (Verbindungen → Discord → „Bot verbinden“).",
+    "bot_offline": "Der Bot ist nicht verbunden – der Grund steht im Bot-Kasten unter Verbindungen → Discord.",
+    "channel_missing": "Kein Kanal gewählt (Verbindungen → Discord → Kanäle je Zweck).",
+    "forbidden": ("Der Bot darf in diesem Kanal nicht schreiben: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: "
+                  "„Kanal ansehen“, „Nachrichten senden“, „Links einbetten“."),
+    "unknown_channel": "Kanal nicht gefunden – gelöscht, oder der Bot ist nicht auf diesem Server.",
+}
+# Ein Ziel, dessen letzter Versuch so scheiterte, ist eine Aufgabe für die Tageszentrale (#303).
+BROKEN_REASONS = ("forbidden", "unknown_channel")
 
 
 def event_field(event_key: str) -> str:
@@ -53,16 +62,14 @@ def event_field(event_key: str) -> str:
     return event_key.replace(".", "__")
 
 
-def is_valid_discord_webhook_url(url: str) -> bool:
-    parsed = urlparse((url or "").strip())
-    if parsed.scheme != "https" or parsed.netloc.lower() not in VALID_WEBHOOK_HOSTS:
-        return False
-    parts = [p for p in parsed.path.split("/") if p]
-    return len(parts) >= 4 and parts[0] == "api" and parts[1] == "webhooks"
+def channel_id_valid(value) -> bool:
+    """Discord-Kanal-IDs sind Snowflakes: nur Ziffern, 17 bis 20 Stellen (mit Luft nach beiden Seiten)."""
+    text = str(value or "").strip()
+    return text.isdigit() and 15 <= len(text) <= 22
 
 
 def should_post_to_public_discord(item: dict | None) -> bool:
-    """Return whether a content object is safe for the public Discord webhook."""
+    """Return whether a content object is safe for a public Discord channel."""
     item = item or {}
     if item.get("is_public") is False:
         return False
@@ -138,26 +145,15 @@ async def _public_link_url(value: str | None) -> str | None:
 
 
 async def _get_discord_config() -> dict:
+    from services.discord_bot import bot_settings
+
     db = get_db()
     s = await db.settings.find_one({"id": "discord"}) or {}
-    webhook_url = decrypt_secret(s.get("webhook_url")).strip()
-    ops_webhook_url = decrypt_secret(s.get("ops_webhook_url")).strip()
-    targets = {}
-    for name, entry in (s.get("targets") or {}).items():
-        if name in EXTRA_TARGETS and isinstance(entry, dict):
-            targets[name] = {
-                "webhook_url": decrypt_secret(entry.get("webhook_url")).strip(),
-                "username": (entry.get("username") or "").strip(),
-            }
+    stored = s.get("channels") if isinstance(s.get("channels"), dict) else {}
     return {
-        "webhook_url": webhook_url,
-        "ops_webhook_url": ops_webhook_url,
         "master": bool(s.get("enabled", True)),
-        "enabled": bool(s.get("enabled", True) and webhook_url),
-        "ops_enabled": bool(s.get("enabled", True) and ops_webhook_url),
-        "username": s.get("username") or "THE LION SQUAD",
-        "avatar_url": await _public_avatar_url(s.get("avatar_url")),
-        "targets": targets,
+        "bot": bot_settings(s),
+        "channels": {target: str(stored.get(target) or "").strip() for target in TARGETS},
         "events": {key: (s.get("events") or {}).get(event_field(key)) for key in EVENTS},
     }
 
@@ -171,21 +167,15 @@ def event_enabled(cfg: dict, event_key: str) -> bool:
 
 
 def resolve_target(cfg: dict, target: str) -> dict:
-    """Webhook, Name und tatsächliches Ziel. Privat fällt nie zurück - auch nicht auf ein anderes privates Ziel."""
+    """Kanal und tatsächliches Ziel. Privat fällt nie zurück - auch nicht auf ein anderes privates Ziel."""
     if target not in TARGETS:
         target = "community"
-    if target == "ops":
-        return {"target": "ops", "webhook_url": cfg.get("ops_webhook_url") or "", "username": OPS_BOT_NAME, "fallback": False}
-    if target == "board":
-        entry = (cfg.get("targets") or {}).get("board") or {}
-        return {"target": "board", "webhook_url": entry.get("webhook_url") or "",
-                "username": entry.get("username") or BOARD_BOT_NAME, "fallback": False}
-    entry = (cfg.get("targets") or {}).get(target) or {}
-    if target != "community" and entry.get("webhook_url"):
-        return {"target": target, "webhook_url": entry["webhook_url"],
-                "username": entry.get("username") or cfg.get("username"), "fallback": False}
-    return {"target": "community", "webhook_url": cfg.get("webhook_url") or "",
-            "username": cfg.get("username"), "fallback": target != "community"}
+    channels = cfg.get("channels") or {}
+    if target in PRIVATE_TARGETS:
+        return {"target": target, "channel_id": channels.get(target) or "", "fallback": False}
+    if target != "community" and channels.get(target):
+        return {"target": target, "channel_id": channels[target], "fallback": False}
+    return {"target": "community", "channel_id": channels.get("community") or "", "fallback": target != "community"}
 
 
 async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E8, url: str | None = None,
@@ -203,42 +193,6 @@ async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E
     return embed
 
 
-async def _post_embed(webhook_url: str, *, username: str | None, avatar_url: str | None,
-                      title: str, description: str, color: int, url: str | None,
-                      fields: list | None, log: dict, image_url: str | None = None) -> dict:
-    """Ein Embed an genau diesen Webhook; das Log landet in email_logs."""
-    db = get_db()
-    embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url)
-    payload = {"embeds": [embed]}
-    if username:
-        payload["username"] = username
-    if _is_public_http_url(avatar_url):
-        payload["avatar_url"] = avatar_url
-    # Für „erneut senden“ (#303): was gesendet werden sollte - ohne die Adresse des Webhooks.
-    log["payload"] = {"title": title[:256], "description": (description or "")[:4000], "color": color, "url": url,
-                      "fields": (fields or [])[:10], "image_url": image_url}
-    try:
-        async with httpx.AsyncClient(timeout=8) as client:
-            r = await client.post(webhook_url, json=payload)
-            if r.status_code == 400 and "avatar_url" in payload and "avatar_url" in r.text:
-                payload.pop("avatar_url", None)
-                r = await client.post(webhook_url, json=payload)
-        log["status_code"] = r.status_code
-        if r.status_code >= 400:
-            log["status"] = "failed"
-            log["error"] = f"{r.status_code} {r.text[:200]}"
-        else:
-            log["status"] = "sent"
-        await db.email_logs.insert_one(log)
-        return {"ok": log["status"] == "sent", "status_code": r.status_code, "error": log["error"], "target": log.get("target")}
-    except Exception as e:
-        logger.error(f"[discord] {type(e).__name__}")
-        log["status"] = "failed"
-        log["error"] = type(e).__name__
-        await db.email_logs.insert_one(log)
-        return {"ok": False, "reason": type(e).__name__, "target": log.get("target")}
-
-
 def _new_log(event_key: str, title: str, target: str) -> dict:
     return {
         "id": new_id(), "channel": "discord", "target": target, "event_key": event_key,
@@ -247,31 +201,62 @@ def _new_log(event_key: str, title: str, target: str) -> dict:
     }
 
 
+def _payload(title, description, color, url, fields, image_url) -> dict:
+    """Für „erneut senden“ (#303): was gesendet werden sollte."""
+    return {"title": title[:256], "description": (description or "")[:4000], "color": color, "url": url,
+            "fields": (fields or [])[:10], "image_url": image_url}
+
+
+async def _skip(log: dict, reason: str, error: str) -> dict:
+    log["reason"] = reason
+    log["error"] = error
+    await get_db().email_logs.insert_one(log)
+    return {"ok": False, "reason": reason, "error": error, "target": log.get("target")}
+
+
+async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
+                      fields: list | None, image_url: str | None, log: dict) -> dict:
+    """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID."""
+    from services.discord_bot import bot
+
+    db = get_db()
+    embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url)
+    log["channel_id"] = channel_id
+    try:
+        result = await bot.send_embed(channel_id, embed)
+    except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
+        logger.error("[discord] %s", type(exc).__name__)
+        result = {"ok": False, "reason": "error", "error": type(exc).__name__}
+    if result.get("ok"):
+        log["status"] = "sent"
+        log["message_id"] = result.get("message_id")
+    else:
+        log["status"] = "failed"
+        log["reason"] = result.get("reason") or "error"
+        log["error"] = result.get("error") or REASON_TEXTS.get(log["reason"]) or log["reason"]
+    await db.email_logs.insert_one(log)
+    return {"ok": log["status"] == "sent", "reason": log.get("reason"), "error": log.get("error"), "target": log.get("target"),
+            "channel_id": channel_id, "message_id": log.get("message_id")}
+
+
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom") -> dict:
-    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie."""
-    db = get_db()
+    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts."""
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, target)
     log = _new_log(event_key, title, resolved["target"])
     if resolved["fallback"]:
         log["wanted_target"] = target
-    if not cfg["master"] or not resolved["webhook_url"]:
+    log["payload"] = _payload(title, description, color, url, fields, image_url)
+    if not cfg["master"]:
+        return await _skip(log, "disabled", REASON_TEXTS["disabled"])
+    if not cfg["bot"]["enabled"]:
+        return await _skip(log, "bot_off", REASON_TEXTS["bot_off"])
+    if not resolved["channel_id"]:
         private = resolved["target"] in PRIVATE_TARGETS
-        log["error"] = "Discord ist ausgeschaltet" if not cfg["master"] else (
-            f"Discord {resolved['target']} webhook not configured" if private else "Discord webhook not configured")
-        await db.email_logs.insert_one(log)
-        reason = "disabled" if not cfg["master"] or not private else f"{resolved['target']}_webhook_missing"
-        return {"ok": False, "reason": reason, "error": log["error"], "target": resolved["target"]}
-    if not is_valid_discord_webhook_url(resolved["webhook_url"]):
-        log["status"] = "failed"
-        log["error"] = "Invalid Discord webhook URL"
-        await db.email_logs.insert_one(log)
-        return {"ok": False, "reason": "invalid_webhook_url", "error": log["error"], "target": resolved["target"]}
-    return await _post_embed(
-        resolved["webhook_url"], username=resolved["username"], avatar_url=cfg.get("avatar_url"),
-        title=title, description=description, color=color, url=url, fields=fields, image_url=image_url, log=log,
-    )
+        return await _skip(log, f"{resolved['target']}_channel_missing" if private else "channel_missing", REASON_TEXTS["channel_missing"])
+    return await _send_embed(resolved["channel_id"], title=title, description=description, color=color, url=url,
+                             fields=fields, image_url=image_url, log=log)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
@@ -290,14 +275,14 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
 async def send_discord(title: str, description: str = "", *,
                        color: int = 0x29B6E8, url: str = None,
                        fields: list = None, event_key: str = "custom") -> dict:
-    """Send an embed to the community Discord webhook."""
+    """Ein Embed in den Community-Kanal."""
     return await send_to("community", title, description, color=color, url=url, fields=fields, event_key=event_key)
 
 
 async def send_ops_discord(title: str, description: str = "", *,
                            color: int = 0xFF3B30, url: str = None,
                            fields: list = None, event_key: str = "ops") -> dict:
-    """Send an embed to the operations webhook only - never to the community channel (#265)."""
+    """Ein Embed nur in den Betriebskanal - nie in die Community (#265)."""
     return await send_to("ops", title, description, color=color, url=url, fields=fields, event_key=event_key)
 
 
@@ -314,30 +299,36 @@ async def send_public_discord(item: dict | None, title: str, description: str = 
 
 
 async def target_status(db=None) -> dict:
-    """Je Ziel: eingerichtet, wohin es wirklich geht, letzter Versuch."""
+    """Je Ziel: Kanal, wohin es wirklich geht, letzter Versuch."""
+    from services.discord_bot import read_state
+
     db = db if db is not None else get_db()
     cfg = await _get_discord_config()
+    names = {str(row.get("id")): row.get("name") for row in ((await read_state(db)).get("channels") or []) if row.get("id")}
     status = {}
     for target in TARGETS:
         resolved = resolve_target(cfg, target)
-        own = not resolved["fallback"] and bool(resolved["webhook_url"])
+        own = not resolved["fallback"] and bool(resolved["channel_id"])
         last = await db.email_logs.find_one(
             {"channel": "discord", "target": target, "status": {"$in": ["sent", "failed"]}},
-            {"_id": 0, "status": 1, "status_code": 1, "error": 1, "event_key": 1, "created_at": 1},
+            {"_id": 0, "status": 1, "reason": 1, "error": 1, "event_key": 1, "created_at": 1, "channel_id": 1},
             sort=[("created_at", -1)],
         )
+        channel_id = cfg["channels"].get(target) or ""
         status[target] = {
             "label": TARGET_LABELS[target], "private": target in PRIVATE_TARGETS, "configured": own,
-            "delivers_to": resolved["target"] if resolved["webhook_url"] else None, "last": last,
+            "channel_id": channel_id, "channel_name": names.get(channel_id),
+            "delivers_to": resolved["target"] if resolved["channel_id"] else None, "last": last,
         }
     return status
 
 
 async def broken_targets(db=None) -> list[dict]:
-    """Ziele, deren letzter Versuch an einem kaputten Webhook scheiterte (401/403/404) - für die Tageszentrale (#303)."""
+    """Ziele, deren letzter Versuch an Kanal oder Recht scheiterte - für die Tageszentrale (#303)."""
     broken = []
     for target, entry in (await target_status(db)).items():
         last = entry.get("last") or {}
-        if entry["configured"] and last.get("status") == "failed" and last.get("status_code") in (401, 403, 404):
-            broken.append({"target": target, "label": entry["label"], "status_code": last.get("status_code"), "at": last.get("created_at")})
+        if entry["configured"] and last.get("status") == "failed" and last.get("reason") in BROKEN_REASONS:
+            broken.append({"target": target, "label": entry["label"], "reason": last.get("reason"),
+                           "text": REASON_TEXTS.get(last.get("reason"), ""), "at": last.get("created_at")})
     return broken

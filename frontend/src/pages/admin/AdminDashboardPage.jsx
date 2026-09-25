@@ -57,7 +57,7 @@ export default function AdminDashboardPage() {
     { label: "E-Mail (Resend)", detail: sys?.smtp?.provider === "resend" && sys?.smtp?.ok ? "konfiguriert" : "prüfen", to: "/admin/settings/resend", icon: Mail, ok: sys?.smtp?.provider === "resend" ? sys?.smtp?.ok : undefined },
     { label: "SMTP-Server", detail: sys?.smtp?.host || "eigener Mailserver", to: "/admin/settings/smtp", icon: Server, ok: sys?.smtp?.provider === "smtp" ? sys?.smtp?.ok : undefined },
     { label: "Newsletter", detail: "News & Event-Mails", to: "/admin/settings/newsletter", icon: Mail, ok: undefined },
-    { label: "Discord", detail: sys?.discord?.ok ? "Webhook aktiv" : "nicht verbunden", to: "/admin/integrations/discord", icon: MessageSquare, ok: sys?.discord?.ok },
+    { label: "Discord", detail: sys?.discord?.ok ? "Bot sendet" : sys?.discord?.configured ? "Bot aus" : "kein Kanal gewählt", to: "/admin/integrations/discord", icon: MessageSquare, ok: sys?.discord?.ok },
     { label: "Twitch", detail: publicCfg?.twitch_channel ? `@${publicCfg.twitch_channel}` : "Live-Erkennung", to: "/admin/integrations/twitch", icon: Radio, ok: undefined },
     { label: "Socials", detail: "Kanäle & Links", to: "/admin/settings/socials", icon: Share2, ok: undefined },
     { label: "SEO & Analytics", detail: publicCfg?.analytics_provider ? publicCfg.analytics_provider : "Tracking & IndexNow", to: "/admin/settings/seo", icon: Search, ok: publicCfg?.analytics_provider ? true : undefined },
@@ -196,8 +196,8 @@ export default function AdminDashboardPage() {
     {
       label: "Discord",
       detail: (data?.discord_broken || []).length
-        ? `Webhook gestört: ${data.discord_broken.map((entry) => `${entry.label} (${entry.status_code})`).join(", ")}`
-        : "Alle Webhooks in Ordnung",
+        ? `Kanal ohne Recht oder gelöscht: ${data.discord_broken.map((entry) => entry.label).join(", ")} – ${data.discord_broken[0].text}`
+        : "Alle Kanäle in Ordnung",
       to: "/admin/integrations/discord",
       icon: AlertTriangle,
       tone: (data?.discord_broken || []).length ? "#FF3B30" : "#00FF88",
@@ -258,7 +258,7 @@ export default function AdminDashboardPage() {
     if (item.to.startsWith("/admin/prizes")) return pendingPrizes > 0 || readyPrizes > 0;
     if (item.to === "/admin/mobile-push") return pushErrors > 0;
     if (item.to === "/admin/ops?tab=app") return Number(data?.client_logs?.open || 0) > 0;
-    // Discord (#303): ein Webhook, der 401/403/404 liefert, ist eine Aufgabe.
+    // Discord (#303, #566): ein Kanal, in dem der Bot nicht schreiben darf, ist eine Aufgabe.
     if (item.to === "/admin/integrations/discord") return (data?.discord_broken || []).length > 0;
     // Betrieb (#265): rote oder gelbe Auto-Checks und offene Fehlergruppen sind eine Aufgabe.
     if (item.to === "/admin/ops") return ["crit", "warn"].includes(data?.ops?.checks?.status) || Number(data?.ops?.open_error_groups || 0) > 0;

@@ -1,12 +1,12 @@
 """Alarme für den Betrieb (#265, #517): rote Auto-Checks, neue 5xx-Fehlergruppen, nicht zustellbare
 Mails, abgebrochene Hintergrundjobs, ein roter Dolibarr-Abgleich, ein Bot, der nicht mehr verbindet,
-und kritische App-Fehler gehen als Meldung raus - per Discord-Webhook (Betriebs-Webhook) und, wenn
+und kritische App-Fehler gehen als Meldung raus - über den Discord-Bot in den Betriebskanal und, wenn
 gewünscht, per E-Mail an den Vorstand. Je Ereignisart legt der Admin unter Betrieb → Alarme fest,
 welche Wege gelten; eine Sperrfrist je Schlüssel verhindert, dass ein Dauerfehler den Kanal flutet.
 
-Der Betrieb hat seinen eigenen Webhook (Admin → Verbindungen → Discord → Betriebs-Webhook) - der
-Community-Kanal mit News, Turnieren und Erfolgen bekommt nie einen Alarm. Ist kein Weg eingerichtet,
-passiert nichts; ``send_ops_discord`` schreibt das ins Log.
+Der Betrieb hat seinen eigenen Kanal (Admin → Verbindungen → Discord → Kanäle je Zweck → Betrieb) - der
+Community-Kanal mit News und Turnieren bekommt nie einen Alarm. Ist kein Weg eingerichtet oder der Bot
+aus, passiert nichts; ``send_ops_discord`` schreibt das ins Log (#566).
 """
 from __future__ import annotations
 
@@ -215,7 +215,7 @@ async def send_test_alert(db) -> dict:
     fields = [{"name": "Zeit", "value": now_utc().strftime("%d.%m.%Y %H:%M UTC"), "inline": True}]
     if any_discord:
         try:
-            if await _send("Testalarm aus Betrieb → Alarme", "Wenn diese Meldung ankommt, passt der Betriebs-Webhook.", fields, "ops_test"):
+            if await _send("Testalarm aus Betrieb → Alarme", "Wenn diese Meldung ankommt, passt der Betriebskanal.", fields, "ops_test"):
                 channels.append("discord")
         except Exception:  # noqa: BLE001
             logger.warning("[ops] Test-Alarm Discord fehlgeschlagen", exc_info=True)

@@ -49,18 +49,13 @@ class TestDiscordSettings:
         r = admin_client.get(f"{base_url}/api/settings/discord")
         assert r.status_code == 200, r.text
         data = r.json()
-        # masked or empty
-        assert "webhook_url" not in data or data.get("webhook_url_masked")
-        assert "configured" in data
+        # Seit #566: Kanäle statt Webhooks, der Bot-Token verlässt den Server nie.
+        assert "webhook_url" not in data and "bot_token" not in data
+        assert "channels" in data and "configured" in data
 
     def test_discord_put_persists_and_audits(self, admin_client, base_url):
-        # Save without webhook to avoid actually triggering anything
-        payload = {
-            "username": "TLS Bot Test",
-            "avatar_url": "https://example.com/avatar.png",
-            "enabled": True,
-            "webhook_url": "",
-        }
+        # Save without a channel to avoid actually triggering anything
+        payload = {"enabled": True, "channels": {"community": ""}}
         r = admin_client.put(f"{base_url}/api/settings/discord", json=payload)
         assert r.status_code == 200, r.text
         assert r.json().get("ok") is True
@@ -69,8 +64,6 @@ class TestDiscordSettings:
         g = admin_client.get(f"{base_url}/api/settings/discord")
         assert g.status_code == 200
         d = g.json()
-        assert d.get("username") == "TLS Bot Test"
-        assert d.get("avatar_url") == "https://example.com/avatar.png"
         assert d.get("enabled") is True
 
         # Audit log entry
@@ -79,27 +72,27 @@ class TestDiscordSettings:
         actions = [x.get("action") for x in a.json()]
         assert any("settings.discord.update" in (x or "") for x in actions)
 
-    def test_discord_rejects_invalid_webhook(self, admin_client, base_url):
+    def test_discord_rejects_invalid_channel_id(self, admin_client, base_url):
         r = admin_client.put(
             f"{base_url}/api/settings/discord",
-            json={"webhook_url": "https://example.com/not-discord", "enabled": True},
+            json={"channels": {"community": "abc"}, "enabled": True},
         )
         assert r.status_code == 400
 
-    def test_discord_can_clear_webhook(self, admin_client, base_url):
-        r = admin_client.put(f"{base_url}/api/settings/discord", json={"clear_webhook": True})
+    def test_discord_can_clear_channel(self, admin_client, base_url):
+        r = admin_client.put(f"{base_url}/api/settings/discord", json={"channels": {"community": ""}})
         assert r.status_code == 200
         g = admin_client.get(f"{base_url}/api/settings/discord")
         assert g.status_code == 200
         assert g.json().get("configured") is False
 
-    def test_discord_test_disabled_when_no_webhook(self, admin_client, base_url):
-        # Ensure webhook is empty (we did not save one above)
+    def test_discord_test_says_why_nothing_is_sent(self, admin_client, base_url):
+        # Kein Kanal gewählt und/oder der Bot ist aus (#566): nichts geht raus, der Grund steht dabei.
         r = admin_client.post(f"{base_url}/api/settings/discord/test")
         assert r.status_code == 200, r.text
         body = r.json()
         assert body.get("ok") is False
-        assert body.get("reason") == "disabled"
+        assert body.get("reason") in ("disabled", "bot_off", "channel_missing")
 
     def test_discord_test_requires_admin(self, api, base_url):
         r = api.post(f"{base_url}/api/settings/discord/test")

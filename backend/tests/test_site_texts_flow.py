@@ -80,7 +80,7 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     }, upsert=True)
     await flow.db.settings.update_one({"id": "auth"}, {"$set": {"google_login_enabled": True, "google_client_id": "abc.apps.googleusercontent.com"}}, upsert=True)
     await flow.db.settings.update_one({"id": "email"}, {"$set": {"provider": "resend", "resend_api_key": encrypt_secret("re_x")}}, upsert=True)
-    await flow.db.settings.update_one({"id": "discord"}, {"$set": {"webhook_url": "https://discord.com/api/webhooks/1/x", "bot_enabled": True}}, upsert=True)
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {"channels": {"community": "100000000000000001"}, "bot_enabled": True}}, upsert=True)
 
     privacy = (await flow.get("/api/settings/public/legal/privacy")).json()
     assert "Mit Google anmelden" in block(privacy, "privacy-google-login")["text"]
@@ -93,7 +93,7 @@ async def test_configured_services_appear_with_googles_limited_use_notice_and_th
     assert "Discord, Steam, YouTube, Lichess, Mastodon, Bluesky" in block(privacy, "privacy-platform-links")["text"]
     recipients = block(privacy, "privacy-recipients")["items"]
     assert any("Resend, Inc." in item for item in recipients) and any("Verknüpfung YouTube: Google Ireland Ltd." in item for item in recipients)
-    assert block(privacy, "privacy-discord-bot") and block(privacy, "privacy-discord-webhooks")
+    assert block(privacy, "privacy-discord-bot") and block(privacy, "privacy-discord-channels")
     assert blocks(privacy, "extra")[0] == {"type": "text", "text": "Extra <script>alert(1)</script> Hinweis"}
 
     # Die Crawler-Vorschau: derselbe Text als HTML, Vereinstext escaped, Anker für Google Play bleibt.

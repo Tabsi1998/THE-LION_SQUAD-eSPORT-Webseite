@@ -422,7 +422,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
         </div>
       ) : null}
       <p className="text-[11px] text-white/40">
-        Rote Prüfungen und neue 5xx-Fehlergruppen gehen per Discord-Webhook raus (Einstellungen → Discord), höchstens eine Meldung je Prüfung und Stunde.
+        Rote Prüfungen und neue 5xx-Fehlergruppen schickt der Discord-Bot in den Betriebskanal (Verbindungen → Discord), höchstens eine Meldung je Prüfung und Stunde.
       </p>
     </div>
   );

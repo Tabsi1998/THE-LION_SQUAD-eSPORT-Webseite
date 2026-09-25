@@ -36,18 +36,18 @@ export const SETUP_GUIDES = {
     ],
     notes: ["Rollen bekommen nur Konten mit bestätigter Discord-Verknüpfung (siehe Konten verknüpfen)."],
   },
-  discord_webhooks: {
-    key: "discord_webhooks",
-    title: "Discord-Meldungen (Webhooks je Zweck)",
+  discord_channels: {
+    key: "discord_channels",
+    title: "Discord-Meldungen (Kanal je Zweck, Versand über den Bot)",
     where: { to: "/admin/integrations/discord", label: "Verbindungen → Discord" },
-    summary: "News, Events und Turniere, Erfolge, Vorstand und Betriebsalarme gehen über Webhooks in je einen Kanal. Ein Webhook ist eine Adresse, die Discord für einen Kanal erzeugt.",
+    summary: "News, Events und Turniere, Vorstands-Hinweise und Betriebsalarme schickt der Bot in je einen Kanal deines Servers. Ohne Bot keine Meldung – einen anderen Weg gibt es nicht.",
     steps: [
-      { text: "In Discord: Server-Einstellungen → „Integrationen“ → „Webhooks“ → „Neuer Webhook“." },
-      { text: "Name vergeben (z. B. „LION News“), den Zielkanal wählen, „Webhook-URL kopieren“." },
-      { text: "Hier bei dem passenden Zweck einfügen (News, Events/Turniere, Erfolge, Vorstand, Betrieb) und speichern. Ein Webhook darf für mehrere Zwecke stehen." },
-      { text: "Mit „Testnachricht“ prüfen; unter „Ereignisse“ je Ereignis ein- oder ausschalten." },
+      { text: "Den Bot einrichten und verbinden (Anleitung „Discord-Bot“). Beim Einladen die Rechte „View Channels“, „Send Messages“ und „Embed Links“ mitgeben." },
+      { text: "In Discord je Kanal prüfen, dass die Bot-Rolle dort schreiben darf: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: „Kanal ansehen“, „Nachrichten senden“, „Links einbetten“. Für Vorstand und Betrieb private Kanäle nehmen." },
+      { text: "Hier unter „Kanäle je Zweck“ je Ziel den Kanal aus der Liste wählen (die Liste zeigt, wo der Bot schreiben darf) und speichern. Ist der Bot gerade nicht verbunden: Kanal-ID eintragen (Rechtsklick auf den Kanal → „Kanal-ID kopieren“, Entwicklermodus)." },
+      { text: "Mit „Test“ je Ziel prüfen; unter „Was gemeldet wird“ je Ereignis ein- oder ausschalten." },
     ],
-    notes: ["Erlaubt sind nur Adressen, die mit https://discord.com/api/webhooks/ beginnen.", "Der Betriebs-Webhook bekommt nur Alarme – am besten ein Kanal, den nur der Vorstand sieht."],
+    notes: ["Vorstand und Betrieb fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
   },
   twitch: {
     key: "twitch",

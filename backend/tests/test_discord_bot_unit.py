@@ -77,3 +77,29 @@ def test_no_guild_becomes_a_click_path():
     nowhere = discord_bot.no_guild_text({"guild_id": ""}, Client([]))
     assert nowhere.startswith("Der Bot ist auf keinem Server") and "URL Generator" in nowhere
     assert "Bot verbinden" in discord_bot.SYNC_TEXTS["offline"]
+
+
+def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
+    """Kanalwahl je Ziel (#566): der Admin sieht je Kanal, ob der Bot dort schreiben und einbetten darf."""
+    class Category:
+        def __init__(self, name):
+            self.name = name
+
+    class Channel:
+        def __init__(self, cid, name, category=None, position=0):
+            self.id, self.name, self.category, self.position = cid, name, category, position
+
+    class Permissions:
+        def __init__(self, view=True, send=True, embed=True):
+            self.view_channel, self.send_messages, self.embed_links = view, send, embed
+
+    row = discord_bot.channel_row(Channel(1, "news", Category("Community"), 2), Permissions(embed=False))
+    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False}
+    assert discord_bot.channel_row(Channel(2, "regeln"), Permissions(send=False))["can_send"] is False
+    rows = discord_bot.sorted_channels([
+        {"id": "9", "name": "regeln", "category": "Info", "position": 0, "can_send": False},
+        {"id": "2", "name": "news", "category": "Community", "position": 1, "can_send": True},
+        {"id": "1", "name": "allgemein", "category": "Community", "position": 0, "can_send": True},
+    ])
+    assert [row["name"] for row in rows] == ["allgemein", "news", "regeln"]
+    assert "Kanal-ID" in discord_bot.CHANNEL_TEXTS["offline"]

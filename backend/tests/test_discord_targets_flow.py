@@ -1,7 +1,7 @@
-"""Discord I (#300, #301, #303) durch die echte Anwendung: ein Webhook je Zweck, Schalter je
-Ereignis, Ankündigungen genau einmal, Erfolge sofort und gebündelt - und die eine Regel über
-allem: Was privat ist, landet nie in einem öffentlichen Kanal, und ein privates Ziel fällt nie
-auf ein öffentliches zurück."""
+"""Discord I–III (#300, #301, #303, #566) durch die echte Anwendung: der Bot schickt alles, je Ziel
+ein Kanal, Schalter je Ereignis, Ankündigungen genau einmal - und die eine Regel über allem: Was
+privat ist, landet nie in einem öffentlichen Kanal, ein privates Ziel fällt nie auf ein
+öffentliches zurück, und ohne Bot wird nichts gesendet (kein Webhook-Rückfall)."""
 import pathlib
 import sys
 from datetime import timedelta
@@ -14,11 +14,14 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import discord_service  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import achievement_queue, discord_announcements  # noqa: E402
+from services import achievement_queue, discord_announcements, discord_bot  # noqa: E402
 
-COMMUNITY = "https://discord.com/api/webhooks/1/community"
-NEWS = "https://discord.com/api/webhooks/2/news"
-BOARD = "https://discord.com/api/webhooks/3/board"
+COMMUNITY = "100000000000000001"
+NEWS = "100000000000000002"
+BOARD = "100000000000000003"
+OPS = "100000000000000004"
+# Erfundener Wert in Token-Form (lang genug, ohne Leerzeichen) - bewusst ohne Zufall, damit kein Scanner anschlägt.
+TOKEN = "test" * 6 + ".fake." + "token" * 8
 
 
 @pytest_asyncio.fixture
@@ -32,16 +35,19 @@ async def flow():
 
 @pytest.fixture
 def posted(monkeypatch):
+    """Der Bot gilt als verbunden: jedes Embed wird festgehalten statt an Discord geschickt; Einstellungen starten ihn nicht wirklich."""
     calls = []
 
-    async def fake_post(webhook_url, **kwargs):
-        calls.append({"webhook_url": webhook_url, **{k: kwargs.get(k) for k in ("username", "title", "description", "url", "fields", "image_url")}})
-        log = kwargs["log"]
-        log["status"] = "sent"
-        await discord_service.get_db().email_logs.insert_one(log)
-        return {"ok": True, "status_code": 204, "error": None, "target": log.get("target")}
+    async def fake_send(channel_id, embed):
+        calls.append({"channel_id": channel_id, "title": embed.get("title"), "description": embed.get("description"),
+                      "url": embed.get("url"), "fields": embed.get("fields"), "image": (embed.get("image") or {}).get("url")})
+        return {"ok": True, "message_id": f"m{len(calls)}", "channel_id": channel_id}
 
-    monkeypatch.setattr(discord_service, "_post_embed", fake_post)
+    async def fake_apply():
+        return True
+
+    monkeypatch.setattr(discord_bot.bot, "send_embed", fake_send)
+    monkeypatch.setattr(discord_bot.bot, "apply_settings", fake_apply)
     return calls
 
 
@@ -53,7 +59,8 @@ async def admin(flow):
 
 async def configure(flow, **body):
     await admin(flow)
-    response = await flow.put("/api/settings/discord", json={"webhook_url": COMMUNITY, "enabled": True, **body})
+    response = await flow.put("/api/settings/discord", json={"channels": {"community": COMMUNITY}, "enabled": True,
+                                                              "bot_token": TOKEN, "bot_enabled": True, **body})
     assert response.status_code == 200, response.text
 
 
@@ -64,21 +71,25 @@ async def test_public_targets_fall_back_to_community_private_targets_never(flow,
     await configure(flow, events={"news.published": True, "membership.application": True})
 
     assert (await discord_service.send_event("news.published", "News", "Text", item={"visibility": "public"}))["ok"] is True
-    assert posted[-1]["webhook_url"] == COMMUNITY, "ohne eigenen Webhook geht News an Community"
+    assert posted[-1]["channel_id"] == COMMUNITY, "ohne eigenen Kanal geht News an Community"
 
     board = await discord_service.send_event("membership.application", "Antrag", "neu")
-    assert board["ok"] is False and board["reason"] == "board_webhook_missing"
-    assert all(call["webhook_url"] == COMMUNITY for call in posted) and len(posted) == 1, "der Vorstand fällt nie auf Community zurück"
+    assert board["ok"] is False and board["reason"] == "board_channel_missing" and "Kein Kanal" in board["error"]
+    assert all(call["channel_id"] == COMMUNITY for call in posted) and len(posted) == 1, "der Vorstand fällt nie auf Community zurück"
 
-    await flow.put("/api/settings/discord", json={"targets": {"news": {"webhook_url": NEWS}, "board": {"webhook_url": BOARD, "username": "Vorstand"}}})
+    await flow.put("/api/settings/discord", json={"channels": {"news": NEWS, "board": BOARD}})
     await discord_service.send_event("news.published", "News 2", "Text", item={"visibility": "public"})
-    assert posted[-1]["webhook_url"] == NEWS
+    assert posted[-1]["channel_id"] == NEWS
     await discord_service.send_event("membership.application", "Antrag", "neu")
-    assert posted[-1]["webhook_url"] == BOARD and posted[-1]["username"] == "Vorstand"
+    assert posted[-1]["channel_id"] == BOARD
 
-    await flow.put("/api/settings/discord", json={"clear_webhook": True})
+    await flow.put("/api/settings/discord", json={"channels": {"community": ""}})
     await discord_service.send_event("membership.application", "Antrag 2", "neu")
-    assert posted[-1]["webhook_url"] == BOARD, "privat braucht die Community nicht"
+    assert posted[-1]["channel_id"] == BOARD, "privat braucht die Community nicht"
+    assert (await discord_service.send_event("tournament.live", "Turnier", item={"visibility": "public"}))["reason"] == "channel_missing"
+
+    log = await flow.db.email_logs.find_one({"channel": "discord", "status": "sent", "target": "board"}, {"_id": 0}, sort=[("created_at", -1)])
+    assert log["channel_id"] == BOARD and log["message_id"], "Kanal und Nachrichten-ID stehen im Versand-Log - die Grundlage fürs Bearbeiten"
 
 
 @pytest.mark.asyncio
@@ -109,29 +120,90 @@ async def test_switches_new_events_are_off_until_the_operator_turns_them_on(flow
 
 
 @pytest.mark.asyncio
-async def test_settings_are_system_only_masked_and_validated(flow, posted):
-    await configure(flow, targets={"news": {"webhook_url": NEWS}})
-    shown = await flow.get("/api/settings/discord")
-    assert NEWS not in shown.text and COMMUNITY not in shown.text
-    data = shown.json()
-    assert data["targets"]["news"]["configured"] is True and data["targets"]["board"]["configured"] is False
-    assert data["target_status"]["news"]["delivers_to"] == "news"
-    assert data["target_status"]["events"]["delivers_to"] == "community" and data["target_status"]["events"]["configured"] is False
-    assert data["target_status"]["board"] == {**data["target_status"]["board"], "private": True, "delivers_to": None}
-    assert {event["key"]: event["enabled"] for event in data["events"]}["news.published"] is False
-    stored = await flow.db.settings.find_one({"id": "discord"})
-    assert stored["targets"]["news"]["webhook_url"].startswith("enc:v1:")
+async def test_without_the_bot_nothing_is_sent_and_the_log_says_why(flow, posted):
+    """Bot aus = keine Meldung (#566) - kein Rückfall, aber der Grund steht in Worten im Versand-Log."""
+    await configure(flow, events={"news.published": True})
+    await flow.put("/api/settings/discord", json={"bot_enabled": False})
+    result = await discord_service.send_event("news.published", "News", item={"visibility": "public"})
+    assert result["ok"] is False and result["reason"] == "bot_off" and "Bot verbinden" in result["error"]
+    assert posted == []
+    log = await flow.db.email_logs.find_one({"channel": "discord"}, {"_id": 0})
+    assert log["status"] == "skipped" and log["reason"] == "bot_off" and log["payload"]["title"] == "News"
+    # Eingeschaltet, aber nicht verbunden: der echte Bot sagt es genauso, ohne Netz.
+    assert await discord_bot.BotRunner().send_embed(COMMUNITY, {"title": "x"}) == {"ok": False, "reason": "bot_offline"}
 
-    assert (await flow.put("/api/settings/discord", json={"targets": {"presse": {"webhook_url": NEWS}}})).status_code == 400
-    assert (await flow.put("/api/settings/discord", json={"targets": {"news": {"webhook_url": "https://example.test/hook"}}})).status_code == 400
+
+@pytest.mark.asyncio
+async def test_a_channel_the_bot_may_not_write_to_is_a_failed_attempt_with_a_click_path(flow, posted, monkeypatch):
+    await configure(flow, events={"news.published": True})
+
+    async def refused(channel_id, embed):
+        return {"ok": False, "reason": "forbidden"}
+
+    monkeypatch.setattr(discord_bot.bot, "send_embed", refused)
+    result = await discord_service.send_event("news.published", "News", item={"visibility": "public"})
+    assert result["ok"] is False and result["reason"] == "forbidden" and "Berechtigungen" in result["error"]
+    log = await flow.db.email_logs.find_one({"channel": "discord"}, {"_id": 0})
+    assert log["status"] == "failed" and log["reason"] == "forbidden" and log["channel_id"] == COMMUNITY
+
+    dashboard = (await flow.get("/api/admin/dashboard")).json()
+    assert [entry["target"] for entry in dashboard["discord_broken"]] == ["community"]
+    assert "Berechtigungen" in dashboard["discord_broken"][0]["text"]
+    status = (await flow.get("/api/settings/discord")).json()["target_status"]["community"]
+    assert status["last"]["reason"] == "forbidden"
+    flow.act_as(await flow.add_user(role="tournament_admin"))
+    assert (await flow.get("/api/admin/dashboard")).json()["discord_broken"] == []
+
+
+@pytest.mark.asyncio
+async def test_settings_are_admin_only_validated_and_never_carry_the_token(flow, posted):
+    await configure(flow, channels={"community": COMMUNITY, "news": NEWS})
+    shown = await flow.get("/api/settings/discord")
+    assert TOKEN not in shown.text and "bot_token" not in shown.text
+    data = shown.json()
+    assert data["channels"] == {"community": COMMUNITY, "news": NEWS, "events": "", "board": "", "ops": ""}
+    assert data["configured"] is True
+    assert data["target_status"]["news"]["delivers_to"] == "news" and data["target_status"]["news"]["configured"] is True
+    assert data["target_status"]["events"]["delivers_to"] == "community" and data["target_status"]["events"]["configured"] is False
+    assert data["target_status"]["board"]["private"] is True and data["target_status"]["board"]["delivers_to"] is None
+    keys = {event["key"] for event in data["events"]}
+    assert keys == set(discord_service.EVENTS) and "achievement.awarded" not in keys, "Erfolge gehen in keinen Kanal mehr (#566)"
+    assert {event["key"]: event["enabled"] for event in data["events"]}["news.published"] is False
+
+    assert (await flow.put("/api/settings/discord", json={"channels": {"presse": NEWS}})).status_code == 400
+    assert (await flow.put("/api/settings/discord", json={"channels": {"news": "abc"}})).status_code == 400
     assert (await flow.put("/api/settings/discord", json={"events": {"alles.senden": True}})).status_code == 400
+    # Alte Webhook-Felder werden ignoriert, nicht gespeichert.
+    ignored = await flow.put("/api/settings/discord", json={"webhook_url": "https://discord.com/api/webhooks/1/x"})
+    assert ignored.status_code == 200 and ignored.json()["changed"] is False
+    assert "webhook_url" not in await flow.db.settings.find_one({"id": "discord"}, {"_id": 0})
 
     test = await flow.post("/api/settings/discord/test?target=events")
-    assert test.json()["ok"] is True and test.json()["target"] == "community"
-    assert (await flow.post("/api/settings/discord/test?target=board")).json()["reason"] == "board_webhook_missing"
+    assert test.json()["ok"] is True and test.json()["target"] == "community" and posted[-1]["channel_id"] == COMMUNITY
+    assert (await flow.post("/api/settings/discord/test?target=board")).json()["reason"] == "board_channel_missing"
+    assert (await flow.post("/api/settings/discord/test?target=achievements")).status_code == 422
+
+    channels = (await flow.get("/api/settings/discord/channels")).json()
+    assert channels["ok"] is False and channels["reason"] == "offline" and "Kanal-ID" in channels["text"] and channels["channels"] == []
 
     flow.act_as(await flow.add_user(role="tournament_admin"))
     assert (await flow.get("/api/settings/discord")).status_code == 403
+    assert (await flow.get("/api/settings/discord/channels")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_old_webhook_fields_are_removed_by_the_migration(flow):
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {
+        "id": "discord", "webhook_url": "enc:v1:x", "ops_webhook_url": "enc:v1:y", "username": "Bot", "avatar_url": "a.png",
+        "targets": {"news": {"webhook_url": "enc:v1:z", "username": "News"}}, "bot_enabled": True, "events": {"news__published": True},
+    }}, upsert=True)
+    from services.migrations import migrate_discord_webhooks_to_bot
+
+    assert "webhook_url" in await migrate_discord_webhooks_to_bot(flow.db)
+    stored = await flow.db.settings.find_one({"id": "discord"}, {"_id": 0})
+    assert not any(key in stored for key in ("webhook_url", "ops_webhook_url", "username", "avatar_url", "targets"))
+    assert stored["bot_enabled"] is True and stored["events"] == {"news__published": True}, "Bot und Schalter bleiben"
+    assert await migrate_discord_webhooks_to_bot(flow.db) == "nothing to remove"
 
 
 # ---------------------------------------------------------------- Ankündigungen
@@ -159,7 +231,7 @@ async def test_news_is_announced_once_with_image_and_link(flow, posted):
     assert len(posted) == 1
     message = posted[0]
     assert message["title"] == "📰 Saisonstart" and message["description"] == "Es geht los."
-    assert message["url"] == "/news/saisonstart" and message["image_url"] == "uploads/public/banner.webp"
+    assert message["url"].endswith("/news/saisonstart") and message["image"].endswith("/api/static/uploads/public/banner.webp")
 
     assert (await discord_announcements.announce_due())["news"] == 0, "jede News wird genau einmal geprüft"
     assert len(posted) == 1
@@ -192,7 +264,7 @@ async def test_event_announcement_names_time_in_vienna_place_and_deadline(flow, 
     result = await discord_announcements.announce_due()
     assert result["outcomes"] == {"sent": 1, "private_visibility": 1, "past_event": 1}
     message = posted[0]
-    assert message["title"] == "📅 LAN-Party" and message["url"] == "/events/lan" and message["image_url"] == "uploads/public/lan.webp"
+    assert message["title"] == "📅 LAN-Party" and message["url"].endswith("/events/lan") and message["image"].endswith("/uploads/public/lan.webp")
     fields = {field["name"]: field["value"] for field in message["fields"]}
     assert fields["Wo"] == "Vereinsheim, Telfs" and fields["Plätze"] == "40"
     assert fields["Wann"].endswith("Uhr – " + discord_announcements.vienna(start + timedelta(days=1), with_time=False)) or "Uhr" in fields["Wann"]
@@ -220,6 +292,11 @@ async def test_preview_shows_the_same_embed_and_the_honest_verdict(flow, posted)
     assert private["would_send"] is False and private["reason"] == "private_visibility"
     skipped = (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": {**item, "discord_skip": True}})).json()
     assert skipped["reason"] == "author_opt_out"
+    # Ohne Bot und ohne Kanal sagt die Vorschau genau das.
+    await flow.put("/api/settings/discord", json={"bot_enabled": False})
+    assert (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": item})).json()["reason"] == "bot_off"
+    await flow.put("/api/settings/discord", json={"bot_enabled": True, "channels": {"community": ""}})
+    assert (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": item})).json()["reason"] == "no_channel"
     assert posted == [], "die Vorschau sendet nie"
 
     flow.act_as(await flow.add_user(role="player"))
@@ -228,14 +305,14 @@ async def test_preview_shows_the_same_embed_and_the_honest_verdict(flow, posted)
 
 @pytest.mark.asyncio
 async def test_board_gets_a_hint_without_names(flow, posted):
-    await configure(flow, targets={"board": {"webhook_url": BOARD}}, events={"membership.application": True, "contact.request": True})
+    await configure(flow, channels={"community": COMMUNITY, "board": BOARD}, events={"membership.application": True, "contact.request": True})
     flow.act_as(None)
     sent = await flow.post("/api/contact/submit", json={"name": "Paula Beispiel", "email": "paula@lionsquad-test.at", "topic": "sponsorship",
                                                           "subject": "Sponsoring-Anfrage von Paula",
                                                           "message": "Ich möchte euch unterstützen, ruft mich an: 0660 1234567", "accept_privacy": True})
     assert sent.status_code in (200, 201), sent.text
     message = posted[-1]
-    assert message["webhook_url"] == BOARD and message["url"] == "/admin/contact"
+    assert message["channel_id"] == BOARD and message["url"].endswith("/admin/contact")
     blob = f"{message['title']} {message['description']} {message['fields']}"
     for secret in ("Paula", "paula@lionsquad-test.at", "0660", "unterstützen"):
         assert secret not in blob
@@ -243,30 +320,19 @@ async def test_board_gets_a_hint_without_names(flow, posted):
 
 @pytest.mark.asyncio
 async def test_failed_message_can_be_resent_to_the_same_target_only(flow, posted):
-    await configure(flow, targets={"board": {"webhook_url": BOARD}})
+    await configure(flow, channels={"community": COMMUNITY, "board": BOARD})
     await flow.db.email_logs.insert_one({"id": "log1", "channel": "discord", "target": "board", "event_key": "membership.application",
-                                         "status": "failed", "status_code": 500, "title": "Antrag",
+                                         "status": "failed", "reason": "forbidden", "title": "Antrag",
                                          "payload": {"title": "Antrag", "description": "neu", "color": 1, "url": "/admin/membership-applications"}})
     await flow.db.email_logs.insert_one({"id": "log2", "channel": "discord", "target": "community", "status": "sent", "payload": {"title": "x"}})
     again = await flow.post("/api/settings/discord/resend/log1")
-    assert again.json()["ok"] is True and posted[-1]["webhook_url"] == BOARD
+    assert again.json()["ok"] is True and posted[-1]["channel_id"] == BOARD
     assert (await flow.db.email_logs.find_one({"id": "log1"}))["status"] == "resent"
     assert (await flow.post("/api/settings/discord/resend/log2")).status_code == 409
     assert (await flow.post("/api/settings/discord/resend/gibtsnicht")).status_code == 404
 
 
-@pytest.mark.asyncio
-async def test_broken_webhook_shows_up_for_those_who_can_fix_it(flow, posted):
-    await configure(flow, targets={"news": {"webhook_url": NEWS}})
-    await flow.db.email_logs.insert_one({"id": "f1", "channel": "discord", "target": "news", "status": "failed", "status_code": 404,
-                                         "created_at": now_utc().isoformat(), "event_key": "news.published"})
-    dashboard = (await flow.get("/api/admin/dashboard")).json()
-    assert [entry["target"] for entry in dashboard["discord_broken"]] == ["news"]
-    flow.act_as(await flow.add_user(role="tournament_admin"))
-    assert (await flow.get("/api/admin/dashboard")).json()["discord_broken"] == []
-
-
-# ---------------------------------------------------------------- Erfolge sofort und gebündelt (#301)
+# ---------------------------------------------------------------- Erfolge sofort und gebündelt (#301) - nur noch an die Person (#566)
 
 GROUP = {"code": "g_pub", "name": "Turniersiege", "public": True}
 TIERS = [
@@ -314,7 +380,7 @@ async def test_sweep_queues_recently_active_and_once_a_day_everyone(flow):
 
 
 @pytest.mark.asyncio
-async def test_awards_are_bundled_into_one_message_and_one_notification(flow, posted, monkeypatch):
+async def test_awards_are_bundled_into_one_notification_and_never_into_a_channel(flow, posted, monkeypatch):
     await configure(flow)
     paula = await player(flow, "paula", privacy_public_profile=True)
     for tier in TIERS:
@@ -323,18 +389,15 @@ async def test_awards_are_bundled_into_one_message_and_one_notification(flow, po
 
     monkeypatch.setattr(achievement_queue, "BUNDLE_WINDOW_SECONDS", -1)
     result = await achievement_queue.flush_awards()
-    assert result == {"users": 1, "discord": 1, "notified": 1}
-    assert len(posted) == 1
-    message = posted[0]
-    assert message["title"] == "🏆 2 Erfolge freigeschaltet" and "Erster Sieg" in message["description"] and "Seriensieger" in message["description"]
-    assert message["fields"] == [{"name": "Punkte", "value": "+200", "inline": True}]
+    assert result == {"users": 1, "notified": 1}
+    assert posted == [], "seit #566 erfährt der Kanal nichts mehr - die Gratulation geht an die Person (#568)"
     notes = await flow.db.notifications.find({"user_id": paula["id"], "kind": "achievement"}).to_list(10)
     assert len(notes) == 1 and notes[0]["title"] == "2 Erfolge freigeschaltet"
     assert await flow.db.achievement_outbox.count_documents({}) == 0
 
 
 @pytest.mark.asyncio
-async def test_discord_only_learns_what_is_public(flow, posted, monkeypatch):
+async def test_the_person_always_learns_about_it_public_profile_or_not(flow, posted, monkeypatch):
     await configure(flow)
     monkeypatch.setattr(achievement_queue, "BUNDLE_WINDOW_SECONDS", -1)
     privat = await player(flow, "privat", privacy_public_profile=False)
@@ -343,8 +406,7 @@ async def test_discord_only_learns_what_is_public(flow, posted, monkeypatch):
     await achievement_queue.note_award(offen["id"], TIERS[0], {**GROUP, "public": False, "name": "Vereinsmitglied"})
     await achievement_queue.note_award(offen["id"], TIERS[1], {**GROUP, "is_negative": True})
     result = await achievement_queue.flush_awards()
-    assert result["discord"] == 0 and posted == [], "kein öffentliches Profil oder keine öffentliche Gruppe: der Discord erfährt nichts"
-    assert result["notified"] == 2, "die Person selbst erfährt es immer"
+    assert result["notified"] == 2 and posted == []
     assert await flow.db.notifications.count_documents({"kind": "achievement"}) == 2
 
 
