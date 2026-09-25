@@ -54,7 +54,9 @@ CAPABILITY_LABELS = {"documents": "Dokumente", "consents": "Einwilligungen", "vo
 # als Nachweis; dafür braucht der API-Benutzer der Website im Modul das Recht „Über die API im Namen jedes
 # Mitglieds handeln“. Ältere Module ignorieren member_id (400 „subject is needed“) - dort bleibt der Code der Weg.
 MEMBER_MODE_MIN_VERSION = (1, 4, 0)
-MEMBER_MODE_CAPABILITIES = ["documents", "profile", "website"]
+# Über die Mitgliedsnummer entscheidet das Modul je Aufruf (Rechte); Versammlungen, Abstimmungen und
+# Veranstaltungen (#327, #331) gehören seit Vereine 1.4 dazu.
+MEMBER_MODE_CAPABILITIES = ["documents", "profile", "website", "meetings", "votes", "events"]
 MEMBER_RIGHT_LABEL = "Über die API im Namen jedes Mitglieds handeln"
 MEMBER_RIGHT_TEXT = ("Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand gibt dem "
                      f"API-Benutzer der Website in Dolibarr das Recht „{MEMBER_RIGHT_LABEL}“.")

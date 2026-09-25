@@ -21,7 +21,7 @@ from services.dolibarr_client import DolibarrClient, DolibarrError, load_setting
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS
 from services.dolibarr_sync import try_auto_link
-from services import dolibarr_identity, dolibarr_self_service
+from services import dolibarr_identity, dolibarr_meetings, dolibarr_self_service
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
@@ -596,6 +596,55 @@ async def request_self_service_exit(body: SelfServiceExitBody, request: Request,
     try:
         return await dolibarr_self_service.request_exit(get_db(), user, body.wished_last_day)
     except dolibarr_self_service.SelfServiceError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+# ---------------------------------------------------------------- Versammlungen und Abstimmungen (#327)
+class MeetingResponseBody(BaseModel):
+    response: Literal["yes", "no", "maybe"]
+
+
+class MotionBody(BaseModel):
+    title: str
+    text: str = ""
+
+
+class VoteBody(BaseModel):
+    right_id: int
+    option: str
+
+
+@router.get("/me/meetings")
+async def my_meetings(user: dict = Depends(get_current_user)):
+    """Sitzungen und Abstimmungen aus der Vereinsakte (#327) - je Teil mit dem Grund, wenn er fehlt."""
+    return await dolibarr_meetings.overview(get_db(), user)
+
+
+@router.put("/me/meetings/{meeting_id}/response")
+async def respond_to_meeting(meeting_id: int, body: MeetingResponseBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:meetings:response", limit=30, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_meetings.respond(get_db(), user, meeting_id, body.response)
+    except dolibarr_meetings.MeetingsError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+@router.post("/me/meetings/{meeting_id}/motions")
+async def submit_meeting_motion(meeting_id: int, body: MotionBody, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:meetings:motion", limit=10, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_meetings.submit_motion(get_db(), user, meeting_id, body.title, body.text)
+    except dolibarr_meetings.MeetingsError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+@router.post("/me/ballots/{ballot_id}/votes")
+async def cast_ballot_vote(ballot_id: int, body: VoteBody, request: Request, user: dict = Depends(get_current_user)):
+    """Bewusst ohne Audit-Eintrag: welche Antwort jemand gibt, schreibt die Website nirgends hin."""
+    await enforce_rate_limit(request, "dolibarr:ballots:vote", limit=60, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_meetings.cast_vote(get_db(), user, ballot_id, body.right_id, body.option)
+    except dolibarr_meetings.MeetingsError as exc:
         raise HTTPException(exc.status, exc.detail)
 
 

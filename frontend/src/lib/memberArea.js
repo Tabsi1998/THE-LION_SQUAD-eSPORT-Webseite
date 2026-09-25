@@ -15,6 +15,7 @@ export const MEMBER_AREA_LINKS = [
   { to: "/members/membership#mitgliedskarte", label: "Mitgliedskarte" },
   { to: "/members/benefits", label: "Vorteile" },
   { to: "/members/documents", label: "Dokumente" },
+  { to: "/members/meetings", label: "Versammlungen" },
   { to: "/members/news", label: "Interne News" },
   { to: "/board", label: "Vorstand" },
 ];

@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote } from "lucide-react";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -24,6 +24,8 @@ export default function MemberAreaPage() {
   const [internalEvents, setInternalEvents] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [discordUrl, setDiscordUrl] = useState("");
+  // Versammlungen und Abstimmungen (#327): nur, wenn die Vereinsakte welche liefert.
+  const [meetings, setMeetings] = useState({ meetings: [], ballots: [] });
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -35,7 +37,8 @@ export default function MemberAreaPage() {
       api.get("/events?upcoming=true&compact=true&limit=48"),
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
-    ]).then(([b, m, d, n, e, p, s]) => {
+      api.get("/membership/me/meetings"),
+    ]).then(([b, m, d, n, e, p, s, mt]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -43,6 +46,7 @@ export default function MemberAreaPage() {
       if (e.status === "fulfilled") setInternalEvents(memberEvents(e.value.data));
       if (p.status === "fulfilled") setContacts(boardContacts(p.value.data));
       if (s.status === "fulfilled") setDiscordUrl(s.value.data?.discord_invite_url || "");
+      if (mt.status === "fulfilled" && mt.value.data?.available) setMeetings({ meetings: mt.value.data.meetings || [], ballots: mt.value.data.ballots || [] });
       setLoaded(true);
     });
   }, []);
@@ -52,7 +56,9 @@ export default function MemberAreaPage() {
   const memberSince = my?.membership?.member_since
     ? formatMemberSince(my.membership.member_since, my.membership.member_since_precision)
     : null;
-  const nothingYet = loaded && !internalEvents.length && !docs.length && !benefits.length && !internalNews.length;
+  const nextMeeting = meetings.meetings.find((row) => row.upcoming) || null;
+  const openBallots = meetings.ballots.filter((row) => row.status === "open").length;
+  const nothingYet = loaded && !internalEvents.length && !docs.length && !benefits.length && !internalNews.length && !nextMeeting && !openBallots;
 
   return (
     <PublicLayout>
@@ -102,6 +108,25 @@ export default function MemberAreaPage() {
 
         <div className="mt-8 grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
+            {nextMeeting || openBallots ? (
+              <Section title="Versammlungen" icon={Vote} testId="member-area-meetings" more={{ to: "/members/meetings", label: "Alle Versammlungen" }}>
+                <div className="space-y-2">
+                  {openBallots ? (
+                    <Link to="/members/meetings" data-testid="member-area-open-ballots" className="block border-l-2 border-[#29B6E8] pl-3 text-sm font-bold text-[#29B6E8] hover:text-white transition">
+                      {openBallots === 1 ? "Eine Abstimmung ist offen" : `${openBallots} Abstimmungen sind offen`} – jetzt abstimmen
+                    </Link>
+                  ) : null}
+                  {nextMeeting ? (
+                    <Link to="/members/meetings" data-testid={`member-area-meeting-${nextMeeting.id}`} className="block border-l-2 border-[#FFD700]/50 pl-3 hover:border-[#FFD700] transition">
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">{nextMeeting.kind_label} · {nextMeeting.day.split("-").reverse().join(".")}{nextMeeting.time ? ` · ${nextMeeting.time} Uhr` : ""}</div>
+                      <div className="font-bold text-white mt-0.5">{nextMeeting.title}</div>
+                      <div className="text-xs text-white/50 mt-0.5">Deine Antwort: {nextMeeting.response_label}</div>
+                    </Link>
+                  ) : null}
+                </div>
+              </Section>
+            ) : null}
+
             {internalEvents.length ? (
               <Section title="Interne Events" icon={Calendar} testId="member-area-events" more={{ to: "/events", label: "Alle Events" }}>
                 <div className="space-y-3">
