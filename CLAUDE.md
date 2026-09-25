@@ -275,6 +275,100 @@ Seit dem 15. September gilt:
   `LegalPages.jsx` rendert nur noch (`lib/privacyFacts.js` weg). Tests `test_site_texts_flow.py`,
   `LegalPages.test.jsx`, e2e `public.spec.js` (`mockLegalPages` nach `**/api/settings/public**`).
   FAQ `google_pruefung`.
+- GitHub-Releases der App von selbst, Beta/Release-Kennzeichnung (#309; PR #563; Backend + Web +
+  App; `update.sh`, App-Build). `services/github_releases.py`: `sync(db, force=, limit=)` holt alle
+  10 min (Scheduler-Job `github_releases`, ein Replikat) `GET /repos/<repo>/releases` mit einem
+  feinkörnigen Token (nur Lesen von Contents; verschlüsselt in `settings.app_releases.github_token`,
+  nie in einer Antwort), `parse_tag` (`mobile-v<version>-build<N>`; Entwürfe und fremde Tags
+  übersprungen), Asset laden → `app_releases.store_release(set_current=False, source="github")`,
+  Prüfsumme gegen die `.sha256`-Datei, erst dann `update_release(is_current=True)` – nur beim
+  höchsten Build und bei einer Beta nur mit `github_rollout_betas` (Standard an, solange die App Beta
+  ist); falsche Prüfsumme → Datei weg, Grund in `github_last_error`. `public_settings`,
+  `save_settings` (Token, `clear_github_token`, Repo `owner/name`, Schalter). Routen
+  `GET/PATCH /api/admin/app-releases/github`, `POST …/github/sync` (auch bei Job aus; Audit
+  `app_release.github_settings|github_sync`). `app_releases.channel_of(version, prerelease)` →
+  `channel` beta|release an jedem Release (`public_release`, also auch `/api/mobile/app-version`),
+  Upload von Hand nach `-beta`. Web `AdminAppReleasesPage`: Kasten `app-release-github` (Stand,
+  Token nur hin, Repo, `…-enabled`, `…-betas`, `…-sync`, `…-clear`), Spalte Kanal (`ChannelBadge`),
+  „von GitHub“. App `lib/appUpdate.ts` `releaseChannel`, `channelLabel`, `installPrompt(channel,
+  mandatory)`; `AppUpdateBanner` Plakette `app-update-channel` (BETA · Testversion gelb / RELEASE
+  grün) und Rückfrage `confirmInstall` (Standard `defaultConfirmInstall` = Alert; Tests geben eine
+  Funktion mit) vor dem Download, Pflicht ohne „Später“ mit demselben Hinweis. Tests
+  `test_github_releases_flow.py` (3, nachgestelltes GitHub), `AdminAppReleasesPage.test.jsx` (+2),
+  `AppUpdateBanner.test.tsx` (+1), `appUpdate.test.ts` (+1).
+- Einstellungen-Seite in Dateien je Abschnitt (#223 Rest; PR #562; nur Web). `AdminSettingsPage`
+  (1692 → 618 Zeilen) behält Zustand, Laden und Handler; je Abschnitt eine reine Darstellungs-
+  Komponente mit genau den Props, die ihr JSX braucht: `pages/admin/settings/sections/
+  {GoogleLoginSection, AccessSection, ResendSection, SmtpSection, NewsletterSection,
+  MailQueueSection, BrandSection, SeoSection, SystemSection}.jsx`, Bausteine `sections/parts.jsx`
+  (BannerPreview, BannerScopePicker, BrandNumberField, BrandDateTimeField, SeoStatusCard),
+  Konstanten/Helfer `settings/shared.js` (SETTINGS_SECTIONS, LEGACY_TAB_REDIRECTS, Presets,
+  Payload-Helfer). Mechanisch per Skript (Props = Namen aus dem Komponenten-Scope, die im Block
+  vorkommen; ESLint no-undef/no-unused-vars als Nachweis). Damit ist #223 durch.
+- Konten verknüpfen III, Welle 3: Mastodon und Bluesky (#547; PR #561; Backend + Web + App;
+  `update.sh`, App-Build). Dezentral, keine App im Admin. `PLATFORMS[*]["input"]` (Label,
+  Platzhalter, Pflicht) – was die Person vor dem Start eintippt; `/me/platform-links` liefert es,
+  `POST …/start` nimmt `{input}` (`LinkStart`), Web `LinkRow` zeigt das Feld vor dem Knopf
+  (`profile-<key>-input`, Pflicht sperrt den Knopf), `?link=mastodon` startet nicht von selbst.
+  `begin_link(db, platform, branding, state, input)` statt `authorize_url` im Start; Sitzungen zum
+  state in `platform_link_sessions` (`_remember_session`/`_take_session`, einmal lesbar, 10 min);
+  `fetch_identity(..., db=)`. Mastodon: `mastodon_instance()` (Host aus „name@instanz“/Adresse,
+  `HOST_RE`), `_resolves_public` (nur öffentlich auflösende Hosts – Tests patchen es), `_mastodon_app`
+  registriert die Website je Instanz (`POST /api/v1/apps`, Scope read:accounts, verschlüsselt in
+  `db.mastodon_apps`), `/oauth/token`, `verify_credentials`; Handle `name@instanz`, `official_url`
+  → `https://instanz/@name`. Bluesky: `GET /api/platform-links/bluesky/client-metadata.json`
+  (`bluesky_client_metadata`, client_id = diese Adresse, `token_endpoint_auth_method: none`,
+  DPoP), `bluesky_handle()`, `_bluesky_issuer` (resolveHandle → DID-Dokument (`plc.directory` /
+  did:web) → PDS → `oauth-protected-resource` → Authorization Server; ohne Handle `bsky.social`),
+  `_dpop_key` (ES256 je Start), `_dpop_proof` (jti/htm/htu/iat/nonce/ath), `_dpop_post` (Nonce-Tanz
+  `use_dpop_nonce`), PAR → `authorization_endpoint?client_id&request_uri`, Token mit DPoP + PKCE,
+  `iss`-Prüfung, Identität = `sub` (DID) + `app.bsky.actor.getProfile`. `check_provider`: beide
+  „keine App nötig“. Felder `mastodon_handle`, `bluesky_handle`; FAQ 29 Plattformen;
+  e2e-Navigationszahl 79. Tests `test_platform_links_flow.py` (+1 mit Fake-Instanz und
+  Fake-Authorization-Server, DPoP-JWT wird verifiziert), `SocialsTab.test.jsx` (+1),
+  `PlatformLinkSettings.test` (5 bereit), `test_site_texts_flow`/`test_club_facts_flow` (Mastodon,
+  Bluesky immer in der Liste). Aus den Spezifikationen gebaut, nicht gegen die echten Server
+  geprüft – der erste echte Durchlauf ist der Nachweis.
+- Bildprüfung: Prüffälle bei Avatar, Banner, Teamlogo verbergen (#415 Rest; PR #560; Backend;
+  `update.sh`). `media_scan._finish`: `review` bei `kind="upload"` geht wie `blocked` in die
+  Quarantäne (`hide`), die Verweise bleiben; `placeholder_png(state)` (Pillow, PNG – die App kann
+  kein SVG; `PLACEHOLDER_TEXT` „Bild wird geprüft“ / „Bild entfernt - Moderation“, im Speicher),
+  `placeholder_for(db, url)`; `server.public_upload` liefert ihn statt 404 mit `Cache-Control:
+  no-store` und `X-TLS-Placeholder: 1`; nginx `map $upstream_http_x_tls_placeholder
+  $tls_upload_expires` (`expires` im Fallback `@tls_upload_backend` nur ohne Platzhalter).
+  `purge_quarantine` nur `state: blocked` (ein Prüffall wartet auf einen Menschen). Freigabe
+  `_restore`, Entfernen aus der Prüfung heraus wie bisher. Test `test_media_scan_flow.py` (+1;
+  **Falle:** `import server` nie am Modulanfang eines Flow-Tests – das Harness importiert die App
+  mit geliehener Umgebung, sonst „Invalid host header“). Doku `docs/MODERATION.md`. Damit ist
+  Moderation II durch (AWS Rekognition bleibt „bei Bedarf“).
+- Plattformen an- und abschalten (#558; PR #559; Backend + Web + App; `update.sh`, App-Build).
+  Branding `disabled_platforms` (Liste; unbekannte → 400); `platform_links.MANUAL_PLATFORMS`
+  (instagram, psn, nintendo, ea), `GAME_PLATFORM_KEYS`, `disabled_platforms(branding)`,
+  `platform_catalog(branding)` (key, label, field, group social|game, linkable, enabled);
+  `providers_configured` meldet abgehakte als nicht verfügbar, `authorize_url` wirft `disabled`
+  (Start → 409 „bietet der Verein nicht an“), `links_for(db, user, branding)` lässt sie aus,
+  `user_routes._field_visible` prüft `ctx["off"]` (öffentliches Profil: Feld, Häkchen, verknüpfte
+  Konten), `privacy_facts` folgt. `/me/platform-links` → `disabled`; `/settings/public` →
+  `disabled_platforms`; Übersicht → `platforms` (Katalog) und Zustand „off – vom Verein
+  abgeschaltet“. Web `AdminIntegrationsOverviewPage.PlatformSwitches` (`platforms-section`,
+  `platform-toggle-<key>`, `platforms-enable-all|disable-all|save|off-count`), `SocialsTab`
+  (`platformsOff`, `MANUAL_PLATFORM_OF`), `PrivacyTab` → `visibilityGroupsFor(disabled)`,
+  `AdminLayout.navGroupsFor(user, query, disabled)` (Menüeintrag `platform`), Hinweis
+  `integration-disabled-hint`, `guideStatus` „Vom Verein abgeschaltet“. App `PlatformLinkRows
+  disabled`, `ProfileScreen` filtert Zeilen und Textfelder. Tests `test_platform_links_flow.py`
+  (+1), `AdminIntegrationsOverviewPage.test.jsx` (+1), `SocialsTab.test.jsx` (+1),
+  `visibility.test.js` (+1), `AdminLayout.test.jsx` (+1), `LinkedAccounts.test.tsx` (+1).
+- Konten verknüpfen III, Welle 2 (#547; PR #556; Backend + Web + App; `update.sh`, App-Build).
+  Threads, Facebook, LinkedIn (OIDC), Snapchat, Pinterest, Telegram (OIDC: kein userinfo – ID-Token
+  gegen `TELEGRAM_JWKS` mit PyJWT `PyJWK`, PKCE), Wargaming (OpenID-artig: `WARGAMING_LOGIN` mit
+  `application_id`, Rückruf bringt `access_token`/`account_id`, Bestätigung über `account/info`),
+  Bungie (`X-API-Key` zusätzlich). `PLATFORMS[*]` kennt `secret_field: None` (nur Kennung) und
+  `extra_field` (zweites Geheimnis); `providers_configured`, `_credentials`, `check_provider`
+  („Application ID fehlt“ / „API Key fehlt“), Übersicht und `PlatformAppCard` (`extraField`,
+  `appReady`) folgen. `privacy_facts` liest auch `extra_field` (sonst zählte Bungie nie als
+  eingerichtet). Felder `<key>_handle`, Sichtbarkeit (Wargaming/Bungie bei Gaming-IDs), FAQ 27
+  Plattformen, e2e-Navigationszahl 77. Tests `test_platform_links_flow.py` (Telegram mit echter
+  RSA-Signatur gegen JWKS), `visibility.test.js` (37), Web/App-Registrierungen.
 - Vereinsprofil ↔ Konto (#506; PR #544; Backend + Web; `update.sh`). `membership_routes`:
   Profil anlegen/verknüpfen legt **keine** Mitgliedschaft mehr an (`_activate_linked_membership`
   weg); löst der Vorstand ein Konto → `account_unlinked_user_id/_at` (der Abgleich hängt es nicht
@@ -2251,7 +2345,7 @@ Seit dem 15. September gilt:
   die Irre). Vorlagen: `MoreScreen.test.tsx`, `TeamsScreen.test.tsx`,
   `InfoCenterScreen.test.tsx`.
 - Der e2e-Test `frontend/e2e/admin-navigation.spec.js` zählt die
-  Admin-Menüeinträge (**69** seit #550/#552; #556 bringt 77) – jeder neue Menüpunkt braucht
+  Admin-Menüeinträge (**79** seit #561; 77 mit #556) – jeder neue Menüpunkt braucht
   die neue Zahl. **Falle:** zwei parallele PRs, die je eine Zahl setzen, ergeben nach dem
   zweiten Merge eine dritte (24.09.: #550 setzte 60, #552 setzte 73, richtig war 69) – den
   zweiten nach dem Merge des ersten rebasen und die Zahl neu rechnen.
@@ -2516,28 +2610,20 @@ als Schalter; `update.sh`; gemergt, während der alte rote CI-Lauf noch
 sichtbar war – der Squash enthielt die Korrektur) und #449 (#410
 Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
-(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build), #491 (Doku-Stand nach #490), #492 (Kanäle aus Dolibarr, Statuten-Archiv, Reiter Social Links; `update.sh`), #493 (Mitgliederverzeichnis aus der Dolibarr-Einwilligung; `update.sh`), #494 (Doku-Stand nach #493), #495 (Klarname bleibt beim Abgleich; `update.sh`), #496 (Mitgliederprofil aus Dolibarr; `update.sh`, Vereine ≥ 1.1), #497 (Doku-Stand nach #496), #498 (Dolibarr-Stand: Zeile Mitgliederverzeichnis; `update.sh`), #499 (Admin → Mitgliederprofile: Hinweis aus Dolibarr; `update.sh`), #500 (Testvertrag auf Vereine 1.1.0), #502 (Doku-Stand nach #500), #518 (Verzeichnis: keine Doppelten, Karte ohne Konto; `update.sh`), #519 (Rundgang-Kleinkram, öffentliches Profil; `update.sh`, App-Build), #520 (Discord no_guild in Klartext; `update.sh`), #522 (Vereinsdaten-Seite; `update.sh`), #523 (Verbindungen ohne Verlink-Seiten; `update.sh`), #524 (Einrichtung als FAQ; `update.sh`), #525 (#517 Teil 1 Alarme; `update.sh`), #526 (#507 Einladung zum Antrag; `update.sh`), #529 (Doku-Stand nach #524), #528 (Website-Profil im Feld-Format, Ersatz für #501; `update.sh`), #530 (#437 Variante A: totes Web-CMS weg, E-Mail-Vorlagen; `update.sh`), #532 (#401 Turnierseite; `update.sh`), #533 (#531 Vereinsakte ohne Einladungscode; `update.sh`, App-Build, Modul 1.4.0), #534 (#231 klassischer Match-Leseweg weg; `update.sh`), #535 (#527 Konten einmal im öffentlichen Profil; `update.sh`, App-Build), #536 (#521 „Mit … verknüpfen“-Knöpfe; `update.sh`, App-Build), #538 (#324 Rest: Vertrag 1.4.0, Rechnungen über die Bindung; `update.sh`), #539 (#510 Dolibarr-Schalter an einem Ort; `update.sh`), #540 (#516 Nutzermenü; `update.sh`, App-Build), #542 (#541 Plattform-Liste der Vereins-Kanäle; `update.sh`, App-Build), #543 (#512 Adminmenü; nur Web), #544 (#506 Vereinsprofil ↔ Konto; `update.sh`) – alle am 24.09. abends gemergt; danach #548 (#545 Google-Prüfung: Rechtstexte im Backend, Crawler-Vorschau mit ganzem Text; `update.sh`), #549 (#546 Einstellungen in die Menüleiste, „Alle Verbindungen“ mit Zustand je Anbindung; `update.sh`), #550 (#517 Teil 2 Betrieb & Logs als eine Seite; `update.sh`), #551 (Doku-Stand nach #544), #552 (#547 Welle 1: FACEIT, start.gg, Roblox, osu!, Lichess, GitHub, Kick, Reddit, Spotify; `update.sh`, App-Build), #553 (#537 Upload-Inventar als Skript; nur Skript), #554 (#223 Teil 1 Turnierbearbeitung in Dateien; nur Web), #555 (#223 Teil 2 Galerie, Fast Lap, Medien; nur Web) – alle am 24.09. nachts gemergt. `main` steht auf `57a7968`.
+(#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build), #491 (Doku-Stand nach #490), #492 (Kanäle aus Dolibarr, Statuten-Archiv, Reiter Social Links; `update.sh`), #493 (Mitgliederverzeichnis aus der Dolibarr-Einwilligung; `update.sh`), #494 (Doku-Stand nach #493), #495 (Klarname bleibt beim Abgleich; `update.sh`), #496 (Mitgliederprofil aus Dolibarr; `update.sh`, Vereine ≥ 1.1), #497 (Doku-Stand nach #496), #498 (Dolibarr-Stand: Zeile Mitgliederverzeichnis; `update.sh`), #499 (Admin → Mitgliederprofile: Hinweis aus Dolibarr; `update.sh`), #500 (Testvertrag auf Vereine 1.1.0), #502 (Doku-Stand nach #500), #518 (Verzeichnis: keine Doppelten, Karte ohne Konto; `update.sh`), #519 (Rundgang-Kleinkram, öffentliches Profil; `update.sh`, App-Build), #520 (Discord no_guild in Klartext; `update.sh`), #522 (Vereinsdaten-Seite; `update.sh`), #523 (Verbindungen ohne Verlink-Seiten; `update.sh`), #524 (Einrichtung als FAQ; `update.sh`), #525 (#517 Teil 1 Alarme; `update.sh`), #526 (#507 Einladung zum Antrag; `update.sh`), #529 (Doku-Stand nach #524), #528 (Website-Profil im Feld-Format, Ersatz für #501; `update.sh`), #530 (#437 Variante A: totes Web-CMS weg, E-Mail-Vorlagen; `update.sh`), #532 (#401 Turnierseite; `update.sh`), #533 (#531 Vereinsakte ohne Einladungscode; `update.sh`, App-Build, Modul 1.4.0), #534 (#231 klassischer Match-Leseweg weg; `update.sh`), #535 (#527 Konten einmal im öffentlichen Profil; `update.sh`, App-Build), #536 (#521 „Mit … verknüpfen“-Knöpfe; `update.sh`, App-Build), #538 (#324 Rest: Vertrag 1.4.0, Rechnungen über die Bindung; `update.sh`), #539 (#510 Dolibarr-Schalter an einem Ort; `update.sh`), #540 (#516 Nutzermenü; `update.sh`, App-Build), #542 (#541 Plattform-Liste der Vereins-Kanäle; `update.sh`, App-Build), #543 (#512 Adminmenü; nur Web), #544 (#506 Vereinsprofil ↔ Konto; `update.sh`) – alle am 24.09. abends gemergt; danach #548 (#545 Google-Prüfung: Rechtstexte im Backend, Crawler-Vorschau mit ganzem Text; `update.sh`), #549 (#546 Einstellungen in die Menüleiste, „Alle Verbindungen“ mit Zustand je Anbindung; `update.sh`), #550 (#517 Teil 2 Betrieb & Logs als eine Seite; `update.sh`), #551 (Doku-Stand nach #544), #552 (#547 Welle 1: FACEIT, start.gg, Roblox, osu!, Lichess, GitHub, Kick, Reddit, Spotify; `update.sh`, App-Build), #553 (#537 Upload-Inventar als Skript; nur Skript), #554 (#223 Teil 1 Turnierbearbeitung in Dateien; nur Web), #555 (#223 Teil 2 Galerie, Fast Lap, Medien; nur Web) – alle am 24.09. nachts gemergt. Am 25.09. früh: #556 (#547 Welle 2; `update.sh`, App-Build), #557 (Doku-Stand nach #555), #560 (#415 Rest Prüffälle verbergen; `update.sh`), #559 (#558 Plattformen an-/abschalten; `update.sh`, App-Build), #561 (#547 Welle 3 Mastodon/Bluesky; `update.sh`, App-Build), #562 (#223 Rest Einstellungen-Seite; nur Web), #563 (#309 GitHub-Releases von selbst; `update.sh`, App-Build). `main` steht auf `05811dc`.
 
 ### Offene PRs
-- Stapel Plattformen (Merge-Reihenfolge, je einer ready): #556 (#547 Welle 2: Threads, Facebook,
-  LinkedIn, Snapchat, Pinterest, Telegram als OpenID Connect mit ID-Token gegen die JWKS, Wargaming
-  nur mit Application ID, Bungie mit zusätzlichem API Key; `PLATFORMS` kennt `secret_field: None`
-  und `extra_field`; ready) → #559 (#558 Haken je Plattform unter Alle Verbindungen, „Alle an/aus“,
-  abgehakte erscheinen nirgends – `disabled_platforms`, `platform_catalog`, `ctx["off"]`; Draft auf
-  #556) → #561 (#547 Welle 3: Mastodon mit App je Instanz, Bluesky mit atproto OAuth/PAR/DPoP;
-  `PLATFORMS[*]["input"]`, `begin_link`, Sitzungen `platform_link_sessions`; Draft auf #559). Nach
-  jedem Merge: `git rebase --onto origin/main <alte Basis>`, `gh pr edit --base main`, ready.
-  Unabhängig davon: #560 (#415 Rest: Prüffälle bei Avatar/Banner/Teamlogo in Quarantäne, die
-  Adresse liefert einen Platzhalter „Bild wird geprüft“ ohne Cache, nginx `X-TLS-Placeholder`;
-  ready), #562 (#223 Rest: `AdminSettingsPage` → `settings/sections/*Section.jsx` +
-  `settings/shared.js`; ready), #563 (#309 GitHub-Releases von selbst: Token nur lesend,
-  Prüfsumme gegen die .sha256-Datei, Beta/Release-Kanal, Plakette und Rückfrage in der App; ready
-  nach dem Check, App-Build). Offen danach: #239 (natives Modul), App 1.0.0-Rest
-  (#412 wartet auf Google, #219 Store-Eintrag), Später-Issues; dann Doku-Stand nach diesen Merges
-  (§5-Einträge für #556–#562). Frage an den Betreiber (24.09. abends, offen): welche
-  Verbindungen nach dem Server-Update fehlten und ob `.env`/Datenbank zurückgespielt wurden –
-  `update.sh` und der Code löschen nichts; die Übersicht „Alle Verbindungen“ (#549) zeigt
-  „gespeichert, aber nicht lesbar“, wenn der `SETTINGS_ENCRYPTION_KEY` nicht mehr passt.
+- Keine offenen PRs von Claude (25.09. früh). Offen bleiben nur Dinge, die den Betreiber oder das
+  Vereinsmodul brauchen: #239 (natives Modul für Tastatur-Sticker), App 1.0.0-Rest (#412 wartet auf
+  Google, #219 Store-Eintrag), Dolibarr III (#330 Testverbund, #329 Mandat – dolibarr-vereine#125),
+  Später (#323 Preisgelder, #327 Generalversammlung – dolibarr-vereine#159–#163, #331 Helferdienste –
+  dolibarr-vereine#23/#165). Frage an den Betreiber (24.09. abends, offen): welche Verbindungen
+  nach dem Server-Update fehlten und ob `.env`/Datenbank zurückgespielt wurden – `update.sh` und der
+  Code löschen nichts; die Übersicht „Alle Verbindungen“ (#549) zeigt „gespeichert, aber nicht
+  lesbar“, wenn der `SETTINGS_ENCRYPTION_KEY` nicht mehr passt. **Stapel-Falle vom 25.09.:** ein
+  gestapelter PR, der den Commit seiner Basis noch mit sich trägt, meldet nach dem Squash der Basis
+  „conflicting“, obwohl der Inhalt gleich ist – nach dem Merge der Basis immer `git rebase --onto
+  origin/main <Basis-Commit>`, damit nur der eigene Commit bleibt.
   **Regel seit
   23.09. abends:**
   Feature-PRs fassen `CLAUDE.md` und `UMBAUPLAN.md` nicht mehr an – die Doku
@@ -2625,6 +2711,16 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   abgelegt. Nächster Build ist 78.
 
 ### Erledigungen beim Betreiber
+- Nach #556–#563 (25.09. früh): `update.sh` und App-Build (Build 78: Plattformen Welle 2 und 3,
+  Plattform-Haken, Beta/Release-Plakette mit Rückfrage beim Update). Danach: Verbindungen → Alle
+  Verbindungen → „Plattformen für Mitglieder“ – abhaken, was der Verein nicht anbieten will („Alle
+  aus“ + einzeln an geht schnell); für neue Plattformen je eine App anlegen (Anleitung auf der Seite;
+  Meta/LinkedIn/Snap/Pinterest brauchen ein App-Review, vorher nur Tester); Mastodon und Bluesky
+  einmal mit dem eigenen Konto durchspielen (erster echter Durchlauf – scheitert er, steht der Grund
+  im Profil und unter Betrieb & Logs). System → App-Versionen: feinkörniges GitHub-Token (nur Lesen
+  von Contents dieses Repos) eintragen, „Jetzt abgleichen“; Schalter „Betas gleich ausrollen“ steht
+  an. Moderation → Bildprüfung: ein Avatar in Prüfung ist jetzt ein Platzhalter, bis jemand
+  entscheidet – die Warteschlange gelegentlich ansehen.
 - Nach #548–#555 (24.09. nachts): `update.sh` und App-Build (Welle 1 der Plattformen in der App).
   Danach: Verbindungen → Alle Verbindungen öffnen (Zustand jeder Anbindung; „nicht lesbar“ heißt:
   `SETTINGS_ENCRYPTION_KEY` in der Server-`.env` prüfen oder Zugangsdaten neu eintragen); System →
@@ -2787,14 +2883,14 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 
 | Meilenstein | Issues |
 | --- | --- |
-| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366; #231 klassischer Match-Leseweg – umgesetzt in #534 (24.09.); #223 Teile 1 und 2 in #554/#555 (Turnier, Galerie, Fast Lap, Medien in Dateien je Bereich); offen nur noch der Rest von #223 (`AdminSettingsPage`) – PR #562 |
+| Web: Tempo und Betrieb | #310 Livestreams der Mitglieder fehlten auf der Startseite (Ursache: Twitch-Client-Secret fehlte, die Abfrage übersprang still; Diagnose in #337), #223 große Admin-Dateien (Twitch-Reiter ist herausgelöst), #231 klassischer Match-Leseweg, #364 Mitgliederbereich Web: Einstieg, Vollständigkeit, Altlasten (Wunsch vom 22.09.) – umgesetzt in #366; #231 klassischer Match-Leseweg – umgesetzt in #534 (24.09.); #223 Teile 1 und 2 in #554/#555 (Turnier, Galerie, Fast Lap, Medien in Dateien je Bereich); der Rest von #223 (`AdminSettingsPage` in Abschnitte) in #562 – der Meilenstein ist durch |
 | Dolibarr I: Anbindung und Mitgliedschaft | #295 Mitgliedschaft und Beitragsstand automatisch und #297 Vereinsrechte aus Funktionen – umgesetzt in #338; #316 und #330 sind mit ihrem ersten Teil drin und wandern mit dem Rest weiter (siehe unten) |
 | Dolibarr II: Eigene Rechnungen und PDF | #296 Rechnungs-Lesedienst, PDF-Archiv, Zahlungsweg aus Dolibarr; #325 ein PDF-Betrachter für Web (App: #341) – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Teil 1 in #363 (#315, #318), Teil 2 in #365 (#316 Kundenanlage, #317 Belege ohne Dubletten, #322 Finanzübersicht mit Zuordnung/Freigabe). #370 Rechnungskonditionen (30 Tage, Überweisung, Girokonto) und lesbare Belegtexte mit Zusatz – umgesetzt in #372. #320 eigene Rechnungen für alle (Nicht-Mitglieder über die Einzelbelege ihrer Vorgänge, Quelle je Beleg, Filter, App-Bildschirm) – umgesetzt in #381. #321 Zahlungsstand im Detail, Prüffälle (Storno/Änderung nach dem Beleg, Überzahlung, Abweichung, verschwundener Beleg), Erstattungen mit Nachweis und #322 Rest (Filter, Summen je Veranstaltung, Zeitleiste, CSV, Steuersätze bestätigen, Runbook, Aufbewahrung) – umgesetzt in #388. Der Meilenstein ist durch |
 | Abrechnung II: Turniere | #319 Startgelder (Zahler = anmeldende Person, Roster zählt, Preis erst mit der Freigabe), #314 Epic – umgesetzt in #371; Einzelrechnungen je Spieler bleiben eine spätere Stufe |
 | Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand aus Dolibarr – Teil 1 in #398 (Rechtliches II: Impressum/Kontakt/Datenschutz aus `/vereine/organization` + `/vereine/board`, Datenschutzerklärung aus den echten Schaltern); Rest (Statuten, öffentliche Vorstandsseite) wartet auf dolibarr-vereine#158. #324 Dokumente, #328 Beitrittsantrag, #329 Einwilligungen/eigene Daten/Austritt, #330 Rest: Durchläufe – das Vereinsmodul 0.7.0 (23.09.) liefert Antrag, Einwilligungen und Antragsstand über die API; Dokumente (#157) noch nicht. Nachtrag 24.09.: Feld-Format (Vereine 1.2.0) in #528; #531 Vereinsakte ohne Einladungscode (Vereine 1.4.0) in #533; #324 Rest (eigene Rechnungen über die Bindung, Vertrag 1.4.0) in #538; #537 Upload-Inventar in #553; offen: #329 Mandat |
 | Discord I: Kanäle und Meldungen | #300 ein Webhook je Zweck mit Schaltern, #301 Erfolge sofort auswerten und gebündelt melden, #303 Meldungen mit Bild und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot (im Backend, Token im Admin; zählt Nachrichten verknüpfter Konten, gleicht die drei Rollen ab, vier Slash-Befehle) – umgesetzt in #378. Der Betreiber richtet den Bot nach dem Merge im Admin ein. Nachtrag 24.09.: #521 offizielle „Mit … verknüpfen“-Knöpfe in #536, #541 Plattform-Liste der Vereins-Kanäle in #542; #545 Google-Prüfung in #548; #547 Welle 1 (FACEIT, start.gg, Roblox, osu!, Lichess, GitHub, Kick, Reddit, Spotify) in #552, Welle 2 (Threads, Facebook, LinkedIn, Snapchat, Pinterest, Telegram, Wargaming, Bungie) als PR #556, Welle 3 (Mastodon, Bluesky) als PR #561; #558 Haken je Plattform als PR #559 |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen (Discord OAuth2, Twitch OAuth2, Steam OpenID; verifiziert im Profil) – umgesetzt in #376; #302 Discord-Bot (im Backend, Token im Admin; zählt Nachrichten verknüpfter Konten, gleicht die drei Rollen ab, vier Slash-Befehle) – umgesetzt in #378. Der Betreiber richtet den Bot nach dem Merge im Admin ein. Nachtrag 24.09.: #521 offizielle „Mit … verknüpfen“-Knöpfe in #536, #541 Plattform-Liste der Vereins-Kanäle in #542; #545 Google-Prüfung in #548; #547 Welle 1 (FACEIT, start.gg, Roblox, osu!, Lichess, GitHub, Kick, Reddit, Spotify) in #552, Welle 2 (Threads, Facebook, LinkedIn, Snapchat, Pinterest, Telegram, Wargaming, Bungie) in #556, Welle 3 (Mastodon, Bluesky) in #561; #558 Haken je Plattform in #559 – der Meilenstein ist durch |
 | Web: Anmeldung und Teilen | #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353. Nachtrag #358 (Meilenstein Spaeter): Passkey mit Gerätesperre zählt als zweiter Faktor – Entscheidung des Betreibers vom 22.09. (Variante B), umgesetzt in #359 |
 | Web: Dynamik | #224 Startseite (Countdown, Live-Zahlen, „Neu“), #225 Turnierseiten (Zeilen gleiten, Rahmen am Match, „gerade eingetragen“ + Hinweis), #226 Skelette statt „Lade …“ und Einblenden beim Seitenwechsel – umgesetzt in #360 |
 | Admin und Turniere | #203 Events an mehreren Standorten, #204 Ort/Stadt und Karte aus der Adresse, #227 Tageszentrale erweitert, #228 Turnier-Leitfaden (Schritt 1), #235 geltenden Termin in die Partie schreiben – umgesetzt in #369; #368 Leitfaden Schritt 2 („Voreinstellung übernehmen“) – umgesetzt in #375 |
@@ -2804,7 +2900,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
 | App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. Offen in #219: Google-Signaturschlüssel in assetlinks/Passkeys eintragen, Store-Eintrag, geschlossener Test, 1.0.0 |
-| Spaeter | #309 GitHub-Releases automatisch abgleichen – PR #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
+| Spaeter | #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
 | Web: Design II | #401 Turnierseite (eine Hauptaktion je Phase, „Dein Stand“, Termine einmal, Reiter) – umgesetzt in #532; der Meilenstein ist durch |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | #437 Variante A (Entscheidung des Betreibers 24.09.): totes Web-CMS entfernt, E-Mail-Vorlagen als Seite – umgesetzt in #530; der Meilenstein ist durch |
 | Admin sauber I: ein Ort je Thema | #508 (#523), #509 (#522), #510 Dolibarr-Schalter (#539), #511 FAQ (#524), #512 Adminmenü (#543), #513/#514 (#519), #515 (#520), #516 Nutzermenü (#540) – umgesetzt; #546 Einstellungen in die Menüleiste + Übersicht aller Verbindungen – umgesetzt in #549; Meilenstein geschlossen |
@@ -2855,9 +2951,11 @@ sinnvoll hältst“):
     Google-Prüfung (#548), #546 Einstellungen ins Menü (#549), #517 Teil 2 (#550), #547 Welle 1
     (#552), #537 Upload-Inventar (#553), #223 Teile 1 und 2 (#554, #555) – alle gemergt; die
     Meilensteine „Admin sauber I“, „Mitglieder sauber“ und „Betrieb & Logs“ sind geschlossen.
-    Offen: die PRs #556/#559/#561 (Plattformen, gestapelt), #560 (#415 Rest), #562 (#223 Rest), #563
-    (#309 GitHub-Releases); dann
-    #239 und die Später-Issues.
+    Am 25.09. früh gemergt: #556, #559, #561 (Plattformen Welle 2, Haken, Welle 3), #560 (#415 Rest),
+    #562 (#223 Rest), #563 (#309 GitHub-Releases) – die Meilensteine „Web: Tempo und Betrieb“,
+    „Discord II“ und „Moderation II“ sind geschlossen. Was bleibt, braucht den Betreiber (#239,
+    #412, #219) oder das Vereinsmodul (#329, #330, #327, #331); #323 Preisgelder ist die einzige
+    große offene Website-Aufgabe ohne Abhängigkeit.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
