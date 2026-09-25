@@ -176,10 +176,14 @@ async def _safe_discord_embeds():
     """Live-Einbettungen (#569): geänderte Nachrichten bearbeiten - höchstens eine je Einbettung pro Minute."""
     try:
         from database import get_db
+        from services.discord_bracket import sweep as sweep_brackets
         from services.discord_embeds import sweep
         res = await sweep(get_db())
         if res.get("edited") or res.get("posted") or res.get("errors"):
             logger.info(f"[scheduler] discord_embeds {res}")
+        brackets = await sweep_brackets(get_db())
+        if brackets.get("edited") or brackets.get("posted") or brackets.get("errors"):
+            logger.info(f"[scheduler] discord_brackets {brackets}")
     except Exception as exc:
         _log_task_failure("discord_embeds", exc)
 
@@ -188,10 +192,14 @@ async def _safe_discord_embeds_full():
     """Live-Einbettungen (#569): alle zehn Minuten jede Einbettung mit neuem „Stand“ schreiben."""
     try:
         from database import get_db
+        from services.discord_bracket import sweep as sweep_brackets
         from services.discord_embeds import sweep
         res = await sweep(get_db(), full=True)
         if res.get("errors"):
             logger.info(f"[scheduler] discord_embeds_full {res}")
+        brackets = await sweep_brackets(get_db(), full=True)
+        if brackets.get("errors"):
+            logger.info(f"[scheduler] discord_brackets_full {brackets}")
     except Exception as exc:
         _log_task_failure("discord_embeds_full", exc)
 

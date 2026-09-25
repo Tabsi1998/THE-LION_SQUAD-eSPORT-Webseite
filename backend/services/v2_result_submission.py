@@ -73,6 +73,12 @@ async def _upsert_result_audit(
 
 
 async def _finish_result_side_effects(db, match: dict, force: bool) -> None:
+    # Bracket im Discord (#571): jedes bestätigte Ergebnis merkt das Turnier für die nächste Bearbeitung vor.
+    try:
+        from services.discord_bracket import request_refresh
+        request_refresh(str(match.get("tournament_id") or ""))
+    except Exception:  # noqa: BLE001
+        pass
     try:
         await notify_match_result_confirmed(db, match, "matches_v2", force=force)
     except Exception as exc:

@@ -50,7 +50,7 @@ export const SETUP_GUIDES = {
       { text: "Unter „Discord-Termine“ einschalten: öffentliche Events und Turniere erscheinen als Termine im Server (Bot-Rolle braucht „Events verwalten“); „auch interne“ nur, wenn der Server intern ist." },
       { text: "Unter „Vorschau“ jede Meldungsart als Discord-Nachbildung ansehen – und echt in den privaten Testkanal (Ziel „Test“, etwa #bot-test) oder an dich als Direktnachricht schicken. Tests tragen den Vermerk „Test“ und zählen nicht als Meldung." },
     ],
-    notes: ["Vorstand, Betrieb und Test fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
+    notes: ["Laufende öffentliche Turniere bekommen im Kanal „Events und Turniere“ eine Bracket-Nachricht, die der Bot bei jedem bestätigten Ergebnis bearbeitet und nach dem Ende als Endstand stehen lässt.", "Vorstand, Betrieb und Test fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
   },
   twitch: {
     key: "twitch",
