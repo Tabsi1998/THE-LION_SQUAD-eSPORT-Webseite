@@ -28,6 +28,9 @@ async def flow(tmp_path, monkeypatch):
     monkeypatch.setattr(media_scan, "auto_process", False)
     media_scan.fake_results.clear()
     instance, shutdown = make_flow()
+    # Erst nach make_flow: das Harness importiert die App mit der Test-Umgebung (sonst „Invalid host header“).
+    import server
+    monkeypatch.setattr(server, "public_upload_dir", tmp_path / "public")
     try:
         yield instance
     finally:
@@ -202,3 +205,65 @@ async def test_a_dead_provider_fails_open_and_the_purge_removes_old_originals(fl
     assert not (tmp_path / "quarantine" / doc["quarantine_key"]).exists()
     after = await flow.db.media_scans.find_one({"id": doc["id"]}, {"_id": 0})
     assert after["quarantine_key"] is None and after["original_removed_at"] and after["state"] == "blocked"
+
+
+@pytest.mark.asyncio
+async def test_a_public_upload_under_review_shows_a_placeholder_until_a_person_decides(flow, tmp_path):
+    """#415 Rest: Prüfung nötig bei Avatar/Banner - Datei in die Quarantäne, Adresse liefert den Platzhalter
+    (nicht cachebar), Verweis bleibt; Freigabe holt das Bild zurück, Entfernen leert den Verweis; die
+    Aufbewahrung räumt Prüffälle nicht ab."""
+    alice, _bob, mod = await people(flow)
+    flow.act_as(alice)
+    uploaded = await flow.post("/api/uploads/image", files={"file": ("avatar.png", png((20, 200, 80)), "image/png")})
+    assert uploaded.status_code == 200, uploaded.text
+    url, filename = uploaded.json()["url"], uploaded.json()["filename"]
+    await flow.db.users.update_one({"id": alice["id"]}, {"$set": {"avatar_url": url}})
+    flow.act_as(None)
+    real = await flow.get(url)
+    assert real.status_code == 200 and real.headers["content-type"] == "image/png" and "x-tls-placeholder" not in real.headers
+
+    media_scan.fake_results.append(scores(0.7))
+    await media_scan.process_pending()
+    doc = await flow.db.media_scans.find_one({"kind": "upload", "url": url}, {"_id": 0})
+    assert doc["state"] == "review" and doc["quarantine_key"]
+    assert not (tmp_path / "public" / filename).exists() and (tmp_path / "quarantine" / doc["quarantine_key"]).is_file()
+    # Der Verweis bleibt - nur das Bild ist ein Platzhalter, für alle, auch für Alice selbst.
+    assert (await flow.db.users.find_one({"id": alice["id"]}, {"_id": 0, "avatar_url": 1}))["avatar_url"] == url
+    hidden = await flow.get(url)
+    assert hidden.status_code == 200 and hidden.headers["x-tls-placeholder"] == "1" and hidden.headers["cache-control"] == "no-store"
+    assert hidden.headers["content-type"] == "image/png" and hidden.content[:8] == b"\x89PNG\r\n\x1a\n"
+    assert (await flow.get(f"{url}?w=400")).headers.get("x-tls-placeholder") == "1"
+    assert media_scan.placeholder_png("review") is media_scan.placeholder_png("review")
+    # Die Aufbewahrung räumt nur Entferntes ab - ein Prüffall wartet auf einen Menschen.
+    await flow.db.media_scans.update_one({"id": doc["id"]}, {"$set": {"decided_at": (now_utc() - timedelta(days=100)).isoformat()}})
+    assert await media_scan.purge_quarantine(flow.db) == 0
+
+    # Freigabe: Datei zurück, Bild wieder echt.
+    flow.act_as(mod)
+    rows = (await flow.get("/api/moderation/media-scan/queue")).json()
+    assert [row["id"] for row in rows] == [doc["id"]] and rows[0]["preview_url"]
+    assert (await flow.get(rows[0]["preview_url"])).status_code == 200
+    approved = (await flow.post(f"/api/moderation/media-scan/{doc['id']}/approve", json={})).json()
+    assert approved["state"] == "safe" and approved["quarantine_key"] is None
+    assert (tmp_path / "public" / filename).is_file()
+    flow.act_as(None)
+    back = await flow.get(url)
+    assert back.status_code == 200 and "x-tls-placeholder" not in back.headers
+
+    # Entfernen aus der Prüfung heraus: Verweis weg, der Platzhalter sagt „entfernt“.
+    flow.act_as(alice)
+    second = await flow.post("/api/uploads/image", files={"file": ("banner.png", png((200, 20, 80)), "image/png")})
+    url2 = second.json()["url"]
+    await flow.db.users.update_one({"id": alice["id"]}, {"$set": {"banner_url": url2}})
+    media_scan.fake_results.append(scores(0.7))
+    await media_scan.process_pending()
+    doc2 = await flow.db.media_scans.find_one({"kind": "upload", "url": url2}, {"_id": 0})
+    assert doc2["state"] == "review" and doc2["quarantine_key"]
+    flow.act_as(mod)
+    removed = (await flow.post(f"/api/moderation/media-scan/{doc2['id']}/remove", json={"note": "nein"})).json()
+    assert removed["state"] == "blocked" and removed["quarantine_key"] == doc2["quarantine_key"]
+    assert (await flow.db.users.find_one({"id": alice["id"]}, {"_id": 0, "banner_url": 1}))["banner_url"] is None
+    flow.act_as(None)
+    gone = await flow.get(url2)
+    assert gone.status_code == 200 and gone.headers["x-tls-placeholder"] == "1"
+    assert media_scan.placeholder_png("blocked") != media_scan.placeholder_png("review")
