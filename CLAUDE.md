@@ -275,6 +275,83 @@ Seit dem 15. September gilt:
   `LegalPages.jsx` rendert nur noch (`lib/privacyFacts.js` weg). Tests `test_site_texts_flow.py`,
   `LegalPages.test.jsx`, e2e `public.spec.js` (`mockLegalPages` nach `**/api/settings/public**`).
   FAQ `google_pruefung`.
+- Discord III Teil 1: der Bot schickt alle Meldungen, Webhooks weg (#566; PR #588; Backend + Web;
+  `update.sh` – danach Bot verbinden und je Zweck einen Kanal wählen, bis dahin geht nichts raus).
+  `discord_service.py` nur noch Bot: `TARGETS` community/news/events/board/ops,
+  `settings.discord.channels[ziel]` = Kanal-ID, `REASON_TEXTS` (disabled, bot_off, bot_offline,
+  channel_missing, forbidden, unknown_channel – in Worten mit Klickweg), `resolve_target` →
+  `channel_id` (öffentlich fällt auf Community, privat nie), `send_to` → `discord_bot.bot.send_embed`,
+  Log in `email_logs` (channel discord: `channel_id`, `message_id`, `reason`, `payload`),
+  `broken_targets` bei forbidden/unknown_channel (Tageszentrale mit `text`); `channel_id_valid`.
+  `discord_bot.BotRunner.send_embed` (Forbidden → forbidden, NotFound → unknown_channel),
+  `list_channels` (Textkanäle mit `can_send`/`can_embed`, Cache in `discord_bot_state.channels`,
+  offline die letzte Liste + Hinweis), `channel_row`/`sorted_channels`, `_guild`. Routen `GET
+  /api/settings/discord/channels`, `PUT /api/settings/discord {enabled, channels, events, bot_*}`
+  (alte Felder werden ignoriert), `/test` kennt nur die fünf Ziele. Migration 3
+  `discord_webhooks_to_bot` verwirft `webhook_url`, `ops_webhook_url`, `username`, `avatar_url`,
+  `targets`. `achievement.awarded` und Ziel „Erfolge“ weg; `achievement_queue.flush_awards` →
+  `{users, notified}`. Web `DiscordTargets` (Select aus der Kanalliste oder Kanal-ID-Feld,
+  `discord-target-<ziel>-channel|id|save|test|clear|last`, `discord-targets-bot-off`,
+  `discord-channels-offline`), `DiscordSettings` nur Schalter „Versand aktiv“ + letzter Stand
+  (`discord-not-configured`); Übersicht-Zeile `discord_channels`; Dashboard „Kanal ohne Recht“;
+  FAQ/Anleitung `discord_channels` (**Falle:** `SETUP_GUIDE_ORDER` muss neue Schlüssel kennen,
+  `SetupGuide.test`); `privacy-discord-channels`, `discord_facts` → `channels`/`bot`;
+  `docs/DISCORD.md`, `docs/BETRIEB.md`. Tests `test_discord_targets_flow.py` (Seam:
+  `monkeypatch.setattr(discord_bot.bot, "send_embed", …)` + `apply_settings`),
+  `test_ops_betrieb2_flow`, `test_discord_bot_unit` (+1), `DiscordTargets.test.jsx`,
+  `DiscordSettings.test.jsx`; Live-Tests `test_phase3` auf Kanäle umgestellt.
+- Play-Store-Paket (#219 Teil 3; PR #587; nur Doku). `docs/PLAY_STORE.md` (Klickweg Play Console,
+  Store-Texte, Datensicherheits-Tabelle, Inhaltseinstufung, Testkonto für Googles Prüfer,
+  Screenshot-Regeln, Ablauf je Version, Checkliste), `docs/store/icon-512.png` und
+  `feature-graphic-1024x500.png` aus `scripts/store_graphics.py` (Pillow, Segoe UI; nach Änderung
+  der Markenbilder neu laufen lassen).
+- Play-Upload per API (#412; PR #586; nur App-Skripte). `mobile/scripts/play-publish.cjs`: JWT
+  RS256 mit Node-Crypto (keine neue Abhängigkeit), Android Publisher v3 Edit → Bundle (Rohdaten)
+  → Track (`versionCodes`, `completed`, Hinweise aus dem Changelog ≤ 500 Zeichen) → Commit; Fehler
+  verwirft den Edit; `resolveTrack` (closed → alpha, Produktion abgelehnt), `checkAccess` (nur
+  lesend), `loadServiceAccount`. `release-local.cjs`: `--play[=closed|<track>]` (schließt `--aab`
+  ein, Datei wird vor dem Bauen gelesen), `--check` sagt, ob das Dienstkonto die App sieht;
+  Dienstkonto `%USERPROFILE%\.lionsapp-release\play-service-account.json`
+  (`playServiceAccountFile` in `signing.json` / `LIONSAPP_PLAY_SERVICE_ACCOUNT`); Fehlschlag nach
+  dem Release = Warnung + Code 1. Tests `play-publish.test.mjs` (21, in `test:release`). Doku
+  `mobile/RELEASES.md` (Punkt 7, „Play Console: Bundle automatisch laden“).
+- Sticker und GIFs der Tastatur im Chat (#239; PR #585; Backend + Web + App 0.18.0-beta / Build 78;
+  `update.sh`, App-Build). Lokales Expo-Modul `mobile/modules/keyboard-image-input` (Kotlin
+  `KeyboardImageInputModule`: `ViewCompat.setOnReceiveContentListener` auf dem `ReactEditText`
+  (`appContext.findView(viewTag)`) – `AppCompatEditText` trägt die MIME-Typen in die `EditorInfo`
+  und reicht `commitContent`-Bilder durch; Kopie nach `cache/keyboard-images`, Ereignis
+  `onKeyboardImage`; `expo prebuild` verlinkt `modules/` von selbst, `package.json` +
+  `expo-module.config.json` im Modulordner), JS `acceptKeyboardImages(findNodeHandle(ref), cb)`
+  (nur Android, sonst No-op), `ChatThreadView` → `attachments.addAssets`. GIF im Chat erlaubt (App
+  `attachmentKindForAsset`, Web `chatAttachmentKind`/`CHAT_ATTACHMENT_ACCEPT`); Server
+  `chat_attachments._keep_animated_image` (GIF und animiertes WebP unverändert, Pixel/Größe
+  geprüft; `_upload_kind` nimmt gif), `image_variants.build_variant` überspringt animierte
+  (`?w=` liefert das Original), `media_scan._still_frame` (PNG-Standbild für NudeNet/OpenCV).
+  Kotlin geprüft mit `expo prebuild --no-install` (Dummy `google-services.json`, gitignored) und
+  `gradlew :keyboard-image-input:compileReleaseKotlin`; `CHANGELOG` 0.18.0-beta fasst alles seit
+  Build 77 zusammen. Tests `test_chat_attachments_flow.py` (+3), `ChatThreadView.test.tsx`
+  (FormData-Ersatz im Test), `chatAttachments.test.ts/js`, ganze App-Suite 257. **Falle:**
+  Bash-Heredocs über ~100 Zeilen scheitern im Werkzeug – große Dateien mit Write schreiben.
+- Helferdienste aus der Vereinsakte (#331; PR #582; Backend + Web + App; `update.sh`, App-Build).
+  `services/dolibarr_helper_shifts.py` (`overview`, `request_shift`, `withdraw_shift`,
+  `event_view`/`shift_view` mit `can_request`/`can_withdraw`, `SHIFT_CONFLICTS` voll/vorbei/
+  abgesagt/überschneidung/bestätigt), Routen `GET /api/membership/me/helper-shifts`, `PUT|DELETE
+  /api/membership/me/events/{e}/shifts/{s}`; Fake `add_event`/`set_event_status`/`request_shift`/
+  `confirm_shift`; Web `/members/helfen` (`MemberHelperShiftsPage`, `shiftWhen`), Karte
+  `member-area-helping`, Link „Helfen“; App `MemberHelperShifts` (`confirmShift`), Kachel „Helfen“;
+  `tests/flow_harness.py` kann `delete()`. Tests `test_member_helper_shifts_flow.py`,
+  `MemberHelperShiftsPage.test.jsx`, `MemberHelperShiftsScreen.test.tsx`.
+- Generalversammlung und Abstimmungen aus der Vereinsakte (#327; PR #565; Backend + Web + App;
+  `update.sh`, App-Build; Recht „… im Namen jedes Mitglieds abstimmen“ beim API-Benutzer nötig).
+  `services/dolibarr_meetings.py` (`overview`, `respond`, `submit_motion`, `cast_vote` –
+  `external_id` = Person+Abstimmung+Recht, **welche Antwort jemand gab, steht nie im Log**;
+  `MeetingsError`, `REASON_TEXTS`, `VOTE_CONFLICTS`, `_conflict_text` liest
+  `exc.detail["message"]`), Routen `GET /api/membership/me/meetings`, `PUT …/meetings/{id}/response`,
+  `POST …/meetings/{id}/motions`, `POST /api/membership/me/ballots/{id}/votes`; Fake Meetings/
+  Ballots; Vertrag Vereine 1.4.0 (51 Pfade, identisch mit `docs/openapi.json` des Moduls). Web
+  `/members/meetings` (`MemberMeetingsPage`), Karte „Versammlungen“; App `MemberMeetings`
+  (`confirmVote`). Tests `test_member_meetings_flow.py`, `MemberMeetingsPage.test.jsx`,
+  `MemberMeetingsScreen.test.tsx`.
 - GitHub-Releases der App von selbst, Beta/Release-Kennzeichnung (#309; PR #563; Backend + Web +
   App; `update.sh`, App-Build). `services/github_releases.py`: `sync(db, force=, limit=)` holt alle
   10 min (Scheduler-Job `github_releases`, ein Replikat) `GET /repos/<repo>/releases` mit einem
@@ -2612,12 +2689,23 @@ Mitgliederverzeichnis per Opt-in; `update.sh`), #450 (#328 Beitrittsantrag über
 Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #452
 (#329 Teil 1 Einwilligungen; `update.sh`), #453 (#417 Wortfilter; `update.sh`, App-Build), #454 (#435 Rest Medien-Seitenblatt; nur Web), #455 (Doku-Stand nach #454), #456 (Rechtliches speichern repariert, Wegweiser in der Admin-Suche; nur Web; `update.sh`), #457 (#409 Referenzen als Erfolgswand; nur Web; `update.sh`), #458 (#260 Nachtrag verknüpfte Konten sichtbar; `update.sh`), #460 (Doku-Stand nach #457), #461 (Dolibarr-Übersicht und Dashboard-Kachel; `update.sh`), #462 (Profil-Sichtbarkeit je Betrachter; `update.sh`), #463 (#416 Verwarnungen mit Stufen; `update.sh`, App-Build), #464 (Doku-Stand nach #462), #465 (Einrichtung im Admin, Prüfung Discord/Twitch/Steam; `update.sh`), #466 (Mein Konto im Menü; nur Web), #467 (Konten verknüpfen II; `update.sh`), #468 (#326 Teil 2 Vorstand aus Dolibarr; `update.sh`), #470 (Menügruppe Verbindungen; nur Web), #471 (Doku-Stand nach #468), #472 (News-Detail am PC breit; nur Web), #473 (Doku-Stand nach #472), #474 (Profilseite neu; nur Web), #475 (Verbindungen ohne Doppeltes; nur Web), #476 (Partnerseiten, #469 Teil 1; `update.sh`), #477 (Doku-Stand nach #475), #478 (#415 Bildprüfung; `update.sh`, App-Build), #479 (Partner II Teil 2; `update.sh`), #480 (#459 verknüpfte Konten in der App; App-Build), #481 (Doku-Stand nach #480), #482 (Partner II Teil 3 Referenzen; `update.sh`), #483 (Partnerseiten in Sitemap und App; `update.sh`, App-Build), #484 (Discord-Bot Fehler als Klickweg, Neustart von selbst; `update.sh`), #485 (#326 Teil 3 Statuten aus Dolibarr, Reiter Rechtliches herausgelöst; `update.sh`), #487 (Doku-Stand nach #485), #486 (#324 Teil 1 Vereinsakte verbinden; `update.sh`, App-Build), #488 (#329 Teil 2 Meine Daten und Austritt; `update.sh`), #489 (App: Expo-Pakete auf SDK-Stand; App-Build), #490 (App: Vereinsakte, eigene Daten, Austritt; App-Build), #491 (Doku-Stand nach #490), #492 (Kanäle aus Dolibarr, Statuten-Archiv, Reiter Social Links; `update.sh`), #493 (Mitgliederverzeichnis aus der Dolibarr-Einwilligung; `update.sh`), #494 (Doku-Stand nach #493), #495 (Klarname bleibt beim Abgleich; `update.sh`), #496 (Mitgliederprofil aus Dolibarr; `update.sh`, Vereine ≥ 1.1), #497 (Doku-Stand nach #496), #498 (Dolibarr-Stand: Zeile Mitgliederverzeichnis; `update.sh`), #499 (Admin → Mitgliederprofile: Hinweis aus Dolibarr; `update.sh`), #500 (Testvertrag auf Vereine 1.1.0), #502 (Doku-Stand nach #500), #518 (Verzeichnis: keine Doppelten, Karte ohne Konto; `update.sh`), #519 (Rundgang-Kleinkram, öffentliches Profil; `update.sh`, App-Build), #520 (Discord no_guild in Klartext; `update.sh`), #522 (Vereinsdaten-Seite; `update.sh`), #523 (Verbindungen ohne Verlink-Seiten; `update.sh`), #524 (Einrichtung als FAQ; `update.sh`), #525 (#517 Teil 1 Alarme; `update.sh`), #526 (#507 Einladung zum Antrag; `update.sh`), #529 (Doku-Stand nach #524), #528 (Website-Profil im Feld-Format, Ersatz für #501; `update.sh`), #530 (#437 Variante A: totes Web-CMS weg, E-Mail-Vorlagen; `update.sh`), #532 (#401 Turnierseite; `update.sh`), #533 (#531 Vereinsakte ohne Einladungscode; `update.sh`, App-Build, Modul 1.4.0), #534 (#231 klassischer Match-Leseweg weg; `update.sh`), #535 (#527 Konten einmal im öffentlichen Profil; `update.sh`, App-Build), #536 (#521 „Mit … verknüpfen“-Knöpfe; `update.sh`, App-Build), #538 (#324 Rest: Vertrag 1.4.0, Rechnungen über die Bindung; `update.sh`), #539 (#510 Dolibarr-Schalter an einem Ort; `update.sh`), #540 (#516 Nutzermenü; `update.sh`, App-Build), #542 (#541 Plattform-Liste der Vereins-Kanäle; `update.sh`, App-Build), #543 (#512 Adminmenü; nur Web), #544 (#506 Vereinsprofil ↔ Konto; `update.sh`) – alle am 24.09. abends gemergt; danach #548 (#545 Google-Prüfung: Rechtstexte im Backend, Crawler-Vorschau mit ganzem Text; `update.sh`), #549 (#546 Einstellungen in die Menüleiste, „Alle Verbindungen“ mit Zustand je Anbindung; `update.sh`), #550 (#517 Teil 2 Betrieb & Logs als eine Seite; `update.sh`), #551 (Doku-Stand nach #544), #552 (#547 Welle 1: FACEIT, start.gg, Roblox, osu!, Lichess, GitHub, Kick, Reddit, Spotify; `update.sh`, App-Build), #553 (#537 Upload-Inventar als Skript; nur Skript), #554 (#223 Teil 1 Turnierbearbeitung in Dateien; nur Web), #555 (#223 Teil 2 Galerie, Fast Lap, Medien; nur Web) – alle am 24.09. nachts gemergt. Am 25.09. früh: #556 (#547 Welle 2; `update.sh`, App-Build), #557 (Doku-Stand nach #555), #560 (#415 Rest Prüffälle verbergen; `update.sh`), #559 (#558 Plattformen an-/abschalten; `update.sh`, App-Build), #561 (#547 Welle 3 Mastodon/Bluesky; `update.sh`, App-Build), #562 (#223 Rest Einstellungen-Seite; nur Web), #563 (#309 GitHub-Releases von selbst; `update.sh`, App-Build). `main` steht auf `05811dc`.
 
+Am 25.09. (früh bis mittags) gemergt: #564 (Doku-Stand nach #563), #565 (#327 Generalversammlung
+und Abstimmungen; `update.sh`, App-Build), #582 (#331 Helferdienste; `update.sh`, App-Build), #585
+(#239 Sticker und GIFs der Tastatur, App 0.18.0-beta; `update.sh`, Build 78), #586 (#412
+Play-Upload per `--play`; nur Skript), #587 (#219 Teil 3 Play-Store-Paket; nur Doku), #588 (#566
+Discord III Teil 1: der Bot schickt alle Meldungen, Webhooks weg; `update.sh`, danach Bot verbinden
+und Kanäle wählen) – die Meilensteine „App 0.9.0-beta“ und „Vereinsmodul 1.4“ sind geschlossen.
+
 ### Offene PRs
-- Keine offenen PRs von Claude (25.09. früh). Offen bleiben nur Dinge, die den Betreiber oder das
-  Vereinsmodul brauchen: #239 (natives Modul für Tastatur-Sticker), App 1.0.0-Rest (#412 wartet auf
-  Google, #219 Store-Eintrag), Dolibarr III (#330 Testverbund, #329 Mandat – dolibarr-vereine#125),
-  Später (#323 Preisgelder, #327 Generalversammlung – dolibarr-vereine#159–#163, #331 Helferdienste –
-  dolibarr-vereine#23/#165). Frage an den Betreiber (24.09. abends, offen): welche Verbindungen
+- Offen (25.09. mittags): #589 (#567 Discord als persönlicher Benachrichtigungskanal –
+  Direktnachricht vom Bot, Opt-in je Thema; bereit auf `main`), #590 (#568 Erfolge als Gratulation
+  per Direktnachricht, Thema „Erfolge“; Entwurf, gestapelt auf #589 – nach dessen Merge `git rebase
+  --onto origin/main <589-Commit>`, Basis `main`, Ready). Danach #583 (Vorschau jeder Meldungsart
+  und Testkanal), dann Discord IV (#569–#571), Discord V (#572–#574, #581), Kanäle II
+  (#578–#580, #584). Sonst hängt Offenes am Betreiber oder am Vereinsmodul: App 1.0.0-Rest (#219
+  Store-Eintrag – alles in `docs/PLAY_STORE.md`, es fehlt das Entwicklerkonto), Dolibarr III (#330
+  Ende-zu-Ende gegen eine Testinstanz, #329 Mandat – dolibarr-vereine#125), Später (#323
+  Preisgelder, #575–#577 Discord-Ideen). Frage an den Betreiber (24.09. abends, offen): welche Verbindungen
   nach dem Server-Update fehlten und ob `.env`/Datenbank zurückgespielt wurden – `update.sh` und der
   Code löschen nichts; die Übersicht „Alle Verbindungen“ (#549) zeigt „gespeichert, aber nicht
   lesbar“, wenn der `SETTINGS_ENCRYPTION_KEY` nicht mehr passt. **Stapel-Falle vom 25.09.:** ein
@@ -2708,7 +2796,10 @@ Dolibarr; `update.sh`; nach #449 neu aufgesetzt), #451 (Doku-Stand nach #449), #
   87583d3, am 23.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit `664355a5`,
   AAB-SHA-256 beginnt mit `21cfce31`, AAB auf dem Desktop des Betreibers; #421
   Play-Update je Installationsquelle, `expo-in-app-updates`), am Vereinsserver
-  abgelegt. Nächster Build ist 78.
+  abgelegt. **Build 78** steht an (`mobile-v0.18.0-beta-build78`, Version in #585 gesetzt: Sticker
+  und GIFs der Tastatur, dazu Versammlungen und Abstimmungen, Helferdienste, Beta/Release-Plakette,
+  Konten verknüpfen, Bildprüfung im Chat – `npm run release:local -- --aab`, mit eingerichtetem
+  Dienstkonto `--play`).
 
 ### Erledigungen beim Betreiber
 - Nach #556–#563 (25.09. früh): `update.sh` und App-Build (Build 78: Plattformen Welle 2 und 3,
@@ -2898,14 +2989,19 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.6.0-beta | #218 Erfolge mit Symbolen, Fortschritt und Freischalt-Moment – umgesetzt in #354, Build 64 nach dem Merge |
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
-| App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur bleibt offen (natives Modul um `TextInput`, eigener Schritt) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. Offen in #219: Google-Signaturschlüssel in assetlinks/Passkeys eintragen, Store-Eintrag, geschlossener Test, 1.0.0 |
-| Spaeter | #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) und wandern in einen eigenen Meilenstein, sobald es liefert |
+| App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur – umgesetzt in #585 (lokales Expo-Modul `keyboard-image-input`, GIF bleibt GIF), Build 78; der Meilenstein ist geschlossen |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. #412 Play-Upload per API – umgesetzt in #586 (`--play`, Dienstkonto beim Betreiber); #219 Teil 3 Store-Paket (Texte, Datensicherheit, Testkonto, Grafiken) – in #587 (`docs/PLAY_STORE.md`). Offen in #219: Entwicklerkonto, Store-Eintrag klicken, interner und geschlossener Test, 1.0.0 |
+| Spaeter | #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563; #327 und #331 sind mit Vereine 1.4.0 in den Meilenstein „Vereinsmodul 1.4“ gewandert und dort umgesetzt (#565, #582); bleibt #323 Preisgelder und die Später-Ideen aus dem Discord-Plan (#575 Bracket als Bild, #576 Rollen je Team, #577 Aktionen per Knopf) |
 | Web: Design II | #401 Turnierseite (eine Hauptaktion je Phase, „Dein Stand“, Termine einmal, Reiter) – umgesetzt in #532; der Meilenstein ist durch |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | #437 Variante A (Entscheidung des Betreibers 24.09.): totes Web-CMS entfernt, E-Mail-Vorlagen als Seite – umgesetzt in #530; der Meilenstein ist durch |
 | Admin sauber I: ein Ort je Thema | #508 (#523), #509 (#522), #510 Dolibarr-Schalter (#539), #511 FAQ (#524), #512 Adminmenü (#543), #513/#514 (#519), #515 (#520), #516 Nutzermenü (#540) – umgesetzt; #546 Einstellungen in die Menüleiste + Übersicht aller Verbindungen – umgesetzt in #549; Meilenstein geschlossen |
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518), #506 Konto im Admin verknüpfen, Profil legt nie Konto/Mitgliedschaft an (#544), #507 Antrag für bestehendes Konto (#526) – der Meilenstein ist durch |
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ mit Ereignissen aller Quellen – umgesetzt in #550; #517 geschlossen, Meilenstein geschlossen (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
+| Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 Generalversammlung und Abstimmungen – umgesetzt in #565; #331 Helferdienste – umgesetzt in #582; der Meilenstein ist geschlossen |
+| Discord III: Bot statt Webhooks | Plan vom 25.09. (Entscheidung: Webhooks entfallen ganz, nur noch der Bot): #566 der Bot schickt alle Meldungen, Kanal je Zweck – umgesetzt in #588; #567 Discord als persönlicher Benachrichtigungskanal (PR #589); #568 Erfolge als Gratulation per Direktnachricht (PR #590); #583 Vorschau jeder Meldungsart, Testkanal, „an mich als Direktnachricht“ |
+| Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt), #570 Discord-Termine (Scheduled Events), #571 Bracket als Text-Embed |
+| Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News, #579 Twitch-Clips + Turnier live, #580 Kalender-Knöpfe, #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
 (#240 Freunde in der App, #227 Tageszentrale, #216 Kalender, #245 Laufbanner,
@@ -2956,6 +3052,13 @@ sinnvoll hältst“):
     „Discord II“ und „Moderation II“ sind geschlossen. Was bleibt, braucht den Betreiber (#239,
     #412, #219) oder das Vereinsmodul (#329, #330, #327, #331); #323 Preisgelder ist die einzige
     große offene Website-Aufgabe ohne Abhängigkeit.
+
+11. 25.09. mittags („die älteren Meilensteine endlich alle fertig“, „App v0.9 ewig ausstehend“):
+    #327 (#565), #331 (#582) – das Modul 1.4.0 hatte die Wege längst; #239 (#585), #412 (#586),
+    #219 Teil 3 (#587) – App 0.9.0-beta und Vereinsmodul 1.4 geschlossen; die alten Meilensteine
+    hängen nur noch am Betreiber (#219 Entwicklerkonto) oder am Modul (#329 Mandat, #330
+    Testinstanz). Danach der Discord-Plan (Meilensteine 34–36, Kanäle II 37): #566 in #588 gemergt,
+    #567 (#589) und #568 (#590) offen; als Nächstes #583, dann Discord IV.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
