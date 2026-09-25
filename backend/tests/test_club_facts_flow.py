@@ -133,12 +133,12 @@ def test_privacy_facts_are_computed_from_the_real_switches_without_secrets():
     facts = privacy_facts.facts_from(
         {"analytics_provider": "plausible", "twitch_channel": "the_lion_squad", "hosting_provider": "Eigenhosting", "hosting_country": "Österreich"},
         {"google_login_enabled": True},
-        {"webhook_url": "", "targets": {"news": {"webhook_url": "enc"}}, "bot_enabled": False},
+        {"channels": {"news": "100000000000000002"}, "bot_enabled": False},
         {"provider": "resend", "resend_api_key": "enc"},
         {"mode": "live", "write_enabled": True, "api_key": "geheim"},
     )
     assert facts == {
-        "analytics": "plausible", "google_login": True, "passkeys": True, "discord": {"webhooks": True, "bot": False}, "twitch_embed": True,
+        "analytics": "plausible", "google_login": True, "passkeys": True, "discord": {"channels": True, "bot": False}, "twitch_embed": True,
         "email_provider": "resend", "dolibarr": True, "dolibarr_billing": True, "app": {"push": True, "crash_reports": True, "app_lock": True},
         "hosting": {"provider": "Eigenhosting", "country": "Österreich"},
         "media_scan": {"enabled": False, "provider": "off"},
@@ -151,7 +151,7 @@ def test_privacy_facts_are_computed_from_the_real_switches_without_secrets():
     assert [row["key"] for row in rows] == ["discord", "steam", "lichess", "mastodon", "bluesky"] and rows[0]["operator"] == "Discord Inc., USA" and "enc" not in str(rows)
     assert "geheim" not in str(facts) and "enc" not in str(facts)
     bare = privacy_facts.facts_from({}, {}, {}, {}, {})
-    assert bare["analytics"] == "" and bare["google_login"] is False and bare["discord"] == {"webhooks": False, "bot": False} and bare["email_provider"] == "none" and bare["dolibarr"] is False
+    assert bare["analytics"] == "" and bare["google_login"] is False and bare["discord"] == {"channels": False, "bot": False} and bare["email_provider"] == "none" and bare["dolibarr"] is False
     assert privacy_facts.email_provider({"smtp_host": "mail.example.test"}) == "smtp"
     assert privacy_facts.email_provider({"provider": "smtp"}) == "none", "SMTP ohne Server versendet nichts"
     assert privacy_facts.email_provider({"provider": "resend"}) == "none", "Resend ohne Schlüssel versendet nichts"
@@ -163,7 +163,7 @@ async def test_public_settings_carry_the_privacy_facts(flow):
     await flow.db.settings.update_one({"id": "discord"}, {"$set": {"id": "discord", "bot_enabled": True}}, upsert=True)
     public = (await flow.get("/api/settings/public")).json()
     facts = public["privacy_facts"]
-    assert facts["email_provider"] == "smtp" and facts["discord"] == {"webhooks": False, "bot": True} and facts["dolibarr"] is False
+    assert facts["email_provider"] == "smtp" and facts["discord"] == {"channels": False, "bot": True} and facts["dolibarr"] is False
     assert set(facts) == {"analytics", "google_login", "passkeys", "discord", "twitch_embed", "email_provider", "dolibarr", "dolibarr_billing", "app", "hosting", "media_scan", "platforms"}
     # Bildprüfung (#415): im Testbetrieb läuft der Testanbieter - das steht ehrlich so drin.
     assert facts["media_scan"]["enabled"] is True and "google_api_key" not in str(facts)

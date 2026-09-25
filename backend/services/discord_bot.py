@@ -163,6 +163,28 @@ def no_guild_text(view: dict, client) -> str:
 SYNC_TEXTS = {
     "offline": "Der Bot ist nicht verbunden – erst „Bot verbinden“ einschalten; der Stand steht unter dem Kasten.",
 }
+CHANNEL_TEXTS = {
+    "offline": ("Der Bot ist nicht verbunden – die Kanal-Liste kommt, sobald er online ist. Bis dahin lässt sich die Kanal-ID "
+                "eintragen (Discord → Einstellungen → Erweitert → Entwicklermodus, Rechtsklick auf den Kanal → „Kanal-ID kopieren“)."),
+}
+
+
+def channel_row(channel, permissions) -> dict:
+    """Ein Textkanal für die Kanalwahl im Admin - mit dem, was der Bot dort darf (#566)."""
+    category = getattr(channel, "category", None)
+    return {
+        "id": str(getattr(channel, "id", "")),
+        "name": str(getattr(channel, "name", "") or ""),
+        "category": str(getattr(category, "name", "") or "") if category is not None else "",
+        "position": int(getattr(channel, "position", 0) or 0),
+        "can_send": bool(getattr(permissions, "view_channel", False) and getattr(permissions, "send_messages", False)),
+        "can_embed": bool(getattr(permissions, "embed_links", False)),
+    }
+
+
+def sorted_channels(rows: list[dict]) -> list[dict]:
+    """Erst Kanäle, in denen der Bot schreiben darf, dann der Rest - je Kategorie in der Reihenfolge des Servers."""
+    return sorted(rows, key=lambda row: (not row.get("can_send"), row.get("category") or "", row.get("position", 0), row.get("name") or ""))
 
 
 def status_text(state: dict) -> str:
@@ -234,6 +256,7 @@ class BotRunner:
         self.guild_name = ""
         self.last_error = ""
         self.last_action = ""
+        self._view: dict = {}
 
     async def start_if_enabled(self) -> bool:
         db = get_db()
@@ -294,6 +317,7 @@ class BotRunner:
         client = discord.Client(intents=intents)
         tree = app_commands.CommandTree(client)
         self._client = client
+        self._view = view
         runner = self
         db = get_db()
 
@@ -304,6 +328,11 @@ class BotRunner:
             runner.guild_name = guild.name if guild else ""
             # Kein Server heißt: Rollen und Befehle gehen ins Leere - das steht dann in Worten im Kasten, nicht als Code (#515).
             runner.last_error = "" if guild else no_guild_text(view, client)
+            if guild:
+                try:
+                    await runner._cache_channels(guild)
+                except Exception as exc:  # noqa: BLE001 - die Kanalliste ist Komfort, kein Muss
+                    logger.warning("[discord-bot] Kanalliste: %s", exc)
             try:
                 if guild:
                     tree.copy_global_to(guild=guild)
@@ -381,6 +410,61 @@ class BotRunner:
             await record_state(db, connected=False, last_error=runner.last_error)
         finally:
             runner.connected = False
+
+    def _guild(self, view: dict | None = None):
+        client = self._client
+        view = view or self._view or {}
+        if client is None:
+            return None
+        guild_id = str(view.get("guild_id") or "")
+        return client.get_guild(int(guild_id)) if guild_id.isdigit() else (client.guilds[0] if client.guilds else None)
+
+    async def _cache_channels(self, guild) -> list[dict]:
+        rows = sorted_channels([channel_row(channel, channel.permissions_for(guild.me)) for channel in guild.text_channels])
+        await record_state(get_db(), channels=rows, channels_at=now_utc().isoformat())
+        return rows
+
+    async def list_channels(self) -> dict:
+        """Die Textkanäle des Servers mit dem, was der Bot dort darf - für die Kanalwahl je Ziel (#566).
+        Offline kommt die zuletzt gesehene Liste mit dem Hinweis, dass die Kanal-ID auch geht."""
+        db = get_db()
+        cached = (await read_state(db)).get("channels") or []
+        if self._client is None or not self.connected:
+            return {"ok": False, "reason": "offline", "text": CHANNEL_TEXTS["offline"], "channels": cached}
+        guild = self._guild()
+        if guild is None:
+            return {"ok": False, "reason": "no_guild", "text": no_guild_text(self._view, self._client), "channels": cached}
+        try:
+            return {"ok": True, "channels": await self._cache_channels(guild)}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
+
+    async def send_embed(self, channel_id: str, embed: dict) -> dict:
+        """Ein Embed in genau diesen Kanal (#566). Kein Rückfall: ist der Bot aus oder darf er dort nicht
+        schreiben, kommt der Grund zurück - den Text dazu kennt discord_service.REASON_TEXTS."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        try:
+            channel = client.get_channel(int(channel_id)) or await client.fetch_channel(int(channel_id))
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_channel"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        try:
+            message = await channel.send(embed=discord.Embed.from_dict(embed))
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Meldung in #{getattr(channel, 'name', channel_id)} ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
 
     async def sync_roles(self) -> dict:
         """Rollen abgleichen - idempotent: nur die drei verwalteten Rollen, nur verknüpfte Konten."""

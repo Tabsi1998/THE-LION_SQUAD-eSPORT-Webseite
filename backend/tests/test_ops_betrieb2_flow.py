@@ -182,43 +182,49 @@ async def test_a_new_5xx_group_alerts_once_and_4xx_never(flow, discord_recorder)
 
 
 @pytest.mark.asyncio
-async def test_alerts_use_only_the_ops_webhook_never_the_community_channel(flow, monkeypatch):
+async def test_alerts_use_only_the_ops_channel_never_the_community_channel(flow, monkeypatch):
+    """Discord III (#566): der Bot schickt in den Betriebskanal - nie in die Community, und ohne Kanal gar nicht."""
     import discord_service
+    from services import discord_bot
 
     posted = []
 
-    async def fake_post(webhook_url, **kwargs):
-        posted.append({"webhook_url": webhook_url, "username": kwargs.get("username")})
-        return {"ok": True, "status_code": 204, "error": None}
+    async def fake_send(channel_id, embed):
+        posted.append({"channel_id": channel_id, "title": embed.get("title")})
+        return {"ok": True, "message_id": "m1", "channel_id": channel_id}
 
-    monkeypatch.setattr(discord_service, "_post_embed", fake_post)
+    async def fake_apply():
+        return True
+
+    monkeypatch.setattr(discord_bot.bot, "send_embed", fake_send)
+    monkeypatch.setattr(discord_bot.bot, "apply_settings", fake_apply)
 
     admin = await flow.add_user(role="club_admin", name="clubadmin")
     flow.act_as(admin)
-    saved = await flow.put("/api/settings/discord", json={"webhook_url": "https://discord.com/api/webhooks/1/community", "enabled": True})
+    token = "test" * 6 + ".fake." + "token" * 8
+    saved = await flow.put("/api/settings/discord", json={"channels": {"community": "100000000000000001"}, "enabled": True, "bot_token": token, "bot_enabled": True})
     assert saved.status_code == 200, saved.text
 
-    # Nur der Community-Webhook ist da: kein Alarm, und schon gar nicht dorthin.
+    # Nur der Community-Kanal ist gewählt: kein Alarm, und schon gar nicht dorthin.
     outcome = await discord_service.send_ops_discord("Betrieb: Test", "rot")
-    assert outcome == {"ok": False, "reason": "ops_webhook_missing", "error": "Discord ops webhook not configured", "target": "ops"}
-    assert posted == []
+    assert outcome["ok"] is False and outcome["reason"] == "ops_channel_missing" and outcome["target"] == "ops"
+    assert "Kein Kanal" in outcome["error"] and posted == []
     skipped = await flow.db.email_logs.find_one({"target": "ops"}, {"_id": 0})
-    assert skipped and skipped["status"] == "skipped"
+    assert skipped and skipped["status"] == "skipped" and skipped["reason"] == "ops_channel_missing"
 
-    saved = await flow.put("/api/settings/discord", json={"ops_webhook_url": "https://discord.com/api/webhooks/2/ops"})
+    saved = await flow.put("/api/settings/discord", json={"channels": {"ops": "100000000000000004"}})
     assert saved.status_code == 200, saved.text
     shown = (await flow.get("/api/settings/discord")).json()
-    assert shown["ops_configured"] is True and "ops_webhook_url" not in shown
-    assert shown["ops_webhook_url_masked"].startswith("https://discord.com/api/webhooks/")
+    assert shown["channels"]["ops"] == "100000000000000004" and "bot_token" not in shown
 
     outcome = await discord_service.send_ops_discord("Betrieb: Test", "rot")
     assert outcome["ok"] is True
-    assert posted == [{"webhook_url": "https://discord.com/api/webhooks/2/ops", "username": "LION Betrieb"}]
+    assert posted == [{"channel_id": "100000000000000004", "title": "Betrieb: Test"}]
 
-    # Der Community-Weg bleibt beim Community-Webhook.
+    # Der Community-Weg bleibt beim Community-Kanal.
     await discord_service.send_discord("News", "öffentlich")
-    assert posted[-1]["webhook_url"] == "https://discord.com/api/webhooks/1/community"
+    assert posted[-1]["channel_id"] == "100000000000000001"
 
     test_message = await flow.post("/api/settings/discord/test?target=ops")
     assert test_message.status_code == 200 and test_message.json()["ok"] is True
-    assert posted[-1]["webhook_url"] == "https://discord.com/api/webhooks/2/ops"
+    assert posted[-1]["channel_id"] == "100000000000000004"

@@ -22,10 +22,10 @@ def email_provider(email_settings: dict | None) -> str:
 
 
 def discord_facts(discord_settings: dict | None) -> dict:
+    """Meldungen gehen über den Bot in gewählte Kanäle (#566); der Bot zählt und gleicht Rollen ab (#302)."""
     doc = discord_settings or {}
-    targets = doc.get("targets") or {}
-    webhooks = bool(doc.get("webhook_url")) or any(bool((entry or {}).get("webhook_url")) for entry in (targets.values() if isinstance(targets, dict) else []))
-    return {"webhooks": webhooks, "bot": bool(doc.get("bot_enabled"))}
+    channels = doc.get("channels") if isinstance(doc.get("channels"), dict) else {}
+    return {"channels": any(str(value or "").strip() for value in channels.values()), "bot": bool(doc.get("bot_enabled"))}
 
 
 def media_scan_facts(settings: dict | None) -> dict:
@@ -72,7 +72,7 @@ async def privacy_facts(db) -> dict:
             if field:
                 fields[field] = 1
     branding = await db.settings.find_one({"id": "branding"}, fields) or {}
-    discord = await db.settings.find_one({"id": "discord"}, {"_id": 0, "webhook_url": 1, "targets": 1, "bot_enabled": 1}) or {}
+    discord = await db.settings.find_one({"id": "discord"}, {"_id": 0, "channels": 1, "bot_enabled": 1}) or {}
     email = await db.settings.find_one({"id": "email"}, {"_id": 0, "provider": 1, "smtp_host": 1, "resend_api_key": 1}) or {}
     dolibarr = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "mode": 1, "write_enabled": 1}) or {}
     from services.media_scan import load_settings as load_media_scan

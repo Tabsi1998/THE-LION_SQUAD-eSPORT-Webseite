@@ -173,7 +173,7 @@ async def dashboard(me: dict = Depends(require_any_admin())):
     except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
         logger.warning("ops summary failed", exc_info=True)
         ops = None
-    # Kaputter Discord-Webhook (#303): nur für den, der ihn in den Einstellungen reparieren kann.
+    # Discord-Kanal ohne Recht oder gelöscht (#303, #566): nur für den, der es in den Einstellungen beheben kann.
     discord_broken = []
     try:
         from services.permissions import user_has_area
@@ -755,7 +755,10 @@ async def system_status(me: dict = Depends(require_any_admin())):
         or mail.get("provider") == "resend" and bool(mail.get("resend_api_key"))
         or bool(mail.get("smtp_host"))
     )
-    discord_ready = bool(discord.get("enabled", True)) and bool(discord.get("webhook_url"))
+    # Discord III (#566): gesendet wird nur über den Bot - ohne Bot oder Kanal ist nichts „ok“.
+    discord_channels = discord.get("channels") if isinstance(discord.get("channels"), dict) else {}
+    discord_configured = any(str(value or "").strip() for value in discord_channels.values())
+    discord_ready = bool(discord.get("enabled", True)) and bool(discord.get("bot_enabled")) and discord_configured
     return {
         "database": database,
         "smtp": {
@@ -767,7 +770,8 @@ async def system_status(me: dict = Depends(require_any_admin())):
         },
         "discord": {
             "ok": discord_ready,
-            "configured": bool(discord.get("webhook_url")),
+            "configured": discord_configured,
+            "bot_enabled": bool(discord.get("bot_enabled")),
             "enabled": bool(discord.get("enabled", True)),
             "latest": latest_discord,
         },

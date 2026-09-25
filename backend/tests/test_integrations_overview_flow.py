@@ -34,7 +34,7 @@ async def test_the_overview_tells_active_off_missing_and_unreadable_apart_withou
     }, upsert=True)
     await flow.db.settings.replace_one({"id": "email"}, {"id": "email", "resend_api_key": encrypt_secret("re_geheim")}, upsert=True)
     await flow.db.settings.replace_one({"id": "mail"}, {"id": "mail", "provider": "smtp", "smtp_host": "mail.lionsquad-test.at", "smtp_pass": encrypt_secret("pw"), "enabled": True}, upsert=True)
-    await flow.db.settings.replace_one({"id": "discord"}, {"id": "discord", "webhook_url": encrypt_secret("https://discord.com/api/webhooks/1/abc"), "bot_token": encrypt_secret("bot"), "bot_enabled": False}, upsert=True)
+    await flow.db.settings.replace_one({"id": "discord"}, {"id": "discord", "channels": {"community": "100000000000000001"}, "bot_token": encrypt_secret("bot"), "bot_enabled": False}, upsert=True)
     await flow.db.settings.replace_one({"id": "dolibarr"}, {"id": "dolibarr", "mode": "live", "base_url": "https://erp.lionsquad-test.at", "api_key": encrypt_secret("dolikey")}, upsert=True)
     await flow.db.settings.replace_one({"id": "dolibarr_sync_state"}, {"id": "dolibarr_sync_state", "ok": False, "last_error": {"kind": "unauthorized", "text": "401"}}, upsert=True)
 
@@ -52,7 +52,7 @@ async def test_the_overview_tells_active_off_missing_and_unreadable_apart_withou
     assert states["google"] == "missing"
     assert states["resend"] == "off" and "SMTP" in details["resend"]
     assert states["smtp"] == "active"
-    assert states["discord_webhooks"] == "active" and states["discord_bot"] == "off"
+    assert states["discord_channels"] == "off" and "Bot aus" in details["discord_channels"] and states["discord_bot"] == "off"
     assert states["analytics"] == "active" and "Plausible" in details["analytics"]
     assert states["dolibarr"] == "error" and "unauthorized" in details["dolibarr"]
     assert states["play"] == "missing"

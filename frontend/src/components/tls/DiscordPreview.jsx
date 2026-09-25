@@ -10,10 +10,12 @@ export const SKIP_REASONS = {
   author_opt_out: "„Ohne Discord“ ist angehakt – es wird nichts gesendet.",
   private_visibility: "Nur für Mitglieder oder den Vorstand sichtbar – so etwas geht nie in einen öffentlichen Discord-Kanal.",
   event_disabled: "Dieses Ereignis ist in Einstellungen → Discord ausgeschaltet.",
-  no_webhook: "Es ist kein Webhook eingerichtet (Einstellungen → Discord).",
+  disabled: "Discord-Meldungen sind ausgeschaltet (Verbindungen → Discord → „Versand aktiv“).",
+  bot_off: "Der Bot ist aus – ohne Bot wird nichts gesendet (Verbindungen → Discord → „Bot verbinden“).",
+  no_channel: "Für dieses Ziel ist kein Kanal gewählt (Verbindungen → Discord → Kanäle je Zweck).",
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
 };
-const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere", achievements: "Erfolge" };
+const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere" };
 
 export function embedColor(color) {
   return `#${Number(color || 0x29b6e8).toString(16).padStart(6, "0")}`;

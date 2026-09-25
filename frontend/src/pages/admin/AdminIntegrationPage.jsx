@@ -12,7 +12,7 @@ import { INTEGRATIONS, integrationApp, integrationByKey, integrationStatus } fro
 
 // Verbindungen (Wunsch des Betreibers, 24.09.): je Dienst eine eigene Seite - Stand, Zugangsdaten
 // (Client ID + Secret, bei Plattformen zum Verknüpfen), Rückrufadresse, „prüfen“ und die Anleitung
-// aufgeklappt. Discord und Twitch haben ihre laufenden Einstellungen (Webhooks, Bot, Zähler bzw.
+// aufgeklappt. Discord und Twitch haben ihre laufenden Einstellungen (Kanäle je Zweck, Bot, Zähler bzw.
 // Vereinskanal und Live-Erkennung) seit 24.09. nur noch hier („muss das doppelt sein?“). Dienste, deren
 // Felder auf einem Reiter liegen (E-Mail, Google-Login, Analytics, Google Play, Dolibarr), haben seit #508
 // keine eigene Seite mehr: die Adresse leitet auf den Reiter um - keine Seite, die nur verlinkt.

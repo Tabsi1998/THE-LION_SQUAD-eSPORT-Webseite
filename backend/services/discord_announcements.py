@@ -122,8 +122,12 @@ async def preview(kind: str, item: dict) -> dict:
     reason = skip_reason(item, published_at=None)
     if not reason and not event_enabled(cfg, message["event_key"]):
         reason = "event_disabled"
-    if not reason and (not cfg["master"] or not resolved["webhook_url"]):
-        reason = "no_webhook"
+    if not reason and not cfg["master"]:
+        reason = "disabled"
+    if not reason and not cfg["bot"]["enabled"]:
+        reason = "bot_off"
+    if not reason and not resolved["channel_id"]:
+        reason = "no_channel"
     embed = await build_embed(message["title"], message["description"], color=message["color"], url=message["url"],
                               fields=message["fields"], image_url=message["image_url"])
     return {"embed": embed, "would_send": reason is None, "reason": reason, "target": resolved["target"]}
@@ -169,7 +173,7 @@ async def announce_due(limit: int = 50) -> dict:
 # ---------------------------------------------------------------- Vorstand (privates Ziel)
 
 async def notify_board(event_key: str, title: str, description: str, *, url: str, fields: list | None = None) -> dict:
-    """Nur an den Vorstands-Webhook. Fehlt er, passiert nichts - nie ein Rückfall auf die Community."""
+    """Nur in den Vorstandskanal. Fehlt er, passiert nichts - nie ein Rückfall auf die Community."""
     from discord_service import send_event
 
     try:

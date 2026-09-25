@@ -191,7 +191,7 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         recipients.append("Statistik: Google Ireland Ltd. (Google Analytics, nur mit Einwilligung)")
     if f.get("analytics") == "plausible":
         recipients.append("Statistik: Plausible Insights OÜ (ohne Cookies)")
-    if discord.get("webhooks") or discord.get("bot"):
+    if discord.get("channels") or discord.get("bot"):
         recipients.append("Discord Inc.: Vereinsserver (Meldungen, Bot)")
     if f.get("twitch_embed"):
         recipients.append("Twitch (Amazon): eingebetteter Stream, erst nach Zustimmung zu externen Medien")
@@ -264,10 +264,10 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   f"und Inhalt; Versandzeitpunkt und -status werden für die Fehlersuche kurz protokolliert. {email_provider_text(f.get('email_provider') or 'none')}",
                   "privacy-email")),
         section("discord", "Discord",
-                p("Ereignisse des Vereins – neue Turniere, Events, News, Ergebnisse und Erfolge – werden automatisch in Kanäle unseres "
-                  "Discord-Servers gepostet (Discord Inc., USA; EU-Standardvertragsklauseln). Dabei gehen nur die auf der Website ohnehin "
+                p("Ereignisse des Vereins – neue Turniere, Events, News und Ergebnisse – postet unser Vereins-Bot automatisch in Kanäle "
+                  "unseres Discord-Servers (Discord Inc., USA; EU-Standardvertragsklauseln). Dabei gehen nur die auf der Website ohnehin "
                   "öffentlichen Angaben mit: Anzeigenamen, Teamnamen, Ergebnisse, Bilder der Beiträge. Interne Vereinsinhalte werden nur in "
-                  "interne Kanäle gepostet.", "privacy-discord-webhooks") if discord.get("webhooks") else None,
+                  "interne Kanäle gepostet.", "privacy-discord-channels") if discord.get("channels") else None,
                 p("Auf unserem Discord-Server läuft der Vereins-Bot. Er zählt für Mitglieder, die ihr Discord-Konto im Profil verknüpft haben, "
                   "die **Anzahl** ihrer Nachrichten (nie den Inhalt – der Bot hat kein Recht, Nachrichten zu lesen), gleicht die Rollen "
                   "„Mitglied“, „Vorstand“ und „Turnierleitung“ mit dem Vereinsstand ab und beantwortet Befehle wie „nächstes Event“. Nicht "

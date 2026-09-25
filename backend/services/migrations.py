@@ -11,6 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id
 from services.secret_migration import migrate_plaintext_secrets
 
+
 async def migrate_team_leader_role(db) -> str:
     """Die globale Rolle team_leader gab es nur in der Auswahl, geprüft hat sie nichts;
     Teamleitung läuft pro Team (#292). Bestehende Konten werden Spieler, mit Audit-Eintrag."""
@@ -29,9 +30,21 @@ async def migrate_team_leader_role(db) -> str:
     return f"{len(ids)} team_leader accounts set to player"
 
 
+async def migrate_discord_webhooks_to_bot(db) -> str:
+    """Discord III (#566): Meldungen gehen nur noch über den Bot. Gespeicherte Webhook-Adressen,
+    Absendername und Avatar je Ziel werden verworfen - Bot-Einstellungen und Schalter bleiben."""
+    doc = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
+    unset = {key: "" for key in ("webhook_url", "ops_webhook_url", "username", "avatar_url", "targets") if key in doc}
+    if not unset:
+        return "nothing to remove"
+    await db.settings.update_one({"id": "discord"}, {"$unset": unset})
+    return f"removed {', '.join(sorted(unset))}"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
+    (3, "discord_webhooks_to_bot", migrate_discord_webhooks_to_bot),
 )
 
 

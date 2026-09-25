@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { BellRing, Send } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 
-// Alarme (#517): je Ereignisart, ob eine Meldung per Discord (Betriebs-Webhook) und/oder per E-Mail an
+// Alarme (#517): je Ereignisart, ob eine Meldung per Discord (Bot → Betriebskanal) und/oder per E-Mail an
 // den Vorstand geht; Sperrfrist je Schlüssel; Testalarm; Aufbewahrung der Versandlogs und Adminaktionen.
 // Die Regeln liegen im Backend (services/ops_alerts), hier nur Anzeige und Speichern.
 
@@ -56,7 +56,7 @@ export function OpsAlertsPanel() {
       const { data: result } = await api.post("/admin/ops/alerts/test");
       const ways = (result.channels || []).map((c) => (c === "discord" ? "Discord" : "E-Mail")).join(" und ");
       if (result.sent) toast.success(`Testalarm raus per ${ways}.`);
-      else toast.error("Kein Weg eingerichtet: Betriebs-Webhook (Verbindungen → Discord) oder E-Mail-Empfänger fehlen.");
+      else toast.error("Kein Weg eingerichtet: Betriebskanal mit verbundenem Bot (Verbindungen → Discord) oder E-Mail-Empfänger fehlen.");
       await load();
     } catch (err) {
       toast.error(formatApiError(err?.response?.data?.detail) || "Testalarm hat nicht geklappt.");
@@ -72,7 +72,7 @@ export function OpsAlertsPanel() {
           <div>
             <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><BellRing className="w-4 h-4 text-[#FFD700]" /> Wer erfährt was</div>
             <p className="text-xs text-white/50 mt-1 max-w-2xl">
-              Discord geht über den Betriebs-Webhook (Verbindungen → Discord, ein privater Kanal nur für den Vorstand). E-Mail geht über die Mail-Queue an die Empfänger unten.
+              Discord geht über den Bot in den Betriebskanal (Verbindungen → Discord, ein privater Kanal nur für den Vorstand; Bot aus = kein Alarm). E-Mail geht über die Mail-Queue an die Empfänger unten.
               Je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job) meldet die Website höchstens einmal je Sperrfrist.
             </p>
           </div>

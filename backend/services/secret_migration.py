@@ -6,7 +6,7 @@ from services.secret_store import PREFIX, encrypt_secret
 SETTING_FIELDS = {
     "email": ("resend_api_key",),
     "mail": ("smtp_pass", "resend_api_key"),
-    "discord": ("webhook_url",),
+    "discord": ("bot_token",),
     "branding": ("twitch_client_secret",),
     "twitch_app_token": ("access_token",),
 }
