@@ -318,6 +318,18 @@ async def _safe_github_releases():
         _log_task_failure("github_releases", exc)
 
 
+async def _safe_steam_presence():
+    """„Gerade in Steam“ (#584): alle zwei Minuten die Konten mit Opt-in bei Steam abfragen - kein Verlauf."""
+    try:
+        from database import get_db
+        from services.steam_presence import poll
+        res = await poll(get_db())
+        if res.get("error") and res["error"] != "no_api_key":
+            logger.info(f"[scheduler] steam_presence {res}")
+    except Exception as exc:
+        _log_task_failure("steam_presence", exc)
+
+
 async def _safe_twitch_poll():
     try:
         from services.twitch_service import twitch_poll_loop
@@ -542,6 +554,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_poll", _safe_twitch_poll), IntervalTrigger(seconds=90), id="twitch_poll",
                   max_instances=1, coalesce=True)

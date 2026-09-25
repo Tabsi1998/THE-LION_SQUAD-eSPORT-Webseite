@@ -54,6 +54,8 @@ def facts_from(branding: dict | None, auth: dict | None, discord: dict | None, e
         "passkeys": True,                      # WebAuthn im eigenen Backend, kein Dritter
         "discord": discord_facts(discord),
         "twitch_embed": bool(str(b.get("twitch_channel") or "").strip()),
+        # „Gerade in Steam“ (#584): nur mit Steam-API-Schlüssel, nur verknüpfte Konten mit Opt-in, nur für Mitglieder.
+        "steam_status": bool(b.get("steam_api_key")),
         "email_provider": email_provider(email),
         "dolibarr": str(d.get("mode") or "off") != "off",
         "dolibarr_billing": bool(d.get("write_enabled")),

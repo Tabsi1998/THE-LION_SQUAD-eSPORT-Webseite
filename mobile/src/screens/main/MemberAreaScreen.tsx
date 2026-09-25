@@ -24,6 +24,17 @@ import type { ClubEvent, NewsPost } from "../../types";
 type Props = NativeStackScreenProps<MoreStackParamList, "MemberArea">;
 
 type Membership = { member_number?: string | null; member_since?: string | null; member_status?: string | null } | null;
+// „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
+type SteamPlayer = { user_id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; state: "playing" | "online"; state_text: string; game?: string | null };
+type SteamPresence = { available: boolean; stale?: boolean; online_count: number; players: SteamPlayer[]; me?: { linked?: boolean; opted_in?: boolean } };
+
+export function steamSummary(presence: SteamPresence | null): string {
+  if (!presence) return "";
+  if (presence.stale) return "Stand veraltet – Steam wurde länger nicht abgefragt.";
+  const count = presence.online_count || 0;
+  if (!count) return "Gerade niemand in Steam.";
+  return count === 1 ? "Ein Mitglied gerade in Steam" : `${count} Mitglieder gerade in Steam`;
+}
 
 export function MemberAreaScreen({ navigation }: Props) {
   const { user } = useAuth();
@@ -34,11 +45,12 @@ export function MemberAreaScreen({ navigation }: Props) {
   const [benefits, setBenefits] = useState<any[]>([]);
   const [contacts, setContacts] = useState<BoardContact[]>([]);
   const [discordUrl, setDiscordUrl] = useState("");
+  const [steam, setSteam] = useState<SteamPresence | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings] = await Promise.allSettled([
+    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings, presence] = await Promise.allSettled([
       api.get<{ membership?: Membership }>("/membership/me"),
       api.get<ClubEvent[]>("/events", { params: { upcoming: true, compact: true, limit: 48 } }),
       api.get<NewsPost[]>("/news"),
@@ -46,6 +58,7 @@ export function MemberAreaScreen({ navigation }: Props) {
       api.get<any[]>("/membership/benefits"),
       api.get<any[]>("/board", { params: { active_only: true } }),
       api.get<{ discord_invite_url?: string }>("/settings/public"),
+      api.get<SteamPresence>("/membership/steam-presence"),
     ]);
     if (my.status === "fulfilled") setMembership(my.value.data?.membership || null);
     if (liveEvents.status === "fulfilled") setEvents(memberEvents(Array.isArray(liveEvents.value.data) ? liveEvents.value.data : []));
@@ -54,6 +67,7 @@ export function MemberAreaScreen({ navigation }: Props) {
     if (liveBenefits.status === "fulfilled") setBenefits(Array.isArray(liveBenefits.value.data) ? liveBenefits.value.data : []);
     if (board.status === "fulfilled") setContacts(boardContacts(Array.isArray(board.value.data) ? board.value.data : []));
     if (settings.status === "fulfilled") setDiscordUrl(String(settings.value.data?.discord_invite_url || ""));
+    if (presence.status === "fulfilled") setSteam(presence.value.data?.available ? presence.value.data : null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -121,6 +135,29 @@ export function MemberAreaScreen({ navigation }: Props) {
                 <Body style={styles.lineTitle}>{post.title}</Body>
               </Pressable>
             ))}
+          </Section>
+        ) : null}
+
+        {steam ? (
+          <Section title="Gerade in Steam" testID="member-area-steam">
+            <Muted testID="member-area-steam-summary">{steamSummary(steam)}</Muted>
+            {steam.players.map((player) => (
+              <Pressable
+                key={player.user_id}
+                disabled={!player.username}
+                onPress={() => player.username && navigation.navigate("PublicProfile", { username: player.username })}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.contact, pressed && styles.pressed]}
+                testID={`member-area-steam-${player.user_id}`}
+              >
+                <MediaImage uri={player.avatar_url || undefined} style={styles.avatar} fallback={<Ionicons name="logo-steam" color={colors.muted} size={18} />} />
+                <View style={styles.contactText}>
+                  <Body style={styles.lineTitle}>{player.display_name || player.username}</Body>
+                  <Muted>{player.state_text}</Muted>
+                </View>
+              </Pressable>
+            ))}
+            {steam.me && steam.me.linked && !steam.me.opted_in ? <Muted>Auch dabei sein: auf lionsquad.at unter Profil → Socials „Meinen Steam-Status im Mitgliederbereich zeigen“ einschalten.</Muted> : null}
           </Section>
         ) : null}
 

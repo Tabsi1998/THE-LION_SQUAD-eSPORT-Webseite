@@ -33,6 +33,7 @@ export function profileToForm(user) {
     discord_name: user.discord_name || "",
     twitch_handle: user.twitch_handle || "",
     show_twitch_embed: user.show_twitch_embed ?? false,
+    show_steam_status: user.show_steam_status ?? false,
     youtube_handle: user.youtube_handle || "",
     tiktok_handle: user.tiktok_handle || "",
     instagram_handle: user.instagram_handle || "",

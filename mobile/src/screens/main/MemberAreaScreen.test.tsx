@@ -30,6 +30,10 @@ const responses: Record<string, unknown> = {
   "/membership/benefits": [{ id: "b1", title: "Rabatt im Shop", description: "10 Prozent" }],
   "/board": [{ id: "p1", display_title: "Obfrau", user: { display_name: "Obfrau Otti", username: "otti" } }],
   "/settings/public": { discord_invite_url: "https://discord.gg/lions" },
+  "/membership/steam-presence": { available: true, stale: false, online_count: 2, me: { linked: true, opted_in: false }, players: [
+    { user_id: "u9", username: "leon", display_name: "Leon", state: "playing", state_text: "spielt gerade Rocket League", game: "Rocket League" },
+    { user_id: "u8", username: "mira", display_name: "Mira", state: "online", state_text: "online" },
+  ] },
 };
 
 beforeEach(() => {
@@ -48,6 +52,12 @@ test("zeigt nur Internes, mit Kacheln zu Mitgliedschaft, Karte, Dokumenten und V
   expect(screen.getByText("Dokumente (2)")).toBeTruthy();
   expect(screen.getByText("Obfrau Otti")).toBeTruthy();
   expect(screen.getByText("Rabatt im Shop")).toBeTruthy();
+  // „Gerade in Steam“ (#584): Zähler, wer spielt, und der Hinweis, wie ich selbst dabei bin.
+  expect(screen.getByTestId("member-area-steam-summary")).toHaveTextContent("2 Mitglieder gerade in Steam");
+  expect(screen.getByText("spielt gerade Rocket League")).toBeTruthy();
+  expect(screen.getByText(/Auch dabei sein/)).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("member-area-steam-u9"));
+  expect(navigate).toHaveBeenCalledWith("PublicProfile", { username: "leon" });
 
   await fireEvent.press(screen.getByTestId("member-area-membership"));
   expect(navigate).toHaveBeenCalledWith("MyMembership");

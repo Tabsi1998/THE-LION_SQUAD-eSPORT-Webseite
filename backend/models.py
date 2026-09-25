@@ -82,6 +82,7 @@ class UserUpdate(BaseModel):
     game_ids: Optional[Dict[str, Dict[str, str]]] = None  # game_slug -> field_key -> value
     # Public profile features
     show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
+    show_steam_status: Optional[bool] = None  # „Gerade in Steam“ im Mitgliederbereich (#584), Opt-in
     # Socials (legacy fields for compatibility)
     discord_name: Optional[str] = None
     discord_id: Optional[str] = None

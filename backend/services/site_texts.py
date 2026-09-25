@@ -195,6 +195,9 @@ def privacy_page(legal: dict, facts: dict) -> dict:
         recipients.append("Discord Inc.: Vereinsserver (Meldungen, Bot)")
     if f.get("twitch_embed"):
         recipients.append("Twitch (Amazon): eingebetteter Stream, erst nach Zustimmung zu externen Medien")
+    if f.get("steam_status"):
+        recipients.append("Valve Corporation (Steam): „Gerade in Steam“ im Mitgliederbereich – nur mit verknüpftem Konto und Opt-in im Profil, "
+                          "übermittelt wird nur die SteamID; kein Verlauf, nur der aktuelle Stand")
     for row in platforms:
         recipients.append(f"Verknüpfung {row['label']}: {row.get('operator') or row['label']} (nur beim Verknüpfen, nur Kennung und Name)")
     if f.get("dolibarr"):

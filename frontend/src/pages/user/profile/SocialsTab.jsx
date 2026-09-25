@@ -146,6 +146,8 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
   const manualRows = [];
   for (let index = 0; index < manualKeys.length; index += 2) manualRows.push(manualKeys.slice(index, index + 2));
   const twitchLinked = Boolean(linkForField(linkedRows, "twitch_handle"));
+  // „Gerade in Steam“ (#584): der Schalter erscheint nur mit verknüpftem Steam-Konto - von Hand eingetragene IDs zählen nicht.
+  const steamLinked = Boolean(linkForField(linkedRows, "steam_id"));
   return (
     <Section>
       <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/65" data-testid="profile-links-hint">
@@ -182,6 +184,22 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
             checked={!!form.show_twitch_embed}
             onCheckedChange={(checked) => set("show_twitch_embed", checked)}
             testId="profile-twitch-embed"
+            className="mt-0.5"
+          />
+        </div>
+      ) : null}
+
+      {steamLinked ? (
+        <div className="flex items-start justify-between gap-4 p-3 border border-[#66c0f4]/30 bg-[#66c0f4]/5 rounded-sm" data-testid="profile-steam-status-row">
+          <div className="text-sm">
+            <div className="font-bold text-white">Meinen Steam-Status im Mitgliederbereich zeigen</div>
+            <div className="text-white/60 text-xs mt-1">Mitglieder sehen unter „Gerade in Steam“, dass du online bist und was du gerade spielst – nur, wenn dein Steam-Profil öffentlich ist. Nie öffentlich, nie im Discord; kein Verlauf.</div>
+          </div>
+          <ProfileSwitch
+            label="Meinen Steam-Status im Mitgliederbereich zeigen"
+            checked={!!form.show_steam_status}
+            onCheckedChange={(checked) => set("show_steam_status", checked)}
+            testId="profile-steam-status"
             className="mt-0.5"
           />
         </div>

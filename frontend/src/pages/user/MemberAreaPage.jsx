@@ -5,7 +5,8 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2 } from "lucide-react";
+import { SteamPresence } from "@/components/tls/SteamPresence";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -28,6 +29,8 @@ export default function MemberAreaPage() {
   const [meetings, setMeetings] = useState({ meetings: [], ballots: [] });
   // Helferdienste (#331): eigene Dienste und freie Plätze aus der Vereinsakte.
   const [helping, setHelping] = useState({ my_count: 0, open_places: 0 });
+  // „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
+  const [steam, setSteam] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -41,7 +44,8 @@ export default function MemberAreaPage() {
       api.get("/settings/public"),
       api.get("/membership/me/meetings"),
       api.get("/membership/me/helper-shifts"),
-    ]).then(([b, m, d, n, e, p, s, mt, hs]) => {
+      api.get("/membership/steam-presence"),
+    ]).then(([b, m, d, n, e, p, s, mt, hs, sp]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -51,6 +55,7 @@ export default function MemberAreaPage() {
       if (s.status === "fulfilled") setDiscordUrl(s.value.data?.discord_invite_url || "");
       if (mt.status === "fulfilled" && mt.value.data?.available) setMeetings({ meetings: mt.value.data.meetings || [], ballots: mt.value.data.ballots || [] });
       if (hs.status === "fulfilled" && hs.value.data?.available) setHelping({ my_count: hs.value.data.my_count || 0, open_places: hs.value.data.open_places || 0 });
+      if (sp.status === "fulfilled" && sp.value.data?.available) setSteam(sp.value.data);
       setLoaded(true);
     });
   }, []);
@@ -193,6 +198,12 @@ export default function MemberAreaPage() {
           </div>
 
           <div className="space-y-6">
+            {steam ? (
+              <Section title="Gerade in Steam" icon={Gamepad2} testId="member-area-steam">
+                <SteamPresence data={steam} />
+              </Section>
+            ) : null}
+
             {internalNews.length ? (
               <Section title="Interne News" icon={Bell} testId="member-area-news" more={{ to: "/members/news", label: "Alle" }}>
                 <div className="space-y-3">
