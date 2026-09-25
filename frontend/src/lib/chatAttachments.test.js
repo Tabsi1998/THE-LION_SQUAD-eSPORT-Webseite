@@ -12,11 +12,11 @@ describe("Chat-Anhänge", () => {
     expect(chatAttachmentKind({ type: "video/quicktime", name: "clip.mov" })).toBe("video");
     expect(chatAttachmentKind({ type: "", name: "IMG_0001.WEBP" })).toBe("image");
     expect(chatAttachmentKind({ type: "", name: "tor.mp4" })).toBe("video");
+    expect(chatAttachmentKind({ type: "image/gif", name: "lustig.gif" })).toBe("image");
   });
 
   test("lehnt alles andere ab", () => {
     expect(chatAttachmentKind({ type: "application/pdf", name: "vertrag.pdf" })).toBeNull();
-    expect(chatAttachmentKind({ type: "image/gif", name: "lustig.gif" })).toBeNull();
     expect(chatAttachmentKind(null)).toBeNull();
   });
 

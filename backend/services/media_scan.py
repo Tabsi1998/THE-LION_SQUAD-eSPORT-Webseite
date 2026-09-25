@@ -19,6 +19,7 @@ import base64
 import logging
 import os
 import shutil
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 
@@ -183,7 +184,33 @@ def _load_detector():
     return _detector
 
 
+def _still_frame(path: Path) -> Path | None:
+    """GIFs und animierte WebPs (#239) kann OpenCV nicht lesen: das erste Bild als PNG, nur für die Prüfung."""
+    from PIL import Image
+
+    try:
+        with Image.open(path) as img:
+            if path.suffix.lower() != ".gif" and not getattr(img, "is_animated", False):
+                return None
+            handle, name = tempfile.mkstemp(prefix="media-scan-", suffix=".png")
+            os.close(handle)
+            img.convert("RGB").save(name, format="PNG")
+            return Path(name)
+    except Exception as exc:  # noqa: BLE001 - dann prüft der Anbieter die Datei selbst
+        logger.warning("[media_scan] Standbild für %s nicht möglich: %s", path.name, exc)
+        return None
+
+
 def _scan_local_sync(path: Path) -> dict:
+    still = _still_frame(path)
+    try:
+        return _detect_local(still or path)
+    finally:
+        if still is not None:
+            still.unlink(missing_ok=True)
+
+
+def _detect_local(path: Path) -> dict:
     detector = _load_detector()
     if detector is None:
         raise RuntimeError(_detector_error or "NudeNet nicht verfügbar")

@@ -9,6 +9,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  findNodeHandle,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +22,7 @@ import { resourceFromPath } from "../realtime/liveChanges";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { AttachButton, AttachmentDraftsRow, MessageAttachments, useChatAttachmentDrafts } from "./ChatAttachments";
 import { MessageSticker, StickerButton, StickerPicker } from "./ChatStickers";
+import { acceptKeyboardImages } from "../../modules/keyboard-image-input";
 import type { CatalogSticker } from "../lib/stickers";
 import { EmptyState, SkeletonList } from "./ListState";
 import { RichText } from "./RichText";
@@ -74,11 +76,21 @@ export function ChatThreadView({
   const [allowed, setAllowed] = useState(true);
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
   const nearBottomRef = useRef(true);
   const didInitialScroll = useRef(false);
   const composerBottomInset = Math.max(insets.bottom, Platform.OS === "android" ? 8 : 10);
   const attachments = useChatAttachmentDrafts();
   const [stickersOpen, setStickersOpen] = useState(false);
+
+  // Sticker und GIFs der Tastatur (#239) kommen wie ein ausgewähltes Bild in die Anhangleiste.
+  const addAssets = attachments.addAssets;
+  useEffect(
+    () => acceptKeyboardImages(findNodeHandle(inputRef.current), (image) => {
+      addAssets([{ uri: image.uri, mimeType: image.mimeType, fileName: image.fileName, fileSize: image.fileSize }]);
+    }),
+    [addAssets],
+  );
 
   const scrollToLatest = useCallback((animated = false) => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated }));
@@ -251,6 +263,7 @@ export function ChatThreadView({
           <AttachButton disabled={!allowed || sending} onPress={() => { void attachments.pick(); }} />
           <StickerButton disabled={!allowed || sending} onPress={() => setStickersOpen(true)} />
           <TextInput
+            ref={inputRef}
             editable={allowed && !sending}
             multiline
             onChangeText={setText}

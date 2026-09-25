@@ -69,6 +69,9 @@ def build_variant(source: Path, width: int) -> Path | None:
         return target
     try:
         with Image.open(source) as image:
+            if getattr(image, "is_animated", False):
+                # Animierte Sticker (#239): eine kleinere Fassung wäre ein Standbild - es kommt das Original.
+                return None
             image = ImageOps.exif_transpose(image)
             if image.width <= width:
                 return None

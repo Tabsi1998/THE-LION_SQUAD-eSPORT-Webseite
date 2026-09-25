@@ -36,6 +36,13 @@ jest.mock("react-native-safe-area-context", () => ({
 // Bündeln der App (expo export läuft durch), Jest mit Node-Auflösung nicht.
 // Icons sind hier ohnehin nicht Gegenstand des Tests.
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
+// Bilder aus der Tastatur (#239): das native Modul gibt es nur auf dem Gerät; hier zählt, dass der Chat
+// sich für sein Eingabefeld anmeldet und ein gemeldetes Bild wie ein ausgewähltes behandelt.
+const mockAcceptKeyboardImages = jest.fn();
+jest.mock("../../modules/keyboard-image-input", () => ({
+  keyboardImagesSupported: true,
+  acceptKeyboardImages: (...args: unknown[]) => mockAcceptKeyboardImages(...args),
+}));
 
 type ImageSource = { uri: string; headers?: Record<string, string> };
 
@@ -91,6 +98,7 @@ const stickerResponse = { data: stickerCatalog };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAcceptKeyboardImages.mockImplementation(() => () => {});
   mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : chatResponse));
 });
 
@@ -198,19 +206,45 @@ test("ein Sticker geht mit einem Tipp in den Chat - nur mit seiner Kennung", asy
   expect(source.headers).toBeUndefined();
 });
 
-test("ein GIF wird gar nicht erst hochgeladen", async () => {
-  jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({
-    canceled: false,
-    assets: [{ uri: "file:///lustig.gif", mimeType: "image/gif", fileName: "lustig.gif", fileSize: 512, width: 10, height: 10 }],
-  } as never);
+test("ein GIF aus der Tastatur wird wie ein Anhang hochgeladen - als GIF - und geht mit der Nachricht (#239)", async () => {
+  mockPost.mockImplementation(async (url: string) => {
+    if (url === "/chat-attachments") {
+      return { data: { id: "att-gif", kind: "image", mime: "image/gif", url: "/api/chat-attachments/att-gif" } };
+    }
+    return { data: { id: "m-4", user_id: "u-1", message: "", attachments: [{ id: "att-gif", kind: "image", url: "/api/chat-attachments/att-gif" }] } };
+  });
+  // Was in den Upload geht, hält ein FormData-Ersatz fest - der echte ist in Jest nicht auslesbar.
+  class RecordingFormData {
+    parts: Array<{ field: string; value: unknown }> = [];
+    append(field: string, value: unknown) {
+      this.parts.push({ field, value });
+    }
+  }
+  const realFormData = globalThis.FormData;
+  (globalThis as unknown as { FormData: unknown }).FormData = RecordingFormData;
+  try {
   await renderChat();
 
-  await act(async () => {
-    fireEvent.press(screen.getByLabelText("Bild oder Video anhängen"));
-  });
+  // Der Chat meldet sein Eingabefeld beim nativen Modul an ...
+  await waitFor(() => expect(mockAcceptKeyboardImages).toHaveBeenCalled());
+  const onImage = mockAcceptKeyboardImages.mock.calls[0][1] as (image: unknown) => void;
 
-  await waitFor(() => expect(screen.getByText("Nur Bilder und Videos.")).toBeTruthy());
-  expect(mockPost).not.toHaveBeenCalledWith("/chat-attachments", expect.anything(), expect.anything());
+  // ... und die Tastatur liefert ein GIF, das im App-Cache liegt.
+  await act(async () => {
+    onImage({ viewTag: 7, uri: "file:///cache/keyboard-images/x.gif", mimeType: "image/gif", fileName: "lustig.gif", fileSize: 512 });
+  });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/chat-attachments", expect.anything(), expect.objectContaining({ timeout: 120000 })));
+  const form = mockPost.mock.calls.find((call) => call[0] === "/chat-attachments")?.[1] as RecordingFormData;
+  expect(form.parts[0]).toEqual({ field: "file", value: { uri: "file:///cache/keyboard-images/x.gif", name: "lustig.gif", type: "image/gif" } });
+  await flush();
+
+  await act(async () => {
+    fireEvent.press(screen.getByText("Senden"));
+  });
+  await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/teams/t-1/chat", { message: "", attachment_ids: ["att-gif"] }));
+  } finally {
+    (globalThis as unknown as { FormData: unknown }).FormData = realFormData;
+  }
 });
 
 test("lange auf eine fremde Nachricht drücken meldet sie - eigene nicht (#414)", async () => {

@@ -39,6 +39,13 @@ def png(width=64, height=48) -> bytes:
     return buffer.getvalue()
 
 
+def gif(frames=2, width=64, height=48) -> bytes:
+    buffer = io.BytesIO()
+    first, *rest = [Image.new("RGB", (width, height), (40 * (index + 1), 90, 200)) for index in range(frames)]
+    first.save(buffer, format="GIF", save_all=True, append_images=rest, duration=120, loop=0)
+    return buffer.getvalue()
+
+
 async def upload(flow, content=None, filename="bild.png", mime="image/png", **extra_files):
     files = {"file": (filename, content if content is not None else png(), mime), **extra_files}
     return await flow.post("/api/chat-attachments", files=files)
@@ -251,6 +258,57 @@ async def test_the_sizes_the_app_asks_for_are_served_too(flow):
     # Eine Breite außerhalb der Liste ist kein Fehler, sondern das Original.
     odd = await flow.get(f"/api/chat-attachments/{attachment_id}?w=999")
     assert odd.status_code == 200, odd.text
+
+
+@pytest.mark.asyncio
+async def test_a_gif_stays_a_gif_also_in_the_small_sizes(flow):
+    """Sticker und GIFs der Tastatur (#239): kein Neukodieren, sonst wäre die Animation weg."""
+    alice, bob, _carol = await people(flow)
+    flow.act_as(alice)
+    response = await upload(flow, content=gif(), filename="lustig.gif", mime="image/gif")
+    assert response.status_code == 200, response.text
+    attachment = response.json()
+    assert attachment["mime"] == "image/gif" and attachment["width"] == 64 and attachment["kind"] == "image"
+    await flow.post(f"/api/messages/direct/{bob['id']}", json={"attachment_ids": [attachment["id"]]})
+
+    flow.act_as(bob)
+    for query in ("", "?w=400", "?w=800"):
+        served = await flow.get(f"/api/chat-attachments/{attachment['id']}{query}")
+        assert served.status_code == 200, served.text
+        assert served.headers["content-type"] == "image/gif"
+        with Image.open(io.BytesIO(served.content)) as image:
+            assert image.format == "GIF" and image.n_frames == 2
+
+
+def test_only_gifs_and_animated_webps_are_kept_as_they_are():
+    from PIL import features
+
+    assert chat_attachments._keep_animated_image(png()) is None
+    assert chat_attachments._keep_animated_image(b"%PDF-1.7 ...") is None
+    kept = chat_attachments._keep_animated_image(gif())
+    assert kept["content_type"] == "image/gif" and kept["ext"] == ".gif" and kept["width"] == 64
+    if features.check("webp_anim"):
+        buffer = io.BytesIO()
+        frames = [Image.new("RGB", (32, 32), (index * 60, 0, 0)) for index in range(3)]
+        frames[0].save(buffer, format="WEBP", save_all=True, append_images=frames[1:], duration=100, loop=0)
+        kept = chat_attachments._keep_animated_image(buffer.getvalue())
+        assert kept["content_type"] == "image/webp" and kept["ext"] == ".webp"
+
+
+def test_the_local_scanner_gets_a_still_image_for_animated_files(tmp_path):
+    from services import media_scan
+
+    animated = tmp_path / "sticker.gif"
+    animated.write_bytes(gif())
+    still = media_scan._still_frame(animated)
+    assert still is not None and still.suffix == ".png"
+    with Image.open(still) as image:
+        assert image.format == "PNG" and image.size == (64, 48)
+    still.unlink()
+
+    plain = tmp_path / "foto.png"
+    plain.write_bytes(png())
+    assert media_scan._still_frame(plain) is None
 
 
 # ---------------------------------------------------------------- Aufräumen und Löschen

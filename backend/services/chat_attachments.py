@@ -18,8 +18,10 @@ import os
 import pathlib
 import uuid
 from datetime import timedelta
+from io import BytesIO
 
 from fastapi import HTTPException, UploadFile
+from PIL import Image
 
 from database import get_db
 from models import new_id, now_utc
@@ -98,10 +100,40 @@ def _write_private(filename: str, data: bytes) -> None:
         raise HTTPException(status_code=500, detail="Upload-Speicher ist nicht beschreibbar.")
 
 
-async def _encode_uploaded_image(file: UploadFile, max_mb: int) -> dict:
+# Sticker und GIFs der Tastatur (#239): GIF und animiertes WebP bleiben, wie sie sind - ein Neukodieren
+# würde die Animation wegwerfen. Geprüft wird trotzdem, dass es ein Bild ist und wie groß es ist.
+ANIMATED_IMAGE_FORMATS = {"GIF": ("image/gif", ".gif"), "WEBP": ("image/webp", ".webp")}
+
+
+def _keep_animated_image(data: bytes) -> dict | None:
+    """Das Bild unverändert, wenn es ein GIF oder ein animiertes WebP ist; sonst None."""
+    from routes.upload_routes import MAX_IMAGE_PIXELS
+
+    try:
+        with Image.open(BytesIO(data)) as img:
+            img.verify()
+        with Image.open(BytesIO(data)) as img:
+            detected = (img.format or "").upper()
+            if detected != "GIF" and not (detected == "WEBP" and getattr(img, "is_animated", False)):
+                return None
+            if img.width * img.height > MAX_IMAGE_PIXELS:
+                raise HTTPException(status_code=413, detail="Bildauflösung ist zu groß")
+            content_type, ext = ANIMATED_IMAGE_FORMATS[detected]
+            return {"data": data, "content_type": content_type, "ext": ext, "width": img.width, "height": img.height}
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001 - kein Bild: der normale Weg nennt den Grund
+        return None
+
+
+async def _encode_uploaded_image(file: UploadFile, max_mb: int, *, keep_animated: bool = False) -> dict:
     from routes.upload_routes import _encode_image_bytes, _read_upload_limited
 
     data = await _read_upload_limited(file, max_mb * 1024 * 1024, max_mb)
+    if keep_animated:
+        kept = _keep_animated_image(data)
+        if kept is not None:
+            return kept
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     return _encode_image_bytes(data, file.content_type or "", suffix, file.filename or "upload")
 
@@ -114,9 +146,9 @@ def _upload_kind(file: UploadFile) -> str:
     suffix = pathlib.Path(file.filename or "").suffix.lower()
     if suffix in VIDEO_MIME_BY_EXT or declared_video in ALLOWED_VIDEO:
         return "video"
-    if declared in ALLOWED_IMAGE or suffix in IMAGE_MIME_BY_EXT:
+    if declared in ALLOWED_IMAGE or declared == "image/gif" or suffix in IMAGE_MIME_BY_EXT or suffix == ".gif":
         return "image"
-    raise HTTPException(status_code=400, detail="Im Chat sind Bilder (PNG, JPG, WebP) und Videos (MP4, WebM, MOV) erlaubt.")
+    raise HTTPException(status_code=400, detail="Im Chat sind Bilder (PNG, JPG, WebP, GIF) und Videos (MP4, WebM, MOV) erlaubt.")
 
 
 async def store_chat_upload(file: UploadFile, owner: dict, poster: UploadFile | None = None) -> dict:
@@ -127,7 +159,7 @@ async def store_chat_upload(file: UploadFile, owner: dict, poster: UploadFile | 
     stem = uuid.uuid4().hex
     poster_key = None
     if kind == "image":
-        encoded = await _encode_uploaded_image(file, MAX_CHAT_IMAGE_MB)
+        encoded = await _encode_uploaded_image(file, MAX_CHAT_IMAGE_MB, keep_animated=True)
         storage_key = f"{stem}{encoded['ext']}"
         _write_private(storage_key, encoded["data"])
         mime, size = encoded["content_type"], len(encoded["data"])

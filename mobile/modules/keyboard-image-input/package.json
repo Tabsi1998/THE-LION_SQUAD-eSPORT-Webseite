@@ -1,0 +1,7 @@
+{
+  "name": "keyboard-image-input",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sticker und GIFs der Android-Tastatur als Bild ins Eingabefeld (#239)",
+  "main": "index.ts"
+}

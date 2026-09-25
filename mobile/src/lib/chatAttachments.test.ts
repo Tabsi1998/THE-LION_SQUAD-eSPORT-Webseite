@@ -30,8 +30,9 @@ describe("welche Dateien in den Chat dürfen", () => {
     expect(attachmentKindForAsset({ uri: "content://media/44", type: "video" })).toBe("video");
   });
 
-  test("GIFs und alles andere werden abgelehnt", () => {
-    expect(attachmentKindForAsset({ uri: "file:///lustig.gif", mimeType: "image/gif" })).toBeNull();
+  test("GIFs sind Bilder (#239); alles andere wird abgelehnt", () => {
+    expect(attachmentKindForAsset({ uri: "file:///lustig.gif", mimeType: "image/gif" })).toBe("image");
+    expect(attachmentKindForAsset({ uri: "content://tastatur/7", fileName: "sticker.GIF" })).toBe("image");
     expect(attachmentKindForAsset({ uri: "file:///vertrag.pdf", mimeType: "application/pdf" })).toBeNull();
     expect(attachmentKindForAsset({ uri: "content://unbekannt" })).toBeNull();
   });

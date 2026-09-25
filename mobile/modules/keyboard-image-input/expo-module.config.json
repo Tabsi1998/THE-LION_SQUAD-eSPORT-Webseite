@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["at.lionsquad.app.keyboardimage.KeyboardImageInputModule"]
+  }
+}

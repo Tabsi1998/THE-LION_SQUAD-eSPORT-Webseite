@@ -7,11 +7,12 @@
 import { API_BASE } from "@/lib/api";
 
 export const MAX_CHAT_ATTACHMENTS = 4;
-export const CHAT_ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/webp,video/mp4,video/webm,video/quicktime";
+// GIF (#239): bleibt beim Server animiert, wie ein Sticker aus der Tastatur der App.
+export const CHAT_ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/quicktime";
 
-const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
+const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
-const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp"]);
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif"]);
 const VIDEO_EXTENSIONS = new Set(["mp4", "webm", "mov", "m4v"]);
 
 export function chatAttachmentKind(file) {
