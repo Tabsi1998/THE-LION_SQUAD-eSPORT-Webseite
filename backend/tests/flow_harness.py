@@ -122,6 +122,9 @@ class Flow:
     async def patch(self, url, **kwargs):
         return await self.client.patch(url, **kwargs)
 
+    async def delete(self, url, **kwargs):
+        return await self.client.delete(url, **kwargs)
+
     # ------------------------------------------------ Turnieraufbau
     async def create_tournament(self, **overrides) -> dict:
         """A tournament in the state the routes create it in.

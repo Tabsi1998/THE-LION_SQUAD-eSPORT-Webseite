@@ -21,7 +21,7 @@ from services.dolibarr_client import DolibarrClient, DolibarrError, load_setting
 from services.dolibarr_links import link_for_user, public_link, verified_link
 from services.dolibarr_policy import MAX_STATE_AGE_HOURS
 from services.dolibarr_sync import try_auto_link
-from services import dolibarr_identity, dolibarr_meetings, dolibarr_self_service
+from services import dolibarr_helper_shifts, dolibarr_identity, dolibarr_meetings, dolibarr_self_service
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/membership", tags=["membership"])
@@ -645,6 +645,31 @@ async def cast_ballot_vote(ballot_id: int, body: VoteBody, request: Request, use
     try:
         return await dolibarr_meetings.cast_vote(get_db(), user, ballot_id, body.right_id, body.option)
     except dolibarr_meetings.MeetingsError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+# ---------------------------------------------------------------- Helferdienste (#331)
+@router.get("/me/helper-shifts")
+async def my_helper_shifts(user: dict = Depends(get_current_user)):
+    """Veranstaltungen mit Helferdiensten aus der Vereinsakte (#331) - oder der Grund, warum es hier nichts gibt."""
+    return await dolibarr_helper_shifts.overview(get_db(), user)
+
+
+@router.put("/me/events/{event_id}/shifts/{shift_id}")
+async def request_helper_shift(event_id: int, shift_id: int, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:shifts:request", limit=30, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_helper_shifts.request_shift(get_db(), user, event_id, shift_id)
+    except dolibarr_helper_shifts.HelperShiftsError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
+@router.delete("/me/events/{event_id}/shifts/{shift_id}")
+async def withdraw_helper_shift(event_id: int, shift_id: int, request: Request, user: dict = Depends(get_current_user)):
+    await enforce_rate_limit(request, "dolibarr:shifts:withdraw", limit=30, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_helper_shifts.withdraw_shift(get_db(), user, event_id, shift_id)
+    except dolibarr_helper_shifts.HelperShiftsError as exc:
         raise HTTPException(exc.status, exc.detail)
 
 
