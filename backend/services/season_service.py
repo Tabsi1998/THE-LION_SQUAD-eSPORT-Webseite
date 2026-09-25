@@ -340,6 +340,9 @@ async def award_points(
         "created_at": now_utc().isoformat(),
     }
     await db.season_points.insert_one(doc)
+    # Live-Einbettung „Rangliste“ (#569): neue Punkte = Nachricht im Discord aktualisieren.
+    from services.discord_embeds import request_refresh
+    request_refresh("ranking")
     doc.pop("_id", None)
     return doc
 

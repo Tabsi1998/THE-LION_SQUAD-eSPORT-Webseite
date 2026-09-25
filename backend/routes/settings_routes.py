@@ -320,6 +320,8 @@ class DiscordSettings(BaseModel):
     bot_guild_id: Optional[str] = None
     bot_roles: Optional[dict[str, str]] = None
     bot_count_messages: Optional[bool] = None
+    # Live-Einbettungen (#569): je Art {enabled, channel_id}; die Nachrichten-IDs verwaltet der Server.
+    embeds: Optional[dict[str, dict]] = None
 
 
 class YoutubeFeedSettings(BaseModel):
@@ -1495,6 +1497,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     from services import discord_bot
     s["bot"] = {**discord_bot.bot_settings(s), **await discord_bot.read_state(db), **discord_bot.bot.status()}
     s["bot"].pop("channels", None)  # die Kanalliste kommt über /discord/channels
+    # Live-Einbettungen (#569): je Art Schalter, Kanal, Nachricht, Stand.
+    from services.discord_embeds import embeds_status
+    s["embeds"] = await embeds_status(db)
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     # Tests aus der Vorschau (#583) zählen nicht als Meldung.
@@ -1557,6 +1562,27 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in EVENTS:
                 raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
             updates[f"events.{event_field(key)}"] = bool(value)
+    # Live-Einbettungen (#569): Schalter und Kanal je Art; ein neuer Kanal heißt eine neue Nachricht.
+    incoming_embeds = updates.pop("embeds", None)
+    if incoming_embeds is not None:
+        from services.discord_embeds import KINDS
+        for kind, patch in incoming_embeds.items():
+            if kind not in KINDS or not isinstance(patch, dict):
+                raise HTTPException(400, f"Unbekannte Einbettung: {kind}")
+            if "enabled" in patch:
+                updates[f"embeds.{kind}.enabled"] = bool(patch["enabled"])
+            if "channel_id" in patch:
+                channel_id = str(patch.get("channel_id") or "").strip()
+                if channel_id and not channel_id_valid(channel_id):
+                    raise HTTPException(400, "Eine Kanal-ID ist eine Zahl mit 17 bis 20 Stellen (Discord: Rechtsklick auf den Kanal → „Kanal-ID kopieren“, Entwicklermodus).")
+                previous = str(((current.get("embeds") or {}).get(kind) or {}).get("channel_id") or "")
+                if channel_id:
+                    updates[f"embeds.{kind}.channel_id"] = channel_id
+                else:
+                    unset[f"embeds.{kind}.channel_id"] = ""
+                if channel_id != previous:
+                    for field in ("message_id", "hash", "posted_at", "updated_at", "error"):
+                        unset[f"embeds.{kind}.{field}"] = ""
     flat_current = dict(current)
     for name, value in (current.get("channels") or {}).items():
         flat_current[f"channels.{name}"] = value
@@ -1564,6 +1590,9 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         flat_current[f"events.{key}"] = value
     for key, value in (current.get("bot_roles") or {}).items():
         flat_current[f"bot_roles.{key}"] = value
+    for kind, state in (current.get("embeds") or {}).items():
+        for key, value in (state or {}).items():
+            flat_current[f"embeds.{kind}.{key}"] = value
     current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
@@ -1767,6 +1796,15 @@ async def discord_sample_send(key: str, via: str = Query(default="test", pattern
         return await send_sample(key, via, me)
     except KeyError:
         raise HTTPException(404, "Diese Meldungsart gibt es nicht.")
+
+
+@settings_router.post("/discord/embeds/{kind}/refresh")
+async def discord_embed_refresh(kind: str, me: dict = Depends(require_club_admin())):
+    """„Jetzt aktualisieren“ (#569): die Einbettung sofort neu schreiben - die Bremse (eine Minute) gilt trotzdem."""
+    from services.discord_embeds import KINDS, refresh
+    if kind not in KINDS:
+        raise HTTPException(404, "Diese Einbettung gibt es nicht.")
+    return await refresh(get_db(), kind, force=True)
 
 
 @settings_router.get("/discord/channels")
