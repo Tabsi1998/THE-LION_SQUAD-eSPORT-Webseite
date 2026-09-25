@@ -43,7 +43,7 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
 - **Kategorie:** Sport · **Tags:** eSports, Verein
 - **Kontakt:** die Vereins-Mailadresse; Website `https://lionsquad.at`
 - **Zielgruppe:** ab 13 Jahren. Die App richtet sich nicht an Kinder; Vereinsmitglieder sind teils Jugendliche. Keine Werbung.
-- **Inhaltseinstufung (Fragebogen):** Kategorie „Soziale Netzwerke / Kommunikation“; Nutzer können miteinander schreiben und eigene Inhalte (Bilder, Videos) teilen – ja; Standort wird nicht geteilt; keine Gewalt-, Sex- oder Glücksspielinhalte; Käufe: keine.
+- **Inhaltseinstufung (IARC-Fragebogen):** Kategorie **„Alle anderen App-Typen“** (kein Spiel; Chat ist Funktion, nicht Hauptzweck). Freigaberelevante Inhalte im App-Paket: nein. Teilen von Benutzerinhalten: Kommunikation/Bilder teilen **ja**; Nutzerinhalt als primäre Quelle nein; Nacktheit/Gewalt teilen nein; Blockieren **ja**, Melden **ja**, Chatmoderation **ja** (Wortfilter, Meldungen, Bildprüfung, Verwarnungen); Interaktionen nur auf eingeladene Freunde beschränkbar nein (Team- und Turnier-Chats sind für Teilnehmer offen). Gewalt, Sex, Drogen, grobe Sprache, Glücksspiel, Werbung, In-App-Käufe, Standort teilen: nein. Erwartet: PEGI 3 / USK 0 mit „Nutzerinteraktion“.
 
 ## Grafiken
 
