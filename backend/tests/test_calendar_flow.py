@@ -107,6 +107,35 @@ async def test_feed_is_the_anonymous_view_without_personal_data(flow):
     assert "paula@lionsquad-test.at" not in text and "ATTENDEE" not in text and "angemeldet" not in text.lower()
 
 
+@pytest.mark.asyncio
+async def test_single_ics_has_reminder_and_check_in_and_hides_private_items(flow):
+    await seed(flow)
+    await flow.db.tournaments.update_one({"id": "t-cup"}, {"$set": {"check_in_from": "2026-10-10T15:45:00+00:00", "check_in_until": "2026-10-10T16:55:00+00:00", "start_date": "2026-10-10T17:00:00+00:00"}})
+    response = await flow.get("/api/calendar/events/sommerfest.ics")
+    assert response.status_code == 200 and response.headers["content-type"].startswith("text/calendar")
+    assert response.headers["content-disposition"] == 'attachment; filename="sommerfest.ics"'
+    text = response.text
+    assert text.count("BEGIN:VEVENT") == 1 and "UID:event-e-fest@lionsquad.at" in text and "SUMMARY:Sommerfest" in text
+    assert "LOCATION:Vereinsheim\\, Telfs" in text and "/events/sommerfest" in text
+    assert "BEGIN:VALARM" in text and "TRIGGER:-PT60M" in text and "ACTION:DISPLAY" in text
+    assert "X-WR-CALNAME" not in text
+
+    cup = (await flow.get("/api/calendar/tournaments/autumn-cup.ics")).text
+    assert "SUMMARY:Autumn Cup" in cup and "DTSTART:20261010T170000Z" in cup
+    assert "Check-in ab 10.10.2026\\, 17:45 Uhr bis 18:55 Uhr" in cup.replace("\r\n ", ""), "Wiener Zeit, Check-in im Text"
+    assert (await flow.get("/api/calendar/tournaments/t-cup.ics")).status_code == 200, "auch über die Kennung"
+
+    for path in ("/api/calendar/events/vorstandssitzung.ics", "/api/calendar/events/lan.ics", "/api/calendar/events/entwurf.ics",
+                 "/api/calendar/tournaments/geheim.ics", "/api/calendar/events/gibt-es-nicht.ics"):
+        assert (await flow.get(path)).status_code == 404, path
+    assert (await flow.get("/api/calendar/events/alt.ics")).status_code == 404, "ohne Datum keine Datei"
+
+
+def test_ics_filename_is_ascii():
+    assert calendar_items.ics_filename({"title": "Weihnachtsfeier, Vereinsheim Ötztal"}) == "weihnachtsfeier-vereinsheim-oetztal.ics"
+    assert calendar_items.ics_filename({"title": ""}) == "termin.ics"
+
+
 def test_ics_folds_long_lines_and_defaults_to_two_hours():
     items = [{"id": "x", "kind": "event", "title": "Ein sehr langer Titel, " * 6, "start": "2026-12-12T18:00:00+01:00", "end": None,
               "path": "/events/x", "status": "scheduled", "phase": {"label": "Angekündigt"}, "location": None}]

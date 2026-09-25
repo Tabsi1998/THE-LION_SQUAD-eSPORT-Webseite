@@ -1,4 +1,4 @@
-import { calendarWindow, downloadIcs, googleCalendarUrl, icsFileName, icsFor } from "./calendarLinks";
+import { calendarWindow, downloadIcs, googleCalendarUrl, icsFileName, icsFor, outlookCalendarUrl, serverIcsPath } from "./calendarLinks";
 
 // „In meinen Kalender“ im Web (#216): .ics und Google-Link mit Zeitfenster, Ort und Text.
 
@@ -16,6 +16,20 @@ test("ohne Ende dauert der Termin zwei Stunden; Sonderzeichen sind maskiert", ()
   expect(googleCalendarUrl(item)).toContain("dates=20261212T170000Z%2F20261212T190000Z");
   expect(icsFileName(item)).toBe("weihnachtsfeier-vereinsheim.ics");
   expect(icsFor({ ...item, start: null })).toBe("");
+});
+
+test("Outlook-Link und die ICS vom Server (#580)", () => {
+  const outlook = outlookCalendarUrl(item);
+  expect(outlook).toContain("https://outlook.live.com/calendar/0/deeplink/compose?");
+  expect(outlook).toContain("startdt=2026-12-12T17%3A00%3A00.000Z");
+  expect(outlook).toContain("enddt=2026-12-12T19%3A00%3A00.000Z");
+  expect(outlook).toContain("subject=Weihnachtsfeier%2C+Vereinsheim");
+  expect(outlook).toContain("location=Vereinsheim%3B+Telfs");
+  expect(outlookCalendarUrl({ ...item, start: null })).toBe("");
+  expect(serverIcsPath({ ...item, slug: "weihnachtsfeier" })).toBe("/api/calendar/events/weihnachtsfeier.ics");
+  expect(serverIcsPath({ id: "t1", kind: "tournament" })).toBe("/api/calendar/tournaments/t1.ics");
+  expect(serverIcsPath({ id: "f1", kind: "fastlap" })).toBe("");
+  expect(serverIcsPath({ kind: "event" })).toBe("");
 });
 
 test("der Download hängt einen Blob-Link an, klickt ihn und räumt auf", () => {

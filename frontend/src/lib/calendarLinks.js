@@ -1,5 +1,6 @@
-// „In meinen Kalender“ im Web (#216): .ics zum Herunterladen und ein Link zu Google Kalender -
-// dieselbe Rechnung wie in der App (mobile/src/lib/calendar.ts). Ohne Ende zwei Stunden.
+// „Zum Kalender hinzufügen“ im Web (#216, #580): Google Kalender, Outlook und die ICS - vom Server
+// je Event und Turnier (mit Erinnerung), sonst im Browser gebaut. Dieselbe Rechnung wie in der App
+// (mobile/src/lib/calendar.ts). Ohne Ende zwei Stunden.
 
 function parseIso(value) {
   if (!value) return null;
@@ -49,6 +50,23 @@ export function googleCalendarUrl(item) {
   if (details) params.set("details", details);
   if (item.location) params.set("location", item.location);
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
+export function outlookCalendarUrl(item) {
+  const window = calendarWindow(item);
+  if (!window) return "";
+  const params = new URLSearchParams({ path: "/calendar/action/compose", rru: "addevent", subject: item.title || "", startdt: window.start.toISOString(), enddt: window.end.toISOString() });
+  const body = [item.detail, item.url].filter(Boolean).join("\n");
+  if (body) params.set("body", body);
+  if (item.location) params.set("location", item.location);
+  return `https://outlook.live.com/calendar/0/deeplink/compose?${params.toString()}`;
+}
+
+/** Die ICS vom Server (#580) - nur für Events und Turniere mit Kennung; sonst leer. */
+export function serverIcsPath(item) {
+  const key = item?.slug || item?.id;
+  if (!key || !["event", "tournament"].includes(item?.kind)) return "";
+  return `/api/calendar/${item.kind === "event" ? "events" : "tournaments"}/${encodeURIComponent(key)}.ics`;
 }
 
 export function icsFileName(item) {

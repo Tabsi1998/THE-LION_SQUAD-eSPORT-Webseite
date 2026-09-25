@@ -153,7 +153,7 @@ export default function EventDetailPage() {
             )}
           </div>
           <AddToCalendar className="mt-6" item={{
-            id: e.id, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
+            id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
             location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
             detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
           }} />
