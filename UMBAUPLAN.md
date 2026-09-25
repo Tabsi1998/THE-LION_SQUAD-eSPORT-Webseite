@@ -460,7 +460,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
 | App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker – umgesetzt in #585 (Block 51.19), Build 78 – der Meilenstein ist durch |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; #412 Play-Upload per API – umgesetzt in #586 (Block 51.20); #219 Teil 3 Store-Paket – in #587 (Block 51.21); offen (14.8): Entwicklerkonto, Store-Eintrag, geschlossener Test, 1.0.0 |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; #412 Play-Upload per API – umgesetzt in #586 (Block 51.20); #219 Teil 3 Store-Paket – in #587 (Block 51.21); #593/#592 Play-Fassung 1.0.0 ohne Installer – umgesetzt in #594 (Block 51.25), Build 79 = 1.0.0 am 25.09.; offen (14.8): offener Test → Produktion |
 | Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum (Linien, Knoten, Durchgänge, Runde für Runde am Handy, „Dein nächstes Spiel“, Setzplätze leer) – umgesetzt in #430 (Block 46.7); #431 Startseite III (Knopfleiste über den Sponsoren, Vorstand unter den News, Benutzermenü Gold/Rot) – umgesetzt in #433 (Block 46.8); #409 Referenzen (Teilnahme mit Team- oder Einzeleinträgen, je eigene Platzierung, Felder statt Titel-Muster, Podest-Optik) – umgesetzt in #445 (Block 46.9), Design-Rework „Erfolgswand“ – umgesetzt in #457 (Block 46.10); News-Detail am PC breit – umgesetzt in #472 (Block 46.11); Profilseite neu – umgesetzt in #474 (Block 46.12); Partner II Teil 1 (#469) – umgesetzt in #476 (Block 46.13); Partner II Teil 2 – umgesetzt in #479 (Block 46.14); #401 Turnierseite – umgesetzt in #532 (Block 51.2); Partner II Teil 3 (Referenzen) – umgesetzt in #482 (Block 46.15); Partnerseiten in Sitemap und App – umgesetzt in #483 (Block 46.16) |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | Prüfrunde vom 23.09. (Meilenstein 29): #434 ein Formular-Rahmen (Editor-Seite mit Seitenleiste und fester Speichern-Leiste; Turnier, Fast Lap, Event, News) – umgesetzt in #438 und #440 (Block 47.1); #435 kleine Formulare als Seitenblatt – Gruppe Verein in #441 (Block 47.2), eSports/Content/Mitglieder in #442; #436 Playwright bei drei Breiten in #443; #437 Web-CMS – Variante A umgesetzt in #530 (Block 51.1): totes CMS weg, E-Mail-Vorlagen als Seite – der Meilenstein ist durch |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
@@ -485,10 +485,10 @@ Version und werden zusammen als Beta veröffentlicht.
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518, Block 48.15), #507 Antrag für bestehendes Konto (#526), #506 Konto im Admin verknüpfen (#544, Block 51.8) – der Meilenstein ist durch |
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – umgesetzt in #550 (Block 51.10); #517 geschlossen – der Meilenstein ist durch (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
 | Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 – umgesetzt in #565 (Block 51.17); #331 – umgesetzt in #582 (Block 51.18) – der Meilenstein ist durch |
-| Discord III: Bot statt Webhooks | Plan vom 25.09.: #566 der Bot schickt alle Meldungen, Kanal je Zweck, Webhooks weg – umgesetzt in #588 (Block 51.22); #567 persönlicher Kanal (PR #589), #568 Erfolge als Gratulation (PR #590), #583 Vorschau und Testkanal |
+| Discord III: Bot statt Webhooks | Plan vom 25.09.: #566 der Bot schickt alle Meldungen, Kanal je Zweck, Webhooks weg – umgesetzt in #588 (Block 51.22); #567 persönlicher Kanal – in #589 (Block 51.23), #568 Erfolge als Gratulation – in #590 (51.24), #583 Vorschau und Testkanal – in #595 (51.26). Fertig |
 | Discord IV: Live-Einbettungen und Termine | #569 Live-Einbettungen, #570 Discord-Termine, #571 Bracket als Text-Embed |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
-| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News, #579 Twitch-Clips + Turnier live, #580 Kalender-Knöpfe, #584 „Gerade in Steam“ |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – in #597 (51.28), #580 Kalender-Knöpfe – in #596 (51.27), #584 „Gerade in Steam“ – in #598 (51.29), #579 Twitch-Clips + Turnier live – PR #599 |
 
 ## Block 22 — Tempo und Betrieb
 
@@ -978,6 +978,59 @@ Grundlage, um Nachrichten später zu bearbeiten. Die eine Regel bleibt an dersel
 fällt nie auf öffentlich zurück. Bot aus heißt: nichts wird gesendet, der Grund steht in Worten im
 Log, im Admin und in der Vorschau. Die Erfolge-Meldung in den Kanal entfällt – die Person bekommt
 die Gratulation (Teil 3).
+
+### Was 51.23 gefunden hat (#567 Discord III Teil 2 – PR #589)
+
+**Discord war Ausgang für die Community, nie Eingang für die Person.** Wer sein Konto verknüpft hat,
+bekommt jetzt dieselben Benachrichtigungen wie In-App und Push als Direktnachricht vom Bot – Opt-in
+je Thema, Standard aus. Was nicht per Push geht, geht auch nicht per Discord: fremde Nachrichtentexte
+bleiben „öffne die Website oder die App“, Moderation bleibt draußen. Lehnt Discord eine Nachricht ab
+(Direktnachrichten geschlossen), merkt sich die Website das je Person und sagt den Klickweg.
+
+### Was 51.24 gefunden hat (#568 Discord III Teil 3 – PR #590)
+
+**Erfolge gingen in den Kanal – die Person selbst bekam nichts.** Jetzt ist es umgekehrt: die
+Gratulation kommt als Direktnachricht („Stark, Paula! 2 Erfolge freigeschaltet“, Stufe als Farbe,
+Weg zum Profil), das Thema „Erfolge“ kennt In-App, Push und Discord, keine E-Mail.
+
+### Was 51.25 gefunden hat (#593, #592 App 1.0.0 – PR #594, Build 79)
+
+**Der eigene Installer stand dem Store im Weg.** Google erlaubt `REQUEST_INSTALL_PACKAGES` nur
+App-Stores – mit dem Server-Updater wäre die App nicht freigebbar. Entscheidung des Betreibers:
+Updates nur noch über Google Play, die APK am GitHub-Release nur als Browser-Download für Geräte
+ohne Play. Ein Config-Plugin nimmt für den Release-Build zusätzlich `SYSTEM_ALERT_WINDOW` (React
+Natives Fehleranzeige) heraus; Build 79 = 1.0.0 trägt beides nicht mehr. Nebenbei: der Profilstatus
+zeigte Feldnamen („avatar_url“) – jetzt Klartext aus einer Zuordnung für Web und App.
+
+### Was 51.26 gefunden hat (#583 Discord III Teil 4 – PR #595)
+
+**Wer an Meldungen drehte, sah sie erst in der Community.** Jetzt baut der Server jede Meldungsart
+mit denselben Funktionen wie im Betrieb (dafür Turnier-, Fast-Lap-, Vorstands- und Betriebs-
+Meldungen in Funktionen gezogen), die Seite zeigt sie als Discord-Nachbildung, und auf Knopfdruck
+geht das Embed echt in einen privaten Testkanal (fällt nie zurück – fehlt er, wird nichts gesendet)
+oder als Direktnachricht an den Admin. Tests stehen mit Vermerk im Log und zählen nicht als Meldung.
+
+### Was 51.27 gefunden hat (#580 Kalender-Knöpfe – PR #596)
+
+**Die ICS kam aus dem Browser, ohne Erinnerung, ohne Outlook.** Jetzt liefert der Server je Event und
+Turnier eine ICS mit Erinnerung eine Stunde vorher und dem Check-in in Wiener Zeit – aus demselben
+VEVENT wie der Abo-Feed; der Knopf hat drei Wege. Die Adressen liegen unter `/api/calendar/…`, weil
+`/api/events/{id}` sonst `sommerfest.ics` als Kennung nimmt. Die App bleibt beim Gerätekalender.
+
+### Was 51.28 gefunden hat (#578 YouTube → News – PR #597)
+
+**Neue Videos brauchten Handarbeit.** Der öffentliche Feed des Kanals reicht (kein Schlüssel, kein
+Kontingent); ein Handle wird einmal zur Kanal-ID aufgelöst. Der erste Abruf merkt sich nur, was es
+schon gibt – sonst wären 15 alte Videos auf einmal News; danach je Video genau einmal eine News der
+Art „Video“ mit Player (erst nach Zustimmung, `youtube-nocookie`). Entwurf oder gleich
+veröffentlichen entscheidet der Betreiber; Shorts wahlweise.
+
+### Was 51.29 gefunden hat (#584 „Gerade in Steam“ – PR #598)
+
+**Wer online ist, wusste niemand.** Jetzt fragt der Server alle zwei Minuten nur die Konten mit
+Opt-in bei Steam nach – gebündelt, ohne Verlauf, nach zehn Minuten ohne Abruf leer. Privates
+Steam-Profil heißt still; Verknüpfung lösen oder Schalter aus nimmt die Person sofort heraus, weil
+die Antwort das erneut prüft. Nie öffentlich, nie im Discord; die Datenschutzerklärung nennt Valve.
 
 ## Block 50 — Nachbesserungen vom 24.09.: Rechtliches speichern, Wegweiser, verknüpfte Konten
 

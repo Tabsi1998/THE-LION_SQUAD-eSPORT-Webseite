@@ -275,6 +275,82 @@ Seit dem 15. September gilt:
   `LegalPages.jsx` rendert nur noch (`lib/privacyFacts.js` weg). Tests `test_site_texts_flow.py`,
   `LegalPages.test.jsx`, e2e `public.spec.js` (`mockLegalPages` nach `**/api/settings/public**`).
   FAQ `google_pruefung`.
+- „Gerade in Steam“ im Mitgliederbereich (#584; PR #598; Backend + Web + App; `update.sh`, die
+  App-Karte kommt mit der nächsten App-Version). `services/steam_presence.py`: `poll` alle 2 min
+  (Job `steam_presence`, `GetPlayerSummaries` gebündelt zu 100, nur Konten mit Opt-in), Zustand
+  `settings.steam_presence_state` ohne Verlauf (nach 10 min ohne Abruf leer), `presence_for` prüft
+  Opt-in und Verknüpfung noch einmal (gelöst oder Schalter aus = sofort draußen; nie eine SteamID
+  in der Antwort), Feld `users.show_steam_status` (Standard aus, nur mit verknüpftem Konto), Route
+  `GET /api/membership/steam-presence` (nur Mitglieder). Web `SteamPresence` (Karte
+  `member-area-steam`, Hinweis „Auch dabei sein“), Schalter in `SocialsTab` (`profile-steam-status`,
+  nur bei `steam_id`-Verknüpfung); App `MemberAreaScreen` Karte + `steamSummary`. Datenschutz: Fakt
+  `steam_status` und Zeile in `site_texts` (**Schlüsselnamen ohne „enc“ – `test_club_facts` sucht so
+  nach Geheimnissen**). Tests `test_steam_presence_flow.py` (4), `SteamPresence.test.jsx`,
+  `SocialsTab.test.jsx` (+1), `MemberAreaScreen.test.tsx`. **Falle:** `flow.act_as(user)` liest die
+  Person nicht neu aus der Datenbank – `is_club_member` & Co. auch im Dict setzen.
+- YouTube-Videos des Vereinskanals als News (#578; PR #597; Backend + Web (+ App-Label);
+  `update.sh`). `services/youtube_feed.py`: Atom-Feed `feeds/videos.xml?channel_id=` (kein
+  Schlüssel), `resolve_channel_id` (Handle einmal über die Kanalseite, gemerkt in
+  `settings.youtube.channel_id`/`channel_id_for`, bei neuer Adresse neu), `parse_feed` (älteste
+  zuerst), `is_short` (`/shorts/<id>` 200 = Short), `video_news` (Kategorie `video`, `video_url`,
+  `source: youtube`, Autor „YouTube“), `sync` (erster Abruf = Baseline ohne News, danach je Video
+  genau einmal; Sammlung `youtube_videos`), `status`; Job `youtube_feed` alle 15 min; Routen
+  `GET|PUT /api/settings/youtube`, `POST /api/settings/youtube/fetch`; `NewsCategory` + `video`,
+  `NewsCreate/NewsUpdate.video_url`. Web `YoutubeSettings` (Verbindungen → YouTube: Schalter
+  abrufen / gleich veröffentlichen (Standard Entwurf) / Shorts, eigene Kanal-Adresse, „Jetzt
+  abrufen“, Stand), `VideoEmbed` (News-Seite, `youtube-nocookie`, erst nach Zustimmung; Banner
+  entfällt bei Video), Feld „Video (YouTube-Link)“ im News-Formular, Label „Video“ (auch App
+  `format.ts`). Discord über den bestehenden News-Job. Tests `test_youtube_feed_flow.py` (4),
+  `VideoEmbed.test.jsx`, `YoutubeSettings.test.jsx`.
+- Zum Kalender hinzufügen: Google, Outlook, ICS vom Server (#580; PR #596; Backend + Web;
+  `update.sh`). `calendar_items`: `_vevent`/`_calendar` (Feed und Einzeltermin aus einem VEVENT),
+  `ics_single` (VALARM `-PT60M`), `ics_filename`, `event_item`/`tournament_item`, `check_in_note`
+  (Wiener Zeit), `vienna`; Routen `GET /api/calendar/events/{slug|id}.ics` und
+  `…/tournaments/{slug|id}.ics` (nur Öffentliches, sonst 404; unter `/api/calendar`, weil
+  `/api/events/{id}` sonst `x.ics` als Kennung fängt). Web `calendarLinks.outlookCalendarUrl`/
+  `serverIcsPath`, `AddToCalendar` mit drei Wegen (`add-to-calendar-google|outlook|ics`), die Seiten
+  geben `slug` mit. App unverändert (Gerätekalender). Tests `test_calendar_flow.py` (+2),
+  `calendarLinks.test.js` (+1), `AddToCalendar.test.jsx`.
+- Discord III Teil 4: Vorschau jeder Meldungsart, Testkanal, „an mich“ (#583; PR #595; Backend +
+  Web; `update.sh`). `services/discord_samples.py` (`sample_catalog`: News, Event, Turnier×4, Fast
+  Lap, Vorstand×2, Betrieb×2, Direktnachrichten×7 – aus denselben Funktionen wie die echte Meldung,
+  letzte echte Daten sonst Beispiele mit „Paula“; `send_sample(key, via=test|dm)`, `TEST_FOOTER`),
+  privates Ziel `test` (`PRIVATE_TARGETS`, `TARGET_LABELS`, `REASON_TEXTS` test_channel_missing /
+  not_linked), `build_embed(footer=)`, `send_to(footer=, test=)` → Log `test: True` (zählt nicht als
+  letzte Meldung). Eine Quelle: `discord_announcements.tournament_message`/`fast_lap_message`/
+  `board_message` (+ `notify_board(event_key, description)`), `ops_alerts.check_red_message`/
+  `error_group_message`. Routen `GET /api/settings/discord/samples`, `POST …/samples/{key}/send?via=`,
+  `/discord/test` kennt `test`. Web `DiscordMessagePreview` (Nachbildung; auch in `DiscordPreview`),
+  `DiscordSamplesPanel` (unter `DiscordTargets`), Ziel „Test“ in der Kanalwahl; e2e
+  `admin-settings.spec.js`. Tests `test_discord_samples_flow.py` (4), `DiscordMessagePreview.test.jsx`,
+  `DiscordSamplesPanel.test.jsx`.
+- App 1.0.0: Play-Fassung ohne Installer, Profilstatus in Klartext (#593, #592; PR #594; App 1.0.0 /
+  Build 79 + Web; `update.sh`, Build 79 am 25.09. gebaut). `mobile/app.json` ohne
+  `REQUEST_INSTALL_PACKAGES`, Config-Plugin `mobile/plugins/withReleaseManifest.js`
+  (`withDangerousMod` → `android/app/src/release/AndroidManifest.xml` mit `tools:node="remove"` für
+  SYSTEM_ALERT_WINDOW und REQUEST_INSTALL_PACKAGES; aapt2 und das Bundle von Build 79 bestätigen es),
+  `lib/appUpdate.ts` ohne Download/`updatePath`, `AppUpdateBanner` nur Play (Rückfrage je Art bleibt,
+  `onStartPlayUpdate` nur bei Play-Installation), Admin ohne Server-Updater-Schalter (Backend-Setting
+  bleibt); `lib/profileCompleteness.ts` + Web `lib/profileCompleteness.js` (`missingLabels`);
+  `docs/PLAY_STORE.md` (Organisationskonto, AT/DE/CH/IT, Tags), `mobile/RELEASES.md`. Tests
+  `AppUpdateBanner.test.tsx` (4), `appUpdate.test.ts` (5), `profileCompleteness.test.*`.
+- Discord III Teil 3: Erfolge als Gratulation per Direktnachricht (#568; PR #590; Backend + Web +
+  App; `update.sh`). Thema `achievements` (`channels: [in_app, push, discord]`, Web und App zeigen
+  für andere Kanäle einen Strich), `NOTIFICATION_KIND_CATEGORY["achievement"]`, `_notify_user` Meta
+  `awards/points/level`, `discord_dm.achievement_content` („🏆 Stark, Paula! 2 Erfolge
+  freigeschaltet“, `LEVEL_COLORS`), `send_discord_dm_for_notification` holt den Anzeigenamen. Tests
+  `test_discord_dm_flow.py` (+1).
+- Discord III Teil 2: Discord als persönlicher Benachrichtigungskanal (#567; PR #589; Backend + Web +
+  App; `update.sh`). `services/discord_dm.py` (`send_discord_dm_for_notification`, `dm_content` –
+  Nachrichtentexte anderer durch `PRIVATE_BODY_TEXT` ersetzt, `EXCLUDED_KINDS` moderation,
+  `dm_state` mit `blocked_at` und Klickweg; Forbidden merkt `users.discord_dm_blocked_at`),
+  `discord_bot.BotRunner.send_dm`, `REASON_TEXTS` dm_forbidden/unknown_user,
+  `DELIVERY_CHANNEL_PREFERENCES["discord"]` (Standard aus, `discord_allowed`),
+  `/users/me/notification-preferences` liefert `discord: {linked, blocked_at, hint}`. Web
+  `NotificationsTab` (Spalte nur verknüpft), App `ProfileScreen` `visibleChannels`/`discordDm`.
+  Tests `test_discord_dm_flow.py`, `NotificationsTab.test.jsx`, `ProfileScreen.test.tsx`. **Falle:**
+  `create_user_notification` hat Abklingzeiten je Art (tournament_checkin 15 min) – im Test
+  verschiedene Arten nehmen.
 - Discord III Teil 1: der Bot schickt alle Meldungen, Webhooks weg (#566; PR #588; Backend + Web;
   `update.sh` – danach Bot verbinden und je Zweck einen Kanal wählen, bis dahin geht nichts raus).
   `discord_service.py` nur noch Bot: `TARGETS` community/news/events/board/ops,
@@ -2696,13 +2772,21 @@ Play-Upload per `--play`; nur Skript), #587 (#219 Teil 3 Play-Store-Paket; nur D
 Discord III Teil 1: der Bot schickt alle Meldungen, Webhooks weg; `update.sh`, danach Bot verbinden
 und Kanäle wählen) – die Meilensteine „App 0.9.0-beta“ und „Vereinsmodul 1.4“ sind geschlossen.
 
+Am 25.09. (mittags bis früher Nachmittag) gemergt: #589 (#567 Discord als persönlicher
+Benachrichtigungskanal; `update.sh`), #590 (#568 Erfolge als Gratulation; `update.sh`), #591
+(Doku-Stand nach #588), #594 (#593 + #592 App 1.0.0 Play-Fassung ohne Installer; `update.sh`,
+**Build 79 = 1.0.0** am 25.09. gebaut – AAB beim Betreiber für den offenen Test in der Play
+Console), #595 (#583 Discord-Vorschau, Testkanal, „an mich“; `update.sh`), #596 (#580
+Kalender-Knöpfe mit Outlook und Server-ICS; `update.sh`), #597 (#578 YouTube-Videos als News;
+`update.sh`), #598 (#584 „Gerade in Steam“; `update.sh`, App-Karte mit der nächsten App-Version) –
+der Meilenstein „Discord III“ ist fertig, „App 1.0.0“ hängt nur noch am Store (#219).
+
 ### Offene PRs
-- Offen (25.09. mittags): #589 (#567 Discord als persönlicher Benachrichtigungskanal –
-  Direktnachricht vom Bot, Opt-in je Thema; bereit auf `main`), #590 (#568 Erfolge als Gratulation
-  per Direktnachricht, Thema „Erfolge“; Entwurf, gestapelt auf #589 – nach dessen Merge `git rebase
-  --onto origin/main <589-Commit>`, Basis `main`, Ready). Danach #583 (Vorschau jeder Meldungsart
-  und Testkanal), dann Discord IV (#569–#571), Discord V (#572–#574, #581), Kanäle II
-  (#578–#580, #584). Sonst hängt Offenes am Betreiber oder am Vereinsmodul: App 1.0.0-Rest (#219
+- Offen (25.09. früher Nachmittag): #599 (#579 Twitch-Clips auf der Startseite und „Turnier
+  live“ mit Stream-Link; Entwurf, Check läuft). Danach Discord IV (#569–#571; #569 Live-Einbettungen
+  in Arbeit), Discord V (#572–#574, #581); Kanäle II ist bis auf #579 fertig. Idee des Betreibers
+  vom 25.09. (offen): „Neueste Videos“ je Mitglied auf dem Profil aus dem YouTube-Feed mit Opt-in
+  (Live je Mitglied geht wegen des API-Kontingents nicht). Sonst hängt Offenes am Betreiber oder am Vereinsmodul: App 1.0.0-Rest (#219
   Store-Eintrag – alles in `docs/PLAY_STORE.md`, es fehlt das Entwicklerkonto), Dolibarr III (#330
   Ende-zu-Ende gegen eine Testinstanz, #329 Mandat – dolibarr-vereine#125), Später (#323
   Preisgelder, #575–#577 Discord-Ideen). Frage an den Betreiber (24.09. abends, offen): welche Verbindungen
@@ -2990,7 +3074,7 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | App 0.7.0-beta: Mitgliederbereich | Wunsch des Betreibers vom 21.09.: der Mitgliederbereich auch in der LionsAPP. #340 eigener Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (nur im privaten App-Speicher), #342 interne Events und News kennzeichnen – Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App, Wallet vorbereitet) – umgesetzt in #357, Build 65 nach dem Merge. #327–#329 bringen ihren App-Teil selbst mit. Die Meilensteine dahinter sind am 22.09. um eins gerückt (Kalender/Galerie → 0.8.0, Sticker/Freunde/Laufbanner → 0.9.0) |
 | App 0.8.0-beta | #216 Kalender (App: Monatsansicht, „In meinen Kalender“ per Gerätekalender/Google; Web: .ics + Google), #236 Galerie in der App – umgesetzt in #374, Build 66 am 22.09. gebaut. Persönlicher Kalender-Feed (`kalender.ics?token=`) bleibt „später, optional“ aus #216 |
 | App 0.9.0-beta | #240 Freundschaftsanfragen (App: Knopf im Profil, Karte „Freunde“, live), #245 Laufbanner (Kanäle Web/App, Ticker über den Tabs) – umgesetzt in #377, Build 67 am 23.09. gebaut. #239 Sticker/GIFs der Tastatur – umgesetzt in #585 (lokales Expo-Modul `keyboard-image-input`, GIF bleibt GIF), Build 78; der Meilenstein ist geschlossen |
-| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. #412 Play-Upload per API – umgesetzt in #586 (`--play`, Dienstkonto beim Betreiber); #219 Teil 3 Store-Paket (Texte, Datensicherheit, Testkonto, Grafiken) – in #587 (`docs/PLAY_STORE.md`). Offen in #219: Entwicklerkonto, Store-Eintrag klicken, interner und geschlossener Test, 1.0.0 |
+| App 1.0.0 | #217 Stufe 1 App-Sperre (Fingerabdruck/Gesicht/Gerätesperre beim Start und nach einer Minute im Hintergrund) – umgesetzt in #380, im Build 70 vom 23.09.; Stufe 2 Passkey-Login in der App – umgesetzt in #384, im Build 71 vom 23.09. #219 Store-Reife: Teil 1 (AAB-Option `--aab` im Release-Skript, Bilder in passender Breite überall) – umgesetzt in #380; Entscheidungen vom 23.09.: Play Store ja (geschlossener Test; der Betreiber legt das Konto an), Absturzberichte über Firebase Crashlytics – umgesetzt in #385, im Build 72 vom 23.09. (Absatz für die Datenschutzerklärung am 23.09. eingefügt). Play Store: Entwicklerkonto am 23.09. beantragt, App „LionsAPP“ (`at.lionsquad.app`) in der Play Console angelegt; Reihenfolge interner Test (Build 74 als AAB) → geschlossener Test → Produktion als 1.0.0; Store-Symbol und Funktionsgrafik liegen beim Betreiber, Screenshots vom Handy. #390 Konto löschen in der App (Google-Pflicht vor dem geschlossenen Test) – umgesetzt in #391, im Build 75 vom 23.09. #412 Play-Upload per API – umgesetzt in #586 (`--play`, Dienstkonto beim Betreiber); #219 Teil 3 Store-Paket (Texte, Datensicherheit, Testkonto, Grafiken) – in #587 (`docs/PLAY_STORE.md`). #593 + #592 Play-Fassung 1.0.0 ohne Installer, Profilstatus in Klartext – umgesetzt in #594, Build 79 = 1.0.0 am 25.09.; Store-Eintrag, Datensicherheit, IARC am 25.09. ausgefüllt (Organisationskonto, AT/DE/CH/IT, Tags Sport/Events/Kommunikation). Offen in #219: offener Test → Produktion in der Play Console |
 | Spaeter | #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563; #327 und #331 sind mit Vereine 1.4.0 in den Meilenstein „Vereinsmodul 1.4“ gewandert und dort umgesetzt (#565, #582); bleibt #323 Preisgelder und die Später-Ideen aus dem Discord-Plan (#575 Bracket als Bild, #576 Rollen je Team, #577 Aktionen per Knopf) |
 | Web: Design II | #401 Turnierseite (eine Hauptaktion je Phase, „Dein Stand“, Termine einmal, Reiter) – umgesetzt in #532; der Meilenstein ist durch |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | #437 Variante A (Entscheidung des Betreibers 24.09.): totes Web-CMS entfernt, E-Mail-Vorlagen als Seite – umgesetzt in #530; der Meilenstein ist durch |
@@ -2998,10 +3082,10 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518), #506 Konto im Admin verknüpfen, Profil legt nie Konto/Mitgliedschaft an (#544), #507 Antrag für bestehendes Konto (#526) – der Meilenstein ist durch |
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ mit Ereignissen aller Quellen – umgesetzt in #550; #517 geschlossen, Meilenstein geschlossen (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
 | Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 Generalversammlung und Abstimmungen – umgesetzt in #565; #331 Helferdienste – umgesetzt in #582; der Meilenstein ist geschlossen |
-| Discord III: Bot statt Webhooks | Plan vom 25.09. (Entscheidung: Webhooks entfallen ganz, nur noch der Bot): #566 der Bot schickt alle Meldungen, Kanal je Zweck – umgesetzt in #588; #567 Discord als persönlicher Benachrichtigungskanal (PR #589); #568 Erfolge als Gratulation per Direktnachricht (PR #590); #583 Vorschau jeder Meldungsart, Testkanal, „an mich als Direktnachricht“ |
+| Discord III: Bot statt Webhooks | Plan vom 25.09. (Entscheidung: Webhooks entfallen ganz, nur noch der Bot): #566 der Bot schickt alle Meldungen, Kanal je Zweck – umgesetzt in #588; #567 Discord als persönlicher Benachrichtigungskanal – umgesetzt in #589; #568 Erfolge als Gratulation per Direktnachricht – in #590; #583 Vorschau jeder Meldungsart, Testkanal, „an mich“ – in #595. Meilenstein fertig |
 | Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt), #570 Discord-Termine (Scheduled Events), #571 Bracket als Text-Embed |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
-| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News, #579 Twitch-Clips + Turnier live, #580 Kalender-Knöpfe, #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – umgesetzt in #597; #580 Kalender-Knöpfe – in #596; #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) – in #598; #579 Twitch-Clips + Turnier live – PR #599 |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
 (#240 Freunde in der App, #227 Tageszentrale, #216 Kalender, #245 Laufbanner,
@@ -3059,6 +3143,16 @@ sinnvoll hältst“):
     hängen nur noch am Betreiber (#219 Entwicklerkonto) oder am Modul (#329 Mandat, #330
     Testinstanz). Danach der Discord-Plan (Meilensteine 34–36, Kanäle II 37): #566 in #588 gemergt,
     #567 (#589) und #568 (#590) offen; als Nächstes #583, dann Discord IV.
+
+12. 25.09. nachmittags: Build 78 (#585) und die Play-Console-Formulare (IARC „Alle anderen
+    App-Typen“, Datensicherheit, Store-Eintrag, Screenshots aus dem Emulator mit Demo-Daten) –
+    dann #594 (App 1.0.0, Build 79), #595 (#583), #596 (#580), #597 (#578), #598 (#584), alle
+    gemergt; #599 (#579) offen. Entscheidungen des Betreibers: Play-Konto als Organisation (der
+    Verein, keine 12-Tester-Regel), APK am GitHub-Release nur als Browser-Download (kein Installer
+    in der App), Länder AT/DE/CH/IT, erst offener Test, dann Produktion. **Play-Console-Falle:**
+    der Fehler „Berechtigung REQUEST_INSTALL_PACKAGES noch nicht erklärt“ kommt von Build 78 in
+    einem aktiven Release oder Track, nicht von Build 79 (Bundle geprüft) – 78 aus dem Entwurf
+    entfernen bzw. 79 auch in den internen Test; die Erklärung nie ausfüllen.
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
