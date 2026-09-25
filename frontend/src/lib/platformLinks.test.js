@@ -8,6 +8,8 @@ test("Felder, Verknüpfung je Feld und Texte", () => {
   expect(PLATFORM_BY_FIELD.psn_id).toBeUndefined();
   // Welle 1 von Konten verknüpfen III (#547): neun weitere per Anmeldung.
   expect(PLATFORM_BY_FIELD).toMatchObject({ faceit_handle: "faceit", startgg_handle: "startgg", roblox_handle: "roblox", osu_handle: "osu", lichess_handle: "lichess", github_handle: "github", kick_handle: "kick", reddit_handle: "reddit", spotify_handle: "spotify" });
+  // Welle 2: Meta/LinkedIn/Snap/Pinterest, Telegram (OIDC), Wargaming (nur Application ID), Bungie (mit API Key).
+  expect(PLATFORM_BY_FIELD).toMatchObject({ threads_handle: "threads", facebook_handle: "facebook", linkedin_handle: "linkedin", snapchat_handle: "snapchat", pinterest_handle: "pinterest", telegram_handle: "telegram", wargaming_handle: "wargaming", bungie_handle: "bungie" });
   const links = [{ platform: "steam", handle: "76561198000000001" }];
   expect(linkForField(links, "steam_id")?.handle).toBe("76561198000000001");
   expect(linkForField(links, "discord_name")).toBeNull();

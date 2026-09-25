@@ -1,4 +1,4 @@
-import { AtSign, Box, Castle, CircleDot, Crosshair, Gamepad, Gamepad2, Github, Globe, Instagram, Joystick, MessageCircle, Music2, Radio, Rocket, Swords, Trophy, Twitch, Twitter, Youtube, Zap } from "lucide-react";
+import { AtSign, Box, Castle, CircleDot, Crosshair, Facebook, Gamepad, Gamepad2, Ghost, Github, Globe, Instagram, Joystick, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Rocket, Send, Shield, Swords, Trophy, Twitch, Twitter, Youtube, Zap } from "lucide-react";
 
 // Socials und Gaming-IDs (#258): je Feld ein Symbol, eine Bereinigung der
 // Eingabe (eine eingefügte Adresse wird zum Nutzernamen) und, wo es eine
@@ -30,6 +30,15 @@ export const SOCIAL_PLATFORMS = [
   { k: "kick_handle", l: "Kick", icon: Radio, hosts: ["kick.com"], url: (h) => `https://kick.com/${h}`, placeholder: "Kanalname oder Adresse", handle: true },
   { k: "reddit_handle", l: "Reddit", icon: MessageCircle, hosts: ["reddit.com"], skip: ["user", "u"], url: (h) => `https://www.reddit.com/user/${h}`, placeholder: "u/nutzername oder Adresse", handle: true },
   { k: "spotify_handle", l: "Spotify", icon: Music2, placeholder: "Anzeigename", handle: true },
+  // Welle 2 (#547).
+  { k: "threads_handle", l: "Threads", icon: AtSign, hosts: ["threads.com", "threads.net"], url: (h) => `https://www.threads.com/@${h}`, placeholder: "@nutzername oder Adresse", handle: true },
+  { k: "facebook_handle", l: "Facebook", icon: Facebook, hosts: ["facebook.com", "fb.com"], url: (h) => `https://www.facebook.com/${h}`, placeholder: "Profilname oder Adresse", handle: true },
+  { k: "linkedin_handle", l: "LinkedIn", icon: Linkedin, hosts: ["linkedin.com"], skip: ["in"], url: (h) => `https://www.linkedin.com/in/${h}`, placeholder: "Profilname oder Adresse", handle: true },
+  { k: "snapchat_handle", l: "Snapchat", icon: Ghost, hosts: ["snapchat.com"], skip: ["add"], url: (h) => `https://www.snapchat.com/add/${h}`, placeholder: "Nutzername oder Adresse", handle: true },
+  { k: "pinterest_handle", l: "Pinterest", icon: Pin, hosts: ["pinterest.com", "pinterest.de", "pinterest.at"], url: (h) => `https://www.pinterest.com/${h}/`, placeholder: "Nutzername oder Adresse", handle: true },
+  { k: "telegram_handle", l: "Telegram", icon: Send, hosts: ["t.me", "telegram.me"], url: (h) => `https://t.me/${h}`, placeholder: "@nutzername oder Adresse", handle: true },
+  { k: "wargaming_handle", l: "Wargaming.net", icon: Shield, placeholder: "Nickname", handle: true },
+  { k: "bungie_handle", l: "Bungie.net", icon: Orbit, placeholder: "Name#1234", handle: true },
   { k: "website", l: "Website", icon: Globe, placeholder: "https://…", website: true },
 ];
 

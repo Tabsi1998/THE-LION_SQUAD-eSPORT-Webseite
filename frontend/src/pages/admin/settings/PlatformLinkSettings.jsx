@@ -47,7 +47,10 @@ function CheckResult({ platform, result }) {
 
 export function appReady(app, brand) {
   if (!app || app.key === "steam" || !app.idField) return true;
-  return Boolean(brand[app.idField] && (brand[app.secretField] || brand[`${app.secretField}_masked`]));
+  if (!brand[app.idField]) return false;
+  const secretReady = !app.secretField || Boolean(brand[app.secretField] || brand[`${app.secretField}_masked`]);
+  const extraReady = !app.extraField || Boolean(brand[app.extraField] || brand[`${app.extraField}_masked`]);
+  return secretReady && extraReady;
 }
 
 function appStateLabel(app, ready) {
@@ -105,6 +108,9 @@ export function PlatformAppCard({ app, brand, setBrandField, onClearSecret, onSa
           )}
           {app.secretField && (
             <SecretInput label={app.secretLabel || `${app.label} Client Secret`} value={brand[app.secretField]} masked={brand[`${app.secretField}_masked`]} onChange={(v) => setBrandField(app.secretField, v)} onClear={() => onClearSecret(app.secretField)} testId={app.secretField.replaceAll("_", "-")} placeholder={app.secretPlaceholder || "Secret eintragen"} />
+          )}
+          {app.extraField && (
+            <SecretInput label={app.extraLabel || `${app.label} API Key`} value={brand[app.extraField]} masked={brand[`${app.extraField}_masked`]} onChange={(v) => setBrandField(app.extraField, v)} onClear={() => onClearSecret(app.extraField)} testId={app.extraField.replaceAll("_", "-")} placeholder="API Key eintragen" />
           )}
         </div>
       )}

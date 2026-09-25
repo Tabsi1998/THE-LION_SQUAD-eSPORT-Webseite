@@ -5,9 +5,10 @@ export const PLATFORM_BY_FIELD = {
   discord_name: "discord", twitch_handle: "twitch", steam_id: "steam", battlenet_id: "battlenet", x_handle: "x",
   youtube_handle: "youtube", tiktok_handle: "tiktok", riot_id: "riot", xbox_id: "xbox", epic_id: "epic",
   faceit_handle: "faceit", startgg_handle: "startgg", roblox_handle: "roblox", osu_handle: "osu", lichess_handle: "lichess", github_handle: "github", kick_handle: "kick", reddit_handle: "reddit", spotify_handle: "spotify",
+  threads_handle: "threads", facebook_handle: "facebook", linkedin_handle: "linkedin", snapchat_handle: "snapchat", pinterest_handle: "pinterest", telegram_handle: "telegram", wargaming_handle: "wargaming", bungie_handle: "bungie",
 };
 
-export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games", faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify" };
+export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games", faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", snapchat: "Snapchat", pinterest: "Pinterest", telegram: "Telegram", wargaming: "Wargaming.net", bungie: "Bungie.net" };
 
 // Was sich nicht verknüpfen lässt - und warum (steht als Hinweis am Feld).
 export const NOT_LINKABLE = {
@@ -39,9 +40,18 @@ export const PLATFORM_APPS = [
   { key: "kick", label: "Kick", idField: "kick_client_id", secretField: "kick_client_secret", guideKey: "kick", optional: true },
   { key: "reddit", label: "Reddit", idField: "reddit_client_id", secretField: "reddit_client_secret", guideKey: "reddit", optional: true },
   { key: "spotify", label: "Spotify", idField: "spotify_client_id", secretField: "spotify_client_secret", guideKey: "spotify", optional: true, note: "Im Development Mode dürfen nur eingetragene Nutzer verknüpfen." },
+  // Welle 2 (#547): Meta, LinkedIn, Snap und Pinterest verlangen ein App-Review, bevor fremde Konten sich anmelden dürfen.
+  { key: "threads", label: "Threads", idField: "threads_client_id", secretField: "threads_client_secret", idLabel: "Threads App ID", secretLabel: "Threads App Secret", guideKey: "threads", optional: true, note: "Ohne App-Review von Meta dürfen nur eingetragene Tester verknüpfen." },
+  { key: "facebook", label: "Facebook", idField: "facebook_client_id", secretField: "facebook_client_secret", idLabel: "Facebook App-ID", secretLabel: "Facebook App-Geheimcode", guideKey: "facebook", optional: true, note: "Ohne App-Review von Meta dürfen nur eingetragene Tester verknüpfen." },
+  { key: "linkedin", label: "LinkedIn", idField: "linkedin_client_id", secretField: "linkedin_client_secret", guideKey: "linkedin", optional: true },
+  { key: "snapchat", label: "Snapchat", idField: "snapchat_client_id", secretField: "snapchat_client_secret", idLabel: "OAuth2 Client ID", guideKey: "snapchat", optional: true, note: "Ohne Review von Snap dürfen nur eingetragene Tester verknüpfen." },
+  { key: "pinterest", label: "Pinterest", idField: "pinterest_client_id", secretField: "pinterest_client_secret", idLabel: "Pinterest App ID", guideKey: "pinterest", optional: true },
+  { key: "telegram", label: "Telegram", idField: "telegram_client_id", secretField: "telegram_client_secret", idLabel: "Client ID (BotFather)", secretLabel: "Client Secret (BotFather)", guideKey: "telegram", optional: true },
+  { key: "wargaming", label: "Wargaming.net", idField: "wargaming_application_id", idLabel: "Application ID", idPlaceholder: "aus dem Developer Room", guideKey: "wargaming", optional: true, note: "Wargaming braucht kein Secret – nur die Application ID." },
+  { key: "bungie", label: "Bungie.net", idField: "bungie_client_id", secretField: "bungie_client_secret", extraField: "bungie_api_key", extraLabel: "API Key", guideKey: "bungie", optional: true, note: "Zusätzlich zur OAuth-Client-ID braucht Bungie den API Key der Anwendung." },
 ];
-export const PLATFORM_APP_FIELDS = PLATFORM_APPS.flatMap((app) => [app.idField, app.secretField].filter(Boolean));
-export const PLATFORM_SECRET_FIELDS = PLATFORM_APPS.map((app) => app.secretField).filter(Boolean);
+export const PLATFORM_APP_FIELDS = PLATFORM_APPS.flatMap((app) => [app.idField, app.secretField, app.extraField].filter(Boolean));
+export const PLATFORM_SECRET_FIELDS = PLATFORM_APPS.flatMap((app) => [app.secretField, app.extraField].filter(Boolean));
 
 const ERROR_TEXTS = {
   denied: "Die Anmeldung bei der Plattform wurde abgebrochen – es wurde nichts verknüpft.",

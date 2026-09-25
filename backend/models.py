@@ -101,6 +101,14 @@ class UserUpdate(BaseModel):
     kick_handle: Optional[str] = None
     reddit_handle: Optional[str] = None
     spotify_handle: Optional[str] = None
+    threads_handle: Optional[str] = None
+    facebook_handle: Optional[str] = None
+    linkedin_handle: Optional[str] = None
+    snapchat_handle: Optional[str] = None
+    pinterest_handle: Optional[str] = None
+    telegram_handle: Optional[str] = None
+    wargaming_handle: Optional[str] = None
+    bungie_handle: Optional[str] = None
     # New socials
     twitch_handle: Optional[str] = None
     youtube_handle: Optional[str] = None
@@ -189,7 +197,8 @@ class MemberBenefitUpdate(BaseModel):
 SocialPlatform = Literal[
     "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
     "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website",
-    "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify"
+    "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify",
+    "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie"
 ]
 
 

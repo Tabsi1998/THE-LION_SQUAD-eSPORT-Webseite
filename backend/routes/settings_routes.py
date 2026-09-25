@@ -179,6 +179,30 @@ class BrandingSettings(BaseModel):
     spotify_client_id: Optional[str] = None
     spotify_client_secret: Optional[str] = None
     clear_spotify_client_secret: Optional[bool] = None
+    threads_client_id: Optional[str] = None
+    threads_client_secret: Optional[str] = None
+    clear_threads_client_secret: Optional[bool] = None
+    facebook_client_id: Optional[str] = None
+    facebook_client_secret: Optional[str] = None
+    clear_facebook_client_secret: Optional[bool] = None
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
+    clear_linkedin_client_secret: Optional[bool] = None
+    snapchat_client_id: Optional[str] = None
+    snapchat_client_secret: Optional[str] = None
+    clear_snapchat_client_secret: Optional[bool] = None
+    pinterest_client_id: Optional[str] = None
+    pinterest_client_secret: Optional[str] = None
+    clear_pinterest_client_secret: Optional[bool] = None
+    telegram_client_id: Optional[str] = None
+    telegram_client_secret: Optional[str] = None
+    clear_telegram_client_secret: Optional[bool] = None
+    bungie_client_id: Optional[str] = None
+    bungie_client_secret: Optional[str] = None
+    clear_bungie_client_secret: Optional[bool] = None
+    wargaming_application_id: Optional[str] = None
+    bungie_api_key: Optional[str] = None
+    clear_bungie_api_key: Optional[bool] = None
     site_banner_enabled: Optional[bool] = None
     site_banner_text: Optional[str] = None
     site_banner_tone: Optional[Literal["info", "live", "warning", "success"]] = None
@@ -321,10 +345,12 @@ class AuthSettings(BaseModel):
 
 SETTING_AUDIT_SECRET_FIELDS = {"resend_api_key", "smtp_pass", "webhook_url", "ops_webhook_url", "twitch_client_secret", "discord_client_secret", "steam_api_key",
                                "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret",
-                               "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret"}
+                               "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret",
+                               "threads_client_secret", "facebook_client_secret", "linkedin_client_secret", "snapchat_client_secret", "pinterest_client_secret", "telegram_client_secret", "bungie_client_secret", "bungie_api_key"}
 # Geheimnisse der Branding-Einstellungen: nie zurückgeben, nur „gespeichert“ melden (#260 dazu: Discord, Steam).
 BRANDING_SECRET_FIELDS = ("twitch_client_secret", "discord_client_secret", "steam_api_key", "battlenet_client_secret", "x_client_secret", "youtube_client_secret", "tiktok_client_secret", "riot_client_secret", "xbox_client_secret", "epic_client_secret",
-                           "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret")
+                           "faceit_client_secret", "startgg_client_secret", "roblox_client_secret", "osu_client_secret", "github_client_secret", "kick_client_secret", "reddit_client_secret", "spotify_client_secret",
+                           "threads_client_secret", "facebook_client_secret", "linkedin_client_secret", "snapchat_client_secret", "pinterest_client_secret", "telegram_client_secret", "bungie_client_secret", "bungie_api_key")
 
 
 def _hide_branding_secrets(settings: dict) -> dict:
@@ -791,7 +817,18 @@ async def integrations_overview(me: dict = Depends(require_area("system"))):
                     "Mitglieder können verknüpfen · mit Steam-API-Schlüssel auch der Anzeigename" if api_state == "ok" else "Mitglieder können verknüpfen · ohne Steam-API-Schlüssel nur die SteamID")
             continue
         client_id = str(branding.get(spec["id_field"]) or "").strip()
+        if not spec.get("secret_field"):
+            add(key, spec["label"], GROUP_PLATFORMS, to, "active" if client_id else "missing", "Mitglieder können verknüpfen" if client_id else "Application ID fehlt")
+            continue
         secret_state = _secret_state(branding.get(spec["secret_field"]))
+        if spec.get("extra_field"):
+            extra_state = _secret_state(branding.get(spec["extra_field"]))
+            if extra_state == "unreadable":
+                add(key, spec["label"], GROUP_PLATFORMS, to, "unreadable", f"API Key {UNREADABLE_TEXT}")
+                continue
+            if extra_state == "missing" and client_id and secret_state == "ok":
+                add(key, spec["label"], GROUP_PLATFORMS, to, "missing", "API Key fehlt")
+                continue
         if secret_state == "unreadable":
             add(key, spec["label"], GROUP_PLATFORMS, to, "unreadable", f"Secret {UNREADABLE_TEXT}")
         elif not client_id and secret_state == "missing":

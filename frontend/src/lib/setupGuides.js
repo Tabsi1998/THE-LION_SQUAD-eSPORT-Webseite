@@ -276,6 +276,110 @@ export const SETUP_GUIDES = {
     notes: ["Die Website liest nur Kennung und Anzeigename; im Development Mode nur eingetragene Nutzer."],
     checkPlatform: "spotify",
   },
+  threads: {
+    key: "threads",
+    title: "Threads verknüpfen (Threads API)",
+    where: { to: "/admin/integrations/threads", label: "Verbindungen → Threads" },
+    summary: "Eine App der Website bei Threads – Mitglieder verknüpfen ihr Threads-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Meta for Developers → Meine Apps öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://developers.facebook.com/apps/", label: "Meta for Developers → Meine Apps" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/threads/callback" },
+      { text: "Client ID und Client Secret → hier bei Threads eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Berechtigung threads_basic; bis zum App-Review von Meta dürfen nur eingetragene Tester verknüpfen. Die Website liest nur Kennung und Nutzername."],
+    checkPlatform: "threads",
+  },
+  facebook: {
+    key: "facebook",
+    title: "Facebook verknüpfen (Facebook Login)",
+    where: { to: "/admin/integrations/facebook", label: "Verbindungen → Facebook" },
+    summary: "Eine App der Website bei Facebook – Mitglieder verknüpfen ihr Facebook-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Meta for Developers → Meine Apps öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://developers.facebook.com/apps/", label: "Meta for Developers → Meine Apps" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/facebook/callback" },
+      { text: "Client ID und Client Secret → hier bei Facebook eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Berechtigung public_profile; bis zum App-Review von Meta dürfen nur eingetragene Tester verknüpfen. Die Website liest nur Kennung und Name."],
+    checkPlatform: "facebook",
+  },
+  linkedin: {
+    key: "linkedin",
+    title: "LinkedIn verknüpfen (Sign In with LinkedIn, OpenID Connect)",
+    where: { to: "/admin/integrations/linkedin", label: "Verbindungen → LinkedIn" },
+    summary: "Eine App der Website bei LinkedIn – Mitglieder verknüpfen ihr LinkedIn-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "LinkedIn Developers → My Apps öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://www.linkedin.com/developers/apps", label: "LinkedIn Developers → My Apps" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/linkedin/callback" },
+      { text: "Client ID und Client Secret → hier bei LinkedIn eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Produkt „Sign In with LinkedIn using OpenID Connect“ in der App freischalten; die Website liest nur Kennung und Name."],
+    checkPlatform: "linkedin",
+  },
+  snapchat: {
+    key: "snapchat",
+    title: "Snapchat verknüpfen (Login Kit)",
+    where: { to: "/admin/integrations/snapchat", label: "Verbindungen → Snapchat" },
+    summary: "Eine App der Website bei Snapchat – Mitglieder verknüpfen ihr Snapchat-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Snap Kit Developer Portal öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://kit.snapchat.com/portal/", label: "Snap Kit Developer Portal" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/snapchat/callback" },
+      { text: "Client ID und Client Secret → hier bei Snapchat eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Login Kit mit den Scopes Display Name und External ID; ohne Review von Snap nur eingetragene Tester. Die Website liest nur Kennung und Anzeigename."],
+    checkPlatform: "snapchat",
+  },
+  pinterest: {
+    key: "pinterest",
+    title: "Pinterest verknüpfen",
+    where: { to: "/admin/integrations/pinterest", label: "Verbindungen → Pinterest" },
+    summary: "Eine App der Website bei Pinterest – Mitglieder verknüpfen ihr Pinterest-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "Pinterest Developers → My apps öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://developers.pinterest.com/apps/", label: "Pinterest Developers → My apps" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/pinterest/callback" },
+      { text: "Client ID und Client Secret → hier bei Pinterest eintragen, speichern, „prüfen“." },
+    ],
+    notes: ["Scope user_accounts:read; die App braucht den Standard-Zugang von Pinterest. Die Website liest nur Kennung und Nutzername."],
+    checkPlatform: "pinterest",
+  },
+  telegram: {
+    key: "telegram",
+    title: "Telegram verknüpfen (OpenID Connect über BotFather)",
+    where: { to: "/admin/integrations/telegram", label: "Verbindungen → Telegram" },
+    summary: "Eine App der Website bei Telegram – Mitglieder verknüpfen ihr Telegram-Konto per Anmeldung, der Name kommt von der Plattform.",
+    steps: [
+      { text: "BotFather in Telegram öffnen → App anlegen (Name der Website, Adresse der Website).", link: { href: "https://t.me/BotFather", label: "BotFather in Telegram" } },
+      { text: "Als Rückruf-/Redirect-Adresse eintragen:", copy: "{origin}/api/platform-links/telegram/callback" },
+      { text: "Client ID und Client Secret von BotFather → hier bei Telegram eintragen, speichern." },
+    ],
+    notes: ["Bei BotFather für den Bot die OAuth-Zugangsdaten anlegen und die Rückrufadresse als Allowed URL eintragen; die Website liest nur Kennung und Nutzername."],
+    checkPlatform: "telegram",
+  },
+  wargaming: {
+    key: "wargaming",
+    title: "Wargaming.net verknüpfen (World of Tanks, World of Warships)",
+    where: { to: "/admin/integrations/wargaming", label: "Verbindungen → Wargaming.net" },
+    summary: "Eine Anwendung im Wargaming Developer Room – Mitglieder verknüpfen ihr Wargaming-Konto per Anmeldung; es gibt kein Secret, nur die Application ID.",
+    steps: [
+      { text: "Wargaming Developer Room öffnen → „Add application“ (Typ Server, Adresse der Website).", link: { href: "https://developers.wargaming.net/applications/", label: "Wargaming Developer Room" } },
+      { text: "Die Rückrufadresse ist:", copy: "{origin}/api/platform-links/wargaming/callback" },
+      { text: "Application ID → hier bei Wargaming.net eintragen, speichern." },
+    ],
+    notes: ["Die Website prüft die Anmeldung bei Wargaming (Region EU) und liest nur Konto-Kennung und Nickname."],
+    checkPlatform: "wargaming",
+  },
+  bungie: {
+    key: "bungie",
+    title: "Bungie.net verknüpfen (Destiny)",
+    where: { to: "/admin/integrations/bungie", label: "Verbindungen → Bungie.net" },
+    summary: "Eine Anwendung bei Bungie – Mitglieder verknüpfen ihr Bungie-Konto per Anmeldung; neben Client ID und Secret braucht Bungie den API Key der Anwendung.",
+    steps: [
+      { text: "Bungie.net → Anwendungen → „Create New App“; OAuth Client Type „Confidential“.", link: { href: "https://www.bungie.net/en/Application", label: "Bungie.net Applications" } },
+      { text: "Als Redirect URL eintragen:", copy: "{origin}/api/platform-links/bungie/callback" },
+      { text: "API Key, OAuth client_id und client_secret → hier bei Bungie.net eintragen, speichern." },
+    ],
+    notes: ["Die Website liest nur die Bungie-Kennung und den Anzeigenamen."],
+    checkPlatform: "bungie",
+  },
   xbox: {
     key: "xbox",
     title: "Xbox-Gamertag verknüpfen (Microsoft)",
@@ -412,7 +516,7 @@ export function guideStatus(key, data = {}) {
       return branding.steam_api_key_masked ? ok("Schlüssel da") : optional("Ohne Schlüssel bleibt die ID");
     case "lichess":
       return ok("Keine App nötig");
-    case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic": case "faceit": case "startgg": case "roblox": case "osu": case "github": case "kick": case "reddit": case "spotify":
+    case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic": case "threads": case "facebook": case "linkedin": case "snapchat": case "pinterest": case "telegram": case "wargaming": case "bungie": case "faceit": case "startgg": case "roblox": case "osu": case "github": case "kick": case "reddit": case "spotify":
       if (!links) return unknown;
       return links[key] ? ok("App eingetragen") : optional("Noch nicht angebunden");
     case "resend":

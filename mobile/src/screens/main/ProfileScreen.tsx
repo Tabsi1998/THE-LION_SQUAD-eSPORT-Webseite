@@ -143,7 +143,7 @@ export function ProfileScreen() {
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
   const manualSocialKeys = useMemo(() => {
-    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id", faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle" };
+    const fieldOf: Record<string, string> = { discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", tiktok: "tiktok_handle", x: "x_handle", steam: "steam_id", epic: "epic_id", xbox: "xbox_id", riot: "riot_id", battlenet: "battlenet_id", faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle", threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle" };
     const notReady = LINKABLE_PLATFORMS.filter((platform) => !linkedPlatforms.has(platform) && !linkAvailable[platform]).map((platform) => fieldOf[platform]);
     return [...notReady, "instagram_handle", "psn_id", "nintendo_fc", "ea_id", "website"];
   }, [linkAvailable, linkedPlatforms]);
@@ -214,6 +214,14 @@ export function ProfileScreen() {
       kick_handle: u.kick_handle || "",
       reddit_handle: u.reddit_handle || "",
       spotify_handle: u.spotify_handle || "",
+      threads_handle: u.threads_handle || "",
+      facebook_handle: u.facebook_handle || "",
+      linkedin_handle: u.linkedin_handle || "",
+      snapchat_handle: u.snapchat_handle || "",
+      pinterest_handle: u.pinterest_handle || "",
+      telegram_handle: u.telegram_handle || "",
+      wargaming_handle: u.wargaming_handle || "",
+      bungie_handle: u.bungie_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
       newsletter_consent: Boolean(u.newsletter_consent),
@@ -792,6 +800,9 @@ function labelFor(key: string) {
     .replace("startgg", "start.gg")
     .replace("osu", "osu!")
     .replace("github", "GitHub")
+    .replace("linkedin", "LinkedIn")
+    .replace("wargaming", "Wargaming.net")
+    .replace("bungie", "Bungie.net")
     .replace(/_/g, " ")
     .replace(/^\w/, (char) => char.toUpperCase());
 }

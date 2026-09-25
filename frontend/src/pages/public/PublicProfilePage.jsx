@@ -180,6 +180,12 @@ function socialUrl(platform, value) {
   if (kind === "github") return `https://github.com/${handle}`;
   if (kind === "kick") return `https://kick.com/${handle}`;
   if (kind === "reddit") return `https://www.reddit.com/user/${handle}`;
+  if (kind === "threads") return `https://www.threads.com/@${handle}`;
+  if (kind === "facebook") return `https://www.facebook.com/${handle}`;
+  if (kind === "linkedin") return `https://www.linkedin.com/in/${handle}`;
+  if (kind === "snapchat") return `https://www.snapchat.com/add/${handle}`;
+  if (kind === "pinterest") return `https://www.pinterest.com/${handle}/`;
+  if (kind === "telegram") return `https://t.me/${handle}`;
   if (kind === "steam") {
     return /^\d{17}$/.test(handle)
       ? `https://steamcommunity.com/profiles/${handle}`
@@ -199,13 +205,14 @@ function isVerified(profile, platform) {
 // Konto (linked_accounts) ersetzt den von Hand eingetragenen Namen derselben Plattform; das Häkchen
 // kommt vom Server, nie aus dem Text. Was privat ist, fehlt hier ganz - der Server schickt das Feld
 // dann gar nicht erst mit.
-const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "github", "kick", "reddit", "spotify", "website"];
-const GAME_PLATFORMS = ["steam", "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "faceit", "startgg", "roblox", "osu", "lichess"];
+const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "website"];
+const GAME_PLATFORMS = ["steam", "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "faceit", "startgg", "roblox", "osu", "lichess", "wargaming", "bungie"];
 const MANUAL_FIELDS = {
   discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", instagram: "instagram_handle",
   tiktok: "tiktok_handle", x: "x_handle", website: "website", steam: "steam_id", epic: "epic_id", psn: "psn_id",
   xbox: "xbox_id", nintendo: "nintendo_fc", ea: "ea_id", riot: "riot_id", battlenet: "battlenet_id",
   faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle",
+  threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle",
 };
 
 function manualUrl(platform, value) {

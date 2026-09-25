@@ -52,6 +52,8 @@ export const VISIBILITY_GROUPS = [
       { k: "roblox", l: "Roblox" },
       { k: "osu", l: "osu!" },
       { k: "lichess", l: "Lichess" },
+      { k: "wargaming", l: "Wargaming.net" },
+      { k: "bungie", l: "Bungie.net" },
     ],
   },
   {
@@ -66,6 +68,12 @@ export const VISIBILITY_GROUPS = [
       { k: "kick", l: "Kick" },
       { k: "reddit", l: "Reddit" },
       { k: "spotify", l: "Spotify" },
+      { k: "threads", l: "Threads" },
+      { k: "facebook", l: "Facebook" },
+      { k: "linkedin", l: "LinkedIn" },
+      { k: "snapchat", l: "Snapchat" },
+      { k: "pinterest", l: "Pinterest" },
+      { k: "telegram", l: "Telegram" },
     ],
   },
   {

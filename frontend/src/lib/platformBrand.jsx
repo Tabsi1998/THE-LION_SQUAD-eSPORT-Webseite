@@ -1,4 +1,4 @@
-import { Box, Castle, CircleDot, Crosshair, Flag, Gamepad2, Github, Globe, MessageCircle, Music2, Radio, Trophy, Zap } from "lucide-react";
+import { AtSign, Box, Castle, CircleDot, Crosshair, Facebook, Flag, Gamepad2, Ghost, Github, Globe, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Send, Shield, Trophy, Zap } from "lucide-react";
 
 // Marken der Plattformen an einer Stelle (#527, #521): Kennung, Name, Farbe und Logo je Plattform -
 // für das öffentliche Profil (Kasten „Konten“) und die Knöpfe „Mit … verknüpfen“ im eigenen Profil.
@@ -20,6 +20,14 @@ export function platformMeta(link) {
   if (platform.includes("psn") || platform.includes("playstation")) return { key: "psn", label: "PlayStation", color: "#0070D1" };
   if (platform.includes("nintendo")) return { key: "nintendo", label: "Nintendo", color: "#E60012" };
   if (platform === "ea") return { key: "ea", label: "EA", color: "#FF4747" };
+  if (platform === "threads") return { key: "threads", label: "Threads", color: "#FFFFFF" };
+  if (platform === "facebook") return { key: "facebook", label: "Facebook", color: "#1877F2" };
+  if (platform === "linkedin") return { key: "linkedin", label: "LinkedIn", color: "#0A66C2" };
+  if (platform === "snapchat") return { key: "snapchat", label: "Snapchat", color: "#FFFC00" };
+  if (platform === "pinterest") return { key: "pinterest", label: "Pinterest", color: "#E60023" };
+  if (platform === "telegram") return { key: "telegram", label: "Telegram", color: "#26A5E4" };
+  if (platform === "wargaming") return { key: "wargaming", label: "Wargaming.net", color: "#D4A017" };
+  if (platform === "bungie") return { key: "bungie", label: "Bungie.net", color: "#3B82F6" };
   if (platform === "faceit") return { key: "faceit", label: "FACEIT", color: "#FF5500" };
   if (platform === "startgg") return { key: "startgg", label: "start.gg", color: "#3F80FF" };
   if (platform === "roblox") return { key: "roblox", label: "Roblox", color: "#FFFFFF" };
@@ -45,6 +53,14 @@ export function PlatformIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "riot") return <Zap className={className} />;
   if (kind === "xbox") return <Gamepad2 className={className} />;
   if (kind === "epic") return <Flag className={className} />;
+  if (kind === "threads") return <AtSign className={className} />;
+  if (kind === "facebook") return <Facebook className={className} />;
+  if (kind === "linkedin") return <Linkedin className={className} />;
+  if (kind === "snapchat") return <Ghost className={className} />;
+  if (kind === "pinterest") return <Pin className={className} />;
+  if (kind === "telegram") return <Send className={className} />;
+  if (kind === "wargaming") return <Shield className={className} />;
+  if (kind === "bungie") return <Orbit className={className} />;
   if (kind === "faceit") return <Crosshair className={className} />;
   if (kind === "startgg") return <Trophy className={className} />;
   if (kind === "roblox") return <Box className={className} />;
@@ -79,6 +95,14 @@ export const BRAND_BUTTONS = {
   kick: { bg: "#53FC18", fg: "#000000" },
   reddit: { bg: "#FF4500", fg: "#FFFFFF" },
   spotify: { bg: "#1DB954", fg: "#000000" },
+  threads: { bg: "#000000", fg: "#FFFFFF", border: "#FFFFFF" },
+  facebook: { bg: "#1877F2", fg: "#FFFFFF" },
+  linkedin: { bg: "#0A66C2", fg: "#FFFFFF" },
+  snapchat: { bg: "#FFFC00", fg: "#000000" },
+  pinterest: { bg: "#E60023", fg: "#FFFFFF" },
+  telegram: { bg: "#26A5E4", fg: "#FFFFFF" },
+  wargaming: { bg: "#2B2B2B", fg: "#FFFFFF", border: "#D4A017" },
+  bungie: { bg: "#1B2A4A", fg: "#FFFFFF", border: "#3B82F6" },
 };
 
 export function brandButtonStyle(key) {

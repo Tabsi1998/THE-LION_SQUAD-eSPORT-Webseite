@@ -63,6 +63,14 @@ type PublicProfilePayload = {
   kick_handle?: string | null;
   reddit_handle?: string | null;
   spotify_handle?: string | null;
+  threads_handle?: string | null;
+  facebook_handle?: string | null;
+  linkedin_handle?: string | null;
+  snapchat_handle?: string | null;
+  pinterest_handle?: string | null;
+  telegram_handle?: string | null;
+  wargaming_handle?: string | null;
+  bungie_handle?: string | null;
   website?: string | null;
   main_platform?: string | null;
   main_platforms?: string[];
