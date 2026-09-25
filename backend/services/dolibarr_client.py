@@ -595,6 +595,42 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Versammlungen und Abstimmungen (#327), über die Bindung
+    async def my_meetings(self, who: dict) -> list[dict]:
+        """Sitzungen, zu denen die Person eingeladen ist (Fähigkeit meetings) - nie eine nur wegen der Mitgliedschaft."""
+        data = await self._get("/vereine/me/meetings", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def respond_meeting(self, who: dict, meeting_id: int, payload: dict) -> dict:
+        """Zu- oder Absage; die Sitzung danach."""
+        data = await self._request("PUT", f"/vereine/me/meetings/{int(meeting_id)}/response", params=dict(who), payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def submit_motion(self, who: dict, meeting_id: int, payload: dict) -> dict:
+        """Antrag zur Tagesordnung - mit `external_id` wiederholbar."""
+        data = await self._request("POST", f"/vereine/me/meetings/{int(meeting_id)}/motions", params=dict(who), payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "external_id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def my_ballots(self, who: dict) -> list[dict]:
+        """Abstimmungen der Versammlungen mit Einladung, ab der Freigabe (Fähigkeit votes)."""
+        data = await self._get("/vereine/me/ballots", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def cast_vote(self, who: dict, ballot_id: int, payload: dict) -> dict:
+        """Eine Stimme mit einem Stimmrecht - dieselbe `external_id` ist dieselbe Stimme; nie wiederholt."""
+        data = await self._request("POST", f"/vereine/me/ballots/{int(ballot_id)}/votes", params=dict(who), payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def my_statutes(self, who: dict) -> dict:
         """Die Statuten, wie der Verein sie für Mitglieder freigibt - über die Bindung (Fähigkeit `documents`)."""
         data = await self._get("/vereine/me/statutes", dict(who))

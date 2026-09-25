@@ -122,6 +122,11 @@ def invoice(invoice_id: int, *, ref: str | None = None, kind: str = "standard", 
             "remaining": remaining, "status": status, "overdue": status == "overdue", "payment_url": payment_url, "fee": fee}
 
 
+def ballot_right(right_id: int, *, for_: str = "self", name: str = "", state: str = "open", reason: str = "own", option: str = "") -> dict:
+    """Ein Stimmrecht, wie das Modul es festhält: eigenes oder Vollmacht, offen oder genutzt."""
+    return {"right_id": right_id, "for": for_, "name": name, "state": state, "reason": reason, "option": option}
+
+
 def member(member_id: int, *, status: str = "active", firstname: str = "Paula", lastname: str = "Beispiel",
            type_id: int = 2, type_label: str = "Ordentliches Mitglied", functions: list | None = None,
            fee_status: str = "paid", paid_until: str = "2026-12-31", membership_ends: str = "",
@@ -197,6 +202,18 @@ class FakeDolibarr:
         self.members_act_right = True        # … „im Namen jedes Mitglieds handeln“ (Vereine 1.4.0: member_id statt subject, #531)
         self.invitations: dict[str, dict] = {}
         self.identities: dict[str, dict] = {}
+        # Versammlungen und Abstimmungen (#327, Vereine 1.4): Einladungen je Sitzung, Antworten, Anträge,
+        # Abstimmungen mit Stimmrechten je Mitglied, Anwesenheitsliste, abgegebene Stimmen.
+        self.meetings: dict[int, dict] = {}
+        self.meeting_invites: dict[int, dict[int, bool]] = {}
+        self.meeting_responses: dict[tuple[int, int], dict] = {}
+        self.motions: dict[int, list[dict]] = {}
+        self.ballots: dict[int, dict] = {}
+        self.ballot_rights: dict[int, dict[int, list[dict]]] = {}
+        self.present: dict[int, set[int]] = {}
+        self.votes: dict[tuple[int, str], dict] = {}
+        self.members_vote_right = True       # „… im Namen jedes Mitglieds abstimmen“ (member_id-Modus)
+        self.today = "2026-09-25"
         self.published_documents: list[dict] = []
         self.tampered_document_ids: set[int] = set()
         # Eigene Daten und Austritt (#329 Teil 2): Profil je Mitglied, Einreichungen je Kennung, Kündigungsregel.
@@ -331,6 +348,72 @@ class FakeDolibarr:
                 "version": "v1", "direct": list(self.direct_fields), "exit": None,
             }
         return self.profiles[member_id]
+
+    # ---------- Versammlungen und Abstimmungen (#327)
+    def add_meeting(self, meeting_id: int, *, kind: str = "general", title: str = "Generalversammlung 2026", day: str = "2026-10-24", time: str = "18:00",
+                    format: str = "hybrid", place: str = "Vereinsheim", access: str = "https://meet.example.test/gv-2026", status: str = "invited",
+                    agenda=("Begrüßung", "Bericht des Vorstands"), motion_deadline: str = "2026-10-21", invited=()) -> dict:
+        """Eine Sitzung mit Einladungen: ``invited`` = [(member_id, stimmberechtigt)]."""
+        self.meetings[meeting_id] = {
+            "id": meeting_id, "kind": kind, "title": title, "day": day, "time": time, "timezone": "Europe/Vienna", "format": format,
+            "place": "" if format == "virtual" else place, "access": "" if format == "physical" else access, "status": status,
+            "agenda": list(agenda), "motion_deadline": "" if kind == "board" else motion_deadline,
+        }
+        self.meeting_invites[meeting_id] = {int(member_id): bool(voting) for member_id, voting in invited}
+        return self.meetings[meeting_id]
+
+    def add_ballot(self, ballot_id: int, meeting_id: int, *, item: int = 3, kind: str = "resolution", question: str = "Entlastung des Vorstands",
+                   status: str = "released", closes: str = "", options: list[dict] | None = None, rights: dict[int, list[dict]] | None = None) -> dict:
+        self.ballots[ballot_id] = {
+            "id": ballot_id, "meeting_id": meeting_id, "item": item, "kind": kind, "question": question, "status": status, "closes": closes,
+            "options": options or [{"code": "yes", "label": "Ja"}, {"code": "no", "label": "Nein"}, {"code": "abstain", "label": "Enthaltung"}],
+            "result": None,
+        }
+        self.ballot_rights[ballot_id] = {int(member_id): [dict(row) for row in rows] for member_id, rows in (rights or {}).items()}
+        return self.ballots[ballot_id]
+
+    def set_ballot_status(self, ballot_id: int, status: str) -> None:
+        self.ballots[ballot_id]["status"] = status
+
+    def confirm_result(self, ballot_id: int, *, outcome: str = "passed", passed: bool = True, counts: dict | None = None, valid: int = 0,
+                       abstain: int = 0, winner: str = "") -> None:
+        self.ballots[ballot_id]["result"] = {"revision": 1, "outcome": outcome, "passed": passed, "counts": dict(counts or {}), "valid": valid, "abstain": abstain, "winner": winner}
+
+    def _rights_for(self, ballot_id: int, member_id: int) -> list[dict]:
+        """Die Stimmrechte der Person - beim Öffnen aus der Einladung festgehalten, danach nur noch genutzt."""
+        rows = self.ballot_rights.setdefault(ballot_id, {})
+        if member_id not in rows:
+            voting = self.meeting_invites.get(self.ballots[ballot_id]["meeting_id"], {}).get(member_id, False)
+            rows[member_id] = [ballot_right(1000 + member_id) if voting else ballot_right(0, state="none", reason="no_voting_right")]
+        return rows[member_id]
+
+    def _my_meeting(self, meeting_id: int, member_id: int) -> dict:
+        base = self.meetings[meeting_id]
+        answer = self.meeting_responses.get((meeting_id, member_id)) or {"response": "", "responded_at": ""}
+        motions = [{key: value for key, value in row.items() if key != "member_id"} for row in self.motions.get(meeting_id, []) if row["member_id"] == member_id]
+        return {**base, "voting": self.meeting_invites[meeting_id][member_id], "response": answer["response"], "responded_at": answer["responded_at"], "motions": motions}
+
+    def _my_ballot(self, ballot_id: int, member_id: int) -> dict:
+        ballot = self.ballots[ballot_id]
+        meeting = self.meetings[ballot["meeting_id"]]
+        return {
+            "id": ballot_id, "meeting_id": ballot["meeting_id"], "meeting": meeting["title"], "day": meeting["day"], "item": ballot["item"], "kind": ballot["kind"],
+            "question": ballot["question"], "status": ballot["status"], "closes": ballot["closes"], "timezone": meeting["timezone"], "options": ballot["options"],
+            "rights": self._rights_for(ballot_id, member_id), "result": ballot["result"],
+        }
+
+    def _json_method(self, template: str, method: str, payload) -> httpx.Response:
+        validate(payload, OPENAPI["paths"][template][method]["responses"]["200"]["content"]["application/json"]["schema"])
+        return httpx.Response(200, json=payload)
+
+    def _vote_person(self, params: dict) -> tuple[dict | None, httpx.Response | None]:
+        """Abstimmen über die Mitgliedsnummer braucht das zweite Recht „… im Namen jedes Mitglieds abstimmen“."""
+        ident, denied = self._person(params, "votes")
+        if denied:
+            return None, denied
+        if params.get("member_id") and not self.members_vote_right:
+            return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to vote for members"}})
+        return ident, None
 
     def _statutes_payload(self, visible: bool) -> dict:
         return self.statutes if visible else {"state": "not_published", "current": None, "versions": []}
@@ -768,6 +851,87 @@ class FakeDolibarr:
                 row["decided_at"] = "2026-09-24T12:00:00Z"
             rows.append(row)
             return self._json_post("/vereine/me/profile/changes", row)
+        if path == "/vereine/me/meetings" and request.method == "GET":
+            ident, denied = self._person(params, "meetings")
+            if denied:
+                return denied
+            rows = [self._my_meeting(mid, ident["member_id"]) for mid in sorted(self.meetings, reverse=True) if ident["member_id"] in self.meeting_invites.get(mid, {})]
+            return self._json("/vereine/me/meetings", rows)
+        match = re.fullmatch(r"/vereine/me/meetings/(\d+)/response", path)
+        if match and request.method == "PUT":
+            ident, denied = self._person(params, "meetings")
+            if denied:
+                return denied
+            mid = int(match.group(1))
+            if mid not in self.meetings or ident["member_id"] not in self.meeting_invites.get(mid, {}):
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Meeting not found"}})
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema("/vereine/me/meetings/{id}/response", "put"))
+            if self.meetings[mid]["status"] != "invited":
+                return httpx.Response(409, json={"error": {"code": 409, "message": "meeting is over"}})
+            self.meeting_responses[(mid, ident["member_id"])] = {"response": body["response"], "responded_at": f"{self.today}T10:00:00Z"}
+            return self._json_method("/vereine/me/meetings/{id}/response", "put", self._my_meeting(mid, ident["member_id"]))
+        match = re.fullmatch(r"/vereine/me/meetings/(\d+)/motions", path)
+        if match and request.method == "POST":
+            ident, denied = self._person(params, "meetings")
+            if denied:
+                return denied
+            mid = int(match.group(1))
+            meeting = self.meetings.get(mid)
+            if not meeting or ident["member_id"] not in self.meeting_invites.get(mid, {}) or meeting["kind"] == "board":
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Meeting not found"}})
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema("/vereine/me/meetings/{id}/motions"))
+            rows = self.motions.setdefault(mid, [])
+            existing = next((row for row in rows if row["external_id"] == body["external_id"] and row["member_id"] == ident["member_id"]), None)
+            if existing:
+                if existing["title"] != body["title"] or existing["text"] != body.get("text", ""):
+                    return httpx.Response(409, json={"error": {"code": 409, "message": "external_id already used with different content"}})
+                return self._json_method("/vereine/me/meetings/{id}/motions", "post", {key: value for key, value in existing.items() if key != "member_id"})
+            deadline = meeting["motion_deadline"]
+            row = {"member_id": ident["member_id"], "external_id": body["external_id"], "title": body["title"], "text": body.get("text", ""),
+                   "received_at": f"{self.today}T10:05:00Z", "late": bool(deadline) and self.today > deadline, "status": "received"}
+            rows.append(row)
+            return self._json_method("/vereine/me/meetings/{id}/motions", "post", {key: value for key, value in row.items() if key != "member_id"})
+        if path == "/vereine/me/ballots" and request.method == "GET":
+            ident, denied = self._vote_person(params)
+            if denied:
+                return denied
+            rows = [self._my_ballot(bid, ident["member_id"]) for bid in sorted(self.ballots) if ident["member_id"] in self.meeting_invites.get(self.ballots[bid]["meeting_id"], {})]
+            return self._json("/vereine/me/ballots", rows)
+        match = re.fullmatch(r"/vereine/me/ballots/(\d+)/votes", path)
+        if match and request.method == "POST":
+            ident, denied = self._vote_person(params)
+            if denied:
+                return denied
+            bid = int(match.group(1))
+            ballot = self.ballots.get(bid)
+            if not ballot or ident["member_id"] not in self.meeting_invites.get(ballot["meeting_id"], {}):
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Ballot not found"}})
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema("/vereine/me/ballots/{id}/votes"))
+            right = next((row for row in self._rights_for(bid, ident["member_id"]) if row["right_id"] == body["right_id"] and row["right_id"] > 0), None)
+            if right is None:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Voting right not found"}})
+            if body["option"] not in {option["code"] for option in ballot["options"]}:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "unknown option", "field": "option"}})
+            if ballot["status"] == "released":
+                return httpx.Response(409, json={"error": {"code": 409, "message": "not_open"}})
+            if ballot["status"] != "open":
+                return httpx.Response(409, json={"error": {"code": 409, "message": "closed"}})
+            if ident["member_id"] not in self.present.get(ballot["meeting_id"], set()):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "not_present"}})
+            external_id = str(body.get("external_id") or "")
+            earlier = self.votes.get((bid, external_id)) if external_id else None
+            if earlier:
+                if earlier["right_id"] != body["right_id"] or earlier["option"] != body["option"]:
+                    return httpx.Response(409, json={"error": {"code": 409, "message": "external_id"}})
+                return self._json_method("/vereine/me/ballots/{id}/votes", "post", self._my_ballot(bid, ident["member_id"]))
+            if right["state"] != "open":
+                return httpx.Response(409, json={"error": {"code": 409, "message": "used"}})
+            right["state"], right["option"] = "used", body["option"]
+            self.votes[(bid, external_id or f"anon-{len(self.votes)}")] = {"right_id": body["right_id"], "option": body["option"], "member_id": ident["member_id"]}
+            return self._json_method("/vereine/me/ballots/{id}/votes", "post", self._my_ballot(bid, ident["member_id"]))
         if path == "/vereine/me/exit" and request.method == "POST":
             ident, denied = self._person(params, "profile")
             if denied:
