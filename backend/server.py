@@ -65,6 +65,7 @@ from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
 from routes.calendar_routes import router as calendar_router
+from services import discord_embeds
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
 from routes.contact_board_routes import contact_router, board_router
@@ -416,6 +417,12 @@ async def api_change_notifications(request, call_next):
         and response.status_code < 400
     ):
         await publish_api_change(request.method, request.url.path, response.status_code)
+        # Live-Einbettungen (#569): Events, Turniere und Saisons ändern „Nächste Events“ und die Rangliste.
+        path = request.url.path
+        if path.startswith(("/api/events", "/api/tournaments", "/api/admin/events", "/api/admin/tournaments", "/api/f1")):
+            discord_embeds.request_refresh("events")
+        if path.startswith(("/api/seasons", "/api/tournaments", "/api/f1", "/api/matches")):
+            discord_embeds.request_refresh("ranking")
     return response
 
 

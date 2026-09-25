@@ -286,7 +286,12 @@ async def fetch_live_streams() -> dict:
             upsert=True,
         )
     # Drop offline streams
+    before = {stream.get("twitch_login") for stream in await db.live_streams.find({}, {"_id": 0, "twitch_login": 1}).to_list(500)}
     await _close_offline_streams(db, seen_logins, now_dt)
+    if before != seen_logins:
+        # Live-Einbettung „Live jetzt“ (#569): Stream beginnt oder endet.
+        from services.discord_embeds import request_refresh
+        request_refresh("live")
     # „Turnier live“ (#579): streamt ein Teilnehmer eines laufenden Turniers, einmal je Stream-Start melden.
     try:
         from services.tournament_streams import sync as sync_tournament_streams

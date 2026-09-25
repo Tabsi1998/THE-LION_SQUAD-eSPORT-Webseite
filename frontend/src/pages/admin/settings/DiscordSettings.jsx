@@ -5,6 +5,7 @@ import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { DiscordBotPanel } from "./DiscordBotPanel";
+import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordTargets } from "./DiscordTargets";
 
@@ -13,7 +14,7 @@ import { DiscordTargets } from "./DiscordTargets";
 // gesendet. Alles steht auf der Discord-Seite unter Verbindungen (24.09.: „muss das doppelt sein?“).
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
-const READ_ONLY = ["configured", "channels", "events", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
+const READ_ONLY = ["configured", "channels", "events", "embeds", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
 
 /** Nur, was sich einstellen lässt - der Rest der Antwort ist Stand, kein Feld. */
 export function discordPayload(source) {
@@ -125,6 +126,7 @@ export function DiscordSettings() {
         )}
       </div>
       <DiscordTargets />
+      <DiscordEmbedsPanel />
       <DiscordSamplesPanel />
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">

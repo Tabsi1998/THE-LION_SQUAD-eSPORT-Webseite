@@ -466,6 +466,65 @@ class BotRunner:
         self.last_action = f"Meldung in #{getattr(channel, 'name', channel_id)} ({now_utc().strftime('%H:%M')} UTC)"
         return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
 
+    async def _channel(self, client, channel_id: str):
+        import discord
+
+        try:
+            return client.get_channel(int(channel_id)) or await client.fetch_channel(int(channel_id)), None
+        except (discord.NotFound, ValueError):
+            return None, {"ok": False, "reason": "unknown_channel"}
+        except discord.Forbidden:
+            return None, {"ok": False, "reason": "forbidden"}
+        except Exception as exc:  # noqa: BLE001
+            return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+
+    async def edit_embed(self, channel_id: str, message_id: str, embed: dict) -> dict:
+        """Eine eigene Nachricht bearbeiten (#569). Ist sie weg, kommt ``unknown_message`` - dann wird neu gepostet."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        channel, problem = await self._channel(client, channel_id)
+        if problem:
+            return problem
+        try:
+            message = await channel.fetch_message(int(message_id))
+            await message.edit(embed=discord.Embed.from_dict(embed))
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_message"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Einbettung in #{getattr(channel, 'name', channel_id)} aktualisiert ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
+
+    async def pin_message(self, channel_id: str, message_id: str) -> dict:
+        """Eine eigene Nachricht anpinnen (#569); scheitert das (kein Recht, 50 Pins voll), bleibt sie trotzdem stehen."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        channel, problem = await self._channel(client, channel_id)
+        if problem:
+            return problem
+        try:
+            message = await channel.fetch_message(int(message_id))
+            await message.pin(reason="LION Website: Einbettung")
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_message"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        return {"ok": True}
+
     async def send_dm(self, discord_user_id: str, embed: dict) -> dict:
         """Eine Direktnachricht an ein verknüpftes Konto (#567). Geschlossene Direktnachrichten melden „forbidden“."""
         client = self._client
