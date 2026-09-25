@@ -506,7 +506,7 @@ export const SETUP_GUIDES = {
   },
 };
 
-export const SETUP_GUIDE_ORDER = ["discord_app", "discord_bot", "discord_webhooks", "twitch", "google_login", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "resend", "smtp", "analytics", "search_console", "play_store", "dolibarr"];
+export const SETUP_GUIDE_ORDER = ["discord_app", "discord_bot", "discord_channels", "twitch", "google_login", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "resend", "smtp", "analytics", "search_console", "play_store", "dolibarr"];
 
 export function resolveGuideValue(value, origin) {
   return String(value || "").replaceAll("{origin}", origin || "");
@@ -526,7 +526,7 @@ export function guideStatus(key, data = {}) {
     case "discord_bot":
       if (!discord) return unknown;
       return discord.bot?.configured ? ok(discord.bot?.connected ? "Bot online" : "Token da, Bot aus oder offline") : missing("Bot-Token fehlt");
-    case "discord_webhooks":
+    case "discord_channels":
       if (!discord) return unknown;
       return discord.configured ? ok(discord.enabled ? "Webhook aktiv" : "Webhook da, Versand aus") : missing("Kein Webhook");
     case "twitch":
