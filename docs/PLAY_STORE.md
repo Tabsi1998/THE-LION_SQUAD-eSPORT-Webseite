@@ -113,11 +113,16 @@ Play – Download im Browser, der Vorstand schickt den Link.
 
 ## Checkliste für den Betreiber
 
-- [ ] Entwicklerkonto freigegeben (Organisation, Vereinsdaten)
-- [ ] App „LionsAPP“ angelegt, Store-Eintrag mit Texten und Grafiken von oben
-- [ ] Screenshots aus dem Emulator, ohne echte Personen
-- [ ] Datenschutz-Link, Datensicherheit, Inhaltseinstufung, Zielgruppe, App-Zugriff (Testkonto) ausgefüllt
-- [ ] Interner Test mit Tester-Liste, erstes Bundle drin
+- [x] Entwicklerkonto freigegeben (Organisation, Vereinsdaten) – 25.09.
+- [x] App „LionsAPP“ angelegt, Store-Eintrag mit Texten und Grafiken von oben – 25.09.
+- [x] Screenshots aus dem Emulator, ohne echte Personen – 25.09. (`Desktop\PlayStore\screenshots`)
+- [x] Datenschutz-Link, Datensicherheit, Inhaltseinstufung, Zielgruppe, App-Zugriff (Testkonto) ausgefüllt – 25.09.
+- [x] Interner Test mit Tester-Liste, erstes Bundle drin – Build 78, dann Build 79
 - [ ] Dienstkonto für `--play` (optional)
-- [ ] Geschlossener Test für Mitglieder
-- [ ] 1.0.0 in Produktion
+- [ ] Offener Test mit 1.0.0 (Build 79) – Entscheidung 25.09.: offener statt geschlossener Test; Länder AT/DE/CH/IT
+- [ ] 1.0.0 in Produktion (aus dem offenen Test hochstufen)
+
+**Falle (25.09.):** Meldet die Vorschau eines Releases „Berechtigung REQUEST_INSTALL_PACKAGES noch nicht
+erklärt“, steckt ein altes Bundle (Build ≤ 78) noch in diesem Entwurf oder in einem aktiven Track – das
+alte Bundle aus dem Entwurf entfernen bzw. Build 79 auch in den internen Test bringen. Die Erklärung
+nie ausfüllen: Build 79 nutzt die Berechtigung nicht.
