@@ -486,9 +486,9 @@ Version und werden zusammen als Beta veröffentlicht.
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – umgesetzt in #550 (Block 51.10); #517 geschlossen – der Meilenstein ist durch (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
 | Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 – umgesetzt in #565 (Block 51.17); #331 – umgesetzt in #582 (Block 51.18) – der Meilenstein ist durch |
 | Discord III: Bot statt Webhooks | Plan vom 25.09.: #566 der Bot schickt alle Meldungen, Kanal je Zweck, Webhooks weg – umgesetzt in #588 (Block 51.22); #567 persönlicher Kanal – in #589 (Block 51.23), #568 Erfolge als Gratulation – in #590 (51.24), #583 Vorschau und Testkanal – in #595 (51.26). Fertig |
-| Discord IV: Live-Einbettungen und Termine | #569 Live-Einbettungen, #570 Discord-Termine, #571 Bracket als Text-Embed |
+| Discord IV: Live-Einbettungen und Termine | #569 Live-Einbettungen – in #601 (Block 51.31), #570 Discord-Termine – in #602 (51.32), #571 Bracket als Text-Embed – in #603 (51.33). Fertig |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
-| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – in #597 (51.28), #580 Kalender-Knöpfe – in #596 (51.27), #584 „Gerade in Steam“ – in #598 (51.29), #579 Twitch-Clips + Turnier live – PR #599 |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – in #597 (51.28), #580 Kalender-Knöpfe – in #596 (51.27), #584 „Gerade in Steam“ – in #598 (51.29), #579 Twitch-Clips + Turnier live – in #599 (51.30). Fertig |
 
 ## Block 22 — Tempo und Betrieb
 
@@ -1031,6 +1031,37 @@ veröffentlichen entscheidet der Betreiber; Shorts wahlweise.
 Opt-in bei Steam nach – gebündelt, ohne Verlauf, nach zehn Minuten ohne Abruf leer. Privates
 Steam-Profil heißt still; Verknüpfung lösen oder Schalter aus nimmt die Person sofort heraus, weil
 die Antwort das erneut prüft. Nie öffentlich, nie im Discord; die Datenschutzerklärung nennt Valve.
+
+### Was 51.30 gefunden hat (#579 Twitch-Clips und „Turnier live“ – PR #599)
+
+**Die Twitch-App lief, aber nur für die Live-Erkennung.** Jetzt holt ein stündlicher Job die meistgesehenen
+Clips des Vereinskanals der letzten 30 Tage (Kanal-ID einmal aufgelöst) und die Startseite zeigt bis zu sechs
+davon, der Player erst nach Zustimmung – Schalter im Admin, Standard aus, eine Störung löscht die Kachel nicht.
+Und streamt ein Teilnehmer, während sein öffentliches Turnier läuft, sagt es die Turnierseite im Kasten „Live“
+und der Bot genau einmal je Stream-Start im Kanal Events und Turniere – nur Personen mit öffentlichem Profil.
+
+### Was 51.31 gefunden hat (#569 Discord IV Teil 1 – PR #601)
+
+**Jede Änderung war eine neue Nachricht.** Ein Bot kann seine Nachricht bearbeiten: je Einbettung (Rangliste,
+nächste Events, Live jetzt) postet er einmal, pinnt und hält sie aktuell – Auslöser sind Änderungen, gebündelt
+auf eine Bearbeitung pro Minute, ein Sammler alle zehn Minuten schreibt den Stand in die Fußzeile; gleicher
+Inhalt heißt kein Aufruf, eine gelöschte Nachricht kommt neu. Beim Neuaufsetzen nach #599 zeigte sich die
+Falle mehrzeiliger `add_job(`-Aufrufe in der Job-Liste – beide Seiten behalten, Fortsetzungszeilen prüfen.
+
+### Was 51.32 gefunden hat (#570 Discord IV Teil 2 – PR #602)
+
+**Termine standen nur auf der Website.** Discord hat eigene Termine mit „Interessiert“ und Erinnerung; ein
+Abgleich alle fünf Minuten gibt jedem öffentlichen Event und Turnier genau einen, zieht Zeit, Titel und Ort
+nach und sagt ab, wenn das Event abgesagt oder „Ohne Discord“ wird. Interne Events nur mit Schalter, die
+Vorschau im Formular sagt, ob und wie der Termin erscheint.
+
+### Was 51.33 gefunden hat (#571 Discord IV Teil 3 – PR #603)
+
+**Das Bracket gab es nur auf der Website – und Slash-Antworten füllten die Kanäle.** Je laufendem Turnier
+hält der Bot eine Bracket-Nachricht aktuell (Runden als Felder, Sieger fett, nur die aktuelle und nächste
+Runde vollständig, Tabellenphasen Top 8), bei jedem bestätigten Ergebnis bearbeitet, nach dem Ende ein
+letztes Mal als Endstand. Und weil Antworten auf Befehle nur die fragende Person angehen, sieht sie nur die
+– was für alle gilt, steht in den gepinnten Einbettungen.
 
 ## Block 50 — Nachbesserungen vom 24.09.: Rechtliches speichern, Wegweiser, verknüpfte Konten
 

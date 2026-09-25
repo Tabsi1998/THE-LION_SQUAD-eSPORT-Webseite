@@ -275,6 +275,55 @@ Seit dem 15. September gilt:
   `LegalPages.jsx` rendert nur noch (`lib/privacyFacts.js` weg). Tests `test_site_texts_flow.py`,
   `LegalPages.test.jsx`, e2e `public.spec.js` (`mockLegalPages` nach `**/api/settings/public**`).
   FAQ `google_pruefung`.
+- Discord IV Teil 3: Turnier-Bracket als Einbettung, Slash-Antworten nur für die fragende Person
+  (#571; PR #603; Backend; `update.sh`). `services/discord_bracket.py`: `bracket_embed`/`bracket_fields`/
+  `match_line` aus demselben Graph-Speicher wie das Web-Bracket (`load_competition_read_model` +
+  `adapt_stage_matches`; Runden als Felder, Sieger fett, kampflos, offen mit Termin oder „live“,
+  Tabellenphasen Top 8 über `competition_standings`), nur aktuelle und nächste Runde vollständig,
+  Grenzen `MAX_FIELDS` 12 / 1000 je Feld / 5500 gesamt; Zustand am Turnier `discord_bracket_embed`
+  (`channel_id`, `message_id`, `hash`, `final`), `refresh` (Kanal „events“ mit Rückfall Community,
+  Bremse 60 s – das Ende überstimmt sie, gelöscht = neu + pinnen, nach `final` Ruhe), `sweep` hängt an
+  den Jobs der Einbettungen (#569). Auslöser `v2_result_submission._finish_result_side_effects` und
+  Statuswechsel live/beendet in `tournament_lifecycle_routes`. **Slash-Befehle antworten `ephemeral`**
+  (Wunsch des Betreibers, 25.09.; Regel für alle künftigen Befehle) – Kanalweites gehört in gepinnte
+  Einbettungen. Tests `test_discord_bracket_flow.py` (3).
+- Discord IV Teil 2: Turniere und Vereins-Events als Discord-Termine (#570; PR #602; Backend + Web;
+  `update.sh`; Bot-Rolle braucht „Events verwalten“). `services/discord_scheduled.py`:
+  `scheduled_payload` (extern: Ort oder Link; ohne Ende Events 2 h, Turniere 4 h), `payload_hash`,
+  `wants_event` (Gründe disabled/author_opt_out/status/hidden/not_public/no_date/past), `sync` alle 5 min
+  (Job `discord_scheduled_events`, höchstens 20 Aufrufe je Lauf: anlegen, bearbeiten, absagen, neu nach
+  manueller Löschung; Zustand am Dokument `discord_scheduled_event`), `preview_for`, `scheduled_status`;
+  Bot `create_scheduled_event`/`edit_scheduled_event`/`cancel_scheduled_event` (discord.py 2.7,
+  `EntityType.external`, `PrivacyLevel.guild_only`); Einstellungen `discord.scheduled_events {enabled,
+  internal}` (Pydantic lehnt Nicht-Wahrheitswerte mit 422 ab); `POST /settings/discord/preview` liefert für
+  Events `scheduled_event`. Web `DiscordScheduledPanel`, `DiscordPreview.scheduledEventText`. Tests
+  `test_discord_scheduled_flow.py` (3), `DiscordScheduledPanel.test.jsx`, `DiscordPreview.test.jsx` (+1).
+- Discord IV Teil 1: Rangliste, nächste Events und „Live jetzt“ als Nachricht, die der Bot aktuell hält
+  (#569; PR #601; Backend + Web; `update.sh`). `services/discord_embeds.py`: `KINDS` ranking/events/live,
+  reine `ranking_embed`/`events_embed`/`live_embed` (Fußzeile „Stand: …“), `content_hash` ohne Fußzeile,
+  `request_refresh` (Merkliste im Prozess), `refresh` (posten + pinnen, dann bearbeiten; Bremse 60 s;
+  `unknown_message` = neu posten), `sweep` (Job `discord_embeds` 60 s für Vorgemerktes,
+  `discord_embeds_full` 10 min für alle mit neuem Stand), `embeds_status`; Bot `edit_embed`/`pin_message`/
+  `_channel`; Einstellungen `discord.embeds[kind] {enabled, channel_id}` (Kanalwechsel = neue Nachricht),
+  `POST /settings/discord/embeds/{kind}/refresh`. Auslöser: Middleware in `server.py` nach schreibenden
+  Aufrufen (Events/Turniere/Saisons/Matches), `season_service.award_points`, Twitch-Abfrage bei geänderter
+  Live-Menge. Web `DiscordEmbedsPanel` (zwischen Kanalwahl und Vorschau). Tests `test_discord_embeds_flow.py`
+  (4), `DiscordEmbedsPanel.test.jsx`. **Falle:** #599 und #601 ergänzten beide die Job-Liste und die
+  Twitch-Abfrage – beim Neuaufsetzen beide Seiten behalten (mehrzeilige `add_job(`-Aufrufe!).
+- Twitch: Clips des Vereinskanals auf der Startseite und „Turnier live“ (#579; PR #599; Backend + Web;
+  `update.sh`). `services/twitch_clips.py` (Job `twitch_clips` stündlich: Helix `users` einmal für die
+  Kanal-ID, `clips` der letzten 30 Tage, `pick_clips` Top 6 nach Aufrufen, Zustand `twitch_clips_state`,
+  Fehler im Klartext, alte Clips bleiben bei Störung; `twitch_clips_enabled` am Branding, Standard aus;
+  `GET /api/streams/clips`, `POST /api/admin/streams/clips/refresh`, Admin-Stand `clips`).
+  `services/tournament_streams.py` (`live_streams_for_tournament`: Teilnehmer inkl. Teammitglieder, nur
+  öffentliches Profil und Twitch nicht privat; `sync` am Ende von `twitch_service.fetch_live_streams`:
+  je laufendem öffentlichen Turnier und Stream-ID genau eine Meldung, Sammlung
+  `tournament_stream_announcements`), Ereignis `tournament.stream_live` (Standard an),
+  `discord_announcements.stream_live_message` (auch in der Vorschau), `GET /api/tournaments/{slug|id}/streams`
+  (im Fähigkeiten-Inventar als öffentliche Ansicht eingeordnet). Web `TwitchClips` (Startseite,
+  Clip-Player erst nach Zustimmung), `TournamentLiveStreams` (Turnierseite bei Status live, Player erst
+  nach Zustimmung), Schalter und Karte im Twitch-Reiter. Tests `test_twitch_clips_flow.py` (3),
+  `test_tournament_streams_flow.py` (3), `TwitchClips.test.jsx`, `TournamentLiveStreams.test.jsx`.
 - „Gerade in Steam“ im Mitgliederbereich (#584; PR #598; Backend + Web + App; `update.sh`, die
   App-Karte kommt mit der nächsten App-Version). `services/steam_presence.py`: `poll` alle 2 min
   (Job `steam_presence`, `GetPlayerSummaries` gebündelt zu 100, nur Konten mit Opt-in), Zustand
@@ -2781,12 +2830,17 @@ Kalender-Knöpfe mit Outlook und Server-ICS; `update.sh`), #597 (#578 YouTube-Vi
 `update.sh`), #598 (#584 „Gerade in Steam“; `update.sh`, App-Karte mit der nächsten App-Version) –
 der Meilenstein „Discord III“ ist fertig, „App 1.0.0“ hängt nur noch am Store (#219).
 
+Am 25.09. (Nachmittag) gemergt: #599 (#579 Twitch-Clips und „Turnier live“; `update.sh`), #600
+(Doku-Stand nach #598), #601 (#569 Einbettungen, die der Bot aktuell hält; `update.sh`), #602 (#570
+Discord-Termine; `update.sh`, Bot-Rolle „Events verwalten“), #603 (#571 Bracket-Einbettung, Slash-Antworten
+nur für die fragende Person; `update.sh`) – die Meilensteine „Discord IV“ und „Kanäle II“ sind fertig.
+
 ### Offene PRs
-- Offen (25.09. früher Nachmittag): #599 (#579 Twitch-Clips auf der Startseite und „Turnier
-  live“ mit Stream-Link; Entwurf, Check läuft). Danach Discord IV (#569–#571; #569 Live-Einbettungen
-  in Arbeit), Discord V (#572–#574, #581); Kanäle II ist bis auf #579 fertig. Idee des Betreibers
-  vom 25.09. (offen): „Neueste Videos“ je Mitglied auf dem Profil aus dem YouTube-Feed mit Opt-in
-  (Live je Mitglied geht wegen des API-Kontingents nicht). Sonst hängt Offenes am Betreiber oder am Vereinsmodul: App 1.0.0-Rest (#219
+- Offen (25.09. Nachmittag): keine Feature-PRs. Nächste Pakete nach der Pause: Discord V (#572
+  Thread je Turnier, #573 Link-Knöpfe und Befehle – Antworten `ephemeral`, #574 Willkommensnachricht, #581
+  Online-Zahl und Voice auf der Website über das Server-Widget). Idee des Betreibers vom 25.09. (offen):
+  „Neueste Videos“ je Mitglied auf dem Profil aus dem YouTube-Feed mit Opt-in (Live je Mitglied geht wegen
+  des API-Kontingents nicht). Sonst hängt Offenes am Betreiber oder am Vereinsmodul: App 1.0.0-Rest (#219
   Store-Eintrag – alles in `docs/PLAY_STORE.md`, es fehlt das Entwicklerkonto), Dolibarr III (#330
   Ende-zu-Ende gegen eine Testinstanz, #329 Mandat – dolibarr-vereine#125), Später (#323
   Preisgelder, #575–#577 Discord-Ideen). Frage an den Betreiber (24.09. abends, offen): welche Verbindungen
@@ -3083,9 +3137,9 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ mit Ereignissen aller Quellen – umgesetzt in #550; #517 geschlossen, Meilenstein geschlossen (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
 | Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 Generalversammlung und Abstimmungen – umgesetzt in #565; #331 Helferdienste – umgesetzt in #582; der Meilenstein ist geschlossen |
 | Discord III: Bot statt Webhooks | Plan vom 25.09. (Entscheidung: Webhooks entfallen ganz, nur noch der Bot): #566 der Bot schickt alle Meldungen, Kanal je Zweck – umgesetzt in #588; #567 Discord als persönlicher Benachrichtigungskanal – umgesetzt in #589; #568 Erfolge als Gratulation per Direktnachricht – in #590; #583 Vorschau jeder Meldungsart, Testkanal, „an mich“ – in #595. Meilenstein fertig |
-| Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt), #570 Discord-Termine (Scheduled Events), #571 Bracket als Text-Embed |
+| Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt) – umgesetzt in #601; #570 Discord-Termine (Scheduled Events) – in #602; #571 Bracket als Text-Embed – in #603. Meilenstein fertig |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
-| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – umgesetzt in #597; #580 Kalender-Knöpfe – in #596; #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) – in #598; #579 Twitch-Clips + Turnier live – PR #599 |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – umgesetzt in #597; #580 Kalender-Knöpfe – in #596; #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) – in #598; #579 Twitch-Clips + Turnier live – in #599. Meilenstein fertig |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
 (#240 Freunde in der App, #227 Tageszentrale, #216 Kalender, #245 Laufbanner,
@@ -3153,6 +3207,12 @@ sinnvoll hältst“):
     der Fehler „Berechtigung REQUEST_INSTALL_PACKAGES noch nicht erklärt“ kommt von Build 78 in
     einem aktiven Release oder Track, nicht von Build 79 (Bundle geprüft) – 78 aus dem Entwurf
     entfernen bzw. 79 auch in den internen Test; die Erklärung nie ausfüllen.
+
+13. 25.09. nachmittags, Discord IV und Kanäle II fertig: #599 (#579), #601 (#569), #602 (#570), #603
+    (#571) – nacheinander gemergt; #601 musste nach #599 neu aufgesetzt werden (Job-Liste, Twitch-Abfrage),
+    #602 und #603 als Stapel je nach dem Merge der Basis umgehängt. Wunsch des Betreibers: Antworten auf
+    Slash-Befehle nur für die fragende Person, Kanalweites nur als gepinnte Einbettung. Danach Pause;
+    offen ist der offene Test der App in der Play Console (Bundle 79 aus der Bibliothek, Werbe-ID „Nein“).
 
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
