@@ -459,8 +459,8 @@ Version und werden zusammen als Beta veröffentlicht.
 | App 0.6.0-beta | #218 Erfolge (14.5): Symbole, Fortschritt zugeklappt, Freischalt-Moment bei offener App, sanfte Übergänge – umgesetzt in #354, Build 64 |
 | App 0.7.0-beta: Mitgliederbereich | #340 Einstieg und Aufbau wie im Web, #339 Meine Mitgliedschaft mit Beitragsstand und Belegen, #341 Vereinsdokumente (privater App-Speicher), #342 Intern-Kennzeichen und Meldungen nur an Berechtigte, #346 digitale Mitgliedskarte mit QR-Code (Web und App) – umgesetzt in #357, Build 65 (Block 27) |
 | App 0.8.0-beta | #216 Kalender (14.6), #236 Galerie – umgesetzt in #374 (Block 33), Build 66 nach dem Merge |
-| App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker bleibt offen (natives Modul) |
-| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; offen (14.8): #412 Play-Upload per API (wartet auf Identitätsbestätigung), Store-Eintrag, geschlossener Test, 1.0.0 |
+| App 0.9.0-beta | #240 Freunde, #245 Laufbanner – umgesetzt in #377 (Block 35), Build 67 am 23.09. gebaut; #239 Tastatur-Sticker – umgesetzt in #585 (Block 51.19), Build 78 – der Meilenstein ist durch |
+| App 1.0.0 | #217 Stufe 1 App-Sperre und #219 Teil 1 (AAB-Option, Bilder in passender Breite) – umgesetzt in #380 (Block 38), im Build 70 vom 23.09.; Stufe 2 Passkey in der App (14.7) – umgesetzt in #384 (Block 40), im Build 71 vom 23.09.; #219 Teil 2 Crashlytics – umgesetzt in #385 (Block 41), im Build 72 vom 23.09.; Play Console am 23.09. angelegt, interner Test mit Build 74 (erstes AAB); #390 Konto löschen in der App (Google-Pflicht) – umgesetzt in #391, Build 75; Google-Signaturschlüssel eingetragen in #394; #396 kostenpflichtige Events in der App und #397 Teilnehmer für Verwaltung und Vorstand – umgesetzt in #411 (Block 45); #414 Melden und Blockieren in der App (Google-Pflicht, beim IARC-Fragebogen aufgefallen) – umgesetzt in #418 (Block 45.2); beides Build 76; #421 Update je Installationsquelle (Play-Dialog statt Server-APK) – umgesetzt in #423 (Block 45.3), Build 77 am 23.09. gebaut; #412 Play-Upload per API – umgesetzt in #586 (Block 51.20); #219 Teil 3 Store-Paket – in #587 (Block 51.21); offen (14.8): Entwicklerkonto, Store-Eintrag, geschlossener Test, 1.0.0 |
 | Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum (Linien, Knoten, Durchgänge, Runde für Runde am Handy, „Dein nächstes Spiel“, Setzplätze leer) – umgesetzt in #430 (Block 46.7); #431 Startseite III (Knopfleiste über den Sponsoren, Vorstand unter den News, Benutzermenü Gold/Rot) – umgesetzt in #433 (Block 46.8); #409 Referenzen (Teilnahme mit Team- oder Einzeleinträgen, je eigene Platzierung, Felder statt Titel-Muster, Podest-Optik) – umgesetzt in #445 (Block 46.9), Design-Rework „Erfolgswand“ – umgesetzt in #457 (Block 46.10); News-Detail am PC breit – umgesetzt in #472 (Block 46.11); Profilseite neu – umgesetzt in #474 (Block 46.12); Partner II Teil 1 (#469) – umgesetzt in #476 (Block 46.13); Partner II Teil 2 – umgesetzt in #479 (Block 46.14); #401 Turnierseite – umgesetzt in #532 (Block 51.2); Partner II Teil 3 (Referenzen) – umgesetzt in #482 (Block 46.15); Partnerseiten in Sitemap und App – umgesetzt in #483 (Block 46.16) |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | Prüfrunde vom 23.09. (Meilenstein 29): #434 ein Formular-Rahmen (Editor-Seite mit Seitenleiste und fester Speichern-Leiste; Turnier, Fast Lap, Event, News) – umgesetzt in #438 und #440 (Block 47.1); #435 kleine Formulare als Seitenblatt – Gruppe Verein in #441 (Block 47.2), eSports/Content/Mitglieder in #442; #436 Playwright bei drei Breiten in #443; #437 Web-CMS – Variante A umgesetzt in #530 (Block 51.1): totes CMS weg, E-Mail-Vorlagen als Seite – der Meilenstein ist durch |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
@@ -480,10 +480,15 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
 | Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; umgesetzt in #386 (Block 42), im Build 73 vom 23.09. |
-| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563 (Block 51.16); #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
+| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen – umgesetzt in #563 (Block 51.16); #327 und #331 – mit Vereine 1.4.0 im Meilenstein „Vereinsmodul 1.4“ umgesetzt (#565 Block 51.17, #582 Block 51.18); bleibt #323 Preisgelder und die Discord-Ideen #575–#577 |
 | Admin sauber I: ein Ort je Thema | Rundgang 25.09.: #508 (#523), #509 (#522), #511 (#524), #513/#514 (#519), #515 (#520) – Block 48.15; #510 Dolibarr-Schalter (#539), #516 Nutzermenü (#540), #512 Adminmenü (#543) – Block 51.7; #546 Einstellungen in die Menüleiste + Alle Verbindungen – umgesetzt in #549 (Block 51.10) – der Meilenstein ist durch |
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518, Block 48.15), #507 Antrag für bestehendes Konto (#526), #506 Konto im Admin verknüpfen (#544, Block 51.8) – der Meilenstein ist durch |
 | Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – umgesetzt in #550 (Block 51.10); #517 geschlossen – der Meilenstein ist durch (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
+| Vereinsmodul 1.4: Versammlungen, Abstimmungen, Helferdienste | #327 – umgesetzt in #565 (Block 51.17); #331 – umgesetzt in #582 (Block 51.18) – der Meilenstein ist durch |
+| Discord III: Bot statt Webhooks | Plan vom 25.09.: #566 der Bot schickt alle Meldungen, Kanal je Zweck, Webhooks weg – umgesetzt in #588 (Block 51.22); #567 persönlicher Kanal (PR #589), #568 Erfolge als Gratulation (PR #590), #583 Vorschau und Testkanal |
+| Discord IV: Live-Einbettungen und Termine | #569 Live-Einbettungen, #570 Discord-Termine, #571 Bracket als Text-Embed |
+| Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
+| Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News, #579 Twitch-Clips + Turnier live, #580 Kalender-Knöpfe, #584 „Gerade in Steam“ |
 
 ## Block 22 — Tempo und Betrieb
 
@@ -785,6 +790,10 @@ Am 25.09. früh gemergt: #556 (Welle 2 der Plattformen), #559 (#558 Haken je Pla
 (Welle 3 Mastodon/Bluesky), #560 (#415 Rest: Prüffälle verbergen), #562 (#223 Rest:
 Einstellungen-Seite) und #563 (#309 GitHub-Releases von selbst, Beta/Release-Plakette mit Rückfrage
 in der App) – damit sind „Web: Tempo und Betrieb“, „Discord II“ und „Moderation II“ durch.
+Mittags am 25.09. („die älteren Meilensteine endlich alle fertig“, „App v0.9 ewig ausstehend“): #565
+(#327 Versammlungen), #582 (#331 Helferdienste), #585 (#239 Tastatur-Sticker), #586 (#412
+Play-Upload), #587 (#219 Store-Paket), #588 (#566 Discord III Teil 1) – „App 0.9.0-beta“ und
+„Vereinsmodul 1.4“ sind durch; die alten Meilensteine hängen nur noch am Betreiber oder am Modul.
 
 ### Was 51.1 gefunden hat (#437 Variante A – PR #530)
 
@@ -919,6 +928,56 @@ prüft die Prüfsumme gegen die `.sha256`-Datei und setzt erst danach das aktuel
 nur mit Schalter aus (Standard an, solange die App Beta ist). Pre-Release = Beta, Release = Release:
 die App zeigt die Plakette und fragt vor dem Installieren je Art – so, wie der Betreiber es am 16.09.
 präzisiert hatte. Kasten unter System → App-Versionen mit Stand, Token, Schaltern, „Jetzt abgleichen“.
+
+### Was 51.17 gefunden hat (#327 Generalversammlung und Abstimmungen – PR #565, Modul 1.4.0)
+
+**Das Vereinsmodul 1.4.0 hatte Versammlungen, Anträge und Abstimmungen längst – die Website nicht.**
+Jetzt stehen sie im Mitgliederbereich (Web und App): Einladung mit Zu-/Absage, eigene Anträge,
+Stimmabgabe mit Rückfrage. Die Stimme geht mit einer Kennung aus Person, Abstimmung und Recht ans
+Modul – doppelt zählt nichts, und **welche Antwort jemand gab, steht nirgends im Log**. Der
+API-Benutzer braucht dafür das Recht „im Namen jedes Mitglieds abstimmen“; fehlt es, sagt es die
+Seite in Worten.
+
+### Was 51.18 gefunden hat (#331 Helferdienste – PR #582)
+
+**Dieselbe Lücke bei den Helferdiensten.** Veranstaltungen mit Schichten, Plätzen und eigenem
+Stand; „Ich helfe“ nach Rückfrage, Rücknahme nur, solange der Vorstand nicht bestätigt hat –
+bestätigen und zählen tut das Modul. Das Flow-Harness kann seitdem `delete()`.
+
+### Was 51.19 gefunden hat (#239 Sticker und GIFs der Tastatur – PR #585, App 0.18.0-beta)
+
+**„Dieser Inhalt kann hier nicht eingegeben werden“ – das TextInput von React Native nennt der
+Tastatur keine Bildtypen.** Ein lokales Expo-Modul gibt dem fertigen Eingabefeld einen
+`OnReceiveContentListener`; weil ReactEditText ein AppCompatEditText ist, trägt der die Typen in
+die EditorInfo ein und reicht Sticker und GIFs von Samsung-Tastatur und Gboard durch – auf jeder
+Android-Version, ohne eigenes Eingabefeld, ohne `android/`-Ordner im Repo. Damit die Animation
+nicht verloren geht, nimmt der Server GIF und animiertes WebP im Chat unverändert an (keine
+Neukodierung, keine verkleinerten Fassungen), und der Bildprüfer bekommt ein Standbild. Kotlin ist
+ohne Gerät geprüft: `expo prebuild` + Gradle-Kompilierung des Moduls.
+
+### Was 51.20 gefunden hat (#412 Play-Upload per API – PR #586)
+
+**Jedes Bundle wanderte von Hand in die Play Console.** Jetzt lädt das Release-Skript mit `--play`
+über die Google Play Developer API in den internen oder geschlossenen Test – JWT selbst signiert,
+keine neue Abhängigkeit, Produktion bewusst abgelehnt; `--check` sagt, ob das Dienstkonto die App
+sehen darf. Was fehlt, ist nur noch das Dienstkonto beim Betreiber (Klickweg in RELEASES.md).
+
+### Was 51.21 gefunden hat (#219 Teil 3 Play-Store-Paket – PR #587)
+
+**Der Store-Eintrag hing an Texten, Tabellen und Grafiken, die verstreut in Kommentaren lagen.**
+Jetzt an einer Stelle (`docs/PLAY_STORE.md`): Klickweg, Store-Texte, Datensicherheit,
+Inhaltseinstufung, Testkonto für Googles Prüfer, Screenshot-Regeln, Ablauf je Version; Symbol und
+Funktionsgrafik aus den Markenbildern per Skript. Offen bleibt nur, was das Entwicklerkonto braucht.
+
+### Was 51.22 gefunden hat (#566 Discord III Teil 1 – PR #588)
+
+**Zwei Wege in denselben Discord: sechs Webhook-Adressen und ein Bot daneben.** Entscheidung des
+Betreibers: nur noch der Bot. Je Zweck ein Kanal aus der Liste des Servers (der Bot liest, wo er
+schreiben darf), Versand über die Bot-Verbindung mit Kanal und Nachrichten-ID im Log – die
+Grundlage, um Nachrichten später zu bearbeiten. Die eine Regel bleibt an derselben Stelle: privat
+fällt nie auf öffentlich zurück. Bot aus heißt: nichts wird gesendet, der Grund steht in Worten im
+Log, im Admin und in der Vorschau. Die Erfolge-Meldung in den Kanal entfällt – die Person bekommt
+die Gratulation (Teil 3).
 
 ## Block 50 — Nachbesserungen vom 24.09.: Rechtliches speichern, Wegweiser, verknüpfte Konten
 
