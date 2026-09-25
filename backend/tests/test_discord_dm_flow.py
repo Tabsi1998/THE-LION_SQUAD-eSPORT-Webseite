@@ -140,9 +140,38 @@ async def test_bot_off_or_offline_means_no_direct_message_but_a_reason(flow, dms
     assert await discord_bot.BotRunner().send_dm(DISCORD_ID, {"title": "x"}) == {"ok": False, "reason": "bot_offline"}
 
 
+@pytest.mark.asyncio
+async def test_achievements_come_as_a_personal_congratulation(flow, dms, monkeypatch):
+    """Erfolge (#568): gebündelt, mit Namen, Punkten, Stufe und Weg zum Profil - Thema „Erfolge“ schaltet es ab."""
+    from services import achievement_queue
+
+    await bot_on(flow)
+    paula = await linked_player(flow)
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"display_name": "Paula"}})
+    monkeypatch.setattr(achievement_queue, "BUNDLE_WINDOW_SECONDS", -1)
+    group = {"code": "g", "name": "Turniersiege", "public": True}
+    await achievement_queue.note_award(paula["id"], {"code": "t1", "name": "Erster Sieg", "description": "x", "points": 50, "level": 1}, group)
+    await achievement_queue.note_award(paula["id"], {"code": "t2", "name": "Seriensieger", "description": "y", "points": 150, "level": 3}, group)
+    assert await achievement_queue.flush_awards() == {"users": 1, "notified": 1}
+    dm = dms[-1]
+    assert dm["title"] == "🏆 Stark, Paula! 2 Erfolge freigeschaltet"
+    assert "• **Erster Sieg** (Turniersiege) · +50 Punkte" in dm["description"] and "Seriensieger" in dm["description"]
+    assert "+200 Punkte" in dm["description"] and "unter „Erfolge“" in dm["description"]
+    assert dm["url"].endswith("/profile?tab=achievements") and dm["color"] == 0xFFD700, "Stufe 3 = Gold"
+
+    # Thema „Erfolge“ aus: In-App bleibt, Discord schweigt.
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"notification_preferences": {"discord": True, "discord:achievements": False}}})
+    await achievement_queue.note_award(paula["id"], {"code": "t3", "name": "Dritter", "description": "z", "points": 10, "level": 1}, group)
+    await achievement_queue.flush_awards()
+    assert len(dms) == 1
+    assert await flow.db.notifications.count_documents({"user_id": paula["id"], "kind": "achievement"}) == 2
+
+
 def test_direct_message_content_keeps_titles_and_links_but_not_foreign_text():
     plain = discord_dm.dm_content({"kind": "tournament_checkin", "title": "Check-in", "body": "15 Minuten", "url": "/t/1"}, "tournament_updates")
     assert plain == {"title": "Check-in", "description": "15 Minuten", "url": "/t/1", "color": 0x29B6E8}
     chat = discord_dm.dm_content({"kind": "team_chat_mention", "title": "Erwähnt", "body": "geheim"}, "community_messages")
     assert chat["description"] == discord_dm.PRIVATE_BODY_TEXT
-    assert discord_dm.dm_content({"kind": "achievement", "title": "Erfolg"}, None)["color"] == 0xFFD700
+    single = discord_dm.dm_content({"kind": "achievement", "title": "Erfolg", "body": "Talker · +20 Punkte", "meta": {"awards": [{"name": "Talker", "points": 20, "level": 2}], "level": 2}}, "achievements", name="Max")
+    assert single["title"] == "🏆 Stark, Max! Erfolg freigeschaltet" and single["description"].startswith("• **Talker** · +20 Punkte") and single["color"] == 0xC0C0C0
+    assert discord_dm.dm_content({"kind": "achievement", "title": "Erfolg", "body": "irgendwas"}, "achievements")["title"] == "🏆 Erfolg freigeschaltet"

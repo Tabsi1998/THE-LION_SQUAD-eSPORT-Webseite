@@ -27,9 +27,30 @@ PRIVATE_BODY_TEXT = "Öffne die Website oder die App, um sie zu lesen."
 COLORS = {"achievement": 0xFFD700, "prize_pending": 0xFFD700, "f1_prize": 0xFFD700, "f1_prize_reminder": 0xFFD700}
 
 
-def dm_content(notification: dict, category: str | None) -> dict:
+def achievement_content(notification: dict, name: str = "") -> dict:
+    """Die Gratulation (#568): persönlich, kurz, mit Erfolgsnamen, Punkten, Stufe (Farbe) und Weg zum Profil."""
+    from services.achievement_queue import LEVEL_COLORS
+
+    meta = notification.get("meta") or {}
+    awards = [award for award in (meta.get("awards") or []) if award.get("name")]
+    count = len(awards) or 1
+    what = "Erfolg freigeschaltet" if count == 1 else f"{count} Erfolge freigeschaltet"
+    title = f"🏆 Stark, {name}! {what}" if name else f"🏆 {what}"
+    lines = [f"• **{award['name']}**" + (f" ({award['group']})" if award.get("group") else "") + f" · +{int(award.get('points') or 0)} Punkte" for award in awards]
+    if not lines:
+        lines = [str(notification.get("body") or "")]
+    if count > 1 and meta.get("points"):
+        lines.append(f"\nInsgesamt **+{int(meta['points'])} Punkte**.")
+    lines.append("Alle deine Erfolge stehen im Profil unter „Erfolge“.")
+    return {"title": title[:256], "description": "\n".join(lines)[:1000], "url": str(notification.get("url") or "/profile?tab=achievements"),
+            "color": LEVEL_COLORS.get(int(meta.get("level") or 1), 0xFFD700)}
+
+
+def dm_content(notification: dict, category: str | None, name: str = "") -> dict:
     """Titel, Text und Link der Direktnachricht - ohne fremde Nachrichtentexte."""
     kind = str(notification.get("kind") or "")
+    if kind == "achievement":
+        return achievement_content(notification, name)
     body = str(notification.get("body") or "")
     if category in PRIVATE_BODY_CATEGORIES:
         body = PRIVATE_BODY_TEXT
@@ -65,7 +86,8 @@ async def send_discord_dm_for_notification(notification: dict, category: str | N
     discord_id = await discord_link_id(db, user_id)
     if not discord_id:
         return 0
-    content = dm_content(notification, category)
+    person = await db.users.find_one({"id": user_id}, {"_id": 0, "display_name": 1, "username": 1}) or {}
+    content = dm_content(notification, category, name=str(person.get("display_name") or person.get("username") or "").strip())
     log = {"id": new_id(), "channel": "discord", "target": DM_TARGET, "user_id": user_id, "event_key": f"notify.{kind}",
            "title": content["title"], "status": "skipped", "error": None, "reason": None,
            "notification_id": notification.get("id"), "created_at": now_utc().isoformat()}

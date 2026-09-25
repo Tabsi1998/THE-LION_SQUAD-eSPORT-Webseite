@@ -26,6 +26,13 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Gewinn bereit, übergeben oder Frist abgelaufen.",
         "default": True,
     },
+    # Erfolge (#568): in der App, per Push und als Gratulation vom Discord-Bot - eine E-Mail dafür gibt es nicht.
+    "achievements": {
+        "label": "Erfolge",
+        "description": "Freigeschaltete Erfolge – als Gratulation.",
+        "default": True,
+        "channels": ["in_app", "push", "discord"],
+    },
     "membership_updates": {
         "label": "Vereinsmitgliedschaft",
         "description": "Bewerbung, Mitgliedsstatus und Vereinsvorteile.",
@@ -141,6 +148,7 @@ NOTIFICATION_KIND_CATEGORY = {
     "f1_prize": "prize_updates",
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",
+    "achievement": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",
