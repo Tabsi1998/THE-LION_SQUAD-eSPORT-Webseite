@@ -631,6 +631,28 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Veranstaltungen und Helferdienste (#331), über die Bindung
+    async def my_events(self, who: dict) -> list[dict]:
+        """Veranstaltungen ab heute mit Helferdiensten und eigenem Stand (Fähigkeit events)."""
+        data = await self._get("/vereine/me/events", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def request_shift(self, who: dict, event_id: int, shift_id: int) -> dict:
+        """Helferdienst anfragen - der Vorstand bestätigt in Dolibarr; nochmal anfragen ändert nichts."""
+        data = await self._request("PUT", f"/vereine/me/events/{int(event_id)}/shifts/{int(shift_id)}", params=dict(who), key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def withdraw_shift(self, who: dict, event_id: int, shift_id: int) -> dict:
+        """Eine noch nicht bestätigte Anfrage zurückziehen."""
+        data = await self._request("DELETE", f"/vereine/me/events/{int(event_id)}/shifts/{int(shift_id)}", params=dict(who), key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     async def my_statutes(self, who: dict) -> dict:
         """Die Statuten, wie der Verein sie für Mitglieder freigibt - über die Bindung (Fähigkeit `documents`)."""
         data = await self._get("/vereine/me/statutes", dict(who))

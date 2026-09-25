@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping } from "lucide-react";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -26,6 +26,8 @@ export default function MemberAreaPage() {
   const [discordUrl, setDiscordUrl] = useState("");
   // Versammlungen und Abstimmungen (#327): nur, wenn die Vereinsakte welche liefert.
   const [meetings, setMeetings] = useState({ meetings: [], ballots: [] });
+  // Helferdienste (#331): eigene Dienste und freie Plätze aus der Vereinsakte.
+  const [helping, setHelping] = useState({ my_count: 0, open_places: 0 });
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -38,7 +40,8 @@ export default function MemberAreaPage() {
       api.get("/board?active_only=true"),
       api.get("/settings/public"),
       api.get("/membership/me/meetings"),
-    ]).then(([b, m, d, n, e, p, s, mt]) => {
+      api.get("/membership/me/helper-shifts"),
+    ]).then(([b, m, d, n, e, p, s, mt, hs]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -47,6 +50,7 @@ export default function MemberAreaPage() {
       if (p.status === "fulfilled") setContacts(boardContacts(p.value.data));
       if (s.status === "fulfilled") setDiscordUrl(s.value.data?.discord_invite_url || "");
       if (mt.status === "fulfilled" && mt.value.data?.available) setMeetings({ meetings: mt.value.data.meetings || [], ballots: mt.value.data.ballots || [] });
+      if (hs.status === "fulfilled" && hs.value.data?.available) setHelping({ my_count: hs.value.data.my_count || 0, open_places: hs.value.data.open_places || 0 });
       setLoaded(true);
     });
   }, []);
@@ -58,7 +62,8 @@ export default function MemberAreaPage() {
     : null;
   const nextMeeting = meetings.meetings.find((row) => row.upcoming) || null;
   const openBallots = meetings.ballots.filter((row) => row.status === "open").length;
-  const nothingYet = loaded && !internalEvents.length && !docs.length && !benefits.length && !internalNews.length && !nextMeeting && !openBallots;
+  const helpingSomething = helping.my_count > 0 || helping.open_places > 0;
+  const nothingYet = loaded && !internalEvents.length && !docs.length && !benefits.length && !internalNews.length && !nextMeeting && !openBallots && !helpingSomething;
 
   return (
     <PublicLayout>
@@ -123,6 +128,15 @@ export default function MemberAreaPage() {
                       <div className="text-xs text-white/50 mt-0.5">Deine Antwort: {nextMeeting.response_label}</div>
                     </Link>
                   ) : null}
+                </div>
+              </Section>
+            ) : null}
+
+            {helpingSomething ? (
+              <Section title="Helferdienste" icon={HandHelping} testId="member-area-helping" more={{ to: "/members/helfen", label: "Alle Helferdienste" }}>
+                <div className="space-y-1 text-sm">
+                  {helping.my_count ? <div data-testid="member-area-helping-mine" className="text-white">Du bist bei {helping.my_count === 1 ? "einem Dienst" : `${helping.my_count} Diensten`} eingetragen.</div> : null}
+                  {helping.open_places ? <Link to="/members/helfen" data-testid="member-area-helping-open" className="block text-[#FFD700] hover:text-white transition">{helping.open_places === 1 ? "Ein freier Platz" : `${helping.open_places} freie Plätze`} – der Verein braucht Hände</Link> : null}
                 </div>
               </Section>
             ) : null}

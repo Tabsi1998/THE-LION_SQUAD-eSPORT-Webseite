@@ -214,6 +214,9 @@ class FakeDolibarr:
         self.votes: dict[tuple[int, str], dict] = {}
         self.members_vote_right = True       # „… im Namen jedes Mitglieds abstimmen“ (member_id-Modus)
         self.today = "2026-09-25"
+        # Veranstaltungen und Helferdienste (#331, Vereine 1.4): Schichten mit Plätzen, Stand je Mitglied.
+        self.events: dict[int, dict] = {}
+        self.shift_states: dict[tuple[int, int, int], str] = {}   # (event, shift, member) → requested|confirmed|done|cancelled
         self.published_documents: list[dict] = []
         self.tampered_document_ids: set[int] = set()
         # Eigene Daten und Austritt (#329 Teil 2): Profil je Mitglied, Einreichungen je Kennung, Kündigungsregel.
@@ -414,6 +417,56 @@ class FakeDolibarr:
         if params.get("member_id") and not self.members_vote_right:
             return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to vote for members"}})
         return ident, None
+
+    # ---------- Veranstaltungen und Helferdienste (#331)
+    def add_event(self, event_id: int, *, label: str = "Sommerfest", day: str = "2026-10-10", end_day: str = "", place: str = "Vereinsheim",
+                  status: str = "planned", visibility: str = "members", registration: tuple[str, str] = ("none", ""), shifts=()) -> dict:
+        self.events[event_id] = {
+            "id": event_id, "label": label, "day": day, "end_day": end_day, "timezone": "Europe/Vienna", "place": place, "status": status,
+            "visibility": visibility, "registration": {"kind": registration[0], "external_ref": registration[1]},
+            "shifts": [dict(shift) for shift in shifts],
+        }
+        return self.events[event_id]
+
+    def set_event_status(self, event_id: int, status: str) -> None:
+        self.events[event_id]["status"] = status
+
+    def request_shift(self, event_id: int, shift_id: int, member_id: int) -> None:
+        self.shift_states[(event_id, shift_id, member_id)] = "requested"
+
+    def confirm_shift(self, event_id: int, shift_id: int, member_id: int) -> None:
+        """Der Vorstand bestätigt (auch ohne vorherige Anfrage) - der Platz zählt ab jetzt."""
+        self.shift_states[(event_id, shift_id, member_id)] = "confirmed"
+
+    def _shift_taken(self, event_id: int, shift_id: int) -> int:
+        return sum(1 for (e, sh, _m), state in self.shift_states.items() if e == event_id and sh == shift_id and state in ("confirmed", "done"))
+
+    def _my_event(self, event_id: int, member_id: int) -> dict:
+        event = self.events[event_id]
+        shifts = []
+        for shift in event["shifts"]:
+            taken = self._shift_taken(event_id, shift["id"])
+            shifts.append({**shift, "taken": taken, "full": taken >= int(shift["capacity"]), "mine": self.shift_states.get((event_id, shift["id"], member_id), "")})
+        return {key: value for key, value in event.items() if key != "shifts"} | {"shifts": shifts}
+
+    def _events_for(self, member_id: int) -> list[dict]:
+        return [self._my_event(event_id, member_id) for event_id in sorted(self.events)
+                if (self.events[event_id]["end_day"] or self.events[event_id]["day"]) >= self.today]
+
+    def _shift_conflict(self, event_id: int, shift: dict, member_id: int) -> str | None:
+        event = self.events[event_id]
+        if event["status"] == "cancelled":
+            return "cancelled"
+        if shift["day"] < self.today:
+            return "past"
+        if self._shift_taken(event_id, shift["id"]) >= int(shift["capacity"]):
+            return "full"
+        for other in event["shifts"]:
+            if other["id"] == shift["id"] or self.shift_states.get((event_id, other["id"], member_id), "") not in ("requested", "confirmed"):
+                continue
+            if other["day"] == shift["day"] and shift["start"] < other["end"] and other["start"] < shift["end"]:
+                return "overlap"
+        return None
 
     def _statutes_payload(self, visible: bool) -> dict:
         return self.statutes if visible else {"state": "not_published", "current": None, "versions": []}
@@ -932,6 +985,38 @@ class FakeDolibarr:
             right["state"], right["option"] = "used", body["option"]
             self.votes[(bid, external_id or f"anon-{len(self.votes)}")] = {"right_id": body["right_id"], "option": body["option"], "member_id": ident["member_id"]}
             return self._json_method("/vereine/me/ballots/{id}/votes", "post", self._my_ballot(bid, ident["member_id"]))
+        if path == "/vereine/me/events" and request.method == "GET":
+            ident, denied = self._person(params, "events")
+            if denied:
+                return denied
+            return self._json("/vereine/me/events", self._events_for(ident["member_id"]))
+        match = re.fullmatch(r"/vereine/me/events/(\d+)/shifts/(\d+)", path)
+        if match and request.method in ("PUT", "DELETE"):
+            ident, denied = self._person(params, "events")
+            if denied:
+                return denied
+            event_id, shift_id = int(match.group(1)), int(match.group(2))
+            event = self.events.get(event_id)
+            visible = event is not None and (event["end_day"] or event["day"]) >= self.today
+            shift = next((row for row in (event or {}).get("shifts", []) if row["id"] == shift_id), None)
+            if not visible or shift is None:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Shift not found"}})
+            key = (event_id, shift_id, ident["member_id"])
+            template = "/vereine/me/events/{id}/shifts/{shift}"
+            if request.method == "PUT":
+                if self.shift_states.get(key) == "requested":
+                    return self._json_method(template, "put", self._my_event(event_id, ident["member_id"]))
+                conflict = self._shift_conflict(event_id, shift, ident["member_id"])
+                if conflict:
+                    return httpx.Response(409, json={"error": {"code": 409, "message": conflict}})
+                self.shift_states[key] = "requested"
+                return self._json_method(template, "put", self._my_event(event_id, ident["member_id"]))
+            state = self.shift_states.get(key, "")
+            if state in ("confirmed", "done"):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "confirmed"}})
+            if state == "requested":
+                del self.shift_states[key]
+            return self._json_method(template, "delete", self._my_event(event_id, ident["member_id"]))
         if path == "/vereine/me/exit" and request.method == "POST":
             ident, denied = self._person(params, "profile")
             if denied:

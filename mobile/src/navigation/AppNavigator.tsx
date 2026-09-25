@@ -26,6 +26,7 @@ import { MemberAreaScreen } from "../screens/main/MemberAreaScreen";
 import { MemberCardScreen } from "../screens/main/MemberCardScreen";
 import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
 import { MemberMeetingsScreen } from "../screens/main/MemberMeetingsScreen";
+import { MemberHelperShiftsScreen } from "../screens/main/MemberHelperShiftsScreen";
 import { MyInvoicesScreen } from "../screens/main/MyInvoicesScreen";
 import { MyMembershipScreen } from "../screens/main/MyMembershipScreen";
 import { MatchDetailScreen } from "../screens/main/MatchDetailScreen";
@@ -234,6 +235,7 @@ function MoreStackScreen() {
       <MoreStack.Screen name="MyMembership" component={MyMembershipScreen} options={{ title: "Meine Mitgliedschaft", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberDocuments" component={MemberDocumentsScreen} options={{ title: "Dokumente", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberMeetings" component={MemberMeetingsScreen} options={{ title: "Versammlungen", headerTintColor: colors.gold }} />
+      <MoreStack.Screen name="MemberHelperShifts" component={MemberHelperShiftsScreen} options={{ title: "Helferdienste", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberCard" component={MemberCardScreen} options={{ title: "Mitgliedskarte", headerTintColor: colors.gold }} />
     </MoreStack.Navigator>
   );

@@ -151,6 +151,7 @@ const MemberAreaPage = lazy(() => import("@/pages/user/MemberAreaPage"));
 const MemberBenefitsPage = lazy(() => import("@/pages/user/MemberBenefitsPage"));
 const MemberDocumentsPage = lazy(() => import("@/pages/user/MemberDocumentsPage"));
 const MemberMeetingsPage = lazy(() => import("@/pages/user/MemberMeetingsPage"));
+const MemberHelperShiftsPage = lazy(() => import("@/pages/user/MemberHelperShiftsPage"));
 const MemberNewsPage = lazy(() => import("@/pages/user/MemberNewsPage"));
 const MyMembershipPage = lazy(() => import("@/pages/user/MyMembershipPage"));
 const MyInvoicesPage = lazy(() => import("@/pages/user/MyInvoicesPage"));
@@ -259,6 +260,7 @@ function App() {
           <Route path="/members/benefits" element={<ProtectedRoute requireMember><MemberBenefitsPage /></ProtectedRoute>} />
           <Route path="/members/documents" element={<ProtectedRoute requireMember><MemberDocumentsPage /></ProtectedRoute>} />
           <Route path="/members/meetings" element={<ProtectedRoute requireMember><MemberMeetingsPage /></ProtectedRoute>} />
+          <Route path="/members/helfen" element={<ProtectedRoute requireMember><MemberHelperShiftsPage /></ProtectedRoute>} />
           <Route path="/members/news" element={<ProtectedRoute requireMember><MemberNewsPage /></ProtectedRoute>} />
           <Route path="/members/membership" element={<ProtectedRoute requireMember><MyMembershipPage /></ProtectedRoute>} />
           {/* Eigene Rechnungen (#296): auch für Ehemalige - es zählt die Zuordnung, nicht die Mitgliedschaft. */}
