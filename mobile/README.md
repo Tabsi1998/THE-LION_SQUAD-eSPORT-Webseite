@@ -28,6 +28,12 @@ npx expo export --platform android
 npm run audit:ci
 ```
 
+## Native modules (Android)
+
+`modules/` holds the app's own Expo modules written in Kotlin. `expo prebuild` links them automatically during a release build, so no `android/` folder is committed.
+
+- `keyboard-image-input`: stickers and GIFs from the phone keyboard (Samsung Keyboard, Gboard) arrive as chat attachments (#239). The module gives the chat's text field an `OnReceiveContentListener`, copies the image into the app cache and reports it to JS as an `onKeyboardImage` event; `ChatThreadView` turns it into an upload like a picked photo.
+
 ## Push Notifications
 
 Remote push notifications are delivered by the OS through Expo Push. The app does not need to keep a polling process running in the background for normal "app closed from recents" cases.

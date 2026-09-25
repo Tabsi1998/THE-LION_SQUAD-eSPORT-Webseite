@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.0-beta - 2026-09-25
+
+- Mobile: Sticker und GIFs der Handy-Tastatur (Samsung-Tastatur, Gboard) lassen sich im Chat einfügen – sie landen als Anhang in der Nachricht, GIFs bleiben animiert. Vorher meldete Android „Dieser Inhalt kann hier nicht eingegeben werden“ (#239).
+- Mobile: Generalversammlung und Abstimmungen aus der Vereinsakte unter Mitgliederbereich → Versammlungen: Einladung, Zu- oder Absage, eigene Anträge und Stimmabgabe mit Rückfrage (#327).
+- Mobile: Beta oder Release ist bei App-Updates erkennbar; der Wechsel auf eine Beta fragt vorher nach (#309).
+- Mobile: Konten verknüpfen wie im Web – offizielle „Mit … verknüpfen“-Knöpfe für Spiele- und Social-Plattformen; was der Verein abgeschaltet hat, erscheint nirgends (#547, #558).
+- Mobile: Vereinsakte verbinden ohne Einladungscode, sobald der Verein die Zuordnung bestätigt hat; eigene Daten ändern und Austritt erklären unter „Meine Mitgliedschaft“ (#324, #533).
+- Mobile: Bildprüfung im Chat – ein hochgeladenes Bild sieht der Empfänger erst nach der automatischen Prüfung; bis dahin steht „wird geprüft“ (#415).
+
 ## 0.17.0-beta - 2026-09-23
 
 - Mobile: Updates je nach Herkunft der App – kommt sie über Google Play, öffnet sich Googles eigener Update-Dialog (bei Pflicht-Updates sofort), und der Banner führt in den Play Store statt eine APK zu laden, die sich über eine Play-Installation nicht installieren lässt. Die APK vom Vereinsserver bleibt für Geräte ohne Play; der Vorstand kann sie unter App-Versionen abschalten, sobald die App öffentlich ist (#421).

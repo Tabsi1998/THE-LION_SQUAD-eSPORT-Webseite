@@ -35,9 +35,10 @@ export type ChatAttachmentDraft = {
   attachment?: ChatAttachment;
 };
 
-const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]);
+// GIF (#239): Sticker und GIFs der Tastatur bleiben animiert; der Server kodiert sie nicht um.
+const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "image/heif"]);
 const VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
-const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "webp", "heic", "heif"]);
+const IMAGE_EXT = new Set(["png", "jpg", "jpeg", "webp", "gif", "heic", "heif"]);
 const VIDEO_EXT = new Set(["mp4", "webm", "mov", "m4v"]);
 
 function extension(name?: string | null) {
@@ -49,7 +50,7 @@ export function attachmentKindForAsset(asset: PickedAsset): AttachmentKind | nul
   const mime = String(asset.mimeType || "").toLowerCase();
   if (VIDEO_MIME.has(mime)) return "video";
   if (IMAGE_MIME.has(mime)) return "image";
-  if (mime) return null; // z. B. image/gif: bekannter Typ, im Chat nicht erlaubt
+  if (mime) return null; // z. B. application/pdf: bekannter Typ, im Chat nicht erlaubt
   const ext = extension(asset.fileName) || extension(asset.uri);
   if (VIDEO_EXT.has(ext)) return "video";
   if (IMAGE_EXT.has(ext)) return "image";
