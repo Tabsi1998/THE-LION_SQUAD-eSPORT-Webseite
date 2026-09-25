@@ -90,23 +90,6 @@ test("ohne Token am Server steht, was zu tun ist", async () => {
   expect(screen.getByTestId("app-release-token-status")).toHaveTextContent(/APP_RELEASE_UPLOAD_TOKEN in der Server-.env setzen/);
 });
 
-// Server-Updater an/aus (#421): der Schalter zeigt den Stand vom Server und schaltet ihn um.
-test("der Server-Updater lässt sich abschalten, sobald die App im Play Store ist", async () => {
-  apiMock.get.mockImplementation((url) => Promise.resolve(
-    String(url).endsWith("/status") ? { data: { upload_token: tokenStatus } }
-      : String(url).endsWith("/settings") ? { data: { server_updater_enabled: true } }
-        : { data: RELEASES },
-  ));
-  apiMock.patch.mockResolvedValue({ data: { server_updater_enabled: false } });
-  render(<MemoryRouter><AdminAppReleasesPage /></MemoryRouter>);
-  const toggle = await screen.findByTestId("app-release-server-updater-toggle");
-  expect(toggle).toBeChecked();
-  await userEvent.click(toggle);
-  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/admin/app-releases/settings", { server_updater_enabled: false }));
-  await waitFor(() => expect(screen.getByTestId("app-release-server-updater-toggle")).not.toBeChecked());
-  expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Google Play"));
-});
-
 // GitHub-Abgleich (#309): Stand, Token nur hin, Schalter, „Jetzt abgleichen“; je Release der Kanal.
 test("der GitHub-Kasten zeigt den Stand, speichert das Token und gleicht auf Knopfdruck ab", async () => {
   const user = userEvent.setup();

@@ -1,9 +1,11 @@
 import Constants from "expo-constants";
-import { API_BASE_URL } from "../config";
 
-// Update aus der App (#250). Der Server hält je Build eine APK; die App fragt
-// höchstens einmal pro Stunde nach, lädt mit ihrer Anmeldung und öffnet den
-// Installer. Alles, was sich ohne Gerät prüfen lässt, steht hier.
+// Update aus der App (#250, #421, #593). Seit der Play-Fassung kommt jedes Update über
+// Google Play: die App fragt höchstens einmal pro Stunde den Server, ob es einen neueren
+// Build gibt, zeigt den Banner mit „Was ist neu“ und startet Googles Update-Dialog oder
+// öffnet die Store-Seite. Den eigenen APK-Download mit Installer gibt es nicht mehr -
+// Google erlaubt die Berechtigung dafür nur App-Stores. Alles, was sich ohne Gerät prüfen
+// lässt, steht hier.
 
 export type AppRelease = {
   build: number;
@@ -32,7 +34,7 @@ export function channelLabel(channel: ReleaseChannel) {
   return channel === "beta" ? "BETA · Testversion" : "RELEASE";
 }
 
-/** Die Rückfrage vor dem Installieren (#309): je Art ein eigener Satz, Pflicht bleibt Pflicht. */
+/** Die Rückfrage vor dem Update (#309): je Art ein eigener Satz, Pflicht bleibt Pflicht. */
 export function installPrompt(channel: ReleaseChannel, mandatory: boolean): { title: string; message: string } {
   const duty = mandatory ? " Dieses Update ist Pflicht – ohne geht es nicht weiter." : "";
   if (channel === "beta") {
@@ -47,26 +49,17 @@ export type AppVersionInfo = {
   update_available: boolean;
   mandatory: boolean;
   next_check_after?: string;
-  /** Ob der Betreiber die Server-APK noch anbietet (#421); fehlt der Wert, gilt ja. */
+  /** Vom Server noch geliefert; seit der Play-Fassung (#593) ohne Wirkung in der App. */
   server_updater_enabled?: boolean;
   play_store_url?: string | null;
 };
 
-// Woher die App kommt (#421): über Google Play signiert Google - eine Server-APK lässt sich
-// darüber nicht installieren. Deshalb bekommen Play-Installationen Googles Update-Dialog, die
-// Server-APK bleibt für Sideload und den Notfall.
+// Woher die App kommt (#421): über Google Play signiert Google; nur dort gibt es den Update-Dialog
+// in der App. Bei Sideload-Installationen (Geräte ohne Google Play) führt der Banner in den Store.
 export type InstallSource = "play" | "sideload" | "unknown";
-export type UpdatePath = "play" | "server";
 
 export const PLAY_STORE_URL = "market://details?id=at.lionsquad.app";
 export const PLAY_STORE_WEB_URL = "https://play.google.com/store/apps/details?id=at.lionsquad.app";
-
-/** Welchen Weg der Banner zeigt: Play, sobald die App von dort kommt oder der Server-Updater aus ist. */
-export function updatePath(source: InstallSource, info: AppVersionInfo | null | undefined): UpdatePath {
-  if (source === "play") return "play";
-  if (info?.server_updater_enabled === false) return "play";
-  return "server";
-}
 
 export const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 export const SNOOZE_KEY = "tls.mobile.updateSnoozedBuild";
@@ -104,36 +97,4 @@ export function decideUpdate(info: AppVersionInfo | null | undefined, snoozedBui
 
 export function releaseTitle(release: AppRelease) {
   return `Build ${release.build} ist da – v${release.version}`;
-}
-
-export function releaseSizeLabel(size: number) {
-  if (!size) return "";
-  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-  return `${Math.round(size / 1024)} KB`;
-}
-
-/** Absolute Download-Adresse, gleich für Emulator und Server. */
-export function downloadUrl(release: AppRelease) {
-  const path = release.download_url || `/api/mobile/app-download/${release.build}`;
-  return path.startsWith("/") ? `${API_BASE_URL}${path}` : path;
-}
-
-/**
- * Stimmt die geladene Datei? Größe muss passen; MD5 wird verglichen, wenn
- * der Server einen hat. Ein Fehler hier heißt: nicht installieren.
- */
-export function verifyDownload(release: AppRelease, info: { size?: number; md5?: string | null }): string | null {
-  if (release.size && info.size !== undefined && info.size !== release.size) {
-    return `Datei unvollständig (${info.size} von ${release.size} Bytes).`;
-  }
-  if (release.md5 && info.md5 && info.md5.toLowerCase() !== release.md5.toLowerCase()) {
-    return "Prüfsumme stimmt nicht - Download verworfen.";
-  }
-  return null;
-}
-
-/** Wie der Fortschritt angezeigt wird: 0 bis 1, nie über 1. */
-export function progressShare(written: number, expected: number) {
-  if (!expected || expected <= 0) return 0;
-  return Math.min(1, Math.max(0, written / expected));
 }

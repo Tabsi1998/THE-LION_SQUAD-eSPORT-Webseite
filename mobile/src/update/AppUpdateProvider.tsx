@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { AppUpdateBanner } from "../components/AppUpdateBanner";
 import { WhatsNewCard } from "../components/WhatsNewCard";
 import { api } from "../lib/api";
-import { decideUpdate, ownBuild, shouldCheck, updatePath, SNOOZE_KEY, type AppVersionInfo } from "../lib/appUpdate";
+import { decideUpdate, ownBuild, shouldCheck, SNOOZE_KEY, type AppVersionInfo } from "../lib/appUpdate";
 import { detectInstallSource, startPlayUpdate, type PlayUpdateState } from "../lib/installSource";
 import { currentWhatsNew, SEEN_BUILD_KEY, shouldShowWhatsNew } from "../lib/whatsnew";
 import { isGuestUser } from "../live";
@@ -41,11 +41,11 @@ async function writeNumber(key: string, value: number) {
 }
 
 export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
   const [info, setInfo] = useState<AppVersionInfo | null>(null);
   const [snoozed, setSnoozed] = useState<number | null>(null);
   const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-  // Installationsquelle (#421): Play-Installationen bekommen Googles Dialog statt der Server-APK.
+  // Installationsquelle (#421, #593): Play-Installationen bekommen Googles Dialog, alle anderen den Store-Link.
   const [play, setPlay] = useState<PlayUpdateState | null>(null);
   const playDialogShown = useRef(false);
   const lastCheck = useRef<number | null>(null);
@@ -104,7 +104,6 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   }, [check, enabled]);
 
   const decision = decideUpdate(info, snoozed);
-  const path = updatePath(play?.source || "unknown", info);
 
   // Play kennt schon ein Update: Googles Dialog einmal je Sitzung von selbst öffnen - bei Pflicht
   // „sofort“, sonst im Hintergrund. Der Banner bleibt als zweiter Weg.
@@ -124,9 +123,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
         <AppUpdateBanner
           release={decision.release}
           mandatory={decision.mandatory}
-          token={accessToken}
-          path={path}
-          onStartPlayUpdate={path === "play" && play?.source === "play" ? (immediate) => startPlayUpdate(immediate && Boolean(play?.immediateAllowed)) : undefined}
+          onStartPlayUpdate={play?.source === "play" ? (immediate) => startPlayUpdate(immediate && Boolean(play?.immediateAllowed)) : undefined}
           onLater={() => {
             setSnoozed(decision.release?.build ?? null);
             void writeNumber(SNOOZE_KEY, decision.release?.build ?? 0);

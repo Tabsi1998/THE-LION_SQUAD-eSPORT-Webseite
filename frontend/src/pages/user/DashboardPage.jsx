@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { missingLabels } from "@/lib/profileCompleteness";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
@@ -183,8 +184,8 @@ export default function DashboardPage() {
                 <UserCheck className="w-3.5 h-3.5" /> Profil-Pflege
               </div>
               <h3 className="font-heading text-lg md:text-xl font-bold uppercase mt-0.5">Profil zu {completeness.score}% komplett</h3>
-              {completeness.missing?.length > 0 && (
-                <p className="text-xs text-white/55 mt-1">Fehlt: <span className="text-white/75">{completeness.missing.slice(0, 4).join(", ")}{completeness.missing.length > 4 ? "…" : ""}</span></p>
+              {missingLabels(completeness.missing).length > 0 && (
+                <p className="text-xs text-white/55 mt-1" data-testid="profile-completeness-missing">Fehlt: <span className="text-white/75">{missingLabels(completeness.missing, 4).join(", ")}{missingLabels(completeness.missing).length > 4 ? "…" : ""}</span></p>
               )}
             </div>
             <Link to="/profile" data-testid="profile-completeness-cta" className="px-4 py-2 border border-[#A855F7]/40 text-[#A855F7] hover:bg-[#A855F7]/10 rounded-sm text-xs font-bold uppercase tracking-wider whitespace-nowrap">Vervollständigen</Link>

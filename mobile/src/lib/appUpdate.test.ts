@@ -1,8 +1,7 @@
-import { channelLabel, installPrompt, releaseChannel } from "./appUpdate";
-import { decideUpdate, progressShare, releaseSizeLabel, releaseTitle, shouldCheck, updatePath, verifyDownload, type AppRelease } from "./appUpdate";
+import { channelLabel, decideUpdate, installPrompt, releaseChannel, releaseTitle, shouldCheck, type AppRelease } from "./appUpdate";
 
-// Update aus der App (#250): wann gefragt wird, wann der Banner erscheint,
-// wann ein Download als heil gilt.
+// Update aus der App (#250, #593): wann gefragt wird, wann der Banner erscheint, welche
+// Art (Beta oder Release) genannt wird. Den Download gibt es seit der Play-Fassung nicht mehr.
 
 const release: AppRelease = {
   build: 63, version: "0.5.0-beta", notes: "- Neu", sha256: "abc", md5: "d41d8cd98f00b204e9800998ecf8427e",
@@ -28,31 +27,8 @@ test("ein Pflicht-Update lässt sich nicht wegdrücken", () => {
   expect(decideUpdate({ current: release, update_available: true, mandatory: true }, 63)).toEqual({ show: true, mandatory: true, release });
 });
 
-test("Texte und Fortschritt", () => {
+test("Titel des Banners", () => {
   expect(releaseTitle(release)).toBe("Build 63 ist da – v0.5.0-beta");
-  expect(releaseSizeLabel(52_428_800)).toBe("50.0 MB");
-  expect(releaseSizeLabel(2048)).toBe("2 KB");
-  expect(progressShare(25, 100)).toBe(0.25);
-  expect(progressShare(200, 100)).toBe(1);
-  expect(progressShare(5, 0)).toBe(0);
-});
-
-test("eine unvollständige oder fremde Datei wird nicht installiert", () => {
-  expect(verifyDownload(release, { size: 52_428_800, md5: "D41D8CD98F00B204E9800998ECF8427E" })).toBeNull();
-  expect(verifyDownload(release, { size: 100 })).toMatch(/unvollständig/);
-  expect(verifyDownload(release, { size: 52_428_800, md5: "ffff" })).toMatch(/Prüfsumme/);
-  expect(verifyDownload({ ...release, md5: null }, { size: 52_428_800, md5: "egal" })).toBeNull();
-});
-
-// Herkunft der App (#421): Play-Installationen nehmen Googles Weg; die Server-APK nur, solange
-// der Betreiber sie anbietet.
-test("updatePath: Play bleibt Play, Sideload nimmt den Server - außer der Updater ist aus", () => {
-  const info = { current: null, update_available: true, mandatory: false } as const;
-  expect(updatePath("play", info)).toBe("play");
-  expect(updatePath("sideload", info)).toBe("server");
-  expect(updatePath("unknown", info)).toBe("server");
-  expect(updatePath("sideload", { ...info, server_updater_enabled: false })).toBe("play");
-  expect(updatePath("unknown", null)).toBe("server");
 });
 
 // Kanal und Rückfrage (#309): Beta aus dem Server-Feld oder der Versionsnummer; je Art ein eigener Satz.
