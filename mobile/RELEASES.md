@@ -39,6 +39,7 @@ Alles Geheime liegt **außerhalb des Repos**, standardmäßig in `%USERPROFILE%\
   upload.jks             Upload-Schlüssel der App (seit Build 57)
   google-services.json   aus Firebase, Android-App at.lionsquad.app (für Push)
   signing.json           Passwörter und Pfade
+  play-service-account.json   Dienstkonto der Play Console, nur für --play (#412)
 ```
 
 Aufbau von `signing.json`:
@@ -77,6 +78,7 @@ cd mobile
 npm run release:local -- --check     # zeigt, was fehlt
 npm run release:local -- --dry-run   # baut und prüft, veröffentlicht nichts
 npm run release:local                # baut, prüft und legt das Release an
+npm run release:local -- --play      # … und lädt das Bundle in den internen Test der Play Console (#412)
 ```
 
 Das Skript geht so vor:
@@ -90,6 +92,12 @@ Das Skript geht so vor:
    Prüfsumme in `builds/` ab und hängt es ans Release. Das Bundle ist mit dem Upload-Schlüssel
    signiert; Google signiert es beim Ausliefern mit dem App-Signaturschlüssel (Play App Signing) –
    dessen SHA-256 steht deshalb zusätzlich in `assetlinks.json` und beim Passkey-Login (#394).
+7. Mit `--play` lädt es das Bundle nach dem Release über die Google Play Developer API in den
+   **internen Test** der Play Console; `--play=closed` in den geschlossenen Test (bei Google
+   „alpha“), jeder andere Track-Name geht als `--play=<name>`. Produktion nie – die Freigabe an alle
+   klickt der Betreiber. `--play` schließt `--aab` ein. Versionshinweise kommen aus dem
+   Changelog-Abschnitt (bis 500 Zeichen). Scheitert der Upload, bleibt das GitHub-Release gültig;
+   das Skript endet mit Code 1 und nennt das Bundle unter `builds/` zum Hochladen von Hand.
 
 **Hinweise der Play Console beim Hochladen (#393):** „Mit diesem App Bundle ist keine
 Offenlegungsdatei verknüpft“ ist reine Information – die App wird nicht verschleiert
@@ -103,6 +111,19 @@ Skript erweitern.
 Passwörter bekommt Gradle nur über Umgebungsvariablen. Die Push-Datei wird nach dem Build aus `mobile/` entfernt, auch wenn der Build abbricht. `android/` und `builds/` sind von Git ausgeschlossen.
 
 Gebaut wird in einem eigenen Ordner außerhalb des Repos (Standard `C:\lsb`, änderbar mit `buildDir` in `signing.json`). Das Skript legt dort ein Git-Worktree des Commits an und installiert die Abhängigkeiten; beim nächsten Mal bleiben sie erhalten. So entspricht die APK genau dem Commit, und der Pfad ist kurz und ohne Leerzeichen. Im Projektpfad `C:\GIT Privat\…` brach der native Build von react-native-reanimated mit `manifest 'build.ninja' still dirty after 100 tries` ab; ein Umweg über ein `subst`-Laufwerk half nicht, weil Node die Pfade wieder zum echten Ort auflöst. Der Ordner braucht einige GB und darf jederzeit gelöscht werden. Der erste Build dauert rund 15 Minuten.
+
+### Play Console: Bundle automatisch laden (#412)
+
+Einmalig, sobald das Entwicklerkonto freigegeben ist (etwa zehn Minuten Klickweg):
+
+1. Play Console → **Einrichtung → API-Zugriff** → „Google Cloud-Projekt verknüpfen“ (das Firebase-Projekt der App geht; sonst ein neues anlegen lassen).
+2. Dort **Dienstkonto erstellen** → in der Google Cloud Console ein Dienstkonto `lionsapp-release` anlegen, **Schlüssel → JSON** erzeugen und herunterladen.
+3. Zurück in der Play Console beim Dienstkonto **Zugriff gewähren** → App „LionsAPP“ → Berechtigung „Releases in Test-Tracks veröffentlichen“ (interner und geschlossener Test). **Produktion bewusst nicht** – die 1.0.0 klickt der Betreiber selbst.
+4. Die JSON-Datei als `play-service-account.json` nach `%USERPROFILE%\.lionsapp-release` legen (anderer Ort: `playServiceAccountFile` in `signing.json` oder `LIONSAPP_PLAY_SERVICE_ACCOUNT`). **Nie ins Repo, nie in einen Chat.**
+
+`npm run release:local -- --check` sagt danach, ob das Dienstkonto die App sehen darf – ein lesender Aufruf (Edit anlegen, Tracks lesen, Edit verwerfen). Ohne die Datei ist das kein Fehler; sie ist nur für `--play` nötig.
+
+Automatisch: Bundle hochladen, Versionshinweise aus dem Changelog, Track fertigstellen. Klick bleibt: Produktion, Store-Eintrag, Datensicherheits-Formular, Tester-Listen.
 
 ## Update aus der App (#250)
 

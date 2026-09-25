@@ -7,6 +7,8 @@
  *   npm run release:local                bauen, prüfen und das Release anlegen
  *   npm run release:local -- --upload-only  die zuletzt gebaute APK nur an den Vereinsserver schicken
  *   npm run release:local -- --aab       zusätzlich das App Bundle (.aab) für die Play Console bauen (#219)
+ *   npm run release:local -- --play      … und das Bundle danach in den internen Test der Play Console laden (#412)
+ *   npm run release:local -- --play=closed  … in den geschlossenen Test (bei Google „alpha“); jeder Track-Name geht, Produktion nie
  *
  * Schlüssel, Passwörter und google-services.json liegen außerhalb des Repos,
  * standardmäßig in %USERPROFILE%\.lionsapp-release (Einrichtung: RELEASES.md).
@@ -25,6 +27,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const release = require("./release-version.cjs");
+const play = require("./play-publish.cjs");
 
 const mobileDir = path.resolve(__dirname, "..");
 const repoDir = path.resolve(mobileDir, "..");
@@ -32,8 +35,11 @@ const buildsDir = path.join(mobileDir, "builds");
 const isWindows = process.platform === "win32";
 const flags = new Set(process.argv.slice(2));
 const mode = flags.has("--check") ? "check" : flags.has("--dry-run") ? "dry-run" : flags.has("--upload-only") ? "upload-only" : "release";
+// Bundle in den Play-Test-Track (#412): --play (intern) oder --play=closed; Produktion nie.
+const playFlag = [...flags].find((flag) => flag === "--play" || flag.startsWith("--play="));
+const playTrack = playFlag ? (playFlag.includes("=") ? playFlag.slice("--play=".length) : "internal") : "";
 // Die Play Console nimmt nur App Bundles; die APK bleibt für Sideload und den Vereinsserver (#219).
-const wantBundle = flags.has("--aab");
+const wantBundle = flags.has("--aab") || Boolean(playTrack);
 const releaseDir = process.env.LIONSAPP_RELEASE_DIR || path.join(os.homedir(), ".lionsapp-release");
 const BUILD_MARKER = ".lionsapp-build";
 
@@ -117,6 +123,8 @@ function loadConfig() {
     // Update aus der App (#250): die APK nach dem Veröffentlichen an den Vereinsserver schicken.
     uploadUrl: String(pick("LIONSAPP_UPLOAD_URL", "uploadUrl", "")).replace(/\/+$/, ""),
     uploadToken: pick("LIONSAPP_UPLOAD_TOKEN", "uploadToken", ""),
+    // Bundle in den Play-Test-Track (#412): JSON-Schlüssel des Dienstkontos, nur nötig mit --play.
+    playServiceAccount: inReleaseDir(pick("LIONSAPP_PLAY_SERVICE_ACCOUNT", "playServiceAccountFile", "play-service-account.json")),
   };
 }
 
@@ -160,6 +168,61 @@ async function uploadToServer({ config, apkPath, apk, version, versionCode, chan
     return true;
   } catch (error) {
     console.warn(`Warnung: Server-Upload fehlgeschlagen (${error.message}). Das GitHub-Release gilt trotzdem.`);
+    return false;
+  }
+}
+
+/** Der JSON-Schlüssel des Play-Dienstkontos; jede Störung als klare Abbruchmeldung, nie mit Inhalt. */
+function loadPlayAccount(config) {
+  let account = null;
+  try {
+    account = play.loadServiceAccount(config.playServiceAccount);
+  } catch (error) {
+    fail(error.message);
+  }
+  if (!account) fail(`Play-Dienstkonto fehlt: ${config.playServiceAccount} (Einrichtung: RELEASES.md, „Play Console: Bundle automatisch laden“).`);
+  return account;
+}
+
+/**
+ * --check: liegt das Dienstkonto da, fragt ein lesender Aufruf, ob es die App sehen darf
+ * (Edit anlegen, Tracks lesen, Edit verwerfen). Fehlt es, ist das kein Fehler - nötig ist es nur mit --play.
+ */
+async function playCheck(config) {
+  let account;
+  try {
+    account = play.loadServiceAccount(config.playServiceAccount);
+  } catch (error) {
+    console.log(`[FEHLT] Play-Dienstkonto: ${error.message}`);
+    return;
+  }
+  if (!account) {
+    console.log(`[  -  ] Play-Dienstkonto: nicht eingerichtet (nur nötig für --play). Erwartet unter ${config.playServiceAccount}, siehe RELEASES.md.`);
+    return;
+  }
+  try {
+    const tracks = await play.checkAccess({ account, packageName: readJson("app.json").expo.android.package });
+    console.log(`[ ok  ] Play-Dienstkonto darf die App sehen (Tracks: ${tracks.join(", ") || "noch keine"})`);
+  } catch (error) {
+    console.log(`[FEHLT] Play-Dienstkonto: ${error.message}`);
+    console.log("       In der Play Console unter Einrichtung → API-Zugriff dem Dienstkonto die App und das Recht für Test-Tracks geben.");
+  }
+}
+
+/**
+ * Nach dem GitHub-Release: das Bundle in den Test-Track (#412). Scheitert es, bleibt das
+ * Release gültig - das Skript sagt es laut, endet mit Code 1 und nennt das Bundle zum Hochladen von Hand.
+ */
+async function publishToPlay({ account, aabPath, version, versionCode, changelog }) {
+  const { whatsNewEntries } = require("./whats-new.cjs");
+  const notes = whatsNewEntries(changelog, version).map((item) => `- ${item}`).join("\n");
+  try {
+    const result = await play.publishBundle({ account, packageName: readJson("app.json").expo.android.package, aabPath, versionCode, track: playTrack, notes });
+    console.log(`In der Play Console: Build ${result.versionCode} im Track „${result.track}“ (Edit ${result.editId}). Tester bekommen ihn nach Googles Prüfung.`);
+    return true;
+  } catch (error) {
+    console.warn(`Warnung: Play-Upload fehlgeschlagen (${error.message}). Das GitHub-Release gilt; das Bundle liegt unter ${aabPath} und lässt sich in der Play Console von Hand hochladen.`);
+    process.exitCode = 1;
     return false;
   }
 }
@@ -243,6 +306,17 @@ function gatherChecks() {
       : `Das ist ein anderes Zertifikat (${key.digest.slice(0, 8)}…), nicht der Upload-Schlüssel der App.`;
   add(key?.digest === release.EXPECTED_SIGNER_SHA256, "Schlüssel passt zum Zertifikat der App", keyHint, true);
   add(fs.existsSync(config.googleServices) && !insideRepo(config.googleServices), "google-services.json für Push liegt außerhalb des Repos", `Erwartet unter ${config.googleServices} (Firebase, App at.lionsquad.app).`);
+
+  if (playTrack) {
+    let trackProblem = "";
+    try {
+      play.resolveTrack(playTrack);
+    } catch (error) {
+      trackProblem = error.message;
+    }
+    add(!trackProblem, `Play-Track „${playTrack}“ ist ein Test-Track`, trackProblem);
+    add(fs.existsSync(config.playServiceAccount) && !insideRepo(config.playServiceAccount), "Play-Dienstkonto (JSON) liegt außerhalb des Repos", `Erwartet unter ${config.playServiceAccount} - Einrichtung: RELEASES.md, „Play Console: Bundle automatisch laden“.`);
+  }
 
   const gh = run("gh", ["auth", "status"], { capture: true, allowFailure: true });
   add(gh.status === 0, "GitHub CLI ist angemeldet", "gh auth login", true);
@@ -333,18 +407,21 @@ async function uploadOnly() {
   return ok;
 }
 
-function main() {
+async function main() {
   if (mode === "upload-only") return uploadOnly();
   const state = gatherChecks();
   printChecks(state.checks);
   const blocking = state.checks.filter((item) => !item.ok && !ignoredInThisMode(item));
   if (mode === "check") {
+    await playCheck(state.config);
     process.exitCode = blocking.length ? 1 : 0;
     return;
   }
   if (blocking.length) fail(`${blocking.length} Voraussetzung(en) fehlen, siehe oben.`);
 
   const { config, version, versionCode, tag, head } = state;
+  // Vor dem Bauen lesen: eine kaputte Dienstkonto-Datei soll nicht erst nach 20 Minuten Gradle auffallen.
+  const playAccount = playTrack ? loadPlayAccount(config) : null;
 
   step(`Build-Ordner vorbereiten: ${config.buildDir} (Commit ${head.slice(0, 7)})`);
   if (state.dirty) console.warn("Hinweis: Gebaut wird der letzte Commit. Ungespeicherte Änderungen sind nicht enthalten.");
@@ -433,6 +510,7 @@ function main() {
   }
 
   if (mode === "dry-run") {
+    if (playTrack) console.log("Play-Upload im Probelauf übersprungen - der Probelauf veröffentlicht nichts.");
     console.log("\nProbelauf fertig. Nichts veröffentlicht.");
     return;
   }
@@ -451,12 +529,15 @@ function main() {
   git(["fetch", "--quiet", "--tags", "origin"]);
   console.log(`\nVeröffentlicht: ${release.releaseName(version, versionCode)}`);
   step("APK an den Vereinsserver schicken");
-  return uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
+  const uploaded = await uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
+  if (playTrack) {
+    step(`App Bundle in den Play-Test-Track „${play.resolveTrack(playTrack)}“ laden`);
+    await publishToPlay({ account: playAccount, aabPath, version, versionCode, changelog });
+  }
+  return uploaded;
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.error(error instanceof ReleaseAbort ? `\nAbgebrochen: ${error.message}` : error);
   process.exitCode = 1;
-}
+});
