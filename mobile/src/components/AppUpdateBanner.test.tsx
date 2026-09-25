@@ -29,7 +29,7 @@ test("Herunterladen schickt die Anmeldung mit, prüft die Datei und öffnet den 
   });
   const installer = jest.fn(async () => {});
   await render(
-    <AppUpdateBanner release={release} mandatory={false} token="token-1" onLater={jest.fn()} onWhatsNew={jest.fn()} downloader={downloader} installer={installer} />,
+    <AppUpdateBanner release={release} mandatory={false} token="token-1" onLater={jest.fn()} onWhatsNew={jest.fn()} confirmInstall={async () => true} downloader={downloader} installer={installer} />,
   );
 
   expect(screen.getByText("Build 63 ist da – v0.5.0-beta")).toBeTruthy();
@@ -45,7 +45,7 @@ test("eine falsche Prüfsumme wird nicht installiert, „Nochmal“ erscheint", 
   const downloader = jest.fn(async () => ({ uri: "file:///cache/x.apk", size: 4, md5: "ff" }));
   const installer = jest.fn(async () => {});
   await render(
-    <AppUpdateBanner release={release} mandatory={false} token={null} onLater={jest.fn()} onWhatsNew={jest.fn()} downloader={downloader} installer={installer} />,
+    <AppUpdateBanner release={release} mandatory={false} token={null} onLater={jest.fn()} onWhatsNew={jest.fn()} confirmInstall={async () => true} downloader={downloader} installer={installer} />,
   );
 
   await fireEvent.press(screen.getByTestId("app-update-download"));
@@ -58,13 +58,13 @@ test("eine falsche Prüfsumme wird nicht installiert, „Nochmal“ erscheint", 
 test("ein Pflicht-Update hat kein „Später“, ein normales schon", async () => {
   const onLater = jest.fn();
   const { rerender } = await render(
-    <AppUpdateBanner release={release} mandatory onLater={onLater} onWhatsNew={jest.fn()} token={null} downloader={jest.fn()} installer={jest.fn()} />,
+    <AppUpdateBanner release={release} mandatory onLater={onLater} onWhatsNew={jest.fn()} confirmInstall={async () => true} token={null} downloader={jest.fn()} installer={jest.fn()} />,
   );
   expect(screen.queryByTestId("app-update-later")).toBeNull();
   expect(screen.getByText(/Dieses Update ist Pflicht\./)).toBeTruthy();
 
   await rerender(
-    <AppUpdateBanner release={release} mandatory={false} onLater={onLater} onWhatsNew={jest.fn()} token={null} downloader={jest.fn()} installer={jest.fn()} />,
+    <AppUpdateBanner release={release} mandatory={false} onLater={onLater} onWhatsNew={jest.fn()} confirmInstall={async () => true} token={null} downloader={jest.fn()} installer={jest.fn()} />,
   );
   await fireEvent.press(screen.getByTestId("app-update-later"));
   expect(onLater).toHaveBeenCalledTimes(1);
@@ -78,7 +78,7 @@ test("über Google Play: Update starten statt herunterladen, Store als Rückfall
   const downloader = jest.fn();
   const onStartPlayUpdate = jest.fn(async () => false);
   await render(
-    <AppUpdateBanner release={release} mandatory onLater={jest.fn()} onWhatsNew={jest.fn()} token={null} path="play" onStartPlayUpdate={onStartPlayUpdate} downloader={downloader} installer={jest.fn()} />,
+    <AppUpdateBanner release={release} mandatory onLater={jest.fn()} onWhatsNew={jest.fn()} confirmInstall={async () => true} token={null} path="play" onStartPlayUpdate={onStartPlayUpdate} downloader={downloader} installer={jest.fn()} />,
   );
   expect(screen.queryByTestId("app-update-download")).toBeNull();
   expect(screen.getByText(/kommt über den Play Store/)).toBeTruthy();
@@ -88,4 +88,27 @@ test("über Google Play: Update starten statt herunterladen, Store als Rückfall
   await waitFor(() => expect(openUrl).toHaveBeenCalledWith("market://details?id=at.lionsquad.app"));
   expect(downloader).not.toHaveBeenCalled();
   openUrl.mockRestore();
+});
+
+// Beta oder Release (#309): Plakette im Kopf, Rückfrage je Art vor dem Download; „Abbrechen“ lädt nichts.
+test("Beta-Plakette und Rückfrage: abgelehnt lädt nichts, bestätigt lädt", async () => {
+  const downloader = jest.fn(async () => ({ uri: "file:///cache/x.apk", size: 4, md5: "AA" }));
+  const installer = jest.fn(async () => {});
+  const confirmInstall = jest.fn(async () => false);
+  const { rerender } = await render(
+    <AppUpdateBanner release={release} mandatory={false} token={null} onLater={jest.fn()} onWhatsNew={jest.fn()} confirmInstall={confirmInstall} downloader={downloader} installer={installer} />,
+  );
+  expect(screen.getByTestId("app-update-channel")).toHaveTextContent("BETA · Testversion");
+  await fireEvent.press(screen.getByTestId("app-update-download"));
+  await waitFor(() => expect(confirmInstall).toHaveBeenCalledWith("beta", false));
+  expect(downloader).not.toHaveBeenCalled();
+
+  const yes = jest.fn(async () => true);
+  await rerender(
+    <AppUpdateBanner release={{ ...release, version: "1.0.0", channel: "release" }} mandatory token={null} onLater={jest.fn()} onWhatsNew={jest.fn()} confirmInstall={yes} downloader={downloader} installer={installer} />,
+  );
+  expect(screen.getByTestId("app-update-channel")).toHaveTextContent("RELEASE");
+  await fireEvent.press(screen.getByTestId("app-update-download"));
+  await waitFor(() => expect(installer).toHaveBeenCalled());
+  expect(yes).toHaveBeenCalledWith("release", true);
 });
