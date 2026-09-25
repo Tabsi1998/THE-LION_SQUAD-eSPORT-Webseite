@@ -464,7 +464,7 @@ Version und werden zusammen als Beta veröffentlicht.
 | Web: Design II | Prüfrunde vom 23.09. (Meilenstein 27): #402 Kalender auf der Website mit Abo-Feed – umgesetzt in #413 (Block 46); #403 Footer + #407 Startseite (Community zuerst, Zahlen, Ansprechpartner) – umgesetzt in #422 (Block 46.2); #400 QR mit dem bestehenden Löwen-PNG, eine Komponente, PNG/SVG-Druck – umgesetzt in #424 (Block 46.3); #425 Startseite II (Turnierteilnahmen, Hochzählen, Hero ohne Knöpfe, Discord/Play im Footer) – umgesetzt in #427 (Block 46.4); #426 Layout am PC (Container 1792 px, mehr Spalten) – umgesetzt in #428 (Block 46.5); #408 Adminmenü – umgesetzt in #429 (Block 46.6); #399 Turnierbaum (Linien, Knoten, Durchgänge, Runde für Runde am Handy, „Dein nächstes Spiel“, Setzplätze leer) – umgesetzt in #430 (Block 46.7); #431 Startseite III (Knopfleiste über den Sponsoren, Vorstand unter den News, Benutzermenü Gold/Rot) – umgesetzt in #433 (Block 46.8); #409 Referenzen (Teilnahme mit Team- oder Einzeleinträgen, je eigene Platzierung, Felder statt Titel-Muster, Podest-Optik) – umgesetzt in #445 (Block 46.9), Design-Rework „Erfolgswand“ – umgesetzt in #457 (Block 46.10); News-Detail am PC breit – umgesetzt in #472 (Block 46.11); Profilseite neu – umgesetzt in #474 (Block 46.12); Partner II Teil 1 (#469) – umgesetzt in #476 (Block 46.13); Partner II Teil 2 – umgesetzt in #479 (Block 46.14); #401 Turnierseite – umgesetzt in #532 (Block 51.2); Partner II Teil 3 (Referenzen) – umgesetzt in #482 (Block 46.15); Partnerseiten in Sitemap und App – umgesetzt in #483 (Block 46.16) |
 | Admin II: Formulare, CMS, E-Mail-Vorlagen | Prüfrunde vom 23.09. (Meilenstein 29): #434 ein Formular-Rahmen (Editor-Seite mit Seitenleiste und fester Speichern-Leiste; Turnier, Fast Lap, Event, News) – umgesetzt in #438 und #440 (Block 47.1); #435 kleine Formulare als Seitenblatt – Gruppe Verein in #441 (Block 47.2), eSports/Content/Mitglieder in #442; #436 Playwright bei drei Breiten in #443; #437 Web-CMS – Variante A umgesetzt in #530 (Block 51.1): totes CMS weg, E-Mail-Vorlagen als Seite – der Meilenstein ist durch |
 | Web: Anmeldung und Teilen | Block 26, Wünsche des Betreibers vom 21.09.: #348 angemeldet bleiben, Passkey anbieten, Zwei-Faktor für alle einrichtbar; #347 neutrale Link-Vorschau für Vereinsinhalte – umgesetzt in #353 |
-| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223 offen, #231 klassischer Leseweg – umgesetzt in #534 (Block 51.4); dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
+| Web: Tempo und Betrieb | Block 15 und 22: #221, #232, #233, #265 (#299) umgesetzt; #223 Teil 1 Turnierbearbeitung – umgesetzt in #554, Teil 2 Galerie/Fast Lap/Medien – in #555 (Block 51.13), Rest `AdminSettingsPage` – PR #562; #231 klassischer Leseweg – umgesetzt in #534 (Block 51.4); dazu #310 Livestreams der Mitglieder fehlen auf der Startseite (Bug vom 16.09.) |
 | Web: Profil I – Aufbau | Block 19: #253 Layout für PC/Tablet/Handy (#267: Seitenmenü, volle Breite, eine Datei je Reiter, umgesetzt), #257 Privatsphäre und Benachrichtigungen (#275, umgesetzt), #258 Grunddaten und Sicherheit (#276, umgesetzt) – Meilenstein abgeschlossen |
 | Web: Profil II – Nachrichten und Dashboard | Block 19: #254 Inbox als Chat (#278, umgesetzt), #255 Benachrichtigungen anklickbar (#279, umgesetzt), #256 Dashboard (#280, umgesetzt), #259 Freunde (#281, umgesetzt; #222 ist darin aufgegangen) – Meilenstein abgeschlossen |
 | Web: Mitgliederbereich und Kopfzeile | Nachtrag zu Block 19 aus dem Betreiber-Test vom 16.09.: #282 Benutzermenü im Kopf, Weg ins Profil (#285, umgesetzt), #283 „Interne Events“ aus der Event-Liste statt Platzhalter (#285, umgesetzt), #284 Mitgliederbereich aufräumen (#298, umgesetzt) – Meilenstein abgeschlossen |
@@ -472,18 +472,18 @@ Version und werden zusammen als Beta veröffentlicht.
 | Dolibarr II: Eigene Rechnungen und PDF | Block 24.3: #296 eigene Rechnungen mit PDF und Zahlungsweg, #325 PDF-Betrachter – umgesetzt in #356 |
 | Abrechnung I: Grundlage und Events | Epic #314. Teil 1 in #363 (Block 29.1): #315, #318. Teil 2 in #365 (Block 29.2): #316 Kunden, #317 Belege ohne Dubletten, Stand zurücklesen. #370 Konditionen und Belegtexte in #372 (Block 32). #320 eigene Rechnungen für alle in #381 (Block 39). #321 + #322 Rest (Zahlungsstand, Prüffälle, Erstattungen, Summen, Steuersätze bestätigen) in #388 (Block 43) – der Meilenstein ist durch |
 | Abrechnung II: Turniere | Block 31: #319 Startgelder für Solo- und Team-Anmeldungen – umgesetzt in #371; damit schließt das Epic #314 |
-| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398, Teil 2 Vorstandsseite aus Dolibarr – umgesetzt in #468 (Block 48.6) (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 3 Statuten aus Dolibarr (dolibarr-vereine#158, Modul 0.11) – umgesetzt in #485 (Block 48.7). #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), #324 Teil 1 Vereinsakte verbinden und eigene Unterlagen – umgesetzt in #486 (Block 48.8); #329 Teil 2 Meine Daten und Austritt – umgesetzt in #488 (Block 48.9); App-Teil – umgesetzt in #490 (Block 48.10); #326 Teil 4 Kanäle des Vereins + #324 Statuten-Archiv – umgesetzt in #492 (Block 48.11); Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag) – umgesetzt in #493 (Block 48.12); Klarname bleibt + Profil aus Dolibarr (Modul #256) – umgesetzt in #495/#496 (Block 48.13); Stand sichtbar + Vertrag 1.1.0 – umgesetzt in #498/#499/#500 (Block 48.14); Verzeichnis ohne Doppelte + Karte ohne Konto – umgesetzt in #518 (Block 48.15); eigenes Website-Profil im Feld-Format (dolibarr-vereine#260, Vereine 1.2.0) – umgesetzt in #528; #531 Vereinsakte ohne Einladungscode (Vereine 1.4.0) – umgesetzt in #533 (Block 51.3); #324 Rechnungen über die Bindung + Vertrag 1.4.0 – umgesetzt in #538 (Block 51.6); offen: #329 Mandat (dolibarr-vereine#125), #537 Altlast Uploads |
+| Dolibarr III: Dokumente, Vereinsseiten, Mitgliedschaft online | #326 Vereinsdaten und Vorstand – Teil 1 in #398, Teil 2 Vorstandsseite aus Dolibarr – umgesetzt in #468 (Block 48.6) (Block 44: Impressum/Kontakt/Datenschutz aus Dolibarr, Datenschutzerklärung aus den echten Schaltern); Teil 3 Statuten aus Dolibarr (dolibarr-vereine#158, Modul 0.11) – umgesetzt in #485 (Block 48.7). #405 Sponsoren und Partner aus Dolibarr als Schalter – umgesetzt in #447 (Block 48.1); #406 „Über den Verein“ aus echten Daten – umgesetzt in #448 (Block 48.2); #410 Mitgliederverzeichnis per Opt-in – umgesetzt in #449 (Block 48.3); #328 Beitrittsantrag über Dolibarr – umgesetzt in #450 (Block 48.4); #329 Teil 1 Einwilligungen – umgesetzt in #452 (Block 48.5), #324 Teil 1 Vereinsakte verbinden und eigene Unterlagen – umgesetzt in #486 (Block 48.8); #329 Teil 2 Meine Daten und Austritt – umgesetzt in #488 (Block 48.9); App-Teil – umgesetzt in #490 (Block 48.10); #326 Teil 4 Kanäle des Vereins + #324 Statuten-Archiv – umgesetzt in #492 (Block 48.11); Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag) – umgesetzt in #493 (Block 48.12); Klarname bleibt + Profil aus Dolibarr (Modul #256) – umgesetzt in #495/#496 (Block 48.13); Stand sichtbar + Vertrag 1.1.0 – umgesetzt in #498/#499/#500 (Block 48.14); Verzeichnis ohne Doppelte + Karte ohne Konto – umgesetzt in #518 (Block 48.15); eigenes Website-Profil im Feld-Format (dolibarr-vereine#260, Vereine 1.2.0) – umgesetzt in #528; #531 Vereinsakte ohne Einladungscode (Vereine 1.4.0) – umgesetzt in #533 (Block 51.3); #324 Rechnungen über die Bindung + Vertrag 1.4.0 – umgesetzt in #538 (Block 51.6); #537 Upload-Inventar – umgesetzt in #553 (Block 51.12); offen: #329 Mandat (dolibarr-vereine#125) |
 | Discord I: Kanäle und Meldungen | Hieß bis 21.09. „Discord: Kanäle und Bot“. Block 25: #300 ein Webhook je Zweck mit Schaltern je Ereignis, #301 Erfolge sofort und gebündelt, #303 Meldungen mit Bild, Link und Vorschau – umgesetzt in #350 |
-| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; Anleitungen und Prüfung – umgesetzt in #465 (Block 50.5); App-Karte verknüpfte Konten (#459) – umgesetzt in #480; Konten verknüpfen II (Battle.net, X, YouTube, TikTok, Riot, Xbox, Epic) – umgesetzt in #467 (Block 50.7); Menügruppe Verbindungen – umgesetzt in #470 (Block 50.8); Verbindungen ohne Doppeltes – umgesetzt in #475 (Block 50.9); Bot-Fehler als Klickweg und Neustart von selbst – umgesetzt in #484 (Block 50.10); #521 offizielle „Mit … verknüpfen“-Knöpfe – umgesetzt in #536 (Block 51.5); #541 Plattform-Liste der Vereins-Kanäle – umgesetzt in #542 (Block 51.8); offen: #547 Konten verknüpfen III, #545 Google-Prüfung (PR #548, Block 51.9) |
-| Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – umgesetzt in #463 (Block 49.2); #415 Bildprüfung – umgesetzt in #478 (Block 49.3); offen: AWS Rekognition als dritter Anbieter |
+| Discord II: Konto-Verknüpfung und Bot | #260 Plattform-Konten verknüpfen – umgesetzt in #376 (Block 34), Nachtrag verknüpfte Konten sichtbar und Grund der Plattform – umgesetzt in #458 (Block 50.2); #302 Discord-Bot im Backend für Aktivitätszähler, Rollenabgleich und Befehle – umgesetzt in #378 (Block 36), Einrichtung durch den Betreiber im Admin; Anleitungen und Prüfung – umgesetzt in #465 (Block 50.5); App-Karte verknüpfte Konten (#459) – umgesetzt in #480; Konten verknüpfen II (Battle.net, X, YouTube, TikTok, Riot, Xbox, Epic) – umgesetzt in #467 (Block 50.7); Menügruppe Verbindungen – umgesetzt in #470 (Block 50.8); Verbindungen ohne Doppeltes – umgesetzt in #475 (Block 50.9); Bot-Fehler als Klickweg und Neustart von selbst – umgesetzt in #484 (Block 50.10); #521 offizielle „Mit … verknüpfen“-Knöpfe – umgesetzt in #536 (Block 51.5); #541 Plattform-Liste der Vereins-Kanäle – umgesetzt in #542 (Block 51.8); #545 Google-Prüfung – umgesetzt in #548 (Block 51.9); #547 Konten verknüpfen III Welle 1 – umgesetzt in #552 (Block 51.11), Welle 2 – PR #556, Welle 3 (Mastodon, Bluesky) – PR #561, #558 Haken je Plattform – PR #559 |
+| Moderation II | #417 Wortfilter – umgesetzt in #453 (Block 49.1); #416 Verwarnungen mit Stufen – umgesetzt in #463 (Block 49.2); #415 Bildprüfung – umgesetzt in #478 (Block 49.3), Rest (Prüffälle bei öffentlichen Uploads verbergen) – PR #560; AWS Rekognition bleibt „bei Bedarf“ |
 | Web: Rollen und Rechte | Block 23: #287–#292 in einem PR umgesetzt – Meilenstein abgeschlossen |
 | Web: Dynamik | Block 20: #224, #225, #226 – umgesetzt in #360 (Block 28) |
 | Admin und Turniere | Block 16 und 21: #203, #204, #227, #228, #235 – umgesetzt in #369 (Block 30); #368 Leitfaden Schritt 2 – umgesetzt in #375 (Block 30.2) |
 | Auszeichnungen und Marke | #229 Block 17 Rest – umgesetzt in #379 (Block 37), im Build 70 vom 23.09.; #230 Block 18 Banner und Trophäen – Entscheidungen am 23.09. bestätigt; umgesetzt in #386 (Block 42), im Build 73 vom 23.09. |
-| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
-| Admin sauber I: ein Ort je Thema | Rundgang 25.09.: #508 (#523), #509 (#522), #511 (#524), #513/#514 (#519), #515 (#520) – Block 48.15; #510 Dolibarr-Schalter (#539), #516 Nutzermenü (#540), #512 Adminmenü (#543) – Block 51.7; #546 Einstellungen in die Menüleiste + Alle Verbindungen – PR #549 (Block 51.10) |
+| Später | Ohne Termin: #309 GitHub-Releases automatisch abgleichen – PR #563; #323 Preisgelder, #327 Generalversammlung und Stimmabgabe, #331 Helferdienste – die drei warten auf das Vereinsmodul („Später“ bzw. v0.8) |
+| Admin sauber I: ein Ort je Thema | Rundgang 25.09.: #508 (#523), #509 (#522), #511 (#524), #513/#514 (#519), #515 (#520) – Block 48.15; #510 Dolibarr-Schalter (#539), #516 Nutzermenü (#540), #512 Adminmenü (#543) – Block 51.7; #546 Einstellungen in die Menüleiste + Alle Verbindungen – umgesetzt in #549 (Block 51.10) – der Meilenstein ist durch |
 | Mitglieder sauber: Vereinsprofile und Konten | #504/#505 (#518, Block 48.15), #507 Antrag für bestehendes Konto (#526), #506 Konto im Admin verknüpfen (#544, Block 51.8) – der Meilenstein ist durch |
-| Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – PR #550 (Block 51.10); offen: gemeinsames Schreibmodell `ops_events` |
+| Betrieb & Logs: ein Logsystem mit Alarmen | #517 Teil 1 Alarme – umgesetzt in #525; Teil 2 eine Seite „Betrieb & Logs“ – umgesetzt in #550 (Block 51.10); #517 geschlossen – der Meilenstein ist durch (ein gemeinsames Schreibmodell `ops_events` bleibt eine spätere Idee) |
 
 ## Block 22 — Tempo und Betrieb
 
@@ -779,6 +779,11 @@ Einträge – ein Einzelstarter seine Platzierung, ein Teammitglied die seines T
 hatte die offenen Fragen als Kommentare beantwortet.** Zwölf PRs an einem Abend, alle gemergt;
 danach drei Dinge, die er beim Einrichten von Google fand (Google-Prüfung, Einstellungen als
 zweites Menü, „Verbindungen weg“) und der Wunsch nach allen Plattformen mit Anmeldung (#547).
+Bis in die Nacht kamen dazu und wurden gemergt: #548 (Google), #549 (Menü), #550 (Betrieb &
+Logs), #552 (Plattformen Welle 1), #553 (Upload-Inventar), #554/#555 (#223 Teile 1 und 2);
+Welle 2 der Plattformen als PR #556, darauf #559 (#558 Haken je Plattform) und #561 (Welle 3
+Mastodon/Bluesky); dazu #560 (#415 Rest: Prüffälle verbergen), #562 (#223 Rest: Einstellungen-Seite) und #563 (#309 GitHub-Releases von selbst,
+Beta/Release-Plakette mit Rückfrage in der App).
 
 ### Was 51.1 gefunden hat (#437 Variante A – PR #530)
 
@@ -834,7 +839,7 @@ Ein Profil ist kein Konto und keine Mitgliedschaft: Kasten „Konto“ im Admin 
 lösen, Bild/Spiele übernehmen), das Mitglied übernimmt über die Dolibarr-Zuordnung das
 Vorstandsprofil statt ein zweites anzulegen, ein gelöstes Konto bleibt gelöst.
 
-### Was 51.9 gefunden hat (#545 Google-Prüfung – PR #548, offen)
+### Was 51.9 gefunden hat (#545 Google-Prüfung – PR #548)
 
 **Google bemängelte: Datenschutz zu dünn, Startseite „braucht Anmeldung“, Zweck unklar, Name
 passt nicht.** Ursache: Crawler bekamen nur die Server-Vorschau mit einem Satz. Die Rechtstexte
@@ -843,7 +848,7 @@ ohne JavaScript, was Website und App tun; die Datenschutzerklärung nennt jede e
 Anbindung von selbst, bei Google mit dem Limited-Use-Hinweis. Der Name in der Console: THE LION
 SQUAD.
 
-### Was 51.10 gefunden hat (#546 Einstellungen ins Menü – PR #549, #517 Teil 2 – PR #550, offen)
+### Was 51.10 gefunden hat (#546 Einstellungen ins Menü – PR #549, #517 Teil 2 – PR #550)
 
 **„Das Einstellungen-Menü ist wieder ein zweites Menü.“** Jeder Reiter ein Menüeintrag
 (Verbindungen, E-Mail, Auftritt, System), ganz oben „Alle Verbindungen“ mit dem Zustand jeder
@@ -851,6 +856,33 @@ Anbindung – auch „gespeichert, aber nicht lesbar“, weil nach einem Server-
 Verbindungen „weg“ wirkten und niemand prüfte, ob die Schlüssel zum
 `SETTINGS_ENCRYPTION_KEY` passen. Und „Betrieb & Logs“ als eine Seite: Überblick, Ereignisse
 aller Quellen mit Filtern und CSV, Fehler, Tempo, Vitals, Checks, App-Logs, Alarme.
+
+### Was 51.11 gefunden hat (#547 Konten verknüpfen III – PR #552 Welle 1, PR #556 Welle 2)
+
+**„Schau, was es noch für Verknüpfungen mit API gibt – alles, was es gibt, ist cool.“** Jede
+Plattform wurde an ihrer Entwickler-Doku geprüft: 27 haben eine Anmeldung für Websites (Welle 1:
+FACEIT, start.gg, Roblox, osu!, Lichess ohne App, GitHub, Kick, Reddit, Spotify; Welle 2: Threads,
+Facebook, LinkedIn, Snapchat, Pinterest, Telegram als OpenID Connect, Wargaming nur mit
+Application ID, Bungie mit API Key). PlayStation, Nintendo, EA, Ubisoft, Rockstar und GOG haben
+keine – die bleiben getippt; Instagram nur für Business-Konten. Das Gerüst brauchte dafür drei
+Erweiterungen: eine Kennung ohne Secret, ein zweites Geheimnis, und ein signiertes ID-Token statt
+userinfo. Meta, LinkedIn, Snap und Pinterest lassen fremde Konten erst nach App-Review zu – das
+steht an der Anleitung. Welle 3 (Bluesky, Mastodon) bleibt offen.
+
+### Was 51.12 gefunden hat (#537 Upload-Inventar – PR #553)
+
+**Unter `uploads/` lagen Dateien, von denen niemand wusste, ob sie noch gebraucht werden.** Ein
+Skript, das nur liest: jede Datei gegen jeden Verweis in der Datenbank (auch in Markdown und
+HTML), Zustände „verwendet“, „registriert“, „Variante“, „verwaist“, „Variante ohne Original“;
+Bericht als Markdown oder JSON. Löschen bleibt eine Entscheidung des Betreibers nach dem Bericht.
+
+### Was 51.13 gefunden hat (#223 Teile 1 und 2 – PR #554, #555)
+
+**Vier Admin-Seiten hatten 1.500 bis 2.000 Zeilen.** Turnierbearbeitung, Galerie, Fast Lap und
+Medien liegen jetzt in Dateien je Bereich – mechanisch per Skript, Importe aus der Verwendung
+berechnet, ESLint/Vitest/Build als Nachweis, kein Verhalten geändert. Übrig ist
+`AdminSettingsPage` (ein großer State – nicht mechanisch zerlegbar; wartet, bis sie jemand
+inhaltlich anfasst).
 
 ## Block 50 — Nachbesserungen vom 24.09.: Rechtliches speichern, Wegweiser, verknüpfte Konten
 
