@@ -6,9 +6,10 @@ export const PLATFORM_BY_FIELD = {
   youtube_handle: "youtube", tiktok_handle: "tiktok", riot_id: "riot", xbox_id: "xbox", epic_id: "epic",
   faceit_handle: "faceit", startgg_handle: "startgg", roblox_handle: "roblox", osu_handle: "osu", lichess_handle: "lichess", github_handle: "github", kick_handle: "kick", reddit_handle: "reddit", spotify_handle: "spotify",
   threads_handle: "threads", facebook_handle: "facebook", linkedin_handle: "linkedin", snapchat_handle: "snapchat", pinterest_handle: "pinterest", telegram_handle: "telegram", wargaming_handle: "wargaming", bungie_handle: "bungie",
+  mastodon_handle: "mastodon", bluesky_handle: "bluesky",
 };
 
-export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games", faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", snapchat: "Snapchat", pinterest: "Pinterest", telegram: "Telegram", wargaming: "Wargaming.net", bungie: "Bungie.net" };
+export const PLATFORM_LABELS = { discord: "Discord", twitch: "Twitch", steam: "Steam", battlenet: "Battle.net", x: "X", youtube: "YouTube", tiktok: "TikTok", riot: "Riot Games", xbox: "Xbox", epic: "Epic Games", faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify", threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", snapchat: "Snapchat", pinterest: "Pinterest", telegram: "Telegram", wargaming: "Wargaming.net", bungie: "Bungie.net", mastodon: "Mastodon", bluesky: "Bluesky" };
 
 // Was sich nicht verknüpfen lässt - und warum (steht als Hinweis am Feld).
 export const NOT_LINKABLE = {
@@ -49,6 +50,9 @@ export const PLATFORM_APPS = [
   { key: "telegram", label: "Telegram", idField: "telegram_client_id", secretField: "telegram_client_secret", idLabel: "Client ID (BotFather)", secretLabel: "Client Secret (BotFather)", guideKey: "telegram", optional: true },
   { key: "wargaming", label: "Wargaming.net", idField: "wargaming_application_id", idLabel: "Application ID", idPlaceholder: "aus dem Developer Room", guideKey: "wargaming", optional: true, note: "Wargaming braucht kein Secret – nur die Application ID." },
   { key: "bungie", label: "Bungie.net", idField: "bungie_client_id", secretField: "bungie_client_secret", extraField: "bungie_api_key", extraLabel: "API Key", guideKey: "bungie", optional: true, note: "Zusätzlich zur OAuth-Client-ID braucht Bungie den API Key der Anwendung." },
+  // Welle 3 (#547): dezentral, keine App im Admin.
+  { key: "mastodon", label: "Mastodon", guideKey: "mastodon", optional: true, note: "Keine App nötig – die Website registriert sich bei jeder Instanz selbst, sobald ein Mitglied sie wählt." },
+  { key: "bluesky", label: "Bluesky", guideKey: "bluesky", optional: true, note: "Keine App nötig – die Website beschreibt sich selbst über ihre Client-Metadaten (atproto OAuth)." },
 ];
 export const PLATFORM_APP_FIELDS = PLATFORM_APPS.flatMap((app) => [app.idField, app.secretField, app.extraField].filter(Boolean));
 export const PLATFORM_SECRET_FIELDS = PLATFORM_APPS.flatMap((app) => [app.secretField, app.extraField].filter(Boolean));

@@ -109,6 +109,8 @@ class UserUpdate(BaseModel):
     telegram_handle: Optional[str] = None
     wargaming_handle: Optional[str] = None
     bungie_handle: Optional[str] = None
+    mastodon_handle: Optional[str] = None
+    bluesky_handle: Optional[str] = None
     # New socials
     twitch_handle: Optional[str] = None
     youtube_handle: Optional[str] = None
@@ -198,7 +200,8 @@ SocialPlatform = Literal[
     "discord", "twitch", "youtube", "tiktok", "instagram", "x", "steam",
     "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "website",
     "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify",
-    "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie"
+    "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie",
+    "mastodon", "bluesky"
 ]
 
 

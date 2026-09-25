@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeCheck, ExternalLink, Lock, Unlink } from "lucide-react";
 import { Row, Section } from "./fields";
@@ -13,7 +14,7 @@ import { PlatformIcon, brandButtonStyle, linkButtonLabel, platformMeta } from "@
 // nicht eingerichtet hat. Die Sichtbarkeit je Konto regelt der Reiter Privatsphäre - auch für den
 // verknüpften Namen.
 const TEST_IDS = { discord_name: "profile-discord", twitch_handle: "profile-twitch", steam_id: "profile-steam" };
-const LINK_ORDER = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie"];
+const LINK_ORDER = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie", "mastodon", "bluesky"];
 const FIELD_BY_PLATFORM = Object.fromEntries(Object.entries(PLATFORM_BY_FIELD).map(([field, key]) => [key, field]));
 const MANUAL_ROWS = [["instagram_handle", "psn_id"], ["nintendo_fc", "ea_id"]];
 
@@ -61,8 +62,11 @@ function ManualField({ platform, value, onChange, note = "" }) {
 }
 
 // Eine Zeile je verknüpfbarer Plattform: Logo in Plattformfarbe, Stand, offizieller Knopf oder „lösen“.
-function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink }) {
+function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, input = null }) {
   const meta = platformMeta({ platform: platformKey });
+  // Mastodon/Bluesky (#547 Welle 3): vor dem Start tippt die Person die Instanz bzw. den Handle ein.
+  const [inputValue, setInputValue] = useState("");
+  const inputMissing = Boolean(input?.required) && !inputValue.trim();
   const label = PLATFORM_LABELS[platformKey] || meta.label;
   const field = FIELD_BY_PLATFORM[platformKey];
   const testId = testIdFor(field);
@@ -110,8 +114,18 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink }) 
             <Unlink className="w-3.5 h-3.5" aria-hidden="true" /> Verknüpfung lösen
           </button>
         )}
+        {!link && available && input && (
+          <input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={input.placeholder || input.label}
+            aria-label={`${label}: ${input.label}`}
+            data-testid={`${testId}-input`}
+            className="w-44 bg-[#121212] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1.5 rounded-sm text-xs text-white"
+          />
+        )}
         {!link && available && (
-          <button type="button" onClick={() => onLink(platformKey)} data-testid={`${testId}-link`} style={brandButtonStyle(meta.key)}
+          <button type="button" onClick={() => (input ? onLink(platformKey, inputValue.trim()) : onLink(platformKey))} disabled={inputMissing} data-testid={`${testId}-link`} style={brandButtonStyle(meta.key)}
             className="inline-flex items-center gap-2 px-3.5 py-2 border rounded-sm text-xs font-bold tracking-wide shadow-[0_0_16px_-8px_var(--social-color)] hover:brightness-110 transition">
             <PlatformIcon kind={meta.key} className="w-4 h-4" /> {linkButtonLabel(meta.key, label)}
           </button>
@@ -152,6 +166,7 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
             set={set}
             onLink={onLink}
             onUnlink={onUnlink}
+            input={delivers[platformKey]?.input || null}
           />
         ))}
       </div>

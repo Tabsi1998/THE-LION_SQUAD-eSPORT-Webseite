@@ -1,4 +1,4 @@
-import { AtSign, Box, Castle, CircleDot, Crosshair, Facebook, Flag, Gamepad2, Ghost, Github, Globe, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Send, Shield, Trophy, Zap } from "lucide-react";
+import { AtSign, Bird, Box, Castle, CircleDot, Crosshair, Facebook, Flag, Gamepad2, Ghost, Github, Globe, Globe2, Linkedin, MessageCircle, Music2, Orbit, Pin, Radio, Send, Shield, Trophy, Zap } from "lucide-react";
 
 // Marken der Plattformen an einer Stelle (#527, #521): Kennung, Name, Farbe und Logo je Plattform -
 // für das öffentliche Profil (Kasten „Konten“) und die Knöpfe „Mit … verknüpfen“ im eigenen Profil.
@@ -20,6 +20,8 @@ export function platformMeta(link) {
   if (platform.includes("psn") || platform.includes("playstation")) return { key: "psn", label: "PlayStation", color: "#0070D1" };
   if (platform.includes("nintendo")) return { key: "nintendo", label: "Nintendo", color: "#E60012" };
   if (platform === "ea") return { key: "ea", label: "EA", color: "#FF4747" };
+  if (platform === "mastodon") return { key: "mastodon", label: "Mastodon", color: "#6364FF" };
+  if (platform === "bluesky") return { key: "bluesky", label: "Bluesky", color: "#0085FF" };
   if (platform === "threads") return { key: "threads", label: "Threads", color: "#FFFFFF" };
   if (platform === "facebook") return { key: "facebook", label: "Facebook", color: "#1877F2" };
   if (platform === "linkedin") return { key: "linkedin", label: "LinkedIn", color: "#0A66C2" };
@@ -53,6 +55,8 @@ export function PlatformIcon({ kind, className = "w-4 h-4" }) {
   if (kind === "riot") return <Zap className={className} />;
   if (kind === "xbox") return <Gamepad2 className={className} />;
   if (kind === "epic") return <Flag className={className} />;
+  if (kind === "mastodon") return <Globe2 className={className} />;
+  if (kind === "bluesky") return <Bird className={className} />;
   if (kind === "threads") return <AtSign className={className} />;
   if (kind === "facebook") return <Facebook className={className} />;
   if (kind === "linkedin") return <Linkedin className={className} />;
@@ -103,6 +107,8 @@ export const BRAND_BUTTONS = {
   telegram: { bg: "#26A5E4", fg: "#FFFFFF" },
   wargaming: { bg: "#2B2B2B", fg: "#FFFFFF", border: "#D4A017" },
   bungie: { bg: "#1B2A4A", fg: "#FFFFFF", border: "#3B82F6" },
+  mastodon: { bg: "#6364FF", fg: "#FFFFFF" },
+  bluesky: { bg: "#0085FF", fg: "#FFFFFF" },
 };
 
 export function brandButtonStyle(key) {

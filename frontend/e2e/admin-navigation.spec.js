@@ -96,8 +96,8 @@ test.describe("Adminmenü", () => {
     // 58 seit der Gruppe "Verbindungen" (je Dienst ein Eintrag, 15 Dienste),
     // 64 seit die Einstellungen im Menü liegen (#546), 60 seit „Betrieb & Logs“ (#517 Teil 2),
     // 69 mit den neun Plattformen aus Konten verknüpfen III, Welle 1 (#547).
-    // 77 mit den acht Plattformen aus Welle 2 (#547).
-    expect((await navMetrics(page)).entries).toBe(77);
+    // 79 mit den acht Plattformen aus Welle 2 und Mastodon/Bluesky aus Welle 3 (#547).
+    expect((await navMetrics(page)).entries).toBe(79);
   });
 
   test("eine Gruppe lässt sich zuklappen und bleibt es nach dem Neuladen", async ({ page }) => {

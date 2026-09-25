@@ -26,7 +26,8 @@ const PROFILE = {
 
 test("accountGroups: verknüpft schlägt getippt, Socials und Spielkonten getrennt, Zähler nur für bestätigte", () => {
   const groups = accountGroups(PROFILE);
-  expect(groups.socials.map((e) => e.key)).toEqual(["discord", "youtube", "website", "website"]);
+  // Mastodon ist seit Welle 3 (#547) eine bekannte Plattform - der eigene Eintrag bekommt ihren Schlüssel statt „website“.
+  expect(groups.socials.map((e) => e.key)).toEqual(["discord", "youtube", "website", "mastodon"]);
   expect(groups.socials[0]).toMatchObject({ title: "Paula B.", detail: "Discord · paula · seit 22.09.2026", verified: true, url: "https://discord.com/users/123" });
   expect(groups.socials[1]).toMatchObject({ title: "paula", detail: "YouTube", verified: false, url: "https://www.youtube.com/@paula" });
   expect(groups.socials[2]).toMatchObject({ title: "paula.example", url: "https://paula.example/" });

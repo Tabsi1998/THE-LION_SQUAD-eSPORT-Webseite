@@ -380,6 +380,30 @@ export const SETUP_GUIDES = {
     notes: ["Die Website liest nur die Bungie-Kennung und den Anzeigenamen."],
     checkPlatform: "bungie",
   },
+  mastodon: {
+    key: "mastodon",
+    title: "Mastodon verknüpfen (jede Instanz)",
+    where: { to: "/admin/integrations/mastodon", label: "Verbindungen → Mastodon" },
+    summary: "Nichts einzurichten: Mitglieder tippen ihre Instanz (z. B. mastodon.social), die Website registriert dort einmal ihre App und merkt sie sich; danach die übliche Anmeldung.",
+    steps: [
+      { text: "Es gibt keine zentrale Mastodon-App – jede Instanz vergibt eigene Zugangsdaten. Die Website holt sie beim ersten Mitglied je Instanz selbst (Berechtigung read:accounts) und speichert sie verschlüsselt." },
+      { text: "Die Rückrufadresse, die die Website dabei anmeldet:", copy: "{origin}/api/platform-links/mastodon/callback" },
+    ],
+    notes: ["Die Website liest nur Kennung, Nutzername und Instanz; der Name im Profil ist name@instanz.", "Nur öffentlich erreichbare Instanzen; interne Adressen lehnt die Website ab."],
+    checkPlatform: "mastodon",
+  },
+  bluesky: {
+    key: "bluesky",
+    title: "Bluesky verknüpfen (atproto OAuth)",
+    where: { to: "/admin/integrations/bluesky", label: "Verbindungen → Bluesky" },
+    summary: "Nichts einzurichten: die Website beschreibt sich selbst über ihre Client-Metadaten; Mitglieder geben ihren Handle an (oder nicht) und melden sich bei ihrem Server an.",
+    steps: [
+      { text: "Bluesky holt die Beschreibung der Website unter dieser Adresse – sie muss öffentlich erreichbar sein (PUBLIC_BACKEND_URL):", copy: "{origin}/api/platform-links/bluesky/client-metadata.json" },
+      { text: "Rückrufadresse (steht in den Metadaten):", copy: "{origin}/api/platform-links/bluesky/callback" },
+    ],
+    notes: ["Ablauf nach atproto OAuth: Handle → DID → PDS → Authorization Server, Pushed Authorization Request und Token mit DPoP-Nachweis, PKCE. Die Website liest nur DID, Handle und Anzeigename.", "Ohne Handle geht es über bsky.social; Konten auf anderen Servern brauchen den Handle."],
+    checkPlatform: "bluesky",
+  },
   xbox: {
     key: "xbox",
     title: "Xbox-Gamertag verknüpfen (Microsoft)",
@@ -514,7 +538,8 @@ export function guideStatus(key, data = {}) {
     case "steam":
       if (!branding) return unknown;
       return branding.steam_api_key_masked ? ok("Schlüssel da") : optional("Ohne Schlüssel bleibt die ID");
-    case "lichess":
+    case "lichess": case "mastodon": case "bluesky":
+      if (Array.isArray(branding?.disabled_platforms) && branding.disabled_platforms.includes(key)) return optional("Vom Verein abgeschaltet");
       return ok("Keine App nötig");
     case "battlenet": case "x": case "youtube": case "tiktok": case "riot": case "xbox": case "epic": case "threads": case "facebook": case "linkedin": case "snapchat": case "pinterest": case "telegram": case "wargaming": case "bungie": case "faceit": case "startgg": case "roblox": case "osu": case "github": case "kick": case "reddit": case "spotify":
       if (Array.isArray(branding?.disabled_platforms) && branding.disabled_platforms.includes(key)) return optional("Vom Verein abgeschaltet");

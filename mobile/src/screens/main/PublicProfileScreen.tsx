@@ -71,6 +71,8 @@ type PublicProfilePayload = {
   telegram_handle?: string | null;
   wargaming_handle?: string | null;
   bungie_handle?: string | null;
+  mastodon_handle?: string | null;
+  bluesky_handle?: string | null;
   website?: string | null;
   main_platform?: string | null;
   main_platforms?: string[];

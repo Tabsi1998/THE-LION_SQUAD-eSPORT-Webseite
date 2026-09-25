@@ -37,6 +37,9 @@ export const INTEGRATIONS = [
   { key: "telegram", label: "Telegram", app: "telegram", guides: ["telegram"] },
   { key: "wargaming", label: "Wargaming.net", app: "wargaming", guides: ["wargaming"] },
   { key: "bungie", label: "Bungie.net", app: "bungie", guides: ["bungie"] },
+  // Welle 3 (#547).
+  { key: "mastodon", label: "Mastodon", app: "mastodon", guides: ["mastodon"] },
+  { key: "bluesky", label: "Bluesky", app: "bluesky", guides: ["bluesky"] },
   // Seit #546 sind Google, Resend und SMTP eigene Seiten unter Verbindungen; Analytics, Google Play und
   // Dolibarr haben ihre Seite anderswo (Auftritt bzw. Mitglieder) und stehen nur in der Übersicht.
   { key: "google", label: "Google", guides: ["google_login"], tab: "/admin/settings/google", tabLabel: "Client-ID und Login-Schalter", searchTerms: ["google login", "google-login", "anmeldung mit google", "oauth", "web-client-id"] },

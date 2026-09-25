@@ -169,9 +169,9 @@ export default function ProfilePage() {
     setParams(next, { replace: true });
     refresh?.();
   }, [linkedParam, linkErrorParam, linkDetailParam, params, setParams, refresh]);
-  const startPlatformLink = useCallback(async (platform) => {
+  const startPlatformLink = useCallback(async (platform, input = "") => {
     try {
-      const { data } = await api.post(`/me/platform-links/${platform}/start`);
+      const { data } = await api.post(`/me/platform-links/${platform}/start`, input ? { input } : undefined);
       if (data?.url) window.location.assign(data.url);
     } catch (err) {
       toast.error(formatRequestError(err, "Die Verknüpfung konnte nicht gestartet werden."));
@@ -197,6 +197,8 @@ export default function ProfilePage() {
     const next = new URLSearchParams(params);
     next.delete("link");
     setParams(next, { replace: true });
+    // Mastodon/Bluesky fragen erst nach Instanz oder Handle - die Zeile ist da, der Start kommt von Hand.
+    if (platformLinks.platforms[linkParam]?.input?.required) return;
     if (platformLinks.available[linkParam]) startPlatformLink(linkParam);
     else toast.error(`${platformLinks.platforms[linkParam]?.label || linkParam} ist auf der Website noch nicht eingerichtet.`);
   }, [linkParam, platformLinks, params, setParams, startPlatformLink]);

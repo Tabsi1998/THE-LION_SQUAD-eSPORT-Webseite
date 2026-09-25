@@ -25,6 +25,7 @@ export const PLATFORM_COLORS: Record<string, string> = {
   psn: "#0070D1", nintendo: "#E60012", ea: "#FF4747", website: "#29B6E8",
   faceit: "#FF5500", startgg: "#3F80FF", roblox: "#FFFFFF", osu: "#FF66AA", lichess: "#BABABA", github: "#FFFFFF", kick: "#53FC18", reddit: "#FF4500", spotify: "#1DB954",
   threads: "#FFFFFF", facebook: "#1877F2", linkedin: "#0A66C2", snapchat: "#FFFC00", pinterest: "#E60023", telegram: "#26A5E4", wargaming: "#D4A017", bungie: "#3B82F6",
+  mastodon: "#6364FF", bluesky: "#0085FF",
 };
 const PLATFORM_LABELS: Record<string, string> = {
   discord: "Discord", twitch: "Twitch", steam: "Steam", youtube: "YouTube", tiktok: "TikTok", x: "X",
@@ -32,6 +33,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   psn: "PlayStation", nintendo: "Nintendo", ea: "EA", website: "Website",
   faceit: "FACEIT", startgg: "start.gg", roblox: "Roblox", osu: "osu!", lichess: "Lichess", github: "GitHub", kick: "Kick", reddit: "Reddit", spotify: "Spotify",
   threads: "Threads", facebook: "Facebook", linkedin: "LinkedIn", snapchat: "Snapchat", pinterest: "Pinterest", telegram: "Telegram", wargaming: "Wargaming.net", bungie: "Bungie.net",
+  mastodon: "Mastodon", bluesky: "Bluesky",
 };
 const PLATFORM_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   discord: "logo-discord", twitch: "logo-twitch", steam: "logo-steam", youtube: "logo-youtube", tiktok: "logo-tiktok",
@@ -39,6 +41,7 @@ const PLATFORM_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   psn: "logo-playstation", nintendo: "game-controller-outline", ea: "game-controller-outline", website: "globe-outline",
   faceit: "flame-outline", startgg: "trophy-outline", roblox: "cube-outline", osu: "disc-outline", lichess: "grid-outline", github: "logo-github", kick: "videocam-outline", reddit: "logo-reddit", spotify: "musical-notes-outline",
   threads: "at-outline", facebook: "logo-facebook", linkedin: "logo-linkedin", snapchat: "logo-snapchat", pinterest: "logo-pinterest", telegram: "paper-plane-outline", wargaming: "shield-outline", bungie: "planet-outline",
+  mastodon: "globe-outline", bluesky: "cloud-outline",
 };
 const VERIFIED_COLOR = "#00FF88";
 
@@ -219,14 +222,14 @@ type AccountSource = {
   socials?: Array<{ platform?: string | null; value?: string | null; url?: string | null }> | null;
 } & Record<string, unknown>;
 
-const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "website"];
+const SOCIAL_PLATFORMS = ["discord", "twitch", "youtube", "instagram", "tiktok", "x", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "mastodon", "bluesky", "website"];
 const GAME_PLATFORMS = ["steam", "epic", "psn", "xbox", "nintendo", "ea", "riot", "battlenet", "faceit", "startgg", "roblox", "osu", "lichess", "wargaming", "bungie"];
 const MANUAL_FIELDS: Record<string, string> = {
   discord: "discord_name", twitch: "twitch_handle", youtube: "youtube_handle", instagram: "instagram_handle",
   tiktok: "tiktok_handle", x: "x_handle", website: "website", steam: "steam_id", epic: "epic_id", psn: "psn_id",
   xbox: "xbox_id", nintendo: "nintendo_fc", ea: "ea_id", riot: "riot_id", battlenet: "battlenet_id",
   faceit: "faceit_handle", startgg: "startgg_handle", roblox: "roblox_handle", osu: "osu_handle", lichess: "lichess_handle", github: "github_handle", kick: "kick_handle", reddit: "reddit_handle", spotify: "spotify_handle",
-  threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle",
+  threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle", mastodon: "mastodon_handle", bluesky: "bluesky_handle",
 };
 
 function cleanHandle(value?: unknown): string {
@@ -257,6 +260,8 @@ function manualUrl(platform: string, value: string): string {
   if (platform === "snapchat") return `https://www.snapchat.com/add/${handle}`;
   if (platform === "pinterest") return `https://www.pinterest.com/${handle}/`;
   if (platform === "telegram") return `https://t.me/${handle}`;
+  if (platform === "mastodon") return handle.includes("@") ? `https://${handle.split("@")[1]}/@${handle.split("@")[0]}` : "";
+  if (platform === "bluesky") return `https://bsky.app/profile/${handle}`;
   return "";
 }
 
@@ -369,7 +374,7 @@ export function AccountsCard({ groups, testID = "public-profile-accounts" }: { g
 // Konten verknüpfen (#521): je verknüpfbarer Plattform eine Zeile - verknüpft mit Namen, Häkchen und
 // „lösen“; sonst der offizielle Knopf, der den Browser zur Website schickt (der Rückruf der Plattform
 // braucht den Browser). Was die Website nicht eingerichtet hat, bleibt Tipparbeit.
-export const LINKABLE_PLATFORMS = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie"];
+export const LINKABLE_PLATFORMS = ["discord", "twitch", "steam", "battlenet", "x", "youtube", "tiktok", "riot", "xbox", "epic", "faceit", "startgg", "roblox", "osu", "lichess", "github", "kick", "reddit", "spotify", "threads", "facebook", "linkedin", "snapchat", "pinterest", "telegram", "wargaming", "bungie", "mastodon", "bluesky"];
 export const BRAND_BUTTONS: Record<string, { bg: string; fg: string; border?: string }> = {
   discord: { bg: "#5865F2", fg: "#FFFFFF" }, twitch: { bg: "#9146FF", fg: "#FFFFFF" }, steam: { bg: "#171A21", fg: "#FFFFFF", border: "#66C0F4" },
   battlenet: { bg: "#148EFF", fg: "#FFFFFF" }, x: { bg: "#000000", fg: "#FFFFFF", border: "#FFFFFF" }, youtube: { bg: "#FF0000", fg: "#FFFFFF" },
@@ -392,6 +397,8 @@ export const BRAND_BUTTONS: Record<string, { bg: string; fg: string; border?: st
   telegram: { bg: "#26A5E4", fg: "#FFFFFF" },
   wargaming: { bg: "#2B2B2B", fg: "#FFFFFF", border: "#D4A017" },
   bungie: { bg: "#1B2A4A", fg: "#FFFFFF", border: "#3B82F6" },
+  mastodon: { bg: "#6364FF", fg: "#FFFFFF" },
+  bluesky: { bg: "#0085FF", fg: "#FFFFFF" },
 };
 
 export function linkButtonLabel(platform: string): string {

@@ -68,3 +68,21 @@ test("abgehakte Plattformen fehlen: keine Zeile, kein Textfeld", () => {
   expect(screen.getByTestId("profile-steam-row")).toBeInTheDocument();
   expect(screen.getByTestId("profile-nintendo")).toBeInTheDocument();
 });
+
+// Mastodon/Bluesky (#547 Welle 3): erst Instanz bzw. Handle, dann der Knopf - Mastodon ohne Instanz bleibt gesperrt.
+test("Plattformen mit Eingabe: Instanz oder Handle vor dem Start, der Wert geht mit", async () => {
+  const user = userEvent.setup();
+  const links = {
+    ...LINKS,
+    available: { ...LINKS.available, mastodon: true, bluesky: true },
+    platforms: { ...LINKS.platforms, mastodon: { delivers: "Kennung", input: { label: "Instanz", placeholder: "z. B. mastodon.social", required: true } }, bluesky: { delivers: "DID", input: { label: "Handle (optional)", placeholder: "name.bsky.social", required: false } } },
+  };
+  const props = renderTab({ links, form: { discord_name: "paula", mastodon_handle: "", bluesky_handle: "" } });
+  expect(screen.getByTestId("profile-mastodon-link")).toBeDisabled();
+  await user.type(screen.getByTestId("profile-mastodon-input"), "mastodon.social");
+  await user.click(screen.getByTestId("profile-mastodon-link"));
+  expect(props.onLink).toHaveBeenCalledWith("mastodon", "mastodon.social");
+  expect(screen.getByTestId("profile-bluesky-link")).toBeEnabled();
+  await user.click(screen.getByTestId("profile-bluesky-link"));
+  expect(props.onLink).toHaveBeenCalledWith("bluesky", "");
+});

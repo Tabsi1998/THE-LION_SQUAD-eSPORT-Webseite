@@ -38,6 +38,10 @@ class FakePlatforms:
         self.steam_valid = True
         self.steam_name = "Paula auf Steam"
         self.app_redirects = ["http://localhost:3000/api/platform-links/discord/callback"]
+        self.mastodon_registrations = 0
+        self.bluesky_nonce_seen = False
+        self.bluesky_challenge = ""
+        self.dpop_thumbprints: set[str] = set()
 
     def transport(self):
         return httpx.MockTransport(self.handle)
@@ -46,6 +50,61 @@ class FakePlatforms:
     def basic(client_id: str, secret: str) -> str:
         import base64
         return "Basic " + base64.b64encode(f"{client_id}:{secret}".encode()).decode()
+
+    # Mastodon: die Website registriert ihre App je Instanz; Token und verify_credentials wie bei jeder Instanz.
+    def mastodon(self, request: httpx.Request, url: str, form: dict) -> httpx.Response:
+        if url.endswith("/api/v1/apps"):
+            assert form.get("redirect_uris") == "http://localhost:3000/api/platform-links/mastodon/callback" and form.get("scopes") == "read:accounts"
+            self.mastodon_registrations += 1
+            return httpx.Response(200, json={"id": "1", "client_id": "masto-app", "client_secret": "masto-geheim"})
+        if url.endswith("/oauth/token"):
+            ok = form.get("client_id") == "masto-app" and form.get("client_secret") == "masto-geheim" and form.get("code") == "gut"
+            return httpx.Response(200, json={"access_token": "masto-token"}) if ok else httpx.Response(401, json={"error": "invalid_client"})
+        if url.endswith("/api/v1/accounts/verify_credentials"):
+            assert request.headers.get("Authorization") == "Bearer masto-token"
+            return httpx.Response(200, json={"id": "108", "username": "paula", "acct": "paula", "display_name": "Paula im Fediverse"})
+        return httpx.Response(404, json={"error": "unbekannt"})
+
+    # Bluesky: Handle → DID → PDS → Authorization Server; PAR und Token verlangen einen DPoP-Nachweis (mit Nonce).
+    def dpop_ok(self, request: httpx.Request, url: str, *, nonce: str | None) -> bool:
+        proof = request.headers.get("DPoP") or ""
+        header = jwt.get_unverified_header(proof)
+        assert header.get("typ") == "dpop+jwt" and header.get("alg") == "ES256" and header.get("jwk")
+        claims = jwt.decode(proof, jwt.PyJWK(header["jwk"], algorithm="ES256").key, algorithms=["ES256"])
+        assert claims["htm"] == "POST" and claims["htu"] == url and claims["jti"]
+        self.dpop_thumbprints.add(json.dumps(header["jwk"], sort_keys=True))
+        return nonce is None or claims.get("nonce") == nonce
+
+    def bluesky(self, request: httpx.Request, url: str, form: dict) -> httpx.Response:
+        params = dict(request.url.params)
+        if url.endswith("/com.atproto.identity.resolveHandle"):
+            return httpx.Response(200, json={"did": "did:plc:paula123"}) if params.get("handle") == "paula.lionsquad-test.at" else httpx.Response(400, json={"error": "InvalidRequest"})
+        if url == "https://plc.directory/did:plc:paula123":
+            return httpx.Response(200, json={"id": "did:plc:paula123", "alsoKnownAs": ["at://paula.lionsquad-test.at"],
+                                             "service": [{"id": "#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": "https://pds.lionsquad-test.at"}]})
+        if url == "https://pds.lionsquad-test.at/.well-known/oauth-protected-resource":
+            return httpx.Response(200, json={"resource": "https://pds.lionsquad-test.at", "authorization_servers": ["https://auth.lionsquad-test.at"]})
+        if url == "https://auth.lionsquad-test.at/.well-known/oauth-authorization-server":
+            return httpx.Response(200, json={"issuer": "https://auth.lionsquad-test.at", "pushed_authorization_request_endpoint": "https://auth.lionsquad-test.at/oauth/par",
+                                             "authorization_endpoint": "https://auth.lionsquad-test.at/oauth/authorize", "token_endpoint": "https://auth.lionsquad-test.at/oauth/token"})
+        if url == "https://auth.lionsquad-test.at/oauth/par":
+            if not self.dpop_ok(request, url, nonce="server-nonce-1" if self.bluesky_nonce_seen else None) or not self.bluesky_nonce_seen:
+                self.bluesky_nonce_seen = True
+                return httpx.Response(400, json={"error": "use_dpop_nonce"}, headers={"DPoP-Nonce": "server-nonce-1"})
+            assert form.get("client_id") == "http://localhost:3000/api/platform-links/bluesky/client-metadata.json" and form.get("scope") == "atproto"
+            assert form.get("code_challenge_method") == "S256" and form.get("code_challenge") and form.get("login_hint") == "paula.lionsquad-test.at"
+            self.bluesky_challenge = form["code_challenge"]
+            return httpx.Response(201, json={"request_uri": "urn:ietf:params:oauth:request_uri:abc", "expires_in": 60}, headers={"DPoP-Nonce": "server-nonce-2"})
+        if url == "https://auth.lionsquad-test.at/oauth/token":
+            assert self.dpop_ok(request, url, nonce="server-nonce-2")
+            assert form.get("grant_type") == "authorization_code" and form.get("code") == "gut" and form.get("client_id").endswith("/client-metadata.json")
+            verifier = form.get("code_verifier") or ""
+            assert platform_links._pkce_challenge(verifier) == self.bluesky_challenge
+            return httpx.Response(200, json={"access_token": "dpop-token", "token_type": "DPoP", "sub": "did:plc:paula123", "scope": "atproto"})
+        if url.endswith("/app.bsky.actor.getProfile"):
+            assert params.get("actor") == "did:plc:paula123"
+            return httpx.Response(200, json={"did": "did:plc:paula123", "handle": "paula.lionsquad-test.at", "displayName": "Paula am Himmel"})
+        return httpx.Response(404, json={"error": "unbekannt"})
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         url = str(request.url).split("?")[0]
@@ -195,6 +254,10 @@ class FakePlatforms:
         if url == platform_links.BUNGIE_MEMBERSHIPS:
             assert request.headers.get("X-API-Key") == "bungie-key"
             return httpx.Response(200, json={"Response": {"bungieNetUser": {"membershipId": "9001", "uniqueName": "Paula#1234", "displayName": "Paula"}}})
+        if url.startswith("https://mastodon.lionsquad-test.at/"):
+            return self.mastodon(request, url, form)
+        if url in (platform_links.BLUESKY_PUBLIC_API + "/com.atproto.identity.resolveHandle", platform_links.BLUESKY_PUBLIC_API + "/app.bsky.actor.getProfile") or url.startswith(("https://plc.directory/", "https://pds.lionsquad-test.at/", "https://auth.lionsquad-test.at/")):
+            return self.bluesky(request, url, form)
         if url == platform_links.STEAM_OPENID:
             assert form.get("openid.mode") == "check_authentication"
             return httpx.Response(200, text="ns:http://specs.openid.net/auth/2.0\nis_valid:true\n" if self.steam_valid else "is_valid:false\n")
@@ -215,6 +278,7 @@ def env(monkeypatch):
 def fake(monkeypatch):
     instance = FakePlatforms()
     monkeypatch.setattr(platform_links, "_transport", instance.transport())
+    monkeypatch.setattr(platform_links, "_resolves_public", lambda host: host.endswith("lionsquad-test.at"))
     return instance
 
 
@@ -268,7 +332,7 @@ async def test_start_needs_a_configured_app_and_signs_the_state(flow):
     overview = (await flow.get("/api/me/platform-links")).json()
     # Steam (OpenID) und Lichess (öffentlicher Client) brauchen keine App - alle anderen schon.
     assert overview["available"]["steam"] is True and overview["available"]["lichess"] is True
-    assert all(value is False for key, value in overview["available"].items() if key not in ("steam", "lichess"))
+    assert all(value is False for key, value in overview["available"].items() if key not in ("steam", "lichess", "mastodon", "bluesky"))
     assert set(overview["available"]) == set(platform_links.PLATFORMS)
     assert overview["platforms"]["discord"]["field"] == "discord_name" and "Discord-Kennung" in overview["platforms"]["discord"]["delivers"]
     assert (await flow.post("/api/me/platform-links/discord/start")).status_code == 409
@@ -622,3 +686,83 @@ async def test_the_club_can_switch_platforms_off_and_they_disappear_everywhere(f
     flow.act_as(None)
     public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
     assert public["twitch_handle"] and public["psn_id"] == "Paula998" and "twitch" in public["verified_platforms"]
+
+
+@pytest.mark.asyncio
+async def test_mastodon_registers_per_instance_and_bluesky_runs_par_with_dpop(flow, fake):
+    """#547 Welle 3: Mastodon - Instanz eintippen, die Website registriert ihre App dort einmal und nutzt sie
+    danach; Bluesky - Handle → DID → PDS → Authorization Server, PAR und Token mit DPoP-Nachweis und Nonce,
+    PKCE, Identität aus sub + Profil. Beide ohne App im Admin, beide mit Sitzung zum state."""
+    await configure(flow)
+    paula = await person(flow, "paula")
+    flow.act_as(paula)
+    listing = (await flow.get("/api/me/platform-links")).json()
+    assert listing["available"]["mastodon"] is True and listing["platforms"]["mastodon"]["input"]["required"] is True
+    assert listing["platforms"]["bluesky"]["input"]["required"] is False and listing["platforms"]["discord"]["input"] is None
+    assert (await flow.post("/api/me/platform-links/mastodon/start")).status_code == 400   # Instanz fehlt
+    assert (await flow.post("/api/me/platform-links/mastodon/start", json={"input": "localhost"})).status_code == 400
+    assert (await flow.post("/api/me/platform-links/mastodon/start", json={"input": "intern.lionsquad.example"})).status_code == 400  # löst nicht öffentlich auf
+
+    start = (await flow.post("/api/me/platform-links/mastodon/start", json={"input": "@paula@Mastodon.lionsquad-test.at"})).json()["url"]
+    assert start.startswith("https://mastodon.lionsquad-test.at/oauth/authorize?") and "client_id=masto-app" in start and "scope=read%3Aaccounts" in start
+    assert fake.mastodon_registrations == 1
+    stored = await flow.db.mastodon_apps.find_one({"instance": "mastodon.lionsquad-test.at"}, {"_id": 0})
+    assert stored["client_id"] == "masto-app" and stored["client_secret"] != "masto-geheim"
+    state = state_of(start)
+    flow.act_as(None)
+    landed = target(await flow.get(f"/api/platform-links/mastodon/callback?code=gut&state={state}"))
+    assert landed == {"tab": "socials", "linked": "mastodon"}, landed
+    user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
+    assert user["mastodon_handle"] == "paula@mastodon.lionsquad-test.at" and user["platform_verified"]["mastodon"] is True
+    assert await flow.db.platform_link_sessions.count_documents({}) == 0   # Sitzung einmal gelesen, dann weg
+    flow.act_as(paula)
+    rows = {row["platform"]: row for row in (await flow.get("/api/me/platform-links")).json()["links"]}
+    assert rows["mastodon"]["url"] == "https://mastodon.lionsquad-test.at/@paula" and rows["mastodon"]["display_name"] == "Paula im Fediverse"
+    # Zweiter Start bei derselben Instanz: keine neue Registrierung.
+    (await flow.post("/api/me/platform-links/mastodon/start", json={"input": "mastodon.lionsquad-test.at"})).json()["url"]
+    assert fake.mastodon_registrations == 1
+
+    # Bluesky: Client-Metadaten öffentlich, Start mit Handle, PAR mit Nonce-Tanz, Token mit DPoP + PKCE.
+    flow.act_as(None)
+    metadata = (await flow.get("/api/platform-links/bluesky/client-metadata.json")).json()
+    assert metadata["client_id"] == "http://localhost:3000/api/platform-links/bluesky/client-metadata.json"
+    assert metadata["redirect_uris"] == ["http://localhost:3000/api/platform-links/bluesky/callback"] and metadata["dpop_bound_access_tokens"] is True
+    flow.act_as(paula)
+    assert (await flow.post("/api/me/platform-links/bluesky/start", json={"input": "nicht bekannt"})).status_code == 400
+    unknown = await flow.post("/api/me/platform-links/bluesky/start", json={"input": "@fremd.lionsquad-test.at"})
+    assert unknown.status_code == 400 and "nicht bekannt" in unknown.json()["detail"]
+    start = (await flow.post("/api/me/platform-links/bluesky/start", json={"input": "https://bsky.app/profile/paula.lionsquad-test.at"})).json()["url"]
+    assert start.startswith("https://auth.lionsquad-test.at/oauth/authorize?") and "request_uri=urn%3Aietf%3Aparams%3Aoauth%3Arequest_uri%3Aabc" in start
+    assert "client_id=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fplatform-links%2Fbluesky%2Fclient-metadata.json" in start
+    session = await flow.db.platform_link_sessions.find_one({"platform": "bluesky"}, {"_id": 0})
+    assert session["data"]["issuer"] == "https://auth.lionsquad-test.at" and session["data"]["dpop_nonce"] == "server-nonce-2"
+    assert "BEGIN PRIVATE KEY" not in session["data"]["dpop_key"]   # verschlüsselt abgelegt
+    state = session["nonce"]
+    signed = next(row for row in fake.calls if row[1] == "https://auth.lionsquad-test.at/oauth/par")[2]["state"]
+    assert state_of(f"x?state={signed}") == signed
+    flow.act_as(None)
+    wrong_issuer = target(await flow.get(f"/api/platform-links/bluesky/callback?code=gut&iss=https://anderer.lionsquad-test.at&state={signed}"))
+    assert wrong_issuer["link_error"] == "invalid"   # und die Sitzung ist verbraucht
+    flow.act_as(paula)
+    start = (await flow.post("/api/me/platform-links/bluesky/start", json={"input": "paula.lionsquad-test.at"})).json()["url"]
+    signed = next(row for row in reversed(fake.calls) if row[1] == "https://auth.lionsquad-test.at/oauth/par")[2]["state"]
+    flow.act_as(None)
+    landed = target(await flow.get(f"/api/platform-links/bluesky/callback?code=gut&iss=https://auth.lionsquad-test.at/&state={signed}"))
+    assert landed == {"tab": "socials", "linked": "bluesky"}, landed
+    user = await flow.db.users.find_one({"id": paula["id"]}, {"_id": 0})
+    assert user["bluesky_handle"] == "paula.lionsquad-test.at" and user["platform_verified"]["bluesky"] is True
+    assert len(fake.dpop_thumbprints) == 2   # ein Schlüsselpaar je Start, PAR und Token desselben Starts mit demselben
+    public = (await flow.get(f"/api/users/public/{paula['username']}")).json()
+    accounts = {row["platform"]: row for row in public["linked_accounts"]}
+    assert accounts["bluesky"]["url"] == "https://bsky.app/profile/paula.lionsquad-test.at" and accounts["bluesky"]["display_name"] == "Paula am Himmel"
+    assert accounts["mastodon"]["url"] == "https://mastodon.lionsquad-test.at/@paula"
+
+    # Ohne Handle geht Bluesky über den Einstiegsserver - den kennt der Fake nicht, der Fehler ist sauber.
+    flow.act_as(paula)
+    entry = await flow.post("/api/me/platform-links/bluesky/start")
+    assert entry.status_code == 502 and "Bluesky" in entry.json()["detail"]
+    chef = await flow.add_user(role="superadmin", name="chef")
+    flow.act_as(chef)
+    for key in ("mastodon", "bluesky"):
+        check = (await flow.post(f"/api/settings/platform-links/{key}/check")).json()
+        assert check["ok"] is True and "keine" in check["checks"][0]["text"]

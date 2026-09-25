@@ -19,13 +19,18 @@ Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App - sie
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
+import ipaddress
+import json
 import logging
 import os
 import re
 import secrets
+import socket
+import uuid
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, urlencode
 
@@ -34,7 +39,7 @@ import jwt
 
 from auth import get_jwt_secret
 from models import new_id, now_utc
-from services.secret_store import decrypt_secret
+from services.secret_store import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger("tls.platform_links")
 
@@ -102,6 +107,15 @@ PLATFORMS = {
              "id_field": 'wargaming_application_id', "secret_field": None, "official": ""},
     "bungie": {"label": "Bungie.net", "operator": "Bungie, Inc., USA", "field": "bungie_handle", "visibility": "bungie", "delivers": "Bungie-Kennung und Anzeigename (Destiny)",
              "id_field": 'bungie_client_id', "secret_field": 'bungie_client_secret', "extra_field": 'bungie_api_key', "official": "https://www.bungie.net/7/en/User/Profile/254/{external_id}"},
+    # Welle 3 (#547): dezentral - keine App im Admin. Mastodon registriert die Website je Instanz selbst,
+    # Bluesky beschreibt die Website über ihre Client-Metadaten (atproto OAuth mit PAR, DPoP und PKCE).
+    # ``input``: was die Person vor dem Start eintippt (Instanz bzw. Handle).
+    "mastodon": {"label": "Mastodon", "operator": "die gewählte Instanz (dezentral, Betreiber je Instanz)", "field": "mastodon_handle", "visibility": "mastodon",
+                 "delivers": "Mastodon-Kennung, Nutzername und Instanz", "id_field": None, "secret_field": None, "official": "",
+                 "input": {"label": "Instanz", "placeholder": "z. B. mastodon.social", "required": True}},
+    "bluesky": {"label": "Bluesky", "operator": "Bluesky Social PBC, USA (oder der eigene PDS)", "field": "bluesky_handle", "visibility": "bluesky",
+                "delivers": "DID und Handle", "id_field": None, "secret_field": None, "official": "https://bsky.app/profile/{handle}",
+                "input": {"label": "Handle (optional)", "placeholder": "name.bsky.social", "required": False}},
 }
 
 DISCORD_AUTHORIZE = "https://discord.com/oauth2/authorize"
@@ -189,6 +203,12 @@ WARGAMING_ACCOUNT_INFO = "https://api.worldoftanks.eu/wot/account/info/"
 BUNGIE_AUTHORIZE = "https://www.bungie.net/en/OAuth/Authorize"
 BUNGIE_TOKEN = "https://www.bungie.net/platform/app/oauth/token/"
 BUNGIE_MEMBERSHIPS = "https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/"
+MASTODON_SCOPE = "read:accounts"
+BLUESKY_ENTRY = "https://bsky.social"                      # Einstiegsserver ohne Handle
+BLUESKY_PUBLIC_API = "https://public.api.bsky.app/xrpc"
+BLUESKY_SCOPE = "atproto"
+PLC_DIRECTORY = "https://plc.directory"
+HOST_RE = re.compile(r"^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")
 
 
 class LinkError(Exception):
@@ -202,6 +222,10 @@ class LinkError(Exception):
 
 # Offizielle Adresse des verknüpften Kontos - damit im Profil steht, wohin es geht.
 def official_url(platform: str, external_id: str, handle: str) -> str:
+    if platform == "mastodon":
+        # Der Handle ist „name@instanz“ - die Adresse liegt auf der Instanz.
+        user, _sep, instance = str(handle or "").partition("@")
+        return f"https://{instance}/@{quote(user, safe='')}" if user and instance else ""
     template = (PLATFORMS.get(platform) or {}).get("official") or ""
     if not template:
         return ""
@@ -275,6 +299,274 @@ def frontend_url() -> str:
 
 def redirect_uri(platform: str) -> str:
     return f"{public_base_url()}/api/platform-links/{platform}/callback"
+
+
+def client_name(branding: dict | None) -> str:
+    return str((branding or {}).get("club_name") or "THE LION SQUAD").strip() or "THE LION SQUAD"
+
+
+async def begin_link(db, platform: str, branding: dict, state: str, user_input: str = "") -> str:
+    """Die Adresse, an die der Browser geht. Mastodon und Bluesky brauchen vorher Arbeit (App je Instanz,
+    PAR mit DPoP) und merken sich die Sitzung zum ``state``; alle anderen liefern die Adresse direkt."""
+    if platform not in PLATFORMS:
+        raise LinkError("unknown")
+    if platform in disabled_platforms(branding):
+        raise LinkError("disabled")
+    if platform == "mastodon":
+        return await _mastodon_authorize(db, branding, state, user_input)
+    if platform == "bluesky":
+        return await _bluesky_authorize(db, branding, state, user_input)
+    return authorize_url(platform, branding, state)
+
+
+async def _remember_session(db, nonce: str, platform: str, data: dict) -> None:
+    now = now_utc()
+    await db.platform_link_sessions.delete_many({"expires_at": {"$lt": now.isoformat()}})
+    await db.platform_link_sessions.update_one({"nonce": nonce}, {"$set": {
+        "nonce": nonce, "platform": platform, "data": data, "expires_at": (now + timedelta(minutes=STATE_MINUTES)).isoformat(),
+    }}, upsert=True)
+
+
+async def _take_session(db, nonce: str) -> dict | None:
+    """Die Sitzung zum state - einmal lesbar, dann weg."""
+    doc = await db.platform_link_sessions.find_one({"nonce": nonce}, {"_id": 0})
+    if not doc:
+        return None
+    await db.platform_link_sessions.delete_one({"nonce": nonce})
+    if str(doc.get("expires_at") or "") < now_utc().isoformat():
+        return None
+    return doc.get("data") or {}
+
+
+def _resolves_public(host: str) -> bool:
+    """Nur echte öffentliche Adressen - die Website spricht keine internen Hosts an, nur weil jemand sie tippt."""
+    try:
+        infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
+    except (socket.gaierror, UnicodeError, OSError):
+        return False
+    try:
+        addresses = [ipaddress.ip_address(info[4][0]) for info in infos]
+    except ValueError:
+        return False
+    return bool(addresses) and all(address.is_global for address in addresses)
+
+
+# ---------- Mastodon: Instanz wählen, App je Instanz registrieren ----------
+
+def mastodon_instance(raw: str) -> str:
+    """Aus „mastodon.social“, „@paula@mastodon.social“ oder „https://mastodon.social/@paula“ wird der Host."""
+    value = str(raw or "").strip().lower()
+    if not value:
+        raise LinkError("input", "Instanz fehlt – zum Beispiel mastodon.social")
+    if "://" in value:
+        value = value.split("://", 1)[1]
+    elif "@" in value:
+        value = value.rsplit("@", 1)[-1]
+    value = value.split("/", 1)[0].split(":", 1)[0].strip(".")
+    if not HOST_RE.match(value) or value.endswith((".local", ".internal", ".localhost")):
+        raise LinkError("input", "Das sieht nicht nach einer Mastodon-Instanz aus – zum Beispiel mastodon.social")
+    return value
+
+
+async def _mastodon_app(db, branding: dict, instance: str) -> tuple[str, str]:
+    """Client ID und Secret der Website bei dieser Instanz - beim ersten Mal registriert sich die Website selbst."""
+    entry = await db.mastodon_apps.find_one({"instance": instance}, {"_id": 0})
+    if entry and entry.get("client_id") and entry.get("client_secret"):
+        try:
+            return str(entry["client_id"]), decrypt_secret(entry["client_secret"])
+        except RuntimeError:
+            pass   # anderer SETTINGS_ENCRYPTION_KEY: neu registrieren
+    async with _client() as client:
+        response = await client.post(f"https://{instance}/api/v1/apps", data={
+            "client_name": client_name(branding), "redirect_uris": redirect_uri("mastodon"), "scopes": MASTODON_SCOPE,
+            "website": frontend_url() or public_base_url(),
+        })
+    body = _json(response) if response.status_code == 200 else {}
+    if not body.get("client_id") or not body.get("client_secret"):
+        raise LinkError("platform_error", f"{instance} nimmt die App-Registrierung nicht an (HTTP {response.status_code})")
+    await db.mastodon_apps.update_one({"instance": instance}, {"$set": {
+        "instance": instance, "client_id": str(body["client_id"]), "client_secret": encrypt_secret(str(body["client_secret"])),
+        "registered_at": now_utc().isoformat(),
+    }}, upsert=True)
+    return str(body["client_id"]), str(body["client_secret"])
+
+
+async def _mastodon_authorize(db, branding: dict, state: str, raw: str) -> str:
+    instance = mastodon_instance(raw)
+    if not await asyncio.to_thread(_resolves_public, instance):
+        raise LinkError("input", f"{instance} ist nicht erreichbar oder keine öffentliche Adresse")
+    client_id, _secret = await _mastodon_app(db, branding, instance)
+    await _remember_session(db, str(read_state_payload(state, "mastodon")["nonce"]), "mastodon", {"instance": instance})
+    return f"https://{instance}/oauth/authorize?" + urlencode({
+        "client_id": client_id, "redirect_uri": redirect_uri("mastodon"), "response_type": "code", "scope": MASTODON_SCOPE, "state": state,
+    })
+
+
+async def _mastodon_identity(db, branding: dict, code: str, nonce: str) -> dict:
+    session = await _take_session(db, nonce)
+    instance = str((session or {}).get("instance") or "")
+    if not instance:
+        raise LinkError("invalid", "Sitzung abgelaufen – bitte noch einmal starten")
+    client_id, secret = await _mastodon_app(db, branding, instance)
+    async with _client() as client:
+        token = await _token(client, f"https://{instance}/oauth/token", data={
+            "grant_type": "authorization_code", "code": code, "client_id": client_id, "client_secret": secret,
+            "redirect_uri": redirect_uri("mastodon"), "scope": MASTODON_SCOPE,
+        })
+        me = await client.get(f"https://{instance}/api/v1/accounts/verify_credentials", headers={"Authorization": f"Bearer {token}"})
+        data = _json(me) if me.status_code == 200 else {}
+        if not data.get("id") or not data.get("username"):
+            raise LinkError("exchange_failed", f"verify_credentials {me.status_code}")
+    handle = f"{data['username']}@{instance}"
+    return {"external_id": f"{instance}:{data['id']}", "handle": handle, "display_name": str(data.get("display_name") or data["username"])}
+
+
+# ---------- Bluesky: atproto OAuth (Client-Metadaten, PAR, DPoP, PKCE) ----------
+
+def bluesky_client_id() -> str:
+    return f"{public_base_url()}/api/platform-links/bluesky/client-metadata.json"
+
+
+def bluesky_client_metadata(branding: dict | None) -> dict:
+    """Die Website beschreibt sich selbst - der Authorization Server holt dieses Dokument unter der client_id."""
+    return {
+        "client_id": bluesky_client_id(), "client_name": client_name(branding), "client_uri": frontend_url() or public_base_url(),
+        "redirect_uris": [redirect_uri("bluesky")], "scope": BLUESKY_SCOPE, "grant_types": ["authorization_code", "refresh_token"],
+        "response_types": ["code"], "token_endpoint_auth_method": "none", "application_type": "web", "dpop_bound_access_tokens": True,
+    }
+
+
+def bluesky_handle(raw: str) -> str:
+    """„@paula.bsky.social“, „paula.bsky.social“ oder „https://bsky.app/profile/paula.bsky.social“ - leer erlaubt."""
+    value = str(raw or "").strip().lower().lstrip("@")
+    if "bsky.app/profile/" in value:
+        value = value.split("bsky.app/profile/", 1)[1].split("/", 1)[0].split("?", 1)[0]
+    if not value:
+        return ""
+    if not HOST_RE.match(value):
+        raise LinkError("input", "Das sieht nicht nach einem Bluesky-Handle aus – zum Beispiel name.bsky.social")
+    return value
+
+
+def _dpop_key() -> tuple[str, dict]:
+    """Ein frisches ES256-Schlüsselpaar je Verknüpfung: privater Teil als PEM, öffentlicher als JWK."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()).decode()
+    jwk = json.loads(jwt.algorithms.ECAlgorithm.to_jwk(key.public_key()))
+    return pem, jwk
+
+
+def _dpop_proof(pem: str, jwk: dict, method: str, url: str, *, nonce: str = "", access_token: str = "") -> str:
+    claims = {"jti": uuid.uuid4().hex, "htm": method, "htu": url.split("?", 1)[0], "iat": int(datetime.now(timezone.utc).timestamp())}
+    if nonce:
+        claims["nonce"] = nonce
+    if access_token:
+        claims["ath"] = base64.urlsafe_b64encode(hashlib.sha256(access_token.encode()).digest()).decode().rstrip("=")
+    return jwt.encode(claims, pem, algorithm="ES256", headers={"typ": "dpop+jwt", "jwk": jwk})
+
+
+async def _dpop_post(client: httpx.AsyncClient, pem: str, jwk: dict, url: str, data: dict, *, nonce: str = "") -> tuple[httpx.Response, str]:
+    """POST mit DPoP-Nachweis. Verlangt der Server einen Nonce (use_dpop_nonce), gleich noch einmal mit Nonce."""
+    response = None
+    for attempt in range(2):
+        response = await client.post(url, data=data, headers={"DPoP": _dpop_proof(pem, jwk, "POST", url, nonce=nonce), "Accept": "application/json"})
+        served = response.headers.get("DPoP-Nonce") or ""
+        if attempt == 0 and response.status_code in (400, 401) and _json(response).get("error") == "use_dpop_nonce" and served:
+            nonce = served
+            continue
+        return response, (served or nonce)
+    return response, nonce
+
+
+async def _did_document(client: httpx.AsyncClient, did: str) -> dict:
+    if did.startswith("did:plc:"):
+        url = f"{PLC_DIRECTORY}/{did}"
+    elif did.startswith("did:web:"):
+        url = f"https://{did[len('did:web:'):].split(':', 1)[0]}/.well-known/did.json"
+    else:
+        raise LinkError("exchange_failed", "unbekannte DID-Art")
+    response = await client.get(url)
+    return _json(response) if response.status_code == 200 else {}
+
+
+async def _bluesky_issuer(client: httpx.AsyncClient, handle: str) -> tuple[str, str]:
+    """(Authorization Server, DID) zu einem Handle - über DID-Dokument und PDS. Ohne Handle: der Einstiegsserver."""
+    if not handle:
+        return BLUESKY_ENTRY, ""
+    resolved = await client.get(f"{BLUESKY_PUBLIC_API}/com.atproto.identity.resolveHandle", params={"handle": handle})
+    did = str((_json(resolved) if resolved.status_code == 200 else {}).get("did") or "")
+    if not did:
+        raise LinkError("input", f"Der Handle {handle} ist bei Bluesky nicht bekannt")
+    document = await _did_document(client, did)
+    pds = next((str(service.get("serviceEndpoint") or "") for service in (document.get("service") or []) if str(service.get("id") or "").endswith("#atproto_pds")), "")
+    if not pds:
+        raise LinkError("exchange_failed", "DID-Dokument ohne PDS")
+    resource = await client.get(f"{pds.rstrip('/')}/.well-known/oauth-protected-resource")
+    servers = (_json(resource) if resource.status_code == 200 else {}).get("authorization_servers") or []
+    if not servers:
+        raise LinkError("exchange_failed", "PDS nennt keinen Authorization Server")
+    return str(servers[0]).rstrip("/"), did
+
+
+async def _bluesky_authorize(db, branding: dict, state: str, raw: str) -> str:
+    if not public_base_url():
+        raise LinkError("not_configured", "PUBLIC_BACKEND_URL fehlt")
+    handle = bluesky_handle(raw)
+    payload = read_state_payload(state, "bluesky")
+    nonce = str(payload["nonce"])
+    async with _client() as client:
+        issuer, did = await _bluesky_issuer(client, handle)
+        meta = await client.get(f"{issuer}/.well-known/oauth-authorization-server")
+        server = _json(meta) if meta.status_code == 200 else {}
+        par_endpoint = str(server.get("pushed_authorization_request_endpoint") or "")
+        authorize = str(server.get("authorization_endpoint") or "")
+        token_endpoint = str(server.get("token_endpoint") or "")
+        if not (par_endpoint and authorize and token_endpoint):
+            raise LinkError("exchange_failed", f"{issuer} nennt keine PAR-/Token-Endpunkte")
+        pem, jwk = _dpop_key()
+        data = {
+            "client_id": bluesky_client_id(), "redirect_uri": redirect_uri("bluesky"), "response_type": "code", "scope": BLUESKY_SCOPE,
+            "state": state, "code_challenge": _pkce_challenge(_pkce_verifier(nonce)), "code_challenge_method": "S256",
+        }
+        if handle:
+            data["login_hint"] = handle
+        response, dpop_nonce = await _dpop_post(client, pem, jwk, par_endpoint, data)
+        body = _json(response)
+        if response.status_code not in (200, 201) or not body.get("request_uri"):
+            raise LinkError("platform_error", f"PAR {response.status_code}: {body.get('error_description') or body.get('error') or ''}".strip(": "))
+    await _remember_session(db, nonce, "bluesky", {
+        "issuer": issuer, "token_endpoint": token_endpoint, "dpop_key": encrypt_secret(pem), "dpop_jwk": jwk, "dpop_nonce": dpop_nonce, "did": did,
+    })
+    return f"{authorize}?" + urlencode({"client_id": bluesky_client_id(), "request_uri": str(body["request_uri"])})
+
+
+async def _bluesky_identity(db, query: dict, code: str, nonce: str) -> dict:
+    session = await _take_session(db, nonce)
+    if not session or not session.get("token_endpoint"):
+        raise LinkError("invalid", "Sitzung abgelaufen – bitte noch einmal starten")
+    issuer = str(query.get("iss") or "").rstrip("/")
+    if issuer and issuer != session.get("issuer"):
+        raise LinkError("invalid", "iss passt nicht zum Authorization Server")
+    pem, jwk = decrypt_secret(session["dpop_key"]), session["dpop_jwk"]
+    async with _client() as client:
+        response, _nonce = await _dpop_post(client, pem, jwk, session["token_endpoint"], {
+            "grant_type": "authorization_code", "code": code, "redirect_uri": redirect_uri("bluesky"), "client_id": bluesky_client_id(),
+            "code_verifier": _pkce_verifier(nonce),
+        }, nonce=str(session.get("dpop_nonce") or ""))
+        body = _json(response)
+        did = str(body.get("sub") or "")
+        if response.status_code != 200 or not did:
+            raise LinkError("exchange_failed", f"token {response.status_code}")
+        profile = await client.get(f"{BLUESKY_PUBLIC_API}/app.bsky.actor.getProfile", params={"actor": did})
+        data = _json(profile) if profile.status_code == 200 else {}
+        handle = str(data.get("handle") or "")
+        if not handle:
+            known = (await _did_document(client, did)).get("alsoKnownAs") or []
+            handle = str(known[0])[len("at://"):] if known and str(known[0]).startswith("at://") else ""
+    return {"external_id": did, "handle": handle or did, "display_name": str(data.get("displayName") or handle or did)}
 
 
 def make_state(user_id: str, platform: str) -> str:
@@ -408,7 +700,7 @@ def _json(response: httpx.Response) -> dict:
     return data if isinstance(data, dict) else {}
 
 
-async def fetch_identity(platform: str, branding: dict, query: dict, state_payload: dict | None = None) -> dict:
+async def fetch_identity(platform: str, branding: dict, query: dict, state_payload: dict | None = None, db=None) -> dict:
     """Wer da ist - ``{"external_id", "handle", "display_name"}``. Wirft ``LinkError``."""
     if query.get("error"):
         # „access_denied“ heißt: die Person hat abgebrochen. Alles andere (z. B. redirect_mismatch,
@@ -445,6 +737,10 @@ async def fetch_identity(platform: str, branding: dict, query: dict, state_paylo
         if platform == "epic":
             return await _epic_identity(branding, code)
         nonce = str((state_payload or {}).get("nonce") or "")
+        if platform == "mastodon":
+            return await _mastodon_identity(db, branding, code, nonce)
+        if platform == "bluesky":
+            return await _bluesky_identity(db, query, code, nonce)
         if platform == "faceit":
             return await _faceit_identity(branding, code)
         if platform == "startgg":
@@ -936,6 +1232,15 @@ async def check_provider(platform: str, branding: dict, *, bot_token: str | None
                 checks.append(_check("api_key", "warn", "Ohne Steam-API-Schlüssel zeigt das Profil die 17-stellige ID statt des Anzeigenamens (optional)."))
             return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
 
+        if platform == "mastodon":
+            checks.append(_check("credentials", "ok", "Mastodon braucht keine feste App – die Website registriert sich bei jeder Instanz selbst, sobald ein Mitglied sie zum ersten Mal wählt."))
+            return {"platform": platform, "ok": True, "redirect_uri": redirect, "checks": checks}
+        if platform == "bluesky":
+            if public_base_url():
+                checks.append(_check("credentials", "ok", f"Bluesky braucht keine App – die Website beschreibt sich selbst unter {bluesky_client_id()} (atproto OAuth mit PAR, DPoP und PKCE)."))
+            else:
+                checks.append(_check("credentials", "fail", "Die öffentliche Adresse der Website fehlt (PUBLIC_BACKEND_URL) – ohne sie gibt es keine Client-Metadaten."))
+            return {"platform": platform, "ok": all(c["state"] != "fail" for c in checks), "redirect_uri": redirect, "checks": checks}
         if platform == "lichess":
             checks.append(_check("credentials", "ok", "Lichess braucht keine App – die Verknüpfung läuft als öffentlicher Client mit PKCE."))
             return {"platform": platform, "ok": True, "redirect_uri": redirect, "checks": checks}
