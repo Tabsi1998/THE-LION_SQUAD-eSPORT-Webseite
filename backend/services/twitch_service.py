@@ -287,6 +287,12 @@ async def fetch_live_streams() -> dict:
         )
     # Drop offline streams
     await _close_offline_streams(db, seen_logins, now_dt)
+    # „Turnier live“ (#579): streamt ein Teilnehmer eines laufenden Turniers, einmal je Stream-Start melden.
+    try:
+        from services.tournament_streams import sync as sync_tournament_streams
+        await sync_tournament_streams(db)
+    except Exception:  # noqa: BLE001 - die Live-Erkennung darf daran nie scheitern
+        logger.warning("[twitch] tournament streams", exc_info=True)
     return await record_poll("ok", checked=len(by_login), live=len(seen_logins))
 
 

@@ -381,3 +381,14 @@ async def delete_tournament(tid: str, me: dict = Depends(require_admin()),
     if v2_match_ids:
         await db.match_reports_v2.delete_many({"match_id": {"$in": v2_match_ids}})
     return {"ok": True}
+
+
+@router.get("/{slug_or_id}/streams")
+async def tournament_live_streams(slug_or_id: str):
+    """„Turnier live“ (#579): die laufenden Streams der Teilnehmer - nur öffentliche Turniere, nur Personen mit öffentlichem Profil."""
+    from services import tournament_streams
+    db = get_db()
+    t, _ = await find_by_slug_or_history(db.tournaments, slug_or_id, {"_id": 0})
+    if not tournament_streams.public_tournament(t):
+        raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    return await tournament_streams.live_streams_for_tournament(db, t)

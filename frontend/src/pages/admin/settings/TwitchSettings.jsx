@@ -10,13 +10,14 @@ import { TwitchTab } from "./TwitchTab";
 // Bis 24.09. ein Reiter der Einstellungen; seit „muss das doppelt sein?“ nur noch auf der Twitch-
 // Seite unter Verbindungen. Das Secret geht nur mit, wenn neu eingetippt.
 
-const EMPTY_BRAND = { twitch_channel: "", twitch_client_id: "", twitch_client_secret: "", twitch_client_secret_masked: "", twitch_live_detection: true };
+const EMPTY_BRAND = { twitch_channel: "", twitch_client_id: "", twitch_client_secret: "", twitch_client_secret_masked: "", twitch_live_detection: true, twitch_clips_enabled: false };
 
 export function twitchPayload(brand) {
   const payload = {
     twitch_channel: brand.twitch_channel || "",
     twitch_client_id: brand.twitch_client_id || "",
     twitch_live_detection: brand.twitch_live_detection !== false,
+    twitch_clips_enabled: brand.twitch_clips_enabled === true,
   };
   if (brand.twitch_client_secret) payload.twitch_client_secret = brand.twitch_client_secret;
   return payload;
@@ -43,6 +44,7 @@ export function TwitchSettings() {
           twitch_client_secret: "",
           twitch_client_secret_masked: data.twitch_client_secret_masked || "",
           twitch_live_detection: data.twitch_live_detection !== false,
+          twitch_clips_enabled: data.twitch_clips_enabled === true,
         };
         originalRef.current = twitchPayload(next);
         return next;

@@ -127,6 +127,8 @@ class BrandingSettings(BaseModel):
     twitch_client_secret: Optional[str] = None
     clear_twitch_client_secret: Optional[bool] = None
     twitch_live_detection: Optional[bool] = None
+    # Clips des Vereinskanals auf der Startseite (#579), Standard aus.
+    twitch_clips_enabled: Optional[bool] = None
     # Plattform-Konten verknüpfen (#260): Discord-App und optionaler Steam-Schlüssel (Twitch nutzt die Helix-App).
     discord_client_id: Optional[str] = None
     discord_client_secret: Optional[str] = None

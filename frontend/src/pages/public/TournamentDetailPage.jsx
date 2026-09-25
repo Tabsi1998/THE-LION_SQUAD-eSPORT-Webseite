@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Calendar, Users, Trophy, MapPin, Gamepad2, Radio, Zap, X, Flag, MessageSquare, Send, Handshake, ExternalLink } from "lucide-react";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
+import { TournamentLiveStreams } from "@/components/tls/tournament/TournamentLiveStreams";
 import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
@@ -305,6 +306,7 @@ export default function TournamentDetailPage() {
               </div>
             </section>
           )}
+          {t.status === "live" && <TournamentLiveStreams tournament={t} />}
           {(t.has_live_stream || (t.twitch_enabled && t.twitch_channel)) && (
             <section data-testid="tournament-stream"><StreamEmbed source={t} /></section>
           )}

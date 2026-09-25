@@ -40,6 +40,7 @@ EVENTS = {
     "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True},
     "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True},
     "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True},
+    "tournament.stream_live": {"target": "events", "label": "Turnier: Teilnehmer streamt", "default": True},
     "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True},
     "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
     "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},

@@ -44,6 +44,6 @@ test("„Jetzt prüfen“ stößt die Abfrage an; das Secret geht nur mit, wenn 
   fireEvent.click(screen.getByTestId("twitch-refresh"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/streams/refresh"));
   expect(toastMock.success).toHaveBeenCalledWith("Twitch geprüft: 1 live von 4 Kanälen.");
-  expect(twitchPayload({ twitch_channel: "a", twitch_client_id: "b", twitch_client_secret: "" })).toEqual({ twitch_channel: "a", twitch_client_id: "b", twitch_live_detection: true });
+  expect(twitchPayload({ twitch_channel: "a", twitch_client_id: "b", twitch_client_secret: "" })).toEqual({ twitch_channel: "a", twitch_client_id: "b", twitch_live_detection: true, twitch_clips_enabled: false });
   expect(twitchPayload({ twitch_client_secret: "neu" }).twitch_client_secret).toBe("neu");
 });
