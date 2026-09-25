@@ -3,6 +3,8 @@
   "build": 78,
   "date": "2026-09-25",
   "items": [
+    "Discord als Benachrichtigungskanal: wer sein Discord-Konto verknüpft hat, schaltet unter Profil → Benachrichtigungen „Discord“ ein und bekommt Benachrichtigungen als Direktnachricht vom Vereins-Bot – je Thema wählbar, Standard aus. Lehnt Discord Direktnachrichten ab, steht dort der Klickweg.",
+    "Erfolge sind ein eigenes Thema in den Benachrichtigungen (In-App, Push, Discord) – mit Discord kommt die Gratulation als Direktnachricht vom Bot.",
     "Sticker und GIFs der Handy-Tastatur (Samsung-Tastatur, Gboard) lassen sich im Chat einfügen – sie landen als Anhang in der Nachricht, GIFs bleiben animiert. Vorher meldete Android „Dieser Inhalt kann hier nicht eingegeben werden“.",
     "Generalversammlung und Abstimmungen aus der Vereinsakte unter Mitgliederbereich → Versammlungen: Einladung, Zu- oder Absage, eigene Anträge und Stimmabgabe mit Rückfrage.",
     "Beta oder Release ist bei App-Updates erkennbar; der Wechsel auf eine Beta fragt vorher nach.",

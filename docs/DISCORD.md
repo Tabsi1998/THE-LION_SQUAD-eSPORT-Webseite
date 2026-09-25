@@ -74,8 +74,12 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   Stand und „Alle jetzt auswerten“: Admin → Achievements.
 - Die Person selbst erfährt es **gebündelt**: mehrere Erfolge innerhalb einer
   Minute ergeben eine Benachrichtigung („3 Erfolge freigeschaltet“) – in der
-  App, per Push und (mit #568) als Gratulation vom Bot. Negative Auszeichnungen
-  werden nie gemeldet. In einen Kanal geht nichts mehr.
+  App, per Push und, mit Discord als Kanal, als **Gratulation vom Bot** (#568):
+  „Stark, Paula! 2 Erfolge freigeschaltet“ mit Erfolgsnamen, Gruppe, Punkten,
+  Farbe der höchsten Stufe und dem Weg zum Profil-Reiter „Erfolge“. Das Thema
+  „Erfolge“ in den Benachrichtigungen schaltet es je Kanal ab; eine E-Mail
+  dafür gibt es nicht. Negative Auszeichnungen werden nie gemeldet. In einen
+  Kanal geht nichts mehr.
 
 ## Wenn etwas nicht ankommt
 

@@ -60,10 +60,12 @@ const notificationChannels: Array<{ key: string; label: string; detail: string }
 
 type DiscordDmState = { linked?: boolean; blocked_at?: string | null; hint?: string | null };
 
-const notificationLabels: Array<{ key: string; label: string; detail: string }> = [
+const notificationLabels: Array<{ key: string; label: string; detail: string; channels?: string[] }> = [
   { key: "match_reminders", label: "Spiel-Erinnerungen", detail: "Startzeiten, Check-in und Match-Hub." },
   { key: "tournament_updates", label: "Turnier-Updates", detail: "Anmeldungen, Status und Ergebnisse." },
   { key: "prize_updates", label: "Gewinne", detail: "Gewinn bereit, Übergabe und Fristen." },
+  // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht.
+  { key: "achievements", label: "Erfolge", detail: "Freigeschaltete Erfolge – als Gratulation.", channels: ["in_app", "push", "discord"] },
   { key: "membership_updates", label: "Mitgliedschaft", detail: "Bewerbung, Status und Vereinsvorteile." },
   { key: "birthday_greetings", label: "Geburtstag", detail: "Geburtstagsgruß vom Verein." },
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
@@ -758,7 +760,7 @@ export function ProfileScreen() {
                 <Muted>{item.detail}</Muted>
                 {item.key === "news_events" && !form.newsletter_consent ? <Muted style={styles.warningText}>E-Mail benötigt Newsletter-Zustimmung.</Muted> : null}
                 <View style={styles.notificationMatrix}>
-                  {visibleChannels.map((channel) => {
+                  {visibleChannels.filter((channel) => !item.channels || item.channels.includes(channel.key)).map((channel) => {
                     const key = notificationPreferenceKey(channel.key, item.key);
                     const channelEnabled = notificationEnabled(channel.key);
                     const disabled = !channelEnabled || (channel.key === "email" && item.key === "news_events" && !form.newsletter_consent);

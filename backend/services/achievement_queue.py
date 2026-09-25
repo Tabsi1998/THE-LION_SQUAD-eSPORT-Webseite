@@ -143,8 +143,11 @@ async def _notify_user(user_id: str, rows: list[dict]) -> bool:
     else:
         names = ", ".join(str(row.get("tier_name")) for row in rows[:4]) + (" …" if len(rows) > 4 else "")
         title, body = f"{len(rows)} Erfolge freigeschaltet", f"{names} · +{_points(rows)} Punkte"
+    # Was die Gratulation per Discord (#568) braucht: Namen, Gruppe, Punkte und Stufe je Erfolg.
+    awards = [{"name": row.get("tier_name"), "group": row.get("group_name"), "points": int(row.get("points") or 0), "level": int(row.get("level") or 1)} for row in rows[:10]]
     created = await create_user_notification(
         user_id, title, body, url="/profile?tab=achievements", kind="achievement",
-        meta={"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}"},
+        meta={"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}",
+              "awards": awards, "points": _points(rows), "level": max(int(row.get("level") or 1) for row in rows)},
     )
     return created is not None

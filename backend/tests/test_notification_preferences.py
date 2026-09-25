@@ -131,3 +131,13 @@ def test_discord_channel_is_opt_in_and_follows_the_topics():
     assert discord_allowed({"notification_preferences": {"discord": True, "match_reminders": False}}, "match_reminder") is False
     channels = {channel["key"]: channel for channel in public_preferences_payload(opted)["channels"]}
     assert channels["discord"]["default"] is False and channels["discord"]["requires_link"] == "discord"
+
+
+def test_achievements_are_a_topic_without_an_email_way():
+    """Erfolge (#568): Thema für In-App, Push und Discord; eine Mail dafür gibt es nicht."""
+    categories = {category["key"]: category for category in public_preferences_payload({})["categories"]}
+    assert categories["achievements"]["channels"] == ["in_app", "push", "discord"] and categories["achievements"]["default"] is True
+    assert notification_allowed({"notification_preferences": {}}, "achievement") is True
+    assert push_allowed({"notification_preferences": {"push:achievements": False}}, "achievement") is False
+    assert discord_allowed({"notification_preferences": {"discord": True}}, "achievement") is True
+    assert discord_allowed({"notification_preferences": {"discord": True, "discord:achievements": False}}, "achievement") is False

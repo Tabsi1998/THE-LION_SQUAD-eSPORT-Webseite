@@ -40,4 +40,8 @@ test("mit Verknüpfung steht Discord als Kanal da; eine abgelehnte Direktnachric
   expect(screen.getByTestId("profile-notification-column-discord")).toHaveTextContent("Kanal aus");
   expect(screen.getByTestId("profile-notification-discord-hint")).toHaveTextContent("Servermitgliedern");
   expect(screen.getByTestId("profile-notification-discord-match_reminders")).toBeDisabled();
+  // Erfolge (#568): kein E-Mail-Weg, aber Push und Discord.
+  expect(screen.getByTestId("profile-notification-email-achievements-none")).toHaveTextContent("–");
+  expect(screen.getByTestId("profile-notification-push-achievements")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-notification-discord-achievements")).toBeInTheDocument();
 });

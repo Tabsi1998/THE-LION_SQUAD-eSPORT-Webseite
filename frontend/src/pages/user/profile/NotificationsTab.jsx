@@ -87,6 +87,9 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
                   </td>
                   {channels.map((channel) => {
                     const key = notificationPreferenceKey(channel.k, topic.k);
+                    if (topic.channels && !topic.channels.includes(channel.k)) {
+                      return <td key={key} className="px-3 py-3 text-center align-top border-b border-white/10 text-white/25" data-testid={`profile-notification-${channel.k}-${topic.k}-none`}>–</td>;
+                    }
                     const channelEnabled = notificationEnabled(channel.k);
                     const disabled = !channelEnabled || (channel.k === "email" && topic.requiresNewsletter && !form.newsletter_consent);
                     const checked = channelEnabled && notificationTopicEnabled(channel.k, topic);
