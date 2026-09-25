@@ -4,7 +4,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from datetime import date
 from database import get_db
-from auth import get_current_user, require_club_admin, get_optional_user, require_area
+from auth import get_current_user, require_club_admin, get_optional_user, require_area, require_club_member
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
     is_active_member, derived_user_type, VALID_STATUSES, VALID_TYPES,
@@ -1198,3 +1198,10 @@ async def public_members_directory():
         })
     out.sort(key=lambda x: (x.get("member_since") or ""))
     return out
+
+
+@router.get("/steam-presence")
+async def steam_presence_view(me: dict = Depends(require_club_member())):
+    """„Gerade in Steam“ (#584): wer von den Mitgliedern mit Opt-in gerade online ist und was gespielt wird - nur für Mitglieder."""
+    from services import steam_presence
+    return await steam_presence.presence_for(get_db(), me)
