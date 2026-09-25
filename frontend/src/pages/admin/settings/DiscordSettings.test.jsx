@@ -12,6 +12,7 @@ vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ user: { role: "superadmin" } }) }));
 vi.mock("./DiscordBotPanel", () => ({ DiscordBotPanel: ({ canSystem }) => <div data-testid="discord-bot-panel">{canSystem ? "system" : "-"}</div> }));
 vi.mock("./DiscordTargets", () => ({ DiscordTargets: () => <div data-testid="discord-targets" /> }));
+vi.mock("./DiscordSamplesPanel", () => ({ DiscordSamplesPanel: () => <div data-testid="discord-samples" /> }));
 
 const { DiscordSettings, discordPayload } = await import("./DiscordSettings");
 
@@ -36,6 +37,7 @@ test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort
   expect(screen.getByTestId("discord-settings")).toHaveTextContent("12 Nachrichten");
   expect(screen.getByTestId("discord-bot-panel")).toHaveTextContent("system");
   expect(screen.getByTestId("discord-targets")).toBeInTheDocument();
+  expect(screen.getByTestId("discord-samples")).toBeInTheDocument();
   expect(screen.getByTestId("discord-last-status")).toHaveTextContent("tournament.live");
   expect(screen.queryByTestId("discord-not-configured")).toBeNull();
   expect(screen.getByTestId("discord-settings")).not.toHaveTextContent("Webhook");

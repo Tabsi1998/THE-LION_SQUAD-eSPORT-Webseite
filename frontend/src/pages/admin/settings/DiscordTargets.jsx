@@ -7,13 +7,14 @@ import { api, formatApiError } from "@/lib/api";
 // fallen ohne eigenen Kanal auf „Community“ zurück; Vorstand und Betrieb sind privat und fallen nie
 // zurück - fehlt ihr Kanal, wird nichts gesendet. Bot aus = keine Meldung, kein Webhook-Rückfall.
 
-const TARGET_ORDER = ["community", "news", "events", "board", "ops"];
+const TARGET_ORDER = ["community", "news", "events", "board", "ops", "test"];
 const TARGET_HINTS = {
   community: "Standard für alles Öffentliche: Turnier-Meldungen, Fast-Lap-Bestzeiten – und News und Events ohne eigenen Kanal.",
   news: "Veröffentlichte News.",
   events: "Angekündigte Events, Turnier-Meldungen, Fast-Lap-Bestzeiten.",
   board: "Privat: neue Mitgliedsanträge und Kontaktanfragen – ohne Namen. Ohne eigenen Kanal wird nichts gesendet.",
   ops: "Privat: rote Auto-Checks und neue Serverfehler (Betrieb & Logs → Alarme). Ohne eigenen Kanal wird nichts gesendet.",
+  test: "Privat: Probe-Meldungen aus der Vorschau unten, mit Vermerk „Test“ (etwa #bot-test). Ohne eigenen Kanal wird nichts gesendet – nie in einen anderen Kanal.",
 };
 
 export function deliveryText(target, status) {

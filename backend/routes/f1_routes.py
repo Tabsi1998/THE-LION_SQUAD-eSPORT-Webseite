@@ -852,17 +852,13 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
                 was_new_leader = True
                 u = await db.users.find_one({"id": body.user_id}, {"display_name": 1, "username": 1}) or {}
                 tr = await db.f1_tracks.find_one({"id": body.track_id}, {"name": 1}) or {}
+                # Dieselbe Meldung wie in der Vorschau unter Verbindungen → Discord (#583).
+                from services.discord_announcements import fast_lap_message
+                message = fast_lap_message({**c, "id": cid}, driver=u.get("display_name") or u.get("username") or "", track=tr.get("name") or "",
+                                           time_text=_ms_to_time_str(effective), previous_text=_ms_to_time_str(prev_best) if prev_best else None)
                 await send_public_discord(
-                    c,
-                    f"🏁 Neue Bestzeit · {c.get('title') or 'Fast Lap'}",
-                    f"**{u.get('display_name') or u.get('username') or 'Fahrer'}** führt jetzt auf **{tr.get('name') or '–'}**!",
-                    color=0xFFD700,
-                    url=f"/fastlap/{c.get('slug') or cid}",
-                    fields=[
-                        {"name": "Zeit", "value": _ms_to_time_str(effective), "inline": True},
-                        *([{"name": "Vorher", "value": _ms_to_time_str(prev_best), "inline": True}] if prev_best else []),
-                    ],
-                    event_key="f1.new_leader",
+                    c, message["title"], message["description"],
+                    color=message["color"], url=message["url"], fields=message["fields"], event_key=message["event_key"],
                 )
         except Exception:
             pass

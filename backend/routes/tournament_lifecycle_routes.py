@@ -330,23 +330,15 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     if is_public_discord_status and prev != status and status in ("registration_open", "live", "completed", "results_published"):
         try:
             from discord_service import send_public_discord
-            colors = {"registration_open": 0x00FF88, "live": 0x29B6E8,
-                      "completed": 0xFFD700, "results_published": 0xFFD700}
-            labels = {"registration_open": "Anmeldung offen", "live": "Jetzt live",
-                      "completed": "Beendet", "results_published": "Ergebnisse veröffentlicht"}
+            from services.discord_announcements import tournament_message
             game_id = t.get("game_id")
             game = await db.games.find_one({"id": game_id}, {"name": 1}) if game_id else None
-            url = f"/tournaments/{t.get('slug') or tid}"
-            fields = []
-            if game and game.get("name"): fields.append({"name": "Spiel", "value": game["name"], "inline": True})
-            if t.get("format"): fields.append({"name": "Format", "value": (t.get("format_label") or t["format"].replace("_", " ").title()), "inline": True})
-            if t.get("max_participants"): fields.append({"name": "Teilnehmer", "value": f"max. {t['max_participants']}", "inline": True})
+            # Dieselbe Meldung wie in der Vorschau unter Verbindungen → Discord (#583).
+            message = tournament_message({**t, "id": tid}, status, game_name=(game or {}).get("name"))
             await send_public_discord(
-                t,
-                f"🏆 {t.get('title') or 'Turnier'} · {labels[status]}",
-                t.get("description") or "",
-                color=colors[status], url=url, fields=fields,
-                event_key=f"tournament.{status}", image_url=t.get("banner_url"),
+                t, message["title"], message["description"],
+                color=message["color"], url=message["url"], fields=message["fields"],
+                event_key=message["event_key"], image_url=message["image_url"],
             )
         except Exception:
             pass

@@ -188,8 +188,7 @@ async def membership_apply(body: ApplyBody, me: dict = Depends(get_current_user)
     await membership_invitations.mark_applied(db, me["id"], doc["id"])  # Einladung (#507) erledigt
     # Vorstands-Kanal (#300): nur der Hinweis, keine Namen - Discord ist ein fremder Dienst.
     from services.discord_announcements import notify_board
-    await notify_board("membership.application", "📝 Neuer Mitgliedsantrag",
-                       "Ein neuer Antrag wartet auf die Entscheidung des Vorstands.", url="/admin/membership-applications")
+    await notify_board("membership.application", "Ein neuer Antrag wartet auf die Entscheidung des Vorstands.")
     # Notify admin via SMTP queue (best-effort)
     try:
         from services.mail_queue import enqueue_mail
@@ -246,8 +245,7 @@ async def _apply_via_dolibarr(db, client, body: ApplyBody, me: dict) -> dict:
     if saved.get("status") == "failed":
         raise HTTPException(502, f"Die Mitgliederverwaltung hat den Antrag nicht angenommen ({saved.get('dolibarr', {}).get('error_text') or 'Fehler'}). Bitte Angaben prüfen und neu stellen.")
     from services.discord_announcements import notify_board
-    await notify_board("membership.application", "📝 Neuer Mitgliedsantrag",
-                       "Ein neuer Antrag ist in der Mitgliederverwaltung eingegangen.", url="/admin/membership-applications")
+    await notify_board("membership.application", "Ein neuer Antrag ist in der Mitgliederverwaltung eingegangen.")
     return dolibarr_applications.own_view(saved)
 
 

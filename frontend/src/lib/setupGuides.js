@@ -46,8 +46,9 @@ export const SETUP_GUIDES = {
       { text: "In Discord je Kanal prüfen, dass die Bot-Rolle dort schreiben darf: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: „Kanal ansehen“, „Nachrichten senden“, „Links einbetten“. Für Vorstand und Betrieb private Kanäle nehmen." },
       { text: "Hier unter „Kanäle je Zweck“ je Ziel den Kanal aus der Liste wählen (die Liste zeigt, wo der Bot schreiben darf) und speichern. Ist der Bot gerade nicht verbunden: Kanal-ID eintragen (Rechtsklick auf den Kanal → „Kanal-ID kopieren“, Entwicklermodus)." },
       { text: "Mit „Test“ je Ziel prüfen; unter „Was gemeldet wird“ je Ereignis ein- oder ausschalten." },
+      { text: "Unter „Vorschau“ jede Meldungsart als Discord-Nachbildung ansehen – und echt in den privaten Testkanal (Ziel „Test“, etwa #bot-test) oder an dich als Direktnachricht schicken. Tests tragen den Vermerk „Test“ und zählen nicht als Meldung." },
     ],
-    notes: ["Vorstand und Betrieb fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
+    notes: ["Vorstand, Betrieb und Test fallen nie auf die Community zurück – fehlt ihr Kanal, wird nichts gesendet.", "Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal."],
   },
   twitch: {
     key: "twitch",
@@ -528,7 +529,7 @@ export function guideStatus(key, data = {}) {
       return discord.bot?.configured ? ok(discord.bot?.connected ? "Bot online" : "Token da, Bot aus oder offline") : missing("Bot-Token fehlt");
     case "discord_channels":
       if (!discord) return unknown;
-      return discord.configured ? ok(discord.enabled ? "Webhook aktiv" : "Webhook da, Versand aus") : missing("Kein Webhook");
+      return discord.configured ? ok(discord.enabled ? "Kanal gewählt, Versand an" : "Kanal gewählt, Versand aus") : missing("Kein Kanal gewählt");
     case "twitch":
       if (!branding) return unknown;
       return branding.twitch_client_id && branding.twitch_client_secret_masked ? ok(branding.twitch_channel ? `App und Kanal ${branding.twitch_channel}` : "App da, Vereinskanal fehlt") : missing("Client ID oder Secret fehlt");

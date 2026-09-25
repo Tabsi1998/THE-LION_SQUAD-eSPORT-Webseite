@@ -1487,8 +1487,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     s["bot"].pop("channels", None)  # die Kanalliste kommt über /discord/channels
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
+    # Tests aus der Vorschau (#583) zählen nicht als Meldung.
     last = await db.email_logs.find_one(
-        {"channel": "discord"},
+        {"channel": "discord", "test": {"$ne": True}},
         {"_id": 0, "status": 1, "error": 1, "event_key": 1, "created_at": 1},
         sort=[("created_at", -1)],
     )
@@ -1678,16 +1679,43 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
 
 
 @settings_router.post("/discord/test")
-async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops)$"), me: dict = Depends(require_club_admin())):
+async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops|test)$"), me: dict = Depends(require_club_admin())):
     """Testmeldung über den Bot in den Kanal des Ziels - privat bleibt privat, ohne Kanal kommt der Grund zurück (#566)."""
     from discord_service import TARGET_LABELS, send_to
     texts = {
         "community": "Diese Nachricht bestätigt, dass der Bot hier schreiben darf. 🦁",
         "ops": "Diese Nachricht bestätigt, dass der Bot im Betriebskanal schreiben darf. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
         "board": "Diese Nachricht bestätigt, dass der Bot im Vorstandskanal schreiben darf. Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen.",
+        "test": "Diese Nachricht bestätigt, dass der Bot im Testkanal schreiben darf. Hierher kommen Probe-Meldungen aus der Vorschau – nie an die Community.",
     }
     title = "THE LION SQUAD · Testnachricht" if target == "community" else f"{TARGET_LABELS[target]} · Testnachricht"
     return await send_to(target, title, texts.get(target, "Diese Nachricht bestätigt, dass der Bot in diesem Kanal schreiben darf."), event_key="test")
+
+
+@settings_router.get("/discord/samples")
+async def discord_samples(me: dict = Depends(require_club_admin())):
+    """Vorschau jeder Meldungsart (#583): Embeds wie im Betrieb, dazu Testkanal und ob „an mich“ geht."""
+    from discord_service import target_status
+    from services.discord_dm import discord_link_id
+    from services.discord_samples import GROUPS, public_entries, sample_catalog
+    db = get_db()
+    test_channel = (await target_status(db)).get("test") or {}
+    return {
+        "groups": list(GROUPS),
+        "entries": public_entries(await sample_catalog(db)),
+        "test_channel": {"configured": bool(test_channel.get("configured")), "channel_name": test_channel.get("channel_name"), "channel_id": test_channel.get("channel_id") or ""},
+        "dm": {"linked": bool(await discord_link_id(db, me["id"]))},
+    }
+
+
+@settings_router.post("/discord/samples/{key}/send")
+async def discord_sample_send(key: str, via: str = Query(default="test", pattern="^(test|dm)$"), me: dict = Depends(require_club_admin())):
+    """Ein Beispiel echt senden: in den Testkanal (nie woandershin) oder als Direktnachricht an mich (#583)."""
+    from services.discord_samples import send_sample
+    try:
+        return await send_sample(key, via, me)
+    except KeyError:
+        raise HTTPException(404, "Diese Meldungsart gibt es nicht.")
 
 
 @settings_router.get("/discord/channels")

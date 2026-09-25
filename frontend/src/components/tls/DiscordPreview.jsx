@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { DiscordMessagePreview, embedColor } from "./DiscordMessagePreview";
 
 // „So sieht die Meldung aus“ (#303): dasselbe Embed, das der Server später an
 // Discord schickt, plus die ehrliche Auskunft, ob und wohin es ginge. Dazu der
-// Haken „Ohne Discord“ für genau diese News / dieses Event.
+// Haken „Ohne Discord“ für genau diese News / dieses Event. Die Nachbildung ist
+// seit #583 dieselbe wie auf der Vorschau unter Verbindungen → Discord.
+
+export { embedColor };
 
 export const SKIP_REASONS = {
   author_opt_out: "„Ohne Discord“ ist angehakt – es wird nichts gesendet.",
@@ -16,10 +20,6 @@ export const SKIP_REASONS = {
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
 };
 const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere" };
-
-export function embedColor(color) {
-  return `#${Number(color || 0x29b6e8).toString(16).padStart(6, "0")}`;
-}
 
 export function DiscordPreview({ kind, item, skip, onSkipChange }) {
   const [preview, setPreview] = useState(null);
@@ -58,19 +58,7 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
           <div className={`text-xs ${preview.would_send ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
             {preview.would_send ? `Geht beim Veröffentlichen an: ${TARGET_NAMES[preview.target] || preview.target}.` : (SKIP_REASONS[preview.reason] || "Wird nicht gesendet.")}
           </div>
-          <div className="bg-[#2B2D31] rounded-sm p-3 text-sm text-[#DBDEE1] border-l-4" style={{ borderLeftColor: embedColor(embed?.color) }} data-testid="discord-preview-embed">
-            <div className="font-bold text-[#00A8FC] break-words">{embed?.title}</div>
-            {embed?.description && <div className="mt-1 whitespace-pre-line break-words">{embed.description}</div>}
-            {embed?.fields?.length > 0 && (
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {embed.fields.map((field) => (
-                  <div key={field.name}><div className="text-xs font-bold">{field.name}</div><div className="text-xs">{field.value}</div></div>
-                ))}
-              </div>
-            )}
-            {embed?.image?.url && <img src={embed.image.url} alt="" className="mt-2 rounded-sm max-h-48 w-full object-cover" />}
-            {embed?.url && <div className="mt-2 text-[10px] text-white/40 break-all">{embed.url}</div>}
-          </div>
+          <DiscordMessagePreview embed={embed} testId="discord-preview-message" embedTestId="discord-preview-embed" />
         </>
       )}
     </div>
