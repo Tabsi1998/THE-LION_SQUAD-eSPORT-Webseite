@@ -14,7 +14,7 @@
     "test:security": "node --no-warnings --test scripts/cache-security.test.mjs scripts/logging-security.test.mjs",
     "release:preflight": "node scripts/release-preflight.cjs",
     "release:local": "node scripts/release-local.cjs",
-    "test:release": "node --no-warnings --test scripts/release-version.test.mjs scripts/whats-new.test.mjs",
+    "test:release": "node --no-warnings --test scripts/release-version.test.mjs scripts/whats-new.test.mjs scripts/play-publish.test.mjs",
     "whatsnew": "node scripts/whats-new.cjs"
   },
   "dependencies": {
