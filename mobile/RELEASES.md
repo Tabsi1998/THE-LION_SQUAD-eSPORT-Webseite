@@ -127,13 +127,17 @@ Automatisch: Bundle hochladen, Versionshinweise aus dem Changelog, Track fertigs
 
 ## Update aus der App (#250)
 
-Das Repo ist privat: vom Handy aus kommt niemand ohne GitHub-Login an die APK. Deshalb hält der
-Vereinsserver je Build eine Kopie (`uploads/app-releases`, Sammlung `app_releases`) und liefert sie
-an angemeldete Nutzer über `GET /api/mobile/app-download/{build}`. Die App fragt beim Start und beim
-Zurückkehren in den Vordergrund höchstens einmal pro Stunde `GET /api/mobile/app-version?build=…`,
-zeigt bei einem neueren Build einen Banner mit „Was ist neu“, „Herunterladen“ und „Später“, prüft
-Größe und MD5 der Datei und öffnet den Android-Installer. Liegt der eigene Build unter `min_build`,
-ist das Update Pflicht und der Banner nicht wegdrückbar.
+**Seit 1.0.0 (#593) kommen Updates über Google Play.** Die App fragt beim Start und beim Zurückkehren
+in den Vordergrund höchstens einmal pro Stunde `GET /api/mobile/app-version?build=…`, zeigt bei einem
+neueren Build einen Banner mit „Was ist neu“ und „Später“, startet Googles Update-Dialog (#421) oder
+öffnet die Store-Seite. Liegt der eigene Build unter `min_build`, ist das Update Pflicht und der Banner
+nicht wegdrückbar. Den eigenen APK-Download mit Installer gibt es nicht mehr: Google erlaubt die
+Berechtigung `REQUEST_INSTALL_PACKAGES` nur App-Stores. Geräte ohne Google Play holen die APK vom
+GitHub-Release im Browser (das Repo ist privat – Vorstand schickt den Link oder die Datei).
+
+Der Vereinsserver hält je Build weiter eine Kopie (`uploads/app-releases`, Sammlung `app_releases`,
+Download für angemeldete Nutzer über `GET /api/mobile/app-download/{build}`) – für den Admin und als
+Ablage, nicht mehr als Update-Weg der App; der Schalter „Server-Updater“ im Admin ist damit weg.
 
 **Wie die APK auf den Server kommt**
 
@@ -187,6 +191,7 @@ Neueste oben.
 - `0.14.1-beta`: Build 74, Auszeichnungen im eigenen Reiter statt unter Referenzen (#230 Nachtrag); erster Build, der auch als App-Bundle (AAB) für den internen Test in der Play Console gebaut wird
 - `0.15.0-beta`: Build 75, „Konto löschen“ in der App (Google-Play-Pflicht vor dem geschlossenen Test, #390)
 - `0.16.0-beta`: Build 76, kostenpflichtige Events in der App, Teilnehmer für Verwaltung und Vorstand, Melden und Blockieren (Meilenstein App 1.0.0, #396, #397, #414)
+- `1.0.0`: Build 79, erste Play-Store-Version – Updates über Google Play, kein eigener Installer mehr (Meilenstein App 1.0.0, #593, #592)
 - `0.18.0-beta`: Build 78, Sticker und GIFs der Tastatur im Chat, Versammlungen und Abstimmungen, Konten verknüpfen (Meilenstein App 0.9.0-beta, #239)
 - `0.17.0-beta`: Build 77, Updates je nach Herkunft – Play-Installationen bekommen Googles Update-Dialog, Server-APK nur für Sideload (Meilenstein App 1.0.0, #421)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema

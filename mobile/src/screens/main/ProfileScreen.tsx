@@ -16,6 +16,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { availabilityText } from "../../lib/appLock";
 import { useAppLock } from "../../lock/AppLockProvider";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
+import { missingLabels } from "../../lib/profileCompleteness";
 import { AchievementGroupCard } from "../../components/AchievementGroupCard";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
 import { type AchievementGroup, achievementIcon } from "../../lib/achievements";
@@ -530,8 +531,8 @@ export function ProfileScreen() {
                 <Stat label="Erfolge" value={`${insights.earned.length}/${insights.tiers.length || 0}`} tone="gold" />
                 <Stat label="Rolle" value={formatStatus(user?.role || "player")} />
               </View>
-              {completeness.missing?.length ? (
-                <Muted>Offen: {completeness.missing.slice(0, 8).join(", ")}</Muted>
+              {missingLabels(completeness.missing).length ? (
+                <Muted testID="profile-completeness-missing">Offen: {missingLabels(completeness.missing).join(", ")}</Muted>
               ) : (
                 <Muted>Alle wichtigen Profilfelder sind gepflegt.</Muted>
               )}

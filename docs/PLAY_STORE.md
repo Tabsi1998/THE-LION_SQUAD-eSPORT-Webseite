@@ -25,7 +25,7 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
 4. **Richtlinien** in der Console: Datenschutzerklärung `https://lionsquad.at/privacy`, App-Zugriff (Testkonto, Abschnitt unten), Werbung „nein“, Inhaltseinstufung (Fragebogen), Zielgruppe, Datensicherheit (Tabelle unten), Regierungs-App „nein“, Finanzfunktionen „keine“.
 5. **Einrichtung → API-Zugriff**: Dienstkonto für `--play`, Klickweg in `mobile/RELEASES.md` („Play Console: Bundle automatisch laden“). Optional, spart das Hochladen von Hand.
 6. **Interner Test**: Tester-Liste mit E-Mail-Adressen (Vorstand, zwei bis drei Freiwillige), Bundle hochladen oder `--play`, Link aus der Console an die Tester schicken. Google prüft interne Tests nicht.
-7. **Geschlossener Test** für Mitglieder: eigene Tester-Liste (E-Mail-Adressen der Mitglieder, die mitmachen) oder eine Google-Gruppe; ab hier prüft Google die App einmal (Store-Eintrag, Richtlinien). Seit 2023 verlangt Google bei neuen Privatkonten 12 Tester über 14 Tage vor der Produktion – bei einem Organisationskonto entfällt das.
+7. **Geschlossener Test** für Mitglieder: eigene Tester-Liste (E-Mail-Adressen der Mitglieder, die mitmachen) oder eine Google-Gruppe; ab hier prüft Google die App einmal (Store-Eintrag, Richtlinien). Das Konto ist als **Organisation** (Verein) angelegt – die 12-Tester-Regel für Privatkonten gilt nicht.
 8. **Produktion** erst mit 1.0.0 (Versionsschema in `mobile/RELEASES.md`); die Freigabe klickt der Betreiber selbst, das Skript lädt nie nach Produktion.
 
 ## Store-Eintrag (Vorschlag)
@@ -40,7 +40,8 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
   >
   > Anmeldung mit deinem Konto von lionsquad.at, auch per Passkey mit Fingerabdruck. Öffentliche Turniere, Events und News siehst du auch ohne Konto.
 
-- **Kategorie:** Sport · **Tags:** eSports, Verein
+- **Kategorie:** Sport · **Tags** (aus Googles Liste): Sport, Events, Kommunikation
+- **Länder:** Österreich, Deutschland, Schweiz, Italien (Entscheidung 25.09.); kostenlos
 - **Kontakt:** die Vereins-Mailadresse; Website `https://lionsquad.at`
 - **Zielgruppe:** ab 13 Jahren. Die App richtet sich nicht an Kinder; Vereinsmitglieder sind teils Jugendliche. Keine Werbung.
 - **Inhaltseinstufung (IARC-Fragebogen):** Kategorie **„Alle anderen App-Typen“** (kein Spiel; Chat ist Funktion, nicht Hauptzweck). Freigaberelevante Inhalte im App-Paket: nein. Teilen von Benutzerinhalten: Kommunikation/Bilder teilen **ja**; Nutzerinhalt als primäre Quelle nein; Nacktheit/Gewalt teilen nein; Blockieren **ja**, Melden **ja**, Chatmoderation **ja** (Wortfilter, Meldungen, Bildprüfung, Verwarnungen); Interaktionen nur auf eingeladene Freunde beschränkbar nein (Team- und Turnier-Chats sind für Teilnehmer offen). Gewalt, Sex, Drogen, grobe Sprache, Glücksspiel, Werbung, In-App-Käufe, Standort teilen: nein. Erwartet: PEGI 3 / USK 0 mit „Nutzerinteraktion“.
@@ -100,6 +101,10 @@ mit Mitgliedschaft „aktiv“ in der Vereinsakte, damit der Mitgliederbereich s
 Das Passwort nur in die Console eintragen, nie ins Repo oder in einen Chat; nach der Prüfung ändern.
 
 ## Ablauf je Version
+
+Seit 1.0.0 (#593) kommen Updates von Google Play; die App hat keinen eigenen Installer mehr (Google
+erlaubt die Berechtigung dafür nur App-Stores). Die APK am GitHub-Release ist nur für Geräte ohne Google
+Play – Download im Browser, der Vorstand schickt den Link.
 
 1. PR mit Version, Build-Zähler und Changelog-Abschnitt mergen (siehe `mobile/RELEASES.md`).
 2. `npm run release:local -- --play` (intern) oder `--play=closed`: GitHub-Release, APK an den Vereinsserver, Bundle in den Track. Ohne Dienstkonto: `--aab` und das Bundle aus `mobile/builds/` in der Console hochladen.

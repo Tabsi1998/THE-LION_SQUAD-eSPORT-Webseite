@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0 - 2026-09-25
+
+- Mobile: Erste Version für Google Play. Updates kommen ab jetzt über den Play Store – der eigene Download mit Installer und die Berechtigung „Apps aus unbekannten Quellen installieren“ sind aus der App entfernt; Geräte ohne Google Play holen die APK vom GitHub-Release im Browser (#593).
+- Mobile: Der Profilstatus nennt offene Angaben in Klartext („Profilbild, Geburtsdatum“) statt als Feldnamen (#592).
+
 ## 0.18.0-beta - 2026-09-25
 
 - Mobile: Discord als Benachrichtigungskanal: wer sein Discord-Konto verknüpft hat, schaltet unter Profil → Benachrichtigungen „Discord“ ein und bekommt Benachrichtigungen als Direktnachricht vom Vereins-Bot – je Thema wählbar, Standard aus. Lehnt Discord Direktnachrichten ab, steht dort der Klickweg (#567).
