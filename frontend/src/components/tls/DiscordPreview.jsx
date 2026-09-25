@@ -20,6 +20,16 @@ export const SKIP_REASONS = {
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
 };
 const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere" };
+// Discord-Termin (#570): warum keiner entsteht - Texte vom Server, hier nur der Rückfall.
+export function scheduledEventText(entry) {
+  if (!entry) return "";
+  if (entry.would_create && entry.payload) {
+    const start = new Date(entry.payload.start).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+    const end = new Date(entry.payload.end).toLocaleTimeString("de-DE", { timeStyle: "short" });
+    return `${entry.existing_id ? "Discord-Termin wird nachgezogen" : "Erscheint als Discord-Termin"}: „${entry.payload.name}“, ${start} – ${end} Uhr, ${entry.payload.location}.`;
+  }
+  return entry.reason_text || "Kein Discord-Termin.";
+}
 
 export function DiscordPreview({ kind, item, skip, onSkipChange }) {
   const [preview, setPreview] = useState(null);
@@ -59,6 +69,11 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
             {preview.would_send ? `Geht beim Veröffentlichen an: ${TARGET_NAMES[preview.target] || preview.target}.` : (SKIP_REASONS[preview.reason] || "Wird nicht gesendet.")}
           </div>
           <DiscordMessagePreview embed={embed} testId="discord-preview-message" embedTestId="discord-preview-embed" />
+          {preview.scheduled_event && (
+            <div className={`text-xs ${preview.scheduled_event.would_create ? "text-[#00FF88]" : "text-white/50"}`} data-testid="discord-preview-scheduled">
+              {scheduledEventText(preview.scheduled_event)}
+            </div>
+          )}
         </>
       )}
     </div>

@@ -31,6 +31,21 @@ test("die Vorschau zeigt Titel, Felder und Bild und sagt, wohin es geht", async 
   expect(screen.getByTestId("discord-preview-verdict")).toHaveTextContent("Geht beim Veröffentlichen an: Events und Turniere.");
 });
 
+// Discord-Termin (#570): die Vorschau sagt, ob und wie das Event als Termin erscheint.
+test("Discord-Termin in der Vorschau: Zeit, Ort und Rückfall-Text", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { would_send: true, reason: null, target: "events", embed: { title: "📅 LAN-Party", color: 1 },
+    scheduled_event: { would_create: true, reason: null, existing_id: null, payload: { name: "LAN-Party", start: "2026-10-03T16:00:00+00:00", end: "2026-10-03T18:00:00+00:00", location: "Vereinsheim, Telfs" } } } });
+  render(<DiscordPreview kind="event" item={{ name: "LAN-Party" }} skip={false} onSkipChange={() => {}} />);
+  await user.click(screen.getByTestId("discord-preview-load"));
+  await waitFor(() => expect(screen.getByTestId("discord-preview-scheduled")).toHaveTextContent("Erscheint als Discord-Termin: „LAN-Party“"));
+  expect(screen.getByTestId("discord-preview-scheduled")).toHaveTextContent("Vereinsheim, Telfs");
+
+  apiMock.post.mockResolvedValue({ data: { would_send: true, reason: null, target: "events", embed: { title: "x", color: 1 }, scheduled_event: { would_create: false, reason: "disabled", reason_text: "Discord-Termine sind ausgeschaltet." } } });
+  await user.click(screen.getByTestId("discord-preview-load"));
+  await waitFor(() => expect(screen.getByTestId("discord-preview-scheduled")).toHaveTextContent("Discord-Termine sind ausgeschaltet."));
+});
+
 test("interne Inhalte: die Vorschau sagt, dass sie nie in einen öffentlichen Kanal gehen", async () => {
   const user = userEvent.setup();
   apiMock.post.mockResolvedValue({ data: { would_send: false, reason: "private_visibility", target: "community", embed: { title: "📰 Intern", color: 1 } } });

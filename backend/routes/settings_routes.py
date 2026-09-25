@@ -322,6 +322,8 @@ class DiscordSettings(BaseModel):
     bot_count_messages: Optional[bool] = None
     # Live-Einbettungen (#569): je Art {enabled, channel_id}; die Nachrichten-IDs verwaltet der Server.
     embeds: Optional[dict[str, dict]] = None
+    # Discord-Termine (#570): {enabled, internal}.
+    scheduled_events: Optional[dict[str, bool]] = None
 
 
 class YoutubeFeedSettings(BaseModel):
@@ -1500,6 +1502,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     # Live-Einbettungen (#569): je Art Schalter, Kanal, Nachricht, Stand.
     from services.discord_embeds import embeds_status
     s["embeds"] = await embeds_status(db)
+    # Discord-Termine (#570): Schalter, letzter Abgleich, Anzahl.
+    from services.discord_scheduled import scheduled_status
+    s["scheduled_events"] = await scheduled_status(db)
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     # Tests aus der Vorschau (#583) zählen nicht als Meldung.
@@ -1562,6 +1567,13 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in EVENTS:
                 raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
             updates[f"events.{event_field(key)}"] = bool(value)
+    # Discord-Termine (#570): zwei Schalter.
+    incoming_scheduled = updates.pop("scheduled_events", None)
+    if incoming_scheduled is not None:
+        for key, value in incoming_scheduled.items():
+            if key not in ("enabled", "internal") or not isinstance(value, bool):
+                raise HTTPException(400, f"Unbekannte Einstellung für Discord-Termine: {key}")
+            updates[f"scheduled_events.{key}"] = value
     # Live-Einbettungen (#569): Schalter und Kanal je Art; ein neuer Kanal heißt eine neue Nachricht.
     incoming_embeds = updates.pop("embeds", None)
     if incoming_embeds is not None:
@@ -1593,6 +1605,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
     for kind, state in (current.get("embeds") or {}).items():
         for key, value in (state or {}).items():
             flat_current[f"embeds.{kind}.{key}"] = value
+    for key, value in (current.get("scheduled_events") or {}).items():
+        flat_current[f"scheduled_events.{key}"] = value
     current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
