@@ -89,6 +89,24 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   gesendeten Meldung stehen im Log – die Grundlage, um Nachrichten später zu
   bearbeiten (Discord IV).
 
+## Discord als persönlicher Benachrichtigungskanal (#567)
+
+Wer sein Discord-Konto verknüpft hat, kann unter Profil → Benachrichtigungen den Kanal
+**Discord** einschalten (Standard aus): dieselben Benachrichtigungen wie In-App und Push kommen
+dann als **Direktnachricht vom Vereins-Bot** – Titel, Text, Link zur Website; die Themen-Schalter
+gelten wie bei Push. Ohne Verknüpfung gibt es den Kanal nicht.
+
+- Nie in einer Direktnachricht: Nachrichtentexte anderer Personen (nur „du hast eine Nachricht“
+  mit Link), Moderation, Zahlungsdaten. Was nicht per Push geht, geht auch nicht per Discord.
+- Discord stellt Direktnachrichten nur zu, wenn die Person mit dem Bot einen Server teilt und
+  „Direktnachrichten von Servermitgliedern“ erlaubt. Lehnt Discord ab, bleibt es bei In-App und
+  Push; die Website merkt sich das (`discord_dm_blocked_at`) und zeigt in den Einstellungen den
+  Klickweg. Klappt es wieder, verschwindet der Hinweis.
+- Bot aus oder nicht verbunden: keine Direktnachricht, Grund im Versand-Log (Ziel `dm`).
+- Code: `services/discord_dm.py` (`send_discord_dm_for_notification`, `dm_content`, `dm_state`),
+  `notification_preferences.discord_allowed`, `BotRunner.send_dm`; der Fan-out sitzt in
+  `user_notifications.create_user_notification` neben Push.
+
 ## Konten verknüpfen (Discord, Twitch, Steam)
 
 Mitglieder verknüpfen im Profil → Socials ihr Discord-, Twitch- oder Steam-Konto per Anmeldung

@@ -118,6 +118,8 @@ export const NOTIFICATION_CHANNELS = [
   { k: "email", l: "E-Mail", d: "Nur wichtige optionale Hinweise per Mail.", defaultOn: true },
   { k: "push", l: "Push", d: "System-Benachrichtigungen auf registrierten Mobilgeräten.", defaultOn: true },
   { k: "in_app", l: "In-App", d: "Hinweise in Web, App und Notification-Center.", defaultOn: true },
+  // Discord als Kanal (#567): Direktnachricht vom Vereins-Bot, nur mit verknüpftem Konto - Standard aus.
+  { k: "discord", l: "Discord", d: "Direktnachricht vom Vereins-Bot – nur mit verknüpftem Discord-Konto.", defaultOn: false },
 ];
 export const notificationPreferenceKey = (channel, topic) => `${channel}:${topic}`;
 

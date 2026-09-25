@@ -917,7 +917,11 @@ async def get_my_notification_preferences(me: dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": me["id"]}, {"_id": 0})
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
-    return public_preferences_payload(user)
+    payload = public_preferences_payload(user)
+    # Discord als Kanal (#567): nur mit verknüpftem Konto; nach einer abgelehnten Direktnachricht steht der Klickweg.
+    from services.discord_dm import dm_state
+    payload["discord"] = await dm_state(db, user)
+    return payload
 
 
 # ---------- User socials ----------

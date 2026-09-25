@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
-from services.notification_preferences import notification_allowed, push_allowed
+from services.notification_preferences import NOTIFICATION_KIND_CATEGORY, discord_allowed, notification_allowed, push_allowed
 
 
 DEFAULT_COOLDOWN_SECONDS = {
@@ -58,7 +58,8 @@ async def create_user_notification(
     category = (meta or {}).get("category")
     in_app_allowed = (not user) or notification_allowed(user, kind, category)
     push_channel_allowed = push_allowed(user, kind, category)
-    if not in_app_allowed and not push_channel_allowed:
+    discord_channel_allowed = discord_allowed(user, kind, category)
+    if not in_app_allowed and not push_channel_allowed and not discord_channel_allowed:
         return None
     meta = meta or {}
     dedupe_key = meta.get("dedupe_key")
@@ -118,4 +119,14 @@ async def create_user_notification(
         )
     except Exception:
         pass
+    # Discord als persönlicher Kanal (#567): Direktnachricht vom Bot - nur mit Opt-in und verknüpftem Konto.
+    try:
+        discord_sent = 0
+        if discord_channel_allowed:
+            from services.discord_dm import send_discord_dm_for_notification
+            discord_sent = await send_discord_dm_for_notification(doc, category or NOTIFICATION_KIND_CATEGORY.get(kind))
+        doc["discord_sent_count"] = discord_sent
+        await db.notifications.update_one({"id": doc["id"]}, {"$set": {"discord_sent_count": discord_sent}})
+    except Exception:
+        doc.setdefault("discord_sent_count", 0)
     return doc

@@ -466,6 +466,30 @@ class BotRunner:
         self.last_action = f"Meldung in #{getattr(channel, 'name', channel_id)} ({now_utc().strftime('%H:%M')} UTC)"
         return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
 
+    async def send_dm(self, discord_user_id: str, embed: dict) -> dict:
+        """Eine Direktnachricht an ein verknüpftes Konto (#567). Geschlossene Direktnachrichten melden „forbidden“."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        try:
+            user = client.get_user(int(discord_user_id)) or await client.fetch_user(int(discord_user_id))
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_user"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        try:
+            message = await user.send(embed=discord.Embed.from_dict(embed))
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Direktnachricht gesendet ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "message_id": str(message.id)}
+
     async def sync_roles(self) -> dict:
         """Rollen abgleichen - idempotent: nur die drei verwalteten Rollen, nur verknüpfte Konten."""
         db = get_db()
