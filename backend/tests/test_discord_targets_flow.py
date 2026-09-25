@@ -161,7 +161,7 @@ async def test_settings_are_admin_only_validated_and_never_carry_the_token(flow,
     shown = await flow.get("/api/settings/discord")
     assert TOKEN not in shown.text and "bot_token" not in shown.text
     data = shown.json()
-    assert data["channels"] == {"community": COMMUNITY, "news": NEWS, "events": "", "board": "", "ops": ""}
+    assert data["channels"] == {"community": COMMUNITY, "news": NEWS, "events": "", "board": "", "ops": "", "test": ""}
     assert data["configured"] is True
     assert data["target_status"]["news"]["delivers_to"] == "news" and data["target_status"]["news"]["configured"] is True
     assert data["target_status"]["events"]["delivers_to"] == "community" and data["target_status"]["events"]["configured"] is False

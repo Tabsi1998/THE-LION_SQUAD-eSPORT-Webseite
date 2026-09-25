@@ -23,11 +23,12 @@ logger = logging.getLogger("tls-arena.discord")
 PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
 
 PUBLIC_TARGETS = ("community", "news", "events")
-PRIVATE_TARGETS = ("board", "ops")
+# „test“ (#583): der Testkanal für die Vorschau - privat, fällt nie zurück.
+PRIVATE_TARGETS = ("board", "ops", "test")
 TARGETS = PUBLIC_TARGETS + PRIVATE_TARGETS
 TARGET_LABELS = {
     "community": "Community (Standard)", "news": "News", "events": "Events und Turniere",
-    "board": "Vorstand (privat)", "ops": "Betrieb (privat)",
+    "board": "Vorstand (privat)", "ops": "Betrieb (privat)", "test": "Test (privat)",
 }
 # Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der Betreiber sie
 # einschaltet; was es vor #300 schon gab, bleibt an. Erfolge gehen seit #566 in keinen Kanal
@@ -56,6 +57,9 @@ REASON_TEXTS = {
     "dm_forbidden": ("Discord lässt keine Direktnachricht zu – in Discord unter Einstellungen → Datenschutz „Direktnachrichten von "
                      "Servermitgliedern erlauben“, und der Bot muss mit dir auf dem Vereinsserver sein."),
     "unknown_user": "Discord kennt dieses Konto nicht mehr – im Profil unter Socials neu verknüpfen.",
+    # Vorschau und Testkanal (#583)
+    "test_channel_missing": "Kein Testkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Test) – ein Test geht nie in einen anderen Kanal.",
+    "not_linked": "Dein Discord-Konto ist nicht verknüpft (Profil → Socials → Discord verknüpfen).",
 }
 # Ein Ziel, dessen letzter Versuch so scheiterte, ist eine Aufgabe für die Tageszentrale (#303).
 BROKEN_REASONS = ("forbidden", "unknown_channel")
@@ -183,9 +187,11 @@ def resolve_target(cfg: dict, target: str) -> dict:
 
 
 async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E8, url: str | None = None,
-                      fields: list | None = None, image_url: str | None = None) -> dict:
-    """Das Embed, wie Discord es bekommt - auch die Vorschau im Admin baut es hiermit (#303)."""
+                      fields: list | None = None, image_url: str | None = None, footer: str | None = None) -> dict:
+    """Das Embed, wie Discord es bekommt - auch die Vorschau im Admin baut es hiermit (#303, #583)."""
     embed = {"title": title[:256], "description": (description or "")[:4000], "color": color}
+    if footer:
+        embed["footer"] = {"text": str(footer)[:2048]}
     embed_url = await _public_link_url(url)
     if embed_url:
         embed["url"] = embed_url
@@ -197,12 +203,15 @@ async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E
     return embed
 
 
-def _new_log(event_key: str, title: str, target: str) -> dict:
-    return {
+def _new_log(event_key: str, title: str, target: str, *, test: bool = False) -> dict:
+    log = {
         "id": new_id(), "channel": "discord", "target": target, "event_key": event_key,
         "title": title, "status": "skipped", "error": None,
         "created_at": now_utc().isoformat(),
     }
+    if test:
+        log["test"] = True  # Vorschau-Test (#583): steht im Log, zählt nicht als Meldung
+    return log
 
 
 def _payload(title, description, color, url, fields, image_url) -> dict:
@@ -219,12 +228,12 @@ async def _skip(log: dict, reason: str, error: str) -> dict:
 
 
 async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
-                      fields: list | None, image_url: str | None, log: dict) -> dict:
+                      fields: list | None, image_url: str | None, log: dict, footer: str | None = None) -> dict:
     """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID."""
     from services.discord_bot import bot
 
     db = get_db()
-    embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url)
+    embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url, footer=footer)
     log["channel_id"] = channel_id
     try:
         result = await bot.send_embed(channel_id, embed)
@@ -244,11 +253,12 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 
 
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
-                  fields: list = None, image_url: str = None, event_key: str = "custom") -> dict:
+                  fields: list = None, image_url: str = None, event_key: str = "custom",
+                  footer: str | None = None, test: bool = False) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts."""
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, target)
-    log = _new_log(event_key, title, resolved["target"])
+    log = _new_log(event_key, title, resolved["target"], test=test)
     if resolved["fallback"]:
         log["wanted_target"] = target
     log["payload"] = _payload(title, description, color, url, fields, image_url)
@@ -258,9 +268,10 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
         return await _skip(log, "bot_off", REASON_TEXTS["bot_off"])
     if not resolved["channel_id"]:
         private = resolved["target"] in PRIVATE_TARGETS
-        return await _skip(log, f"{resolved['target']}_channel_missing" if private else "channel_missing", REASON_TEXTS["channel_missing"])
+        reason = f"{resolved['target']}_channel_missing" if private else "channel_missing"
+        return await _skip(log, reason, REASON_TEXTS.get(reason) or REASON_TEXTS["channel_missing"])
     return await _send_embed(resolved["channel_id"], title=title, description=description, color=color, url=url,
-                             fields=fields, image_url=image_url, log=log)
+                             fields=fields, image_url=image_url, log=log, footer=footer)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,

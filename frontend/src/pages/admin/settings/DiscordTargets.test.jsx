@@ -14,7 +14,7 @@ const { DiscordTargets, deliveryText, lastAttemptText, channelOptionLabel } = aw
 
 const FORBIDDEN = "Der Bot darf in diesem Kanal nicht schreiben: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: „Kanal ansehen“, „Nachrichten senden“, „Links einbetten“.";
 const DATA = {
-  channels: { community: "100000000000000001", news: "100000000000000002", events: "", board: "", ops: "" },
+  channels: { community: "100000000000000001", news: "100000000000000002", events: "", board: "", ops: "", test: "" },
   bot: { enabled: true, configured: true },
   events: [
     { key: "news.published", label: "News veröffentlicht", target: "news", enabled: false },
@@ -27,6 +27,7 @@ const DATA = {
     events: { label: "Events und Turniere", private: false, configured: false, channel_id: "", channel_name: null, delivers_to: "community", last: null },
     board: { label: "Vorstand (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
     ops: { label: "Betrieb (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
+    test: { label: "Test (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
   },
 };
 const CHANNELS = {

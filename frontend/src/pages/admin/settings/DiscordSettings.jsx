@@ -5,6 +5,7 @@ import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { DiscordBotPanel } from "./DiscordBotPanel";
+import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordTargets } from "./DiscordTargets";
 
 // Discord: Meldungen über den Bot (Kanal je Zweck, Schalter je Ereignis), Bot und Aktivitätszähler.
@@ -124,6 +125,7 @@ export function DiscordSettings() {
         )}
       </div>
       <DiscordTargets />
+      <DiscordSamplesPanel />
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">

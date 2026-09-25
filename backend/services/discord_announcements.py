@@ -170,14 +170,74 @@ async def announce_due(limit: int = 50) -> dict:
     return {"news": len(posts), "events": len(events), "outcomes": outcomes}
 
 
+# ---------------------------------------------------------------- Turniere und Fast Lap (eine Quelle, #583)
+
+TOURNAMENT_STATUS = {
+    "registration_open": {"label": "Anmeldung offen", "color": 0x00FF88},
+    "live": {"label": "Jetzt live", "color": 0x29B6E8},
+    "completed": {"label": "Beendet", "color": 0xFFD700},
+    "results_published": {"label": "Ergebnisse veröffentlicht", "color": 0xFFD700},
+}
+
+
+def tournament_message(tournament: dict, status: str, *, game_name: str | None = None) -> dict:
+    """Die Turnier-Meldung je Statuswechsel - der Statuswechsel und die Vorschau bauen sie hiermit."""
+    spec = TOURNAMENT_STATUS.get(status) or {"label": status, "color": 0x29B6E8}
+    fields = []
+    if game_name:
+        fields.append({"name": "Spiel", "value": game_name, "inline": True})
+    if tournament.get("format"):
+        fields.append({"name": "Format", "value": tournament.get("format_label") or str(tournament["format"]).replace("_", " ").title(), "inline": True})
+    if tournament.get("max_participants"):
+        fields.append({"name": "Teilnehmer", "value": f"max. {tournament['max_participants']}", "inline": True})
+    return {
+        "event_key": f"tournament.{status}",
+        "title": f"🏆 {tournament.get('title') or 'Turnier'} · {spec['label']}",
+        "description": tournament.get("description") or "",
+        "color": spec["color"],
+        "url": f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
+        "fields": fields,
+        "image_url": tournament.get("banner_url"),
+    }
+
+
+def fast_lap_message(challenge: dict, *, driver: str, track: str, time_text: str, previous_text: str | None = None) -> dict:
+    """Die Bestzeit-Meldung - Zeiten kommen schon formatiert (die Formatierung wohnt bei Fast Lap)."""
+    fields = [{"name": "Zeit", "value": time_text, "inline": True}]
+    if previous_text:
+        fields.append({"name": "Vorher", "value": previous_text, "inline": True})
+    return {
+        "event_key": "f1.new_leader",
+        "title": f"🏁 Neue Bestzeit · {challenge.get('title') or 'Fast Lap'}",
+        "description": f"**{driver or 'Fahrer'}** führt jetzt auf **{track or '–'}**!",
+        "color": 0xFFD700,
+        "url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}",
+        "fields": fields,
+        "image_url": None,
+    }
+
+
 # ---------------------------------------------------------------- Vorstand (privates Ziel)
 
-async def notify_board(event_key: str, title: str, description: str, *, url: str, fields: list | None = None) -> dict:
+# Titel und Ziel je Vorstands-Hinweis - Namen und Texte stehen nie drin, die sind im Admin.
+BOARD_MESSAGES = {
+    "membership.application": {"title": "📝 Neuer Mitgliedsantrag", "url": "/admin/membership-applications"},
+    "contact.request": {"title": "✉️ Neue Kontaktanfrage", "url": "/admin/contact"},
+}
+
+
+def board_message(event_key: str, description: str = "") -> dict:
+    spec = BOARD_MESSAGES.get(event_key) or {"title": "Hinweis an den Vorstand", "url": "/admin"}
+    return {"event_key": event_key, "title": spec["title"], "description": description, "color": 0xFFD700, "url": spec["url"], "fields": [], "image_url": None}
+
+
+async def notify_board(event_key: str, description: str = "", *, fields: list | None = None) -> dict:
     """Nur in den Vorstandskanal. Fehlt er, passiert nichts - nie ein Rückfall auf die Community."""
     from discord_service import send_event
 
+    message = board_message(event_key, description)
     try:
-        return await send_event(event_key, title, description, color=0xFFD700, url=url, fields=fields)
+        return await send_event(event_key, message["title"], description, color=message["color"], url=message["url"], fields=fields)
     except Exception:  # noqa: BLE001 - ein Antrag darf nie an Discord scheitern
         logger.warning("[discord] board notification failed", exc_info=True)
         return {"ok": False, "reason": "error"}

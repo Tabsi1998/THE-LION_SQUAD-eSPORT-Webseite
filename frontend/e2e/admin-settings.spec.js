@@ -39,6 +39,14 @@ async function mockSettings(page) {
   })));
   await page.route("**/api/admin/streams/status", (r) => r.fulfill(json({})));
   await page.route("**/api/admin/discord/counters**", (r) => r.fulfill(json([])));
+  await page.route("**/api/settings/discord/channels", (r) => r.fulfill(json({ ok: false, channels: [], text: "" })));
+  // Vorschau jeder Meldungsart (#583): eine News als Nachbildung, ohne Testkanal.
+  await page.route("**/api/settings/discord/samples", (r) => r.fulfill(json({
+    groups: [{ key: "public", label: "Öffentliche Kanäle" }],
+    entries: [{ key: "news.published", label: "News veröffentlicht", group: "public", target: "news", source: "example", source_text: "Beispiel", enabled: true, dm: false,
+      embed: { title: "📰 Sommerfest am Vereinsplatz", description: "Grillen und Turniere.", color: 0x29b6e8, url: "https://lionsquad.at/news/sommerfest" } }],
+    test_channel: { configured: false, channel_name: null }, dm: { linked: false },
+  })));
 }
 
 test.describe("Einstellungen", () => {
@@ -55,6 +63,14 @@ test.describe("Einstellungen", () => {
     await page.goto("/admin/settings?tab=smtp");
     await expect(page).toHaveURL(/\/admin\/settings\/smtp$/);
     await expect(page.getByTestId("settings-title")).toHaveText("SMTP");
+  });
+
+  test("Verbindungen → Discord zeigt jede Meldungsart als Discord-Nachbildung mit Testkanal-Hinweis (#583)", async ({ page }) => {
+    await page.goto("/admin/integrations/discord");
+    await expect(page.getByTestId("discord-samples")).toBeVisible();
+    await expect(page.getByTestId("discord-sample-news.published-message-embed")).toContainText("Sommerfest am Vereinsplatz");
+    await expect(page.getByTestId("discord-samples-test-channel")).toContainText("Kein Testkanal gewählt");
+    await expect(page.getByTestId("discord-target-test")).toBeVisible();
   });
 
   test("die Seite läuft am Telefon nicht quer, auch nicht bei der Mail-Queue", async ({ page }) => {

@@ -232,6 +232,20 @@ async def send_test_alert(db) -> dict:
 
 # ---------------------------------------------------------------- Bestehende Anlässe (#265)
 
+def check_red_message(check: dict, run: dict) -> dict:
+    """Titel, Text und Felder eines roten Auto-Checks - auch die Vorschau (#583) baut sie hiermit."""
+    return {"title": f"Betrieb: {check.get('label')} ist rot",
+            "description": f"{check.get('value') or ''}\n{check.get('detail') or ''}".strip(),
+            "fields": [{"name": "Prüfung", "value": check.get("key") or "-", "inline": True}, {"name": "Lauf", "value": run.get("at") or "-", "inline": True}]}
+
+
+def error_group_message(group: dict) -> dict:
+    """Titel, Text und Felder einer neuen Fehlergruppe."""
+    return {"title": f"Serverfehler: {group.get('error_type') or 'Fehler'} auf {group.get('method') or ''} {group.get('route') or ''}".strip(),
+            "description": (group.get("message") or "")[:1000],
+            "fields": [{"name": "HTTP", "value": str(group.get("status_code") or ""), "inline": True}, {"name": "Zähler", "value": str(group.get("count") or 1), "inline": True}]}
+
+
 async def alert_red_checks(db, run: dict) -> list[str]:
     """Je roter Prüfung höchstens eine Meldung je Sperrfrist. Gibt die gemeldeten Schlüssel zurück."""
     sent: list[str] = []
@@ -239,12 +253,8 @@ async def alert_red_checks(db, run: dict) -> list[str]:
         if check.get("status") != "crit":
             continue
         key = f"check:{check.get('key')}"
-        outcome = await notify(
-            db, "check_red", f"Betrieb: {check.get('label')} ist rot",
-            f"{check.get('value') or ''}\n{check.get('detail') or ''}".strip(),
-            [{"name": "Prüfung", "value": check.get("key") or "-", "inline": True}, {"name": "Lauf", "value": run.get("at") or "-", "inline": True}],
-            key=key, event_key="ops_check",
-        )
+        message = check_red_message(check, run)
+        outcome = await notify(db, "check_red", message["title"], message["description"], message["fields"], key=key, event_key="ops_check")
         if outcome.get("sent"):
             sent.append(key)
     return sent
@@ -254,13 +264,9 @@ async def alert_error_group(db, group: dict) -> bool:
     """Eine neue Fehlergruppe mit 5xx - einmal pro Gruppe und Sperrfrist."""
     if int(group.get("status_code") or 0) < 500:
         return False
-    outcome = await notify(
-        db, "error_group",
-        f"Serverfehler: {group.get('error_type') or 'Fehler'} auf {group.get('method') or ''} {group.get('route') or ''}".strip(),
-        (group.get("message") or "")[:1000],
-        [{"name": "HTTP", "value": str(group.get("status_code") or ""), "inline": True}, {"name": "Zähler", "value": str(group.get("count") or 1), "inline": True}],
-        key=f"error:{group.get('fingerprint')}", event_key="ops_error",
-    )
+    message = error_group_message(group)
+    outcome = await notify(db, "error_group", message["title"], message["description"], message["fields"],
+                           key=f"error:{group.get('fingerprint')}", event_key="ops_error")
     return bool(outcome.get("sent"))
 
 
