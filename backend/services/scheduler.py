@@ -580,6 +580,7 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_clips", _safe_twitch_clips, lease_seconds=300.0), IntervalTrigger(hours=1), id="twitch_clips",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_poll", _safe_twitch_poll), IntervalTrigger(seconds=90), id="twitch_poll",
