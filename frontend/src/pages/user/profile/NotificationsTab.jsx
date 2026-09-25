@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
+import { api } from "@/lib/api";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, notificationPreferenceKey } from "./constants";
 import { Section } from "./fields";
 import { AutosaveStatus, ProfileSwitch, SwitchRow } from "./SwitchRow";
@@ -8,18 +10,29 @@ import { AutosaveStatus, ProfileSwitch, SwitchRow } from "./SwitchRow";
 // Kästchen; ein Kanal, der oben aus ist, graut seine Spalte aus. Am PC bleibt
 // der Tabellenkopf beim Scrollen sichtbar; am Handy scrollt die Tabelle
 // seitwärts, weil ein Scrollrahmen und ein klebender Kopf sich ausschließen.
+// Discord (#567) steht nur mit verknüpftem Discord-Konto als Kanal da; lehnt Discord eine
+// Direktnachricht ab, nennt der Server den Klickweg, und der steht hier beim Kanal.
 export function NotificationsTab({ form, set, setNotificationPreference, notificationEnabled, notificationTopicEnabled, autosave }) {
+  const [discord, setDiscord] = useState(null);
+  useEffect(() => {
+    let active = true;
+    api.get("/users/me/notification-preferences")
+      .then(({ data }) => { if (active) setDiscord(data?.discord || { linked: false }); })
+      .catch(() => { if (active) setDiscord({ linked: false }); });
+    return () => { active = false; };
+  }, []);
+  const channels = NOTIFICATION_CHANNELS.filter((channel) => channel.k !== "discord" || discord?.linked);
   return (
     <Section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-white/60">Steuere getrennt, ob Hinweise per E-Mail, Push oder In-App ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
+        <p className="text-sm text-white/60">Steuere getrennt, ob Hinweise per E-Mail, Push, In-App oder als Discord-Direktnachricht ankommen. Account- und Sicherheitsmails bleiben immer aktiv.</p>
         <AutosaveStatus status={autosave.status} message={autosave.message} />
       </div>
 
       <div>
         <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">Kanäle</div>
-        <div className="grid sm:grid-cols-3 gap-3">
-          {NOTIFICATION_CHANNELS.map((channel) => (
+        <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {channels.map((channel) => (
             <SwitchRow
               key={channel.k}
               label={channel.l}
@@ -30,6 +43,12 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
             />
           ))}
         </div>
+        {discord && !discord.linked ? (
+          <p className="text-xs text-white/45 mt-2" data-testid="profile-notification-discord-unlinked">Discord als Kanal: erst im Reiter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</p>
+        ) : null}
+        {discord?.linked && discord?.hint ? (
+          <p className="text-[11px] text-[#FFD700] mt-2" data-testid="profile-notification-discord-hint">{discord.hint}</p>
+        ) : null}
       </div>
 
       <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
@@ -45,7 +64,7 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
             <thead className="md:sticky md:top-20 z-10 bg-[#121212] text-[10px] uppercase tracking-widest text-white/45">
               <tr>
                 <th scope="col" className="text-left px-3 py-3 border-b border-white/10">Benachrichtigung</th>
-                {NOTIFICATION_CHANNELS.map((channel) => {
+                {channels.map((channel) => {
                   const enabled = notificationEnabled(channel.k);
                   return (
                     <th key={channel.k} scope="col" className={`text-center px-3 py-3 border-b border-white/10 ${enabled ? "" : "opacity-40"}`} data-testid={`profile-notification-column-${channel.k}`}>
@@ -66,7 +85,7 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
                       <div className="text-[11px] text-[#FFD700] mt-1">Per E-Mail nur mit Newsletter-Zustimmung (unten).</div>
                     ) : null}
                   </td>
-                  {NOTIFICATION_CHANNELS.map((channel) => {
+                  {channels.map((channel) => {
                     const key = notificationPreferenceKey(channel.k, topic.k);
                     const channelEnabled = notificationEnabled(channel.k);
                     const disabled = !channelEnabled || (channel.k === "email" && topic.requiresNewsletter && !form.newsletter_consent);

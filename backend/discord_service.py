@@ -52,6 +52,10 @@ REASON_TEXTS = {
     "forbidden": ("Der Bot darf in diesem Kanal nicht schreiben: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: "
                   "„Kanal ansehen“, „Nachrichten senden“, „Links einbetten“."),
     "unknown_channel": "Kanal nicht gefunden – gelöscht, oder der Bot ist nicht auf diesem Server.",
+    # Direktnachrichten (#567)
+    "dm_forbidden": ("Discord lässt keine Direktnachricht zu – in Discord unter Einstellungen → Datenschutz „Direktnachrichten von "
+                     "Servermitgliedern erlauben“, und der Bot muss mit dir auf dem Vereinsserver sein."),
+    "unknown_user": "Discord kennt dieses Konto nicht mehr – im Profil unter Socials neu verknüpfen.",
 }
 # Ein Ziel, dessen letzter Versuch so scheiterte, ist eine Aufgabe für die Tageszentrale (#303).
 BROKEN_REASONS = ("forbidden", "unknown_channel")

@@ -54,7 +54,11 @@ const notificationChannels: Array<{ key: string; label: string; detail: string }
   { key: "email", label: "E-Mail", detail: "Nur wichtige optionale Hinweise per Mail." },
   { key: "push", label: "Push", detail: "System-Benachrichtigungen am Handy." },
   { key: "in_app", label: "In-App", detail: "Hinweise in App, Web und Notification-Center." },
+  // Discord als Kanal (#567): Direktnachricht vom Vereins-Bot, nur mit verknüpftem Konto - Standard aus.
+  { key: "discord", label: "Discord", detail: "Direktnachricht vom Vereins-Bot – nur mit verknüpftem Discord-Konto." },
 ];
+
+type DiscordDmState = { linked?: boolean; blocked_at?: string | null; hint?: string | null };
 
 const notificationLabels: Array<{ key: string; label: string; detail: string }> = [
   { key: "match_reminders", label: "Spiel-Erinnerungen", detail: "Startzeiten, Check-in und Match-Hub." },
@@ -250,7 +254,7 @@ export function ProfileScreen() {
       const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult, standingResult, linksResult] = await Promise.all([
         api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
-        api.get<{ preferences?: Record<string, boolean> } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
+        api.get<{ preferences?: Record<string, boolean>; discord?: DiscordDmState } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
         api.get<PrizePickup[]>("/prizes/me").catch(() => ({ data: [] })),
         api.get<ModerationStanding>("/moderation/me/standing").catch(() => ({ data: null })),
@@ -264,6 +268,7 @@ export function ProfileScreen() {
       setReferences(referenceResult.data || { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
       setPrizes(Array.isArray(prizeResult.data) ? prizeResult.data : []);
       setCompleteness(completenessResult.data || {});
+      setDiscordDm(((preferenceResult.data as any)?.discord as DiscordDmState | undefined) || null);
       setForm((current) => ({
         ...current,
         notification_preferences: {
@@ -420,7 +425,10 @@ export function ProfileScreen() {
 
   const avatar = resolveMediaUrl(form.avatar_url || user?.avatar_url);
   const banner = resolveMediaUrl(form.banner_url || (user as any)?.banner_url);
+  const [discordDm, setDiscordDm] = useState<DiscordDmState | null>(null);
+  const visibleChannels = notificationChannels.filter((channel) => channel.key !== "discord" || Boolean(discordDm?.linked));
   const notificationEnabled = useCallback((key: string) => {
+    if (key === "discord") return Boolean((form.notification_preferences || {}).discord);
     if (key === "news_events" && !form.newsletter_consent) return false;
     const pref = form.notification_preferences || {};
     if (Object.prototype.hasOwnProperty.call(pref, key)) return Boolean(pref[key]);
@@ -726,7 +734,7 @@ export function ProfileScreen() {
             <Heading>Benachrichtigungen</Heading>
             <Toggle label="Newsletter" detail="Grundsätzliche Zustimmung für News und Events." value={Boolean(form.newsletter_consent)} onValueChange={(v) => { setField(setForm, "newsletter_consent", v); scheduleSave(); }} />
             <Muted style={styles.sectionText}>Kanäle</Muted>
-            {notificationChannels.map((item) => (
+            {visibleChannels.map((item) => (
               <Toggle
                 key={item.key}
                 label={item.label}
@@ -741,6 +749,8 @@ export function ProfileScreen() {
                 }}
               />
             ))}
+            {discordDm && !discordDm.linked ? <Muted testID="profile-discord-dm-unlinked">Discord als Kanal: erst unter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</Muted> : null}
+            {discordDm?.linked && discordDm.hint ? <Muted style={styles.warningText} testID="profile-discord-dm-hint">{discordDm.hint}</Muted> : null}
             <Muted style={styles.sectionText}>Jede Benachrichtigung pro Kanal</Muted>
             {notificationLabels.map((item) => (
               <View key={item.key} style={styles.notificationTopic}>
@@ -748,7 +758,7 @@ export function ProfileScreen() {
                 <Muted>{item.detail}</Muted>
                 {item.key === "news_events" && !form.newsletter_consent ? <Muted style={styles.warningText}>E-Mail benötigt Newsletter-Zustimmung.</Muted> : null}
                 <View style={styles.notificationMatrix}>
-                  {notificationChannels.map((channel) => {
+                  {visibleChannels.map((channel) => {
                     const key = notificationPreferenceKey(channel.key, item.key);
                     const channelEnabled = notificationEnabled(channel.key);
                     const disabled = !channelEnabled || (channel.key === "email" && item.key === "news_events" && !form.newsletter_consent);

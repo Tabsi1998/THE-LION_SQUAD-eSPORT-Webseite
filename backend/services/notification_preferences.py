@@ -73,6 +73,14 @@ DELIVERY_CHANNEL_PREFERENCES = {
         "description": "Benachrichtigungen im Web und in der App anzeigen.",
         "default": True,
     },
+    # Discord als persönlicher Kanal (#567): Direktnachricht vom Vereins-Bot, nur mit verknüpftem Konto
+    # und ausdrücklichem Opt-in - deshalb Standard aus.
+    "discord": {
+        "label": "Discord",
+        "description": "Direktnachricht vom Vereins-Bot – nur mit verknüpftem Discord-Konto.",
+        "default": False,
+        "requires_link": "discord",
+    },
 }
 
 CHANNEL_TOPIC_SEPARATOR = ":"
@@ -211,6 +219,14 @@ def notification_allowed(user: dict | None, kind: str, category: str | None = No
 def push_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
     category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
     return channel_topic_allowed(user, "push", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
+
+
+def discord_allowed(user: dict | None, kind: str, category: str | None = None) -> bool:
+    """Discord als Kanal (#567) braucht das Opt-in der Person - auch für Pflicht-Benachrichtigungen."""
+    if not normalized_preferences(user).get("discord"):
+        return False
+    category = category or NOTIFICATION_KIND_CATEGORY.get(kind)
+    return channel_topic_allowed(user, "discord", category, required=kind in REQUIRED_NOTIFICATION_KINDS)
 
 
 async def send_user_template(user: dict | None, template_key: str, category: str | None = None, **kwargs) -> dict:

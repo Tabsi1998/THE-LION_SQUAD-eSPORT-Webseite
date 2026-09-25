@@ -118,3 +118,28 @@ async def test_push_can_be_sent_when_in_app_channel_is_disabled(monkeypatch):
     assert created["push_sent_count"] == 1
     assert created["in_app_visible"] is False
     assert db.notifications.rows[0]["in_app_visible"] is False
+
+
+@pytest.mark.anyio
+async def test_discord_direct_message_only_with_opt_in(monkeypatch):
+    """Discord als Kanal (#567): der Fan-out ruft den Bot nur, wenn die Person den Kanal eingeschaltet hat."""
+    calls = []
+    dm_module = types.ModuleType("services.discord_dm")
+
+    async def _send_dm(notification, category=None):
+        calls.append((notification["kind"], category))
+        return 1
+
+    dm_module.send_discord_dm_for_notification = _send_dm
+    monkeypatch.setitem(sys.modules, "services.discord_dm", dm_module)
+
+    db = _Db({"id": "u1", "notification_preferences": {"push": False, "in_app": True, "discord": True}})
+    monkeypatch.setattr("services.user_notifications.get_db", lambda: db)
+    created = await create_user_notification("u1", "Match", kind="match_reminder", meta={"dedupe_key": "dm-1"})
+    assert created["discord_sent_count"] == 1 and calls == [("match_reminder", "match_reminders")]
+    assert db.notifications.rows[0]["discord_sent_count"] == 1
+
+    quiet = _Db({"id": "u2", "notification_preferences": {"push": False, "in_app": True}})
+    monkeypatch.setattr("services.user_notifications.get_db", lambda: quiet)
+    created = await create_user_notification("u2", "Match", kind="match_reminder", meta={"dedupe_key": "dm-2"})
+    assert created["discord_sent_count"] == 0 and len(calls) == 1

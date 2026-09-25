@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from services.notification_preferences import (
+    discord_allowed,
     email_allowed,
     notification_allowed,
     normalized_preferences,
@@ -116,3 +117,17 @@ def test_public_preferences_payload_contains_channels():
     assert {"match_reminders", "news_events", "membership_updates", "birthday_greetings"}.issubset(category_keys)
     assert "email:match_reminders" in payload["preferences"]
     assert "push:community_messages" in payload["preferences"]
+
+
+def test_discord_channel_is_opt_in_and_follows_the_topics():
+    """Discord als Kanal (#567): aus, bis die Person ihn einschaltet; dann gelten die Themen wie bei Push."""
+    quiet = {"notification_preferences": {}}
+    assert normalized_preferences(quiet)["discord"] is False
+    assert discord_allowed(quiet, "match_reminder") is False
+    assert push_allowed(quiet, "match_reminder") is True, "Push bleibt, wie es war"
+    opted = {"notification_preferences": {"discord": True}}
+    assert discord_allowed(opted, "match_reminder") is True
+    assert discord_allowed({"notification_preferences": {"discord": True, "discord:match_reminders": False}}, "match_reminder") is False
+    assert discord_allowed({"notification_preferences": {"discord": True, "match_reminders": False}}, "match_reminder") is False
+    channels = {channel["key"]: channel for channel in public_preferences_payload(opted)["channels"]}
+    assert channels["discord"]["default"] is False and channels["discord"]["requires_link"] == "discord"
