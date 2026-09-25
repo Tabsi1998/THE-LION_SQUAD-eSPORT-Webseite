@@ -132,7 +132,7 @@ export const SETUP_GUIDES = {
       { text: "Client-ID und Client-Secret kopieren → hier bei YouTube eintragen und speichern." },
       { text: "OAuth-Zustimmungsbildschirm: Bereich „…/auth/youtube.readonly“ hinzufügen. Solange die App nicht von Google geprüft ist, zeigt Google eine Warnung – das ist normal, die Verknüpfung geht trotzdem (bis 100 Nutzer)." },
     ],
-    notes: ["Ohne YouTube-Kanal auf dem Google-Konto bricht die Verknüpfung mit einem Hinweis ab."],
+    notes: ["Ohne YouTube-Kanal auf dem Google-Konto bricht die Verknüpfung mit einem Hinweis ab.", "Neue Videos des Vereinskanals werden von selbst News der Art „Video“ – Schalter unter Verbindungen → YouTube → „Videos als News“ (Quelle ist der öffentliche Feed, kein Schlüssel nötig)."],
     checkPlatform: "youtube",
   },
   tiktok: {

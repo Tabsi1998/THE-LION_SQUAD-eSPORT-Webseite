@@ -320,6 +320,14 @@ class DiscordSettings(BaseModel):
     bot_count_messages: Optional[bool] = None
 
 
+class YoutubeFeedSettings(BaseModel):
+    """YouTube → News (#578): Abruf an/aus, gleich veröffentlichen oder Entwurf, Shorts, eigene Kanal-Adresse."""
+    enabled: Optional[bool] = None
+    publish: Optional[bool] = None
+    include_shorts: Optional[bool] = None
+    channel_url: Optional[str] = None
+
+
 class AmpSettings(BaseModel):
     base_url: Optional[str] = None
     username: Optional[str] = None
@@ -1574,6 +1582,47 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         except Exception as exc:
             logging.getLogger("tls.discord.bot").warning("[discord-bot] Neustart nach Einstellung: %s", exc)
     return {"ok": True, "changed": True}
+
+
+# ---- YouTube → News (#578) ----
+@settings_router.get("/youtube")
+async def get_youtube(me: dict = Depends(require_club_admin())):
+    from services import youtube_feed
+    return await youtube_feed.status(get_db())
+
+
+@settings_router.put("/youtube")
+async def update_youtube(body: YoutubeFeedSettings, me: dict = Depends(require_club_admin())):
+    from services import youtube_feed
+    db = get_db()
+    updates = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v is not None}
+    unset = {}
+    if "channel_url" in updates:
+        url = str(updates["channel_url"] or "").strip()
+        if url and not youtube_feed.is_youtube_url(url):
+            raise HTTPException(400, "Das ist keine YouTube-Adresse – erwartet wird etwa https://www.youtube.com/@Vereinskanal.")
+        updates["channel_url"] = url
+        # Neue Adresse = die gemerkte Kanal-ID gilt nicht mehr; der nächste Abruf ermittelt sie neu.
+        unset.update({"channel_id": "", "channel_id_for": ""})
+    current = await db.settings.find_one({"id": youtube_feed.SETTINGS_ID}, {"_id": 0}) or {}
+    changed_fields = _changed_setting_fields(current, updates, unset)
+    if changed_fields:
+        updates["updated_at"] = now_utc().isoformat()
+        op = {"$set": updates, "$setOnInsert": {"id": youtube_feed.SETTINGS_ID}}
+        if unset:
+            op["$unset"] = unset
+        await db.settings.update_one({"id": youtube_feed.SETTINGS_ID}, op, upsert=True)
+        await _audit_settings_change(db, "settings.youtube.update", "youtube", me["id"], changed_fields)
+    return await youtube_feed.status(db)
+
+
+@settings_router.post("/youtube/fetch")
+async def fetch_youtube(me: dict = Depends(require_club_admin())):
+    """„Jetzt abrufen“: den Feed sofort holen - auch bei ausgeschaltetem Abruf, damit der erste Abruf bewusst passiert."""
+    from services import youtube_feed
+    db = get_db()
+    result = await youtube_feed.sync(db, force=True)
+    return {**(await youtube_feed.status(db)), "result": result}
 
 
 # ---- AMP-Panel ----

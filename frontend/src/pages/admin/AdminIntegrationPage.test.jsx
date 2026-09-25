@@ -13,6 +13,7 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 // Discord und Twitch tragen ihre laufenden Einstellungen selbst (eigene Tests); hier nur, dass sie da sind.
 vi.mock("@/pages/admin/settings/DiscordSettings", () => ({ DiscordSettings: () => <div data-testid="discord-settings-stub" /> }));
 vi.mock("@/pages/admin/settings/TwitchSettings", () => ({ TwitchSettings: () => <div data-testid="twitch-settings-stub" /> }));
+vi.mock("@/pages/admin/settings/YoutubeSettings", () => ({ YoutubeSettings: () => <div data-testid="youtube-settings-stub" /> }));
 
 const AdminIntegrationPage = (await import("./AdminIntegrationPage")).default;
 

@@ -13,7 +13,7 @@ export const INTEGRATIONS = [
   { key: "steam", label: "Steam", app: "steam", guides: ["steam"] },
   { key: "battlenet", label: "Battle.net", app: "battlenet", guides: ["battlenet"] },
   { key: "x", label: "X (Twitter)", app: "x", guides: ["x"] },
-  { key: "youtube", label: "YouTube", app: "youtube", guides: ["youtube"] },
+  { key: "youtube", label: "YouTube", app: "youtube", guides: ["youtube"], searchTerms: ["videos als news", "feed", "vereinskanal", "shorts", "kanal-id"] },
   { key: "tiktok", label: "TikTok", app: "tiktok", guides: ["tiktok"] },
   { key: "riot", label: "Riot Games", app: "riot", guides: ["riot"] },
   { key: "xbox", label: "Xbox", app: "xbox", guides: ["xbox"] },

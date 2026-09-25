@@ -12,6 +12,7 @@ export const NEWS_CATEGORY_LABELS = {
   announcement: "Ankündigung",
   recap: "Rückblick",
   maintenance: "Wartung",
+  video: "Video",
 };
 
 export function newsCategoryLabel(value) {

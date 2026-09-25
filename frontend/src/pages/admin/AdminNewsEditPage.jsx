@@ -84,6 +84,7 @@ function NewsForm({ post, meta, onDone }) {
     excerpt: source.excerpt || "",
     content: source.content || "",
     banner_url: source.banner_url || "",
+    video_url: source.video_url || "",
     category: source.category || "club",
     visibility: source.visibility || "public",
     published: source.published ?? true,
@@ -269,6 +270,7 @@ function NewsForm({ post, meta, onDone }) {
         <FieldLabel label="Banner">
           <ImageUpload value={form.banner_url} onChange={(v) => set("banner_url", v)} testId="news-banner" variant="wide" allowLibrary />
         </FieldLabel>
+        <TextField label="Video (YouTube-Link)" value={form.video_url} onChange={(v) => set("video_url", v)} placeholder="https://www.youtube.com/watch?v=…" testId="news-video-url" hint="Steht oben auf der News-Seite als Player – erst nach Zustimmung zu externen Medien; statt des Banners." />
       </FormSection>
 
       <FormSection title="Personen und Verknüpfungen" hint="Ein Klick fügt einen Profil-Link bzw. eine Karte in den Text ein und merkt die Verknüpfung für die News-Seite vor.">
