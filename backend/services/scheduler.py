@@ -308,6 +308,18 @@ async def _safe_dolibarr_pending():
         _log_task_failure("dolibarr_pending", exc)
 
 
+async def _safe_youtube_feed():
+    """Neue YouTube-Videos als News (#578) - alle 15 Minuten, ein Replikat; aus = kein Abruf."""
+    try:
+        from database import get_db
+        from services.youtube_feed import sync
+        res = await sync(get_db())
+        if res.get("created") or res.get("error"):
+            logger.info(f"[scheduler] youtube_feed {res}")
+    except Exception as exc:
+        _log_task_failure("youtube_feed", exc)
+
+
 async def _safe_github_releases():
     """App-Releases von GitHub holen (#309) - alle zehn Minuten, ein Replikat."""
     try:
@@ -567,6 +579,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("discord_bot_roles", _safe_discord_bot_roles, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_bot_roles",
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_discord_bot_watch, IntervalTrigger(minutes=5), id="discord_bot_watch", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("youtube_feed", _safe_youtube_feed, lease_seconds=300.0), IntervalTrigger(minutes=15), id="youtube_feed",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("github_releases", _safe_github_releases, lease_seconds=600.0), IntervalTrigger(minutes=10), id="github_releases",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_sweep", _safe_achievement_sweep, lease_seconds=300.0), IntervalTrigger(minutes=15), id="achievement_sweep",

@@ -929,6 +929,7 @@ class StationUpdate(BaseModel):
 NewsCategory = Literal[
     "club", "tournaments", "events", "community", "sponsors",
     "members", "teams", "announcement", "recap", "maintenance",
+    "video",  # YouTube-Videos des Vereinskanals (#578)
 ]
 NewsVisibility = Literal["public", "community", "members", "internal"]
 
@@ -939,6 +940,8 @@ class NewsCreate(BaseModel):
     excerpt: Optional[str] = None
     content: str
     banner_url: Optional[str] = None
+    # Video zur News (#578): YouTube-Link, auf der News-Seite als Player (erst nach Zustimmung).
+    video_url: Optional[str] = None
     category: NewsCategory = "club"
     visibility: NewsVisibility = "public"
     published: bool = True
@@ -961,6 +964,7 @@ class NewsUpdate(BaseModel):
     excerpt: Optional[str] = None
     content: Optional[str] = None
     banner_url: Optional[str] = None
+    video_url: Optional[str] = None
     category: Optional[NewsCategory] = None
     visibility: Optional[NewsVisibility] = None
     published: Optional[bool] = None

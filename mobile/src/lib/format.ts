@@ -239,6 +239,7 @@ const NEWS_CATEGORY_LABELS: Record<string, string> = {
   teams: "Teams",
   announcement: "Ankündigung",
   recap: "Rückblick",
+  video: "Video",
   maintenance: "Wartung",
 };
 

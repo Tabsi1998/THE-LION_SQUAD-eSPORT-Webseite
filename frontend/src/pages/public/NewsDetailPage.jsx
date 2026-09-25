@@ -7,6 +7,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
+import { VideoEmbed } from "@/components/tls/VideoEmbed";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -129,7 +130,8 @@ export default function NewsDetailPage() {
             </div>
             <h1 className="mt-3 font-heading text-3xl md:text-5xl xl:text-6xl font-black uppercase leading-[1.02] break-words">{post.title}</h1>
             {post.excerpt && <p className="mt-4 text-lg xl:text-xl text-white/70 max-w-4xl">{post.excerpt}</p>}
-            {post.banner_url && (
+            {post.video_url && <VideoEmbed url={post.video_url} title={post.title} className="mt-8" />}
+            {post.banner_url && !post.video_url && (
               <div className="mt-8 rounded-sm overflow-hidden border border-white/10 bg-[#0A0A0A]">
                 <img src={resolveMediaUrl(post.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-auto max-h-[38rem] object-cover" />
               </div>

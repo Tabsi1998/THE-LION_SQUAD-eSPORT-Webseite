@@ -7,6 +7,7 @@ import { SetupGuide, StatusChip } from "@/components/tls/SetupGuide";
 import { PlatformAppCard } from "@/pages/admin/settings/PlatformLinkSettings";
 import { DiscordSettings } from "@/pages/admin/settings/DiscordSettings";
 import { TwitchSettings } from "@/pages/admin/settings/TwitchSettings";
+import { YoutubeSettings } from "@/pages/admin/settings/YoutubeSettings";
 import { api, formatRequestError } from "@/lib/api";
 import { INTEGRATIONS, integrationApp, integrationByKey, integrationStatus } from "@/lib/integrations";
 
@@ -120,6 +121,7 @@ export default function AdminIntegrationPage() {
         )}
         {integration.key === "discord" && <div data-testid="integration-settings"><DiscordSettings /></div>}
         {integration.key === "twitch" && <div data-testid="integration-settings"><TwitchSettings /></div>}
+        {integration.key === "youtube" && <div data-testid="integration-settings"><YoutubeSettings /></div>}
         <div className="space-y-3" data-testid="integration-guides">
           {/* Aufklappbar (#511): die Felder stehen oben, die Anleitung steht im FAQ unter Einrichtung genauso. */}
           {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open={false} />)}
