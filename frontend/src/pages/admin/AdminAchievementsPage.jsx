@@ -21,14 +21,32 @@ import {
 } from "lucide-react";
 
 const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Legendär" };
-const LEVEL_COLORS = { 1: "#CD7F32", 2: "#C0C0C0", 3: "#FFD700", 4: "#29B6E8", 5: "#FF3B30" };
+// Erfolge II (#611): Material statt Level - Holz bis Diamant, dazu Legendär und Geheim.
+export const MATERIALS = {
+  wood: ["Holz", "#A0703C"], iron: ["Eisen", "#9AA0A6"], bronze: ["Bronze", "#CD7F32"], silver: ["Silber", "#C0C0C0"],
+  gold: ["Gold", "#FFD700"], platinum: ["Platin", "#29B6E8"], diamond: ["Diamant", "#B9F2FF"], legendary: ["Legendär", "#FF3B30"], hidden: ["Geheim", "#A855F7"],
+};
+export function materialLabel(tier) {
+  if (tier?.material && MATERIALS[tier.material]) return MATERIALS[tier.material][0];
+  return tier?.material_name || LEVEL_NAMES[tier?.level] || "?";
+}
+export function materialColor(tier) {
+  if (tier?.material && MATERIALS[tier.material]) return MATERIALS[tier.material][1];
+  return tier?.material_color || "#CD7F32";
+}
 const CATEGORIES = [
-  { value: "match", label: "Spiel" },
+  { value: "match", label: "Spielen" },
   { value: "tournament", label: "Turnier" },
   { value: "fastlap", label: "Fast Lap" },
-  { value: "club", label: "Verein" },
-  { value: "special", label: "Sonderauszeichnung" },
-  { value: "negative", label: "Negative" },
+  { value: "season", label: "Saison" },
+  { value: "team", label: "Team" },
+  { value: "community", label: "Community" },
+  { value: "creator", label: "Streaming & Creator" },
+  { value: "profile", label: "Profil & Konto" },
+  { value: "club", label: "Verein (nur Mitglieder)" },
+  { value: "special", label: "Besonders" },
+  { value: "hidden", label: "Geheim" },
+  { value: "negative", label: "Negativ" },
 ];
 
 export default function AdminAchievementsPage() {
@@ -258,7 +276,7 @@ function TiersTab() {
             <tbody className="divide-y divide-white/5">
               {tiers.map(t => (
                 <tr key={t.code} data-testid={`tier-row-${t.code}`}>
-                  <td className="px-4 py-3"><span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: LEVEL_COLORS[t.level] }}>{LEVEL_NAMES[t.level]}</span></td>
+                  <td className="px-4 py-3"><span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: materialColor(t) }} data-testid={`tier-material-${t.code}`}>{materialLabel(t)}</span></td>
                   <td className="px-4 py-3 text-xs text-white/40 font-mono">{t.code}</td>
                   <td className="px-4 py-3 font-semibold">{t.name}</td>
                   <td className="px-4 py-3 text-xs text-white/55">
@@ -298,7 +316,7 @@ function TierForm({ tier, groupCode, onClose, onSaved }) {
   const [form, setForm] = useState({
     code: tier?.code || "",
     group_code: tier?.group_code || groupCode,
-    level: tier?.level || 1,
+    material: tier?.material || "bronze",
     name: tier?.name || "",
     description: tier?.description || "",
     condition_key: tier?.condition_key || "",
@@ -329,7 +347,7 @@ function TierForm({ tier, groupCode, onClose, onSaved }) {
       <FormGrid>
         <TextField label="Code (eindeutig)" required disabled={!isNew} value={form.code} onChange={(v) => setForm({ ...form, code: v })} testId="tier-code" />
         <TextField label="Name" required value={form.name} onChange={(v) => setForm({ ...form, name: v })} testId="tier-name" />
-        <SelectField label="Stufe" value={String(form.level)} onChange={(v) => setForm({ ...form, level: parseInt(v) })} options={Object.entries(LEVEL_NAMES).map(([k, v]) => [k, `${k} · ${v}`])} testId="tier-level" />
+        <SelectField label="Material" value={form.material} onChange={(v) => setForm({ ...form, material: v })} options={Object.entries(MATERIALS).map(([k, [label]]) => [k, label])} testId="tier-material" />
         <TextField label="Punkte" type="number" value={form.points} onChange={(v) => setForm({ ...form, points: parseInt(v) || 0 })} testId="tier-points" />
       </FormGrid>
       <TextAreaField label="Beschreibung" rows={2} value={form.description} onChange={(v) => setForm({ ...form, description: v })} />
@@ -413,7 +431,7 @@ function AwardTab() {
           label="Achievement-Tier"
           value={tierCode}
           onChange={setTierCode}
-          options={[["", "— wählen —"], ...tiers.map((t) => [t.code, `${t.member_only ? "[Verein] " : ""}${t.group_code} · ${LEVEL_NAMES[t.level]} · ${t.name}`])]}
+          options={[["", "— wählen —"], ...tiers.map((t) => [t.code, `${t.member_only ? "[Verein] " : ""}${t.group_code} · ${materialLabel(t)} · ${t.name}`])]}
           testId="award-tier-select"
           className="mb-3"
         />
