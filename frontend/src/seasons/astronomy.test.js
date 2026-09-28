@@ -53,7 +53,7 @@ test("Kuppel: Osten links, Süden Mitte, Westen rechts; Horizont unten, 60° obe
   expect(south.x).toBeCloseTo(500, 5);
   expect(west.x).toBeGreaterThan(south.x);
   expect(east.y).toBeGreaterThan(south.y);
-  expect(south.y).toBeCloseTo(800 * 0.12, 5);
+  expect(south.y).toBeCloseTo(800 * 0.2, 5);
   expect(skyPlacement({ altitude: 0, azimuth: 180 }, view).y).toBeCloseTo(800 * 0.86, 5);
   expect(east.scale).toBeGreaterThan(south.scale);
   expect(east.warmth).toBeGreaterThan(0.7);

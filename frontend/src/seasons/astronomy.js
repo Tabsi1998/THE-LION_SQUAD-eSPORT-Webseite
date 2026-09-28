@@ -80,10 +80,11 @@ export function nextMoonEvent(date, lat, lon, hours = 26) {
 
 /**
  * Die Himmelskuppel als Fläche über der Seite: Osten links, Süden Mitte, Westen rechts; der Horizont liegt bei
- * `horizon` (Anteil der Höhe von oben), 60° und mehr knapp unter der Kopfzeile bei `top`. Unter dem Horizont: nicht
- * sichtbar. Nahe dem Horizont wirkt der Mond größer und wärmer (Mondtäuschung).
+ * `horizon` (Anteil der Höhe von oben), 60° und mehr bei `top` - ein Fünftel der Höhe, damit die Scheibe ganz
+ * unter der Kopfzeile bleibt. Unter dem Horizont: nicht sichtbar. Nahe dem Horizont wirkt der Mond größer und
+ * wärmer (Mondtäuschung).
  */
-export function skyPlacement({ altitude, azimuth }, { width, height }, { horizon = 0.86, top = 0.12, edge = 0.06 } = {}) {
+export function skyPlacement({ altitude, azimuth }, { width, height }, { horizon = 0.86, top = 0.2, edge = 0.06 } = {}) {
   const visible = altitude > -1.5;
   // Azimut 60°…300° auf die Breite legen (Ost → West über den Süden); weiter nördlich bleibt es am Rand.
   const span = Math.max(60, Math.min(300, azimuth));
