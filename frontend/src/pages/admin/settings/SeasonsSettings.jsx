@@ -3,6 +3,7 @@ import { CalendarDays, Eye, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { SeasonsWeatherCard } from "./SeasonsWeatherCard";
 
 // Jahreszeiten (#632/#633): Halloween, Advent, Weihnachten, Silvester, Fasching, Geburtstag, Ostern - alles
 // an einem Ort. Ein Hauptschalter, je Saison Ein/Aus, automatisch nach Datum oder erzwungen (bis wann),
@@ -185,6 +186,19 @@ export function SeasonsSettings() {
       setBusy(false);
     }
   };
+  const refreshWeather = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { data: result } = await api.post("/settings/seasons/weather/refresh");
+      setData(result);
+      toast.success(result.weather?.stale ? "Abruf fehlgeschlagen – es gilt der letzte Stand oder die Vorgabe." : "Wetter abgerufen.");
+    } catch (err) {
+      toast.error(formatApiError(err.response?.data?.detail));
+    } finally {
+      setBusy(false);
+    }
+  };
   const loadCalendar = async (year) => {
     try {
       const { data: result } = await api.get(`/seasonal/calendar?year=${year}`);
@@ -215,6 +229,7 @@ export function SeasonsSettings() {
           <span>Saisonale Deko</span>
         </label>
       </div>
+      <SeasonsWeatherCard weather={data.weather} location={data.location} busy={busy} onSave={(location) => save({ location }, "Vereinsort gespeichert – das Wetter kommt beim nächsten Abruf.")} onRefresh={refreshWeather} />
       <div className={`grid gap-4 ${data.enabled ? "" : "opacity-60"}`}>
         {data.seasons.map((season) => (
           <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />

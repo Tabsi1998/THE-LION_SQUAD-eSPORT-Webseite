@@ -16,7 +16,7 @@ scheduler never crashes the app, and every tick runs on one API replica only.
 """
 import logging
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -131,6 +131,18 @@ async def _safe_xp_baseline():
             logger.info(f"[scheduler] xp_baseline rebuilt={n}")
     except Exception as exc:
         _log_task_failure("xp_baseline", exc)
+
+
+async def _safe_seasons_weather():
+    """Jahreszeiten (#666): echtes Wetter für den Vereinsort alle zehn Minuten; bei Ausfall bleibt der letzte Stand."""
+    try:
+        from database import get_db
+        from services.weather import refresh
+        doc = await refresh(get_db())
+        if doc.get("error"):
+            logger.info(f"[scheduler] seasons_weather stale: {doc['error']}")
+    except Exception as exc:
+        _log_task_failure("seasons_weather", exc)
 
 
 async def _safe_prize_expiry():
@@ -641,6 +653,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("prize_expiry", _safe_prize_expiry), IntervalTrigger(minutes=60), id="prize_expiry",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("seasons_weather", _safe_seasons_weather), IntervalTrigger(minutes=10), id="seasons_weather",
+                  max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=20))
     sched.add_job(_single_replica("xp_baseline", _safe_xp_baseline), IntervalTrigger(seconds=60), id="xp_baseline",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievements_reconcile", _safe_achievements_reconcile), CronTrigger(hour=4, minute=10, timezone="Europe/Vienna"),

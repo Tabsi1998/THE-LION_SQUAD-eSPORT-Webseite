@@ -509,7 +509,7 @@ export function windAt(seconds, base = 0.6) {
  * Die Ebene für den gemeinsamen Loop: baut die Simulation für die Fenstergröße, hört auf Zeiger und Scrollen
  * (nur solange sie lebt) und zeichnet. `win` ist nur für Tests austauschbar.
  */
-export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, windBase = 0.6, rng = Math.random }, win = typeof window === "undefined" ? null : window) {
+export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, windBase = 0.6, rng = Math.random, weather = null }, win = typeof window === "undefined" ? null : window) {
   const plan = buildPlan(seed);
   const mirror = corner === "tr";
   let sim = null;
@@ -532,9 +532,21 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     lastImpulseAt = stamp;
     applyImpulse(sim, 0, -delta * 0.05);
   };
+  // Echtes Wetter (#666): Windstärke als Faktor (0,3–1,6 gegenüber der Vorgabe 0,6), Richtung als Vorzeichen.
+  let windScale = 1;
+  let windSign = 1;
+  const applyWeather = (conditions) => {
+    if (!conditions) return;
+    const factor = Number(conditions.wind_factor);
+    windScale = factor > 0 ? factor / 0.6 : 1;
+    windSign = Number(conditions.wind_dir) > 180 ? 1 : -1;
+  };
+  applyWeather(weather);
+  const onWeather = (event) => applyWeather(event?.detail);
   if (win) {
     win.addEventListener("mousemove", onMove, { passive: true });
     win.addEventListener("scroll", onScroll, { passive: true });
+    win.addEventListener("tls:season-weather", onWeather);
   }
   const ensure = (viewport) => {
     const radius = webRadius(viewport.width, factor);
@@ -550,10 +562,14 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     get sim() {
       return sim;
     },
+    get wind() {
+      return { scale: windScale, sign: windSign };
+    },
     draw(ctx, dt, viewport) {
       const current = ensure(viewport);
       seconds += dt;
-      current.wind = windAt(seconds, windBase);
+      const gust = windAt(seconds, windBase * windScale);
+      current.wind = { x: gust.x * windSign, y: gust.y };
       current.pointer = pointer.seen > 0 ? { x: pointer.x, y: pointer.y } : null;
       if (pointer.seen > 0) pointer.seen -= 1;
       if (!current.done) advanceBuild(current, dt);
@@ -565,6 +581,7 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
       if (!win) return;
       win.removeEventListener("mousemove", onMove);
       win.removeEventListener("scroll", onScroll);
+      win.removeEventListener("tls:season-weather", onWeather);
     },
   };
 }

@@ -84,7 +84,7 @@ function SkyCanvas({ layers }) {
 }
 
 export function SeasonStage() {
-  const { seasons, ready, reducedMotion, preview } = useSeason();
+  const { seasons, ready, reducedMotion, preview, weather } = useSeason();
   const location = useLocation();
   // Im Admin bleibt die Bühne leer - außer bei der Vorschau, die soll dort sofort zu sehen sein.
   const quiet = isQuietPath(location.pathname) && !preview;
@@ -106,11 +106,22 @@ export function SeasonStage() {
     }
   }, [mounted, modules]);
 
-  const skyLayers = useMemo(() => mounted.flatMap((season) => {
-    const factory = modules[season.key].skyLayers;
-    const budget = budgetFor(season.effective);
-    return factory && budget > 0 ? factory({ season, budget, reducedMotion }) : [];
-  }), [mounted, modules, reducedMotion]);
+  // Die Ebenen leben, bis sich Saison, Stärke, Phase oder Seite ändert - nicht bei jeder Antwort des Servers,
+  // sonst finge das Netz alle zehn Minuten neu an zu wachsen. Das Wetter holen sie sich über das Ereignis.
+  const mountedRef = useRef(mounted);
+  mountedRef.current = mounted;
+  const weatherRef = useRef(weather);
+  weatherRef.current = weather;
+  const mountedSignature = mounted.map((season) => `${season.key}:${season.effective}:${season.phase}`).join(",");
+  const skyLayers = useMemo(
+    () => mountedRef.current.flatMap((season) => {
+      const factory = modules[season.key].skyLayers;
+      const budget = budgetFor(season.effective);
+      return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current }) : [];
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mountedSignature, modules, reducedMotion, location.pathname],
+  );
 
   if (!ready || !mounted.length || typeof document === "undefined") return null;
   return createPortal(

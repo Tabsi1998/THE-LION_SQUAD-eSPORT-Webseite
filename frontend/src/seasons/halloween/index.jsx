@@ -326,14 +326,14 @@ export function Widget({ season }) {
 }
 
 /** Die Ebenen für den gemeinsamen Canvas-Loop: das lebende Netz (eins oder zwei), Fledermäuse, Schwaden. */
-export function skyLayers({ season, reducedMotion }) {
+export function skyLayers({ season, reducedMotion, weather = null }) {
   if (reducedMotion || season.effective === "subtle") return [];
   const night = Boolean(season.data?.night);
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
   const rng = pageRng(pathname, "bats");
   const layout = pageLayout(pathname, season.effective);
-  const layers = [createWebLayer(layout.web)];
-  if (layout.secondWeb) layers.push(createWebLayer(layout.secondWeb));
+  const layers = [createWebLayer({ ...layout.web, weather })];
+  if (layout.secondWeb) layers.push(createWebLayer({ ...layout.secondWeb, weather }));
   const state = { flock: null, wait: 6, lastPath: pathname, pageArmed: true, wisp: null, wispWait: nextWispDelay(night, rng) };
   // Seitenwechsel: ein Schwarm darf kurz darauf starten - höchstens einmal je Minute.
   const onPage = (event) => {
