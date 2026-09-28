@@ -1,5 +1,7 @@
 import "@/App.css";
 import { lazy, Suspense } from "react";
+import { SeasonProvider } from "@/seasons/SeasonContext";
+import { SeasonStage } from "@/seasons/SeasonStage";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -180,6 +182,7 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <SeasonProvider>
         <CookieConsentProvider>
           <ConfirmDialogProvider>
             <BrandingHead />
@@ -187,6 +190,8 @@ function App() {
             <ApiInvalidationBridge />
             <ScrollManager />
             <AchievementCatchUp />
+            {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
+            <SeasonStage />
             <Toaster theme="dark" position="top-right" richColors />
             <AppErrorBoundary>
             <BottomNav />
@@ -363,6 +368,7 @@ function App() {
             </AppErrorBoundary>
           </ConfirmDialogProvider>
         </CookieConsentProvider>
+        </SeasonProvider>
       </BrowserRouter>
     </AuthProvider>
   );
