@@ -1,12 +1,16 @@
-// Rundes Netz mit Physik (#660): ein Bauplan in der Reihenfolge einer echten Radnetzspinne (Ankerfäden und
-// Rahmen, Speichen, Nabe, Fangspirale von außen nach innen), Verlet-Physik für jeden Faden (Zeiger stupst an,
-// Scrollen gibt einen Stoß, Wind bewegt), Zeichnen auf dem gemeinsamen Canvas samt Spinne, die man beim
-// Spinnen zuschauen kann - und ein statisches SVG für „dezent“ und „Bewegung reduzieren“.
+// Rundes Netz mit Physik (#660, Nachbesserung nach #668 live): ein Bauplan in der Reihenfolge einer echten Radnetzspinne
+// (Ankerfäden und Rahmen, Speichen, Nabe, Fangspirale von außen nach innen), Verlet-Physik für jeden Faden
+// (Zeiger stupst an, Scrollen gibt einen Stoß, Wind bewegt), Zeichnen auf dem gemeinsamen Canvas samt Spinne,
+// der man beim Spinnen zuschauen kann - und ein statisches SVG für „dezent“ und „Bewegung reduzieren“.
+// Während des Baus steht das Netz straff (alle Knoten fest), erst das fertige Netz schwingt; jeder Knoten hat
+// eine weiche Rückstellung zur Ruheform, Stöße und Schritte sind begrenzt - so knautscht nichts mehr.
 // Der Plan rechnet in Nabe-Koordinaten mit Radius 1, erst die Simulation rechnet in Pixel um. Kein Paket.
 import { hashString, mulberry32 } from "../rng";
 
 export const RADII = 16;
 export const RINGS = 9;
+export const RADII_CHOICES = [12, 14, 16, 18];
+export const RINGS_CHOICES = [7, 8, 9, 10];
 export const SPIN_SPEED = 70;
 export const WALK_SPEED = 130;
 /** Ausdehnung des ganzen Netzes samt Ankerfäden in Radien, von der Ecke aus. */
@@ -21,24 +25,50 @@ export const THREAD_GLOW = "rgba(170, 225, 240, 0.10)";
 const HUB_RING = 0.12;
 const FIRST_RING = 0.24;
 const LAST_RING = 0.9;
-const RADIUS_ORDER = [0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15];
-const GRAVITY = 40;
-const DAMPING = 0.985;
-const STIFFNESS = { anchor: 0.85, frame: 0.85, radius: 0.8, hubring: 0.7, spiral: 0.55 };
+const GRAVITY = 6;
+const DAMPING = 0.94;
+const STIFFNESS = { anchor: 0.9, frame: 0.9, radius: 0.9, hubring: 0.8, spiral: 0.6 };
+const ITERATIONS = 5;
+/** Höchstens so viele Pixel bewegt sich ein Knoten je Schritt - kein Faden reißt aus, nichts explodiert. */
+const MAX_STEP = 4;
+/** Weiche Rückstellung zur Ruheform je Schritt: das Netz findet immer zu seiner Gestalt zurück. */
+const REST_PULL = 0.03;
+/** Weiter als so viel vom Radius entfernt sich kein Knoten von seiner Ruhelage - das Netz bleibt ein Netz. */
+const MAX_DRIFT = 0.15;
+const IMPULSE_MAX = 1.5;
+/** Scroll-Stöße höchstens alle 150 ms - ein Wackler je Scrollbewegung, kein Dauerbeben. */
+export const IMPULSE_GAP_MS = 150;
 const POINTER_RADIUS = 42;
 const POINTER_PUSH = 2.2;
 
-export function nodeId(i, k) {
-  return 1 + i * (RINGS + 1) + k;
+export function nodeId(i, k, rings = RINGS) {
+  return 1 + i * (rings + 1) + k;
 }
 
-function ringRadius(k) {
+function ringRadius(k, rings) {
   if (k <= 0) return HUB_RING;
-  return FIRST_RING + ((k - 1) / (RINGS - 2)) * (LAST_RING - FIRST_RING);
+  return FIRST_RING + ((k - 1) / (rings - 2)) * (LAST_RING - FIRST_RING);
 }
 
 function angleDiff(a, b) {
   return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+}
+
+function gcd(a, b) {
+  return b === 0 ? a : gcd(b, a % b);
+}
+
+/** Die Reihenfolge, in der eine Spinne ihre Speichen legt: immer ungefähr gegenüber der letzten, bis alle da sind. */
+export function spiderOrder(radii) {
+  let step = Math.floor(radii / 2) + 1;
+  while (gcd(step, radii) !== 1) step -= 1;
+  const order = [];
+  let i = 0;
+  for (let n = 0; n < radii; n += 1) {
+    order.push(i);
+    i = (i + step) % radii;
+  }
+  return order;
 }
 
 /** Radius in Pixel für eine Fensterbreite: 56–150 px, mal Seitenfaktor. */
@@ -48,29 +78,34 @@ export function webRadius(width, factor = 1) {
 
 /**
  * Bauplan: Knoten (Einheitsradius, Nabe im Ursprung), Fäden mit Art und Ruhelänge, Reihenfolge des Baus als
- * Schritte { thread, from, to } (Faden spinnen) oder { walk: true, from, to } (nur laufen).
+ * Schritte { thread, from, to } (Faden spinnen) oder { walk: true, from, to } (nur laufen). Speichen, Windungen
+ * und Drehsinn kommen aus dem Seed - kein Netz gleicht dem anderen.
  */
 export function buildPlan(seed = 0.37) {
   const rng = mulberry32(hashString(`web:${seed}`));
+  const radii = RADII_CHOICES[Math.floor(rng() * RADII_CHOICES.length)];
+  const rings = RINGS_CHOICES[Math.floor(rng() * RINGS_CHOICES.length)];
+  const turn = rng() < 0.5 ? 1 : -1;
   const nodes = [{ x: 0, y: 0, kind: "hub" }];
   const angles = [];
   const frame = [];
-  for (let i = 0; i < RADII; i += 1) {
-    angles.push(-Math.PI / 2 + (i / RADII) * Math.PI * 2 + (rng() - 0.5) * 0.12);
+  for (let i = 0; i < radii; i += 1) {
+    angles.push(-Math.PI / 2 + turn * (i / radii) * Math.PI * 2 + (rng() - 0.5) * 0.12);
     frame.push(0.95 + rng() * 0.1);
   }
-  for (let i = 0; i < RADII; i += 1) {
-    for (let k = 0; k <= RINGS; k += 1) {
+  for (let i = 0; i < radii; i += 1) {
+    for (let k = 0; k <= rings; k += 1) {
       let r;
-      if (k === RINGS) r = frame[i];
+      if (k === rings) r = frame[i];
       else if (k === 0) r = HUB_RING;
       else {
-        const next = k < RINGS - 1 ? ringRadius(k + 1) : Math.min(frame[i] - 0.05, LAST_RING + 0.05);
-        r = ringRadius(k) + (i / RADII) * (next - ringRadius(k));
+        const next = k < rings - 1 ? ringRadius(k + 1, rings) : Math.min(frame[i] - 0.05, LAST_RING + 0.05);
+        r = ringRadius(k, rings) + (i / radii) * (next - ringRadius(k, rings));
       }
-      nodes.push({ x: Math.cos(angles[i]) * r, y: Math.sin(angles[i]) * r, kind: k === RINGS ? "frame" : k === 0 ? "hubring" : "spiral", i, k });
+      nodes.push({ x: Math.cos(angles[i]) * r, y: Math.sin(angles[i]) * r, kind: k === rings ? "frame" : k === 0 ? "hubring" : "spiral", i, k });
     }
   }
+  const id = (i, k) => nodeId(i, k, rings);
   const threads = [];
   const order = [];
   const add = (kind, a, b) => {
@@ -84,8 +119,8 @@ export function buildPlan(seed = 0.37) {
   const anchorAt = ANCHORS.map(([ax, ay]) => {
     const angle = Math.atan2(ay, ax);
     let best = 0;
-    for (let i = 1; i < RADII; i += 1) if (angleDiff(angles[i], angle) < angleDiff(angles[best], angle)) best = i;
-    const mid = nodes.push({ x: (nodes[nodeId(best, RINGS)].x + ax) / 2, y: (nodes[nodeId(best, RINGS)].y + ay) / 2, kind: "mid" }) - 1;
+    for (let i = 1; i < radii; i += 1) if (angleDiff(angles[i], angle) < angleDiff(angles[best], angle)) best = i;
+    const mid = nodes.push({ x: (nodes[id(best, rings)].x + ax) / 2, y: (nodes[id(best, rings)].y + ay) / 2, kind: "mid" }) - 1;
     const anchor = nodes.push({ x: ax, y: ay, kind: "anchor", pinned: true }) - 1;
     return { frame: best, mid, anchor };
   });
@@ -94,58 +129,65 @@ export function buildPlan(seed = 0.37) {
   //    geht ein Faden zur Kante und die Spinne kommt zurück.
   const [first, second, third] = anchorAt;
   spin("anchor", first.anchor, first.mid);
-  spin("anchor", first.mid, nodeId(first.frame, RINGS));
-  const framePath = [];
-  for (let n = 1; n <= RADII; n += 1) framePath.push((first.frame + n) % RADII);
+  spin("anchor", first.mid, id(first.frame, rings));
   let at = first.frame;
-  framePath.forEach((next) => {
-    spin("frame", nodeId(at, RINGS), nodeId(next, RINGS));
+  for (let n = 1; n <= radii; n += 1) {
+    const next = (first.frame + n) % radii;
+    spin("frame", id(at, rings), id(next, rings));
     at = next;
     [second, third].forEach((entry) => {
-      if (entry.frame !== at) return;
-      spin("anchor", nodeId(at, RINGS), entry.mid);
+      if (entry.frame !== at || entry.frame === first.frame) return;
+      spin("anchor", id(at, rings), entry.mid);
       spin("anchor", entry.mid, entry.anchor);
       walk(entry.anchor, entry.mid);
-      walk(entry.mid, nodeId(at, RINGS));
+      walk(entry.mid, id(at, rings));
     });
+  }
+  // Fällt ein Anker auf denselben Rahmenknoten wie der erste (bei wenigen Speichen möglich), kommt er zum Schluss.
+  [second, third].forEach((entry) => {
+    if (entry.frame !== first.frame) return;
+    spin("anchor", id(at, rings), entry.mid);
+    spin("anchor", entry.mid, entry.anchor);
+    walk(entry.anchor, entry.mid);
+    walk(entry.mid, id(at, rings));
   });
 
   // 2. Speichen: die erste vom Rahmen zur Nabe, alle weiteren von der Nabe nach außen und zurück.
   const firstRadius = first.frame;
-  for (let k = RINGS; k > 0; k -= 1) spin("radius", nodeId(firstRadius, k), nodeId(firstRadius, k - 1));
-  spin("radius", nodeId(firstRadius, 0), 0);
-  RADIUS_ORDER.filter((i) => i !== firstRadius).forEach((i) => {
-    spin("radius", 0, nodeId(i, 0));
-    for (let k = 0; k < RINGS; k += 1) spin("radius", nodeId(i, k), nodeId(i, k + 1));
-    for (let k = RINGS; k > 0; k -= 1) walk(nodeId(i, k), nodeId(i, k - 1));
-    walk(nodeId(i, 0), 0);
+  for (let k = rings; k > 0; k -= 1) spin("radius", id(firstRadius, k), id(firstRadius, k - 1));
+  spin("radius", id(firstRadius, 0), 0);
+  spiderOrder(radii).filter((i) => i !== firstRadius).forEach((i) => {
+    spin("radius", 0, id(i, 0));
+    for (let k = 0; k < rings; k += 1) spin("radius", id(i, k), id(i, k + 1));
+    for (let k = rings; k > 0; k -= 1) walk(id(i, k), id(i, k - 1));
+    walk(id(i, 0), 0);
   });
 
   // 3. Die Nabe: ein kleiner Ring um die Mitte.
-  walk(0, nodeId(0, 0));
-  for (let i = 0; i < RADII; i += 1) spin("hubring", nodeId(i, 0), nodeId((i + 1) % RADII, 0));
+  walk(0, id(0, 0));
+  for (let i = 0; i < radii; i += 1) spin("hubring", id(i, 0), id((i + 1) % radii, 0));
 
   // 4. Fangspirale von außen nach innen: erst hinauslaufen, dann Windung für Windung zur Nabe.
-  const outer = RINGS - 1;
-  walk(nodeId(0, 0), nodeId(RADII - 1, 0));
-  for (let k = 0; k < outer; k += 1) walk(nodeId(RADII - 1, k), nodeId(RADII - 1, k + 1));
+  const outer = rings - 1;
+  walk(id(0, 0), id(radii - 1, 0));
+  for (let k = 0; k < outer; k += 1) walk(id(radii - 1, k), id(radii - 1, k + 1));
   for (let k = outer; k >= 1; k -= 1) {
-    for (let i = RADII - 1; i >= 0; i -= 1) {
-      if (i === RADII - 1) {
+    for (let i = radii - 1; i >= 0; i -= 1) {
+      if (i === radii - 1) {
         if (k === outer) continue;
-        spin("spiral", nodeId(0, k + 1), nodeId(RADII - 1, k));
+        spin("spiral", id(0, k + 1), id(radii - 1, k));
       } else {
-        spin("spiral", nodeId(i + 1, k), nodeId(i, k));
+        spin("spiral", id(i + 1, k), id(i, k));
       }
     }
   }
-  walk(nodeId(0, 1), nodeId(0, 0));
-  walk(nodeId(0, 0), 0);
+  walk(id(0, 1), id(0, 0));
+  walk(id(0, 0), 0);
 
   const dew = [];
   const dewRng = mulberry32(hashString(`dew:${seed}`));
-  for (let n = 0; n < 7; n += 1) dew.push(nodeId(Math.floor(dewRng() * RADII), 2 + Math.floor(dewRng() * (RINGS - 3))));
-  return { nodes, threads, order, dew, seed };
+  for (let n = 0; n < 7; n += 1) dew.push(id(Math.floor(dewRng() * radii), 2 + Math.floor(dewRng() * (rings - 3))));
+  return { nodes, threads, order, dew, seed, radii, rings, turn };
 }
 
 /** Knotenposition in Pixel: Ecke als Ursprung, `mirror` spiegelt für die rechte Ecke. */
@@ -165,18 +207,22 @@ export function staticLines(plan, radius, mirror = false) {
   });
 }
 
-/** Die Simulation in Pixel: Knoten mit Vorposition (Verlet), Fäden mit Ruhelänge und Baufortschritt. */
+/** Die Simulation in Pixel: Knoten mit Vorposition und Ruheform (Verlet), Fäden mit Ruhelänge und Baufortschritt. */
 export function createSim(plan, { radius, origin, mirror = false, prebuilt = false }) {
   const nodes = plan.nodes.map((node) => {
     const p = toPixels(node, radius, mirror, origin);
-    return { x: p.x, y: p.y, px: p.x, py: p.y, anchor: Boolean(node.pinned), pinned: true, links: 0 };
+    return { x: p.x, y: p.y, px: p.x, py: p.y, rx: p.x, ry: p.y, anchor: Boolean(node.pinned), pinned: true, links: 0 };
   });
   const threads = plan.threads.map((thread) => ({ ...thread, rest: thread.rest * radius, built: 0 }));
-  const sim = { plan, nodes, threads, radius, origin, mirror, step: 0, t: 0, done: false, pointer: null, wind: { x: 0, y: 0 }, spider: { x: nodes[0].x, y: nodes[0].y, heading: 0, phase: 0, moving: false }, idle: 45, patrol: null };
+  const sim = {
+    plan, nodes, threads, radius, origin, mirror, step: 0, t: 0, done: false, pointer: null, wind: { x: 0, y: 0 }, impulse: { x: 0, y: 0 },
+    spider: { x: nodes[0].x, y: nodes[0].y, heading: 0, phase: 0, moving: false }, idle: 45, patrol: null,
+  };
   if (prebuilt) {
     threads.forEach((thread) => finishThread(sim, thread));
     sim.step = plan.order.length;
     sim.done = true;
+    releaseNodes(sim);
     sim.spider.x = nodes[0].x;
     sim.spider.y = nodes[0].y;
   } else {
@@ -190,10 +236,14 @@ export function createSim(plan, { radius, origin, mirror = false, prebuilt = fal
 function finishThread(sim, thread) {
   if (thread.built >= 1) return;
   thread.built = 1;
-  [thread.a, thread.b].forEach((id) => {
-    const node = sim.nodes[id];
-    node.links += 1;
-    if (!node.anchor && node.links >= 2) node.pinned = false;
+  sim.nodes[thread.a].links += 1;
+  sim.nodes[thread.b].links += 1;
+}
+
+/** Das fertige Netz darf schwingen: alle Knoten außer den Ankern werden frei. */
+function releaseNodes(sim) {
+  sim.nodes.forEach((node) => {
+    if (!node.anchor) node.pinned = false;
   });
 }
 
@@ -201,9 +251,9 @@ function finishThread(sim, thread) {
 export function resizeSim(sim, { radius, origin }) {
   sim.radius = radius;
   sim.origin = origin;
-  sim.plan.nodes.forEach((node, id) => {
+  sim.plan.nodes.forEach((node, index) => {
     const p = toPixels(node, radius, sim.mirror, origin);
-    Object.assign(sim.nodes[id], { x: p.x, y: p.y, px: p.x, py: p.y });
+    Object.assign(sim.nodes[index], { x: p.x, y: p.y, px: p.x, py: p.y, rx: p.x, ry: p.y });
   });
   sim.threads.forEach((thread, index) => {
     thread.rest = sim.plan.threads[index].rest * radius;
@@ -232,7 +282,7 @@ export function advanceBuild(sim, dt) {
     sim.spider.heading = Math.atan2(to.y - from.y, to.x - from.x);
     sim.spider.moving = true;
     sim.spider.phase += used * 22;
-    // Erst finishThread setzt 1 und zählt die Verbindungen - sonst bliebe der Knoten für immer festgenagelt.
+    // Erst finishThread setzt 1 und zählt die Verbindungen.
     if (!item.walk) sim.threads[item.thread].built = Math.min(0.999, sim.t);
     if (sim.t >= 1 - 1e-6) {
       if (!item.walk) finishThread(sim, sim.threads[item.thread]);
@@ -241,6 +291,7 @@ export function advanceBuild(sim, dt) {
       if (sim.step >= sim.plan.order.length) {
         sim.done = true;
         sim.spider.moving = false;
+        releaseNodes(sim);
       }
     }
   }
@@ -249,13 +300,14 @@ export function advanceBuild(sim, dt) {
 /** Fertiges Netz: die Spinne sitzt in der Nabe, atmet, und geht alle 40–90 s einmal eine Speiche hinaus und zurück. */
 export function advanceIdle(sim, dt, rng = Math.random) {
   const spider = sim.spider;
+  const { radii, rings } = sim.plan;
   if (!sim.patrol) {
     sim.idle -= dt;
     spider.phase += dt * 1.5;
     if (sim.idle > 0) return;
-    const radius = Math.floor(rng() * RADII);
+    const radius = Math.floor(rng() * radii);
     const path = [];
-    for (let k = 0; k <= RINGS; k += 1) path.push(nodeId(radius, k));
+    for (let k = 0; k <= rings; k += 1) path.push(nodeId(radius, k, rings));
     sim.patrol = { path: [0, ...path, ...path.slice().reverse(), 0], index: 0, t: 0 };
     sim.idle = 40 + rng() * 50;
   }
@@ -279,17 +331,29 @@ export function advanceIdle(sim, dt, rng = Math.random) {
   }
 }
 
-/** Stoß auf alle freien Knoten (Scrollen): Geschwindigkeit dazu. */
+/** Stoß auf alle freien Knoten (Scrollen): wird gesammelt und im nächsten Schritt begrenzt angewendet. */
 export function applyImpulse(sim, vx, vy) {
-  sim.nodes.forEach((node) => {
-    if (node.pinned) return;
-    node.px -= vx;
-    node.py -= vy;
-  });
+  sim.impulse.x += vx;
+  sim.impulse.y += vy;
 }
 
-/** Ein Physikschritt: Kräfte (Schwerkraft, Wind, Zeiger), dann die Fäden dreimal auf Ruhelänge ziehen. */
+function clamp(value, limit) {
+  return Math.max(-limit, Math.min(limit, value));
+}
+
+/** Ein Physikschritt: Stoß, Kräfte (Schwerkraft, Wind, Zeiger), weiche Rückstellung, dann die Fäden auf Ruhelänge ziehen. */
 export function stepPhysics(sim, dt) {
+  const ix = clamp(sim.impulse.x, IMPULSE_MAX);
+  const iy = clamp(sim.impulse.y, IMPULSE_MAX);
+  sim.impulse.x = 0;
+  sim.impulse.y = 0;
+  if (ix || iy) {
+    sim.nodes.forEach((node) => {
+      if (node.pinned) return;
+      node.px -= ix;
+      node.py -= iy;
+    });
+  }
   const steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.02)));
   const h = dt / steps;
   for (let s = 0; s < steps; s += 1) {
@@ -299,10 +363,18 @@ export function stepPhysics(sim, dt) {
       const vy = (node.y - node.py) * DAMPING;
       node.px = node.x;
       node.py = node.y;
-      let ax = sim.wind.x;
-      let ay = GRAVITY + sim.wind.y;
-      node.x += vx + ax * h * h;
-      node.y += vy + ay * h * h;
+      node.x += clamp(vx + sim.wind.x * h * h, MAX_STEP);
+      node.y += clamp(vy + (GRAVITY + sim.wind.y) * h * h, MAX_STEP);
+      node.x += (node.rx - node.x) * REST_PULL;
+      node.y += (node.ry - node.y) * REST_PULL;
+      const driftX = node.x - node.rx;
+      const driftY = node.y - node.ry;
+      const drift = Math.hypot(driftX, driftY);
+      const maxDrift = MAX_DRIFT * sim.radius;
+      if (drift > maxDrift) {
+        node.x = node.rx + (driftX / drift) * maxDrift;
+        node.y = node.ry + (driftY / drift) * maxDrift;
+      }
       if (sim.pointer) {
         const dx = node.x - sim.pointer.x;
         const dy = node.y - sim.pointer.y;
@@ -315,7 +387,7 @@ export function stepPhysics(sim, dt) {
         }
       }
     });
-    for (let iteration = 0; iteration < 3; iteration += 1) {
+    for (let iteration = 0; iteration < ITERATIONS; iteration += 1) {
       sim.threads.forEach((thread) => {
         if (thread.built < 1) return;
         const a = sim.nodes[thread.a];
@@ -449,11 +521,16 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     pointer.y = event.clientY;
     pointer.seen = 6;
   };
+  // Scrollen: ein kleiner Stoß je Scrollbewegung (höchstens alle 150 ms), im Schritt begrenzt - kein Knäuel bei schnellem Rad.
+  let lastImpulseAt = -Infinity;
   const onScroll = () => {
     const now = win.scrollY;
     const delta = Math.max(-30, Math.min(30, now - lastScroll));
     lastScroll = now;
-    if (sim) applyImpulse(sim, 0, -delta * 0.35);
+    const stamp = typeof performance !== "undefined" ? performance.now() : Date.now();
+    if (!sim || stamp - lastImpulseAt < IMPULSE_GAP_MS) return;
+    lastImpulseAt = stamp;
+    applyImpulse(sim, 0, -delta * 0.05);
   };
   if (win) {
     win.addEventListener("mousemove", onMove, { passive: true });

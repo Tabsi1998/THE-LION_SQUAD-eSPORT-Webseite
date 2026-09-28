@@ -165,10 +165,10 @@ export function Cat({ className = "", style, size = 68 }) {
 export function MiniTombstone({ size = 20 }) {
   return (
     <svg width={size} height={size * 1.1} viewBox="0 0 20 22" aria-hidden="true">
-      <path d="M3 22 v-13 q0 -7 7 -7 q7 0 7 7 v13 z" fill={RIM} transform="translate(0 -0.8)" />
-      <path d="M3 22 v-13 q0 -7 7 -7 q7 0 7 7 v13 z" fill="#17151d" />
-      <path d="M6 11 h8 M7 14 h6" stroke="rgba(170, 225, 240, 0.28)" strokeWidth="0.8" />
-      <path d="M0 22 h20" stroke="rgba(170, 225, 240, 0.2)" strokeWidth="0.6" />
+      <path d="M3 22 v-13 q0 -7 7 -7 q7 0 7 7 v13 z" fill="rgba(170, 225, 240, 0.5)" transform="translate(0 -1)" />
+      <path d="M3 22 v-13 q0 -7 7 -7 q7 0 7 7 v13 z" fill="#2a2734" />
+      <path d="M6 11 h8 M7 14 h6" stroke="rgba(170, 225, 240, 0.5)" strokeWidth="0.9" />
+      <path d="M0 22 h20" stroke="rgba(170, 225, 240, 0.4)" strokeWidth="0.8" />
     </svg>
   );
 }

@@ -5,7 +5,7 @@ import { between, pageRng, pick } from "../rng";
 import { Cat, Lantern, Moon, Pumpkin, Spider } from "./art";
 import { advanceFlock, createFlock, drawBat, nextFlightDelay } from "./bats";
 import { HangingBats } from "./HangingBats";
-import { Graveyard } from "./graveyard";
+import { Graveyard, useFooterLineTop } from "./graveyard";
 import { advanceRappel, createRappel, rappelView } from "./rappel";
 import { EXTENT, buildPlan, createWebLayer, staticLines, webRadius } from "./web";
 import { advanceWisp, createWisp, drawWisp, nextWispDelay } from "./wisps";
@@ -40,7 +40,7 @@ export function pageLayout(pathname, intensity = "normal") {
   const corner = rng() < 0.7 ? "tl" : "tr";
   const web = { corner, factor: between(rng, 0.85, 1.15), seed: rng(), build: rng() < 0.7 && !subtle, windBase: between(rng, 0.4, 0.9) };
   const secondWeb = rng() < 0.35 ? { corner: corner === "tl" ? "tr" : "tl", factor: between(rng, 0.4, 0.55), seed: rng(), build: false, windBase: 0.3 } : null;
-  const spider = { side: corner === "tl" ? "right" : "left", offset: Math.round(between(rng, 6, 22)), period: between(rng, 45, 80), delay: between(rng, 25, 40), size: between(rng, 22, 30), drop: between(rng, 110, 200) };
+  const spider = { side: corner === "tl" ? "right" : "left", offset: Math.round(between(rng, 2, 9)), period: between(rng, 45, 80), delay: between(rng, 25, 40), size: between(rng, 22, 30), drop: between(rng, 110, 200) };
   const spiders = subtle ? [] : [spider];
   const crawlerRoll = rng();
   const crawlerSpec = { every: between(rng, 150, 320), first: between(rng, 40, 90), size: between(rng, 24, 32), duration: between(rng, 16, 26) };
@@ -50,7 +50,7 @@ export function pageLayout(pathname, intensity = "normal") {
   const rappel = !subtle && rappelRoll < 0.55 ? rappelSpec : null;
   const batRoll = Math.floor(rng() * 3);
   const hangingBats = subtle ? 0 : full ? 2 + batRoll : 1 + batRoll;
-  const graves = rng() < 0.6 ? Array.from({ length: 2 + Math.floor(rng() * 3) }, (_, index) => ({ x: 0.08 + index * 0.16 + rng() * 0.09, size: Math.round(between(rng, 16, 24)), tilt: between(rng, -7, 7) })) : [];
+  const graves = rng() < 0.6 ? Array.from({ length: 2 + Math.floor(rng() * 3) }, (_, index) => ({ x: 0.08 + index * 0.16 + rng() * 0.09, size: Math.round(between(rng, 20, 28)), tilt: between(rng, -7, 7) })) : [];
   const cat = rng() < 0.35 ? { size: Math.round(between(rng, 60, 76)) } : null;
   const moonRoll = rng();
   const moon = !subtle && moonRoll < 0.6 ? { side: corner === "tl" ? "right" : "left" } : null;
@@ -179,6 +179,7 @@ export function RappelSpider({ spec, active }) {
     <div className={classes} style={{ height: `${Math.round(state.y)}px` }} aria-hidden="true" data-testid="halloween-rappel" data-phase={state.phase}>
       {view.spiderOnThread && <Spider size={state.size} thread={false} className="tls-rappel__spider" />}
       {view.running && <Spider size={state.size} thread={false} className="tls-rappel__runner" style={{ transform: `translate(${state.x.toFixed(0)}px, 0) rotate(${state.runDir > 0 ? 90 : -90}deg)` }} />}
+      {!view.spiderOnThread && !view.running && <span className="tls-rappel__end" />}
     </div>,
     document.body,
   );
@@ -243,6 +244,8 @@ export function Footer({ season }) {
 /** Die Katze an der Footer-Kante: der Kopf dreht sich ein wenig zum Zeiger, die Pupillen wandern mit. */
 function CatOnEdge({ size, moving }) {
   const ref = useRef(null);
+  // Hockt auf dem Strich über dem Impressum - wie die Gräber; ohne Strich auf der Oberkante des Footers.
+  const lineTop = useFooterLineTop([size]);
   useEffect(() => {
     if (!moving || typeof window === "undefined") return undefined;
     let frame = 0;
@@ -264,7 +267,7 @@ function CatOnEdge({ size, moving }) {
     };
   }, [moving]);
   return (
-    <div ref={ref} className="tls-footer-cat" data-testid="halloween-cat">
+    <div ref={ref} className={`tls-footer-cat ${lineTop === null ? "" : "tls-footer-cat--line"}`} style={lineTop === null ? undefined : { top: `${lineTop}px` }} data-testid="halloween-cat">
       <Cat size={size} />
     </div>
   );
