@@ -37,6 +37,8 @@ export function Scares({ season, allowed, rng = Math.random, now = () => Date.no
   const night = Boolean(season?.data?.night);
   const [active, setActive] = useState(null);
   const [note, setNote] = useState(false);
+  // Der letzte Grund, warum (noch) kein Schreck kam - sichtbar am Wächter-Element, für Proben und Fehlersuche.
+  const [reason, setReason] = useState("idle");
   const loadedAt = useRef(now());
   const lastFigure = useRef(null);
   const storage = typeof localStorage === "undefined" ? null : localStorage;
@@ -59,6 +61,7 @@ export function Scares({ season, allowed, rng = Math.random, now = () => Date.no
         quiet: isQuietPath(location.pathname), inputFocused: page.inputFocused, mediaPlaying: page.mediaPlaying,
         visits: state.visits, lastDay: state.lastDay, today, loadedAt: loadedAt.current,
       }, now());
+      setReason(verdict.reason);
       if (!verdict.ok) return;
       const variant = pickVariant(rng, { night, lastFigure: lastFigure.current });
       lastFigure.current = variant.figure;
@@ -91,13 +94,14 @@ export function Scares({ season, allowed, rng = Math.random, now = () => Date.no
     return () => window.clearTimeout(timer);
   }, [note]);
 
-  if (typeof document === "undefined" || (!active && !note)) return null;
+  if (typeof document === "undefined") return null;
   const disable = () => {
     setScaresDisabled(storage, true);
     setNote(false);
   };
   return createPortal(
     <>
+      <span hidden data-testid="halloween-scare-guard" data-reason={permitted ? reason : "age"} data-allowed={permitted ? "1" : "0"} />
       {active && (
         <div className={`tls-scare tls-scare--${active.entrance} tls-scare--frame-${active.frame} tls-scare--${active.figure}`} aria-hidden="true" data-testid="halloween-scare" data-variant={active.id}>
           <div className="tls-scare__figure"><Figure figure={active.figure} /></div>
