@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { api, resolveMediaUrl } from "@/lib/api";
+import { useOptionalAuth } from "@/context/AuthContext";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -60,15 +61,19 @@ export default function NewsDetailPage() {
   });
   useCanonicalSlugRedirect(slug, post?.slug, "/news");
 
+  // Ohne Anmeldeprovider (Tests, Einbettung) gibt es keinen Leser - und keinen Marker.
+  const user = useOptionalAuth()?.user || null;
   const load = useCallback(() => {
     api.get(`/news/${slug}`).then(({ data }) => {
       setPost(data);
       setError(null);
+      // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
+      if (user?.id) api.post(`/news/${slug}/read`, null, { skipInvalidation: true }).catch(() => {});
     }).catch((e) => {
       setError(e.response?.status === 403 ? "Dieser Beitrag ist nicht öffentlich." : "Nicht gefunden.");
     });
     api.get("/news?limit=6").then(({ data }) => setMore(Array.isArray(data) ? data : data?.items || [])).catch(() => setMore([]));
-  }, [slug]);
+  }, [slug, user?.id]);
 
   useEffect(() => {
     load();

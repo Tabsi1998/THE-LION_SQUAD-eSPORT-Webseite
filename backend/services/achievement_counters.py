@@ -1,0 +1,683 @@
+"""Zähler für die Erfolge (#616): eine Registry, die weiß, welcher Schlüssel aus welcher Quelle kommt.
+
+Jeder Zähler ist eine kleine Funktion über einem ``Context`` (lädt Daten einmal je Auswertung). Der
+alte Block ``badges.compute_user_progress`` liefert weiterhin seine Schlüssel und wird bei jeder
+Auffrischung mitgerechnet; die neuen Zähler laufen nur, wenn ihre Quelle sich geändert hat. Der Stand
+je Person liegt in ``user_achievement_stats`` - Profil und Katalog lesen ihn, statt alles neu zu rechnen.
+Nächtlich rechnet ``reconcile`` alle Aktiven komplett nach und protokolliert Abweichungen.
+
+Signale (``user_signals``) sind Ereignisse, die der Client meldet - Kürbis geklickt, Konami-Code,
+Schneeflocken - je Tag gezählt, vom Server auf Plausibilität geprüft (Saison, Deckel).
+"""
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Awaitable, Callable
+from zoneinfo import ZoneInfo
+
+from database import get_db
+from models import now_utc
+
+logger = logging.getLogger("tls.achievements.counters")
+VIENNA = ZoneInfo("Europe/Vienna")
+STATS = "user_achievement_stats"
+SIGNALS = "user_signals"
+STALE_SECONDS = 600
+LOGO_CLICKS_FOR_TAMER = 20
+
+# Quellen: wer ein Ereignis auslöst, nennt sie - danach richtet sich, welche Zähler neu gerechnet werden.
+SOURCES = ("match", "tournament", "fastlap", "season", "team", "event", "community", "discord", "chat", "profile",
+           "club", "achievement", "xp", "signal", "stream", "friend")
+# Was der alte Block (badges.compute_user_progress) liefert - bei jeder Auffrischung mitgerechnet.
+LEGACY_KEYS = frozenset({
+    "tournaments_registered", "distinct_games_registered", "distinct_formats", "matches_played", "matches_won",
+    "match_streak_max", "tournaments_won", "podium_finishes", "rank_4_count", "fastlap_valid_count", "distinct_tracks",
+    "pole_count", "membership_days", "events_attended", "season_points_total", "distinct_platforms", "seasons_active",
+    "profile_completeness", "achievements_unlocked", "achievement_points", "teams_founded", "team_days_max",
+    "discord_messages", "twitch_live_sessions", "twitch_stream_minutes", "friends_count", "direct_messages_sent",
+    "team_chat_messages_sent", "match_chat_messages_sent", "tournament_chat_messages_sent", "community_messages_sent",
+})
+
+
+@dataclass(frozen=True)
+class Counter:
+    key: str
+    sources: frozenset
+    compute: Callable[["Context"], Awaitable[int]]
+
+
+REGISTRY: dict[str, Counter] = {}
+
+
+def counter(key: str, *sources: str):
+    """Einen Zähler registrieren: ``@counter("prizes_received", "tournament")``."""
+    unknown = set(sources) - set(SOURCES)
+    if unknown:
+        raise ValueError(f"Unbekannte Quelle {unknown} für {key}")
+
+    def wrap(fn):
+        REGISTRY[key] = Counter(key, frozenset(sources), fn)
+        return fn
+    return wrap
+
+
+def keys_for_sources(sources) -> set[str]:
+    wanted = set(sources or [])
+    return {key for key, item in REGISTRY.items() if item.sources & wanted}
+
+
+# ------------------------------------------------------------------ Kontext
+
+class Context:
+    """Daten einer Person, je Auswertung einmal geladen."""
+
+    def __init__(self, db, user_id: str):
+        self.db = db
+        self.user_id = user_id
+        self._cache: dict = {}
+
+    async def _memo(self, name: str, loader):
+        if name not in self._cache:
+            self._cache[name] = await loader()
+        return self._cache[name]
+
+    async def user(self) -> dict:
+        return await self._memo("user", lambda: self.db.users.find_one({"id": self.user_id}, {"_id": 0})) or {}
+
+    async def registrations(self) -> list[dict]:
+        return await self._memo("registrations", lambda: self.db.tournament_registrations.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))
+
+    async def registration_ids(self) -> set[str]:
+        return {r["id"] for r in await self.registrations() if r.get("id")}
+
+    async def tournaments(self) -> dict[str, dict]:
+        async def load():
+            ids = list({r.get("tournament_id") for r in await self.registrations() if r.get("tournament_id")})
+            rows = await self.db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1}).to_list(2000) if ids else []
+            return {row["id"]: row for row in rows}
+        return await self._memo("tournaments", load)
+
+    async def matches(self) -> list[dict]:
+        """Rohe Matches aus ``matches_v2`` - mit Zeitstempeln, die der kanonische Umbau nicht mitnimmt."""
+        async def load():
+            ids = list(await self.registration_ids())
+            if not ids:
+                return []
+            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1}).to_list(5000)
+        return await self._memo("matches", load)
+
+    async def awards(self) -> list[dict]:
+        return await self._memo("awards", lambda: self.db.user_achievements.find({"user_id": self.user_id}, {"_id": 0}).to_list(2000))
+
+    async def teams(self) -> list[dict]:
+        return await self._memo("teams", lambda: self.db.teams.find({"member_ids": self.user_id}, {"_id": 0}).to_list(100))
+
+    async def xp(self) -> dict:
+        return await self._memo("xp", lambda: self.db.user_xp.find_one({"user_id": self.user_id}, {"_id": 0})) or {}
+
+    async def signals(self) -> dict[str, dict]:
+        async def load():
+            rows = await self.db[SIGNALS].find({"user_id": self.user_id}, {"_id": 0}).to_list(200)
+            return {row["name"]: row for row in rows}
+        return await self._memo("signals", load)
+
+    async def links(self) -> set[str]:
+        async def load():
+            rows = await self.db.platform_links.find({"user_id": self.user_id}, {"_id": 0, "platform": 1}).to_list(100)
+            return {row.get("platform") for row in rows if row.get("platform")}
+        return await self._memo("links", load)
+
+    async def season_standings(self) -> list[dict]:
+        return await self._memo("season_standings", lambda: self.db.season_standings.find({"user_id": self.user_id}, {"_id": 0, "rank": 1, "season_id": 1}).to_list(500))
+
+    async def awards_places(self) -> list[dict]:
+        async def load():
+            ids = list(await self.registration_ids())
+            return await self.db.tournament_awards.find({"registration_id": {"$in": ids}}, {"_id": 0, "tournament_id": 1, "place": 1}).to_list(2000) if ids else []
+        return await self._memo("awards_places", load)
+
+
+def _parse(value) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _signal_count(signals: dict, name: str) -> int:
+    return int((signals.get(name) or {}).get("count") or 0)
+
+
+def _signal_days(signals: dict, name: str) -> int:
+    return len((signals.get(name) or {}).get("days") or {})
+
+
+# ------------------------------------------------------------------ Signale (Client meldet, Server prüft)
+
+@counter("halloween_pumpkin", "signal")
+async def _halloween_pumpkin(ctx):
+    return 1 if _signal_count(await ctx.signals(), "halloween_pumpkin") else 0
+
+
+@counter("snowflakes_clicked", "signal")
+async def _snowflakes(ctx):
+    return _signal_count(await ctx.signals(), "snowflakes_clicked")
+
+
+@counter("online_at_new_year", "signal")
+async def _new_year(ctx):
+    return 1 if _signal_count(await ctx.signals(), "online_at_new_year") else 0
+
+
+@counter("konami_found", "signal")
+async def _konami(ctx):
+    return 1 if _signal_count(await ctx.signals(), "konami") else 0
+
+
+@counter("lost_404", "signal")
+async def _lost(ctx):
+    return 1 if _signal_count(await ctx.signals(), "lost_404") else 0
+
+
+@counter("logo_clicks", "signal")
+async def _logo(ctx):
+    return _signal_count(await ctx.signals(), "logo_clicks")
+
+
+@counter("explorer_done", "signal")
+async def _explorer(ctx):
+    return 1 if _signal_count(await ctx.signals(), "explorer_done") else 0
+
+
+@counter("calendar_subscribed", "signal")
+async def _calendar(ctx):
+    return 1 if _signal_count(await ctx.signals(), "calendar_used") else 0
+
+
+@counter("member_card_added", "signal", "club")
+async def _member_card(ctx):
+    return 1 if _signal_count(await ctx.signals(), "member_card_added") else 0
+
+
+@counter("app_days", "signal")
+async def _app_days(ctx):
+    return _signal_days(await ctx.signals(), "app_open")
+
+
+@counter("onboarding_completed", "signal", "profile")
+async def _onboarding(ctx):
+    return 1 if _signal_count(await ctx.signals(), "tutorial_done") else 0
+
+
+@counter("advent_doors_opened", "signal")
+async def _advent(ctx):
+    return _signal_count(await ctx.signals(), "advent_door")
+
+
+@counter("easter_eggs_found", "signal")
+async def _eggs(ctx):
+    return _signal_count(await ctx.signals(), "easter_egg")
+
+
+# ------------------------------------------------------------------ Profil und Konten
+
+@counter("discord_linked", "profile")
+async def _discord_linked(ctx):
+    return 1 if "discord" in await ctx.links() else 0
+
+
+@counter("twitch_linked", "profile")
+async def _twitch_linked(ctx):
+    return 1 if "twitch" in await ctx.links() else 0
+
+
+@counter("youtube_linked", "profile")
+async def _youtube_linked(ctx):
+    return 1 if "youtube" in await ctx.links() else 0
+
+
+@counter("tiktok_linked", "profile")
+async def _tiktok_linked(ctx):
+    return 1 if "tiktok" in await ctx.links() else 0
+
+
+@counter("linked_accounts", "profile")
+async def _linked_accounts(ctx):
+    return len(await ctx.links())
+
+
+@counter("avatar_and_banner", "profile")
+async def _avatar_banner(ctx):
+    user = await ctx.user()
+    return 1 if user.get("avatar_url") and user.get("banner_url") else 0
+
+
+@counter("bio_and_socials", "profile")
+async def _bio_socials(ctx):
+    user = await ctx.user()
+    socials = any(user.get(key) for key in ("website", "discord_name", "twitch_handle", "youtube_handle", "tiktok_handle", "instagram_handle", "x_handle"))
+    return 1 if str(user.get("bio") or "").strip() and (socials or await ctx.links()) else 0
+
+
+@counter("email_verified", "profile")
+async def _email_verified(ctx):
+    return 1 if (await ctx.user()).get("email_verified") else 0
+
+
+@counter("passkey_registered", "profile")
+async def _passkey(ctx):
+    return 1 if await ctx.db.passkeys.count_documents({"user_id": ctx.user_id}) else 0
+
+
+@counter("notification_prefs_saved", "profile")
+async def _notification_prefs(ctx):
+    prefs = (await ctx.user()).get("notification_preferences")
+    return 1 if isinstance(prefs, dict) and prefs else 0
+
+
+@counter("privacy_reviewed", "profile")
+async def _privacy(ctx):
+    user = await ctx.user()
+    return 1 if isinstance(user.get("privacy_public_profile"), bool) or user.get("profile_visibility") else 0
+
+
+@counter("newsletter_subscribed", "profile", "community")
+async def _newsletter(ctx):
+    return 1 if (await ctx.user()).get("newsletter_consent") else 0
+
+
+@counter("push_enabled", "profile")
+async def _push(ctx):
+    return 1 if await ctx.db.mobile_push_tokens.count_documents({"user_id": ctx.user_id}) else 0
+
+
+@counter("account_years", "profile")
+async def _account_years(ctx):
+    created = _parse((await ctx.user()).get("created_at"))
+    return max(0, (now_utc() - created).days // 365) if created else 0
+
+
+# ------------------------------------------------------------------ XP und Erfolge
+
+@counter("login_streak_max", "xp")
+async def _login_streak(ctx):
+    return int((await ctx.xp()).get("login_streak_max") or 0)
+
+
+@counter("level", "xp")
+async def _level(ctx):
+    return int((await ctx.xp()).get("level") or 1)
+
+
+@counter("prestige_stars", "xp")
+async def _prestige(ctx):
+    return int((await ctx.xp()).get("prestige") or 0)
+
+
+@counter("birthday_logins", "xp")
+async def _birthday(ctx):
+    return int((await ctx.xp()).get("birthday_logins") or 0)
+
+
+@counter("hidden_unlocked", "achievement")
+async def _hidden(ctx):
+    hidden = {g["code"] async for g in ctx.db.achievement_groups.find({"hidden": True}, {"_id": 0, "code": 1})}
+    return sum(1 for award in await ctx.awards() if award.get("group_code") in hidden)
+
+
+@counter("categories_completed", "achievement")
+async def _categories(ctx):
+    groups = {g["code"]: g async for g in ctx.db.achievement_groups.find({"public": True, "is_negative": {"$ne": True}, "hidden": {"$ne": True}}, {"_id": 0, "code": 1, "category": 1})}
+    tiers_by_category: dict[str, set[str]] = {}
+    async for tier in ctx.db.achievements.find({"group_code": {"$in": list(groups)}}, {"_id": 0, "code": 1, "group_code": 1}):
+        tiers_by_category.setdefault(groups[tier["group_code"]].get("category") or "special", set()).add(tier["code"])
+    earned = {award.get("tier_code") for award in await ctx.awards()}
+    return sum(1 for codes in tiers_by_category.values() if codes and codes <= earned)
+
+
+# ------------------------------------------------------------------ Turnier
+
+@counter("prizes_received", "tournament")
+async def _prizes(ctx):
+    return await ctx.db.prize_pickups.count_documents({"user_id": ctx.user_id})
+
+
+@counter("tournaments_staffed_completed", "tournament")
+async def _staffed(ctx):
+    ids = {row.get("tournament_id") async for row in ctx.db.tournament_staff_assignments.find({"user_id": ctx.user_id}, {"_id": 0, "tournament_id": 1}) if row.get("tournament_id")}
+    if not ids:
+        return 0
+    return await ctx.db.tournaments.count_documents({"id": {"$in": list(ids)}, "status": {"$in": ["completed", "results_published", "archived"]}})
+
+
+@counter("seed_one_count", "tournament")
+async def _seed_one(ctx):
+    """Topgesetzt: je Turnier einmal, egal wie viele Anmeldungen dort auf Platz 1 gesetzt waren."""
+    return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("seed") == 1 and r.get("tournament_id")})
+
+
+@counter("tournaments_completed", "tournament")
+async def _tournaments_completed(ctx):
+    tournaments = await ctx.tournaments()
+    done = {tid for tid, t in tournaments.items() if t.get("status") in ("completed", "results_published", "archived")}
+    return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("tournament_id") in done})
+
+
+@counter("fast_registrations", "tournament")
+async def _fast_registrations(ctx):
+    tournaments = await ctx.tournaments()
+    count = 0
+    for reg in await ctx.registrations():
+        tournament = tournaments.get(reg.get("tournament_id")) or {}
+        opened = _parse(tournament.get("registration_opens_at") or tournament.get("registration_open_from"))
+        created = _parse(reg.get("created_at"))
+        if opened and created and timedelta(0) <= created - opened <= timedelta(minutes=10):
+            count += 1
+    return count
+
+
+@counter("first_checkins", "tournament")
+async def _first_checkins(ctx):
+    """Erster Check-in eines Turniers: der eigene Check-in-Zeitpunkt liegt vor allen anderen."""
+    mine = [r for r in await ctx.registrations() if r.get("status") == "checked_in" and r.get("tournament_id")]
+    count = 0
+    for reg in mine:
+        stamp = str(reg.get("checked_in_at") or reg.get("updated_at") or "")
+        if not stamp:
+            continue
+        earlier = await ctx.db.tournament_registrations.count_documents({"tournament_id": reg["tournament_id"], "status": "checked_in", "id": {"$ne": reg["id"]}, "$or": [{"checked_in_at": {"$lt": stamp}}, {"checked_in_at": {"$exists": False}, "updated_at": {"$lt": stamp}}]})
+        if earlier == 0:
+            count += 1
+    return count
+
+
+@counter("top8_finishes", "tournament")
+async def _top8(ctx):
+    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 8})
+
+
+@counter("finals_played", "tournament")
+async def _finals(ctx):
+    return len({row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) <= 2})
+
+
+# ------------------------------------------------------------------ Match (Zeit, Gegner, Lob)
+
+def _completed_matches(matches: list[dict], registration_ids: set[str]) -> list[tuple[dict, bool, datetime | None, set[str]]]:
+    out = []
+    for match in matches:
+        if match.get("status") != "completed":
+            continue
+        slots = [slot for slot in match.get("slots") or [] if slot.get("registration_id")]
+        mine = {slot["registration_id"] for slot in slots} & registration_ids
+        if not mine:
+            continue
+        won = any(result.get("registration_id") in registration_ids and result.get("outcome") == "winner" for result in match.get("results") or [])
+        when = _parse(match.get("completed_at") or match.get("updated_at") or match.get("scheduled_at"))
+        opponents = {slot["registration_id"] for slot in slots} - registration_ids
+        out.append((match, won, when, opponents))
+    return out
+
+
+@counter("matches_before_9", "match")
+async def _before_9(ctx):
+    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).hour < 9)
+
+
+@counter("matches_after_23", "match")
+async def _after_23(ctx):
+    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).hour >= 23)
+
+
+@counter("weekend_matches", "match")
+async def _weekend(ctx):
+    return sum(1 for _m, _w, when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if when and when.astimezone(VIENNA).weekday() >= 5)
+
+
+@counter("same_opponent_max", "match")
+async def _same_opponent(ctx):
+    rows = _completed_matches(await ctx.matches(), await ctx.registration_ids())
+    opponent_ids = {opp for _m, _w, _when, opponents in rows for opp in opponents}
+    if not opponent_ids:
+        return 0
+    regs = await ctx.db.tournament_registrations.find({"id": {"$in": list(opponent_ids)}}, {"_id": 0, "id": 1, "user_id": 1, "team_id": 1}).to_list(5000)
+    owner = {r["id"]: r.get("user_id") or r.get("team_id") for r in regs}
+    tally: dict[str, int] = {}
+    for _m, _w, _when, opponents in rows:
+        for opp in opponents:
+            key = owner.get(opp)
+            if key:
+                tally[key] = tally.get(key, 0) + 1
+    return max(tally.values()) if tally else 0
+
+
+@counter("upsets", "match")
+async def _upsets(ctx):
+    """Sieg gegen einen besser gesetzten Gegner (kleinere Setznummer)."""
+    count = 0
+    mine = await ctx.registration_ids()
+    for match, won, _when, _opponents in _completed_matches(await ctx.matches(), mine):
+        if not won:
+            continue
+        seeds = {slot.get("registration_id"): slot.get("seed") for slot in match.get("slots") or [] if slot.get("registration_id")}
+        my_seed = min((int(seeds[r]) for r in seeds if r in mine and isinstance(seeds.get(r), int)), default=None)
+        their = min((int(seeds[r]) for r in seeds if r not in mine and isinstance(seeds.get(r), int)), default=None)
+        if my_seed is not None and their is not None and their < my_seed:
+            count += 1
+    return count
+
+
+@counter("commendations_received", "match")
+async def _gg_received(ctx):
+    ids = list(await ctx.registration_ids())
+    return await ctx.db.match_commendations.count_documents({"to_registration_id": {"$in": ids}}) if ids else 0
+
+
+@counter("commendations_given", "match")
+async def _gg_given(ctx):
+    return await ctx.db.match_commendations.count_documents({"from_user_id": ctx.user_id})
+
+
+# ------------------------------------------------------------------ Team
+
+@counter("team_size_max", "team")
+async def _team_size(ctx):
+    return max((len(team.get("member_ids") or []) for team in await ctx.teams()), default=0)
+
+
+@counter("team_profile_complete", "team")
+async def _team_profile(ctx):
+    return 1 if any(team.get("logo_url") and team.get("banner_url") and str(team.get("description") or "").strip() for team in await ctx.teams() if team.get("leader_id") == ctx.user_id) else 0
+
+
+@counter("captain_days", "team")
+async def _captain_days(ctx):
+    days = 0
+    for team in await ctx.teams():
+        if team.get("leader_id") != ctx.user_id:
+            continue
+        created = _parse(team.get("created_at"))
+        if created:
+            days = max(days, (now_utc() - created).days)
+    return days
+
+
+@counter("team_level_max", "team")
+async def _team_level(ctx):
+    teams = await ctx.teams()
+    if not teams:
+        return 0
+    from services.team_levels import compute_all_team_levels
+    levels = await compute_all_team_levels()
+    return max((int((levels.get(team["id"]) or {}).get("level") or 0) for team in teams if team.get("id")), default=0)
+
+
+@counter("team_tournaments_played", "team", "tournament")
+async def _team_tournaments(ctx):
+    ids = [team["id"] for team in await ctx.teams() if team.get("id")]
+    if not ids:
+        return 0
+    return len(await ctx.db.tournament_registrations.distinct("tournament_id", {"team_id": {"$in": ids}}))
+
+
+# ------------------------------------------------------------------ Events, Saison, Community
+
+@counter("events_hosted_completed", "event")
+async def _events_hosted(ctx):
+    return await ctx.db.events.count_documents({"created_by": ctx.user_id, "status": "completed"})
+
+
+@counter("club_events_attended", "event", "club")
+async def _club_events(ctx):
+    event_ids = [row.get("event_id") async for row in ctx.db.event_registrations.find({"user_id": ctx.user_id, "$or": [{"status": "checked_in"}, {"checked_in": True}]}, {"_id": 0, "event_id": 1}) if row.get("event_id")]
+    if not event_ids:
+        return 0
+    return await ctx.db.events.count_documents({"id": {"$in": event_ids}, "visibility": {"$in": ["members", "internal"]}})
+
+
+@counter("season_top10_finishes", "season")
+async def _season_top10(ctx):
+    return sum(1 for row in await ctx.season_standings() if isinstance(row.get("rank"), int) and row["rank"] <= 10)
+
+
+@counter("season_wins", "season")
+async def _season_wins(ctx):
+    return sum(1 for row in await ctx.season_standings() if row.get("rank") == 1)
+
+
+@counter("news_read", "community")
+async def _news_read(ctx):
+    return await ctx.db.news_reads.count_documents({"user_id": ctx.user_id})
+
+
+@counter("streams_watched", "community", "stream")
+async def _streams_watched(ctx):
+    return await ctx.db.stream_watches.count_documents({"user_id": ctx.user_id})
+
+
+@counter("reports_actioned", "community")
+async def _reports(ctx):
+    return await ctx.db.user_reports.count_documents({"reporter_id": ctx.user_id, "status": {"$in": ["removed", "actioned", "accepted"]}})
+
+
+# ------------------------------------------------------------------ Rechnen, Cache, Abgleich
+
+async def compute(user_id: str, keys: set[str] | None = None) -> dict[str, int]:
+    """Zähler rechnen - alle, oder nur ``keys``. Der alte Block läuft immer mit."""
+    db = get_db()
+    from badges import compute_user_progress
+    values = dict(await compute_user_progress(user_id))
+    ctx = Context(db, user_id)
+    for key, item in REGISTRY.items():
+        if keys is not None and key not in keys:
+            continue
+        try:
+            values[key] = int(await item.compute(ctx) or 0)
+        except Exception:  # noqa: BLE001 - ein kaputter Zähler hält die anderen nicht auf
+            logger.warning("[achievements] counter %s failed for %s", key, user_id, exc_info=True)
+    return values
+
+
+async def refresh(user_id: str, sources=None) -> dict[str, int]:
+    """Stand auffrischen: mit ``sources`` nur die betroffenen neuen Zähler, sonst alles."""
+    db = get_db()
+    keys = None if not sources else keys_for_sources(sources)
+    fresh = await compute(user_id, keys)
+    current = await db[STATS].find_one({"user_id": user_id}, {"_id": 0}) or {}
+    values = {**(current.get("values") or {}), **fresh}
+    stamp = now_utc().isoformat()
+    update = {"$set": {"values": values, "updated_at": stamp}, "$setOnInsert": {"user_id": user_id}}
+    if keys is None:
+        update["$set"]["full_at"] = stamp
+    await db[STATS].update_one({"user_id": user_id}, update, upsert=True)
+    return values
+
+
+async def stats(user_id: str, max_age_seconds: int = STALE_SECONDS) -> dict[str, int]:
+    """Der gespeicherte Stand - frisch gerechnet, wenn er fehlt oder älter als zehn Minuten ist."""
+    doc = await get_db()[STATS].find_one({"user_id": user_id}, {"_id": 0})
+    full_at = _parse((doc or {}).get("full_at"))
+    if doc and full_at and now_utc() - full_at <= timedelta(seconds=max_age_seconds):
+        return dict(doc.get("values") or {})
+    return await refresh(user_id)
+
+
+async def reconcile(days: int = 7, limit: int = 5000) -> dict:
+    """Nächtlich: alle, die in den letzten Tagen aktiv waren, komplett neu rechnen, Abweichungen protokollieren, auswerten."""
+    db = get_db()
+    since = (now_utc() - timedelta(days=days)).isoformat()
+    active = {row["user_id"] async for row in db.xp_events.find({"at": {"$gte": since}}, {"_id": 0, "user_id": 1})}
+    active |= {row["user_id"] async for row in db[STATS].find({"updated_at": {"$gte": since}}, {"_id": 0, "user_id": 1})}
+    from badges import evaluate_user_progress
+    checked = drift = awarded = 0
+    for user_id in list(active)[:limit]:
+        before = ((await db[STATS].find_one({"user_id": user_id}, {"_id": 0, "values": 1}) or {}).get("values") or {})
+        after = await refresh(user_id)
+        changed = {key: (before.get(key), value) for key, value in after.items() if key in before and before[key] != value}
+        if changed:
+            drift += 1
+            logger.info("[achievements] reconcile %s: %s", user_id, changed)
+        awarded += await evaluate_user_progress(user_id)
+        checked += 1
+    return {"checked": checked, "drift": drift, "awarded": awarded}
+
+
+# ------------------------------------------------------------------ Signale
+
+# Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
+SIGNAL_RULES: dict[str, dict] = {
+    "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
+    "snowflakes_clicked": {"per_day": 200, "season": "snow"},
+    "online_at_new_year": {"per_day": 1, "season": "new_year", "phases": {"pre_countdown", "countdown", "show", "fade"}},
+    "konami": {"per_day": 1},
+    "lost_404": {"per_day": 1},
+    "logo_clicks": {"per_day": 100},
+    "explorer_done": {"per_day": 1},
+    "calendar_used": {"per_day": 1},
+    "member_card_added": {"per_day": 1},
+    "app_open": {"per_day": 1},
+    "tutorial_done": {"per_day": 1},
+    "advent_door": {"per_day": 24, "season": "advent_calendar"},
+    "easter_egg": {"per_day": 50, "season": "easter_hunt"},
+}
+
+
+async def season_allows(name: str) -> bool:
+    """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit."""
+    rule = SIGNAL_RULES.get(name) or {}
+    if not rule.get("season"):
+        return True
+    from routes.seasons_routes import load_context
+    from services import seasons
+    db = get_db()
+    stored, founded = await load_context(db)
+    active = {s["key"]: s for s in seasons.active(None, stored, founded)["seasons"]}
+    state = active.get(rule["season"])
+    if not state:
+        return False
+    return not rule.get("phases") or state.get("phase") in rule["phases"]
+
+
+async def record_signal(user_id: str, name: str, count: int = 1) -> dict:
+    """Ein Signal zählen. Liefert {accepted, count, day_count} - abgelehnt bei Deckel oder falscher Saison."""
+    if name not in SIGNAL_RULES or not user_id:
+        return {"accepted": False, "reason": "unknown"}
+    if not await season_allows(name):
+        return {"accepted": False, "reason": "season"}
+    db = get_db()
+    rule = SIGNAL_RULES[name]
+    day = now_utc().astimezone(VIENNA).date().isoformat()
+    doc = await db[SIGNALS].find_one({"user_id": user_id, "name": name}, {"_id": 0}) or {}
+    today = int((doc.get("days") or {}).get(day) or 0)
+    room = max(0, int(rule["per_day"]) - today)
+    add = min(max(1, int(count)), room)
+    if add <= 0:
+        return {"accepted": False, "reason": "cap", "count": int(doc.get("count") or 0), "day_count": today}
+    stamp = now_utc().isoformat()
+    await db[SIGNALS].update_one({"user_id": user_id, "name": name}, {"$inc": {"count": add, f"days.{day}": add}, "$set": {"last_at": stamp}, "$setOnInsert": {"user_id": user_id, "name": name, "first_at": stamp}}, upsert=True)
+    return {"accepted": True, "count": int(doc.get("count") or 0) + add, "day_count": today + add}

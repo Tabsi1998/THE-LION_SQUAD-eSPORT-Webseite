@@ -154,8 +154,8 @@ async def accept_friend(friendship_id: str, me: dict = Depends(get_current_user)
         pass
     try:
         from badges import evaluate_user_progress
-        await evaluate_user_progress(me["id"])
-        await evaluate_user_progress(row["requester_id"])
+        await evaluate_user_progress(me["id"], {"community", "friend"})
+        await evaluate_user_progress(row["requester_id"], {"community", "friend"})
     except Exception:
         pass
     return {"ok": True}

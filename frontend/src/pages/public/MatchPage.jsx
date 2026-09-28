@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
+import { CommendButton } from "@/components/tls/CommendButton";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -337,8 +338,12 @@ export default function MatchPage() {
               <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
               <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>
             </div>
-            <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
-              <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* GG (#616): eine Seite lobt die andere - einmal je Match, nur nach dem Ende. */}
+              {user && isV2 ? <CommendButton matchId={id} completed={String(match.status) === "completed"} /> : null}
+              <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]">
+                <RefreshCw className="w-3.5 h-3.5" /> Live-Refresh
+              </div>
             </div>
           </div>
 

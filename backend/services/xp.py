@@ -119,6 +119,11 @@ async def grant(user_id: str, source: str, ref: str, *, amount: int | None = Non
     result = {"amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before, "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
     if result["level_up"]:
         await _announce_level_up(user_id, level_before, level_after, prestige)
+        try:
+            from services.achievement_queue import request_evaluation
+            await request_evaluation([user_id], "level_up", sources={"xp"})
+        except Exception:  # noqa: BLE001
+            logger.debug("[xp] queue after level-up failed", exc_info=True)
     return result
 
 
@@ -159,7 +164,12 @@ async def grant_daily_login(user_id: str) -> dict | None:
         return None
     yesterday = (now_utc().astimezone(VIENNA).date() - timedelta(days=1)).isoformat()
     streak = int(doc.get("login_streak") or 0) + 1 if doc.get("last_login_day") == yesterday else 1
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"last_login_day": day, "login_streak": streak, "login_streak_max": max(streak, int(doc.get("login_streak_max") or 0))}, "$setOnInsert": {"user_id": user_id, "total": 0, "prestige": 0, "level": 1}}, upsert=True)
+    update = {"$set": {"last_login_day": day, "login_streak": streak, "login_streak_max": max(streak, int(doc.get("login_streak_max") or 0))}, "$setOnInsert": {"user_id": user_id, "total": 0, "prestige": 0, "level": 1}}
+    # Geburtstagskind (#616): eine Anmeldung am eigenen Geburtstag zählt - aus dem Profil, nie nach außen.
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "birth_date": 1}) or {}
+    if str(user.get("birth_date") or "")[5:10] == day[5:10]:
+        update["$inc"] = {"birthday_logins": 1}
+    await db.user_xp.update_one({"user_id": user_id}, update, upsert=True)
     amount = min(SOURCES["daily_login"][0] + LOGIN_STREAK_STEP * (streak - 1), LOGIN_STREAK_MAX)
     return await grant(user_id, "daily_login", day, amount=amount)
 

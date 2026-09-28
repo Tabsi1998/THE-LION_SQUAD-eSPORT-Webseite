@@ -35,17 +35,19 @@ MATERIAL_COLORS = {key: int(str(value["color"]).lstrip("#"), 16) for key, value 
 
 # ---------------------------------------------------------------- Auswerten
 
-async def request_evaluation(user_ids, reason: str = "") -> int:
-    """Betroffene vormerken. Idempotent: eine Person steht höchstens einmal in der Schlange."""
+async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
+    """Betroffene vormerken. Idempotent: eine Person steht höchstens einmal in der Schlange. Mit ``sources``
+    (#616) merkt sich der Eintrag, welche Zähler dran sind; ohne Quelle wird alles gerechnet."""
     db = get_db()
     due = (now_utc() + timedelta(seconds=EVAL_DELAY_SECONDS)).isoformat()
     count = 0
     for user_id in {uid for uid in (user_ids or []) if uid}:
-        await db.achievement_eval_queue.update_one(
-            {"user_id": user_id},
-            {"$set": {"user_id": user_id, "reason": reason[:60]}, "$setOnInsert": {"due_at": due, "created_at": now_utc().isoformat()}},
-            upsert=True,
-        )
+        update = {"$set": {"user_id": user_id, "reason": reason[:60]}, "$setOnInsert": {"due_at": due, "created_at": now_utc().isoformat()}}
+        if sources:
+            update["$addToSet"] = {"sources": {"$each": sorted(set(sources))}}
+        else:
+            update["$set"]["full"] = True
+        await db.achievement_eval_queue.update_one({"user_id": user_id}, update, upsert=True)
         count += 1
     return count
 
@@ -60,7 +62,8 @@ async def process_queue(limit: int = BATCH) -> dict:
         # Erst löschen: Kommt während der Auswertung ein neues Ereignis, steht die Person wieder drin.
         await db.achievement_eval_queue.delete_one({"user_id": entry["user_id"]})
         try:
-            awarded += await evaluate_user_progress(entry["user_id"])
+            sources = None if entry.get("full") or not entry.get("sources") else set(entry["sources"])
+            awarded += await evaluate_user_progress(entry["user_id"], sources)
         except Exception:  # noqa: BLE001 - eine kaputte Auswertung hält die anderen nicht auf
             logger.warning("[achievements] evaluation failed", exc_info=True)
     if due:

@@ -221,7 +221,7 @@ async def count_message(db, user_id: str) -> None:
         pass
     # Erfolge „Discord-Aktiv“ sollen nicht auf den nächtlichen Durchlauf warten (#301: Schlange, je Person einmal).
     from services.achievement_queue import request_evaluation
-    await request_evaluation([user_id], "discord_message")
+    await request_evaluation([user_id], "discord_message", sources={"discord", "community"})
 
 
 async def wanted_roles_by_user(db, user_ids: list[str]) -> dict[str, set[str]]:
