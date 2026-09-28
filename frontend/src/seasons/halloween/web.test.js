@@ -256,25 +256,42 @@ test("Weg und zurück: die Spinne verlässt das fertige Netz über den Ankerfade
 
 test("Packen: die Hand hält das Netz und zieht - die Spinne flieht, die Anker reißen nacheinander, das Netz faltet sich und hängt am Zeiger; losgelassen fliegt es davon, und die Ebene spinnt ein neues", () => {
   const listeners = {};
-  const win = { innerWidth: 1200, scrollY: 0, addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: (name) => { delete listeners[name]; } };
+  const toggled = [];
+  const removeAllRanges = vi.fn();
+  const win = {
+    innerWidth: 1200, scrollY: 0,
+    addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: (name) => { delete listeners[name]; },
+    document: { documentElement: { classList: { toggle: (name, on) => toggled.push([name, on]) } } },
+    getSelection: () => ({ removeAllRanges }),
+  };
   const layer = createWebLayer({ seed: 0.42, corner: "tl", factor: 1, build: false, rng: () => 0.5 }, win);
   const ctx = fakeContext([]);
   const viewport = { width: 1200, height: 800 };
   layer.draw(ctx, 1 / 60, viewport);
   const sim = layer.sim;
   const hub = { x: sim.nodes[0].x, y: sim.nodes[0].y };
-  // Ein Klick ohne Ziehen tut dem Netz nichts.
-  listeners.mousedown({ button: 0, clientX: hub.x, clientY: hub.y });
+  // Ein Klick ohne Ziehen tut dem Netz nichts - aber die Taste nahe am Netz markiert keinen Text.
+  const prevented = vi.fn();
+  listeners.mousedown({ button: 0, clientX: hub.x, clientY: hub.y, preventDefault: prevented });
+  expect(prevented).toHaveBeenCalledTimes(1);
   listeners.mouseup({});
   layer.draw(ctx, 1 / 60, viewport);
   expect(sim.grab).toBeNull();
   expect(sim.torn).toBe(0);
-  // Packen und ziehen: die Spinne sitzt noch drin und flieht über den Ankerfaden.
+  expect(toggled).toEqual([]);
+  // Weit weg vom Netz bleibt die Taste unberührt.
+  const untouched = vi.fn();
+  listeners.mousedown({ button: 0, clientX: 900, clientY: 700, preventDefault: untouched });
+  expect(untouched).not.toHaveBeenCalled();
+  listeners.mouseup({});
+  // Packen und ziehen: die Spinne sitzt noch drin und flieht über den Ankerfaden; die Seite bekommt die Greif-Klasse.
   hub.x = sim.nodes[0].x;
   hub.y = sim.nodes[0].y;
   listeners.mousedown({ button: 0, clientX: hub.x, clientY: hub.y });
   listeners.mousemove({ clientX: hub.x + 20, clientY: hub.y + 20 });
   expect(sim.grab).not.toBeNull();
+  expect(toggled).toEqual([["tls-web-grabbing", true]]);
+  expect(removeAllRanges).toHaveBeenCalledTimes(1);
   expect(sim.grab.nodes.map((entry) => entry.index)).toContain(0);
   expect(sim.patrol).toMatchObject({ leaving: true });
   for (let step = 1; step <= 40; step += 1) {
@@ -292,6 +309,7 @@ test("Packen: die Hand hält das Netz und zieht - die Spinne flieht, die Anker r
   // Losgelassen: es fliegt, verblasst und ist weg; nach der Pause beginnt ein neues Netz mit anderem Plan - und Bau.
   listeners.mouseup({});
   expect(sim.grab).toBeNull();
+  expect(toggled).toEqual([["tls-web-grabbing", true], ["tls-web-grabbing", false]]);
   for (let n = 0; n < 60 * 8 && !sim.gone; n += 1) layer.draw(ctx, 1 / 60, viewport);
   expect(sim.gone).toBe(true);
   expect(layer.sim).toBeNull();

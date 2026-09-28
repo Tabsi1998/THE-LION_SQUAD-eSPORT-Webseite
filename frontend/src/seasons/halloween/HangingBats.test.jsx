@@ -39,8 +39,26 @@ function fakeGlyphs(table) {
   };
 }
 
+/** jsdom hat keinen Canvas: die Schriftmaße kommen aus der Schriftgröße (Oberlänge 0,7, Schriftkasten 0,85). */
+function fakeCanvas() {
+  const original = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function getContext() {
+    return {
+      font: "",
+      measureText() {
+        const size = parseFloat((this.font.match(/(\d+(?:\.\d+)?)px/) || [0, "16"])[1]);
+        return { actualBoundingBoxAscent: size * 0.7, actualBoundingBoxDescent: 0, fontBoundingBoxAscent: size * 0.85 };
+      },
+    };
+  };
+  return () => {
+    HTMLCanvasElement.prototype.getContext = original;
+  };
+}
+
 let fixture = null;
 let restoreRange = null;
+let restoreCanvas = null;
 
 function mountFixture(html) {
   fixture = document.createElement("div");
@@ -54,11 +72,14 @@ afterEach(() => {
   fixture = null;
   restoreRange?.();
   restoreRange = null;
+  restoreCanvas?.();
+  restoreCanvas = null;
   Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
 });
 
-test("Anker: Menüpunkte am Fenster, Buchstaben der letzten Zeile in der Seite, Karten an der Oberkante, der Löwe; Kleines und Verstecktes zählt nicht", () => {
-  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a><a id="hidden">Menü</a></nav></header><main><h1 id="h1">Ein Rudel.<br><span id="s1">Eine Familie.</span></h1><h2 id="h2">Klein</h2><a id="c1" data-season-anchor="card">Karte eins</a><div id="lion" data-season-anchor="lion"></div></main>');
+test("Anker: Menüpunkte am Fenster, Buchstaben an ihrer Oberkante in der Seite, Karten an der Oberkante, der Löwe; Kleines und Verstecktes zählt nicht", () => {
+  restoreCanvas = fakeCanvas();
+  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a><a id="hidden">Menü</a></nav></header><main><h1 id="h1" style="font-size:72px">Ein Rudel.<br><span id="s1">Eine Familie.</span></h1><h2 id="h2" style="font-size:10px">Klein</h2><a id="c1" data-season-anchor="card">Karte eins</a><div id="lion" data-season-anchor="lion"></div></main>');
   rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
   rectOf(document.getElementById("n2"), { left: 200, right: 280, top: 20, bottom: 44 });
   rectOf(document.getElementById("hidden"), { left: 0, right: 0, top: 0, bottom: 0 });
@@ -76,11 +97,15 @@ test("Anker: Menüpunkte am Fenster, Buchstaben der letzten Zeile in der Seite, 
   expect(nav.length).toBe(2);
   expect(nav[0]).toMatchObject({ fixed: true, x: 130, y: 46, px: 130, py: 546 });
   const glyphs = found.filter((anchor) => anchor.kind === "glyph");
-  // Nur die letzte Zeile „Eine Familie.“ (11 Buchstaben, Punkt und Leerzeichen zählen nicht), Unterkante plus Scrollstand.
-  expect(glyphs.length).toBe(11);
-  expect(glyphs.every((anchor) => anchor.y === 350 - 1 + 500 && anchor.fixed === false)).toBe(true);
+  // Beide Zeilen: „Ein Rudel.“ (8 Buchstaben) und „Eine Familie.“ (11) - Punkt und Leerzeichen zählen nicht.
+  // Hängepunkt: Oberkante des Zeichens = Kastenoberkante + Schriftkasten (0,85 em) - Oberlänge (0,7 em), plus 1 px, plus Scrollstand.
+  expect(glyphs.length).toBe(19);
+  expect(glyphs.every((anchor) => anchor.fixed === false)).toBe(true);
+  expect(glyphs[0].y).toBeCloseTo(200 + 72 * 0.85 - 72 * 0.7 + 1 + 500, 5);
+  expect(glyphs[8].y).toBeCloseTo(280 + 72 * 0.85 - 72 * 0.7 + 1 + 500, 5);
   expect(glyphs[0].x).toBe(40 + 15);
-  expect(glyphs[0].size).toBe(27);
+  expect(glyphs[0].size).toBe(25);
+  // Die kleine Überschrift (Zeichen 7 px hoch) bekommt keine Fledermaus.
   expect(found.filter((anchor) => anchor.element.id === "h2").length).toBe(0);
   const card = found.find((anchor) => anchor.kind === "card");
   expect(card).toMatchObject({ fixed: false, y: 701 + 500, size: 24 });
@@ -132,7 +157,8 @@ test("Flugbahn: beginnt am Hängepunkt, geht erst hoch, endet unter dem Fenster 
 
 test("Fledermäuse hängen still, Menü-Fledermäuse am Fenster, die anderen in der Seite; ein Klick lässt eine davonfliegen; Karten, die später kommen, werden nachbesetzt", async () => {
   vi.useFakeTimers();
-  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a><a id="n3">Kontakt</a></nav></header><main><h1 id="h1">Rudel</h1><div id="late"></div></main>');
+  restoreCanvas = fakeCanvas();
+  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a><a id="n3">Kontakt</a></nav></header><main><h1 id="h1" style="font-size:40px">Rudel</h1><div id="late"></div></main>');
   rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
   rectOf(document.getElementById("n2"), { left: 300, right: 380, top: 20, bottom: 44 });
   rectOf(document.getElementById("n3"), { left: 500, right: 580, top: 20, bottom: 44 });
@@ -157,7 +183,8 @@ test("Fledermäuse hängen still, Menü-Fledermäuse am Fenster, die anderen in 
   expect(fixed.querySelectorAll("[data-kind='nav']").length).toBe(kinds.filter((kind) => kind === "nav").length);
   expect(page.querySelectorAll("[data-kind='glyph']").length).toBe(kinds.filter((kind) => kind === "glyph").length);
   const glyphBat = page.querySelector("[data-kind='glyph']");
-  expect(glyphBat.style.transform).toMatch(/, 379\.0px\)$/);
+  // Oberkante des Zeichens: 300 + 40 · 0,85 - 40 · 0,7 + 1 = 307
+  expect(glyphBat.style.transform).toMatch(/, 307\.0px\)$/);
   vi.useRealTimers();
   fireEvent.click(hanging[0]);
   expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(2);

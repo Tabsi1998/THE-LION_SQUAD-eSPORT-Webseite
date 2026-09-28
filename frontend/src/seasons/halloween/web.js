@@ -722,6 +722,19 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
   // Greifen: Maustaste unten nahe am Netz merkt sich die Knoten; erst Bewegung macht daraus ein Ziehen (ein Klick
   // auf etwas unter dem Netz bleibt ein Klick). Sitzt die Spinne noch im Netz, flieht sie.
   let pending = null;
+  // Solange die Hand das Netz hält: kein Textmarkieren in der Seite, der Zeiger zeigt „greifen“ (Klasse am Dokument).
+  const setGrabbing = (on) => {
+    const root = win && win.document && win.document.documentElement;
+    if (!root || !root.classList) return;
+    root.classList.toggle("tls-web-grabbing", on);
+    if (on && typeof win.getSelection === "function") {
+      try {
+        win.getSelection().removeAllRanges();
+      } catch {
+        // ohne Auswahl nichts zu löschen
+      }
+    }
+  };
   const onMove = (event) => {
     pointer.x = event.clientX;
     pointer.y = event.clientY;
@@ -729,17 +742,24 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     if (sim && pending && !sim.grab && Math.hypot(event.clientX - pending.x, event.clientY - pending.y) > GRAB_MIN_MOVE) {
       if (!sim.spider.away) sendSpiderAway(sim, rng, true);
       startGrab(sim, pending.x, pending.y, pending.nodes);
+      setGrabbing(true);
     }
     if (sim && sim.grab) moveGrab(sim, event.clientX, event.clientY);
   };
   const onDown = (event) => {
     if ((event.button || 0) !== 0 || !sim || !sim.done || sim.free || sim.grab) return;
     const nodes = grabNodes(sim, event.clientX, event.clientY);
-    if (nodes.length) pending = { x: event.clientX, y: event.clientY, nodes };
+    if (!nodes.length) return;
+    pending = { x: event.clientX, y: event.clientY, nodes };
+    // Die Taste gilt dem Netz: kein Markieren beim Ziehen - ein Klick auf etwas darunter bleibt ein Klick.
+    if (typeof event.preventDefault === "function") event.preventDefault();
   };
   const onUp = () => {
     pending = null;
-    if (sim) releaseGrab(sim, rng);
+    if (sim && sim.grab) {
+      releaseGrab(sim, rng);
+      setGrabbing(false);
+    }
   };
   // Scrollen: ein kleiner Stoß je Scrollbewegung (höchstens alle 150 ms), im Schritt begrenzt - kein Knäuel bei schnellem Rad.
   let lastImpulseAt = -Infinity;
@@ -765,7 +785,7 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
   const onWeather = (event) => applyWeather(event?.detail);
   if (win) {
     win.addEventListener("mousemove", onMove, { passive: true });
-    win.addEventListener("mousedown", onDown, { passive: true });
+    win.addEventListener("mousedown", onDown);
     win.addEventListener("mouseup", onUp, { passive: true });
     win.addEventListener("scroll", onScroll, { passive: true });
     win.addEventListener("tls:season-weather", onWeather);
@@ -820,6 +840,7 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     },
     dispose() {
       if (!win) return;
+      if (sim && sim.grab) setGrabbing(false);
       win.removeEventListener("mousemove", onMove);
       win.removeEventListener("mousedown", onDown);
       win.removeEventListener("mouseup", onUp);

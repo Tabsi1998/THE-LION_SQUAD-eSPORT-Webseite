@@ -36,7 +36,37 @@ function glyphRect(doc, node, index) {
   range.setEnd(node, index + 1);
   if (typeof range.getBoundingClientRect !== "function") return null;
   const rect = range.getBoundingClientRect();
-  return rect && rect.width >= 6 && rect.height >= 16 ? rect : null;
+  return rect && rect.width >= 4 && rect.height >= 8 ? rect : null;
+}
+
+let metricsCanvas = null;
+let metricsUnsupported = false;
+
+/** Ein Canvas nur zum Messen der Schrift; ohne Canvas (Tests ohne Attrappe) keine Buchstaben-Anker - einmal geprüft, dann gemerkt. */
+function glyphMeasurer(doc) {
+  if (metricsUnsupported) return null;
+  if (!metricsCanvas) metricsCanvas = doc.createElement("canvas");
+  const ctx = typeof metricsCanvas.getContext === "function" ? metricsCanvas.getContext("2d") : null;
+  if (!ctx || typeof ctx.measureText !== "function") {
+    metricsUnsupported = true;
+    return null;
+  }
+  return ctx;
+}
+
+function fontOf(style) {
+  return style.font || `${style.fontStyle || "normal"} ${style.fontWeight || "400"} ${style.fontSize || "16px"} ${style.fontFamily || "sans-serif"}`;
+}
+
+/**
+ * Die Tinte eines Zeichens: der Range gibt den Zeichenkasten (Schriftkasten, oben mehr Luft als der Buchstabe hat),
+ * die Schriftmaße des Canvas die Grundlinie und die tatsächliche Ober- und Unterkante des Zeichens.
+ */
+function inkBounds(ctx, rect, ch) {
+  const metrics = ctx.measureText(ch);
+  if (!metrics || !(metrics.actualBoundingBoxAscent > 0)) return null;
+  const baseline = rect.top + (metrics.fontBoundingBoxAscent > 0 ? metrics.fontBoundingBoxAscent : rect.height * 0.78);
+  return { top: baseline - metrics.actualBoundingBoxAscent, bottom: baseline + Math.max(0, metrics.actualBoundingBoxDescent || 0) };
 }
 
 function navAnchors(doc, win) {
@@ -56,38 +86,49 @@ function navAnchors(doc, win) {
   return found;
 }
 
-/** Buchstaben der letzten Zeile jeder Überschrift: die Fledermaus greift die Unterkante des Zeichens. */
+/**
+ * Buchstaben der Überschriften: die Fledermaus greift die Oberkante des Zeichens und hängt davor - dunkle Silhouette
+ * auf dem hellen Buchstaben, nicht im Absatz darunter (am Livesystem gemessen, 28.09.). Größe nach der Zeichenhöhe.
+ */
 function glyphAnchors(doc, win) {
   const found = [];
+  const ctx = glyphMeasurer(doc);
+  if (!ctx || !win || typeof win.getComputedStyle !== "function") return found;
   const at = scrollOf(win);
   const headings = Array.from(doc.querySelectorAll(HEADING_SELECTOR)).slice(0, MAX_HEADINGS);
   headings.forEach((heading) => {
-    const glyphs = [];
+    const style = win.getComputedStyle(heading);
+    const font = fontOf(style);
+    const upper = style.textTransform === "uppercase";
+    const inkOf = (rect, ch) => {
+      ctx.font = font;
+      return inkBounds(ctx, rect, upper ? ch.toUpperCase() : ch);
+    };
     const walker = doc.createTreeWalker(heading, 4 /* NodeFilter.SHOW_TEXT */);
     let node = walker.nextNode();
     while (node) {
       const text = node.textContent || "";
       for (let index = 0; index < text.length; index += 1) {
-        if (!GLYPH.test(text[index])) continue;
+        const ch = text[index];
+        if (!GLYPH.test(ch)) continue;
         const rect = glyphRect(doc, node, index);
-        if (rect) glyphs.push({ node, index, rect });
+        const ink = rect ? inkOf(rect, ch) : null;
+        if (!ink || ink.bottom - ink.top < 14) continue;
+        const textNode = node;
+        const measure = () => {
+          if (!textNode.isConnected) return null;
+          const again = glyphRect(doc, textNode, index);
+          const inkAgain = again ? inkOf(again, ch) : null;
+          if (!inkAgain) return null;
+          const now = scrollOf(win);
+          return { x: again.left + again.width / 2 + now.x, y: inkAgain.top + 1 + now.y };
+        };
+        const x = rect.left + rect.width / 2 + at.x;
+        const y = ink.top + 1 + at.y;
+        found.push({ kind: "glyph", fixed: false, element: heading, x, y, px: x, py: y, size: clampSize((ink.bottom - ink.top) * 0.5), measure });
       }
       node = walker.nextNode();
     }
-    if (!glyphs.length) return;
-    const bottom = Math.max(...glyphs.map((glyph) => glyph.rect.bottom));
-    glyphs.filter((glyph) => glyph.rect.bottom > bottom - 3).forEach((glyph) => {
-      const measure = () => {
-        if (!glyph.node.isConnected) return null;
-        const again = glyphRect(doc, glyph.node, glyph.index);
-        if (!again) return null;
-        const now = scrollOf(win);
-        return { x: again.left + again.width / 2 + now.x, y: again.bottom - 1 + now.y };
-      };
-      const x = glyph.rect.left + glyph.rect.width / 2 + at.x;
-      const y = glyph.rect.bottom - 1 + at.y;
-      found.push({ kind: "glyph", fixed: false, element: heading, x, y, px: x, py: y, size: clampSize(glyph.rect.height * 0.38), measure });
-    });
   });
   return found;
 }

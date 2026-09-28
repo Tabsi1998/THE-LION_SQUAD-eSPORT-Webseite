@@ -6,6 +6,9 @@
    deshalb waren Geister, hängende Fledermäuse und die Abseil-Spinne unsichtbar (28.09., am Livesystem gemessen). */
 .tls-hbats svg, .tls-ghosts svg, .tls-rappel svg, .tls-spiders svg, .tls-graveyard svg, .tls-footer-cat svg, .tls-footer-pumpkins svg, .tls-crawler, .tls-web { max-width: none; }
 
+/* Solange die Hand das lebende Netz hält (web.js setzt die Klasse): nichts markieren, Zeiger „greifen“ */
+.tls-web-grabbing, .tls-web-grabbing * { user-select: none !important; cursor: grabbing !important; }
+
 /* Statisches Netz („dezent“, „Bewegung reduzieren“): fertig, ganz im Bild, in der Ecke */
 .tls-web { position: fixed; top: 0; pointer-events: none; opacity: 0.9; }
 .tls-web--tl { left: 0; }
