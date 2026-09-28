@@ -13,6 +13,8 @@ import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
+import { SeasonFooterSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
+import { DecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
 import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/lib/siteFooter";
@@ -74,7 +76,7 @@ export function PublicLayout({ children }) {
       <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4">
-          <Logo size="lg" />
+          <div className="flex items-center min-w-0"><Logo size="lg" /><SeasonWidgetSlot /></div>
           <MainNav isClubMember={isClubMember} />
           <div className="flex items-center gap-2">
             <GlobalSearch />
@@ -186,7 +188,8 @@ export function PublicLayout({ children }) {
       {/* Footer (#403, #431): Mitmach-Streifen mit Discord-Knopf und Play-Badge über den Sponsoren,
           Sponsoren-Streifen, drei Spalten mit den Hauptbereichen, Kontakt aus den Vereinsdaten,
           Bottom-Bar ohne Versionsnummer (die steht im Admin unter System). */}
-      <footer className="border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
+      <footer className="relative border-t border-white/10 bg-[#0A0A0A] mt-24 min-w-0 max-w-full overflow-x-clip pb-16 lg:pb-0">
+        <SeasonFooterSlot />
         <div className="border-b border-white/5 bg-[#0D0D0E]" data-testid="footer-cta">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 min-w-0">
             <div className="min-w-0">
@@ -260,6 +263,7 @@ export function PublicLayout({ children }) {
               <Link to="/privacy" className="hover:text-[#29B6E8] transition" data-testid="footer-privacy">Datenschutz</Link>
               <Link to="/terms" className="hover:text-[#29B6E8] transition">Nutzungsbedingungen</Link>
               <button type="button" onClick={openCookieSettings} className="hover:text-[#29B6E8] transition">Cookies</button>
+              <DecoSwitch />
             </div>
           </div>
         </div>
