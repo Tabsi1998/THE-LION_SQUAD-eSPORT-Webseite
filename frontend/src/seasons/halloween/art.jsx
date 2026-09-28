@@ -221,3 +221,32 @@ export function FlyingBatShape({ size = 44 }) {
     </svg>
   );
 }
+
+/** Dieselbe Katze im Gang: Seitenansicht, vier Beine, die abwechselnd schwingen, Schwanz hoch. Blickt nach links. */
+export function CatWalking({ className = "", style, size = 68 }) {
+  const legs = [[30, "a"], [38, "b"], [52, "a"], [60, "b"]];
+  return (
+    <svg className={`tls-cat tls-cat-walking ${className}`} style={style} width={size} height={size * 0.9} viewBox="0 0 90 81" aria-hidden="true">
+      <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={RIM} strokeWidth="7.4" fill="none" strokeLinecap="round" />
+      <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" />
+      {legs.map(([x, group]) => (
+        <path key={x} className={`tls-cat-walking__leg tls-cat-walking__leg--${group}`} d={`M${x} 52 l0 22`} stroke={INK} strokeWidth="5.5" strokeLinecap="round" style={{ transformOrigin: `${x}px 52px` }} />
+      ))}
+      <ellipse cx="46" cy="46" rx="25.5" ry="12.8" fill={RIM} />
+      <ellipse cx="46" cy="46" rx="24.5" ry="12" fill={INK} />
+      <g className="tls-cat__head">
+        <path d="M11 24 L8 8 L20 18 Z M28 24 L32 8 L22 18 Z" fill={RIM} transform="translate(0 -1)" />
+        <circle cx="20" cy="32" r="12.6" fill={RIM} />
+        <path d="M11 24 L8 8 L20 18 Z M28 24 L32 8 L22 18 Z" fill={INK} />
+        <circle cx="20" cy="32" r="11.8" fill={INK} />
+        <g className="tls-cat__eyes">
+          <ellipse cx="15" cy="31" rx="2.8" ry="2.3" fill="#9be7ff" />
+          <ellipse cx="25" cy="31" rx="2.8" ry="2.3" fill="#9be7ff" />
+          <ellipse cx="15" cy="31" rx="0.9" ry="2" fill={INK} />
+          <ellipse cx="25" cy="31" rx="0.9" ry="2" fill={INK} />
+        </g>
+        <path d="M2 33 l10 1 M2 37 l10 -1" stroke="rgba(170, 225, 240, 0.3)" strokeWidth="0.7" />
+      </g>
+    </svg>
+  );
+}

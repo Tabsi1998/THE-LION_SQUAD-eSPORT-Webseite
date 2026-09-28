@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
-const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT } = await import("./index.jsx");
+const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT, catTarget } = await import("./index.jsx");
 
 const PATHS = ["/", "/news", "/events", "/tournaments", "/teams", "/about", "/shop", "/faq", "/contact", "/gallery", "/members", "/stream", "/discord", "/sponsors", "/awards", "/rules", "/calendar", "/players"];
 
@@ -65,7 +65,11 @@ test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere 
   const layouts = PATHS.map((path) => pageLayout(path, "normal"));
   expect(new Set(layouts.map((layout) => layout.web.corner)).size).toBe(2);
   expect(new Set(layouts.map((layout) => layout.spiders[0].offset)).size).toBeGreaterThan(3);
-  expect(layouts.some((layout) => layout.rappel)).toBe(true);
+  expect(layouts.every((layout) => layout.rappel)).toBe(true);
+  expect(layouts.every((layout) => layout.rappel.first >= 5 && layout.rappel.first <= 12)).toBe(true);
+  // Jede Ladung würfelt neu: ein anderes Salz gibt eine andere Anordnung, dasselbe Salz dieselbe.
+  expect(JSON.stringify(pageLayout("/news", "normal", "abc"))).not.toBe(JSON.stringify(pageLayout("/news", "normal", "xyz")));
+  expect(pageLayout("/news", "normal", "abc")).toEqual(pageLayout("/news", "normal", "abc"));
   expect(layouts.some((layout) => layout.graves.length > 0)).toBe(true);
   expect(layouts.some((layout) => layout.graves.length === 0)).toBe(true);
   expect(layouts.some((layout) => layout.cat)).toBe(true);
@@ -142,28 +146,29 @@ test("Pupillen: folgen dem Zeiger um höchstens gut zwei Pixel, nicht bei dezent
   expect(screen.getByTestId("halloween-lantern").style.getPropertyValue("--eye-x")).toBe("");
 });
 
-test("Ecken: ohne Bewegung das fertige Netz als SVG, mit Bewegung Spinne am Faden und Abseil-Spinne; Seitenwechsel wird gemeldet", () => {
-  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").rappel && pageLayout(candidate, "normal").secondWeb);
+test("Ecken: ohne Bewegung das fertige Netz als SVG, mit Bewegung Spinne am Faden (an der Seite) und Abseil-Spinne; Seitenwechsel wird gemeldet", () => {
+  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").secondWeb) || "/news";
   const layout = pageLayout(path, "normal");
   const onPage = vi.fn();
   window.addEventListener("tls:season-page", onPage);
   const subtle = mount(<Corners season={halloween({ effective: "subtle" })} />, path);
-  expect(subtle.container.querySelectorAll("[data-testid='halloween-web-static']").length).toBe(2);
-  expect(subtle.container.querySelector(".tls-spider")).toBeNull();
+  expect(subtle.container.querySelectorAll("[data-testid='halloween-web-static']").length).toBe(pageLayout(path, "normal").secondWeb ? 2 : 1);
+  expect(screen.queryByTestId("halloween-spiders")).toBeNull();
   expect(screen.queryByTestId("halloween-rappel")).toBeNull();
   expect(onPage).toHaveBeenCalledTimes(1);
   expect(onPage.mock.calls[0][0].detail.pathname).toBe(path);
   subtle.unmount();
   const normal = mount(<Corners season={halloween({ effective: "normal" })} />, path);
   expect(normal.container.querySelector("[data-testid='halloween-web-static']")).toBeNull();
-  const drop = normal.container.querySelector(".tls-spider--drop");
-  expect(drop).not.toBeNull();
+  const drop = screen.getByTestId(`halloween-spider-${layout.spiders[0].side}`);
   expect(drop.style.getPropertyValue("--spider-offset")).toBe(`${layout.spiders[0].offset}vw`);
+  expect(screen.getByTestId("halloween-spiders").parentElement).toBe(document.body);
   // Die Abseil-Spinne wartet erst 10–25 s unsichtbar; ihr Ablauf steht im eigenen Test.
   expect(screen.queryByTestId("halloween-rappel")).toBeNull();
   expect(normal.container.querySelector(".tls-crawler")).toBeNull();
   normal.unmount();
   expect(screen.queryByTestId("halloween-rappel")).toBeNull();
+  expect(screen.queryByTestId("halloween-spiders")).toBeNull();
   window.removeEventListener("tls:season-page", onPage);
 });
 
@@ -228,14 +233,29 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   const pumpkins = footer.container.querySelectorAll(".tls-footer-pumpkins > .tls-pumpkin");
   expect(pumpkins.length).toBeGreaterThanOrEqual(1);
   expect(Number(pumpkins[0].getAttribute("width"))).toBeGreaterThanOrEqual(46);
-  expect(screen.getByTestId("halloween-cat")).toBeInTheDocument();
-  expect(screen.getByTestId("halloween-cat").style.top).toBe("250px");
+  const cat = screen.getByTestId("halloween-cat");
+  expect(cat.style.top).toBe("250px");
+  expect(cat.style.left).toBe(`${layout.cat.x}px`);
   expect(footer.container.querySelector(".tls-cat__tail")).not.toBeNull();
+  // Klick: die Katze trottet zu einer anderen Stelle des Strichs und sitzt danach wieder.
+  fireEvent.click(cat);
+  expect(cat.getAttribute("data-walking")).toBe("1");
+  expect(footer.container.querySelector(".tls-cat-walking")).not.toBeNull();
+  expect(cat.style.left).not.toBe(`${layout.cat.x}px`);
+  expect(Math.abs(parseInt(cat.style.left, 10) - layout.cat.x)).toBeGreaterThanOrEqual(120);
   expect(screen.getAllByTestId("halloween-grave").length).toBe(layout.graves.length);
   footer.unmount();
   const quiet = mount(<Footer season={halloween({ effective: "subtle" })} />, footerPath);
   expect(screen.queryByTestId("halloween-graveyard")).toBeNull();
   quiet.unmount();
+});
+
+test("Katze: das Ziel liegt mindestens 120 px entfernt und nie über den Kürbissen rechts", () => {
+  const target = catTarget(40, 1200, () => 0.5);
+  expect(Math.abs(target - 40)).toBeGreaterThanOrEqual(120);
+  expect(target).toBeLessThanOrEqual(1200 - 220);
+  expect(catTarget(900, 1200, () => 0.99)).toBe(24);
+  expect(catTarget(24, 1200, () => 0.01)).toBeGreaterThanOrEqual(144);
 });
 
 test("Himmel: lebendes Netz, Fledermäuse und Schwaden als Ebenen; nichts bei Bewegung reduzieren oder dezent", () => {

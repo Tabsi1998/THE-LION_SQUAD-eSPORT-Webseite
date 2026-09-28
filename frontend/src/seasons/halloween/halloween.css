@@ -2,6 +2,10 @@
    hier liegt alles, was im DOM hängt: das statische Netz, Spinnen, hängende Fledermäuse, Friedhof und Geister,
    Mond, Katze, Kürbisse und die Laterne. Kein Filter auf inneren SVG-Gruppen. */
 
+/* Tailwinds Vorgabe „svg { max-width: 100% }“ lässt ein SVG in einem 0 px breiten Halter auf 0 zusammenfallen -
+   deshalb waren Geister, hängende Fledermäuse und die Abseil-Spinne unsichtbar (28.09., am Livesystem gemessen). */
+.tls-hbats svg, .tls-ghosts svg, .tls-rappel svg, .tls-spiders svg, .tls-graveyard svg, .tls-footer-cat svg, .tls-footer-pumpkins svg, .tls-crawler, .tls-web { max-width: none; }
+
 /* Statisches Netz („dezent“, „Bewegung reduzieren“): fertig, ganz im Bild, in der Ecke */
 .tls-web { position: fixed; top: 0; pointer-events: none; opacity: 0.9; }
 .tls-web--tl { left: 0; }
@@ -19,8 +23,9 @@
 }
 @keyframes tls-spider-legs { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
 .tls-spider { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)); }
-/* immer vom oberen Rand, an den Seiten - nie mitten im Bild */
-.tls-spider--drop { position: fixed; top: 0; transform-origin: top center; animation: tls-spider-drop var(--spider-period, 60s) ease-in-out var(--spider-delay, 30s) infinite; transform: translateY(calc(-1 * var(--spider-drop, 160px) - 100px)); }
+/* immer vom oberen Rand der Seite, an den Seiten - nie mitten im Bild; hängt an der Seite, nicht am Fenster */
+.tls-spiders { position: absolute; top: 0; left: 0; right: 0; height: 0; z-index: 40; pointer-events: none; }
+.tls-spider--drop { position: absolute; top: 0; transform-origin: top center; animation: tls-spider-drop var(--spider-period, 60s) ease-in-out var(--spider-delay, 30s) infinite; transform: translateY(calc(-1 * var(--spider-drop, 160px) - 100px)); }
 .tls-spider--left { left: var(--spider-offset, 4vw); }
 .tls-spider--right { right: var(--spider-offset, 4vw); }
 .tls-spider__leg { transform-origin: 10px 64px; animation: tls-spider-legs 1.1s ease-in-out infinite; }
@@ -84,8 +89,16 @@
 /* Katze an der Footer-Kante: Schwanz wedelt, Augen blinzeln, Kopf und Pupillen folgen dem Zeiger ein wenig */
 @keyframes tls-cat-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.06); } }
 @keyframes tls-cat-tail { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-12deg); } }
-.tls-footer-cat { position: absolute; left: 2.5rem; bottom: 0; transform: translateY(-100%); line-height: 0; }
+.tls-footer-cat { position: absolute; left: 2.5rem; bottom: 0; transform: translateY(-100%); line-height: 0; cursor: pointer; pointer-events: auto; transition: left var(--cat-seconds, 0s) linear; }
 .tls-footer-cat--line { bottom: auto; }
+.tls-footer-cat--flip { transform: translateY(-100%) scaleX(-1); }
+/* Beim Klick trottet die Katze ein Stück weiter: Beine laufen, der Körper wippt leicht */
+@keyframes tls-cat-trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
+@keyframes tls-cat-leg { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+.tls-footer-cat--walk .tls-cat-walking { animation: tls-cat-trot 0.42s ease-in-out infinite; }
+.tls-cat-walking__leg { transform-origin: 50% 0; animation: tls-cat-leg 0.42s ease-in-out infinite; }
+.tls-cat-walking__leg--b { animation-delay: -0.21s; }
+.tls-cat-walking__tail { transform-origin: 68px 44px; animation: tls-cat-tail 1.4s ease-in-out infinite; }
 .tls-cat__tail { transform-origin: 60px 76px; animation: tls-cat-tail 4.5s ease-in-out infinite; }
 .tls-cat__head { transform-origin: 34px 34px; transform: rotate(var(--head-tilt, 0deg)); transition: transform 0.25s ease-out; }
 .tls-cat__eyes { transform-origin: 34px 30px; animation: tls-cat-blink 6s ease-in-out infinite; }
@@ -110,6 +123,7 @@
 .tls-footer-pumpkins { position: absolute; right: 2rem; bottom: 0; display: flex; align-items: flex-end; gap: 0.4rem; transform: translateY(-100%); }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-hbat--hanging, .tls-hbat__wing, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
+  .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-cat-walking, .tls-cat-walking__leg, .tls-cat-walking__tail, .tls-hbat--hanging, .tls-hbat__wing, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
+  .tls-footer-cat { transition: none; }
   .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-hbats, .tls-ghosts { display: none; }
 }
