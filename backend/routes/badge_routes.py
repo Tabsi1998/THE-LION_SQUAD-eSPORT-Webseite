@@ -24,7 +24,7 @@ import re
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Optional
 from database import get_db
 from auth import get_optional_user, get_current_user, require_admin, require_area
 from badges import (
@@ -33,7 +33,7 @@ from badges import (
     NEGATIVE_INCIDENTS,
 )
 from models import now_utc, new_id
-from achievement_catalog import CONDITION_KEY_STATUS
+from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier
 
 
 logger = logging.getLogger(__name__)
@@ -149,13 +149,15 @@ async def evaluate_everyone(me: dict = Depends(require_area("content"))):
 class GroupCreate(BaseModel):
     code: str = Field(min_length=2, max_length=80)
     name: str
-    category: Literal["match", "tournament", "fastlap", "club", "special", "negative"] = "special"
+    category: str = "special"
     icon: str = "trophy"
     accent_color: str = "#FF3B30"
     description: str = ""
     public: bool = True
     is_special: bool = True
     is_negative: bool = False
+    hidden: bool = False
+    how_to: str = ""
     sort_order: int = 600
 
 
@@ -168,7 +170,19 @@ class GroupPatch(BaseModel):
     public: Optional[bool] = None
     is_special: Optional[bool] = None
     is_negative: Optional[bool] = None
+    hidden: Optional[bool] = None
+    how_to: Optional[str] = None
     sort_order: Optional[int] = None
+
+
+def _check_category(category: str | None) -> None:
+    if category is not None and category not in CATEGORIES:
+        raise HTTPException(400, f"Unbekannte Kategorie „{category}“ – erlaubt: {', '.join(CATEGORIES)}.")
+
+
+def _check_material(material: str | None) -> None:
+    if material is not None and material not in MATERIALS:
+        raise HTTPException(400, f"Unbekanntes Material „{material}“ – erlaubt: {', '.join(MATERIALS)}.")
 
 
 @admin_router.get("/groups")
@@ -180,6 +194,7 @@ async def admin_list_groups(me: dict = Depends(require_area("content"))):
 @admin_router.post("/groups")
 async def admin_create_group(body: GroupCreate, me: dict = Depends(require_area("content"))):
     db = get_db()
+    _check_category(body.category)
     if await db.achievement_groups.find_one({"code": body.code}):
         raise HTTPException(409, "Code bereits vergeben.")
     doc = {**body.model_dump(), "id": body.code, "is_admin_created": True,
@@ -196,6 +211,7 @@ async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(requ
     nullable_fields = {"description", "accent_color"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    _check_category(updates.get("category"))
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
     res = await db.achievement_groups.update_one({"code": code}, {"$set": updates})
@@ -222,19 +238,26 @@ async def admin_delete_group(code: str, me: dict = Depends(require_area("content
 class TierCreate(BaseModel):
     code: str = Field(min_length=2, max_length=80)
     group_code: str
-    level: int = Field(ge=1, le=5)
+    # Erfolge II (#611): Material ist die Wahrheit, level (1–5) bleibt für alte Formulare.
+    material: Optional[str] = None
+    level: Optional[int] = Field(None, ge=1, le=5)
     name: str
     description: str = ""
+    how_to: Optional[str] = None
+    art: Optional[str] = None
     condition_key: Optional[str] = None
     progress_target: Optional[int] = None
-    points: int = 10
+    points: Optional[int] = None
     icon: Optional[str] = None
     manual_only: bool = False
     member_only: bool = False
 
 
 class TierPatch(BaseModel):
+    material: Optional[str] = None
     level: Optional[int] = None
+    how_to: Optional[str] = None
+    art: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
     condition_key: Optional[str] = None
@@ -252,7 +275,7 @@ async def admin_list_tiers(group_code: Optional[str] = None,
     q: dict = {}
     if group_code:
         q["group_code"] = group_code
-    tiers = await db.achievements.find(q, {"_id": 0}).sort([("group_code", 1), ("level", 1)]).to_list(2000)
+    tiers = await db.achievements.find(q, {"_id": 0}).sort([("group_code", 1), ("rank", 1), ("level", 1)]).to_list(2000)
     for tier in tiers:
         key = tier.get("condition_key")
         tier["condition_status"] = CONDITION_KEY_STATUS.get(key) if key else None
@@ -266,7 +289,19 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_area("c
         raise HTTPException(404, "Group nicht gefunden.")
     if await db.achievements.find_one({"code": body.code}):
         raise HTTPException(409, "Tier-Code bereits vergeben.")
-    doc = {**body.model_dump(), "id": body.code, "created_at": now_utc().isoformat()}
+    _check_material(body.material)
+    group = await db.achievement_groups.find_one({"code": body.group_code}, {"_id": 0})
+    raw = body.model_dump()
+    if raw.get("points") is None:
+        raw.pop("points")
+    if raw.get("material") is None:
+        raw.pop("material")
+        raw["level"] = raw.get("level") or 1
+    doc = annotate_tier(raw, group)
+    if body.points is None:
+        from achievement_catalog import material_points
+        doc["points"] = material_points(doc["material"])
+    doc.update({"id": body.code, "created_at": now_utc().isoformat()})
     await db.achievements.insert_one(doc)
     doc.pop("_id", None)
     return doc
@@ -279,8 +314,19 @@ async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(requir
     nullable_fields = {"description", "condition_key", "progress_target", "icon"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
+    _check_material(updates.get("material"))
     if not updates:
         raise HTTPException(400, "Keine Änderungen.")
+    current = await db.achievements.find_one({"code": code}, {"_id": 0})
+    if not current:
+        raise HTTPException(404, "Tier nicht gefunden.")
+    if "material" in updates or "level" in updates:
+        merged = {**current, **updates}
+        if "material" not in updates:
+            merged.pop("material", None)  # neues Level ohne Material: Material folgt dem Level
+        group = await db.achievement_groups.find_one({"code": current.get("group_code")}, {"_id": 0})
+        annotated = annotate_tier(merged, group)
+        updates.update({k: annotated[k] for k in ("material", "rank", "material_name", "material_color", "level")})
     res = await db.achievements.update_one({"code": code}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Tier nicht gefunden.")

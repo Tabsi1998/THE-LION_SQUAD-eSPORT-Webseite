@@ -29,6 +29,8 @@ BATCH = 100
 SWEEP_ACTIVE_MINUTES = 20
 STATE_ID = "achievement_queue_state"
 LEVEL_COLORS = {1: 0xCD7F32, 2: 0xC0C0C0, 3: 0xFFD700, 4: 0x29B6E8, 5: 0xFF3B30}
+# Erfolge II (#611): Farbe je Material für Einbettungen; das alte Level bleibt als Rückfall.
+MATERIAL_COLORS = {key: int(str(value["color"]).lstrip("#"), 16) for key, value in __import__("achievement_catalog").MATERIALS.items()}
 
 
 # ---------------------------------------------------------------- Auswerten
@@ -106,7 +108,7 @@ async def note_award(user_id: str, tier: dict, group: dict) -> None:
     await get_db().achievement_outbox.insert_one({
         "id": new_id(), "user_id": user_id, "tier_code": tier.get("code"), "tier_name": tier.get("name"),
         "tier_description": tier.get("description") or "", "points": int(tier.get("points") or 0),
-        "level": int(tier.get("level") or 1), "group_name": group.get("name"),
+        "level": int(tier.get("level") or 1), "material": tier.get("material"), "group_name": group.get("name"),
         "group_public": bool(group.get("public", True)), "created_at": now_utc().isoformat(),
     })
 
@@ -144,7 +146,7 @@ async def _notify_user(user_id: str, rows: list[dict]) -> bool:
         names = ", ".join(str(row.get("tier_name")) for row in rows[:4]) + (" …" if len(rows) > 4 else "")
         title, body = f"{len(rows)} Erfolge freigeschaltet", f"{names} · +{_points(rows)} Punkte"
     # Was die Gratulation per Discord (#568) braucht: Namen, Gruppe, Punkte und Stufe je Erfolg.
-    awards = [{"name": row.get("tier_name"), "group": row.get("group_name"), "points": int(row.get("points") or 0), "level": int(row.get("level") or 1)} for row in rows[:10]]
+    awards = [{"name": row.get("tier_name"), "group": row.get("group_name"), "points": int(row.get("points") or 0), "level": int(row.get("level") or 1), "material": row.get("material")} for row in rows[:10]]
     created = await create_user_notification(
         user_id, title, body, url="/profile?tab=achievements", kind="achievement",
         meta={"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}",

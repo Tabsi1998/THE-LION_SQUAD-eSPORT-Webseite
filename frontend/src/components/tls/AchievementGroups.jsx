@@ -27,10 +27,15 @@ const CATEGORY_META = {
   fastlap:    { label: "Fast Lap",  icon: "flag",          accent: "#A855F7", order: 3 },
   team:       { label: "Team",      icon: "users",         accent: "#00FF88", order: 4 },
   community:  { label: "Community", icon: "messages-square", accent: "#29B6E8", order: 5 },
-  content:    { label: "Streaming & Content", icon: "radio", accent: "#9146FF", order: 6 },
-  progression:{ label: "Fortschritt", icon: "trending-up",  accent: "#00FF88", order: 7 },
+  season:     { label: "Saison",    icon: "calendar-days", accent: "#29B6E8", order: 3.5 },
+  // Erfolge II (#611): Streaming & Content heißt jetzt Streaming & Creator, Fortschritt Profil & Konto.
+  content:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
+  creator:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
+  progression:{ label: "Profil & Konto", icon: "user-round",  accent: "#00FF88", order: 7 },
+  profile:    { label: "Profil & Konto", icon: "user-round",  accent: "#00FF88", order: 7 },
   club:       { label: "Verein",    icon: "crown",         accent: "#FFD700", order: 8 },
-  special:    { label: "Sonderauszeichnungen", icon: "sparkles",  accent: "#FF3B30", order: 9 },
+  special:    { label: "Besonders", icon: "sparkles",  accent: "#FF3B30", order: 9 },
+  hidden:     { label: "Geheim",    icon: "eye-off",   accent: "#A855F7", order: 9.5 },
   negative:   { label: "Geheim / Fun", icon: "alert-triangle", accent: "#FF3B30", order: 10 },
 };
 

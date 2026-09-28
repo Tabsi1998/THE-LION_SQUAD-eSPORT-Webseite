@@ -96,8 +96,14 @@ const CATEGORY_ICONS: Record<string, IoniconName> = {
   match: "game-controller",
   tournament: "trophy",
   fastlap: "speedometer",
+  season: "calendar",
+  team: "people",
+  community: "chatbubbles",
+  creator: "videocam",
+  profile: "person-circle",
   club: "shield",
   special: "star",
+  hidden: "eye-off",
   negative: "warning",
 };
 

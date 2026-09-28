@@ -23,7 +23,7 @@ from database import get_db
 from models import now_utc, new_id
 from achievement_catalog import (
     ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, GROUP_BY_CODE, TIER_BY_CODE,
-    CONDITION_KEY_STATUS, apply_category_overrides,
+    CONDITION_KEY_STATUS, apply_category_overrides, annotate_tier, material_color, material_name,
 )
 from services.membership_service import get_membership, is_active_member
 from services.competition_read import load_competition_read_model, load_registration_matches
@@ -68,9 +68,23 @@ async def seed_badges():
              "$setOnInsert": {"created_at": now_utc().isoformat()}},
             upsert=True,
         )
+    # Von Hand angelegte Stufen (Admin) bekommen Material und Rang nachgetragen (#611).
+    async for t in db.achievements.find({"material": {"$exists": False}}, {"_id": 0}):
+        group = await db.achievement_groups.find_one({"code": t.get("group_code")}, {"_id": 0})
+        annotated = annotate_tier(t, group)
+        await db.achievements.update_one({"code": t["code"]}, {"$set": {k: annotated[k] for k in ("material", "rank", "material_name", "material_color", "art", "how_to")}})
     await db.user_achievements.create_index([("user_id", 1), ("tier_code", 1)], unique=True)
     await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
     await db.achievements.create_index([("group_code", 1), ("level", 1)])
+    await db.achievements.create_index([("group_code", 1), ("rank", 1)])
+    # Erfolge II (#611): Vergaben mit Material versehen und die Abbildung alt → neu anwenden.
+    try:
+        from services.achievement_migration import run_all
+        result = await run_all(db)
+        if result["annotated"]["updated"] or result["mapping"]["groups"]:
+            logger.info("[achievements] v2: %s", result)
+    except Exception:  # noqa: BLE001 - ein Fehler hier darf den Start nicht stoppen
+        logger.warning("[achievements] v2-Migration fehlgeschlagen", exc_info=True)
 
 
 # ---------------- Award ----------------
@@ -97,12 +111,15 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
     existing = await db.user_achievements.find_one({"user_id": user_id, "tier_code": tier_code})
     if existing:
         return False
+    annotated = annotate_tier(tier, group)
     doc = {
         "id": new_id(),
         "user_id": user_id,
         "tier_code": tier_code,
         "group_code": tier["group_code"],
-        "level": tier["level"],
+        "level": annotated["level"],
+        "material": annotated["material"],
+        "rank": annotated["rank"],
         "earned_at": now_utc().isoformat(),
         "context": context or {},
         "awarded_by": awarded_by,
@@ -390,6 +407,21 @@ def _level_name(level: int, group: dict | None = None) -> str:
     return {1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin"}.get(int(level or 1), "?")
 
 
+def material_fields(tier: dict, group: dict | None = None) -> dict:
+    """Erfolge II (#611): Material, Rang, Name und Farbe einer Stufe - alte Stufen werden abgeleitet.
+    ``level_name``/``level_color`` folgen dem Material, ``level`` bleibt 1–5 für alte Clients."""
+    annotated = annotate_tier(tier, group)
+    name = material_name(annotated["material"])
+    if annotated["material"] == "legendary" and group and (group.get("is_special") or group.get("category") == "special") and not tier.get("material"):
+        name = _level_name(5, group)
+    return {
+        "material": annotated["material"], "rank": annotated["rank"], "material_name": annotated["material_name"],
+        "material_color": annotated["material_color"], "level": annotated["level"],
+        "level_name": name, "level_color": material_color(annotated["material"]),
+        "art": annotated.get("art"), "how_to": annotated.get("how_to") or "",
+    }
+
+
 def _safe_negative_description() -> str:
     return "Geheimes Fun-/Negative-Achievement freigeschaltet."
 
@@ -404,7 +436,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
     is_admin = bool(viewer and viewer.get("role") in ("club_admin", "superadmin"))
 
     groups = await db.achievement_groups.find({}, {"_id": 0}).sort("sort_order", 1).to_list(500)
-    tiers = await db.achievements.find({}, {"_id": 0}).sort("level", 1).to_list(2000)
+    tiers = await db.achievements.find({}, {"_id": 0}).sort("rank", 1).to_list(2000)
     awards: list = []
     progress: dict = {}
     if user_id:
@@ -416,15 +448,20 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
     out = []
     for g in groups:
         is_negative = bool(g.get("is_negative"))
+        # Geheime Gruppen (#611) tauchen wie negative erst nach der ersten Freischaltung auf - Admins sehen alles.
+        is_hidden = bool(g.get("hidden")) and not is_negative
         if is_negative:
+            if not user_id or g["code"] not in earned_group_codes:
+                continue
+        elif is_hidden and not is_admin:
             if not user_id or g["code"] not in earned_group_codes:
                 continue
         elif not g.get("public") and not is_admin:
             continue
         gtiers = [t for t in tiers if t.get("group_code") == g["code"]]
-        if is_negative:
+        if is_negative or (is_hidden and not is_admin):
             gtiers = [t for t in gtiers if t["code"] in awarded_codes]
-        gtiers.sort(key=lambda x: x.get("level", 0))
+        gtiers.sort(key=lambda x: (x.get("rank") or 0, x.get("level", 0)))
         out_tiers = []
         for t in gtiers:
             ck = t.get("condition_key")
@@ -433,8 +470,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
             earned_doc = awarded_codes.get(t["code"])
             tier_payload = {
                 **t,
-                "level_name": _level_name(t.get("level", 1), g),
-                "level_color": _color_for_level(t.get("level", 1)),
+                **material_fields(t, g),
                 "earned": bool(earned_doc),
                 "earned_at": earned_doc["earned_at"] if earned_doc else None,
                 "current": min(cur, target) if target else cur,
@@ -458,11 +494,14 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 })
             out_tiers.append(tier_payload)
         earned_levels = [t["level"] for t in out_tiers if t["earned"]]
+        earned_ranks = [int(t.get("rank") or 0) for t in out_tiers if t["earned"]]
         out.append({
             **g,
+            "hidden": is_hidden,
             "description": _safe_negative_group_description() if is_negative else g.get("description"),
             "tiers": out_tiers,
             "highest_earned_level": max(earned_levels) if earned_levels else 0,
+            "highest_earned_rank": max(earned_ranks) if earned_ranks else 0,
             "tier_count": len(out_tiers),
             "earned_count": len(earned_levels),
         })
@@ -495,8 +534,7 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             "secret": is_negative,
             "member_only": bool(t.get("member_only")),
             "condition_status": CONDITION_KEY_STATUS.get(t.get("condition_key")) if t.get("condition_key") else None,
-            "level_name": _level_name(t.get("level", 1), g),
-            "level_color": _color_for_level(t.get("level", 1)),
+            **material_fields(t, g),
             "earned_at": a["earned_at"],
         })
     return out
