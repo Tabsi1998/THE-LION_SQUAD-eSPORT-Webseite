@@ -1,5 +1,5 @@
-// Fledermäuse in der App (#636, #655): dieselbe Logik wie im Web, ohne Canvas - jede Fledermaus ist eine
-// animierte View, die Kurve liefert Stützpunkte. Groß genug, dass man sie sieht, in V-Formation oder als Haufen.
+// Fledermäuse in der App (#636, #655, #658): dieselbe Logik wie im Web, ohne Canvas - jede Fledermaus ist eine
+// animierte View, die Kurve liefert Stützpunkte. Ruhige Größe wie in der ersten Fassung, in V-Formation oder als Haufen.
 
 export type Point = { x: number; y: number };
 export type FlightPath = { p0: Point; p1: Point; p2: Point; p3: Point; facing: 1 | -1 };
@@ -9,7 +9,7 @@ export const FLIGHT_MS: [number, number] = [6500, 9500];
 export const KEYFRAMES = 24;
 
 export function batCount(intensity: string, rng: () => number = Math.random): number {
-  const [min, max] = intensity === "full" ? [5, 8] : [3, 5];
+  const [min, max] = intensity === "full" ? [4, 6] : [3, 5];
   return min + Math.floor(rng() * (max - min + 1));
 }
 
@@ -75,6 +75,6 @@ export function planFlock(intensity: string, rng: () => number = Math.random): B
   const formation: "v" | "loose" = rng() < 0.55 ? "v" : "loose";
   return Array.from({ length: count }, (_, index) => {
     const offset = formationOffset(index, formation, rng);
-    return { delayMs: offset.delayMs, offset: { x: offset.x, y: offset.y }, scale: 1.5 + rng() * 1.0, durationMs };
+    return { delayMs: offset.delayMs, offset: { x: offset.x, y: offset.y }, scale: 0.8 + rng() * 0.5, durationMs };
   });
 }
