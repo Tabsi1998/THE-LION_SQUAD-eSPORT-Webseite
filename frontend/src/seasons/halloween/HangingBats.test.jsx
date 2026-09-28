@@ -194,6 +194,33 @@ test("Fledermäuse hängen still, Menü-Fledermäuse am Fenster, die anderen in 
   expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(2);
 });
 
+test("jede Fledermaus für sich: die zweite anklicken, während die erste fliegt, lässt die erste nicht von vorn beginnen", async () => {
+  vi.useFakeTimers();
+  restoreCanvas = fakeCanvas();
+  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a><a id="n3">Kontakt</a></nav></header>');
+  rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
+  rectOf(document.getElementById("n2"), { left: 300, right: 380, top: 20, bottom: 44 });
+  rectOf(document.getElementById("n3"), { left: 500, right: 580, top: 20, bottom: 44 });
+  render(<MemoryRouter initialEntries={["/news"]}><HangingBats count={3} seed={0.3} salt="x" flightMs={300} /></MemoryRouter>);
+  await act(async () => {
+    vi.advanceTimersByTime(450);
+  });
+  vi.useRealTimers();
+  const hanging = screen.getAllByTestId("halloween-bat-hanging");
+  expect(hanging.length).toBe(3);
+  fireEvent.click(hanging[0]);
+  await act(() => new Promise((resolve) => setTimeout(resolve, 150)));
+  fireEvent.click(hanging[1]);
+  expect(screen.getAllByTestId("halloween-bat-flying").length).toBe(2);
+  // Nach weiteren 220 ms (370 ms seit dem ersten Klick) ist die erste weg - hätte ihr Flug neu begonnen, flöge sie noch.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 220)));
+  expect(screen.getAllByTestId("halloween-bat-flying").length).toBe(1);
+  expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(1);
+  await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+  expect(screen.queryByTestId("halloween-bat-flying")).toBeNull();
+  expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(1);
+});
+
 test("Nachbesetzen: erst nur das Menü, die Karte kommt später dazu - und ein verschwundener Anker nimmt seine Fledermaus mit", async () => {
   vi.useFakeTimers();
   mountFixture('<header><nav><a id="n1">News</a></nav></header><main><div id="late"></div></main>');

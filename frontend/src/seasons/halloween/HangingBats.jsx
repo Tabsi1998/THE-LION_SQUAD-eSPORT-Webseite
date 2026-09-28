@@ -232,21 +232,28 @@ export function pointOn(path, t) {
   };
 }
 
+/**
+ * Ein Flug ist für sich: Startzeit und Rückruf liegen in Refs, damit ein Neuzeichnen der Nachbarn (die nächste
+ * Fledermaus wird geklickt) den laufenden Flug nicht von vorn beginnen lässt (Rückmeldung 29.09.).
+ */
 function FlyingBat({ path, durationMs, size, onDone }) {
   const ref = useRef(null);
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+  const startRef = useRef(0);
   useEffect(() => {
     let frame = 0;
-    const start = performance.now();
+    if (!startRef.current) startRef.current = performance.now();
     const tick = () => {
-      const t = Math.min(1, (performance.now() - start) / durationMs);
+      const t = Math.min(1, (performance.now() - startRef.current) / durationMs);
       const point = pointOn(path, t);
       if (ref.current) ref.current.style.transform = `translate(${(point.x - size * 0.85).toFixed(1)}px, ${(point.y - size * 0.47).toFixed(1)}px) scaleX(${path.facing})`;
       if (t < 1) frame = requestAnimationFrame(tick);
-      else onDone();
+      else doneRef.current();
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [path, durationMs, size, onDone]);
+  }, [path, durationMs, size]);
   return (
     <div ref={ref} className="tls-hbat tls-hbat--flying" style={{ transform: `translate(${path.p0.x - size * 0.85}px, ${path.p0.y - size * 0.47}px)` }} data-testid="halloween-bat-flying">
       <FlyingBatShape size={size * 1.7} />
