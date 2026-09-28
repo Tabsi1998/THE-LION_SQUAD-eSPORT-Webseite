@@ -70,3 +70,31 @@ test("Speichern schickt nur die Änderung; ohne Änderung nur ein Hinweis", asyn
   expect(patch).toEqual(expect.objectContaining({ title: "Monza Sprint 2026" }));
   expect(patch).not.toHaveProperty("visibility");
 });
+
+test("Neue Strecke mit Zielzeit (#613): der Text wird zu Millisekunden, leer heißt keine Zielzeit, Unsinn wird gemeldet", async () => {
+  apiMock.post.mockReset();
+  apiMock.post.mockResolvedValue({ data: { id: "tr-1" } });
+  toastMock.error.mockReset();
+  renderPage();
+  await screen.findByRole("heading", { name: "Monza Sprint" });
+  fireEvent.change(screen.getByTestId("f1-new-track-name"), { target: { value: "Monza" } });
+  fireEvent.change(screen.getByTestId("f1-new-track-target"), { target: { value: "1:32,450" } });
+  fireEvent.click(screen.getByTestId("f1-add-track-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+  const [url, body] = apiMock.post.mock.calls[0];
+  expect(url).toBe("/f1/challenges/c-1/tracks");
+  expect(body).toEqual(expect.objectContaining({ name: "Monza", target_time_ms: 92450, order_index: 0 }));
+  expect(body).not.toHaveProperty("target_time");
+  // Nach dem Speichern ist das Formular leer; ohne Zielzeit geht null mit.
+  expect(screen.getByTestId("f1-new-track-target")).toHaveValue("");
+  fireEvent.change(screen.getByTestId("f1-new-track-name"), { target: { value: "Spa" } });
+  fireEvent.click(screen.getByTestId("f1-add-track-btn"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(2));
+  expect(apiMock.post.mock.calls[1][1]).toEqual(expect.objectContaining({ name: "Spa", target_time_ms: null }));
+  // Unlesbare Zielzeit: Hinweis, kein Aufruf.
+  fireEvent.change(screen.getByTestId("f1-new-track-name"), { target: { value: "Suzuka" } });
+  fireEvent.change(screen.getByTestId("f1-new-track-target"), { target: { value: "schnell" } });
+  fireEvent.click(screen.getByTestId("f1-add-track-btn"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."));
+  expect(apiMock.post).toHaveBeenCalledTimes(2);
+});
