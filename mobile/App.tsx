@@ -10,6 +10,7 @@ import { AppLockProvider } from "./src/lock/AppLockProvider";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { NotificationProvider } from "./src/notifications/NotificationContext";
 import { LiveChangesProvider } from "./src/realtime/LiveChangesProvider";
+import { SeasonProvider } from "./src/seasons/SeasonProvider";
 import { AppUpdateProvider } from "./src/update/AppUpdateProvider";
 
 installMobileLogHandlers();
@@ -23,6 +24,7 @@ export default function App() {
           <AuthProvider>
             <LiveChangesProvider>
               <BrandingProvider>
+                <SeasonProvider>
                 <AppLockProvider>
                   <NotificationProvider>
                     <AppUpdateProvider>
@@ -31,6 +33,7 @@ export default function App() {
                     </AppUpdateProvider>
                   </NotificationProvider>
                 </AppLockProvider>
+                </SeasonProvider>
               </BrandingProvider>
             </LiveChangesProvider>
           </AuthProvider>

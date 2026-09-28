@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 - 2026-10-10
+
+- Mobile: Saisonale Deko: Halloween mit Spinnweben in den Ecken, Fledermausschwärmen alle paar Minuten, der Kürbislaterne im Dashboard-Kopf (antippen: Gruß und Haptik) und dem Kürbis im Tab „Mehr“. Der Verein schaltet die Saisonen unter Auftritt → Jahreszeiten; jede Person stellt die Deko unter Mehr → Darstellung auf an, dezent oder aus – angemeldet gilt die Wahl auch auf der Website. „Bewegung reduzieren“ des Handys macht alles ruhig. Advent, Weihnachten, Silvester, Fasching und Ostern kommen als weitere Module mit den nächsten Builds (#636).
+
 ## 1.0.0 - 2026-09-25
 
 - Mobile: Erste Version für Google Play. Updates kommen ab jetzt über den Play Store – der eigene Download mit Installer und die Berechtigung „Apps aus unbekannten Quellen installieren“ sind aus der App entfernt; Geräte ohne Google Play holen die APK vom GitHub-Release im Browser (#593).
