@@ -47,6 +47,12 @@ export function rememberPreview(token, seconds) {
   } catch {
     // Kein sessionStorage (privates Fenster): die Vorschau geht dann nur über die Antwort des Servers.
   }
+  // Die Bühne liest das Token sofort neu - ohne Neuladen, auch hier im Admin.
+  try {
+    window.dispatchEvent(new CustomEvent("tls:season-preview"));
+  } catch {
+    // Alte Umgebung ohne CustomEvent: der nächste Tab-Wechsel oder das nächste Laden holt die Vorschau.
+  }
 }
 
 function SeasonCard({ season, busy, onSave, onPreview }) {
@@ -127,7 +133,7 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
             <input type="datetime-local" value={previewAt} onChange={(e) => setPreviewAt(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" data-testid={`season-${season.key}-preview-at`} />
           </label>
         )}
-        <span className="text-[11px] text-white/40">Nur du siehst sie – in diesem Tab, auf der Startseite.</span>
+        <span className="text-[11px] text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
       </div>
     </div>
   );
@@ -172,7 +178,7 @@ export function SeasonsSettings() {
     try {
       const { data: result } = await api.post(`/settings/seasons/${key}/preview`, at ? { at } : {});
       rememberPreview(result.token, result.seconds || 60);
-      toast.success(`Vorschau läuft ${result.seconds || 60} Sekunden – öffne die Startseite in diesem Tab.`);
+      toast.success(`Vorschau läuft ${result.seconds || 60} Sekunden – hier und auf jeder Seite in diesem Tab.`);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     } finally {

@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 
 // Jahreszeiten-Bühne (#634): Stärke wird nur leiser, nie lauter; Vorschau-Token aus dieser Sitzung geht
 // mit; die persönliche Wahl kommt aus dem Konto oder dem Browser und wird angemeldet gespeichert.
@@ -62,7 +63,7 @@ test("Nachfrage-Takt: zehn Minuten, um Mitternacht am 31.12. alle 30 Sekunden", 
 
 test("nur Saisonen des eigenen Kanals, Stärke nach Wahl, Wahl aus dem Browser", async () => {
   localStorage.setItem(PREFERENCE_STORAGE_KEY, "subtle");
-  render(<SeasonProvider><Probe /></SeasonProvider>);
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
   expect(apiMock.get).toHaveBeenCalledWith("/seasonal/active", { params: {}, skipInvalidation: true });
   expect(screen.getByTestId("keys")).toHaveTextContent("halloween:subtle");
@@ -73,7 +74,7 @@ test("Bewegung reduzieren macht alles dezent; angemeldet zählt das Konto und di
   reduced = true;
   authState.user = { id: "u1", seasonal_decorations: "on" };
   const user = userEvent.setup();
-  render(<SeasonProvider><Probe /></SeasonProvider>);
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("keys")).toHaveTextContent("halloween:subtle"));
   expect(screen.getByTestId("pref")).toHaveTextContent("on");
   await user.click(screen.getByText("dezent"));
@@ -84,19 +85,19 @@ test("Bewegung reduzieren macht alles dezent; angemeldet zählt das Konto und di
 test("Vorschau-Token aus dieser Sitzung geht mit, abgelaufene werden verworfen", async () => {
   sessionStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify({ token: "halloween.1.2.abc", expires: Date.now() + 30_000 }));
   apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, preview: true } });
-  render(<SeasonProvider><Probe /></SeasonProvider>);
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("preview")).toHaveTextContent("true"));
   expect(apiMock.get).toHaveBeenCalledWith("/seasonal/active", { params: { preview: "halloween.1.2.abc" }, skipInvalidation: true });
   sessionStorage.setItem(PREVIEW_STORAGE_KEY, JSON.stringify({ token: "alt", expires: Date.now() - 1 }));
   apiMock.get.mockClear();
-  render(<SeasonProvider><Probe /></SeasonProvider>);
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/seasonal/active", { params: {}, skipInvalidation: true }));
   expect(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).toBeNull();
 });
 
 test("Serverfehler: die Seite läuft ohne Deko weiter", async () => {
   apiMock.get.mockRejectedValue(new Error("down"));
-  render(<SeasonProvider><Probe /></SeasonProvider>);
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
   expect(screen.getByTestId("keys")).toHaveTextContent("");
 });

@@ -84,9 +84,10 @@ function SkyCanvas({ layers }) {
 }
 
 export function SeasonStage() {
-  const { seasons, ready, reducedMotion } = useSeason();
+  const { seasons, ready, reducedMotion, preview } = useSeason();
   const location = useLocation();
-  const quiet = isQuietPath(location.pathname);
+  // Im Admin bleibt die Bühne leer - außer bei der Vorschau, die soll dort sofort zu sehen sein.
+  const quiet = isQuietPath(location.pathname) && !preview;
   const active = quiet ? [] : seasons.filter((season) => season.effective !== "off");
   const modules = useSeasonModules(active);
   const mounted = active.filter((season) => modules[season.key]);

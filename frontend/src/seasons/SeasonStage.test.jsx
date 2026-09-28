@@ -88,3 +88,12 @@ test("im Admin bleibt die Bühne leer", async () => {
   expect(loadModule).not.toHaveBeenCalled();
   expect(screen.queryByTestId("fake-widget")).toBeNull();
 });
+
+test("mit Vorschau zeichnet die Bühne auch im Admin - sofort sichtbar nach dem Knopf", async () => {
+  seasonState.seasons = [halloween("full")];
+  seasonState.preview = true;
+  render(<MemoryRouter initialEntries={["/admin/settings/jahreszeiten"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
+  expect(await screen.findByTestId("fake-corners")).toBeInTheDocument();
+  expect(screen.getByTestId("fake-widget")).toBeInTheDocument();
+  seasonState.preview = false;
+});

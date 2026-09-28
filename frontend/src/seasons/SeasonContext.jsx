@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
@@ -66,6 +67,7 @@ export function SeasonProvider({ children, channel = "web" }) {
   const [localPreference, setLocalPreference] = useState(readStoredPreference);
   const [previewToken, setPreviewToken] = useState(() => readPreviewToken()?.token || null);
   const timer = useRef(0);
+  const location = useLocation();
 
   const load = useCallback(async () => {
     const preview = readPreviewToken();
@@ -93,6 +95,13 @@ export function SeasonProvider({ children, channel = "web" }) {
       window.removeEventListener("tls:season-preview", onPreview);
     };
   }, [load]);
+
+  // Seitenwechsel: liegt ein gültiges Token vor, das die Antwort noch nicht kennt, sofort nachfragen.
+  useEffect(() => {
+    const preview = readPreviewToken();
+    if (preview && payload && !payload.preview) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!payload) return undefined;
