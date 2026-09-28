@@ -4,7 +4,7 @@ import logging
 import os
 from fastapi import Query, APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone
 import httpx
 
@@ -332,6 +332,25 @@ class YoutubeFeedSettings(BaseModel):
     publish: Optional[bool] = None
     include_shorts: Optional[bool] = None
     channel_url: Optional[str] = None
+
+
+class SeasonConfigPayload(BaseModel):
+    """Eine Saison (#632): an/aus, automatisch oder erzwungen (bis wann), Stärke, Kanäle, Texte."""
+    enabled: Optional[bool] = None
+    mode: Optional[Literal["auto", "force_on", "force_off"]] = None
+    until: Optional[str] = None
+    intensity: Optional[Literal["subtle", "normal", "full"]] = None
+    channels: Optional[List[Literal["web", "app"]]] = None
+    texts: Optional[Dict[str, str]] = None
+
+
+class SeasonsSettings(BaseModel):
+    enabled: Optional[bool] = None
+    seasons: Optional[Dict[str, SeasonConfigPayload]] = None
+
+
+class SeasonPreviewPayload(BaseModel):
+    at: Optional[str] = None
 
 
 class AmpSettings(BaseModel):
@@ -1668,6 +1687,74 @@ async def fetch_youtube(me: dict = Depends(require_club_admin())):
     db = get_db()
     result = await youtube_feed.sync(db, force=True)
     return {**(await youtube_feed.status(db)), "result": result}
+
+
+# ---- Jahreszeiten (#632) ----
+@settings_router.get("/seasons")
+async def get_seasons(me: dict = Depends(require_club_admin())):
+    from routes.seasons_routes import load_context
+    from services import seasons
+    stored, founded = await load_context(get_db())
+    return seasons.admin_view(stored, founded=founded)
+
+
+@settings_router.put("/seasons")
+async def update_seasons(body: SeasonsSettings, me: dict = Depends(require_club_admin())):
+    from routes.seasons_routes import load_context
+    from services import seasons
+    db = get_db()
+    stored, founded = await load_context(db)
+    current = seasons.merge_settings(stored)
+    changed_fields: list[str] = []
+    updates: dict = {}
+    if body.enabled is not None and body.enabled != current["enabled"]:
+        updates["enabled"] = body.enabled
+        changed_fields.append("enabled")
+    for key, patch in (body.seasons or {}).items():
+        if key not in seasons.SEASONS:
+            raise HTTPException(400, f"Diese Saison gibt es nicht: {key}")
+        cfg = dict(current["seasons"][key])
+        cfg["texts"] = dict(cfg["texts"])
+        data = patch.model_dump(exclude_unset=True)
+        if "until" in data:
+            until = str(data["until"] or "").strip()
+            if until and seasons._parse_until(until) is None:
+                raise HTTPException(400, "„Bis“ braucht ein Datum mit Uhrzeit, etwa 2026-10-31T23:59.")
+            data["until"] = until or None
+        if "texts" in data:
+            for name, value in (data.pop("texts") or {}).items():
+                if name not in cfg["texts"]:
+                    raise HTTPException(400, f"Diesen Text gibt es bei „{seasons.SEASONS[key]['label']}“ nicht: {name}")
+                cleaned = str(value or "").strip()[:200]
+                cfg["texts"][name] = cleaned or seasons.SEASONS[key]["texts"][name]
+        if "channels" in data:
+            data["channels"] = [c for c in seasons.CHANNELS if c in (data["channels"] or [])]
+        for name, value in data.items():
+            if value is not None or name == "until":
+                cfg[name] = value
+        if cfg != current["seasons"][key]:
+            updates[f"seasons.{key}"] = cfg
+            changed_fields.append(f"seasons.{key}")
+    if updates:
+        updates["updated_at"] = now_utc().isoformat()
+        await db.settings.update_one({"id": seasons.SETTINGS_ID}, {"$set": updates, "$setOnInsert": {"id": seasons.SETTINGS_ID}}, upsert=True)
+        await _audit_settings_change(db, "settings.seasons.update", "seasons", me["id"], changed_fields)
+    stored, founded = await load_context(db)
+    return seasons.admin_view(stored, founded=founded)
+
+
+@settings_router.post("/seasons/{key}/preview")
+async def preview_season(key: str, body: SeasonPreviewPayload, me: dict = Depends(require_club_admin())):
+    """„Vorschau 60 Sekunden“: ein Token, mit dem nur diese Person die Saison sofort sieht - wahlweise zu
+    einer gewählten Zeit (Countdown, Kerzen), ohne dass sich für andere etwas ändert."""
+    from services import seasons
+    if key not in seasons.SEASONS:
+        raise HTTPException(404, "Diese Saison gibt es nicht.")
+    at_time = seasons._parse_until(body.at) if body.at else None
+    if body.at and at_time is None:
+        raise HTTPException(400, "Die Zeit für die Vorschau braucht ein Datum mit Uhrzeit, etwa 2026-12-31T23:59.")
+    token = seasons.preview_token(key, at_time=at_time)
+    return {"token": token, "seconds": seasons.PREVIEW_SECONDS, "key": key, "at": at_time.isoformat() if at_time else None}
 
 
 # ---- AMP-Panel ----

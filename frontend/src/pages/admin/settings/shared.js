@@ -49,6 +49,7 @@ export const SETTINGS_SECTIONS = {
   branding: { tab: "brand", group: "Auftritt", label: "Branding" },
   socials: { tab: "socials", group: "Auftritt", label: "Socials" },
   seo: { tab: "seo", group: "Auftritt", label: "SEO & Analytics" },
+  jahreszeiten: { tab: "seasons", group: "Auftritt", label: "Jahreszeiten" },
   status: { tab: "system", group: "System", label: "Status" },
 };
 

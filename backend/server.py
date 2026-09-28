@@ -65,6 +65,7 @@ from routes.membership_routes import router as membership_router
 from routes.document_routes import router as document_router
 from routes.home_routes import router as home_router
 from routes.calendar_routes import router as calendar_router
+from routes.seasons_routes import router as seasons_router
 from services import discord_embeds
 from routes.prize_routes import router as prize_router
 from routes.setup_routes import router as setup_router, sitemap_router
@@ -278,6 +279,7 @@ app.include_router(membership_router)
 app.include_router(document_router)
 app.include_router(home_router)
 app.include_router(calendar_router)
+app.include_router(seasons_router)
 app.include_router(prize_router)
 app.include_router(setup_router)
 app.include_router(sitemap_router)
@@ -400,8 +402,9 @@ async def security_headers(request, call_next):
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     # Sticker-Bilder des Startpakets ändern sich nie und stehen in jedem Chat
-    # dutzendfach - die dürfen im Browser und in der App zwischengespeichert werden.
-    if request.url.path.startswith("/api/") and not request.url.path.startswith("/api/stickers/files/"):
+    # dutzendfach - die dürfen im Browser und in der App zwischengespeichert werden. Die Jahreszeiten-
+    # Abfrage (#632) setzt ihre Cache-Regel selbst: eine Minute öffentlich, Vorschau ohne Cache.
+    if request.url.path.startswith("/api/") and not request.url.path.startswith(("/api/stickers/files/", "/api/seasonal/")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
