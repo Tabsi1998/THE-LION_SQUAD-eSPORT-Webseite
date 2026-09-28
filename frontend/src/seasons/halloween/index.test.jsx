@@ -1,19 +1,18 @@
 import { render, screen, act, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import { webSegments } from "./art";
 
-// Halloween (#635, #655, #658): je Seite eine andere, aber stabile Anordnung; das Netz wird sichtbar gesponnen;
-// Spinnen nur mit Bewegung, eine seilt sich in der Seite ab; Scrollen schwingt das Netz, der Seitenwechsel
-// startet die Fledermäuse; Mond mit echter Phase; Laterne mit Gruß, Signal und Pupillen, die dem Zeiger
-// folgen; Blätter und Fledermäuse als Ebenen, nichts davon bei „Bewegung reduzieren“.
+// Halloween (#635, #655, #658, #660–#664): je Seite eine andere, stabile Anordnung; ohne Bewegung ein fertiges
+// Netz als SVG ganz im Bild, mit Bewegung das lebende Netz auf dem Canvas; Spinnen, Abseil-Spinne, hängende
+// Fledermäuse nur mit Bewegung; Mond mit echter Phase; Laterne mit Gruß, Signal und Pupillen; Friedhof, Katze
+// und Kürbisse am Footer; Fledermäuse und Schwaden als Ebenen.
 
 const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
-const { Widget, Backdrop, Corners, Footer, BuildingWeb, RappellingSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season } = await import("./index.jsx");
+const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT } = await import("./index.jsx");
 
-const PATHS = ["/", "/news", "/events", "/tournaments", "/teams", "/about", "/shop", "/faq", "/contact", "/gallery", "/members", "/stream", "/discord", "/sponsors", "/awards", "/rules"];
+const PATHS = ["/", "/news", "/events", "/tournaments", "/teams", "/about", "/shop", "/faq", "/contact", "/gallery", "/members", "/stream", "/discord", "/sponsors", "/awards", "/rules", "/calendar", "/players"];
 
 function halloween(overrides = {}) {
   return { key: "halloween", effective: "normal", texts: { greeting: "Happy Halloween von THE LION SQUAD" }, data: { night: true }, ...overrides };
@@ -24,37 +23,71 @@ function mount(node, path = "/") {
 }
 
 function fakeContext(calls) {
-  return new Proxy({}, { get: (_t, name) => (["fillStyle", "strokeStyle", "lineWidth"].includes(name) ? "" : () => calls.push(name)) });
+  return new Proxy({}, {
+    get: (_t, name) => {
+      if (["fillStyle", "strokeStyle", "lineWidth", "lineCap"].includes(name)) return "";
+      if (name === "createRadialGradient") return () => ({ addColorStop: () => calls.push("stop") });
+      return () => calls.push(name);
+    },
+  });
+}
+
+let fixture = null;
+
+function mountFixture(html) {
+  fixture?.remove();
+  fixture = document.createElement("div");
+  fixture.innerHTML = html;
+  document.body.appendChild(fixture);
+  return fixture;
 }
 
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  fixture?.remove();
+  fixture = null;
 });
 
-test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere, Stärke passend", () => {
+test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere - und nicht nur die Netzgröße", () => {
   const news = pageLayout("/news", "normal");
   expect(pageLayout("/news", "normal")).toEqual(news);
-  expect(JSON.stringify(pageLayout("/events", "normal"))).not.toBe(JSON.stringify(news));
-  expect(news.webs.length).toBeGreaterThanOrEqual(1);
+  const events = pageLayout("/events", "normal");
+  expect(JSON.stringify(events)).not.toBe(JSON.stringify(news));
+  expect(news.web.corner).toMatch(/^t[lr]$/);
+  expect(news.web.factor).toBeGreaterThanOrEqual(0.85);
   expect(news.spiders.length).toBe(1);
   expect(news.spiders[0].size).toBeLessThanOrEqual(30);
-  expect(news.footerPumpkins.length).toBeGreaterThanOrEqual(1);
-  expect(news.leaves).toBeGreaterThanOrEqual(3);
+  expect(news.spiders[0].offset).toBeGreaterThanOrEqual(6);
+  expect(news.hangingBats).toBeGreaterThanOrEqual(1);
   expect(news.flock).toEqual([3, 5]);
+  const layouts = PATHS.map((path) => pageLayout(path, "normal"));
+  expect(new Set(layouts.map((layout) => layout.web.corner)).size).toBe(2);
+  expect(new Set(layouts.map((layout) => layout.spiders[0].offset)).size).toBeGreaterThan(3);
+  expect(layouts.some((layout) => layout.rappel)).toBe(true);
+  expect(layouts.some((layout) => layout.graves.length > 0)).toBe(true);
+  expect(layouts.some((layout) => layout.graves.length === 0)).toBe(true);
+  expect(layouts.some((layout) => layout.cat)).toBe(true);
+  expect(layouts.some((layout) => layout.secondWeb)).toBe(true);
+  expect(layouts.some((layout) => layout.web.build)).toBe(true);
+  layouts.forEach((layout) => {
+    layout.graves.forEach((grave) => {
+      expect(grave.x).toBeGreaterThanOrEqual(0.08);
+      expect(grave.x).toBeLessThanOrEqual(0.66);
+    });
+  });
   const subtle = pageLayout("/news", "subtle");
   expect(subtle.spiders).toEqual([]);
   expect(subtle.crawler).toBeNull();
   expect(subtle.rappel).toBeNull();
   expect(subtle.moon).toBeNull();
-  expect(subtle.leaves).toBe(0);
-  expect(subtle.webs.every((web) => !web.build)).toBe(true);
+  expect(subtle.hangingBats).toBe(0);
+  expect(subtle.web.build).toBe(false);
   const full = pageLayout("/news", "full");
   expect(full.flock).toEqual([5, 8]);
-  expect(full.leaves).toBeGreaterThanOrEqual(6);
+  expect(full.hangingBats).toBeGreaterThanOrEqual(2);
   expect(full.crawler).not.toBeNull();
-  expect(PATHS.some((path) => pageLayout(path, "normal").rappel)).toBe(true);
-  expect(PATHS.some((path) => pageLayout(path, "normal").cat)).toBe(true);
+  expect(LOAD_SALT.length).toBeGreaterThan(0);
 });
 
 test("Signal zählt nur am 31. Oktober ab 18 Uhr", () => {
@@ -63,31 +96,16 @@ test("Signal zählt nur am 31. Oktober ab 18 Uhr", () => {
   expect(pumpkinCounts(new Date(2026, 9, 30, 20, 0))).toBe(false);
 });
 
-test("Netzbau: die Spinne sitzt am Fadenende und spinnt Schritt für Schritt, bis das Netz fertig ist", async () => {
-  vi.useFakeTimers();
-  const web = { corner: "tl", scale: 1, seed: 0.3, build: true, stepMs: 100 };
-  const { container } = render(<BuildingWeb web={web} corner="tl" reducedMotion={false} />);
-  expect(screen.getByTestId("halloween-web-building")).toBeInTheDocument();
-  const spinner = container.querySelector(".tls-web__spinner");
-  expect(spinner).not.toBeNull();
-  const start = spinner.style.left;
-  await act(async () => {
-    vi.advanceTimersByTime(450);
+test("Statisches Netz: fertig, ganz im Kasten, links oder rechts", () => {
+  const { container } = render(<StaticWeb web={{ corner: "tr", factor: 1, seed: 0.3 }} width={1366} />);
+  const svg = container.querySelector("svg");
+  expect(svg.getAttribute("class")).toContain("tls-web--tr");
+  expect(svg.querySelectorAll("line").length).toBeGreaterThan(200);
+  const width = Number(svg.getAttribute("width"));
+  svg.querySelectorAll("line").forEach((line) => {
+    expect(Number(line.getAttribute("x1"))).toBeLessThanOrEqual(width + 0.5);
+    expect(Number(line.getAttribute("x1"))).toBeGreaterThanOrEqual(-0.5);
   });
-  expect(container.querySelector(".tls-web__spinner").style.left).not.toBe(start);
-  const steps = webSegments(0.3).length;
-  await act(async () => {
-    vi.advanceTimersByTime(steps * 100 + 100);
-  });
-  expect(screen.getByTestId("halloween-web")).toBeInTheDocument();
-  expect(container.querySelector(".tls-spider--spinning")).toBeNull();
-  expect(container.querySelectorAll(".tls-dew").length).toBeGreaterThan(0);
-});
-
-test("Netzbau bei Bewegung reduzieren: das Netz steht sofort fertig da", () => {
-  const web = { corner: "tr", scale: 0.7, seed: 0.5, build: true, stepMs: 100 };
-  render(<BuildingWeb web={web} corner="tr" reducedMotion />);
-  expect(screen.getByTestId("halloween-web")).toBeInTheDocument();
 });
 
 test("Laterne öffnet sich beim Klick, zeigt den Gruß und meldet abends am 31.10. das Signal", async () => {
@@ -112,8 +130,6 @@ test("Pupillen: folgen dem Zeiger um höchstens gut zwei Pixel, nicht bei dezent
   const right = eyeOffset({ x: 600, y: 0 }, { x: 0, y: 0 });
   expect(right.x).toBeCloseTo(2.2, 1);
   expect(right.y).toBeCloseTo(0);
-  const near = eyeOffset({ x: 110, y: 0 }, { x: 0, y: 0 });
-  expect(near.x).toBeCloseTo(1.1, 1);
   const normal = mount(<Widget season={halloween()} />);
   fireEvent.mouseMove(window, { clientX: 500, clientY: 10 });
   await act(() => new Promise((resolve) => setTimeout(resolve, 60)));
@@ -125,47 +141,55 @@ test("Pupillen: folgen dem Zeiger um höchstens gut zwei Pixel, nicht bei dezent
   expect(screen.getByTestId("halloween-lantern").style.getPropertyValue("--eye-x")).toBe("");
 });
 
-test("Ecken: Netz immer, Spinnen und Abseil-Spinne nur mit Bewegung; Seitenwechsel wird gemeldet", () => {
-  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").rappel);
+test("Ecken: ohne Bewegung das fertige Netz als SVG, mit Bewegung Spinne am Faden und Abseil-Spinne; Seitenwechsel wird gemeldet", () => {
+  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").rappel && pageLayout(candidate, "normal").secondWeb);
+  const layout = pageLayout(path, "normal");
   const onPage = vi.fn();
   window.addEventListener("tls:season-page", onPage);
   const subtle = mount(<Corners season={halloween({ effective: "subtle" })} />, path);
-  expect(subtle.container.querySelectorAll(".tls-cobweb").length).toBeGreaterThanOrEqual(1);
+  expect(subtle.container.querySelectorAll("[data-testid='halloween-web-static']").length).toBe(2);
   expect(subtle.container.querySelector(".tls-spider")).toBeNull();
   expect(screen.queryByTestId("halloween-rappel")).toBeNull();
   expect(onPage).toHaveBeenCalledTimes(1);
   expect(onPage.mock.calls[0][0].detail.pathname).toBe(path);
   subtle.unmount();
   const normal = mount(<Corners season={halloween({ effective: "normal" })} />, path);
-  expect(normal.container.querySelectorAll(".tls-spider--drop").length).toBe(1);
-  expect(screen.getByTestId("halloween-rappel").style.height).toBe("90px");
+  expect(normal.container.querySelector("[data-testid='halloween-web-static']")).toBeNull();
+  const drop = normal.container.querySelector(".tls-spider--drop");
+  expect(drop).not.toBeNull();
+  expect(drop.style.getPropertyValue("--spider-offset")).toBe(`${layout.spiders[0].offset}vw`);
+  // Die Abseil-Spinne wartet erst 10–25 s unsichtbar; ihr Ablauf steht im eigenen Test.
+  expect(screen.queryByTestId("halloween-rappel")).toBeNull();
   expect(normal.container.querySelector(".tls-crawler")).toBeNull();
   normal.unmount();
   expect(screen.queryByTestId("halloween-rappel")).toBeNull();
   window.removeEventListener("tls:season-page", onPage);
 });
 
-test("Scrollen: die Seite merkt sich den Stand und schwingt das Netz kurz nach", async () => {
+test("Scrollen: der Stand steht als Variable am Dokument (Mond-Parallaxe) und geht beim Abbau wieder weg", () => {
   const root = document.documentElement;
   const view = mount(<Corners season={halloween()} />, "/news");
   expect(root.style.getPropertyValue("--season-scroll")).toBe("0px");
   Object.defineProperty(window, "scrollY", { value: 240, configurable: true });
   fireEvent.scroll(window);
   expect(root.style.getPropertyValue("--season-scroll")).toBe("240px");
-  await act(() => new Promise((resolve) => setTimeout(resolve, 40)));
-  expect(root.style.getPropertyValue("--season-sway")).not.toBe("");
   view.unmount();
   expect(root.style.getPropertyValue("--season-scroll")).toBe("");
   Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
 });
 
-test("Abseil-Spinne: seilt sich in der Seite ab, rastet unten und wartet dann", async () => {
-  render(<RappellingSpider spec={{ side: "left", size: 20, speed: 4000, first: 0, rest: 5 }} active />);
+test("Abseil-Spinne: seilt sich bis zum Strich ab, lässt los und läuft", async () => {
+  mountFixture('<footer><div data-season-line="footer"></div></footer>');
+  document.querySelector("[data-season-line]").getBoundingClientRect = () => ({ top: 420, left: 0, width: 800, height: 40, bottom: 460, right: 800 });
+  render(<RappelSpider spec={{ side: "left", size: 20, speed: 4000, first: 0, rest: 5 }} active />);
+  await act(() => new Promise((resolve) => setTimeout(resolve, 250)));
   const thread = screen.getByTestId("halloween-rappel");
   expect(thread.className).toContain("tls-rappel--left");
-  await act(() => new Promise((resolve) => setTimeout(resolve, 300)));
-  expect(thread.style.height).toBe("300px");
-  render(<RappellingSpider spec={null} active />);
+  expect(thread.style.height).toBe(`${420 - 80}px`);
+  expect(["release", "run"]).toContain(thread.getAttribute("data-phase"));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 800)));
+  expect(["run", "sway"]).toContain(screen.getByTestId("halloween-rappel").getAttribute("data-phase"));
+  render(<RappelSpider spec={null} active />);
   expect(screen.getAllByTestId("halloween-rappel").length).toBe(1);
 });
 
@@ -185,7 +209,7 @@ test("Krabbler kommt nach der Wartezeit quer über den Bildschirm und geht wiede
   expect(screen.queryByTestId("halloween-crawler")).toBeNull();
 });
 
-test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen und je nach Seite einer Katze", () => {
+test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, Friedhof auf dem Strich und je nach Seite Katze", () => {
   const path = PATHS.find((candidate) => pageLayout(candidate, "normal").moon);
   const subtle = mount(<Backdrop season={halloween({ effective: "subtle" })} />, path);
   expect(subtle.container.querySelector(".tls-moon")).toBeNull();
@@ -195,41 +219,59 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen un
   expect(moon).not.toBeNull();
   expect(Number(moon.getAttribute("data-phase"))).toBeGreaterThanOrEqual(0);
   normal.unmount();
-  const catPath = PATHS.find((candidate) => pageLayout(candidate, "normal").cat);
-  const footer = mount(<Footer season={halloween()} />, catPath);
+  const footerPath = PATHS.find((candidate) => pageLayout(candidate, "normal").cat && pageLayout(candidate, "normal").graves.length > 0);
+  const layout = pageLayout(footerPath, "normal");
+  mountFixture('<footer style="position:relative"><div data-season-line="footer"></div></footer>');
+  Object.defineProperty(document.querySelector("[data-season-line]"), "offsetTop", { value: 250, configurable: true });
+  const footer = mount(<Footer season={halloween()} />, footerPath);
   const pumpkins = footer.container.querySelectorAll(".tls-footer-pumpkins > .tls-pumpkin");
   expect(pumpkins.length).toBeGreaterThanOrEqual(1);
   expect(Number(pumpkins[0].getAttribute("width"))).toBeGreaterThanOrEqual(46);
   expect(screen.getByTestId("halloween-cat")).toBeInTheDocument();
+  expect(footer.container.querySelector(".tls-cat__tail")).not.toBeNull();
+  expect(screen.getAllByTestId("halloween-grave").length).toBe(layout.graves.length);
+  footer.unmount();
+  const quiet = mount(<Footer season={halloween({ effective: "subtle" })} />, footerPath);
+  expect(screen.queryByTestId("halloween-graveyard")).toBeNull();
+  quiet.unmount();
 });
 
-test("Himmel: Blätter und Fledermäuse als Ebenen, nichts bei Bewegung reduzieren oder dezent", () => {
+test("Himmel: lebendes Netz, Fledermäuse und Schwaden als Ebenen; nichts bei Bewegung reduzieren oder dezent", () => {
   expect(skyLayers({ season: halloween(), budget: 60, reducedMotion: true })).toEqual([]);
   expect(skyLayers({ season: halloween({ effective: "subtle" }), budget: 60, reducedMotion: false })).toEqual([]);
   const layers = skyLayers({ season: halloween(), budget: 60, reducedMotion: false });
-  expect(layers.map((layer) => layer.key)).toEqual(["halloween-leaves", "halloween-bats"]);
-  const leafCalls = [];
-  layers[0].draw(fakeContext(leafCalls), 0.5, { width: 1000, height: 600 });
-  expect(leafCalls.filter((name) => name === "fill").length).toBe(pageLayout("/", "normal").leaves);
+  const keys = layers.map((layer) => layer.key);
+  expect(keys[0]).toMatch(/^halloween-web-t[lr]$/);
+  expect(keys.slice(-2)).toEqual(["halloween-bats", "halloween-wisps"]);
+  const webCalls = [];
+  layers[0].draw(fakeContext(webCalls), 1 / 60, { width: 1000, height: 600 });
+  expect(webCalls.filter((name) => name === "stroke").length).toBeGreaterThanOrEqual(1);
+  const bats = layers.find((layer) => layer.key === "halloween-bats");
   const calls = [];
   const ctx = fakeContext(calls);
-  layers[1].draw(ctx, 1, { width: 1000, height: 600 });
+  bats.draw(ctx, 1, { width: 1000, height: 600 });
   expect(calls.length).toBe(0);
-  // Nach sechs Sekunden startet der Schwarm; spätestens eine Sekunde später ist die erste Fledermaus zu sehen.
-  layers[1].draw(ctx, 5, { width: 1000, height: 600 });
-  layers[1].draw(ctx, 1, { width: 1000, height: 600 });
+  bats.draw(ctx, 5, { width: 1000, height: 600 });
+  bats.draw(ctx, 1, { width: 1000, height: 600 });
   expect(calls.filter((name) => name === "fill").length).toBeGreaterThan(0);
-  layers[1].dispose();
+  const wisps = layers.find((layer) => layer.key === "halloween-wisps");
+  const wispCalls = [];
+  wisps.draw(fakeContext(wispCalls), 1, { width: 1000, height: 600 });
+  expect(wispCalls.length).toBe(0);
+  wisps.draw(fakeContext(wispCalls), 400, { width: 1000, height: 600 });
+  expect(wispCalls.filter((name) => name === "fill").length).toBeGreaterThan(0);
+  layers.forEach((layer) => layer.dispose?.());
   expect(season.key).toBe("halloween");
 });
 
-test("Himmel: ein Seitenwechsel lässt den Schwarm früher starten, aber nur einmal je Minute", () => {
-  const [, bats] = skyLayers({ season: halloween(), budget: 60, reducedMotion: false });
+test("Himmel: ein Seitenwechsel lässt den Schwarm früher starten", () => {
+  const layers = skyLayers({ season: halloween(), budget: 60, reducedMotion: false });
+  const bats = layers.find((layer) => layer.key === "halloween-bats");
   window.dispatchEvent(new CustomEvent("tls:season-page", { detail: { pathname: "/events" } }));
   const calls = [];
   const ctx = fakeContext(calls);
   bats.draw(ctx, 1.6, { width: 1000, height: 600 });
   bats.draw(ctx, 0.5, { width: 1000, height: 600 });
   expect(calls.filter((name) => name === "fill").length).toBeGreaterThan(0);
-  bats.dispose();
+  layers.forEach((layer) => layer.dispose?.());
 });
