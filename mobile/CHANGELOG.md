@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-10-10
+
+- Mobile: Halloween mit mehr Leben: große Spinnweben mit Spinnen, die sich abseilen und ab und zu über den Screen krabbeln, Fledermausschwärme mit hellem Rand in Formation, hängende Fledermäuse unter der Kopfzeile, Nebel am unteren Rand, bei „voll“ ein Geist. Jeder Screen bekommt seine eigene Anordnung. Der Gruß der Laterne erscheint als Karte unter der Kopfzeile statt als Rahmen über dem halben Screen (#655).
+
 ## 1.0.1 - 2026-10-10
 
 - Mobile: Saisonale Deko: Halloween mit Spinnweben in den Ecken, Fledermausschwärmen alle paar Minuten, der Kürbislaterne im Dashboard-Kopf (antippen: Gruß und Haptik) und dem Kürbis im Tab „Mehr“. Der Verein schaltet die Saisonen unter Auftritt → Jahreszeiten; jede Person stellt die Deko unter Mehr → Darstellung auf an, dezent oder aus – angemeldet gilt die Wahl auch auf der Website. „Bewegung reduzieren“ des Handys macht alles ruhig. Advent, Weihnachten, Silvester, Fasching und Ostern kommen als weitere Module mit den nächsten Builds (#636).
