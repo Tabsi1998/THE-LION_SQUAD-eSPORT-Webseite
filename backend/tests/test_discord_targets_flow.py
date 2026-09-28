@@ -413,9 +413,10 @@ async def test_the_person_always_learns_about_it_public_profile_or_not(flow, pos
 @pytest.mark.asyncio
 async def test_every_automatic_achievement_can_actually_be_reached(flow):
     from achievement_catalog import ACHIEVEMENT_TIERS
-    from badges import compute_user_progress
+    from services.achievement_counters import refresh
 
-    counters = await compute_user_progress((await flow.add_user(role="player"))["id"])
+    # Erreichbar heißt: der Schlüssel kommt aus dem alten Block oder aus der Zähler-Registry (#616) - so wertet auch die Vergabe aus.
+    counters = await refresh((await flow.add_user(role="player"))["id"])
     automatic = [tier for tier in ACHIEVEMENT_TIERS if not tier.get("manual_only")]
     assert automatic, "der Katalog ist leer"
     unreachable = [tier["code"] for tier in automatic if not tier.get("condition_key") or not tier.get("progress_target") or tier["condition_key"] not in counters]

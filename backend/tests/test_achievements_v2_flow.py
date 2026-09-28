@@ -68,12 +68,18 @@ def test_neue_stufe_mit_material():
 async def test_oeffentlicher_katalog_traegt_material_alte_felder_bleiben(flow):
     flow.act_as(None)
     groups = (await flow.get("/api/achievements/groups")).json()
-    match_master = next(g for g in groups if g["code"] == "match_master")
-    tiers = match_master["tiers"]
-    assert [t["material"] for t in tiers] == ["bronze", "silver", "gold", "platinum", "legendary"]
-    assert [t["rank"] for t in tiers] == [3, 4, 5, 6, 8] and [t["level"] for t in tiers] == [1, 2, 3, 4, 5]
-    assert tiers[0]["material_name"] == "Bronze" and tiers[0]["level_name"] == "Bronze" and tiers[0]["level_color"] == "#CD7F32"
-    assert match_master["category"] == "match" and match_master["hidden"] is False and match_master["highest_earned_rank"] == 0
+    # Katalog A (#612): die Leiter Holz→Diamant; alte Clients sehen weiter Level 1–4.
+    played = next(g for g in groups if g["code"] == "matches_played")
+    tiers = played["tiers"]
+    assert [t["material"] for t in tiers] == ["wood", "iron", "bronze", "silver", "gold", "platinum", "diamond"]
+    assert [t["rank"] for t in tiers] == [1, 2, 3, 4, 5, 6, 7] and [t["level"] for t in tiers] == [1, 1, 1, 2, 3, 4, 4]
+    assert tiers[0]["material_name"] == "Holz" and tiers[0]["material_color"] == "#A0703C" and tiers[0]["level_name"] == "Holz"
+    assert played["category"] == "match" and played["hidden"] is False and played["highest_earned_rank"] == 0
+    assert not any(g["code"] == "match_master" for g in groups), "abgelöste Gruppen erscheinen nicht mehr"
+    # Eine alte Gruppe mit Level 1–5 trägt die abgeleiteten Materialien.
+    legacy = next(g for g in groups if g["code"] == "season_consistency")
+    assert [t["material"] for t in legacy["tiers"]] == ["bronze", "silver", "gold", "platinum", "legendary"]
+    assert [t["level"] for t in legacy["tiers"]] == [1, 2, 3, 4, 5]
     categories = {g["category"] for g in groups}
     assert categories <= set(catalog.CATEGORIES) and "creator" in categories and "profile" in categories
     assert not any(g.get("hidden") for g in groups), "geheime Gruppen zeigt der Katalog anonym nie"
@@ -82,12 +88,12 @@ async def test_oeffentlicher_katalog_traegt_material_alte_felder_bleiben(flow):
 @pytest.mark.asyncio
 async def test_vergabe_speichert_material_und_rang(flow):
     user = await flow.add_user(name="Spielerin")
-    assert await badges.award_achievement(user["id"], "match_master_s")
-    award = await flow.db.user_achievements.find_one({"user_id": user["id"], "tier_code": "match_master_s"}, {"_id": 0})
+    assert await badges.award_achievement(user["id"], "matches_played_4")
+    award = await flow.db.user_achievements.find_one({"user_id": user["id"], "tier_code": "matches_played_4"}, {"_id": 0})
     assert award["material"] == "silver" and award["rank"] == 4 and award["level"] == 2
     flow.act_as(user)
     shown = (await flow.get(f"/api/achievements/user/{user['id']}")).json()
-    mine = next(a for a in shown["awards"] if a["code"] == "match_master_s")  # die Vergabeliste trägt den Stufen-Code als „code“
+    mine = next(a for a in shown["awards"] if a["code"] == "matches_played_4")  # die Vergabeliste trägt den Stufen-Code als „code“
     assert mine["material"] == "silver" and mine["material_color"] == "#C0C0C0" and mine["level_name"] == "Silber"
 
 

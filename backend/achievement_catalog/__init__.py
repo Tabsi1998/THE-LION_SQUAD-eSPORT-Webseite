@@ -13,6 +13,7 @@ from .materials import (  # noqa: F401
     material_name, material_points, material_rank, tier,
 )
 from .migration_map import GROUP_MAPPING  # noqa: F401
+from .catalog_a import CONDITION_KEYS_A, GROUPS_A, REDEFINED, REPLACED, TIERS_A  # noqa: F401
 
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (
@@ -26,8 +27,20 @@ COUNTER_KEYS_V2 = (
     "commendations_received", "commendations_given", "team_size_max", "team_profile_complete", "captain_days", "team_level_max",
     "team_tournaments_played", "events_hosted_completed", "club_events_attended", "season_top10_finishes", "season_wins", "news_read",
     "streams_watched", "reports_actioned",
+    # Katalog A (#612): Serien, Karten, Pünktlichkeit, Dispute, Turnierläufe
+    "win_rate_qualified", "comebacks", "clean_sheets", "distinct_maps", "full_distance_series", "deciders_won",
+    "matches_ready_on_time", "results_reported_accepted", "dispute_free_streak", "tournaments_completed_no_forfeit",
+    "checkin_streak", "lower_bracket_top4", "tournaments_won_undefeated", "group_stage_firsts", "streamed_matches",
+    "disputes_resolved_as_staff", "bracket_resets_won",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
+
+# Katalog A (#612) ersetzt alte Gruppen: die abgelösten (REPLACED) und die neu definierten (REDEFINED) weichen aus
+# dem Katalog, ihre Vergaben wandern beim Start über die Abbildung (services/achievement_migration.py).
+_RETIRED = set(REPLACED) | set(REDEFINED)
+ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A
+ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A
+GROUP_MAPPING.update(REPLACED)
 
 # Alte Kategorienamen in den Überschreibungen → neue (Streaming & Content → Creator, Fortschritt → Profil).
 for _code, _category in list(CATEGORY_OVERRIDES.items()):

@@ -81,3 +81,48 @@ def test_no_public_tier_uses_planned_automation():
 def test_event_host_group_is_hidden_from_public_catalog():
     event_host = next(g for g in ACHIEVEMENT_GROUPS if g["code"] == "event_host")
     assert event_host["public"] is False
+
+
+# ---------- Erfolge II, Katalog A (#612): Spielen und Turnier ----------
+
+from achievement_catalog import COUNTER_KEYS_V2, GROUP_MAPPING, GROUPS_A, LADDERS, REDEFINED, REPLACED, TIERS_A  # noqa: E402
+from services import achievement_counters as counters  # noqa: E402
+
+
+def test_katalog_a_hat_40_gruppen_und_206_stufen_mit_eindeutigen_codes():
+    assert len(GROUPS_A) == 40 and len(TIERS_A) == 206
+    assert len([g for g in GROUPS_A if g["category"] == "match"]) == 20
+    assert len([g for g in GROUPS_A if g["category"] == "tournament"]) == 20
+    codes = [g["code"] for g in GROUPS_A]
+    assert len(codes) == len(set(codes))
+    tier_codes = [t["code"] for t in TIERS_A]
+    assert len(tier_codes) == len(set(tier_codes))
+    in_catalog = {g["code"] for g in ACHIEVEMENT_GROUPS}
+    assert set(codes) <= in_catalog
+    assert not (set(REPLACED) & in_catalog), "abgelöste Gruppen sind aus dem Katalog"
+    assert all(GROUP_MAPPING.get(old) == new for old, new in REPLACED.items())
+    assert set(REDEFINED) <= set(codes)
+
+
+def test_katalog_a_ziele_steigen_material_passt_zur_leiter_texte_da():
+    by_group = defaultdict(list)
+    for tier in TIERS_A:
+        by_group[tier["group_code"]].append(tier)
+    for group in GROUPS_A:
+        tiers = by_group[group["code"]]
+        targets = [t["progress_target"] for t in tiers]
+        assert targets == sorted(targets) and len(set(targets)) == len(targets), group["code"]
+        assert [t["material"] for t in tiers] == LADDERS[len(tiers)], group["code"]
+        assert all(t["condition_key"] == group["condition_key"] for t in tiers)
+        assert group["description"] and group["how_to"] and group["icon"] and group["art"]
+        assert all(t["description"] and t["how_to"] and t["points"] > 0 for t in tiers)
+        assert all(t["name"] == f"{group['name']} {ROMAN}" for t, ROMAN in zip(tiers, ["I", "II", "III", "IV", "V", "VI", "VII"]))
+        assert all(t["level"] in (1, 2, 3, 4) for t in tiers), "alte Clients sehen 1–4"
+
+
+def test_katalog_a_schluessel_sind_live_und_registriert():
+    keys = {g["condition_key"] for g in GROUPS_A}
+    assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
+    known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
+    assert keys <= known, sorted(keys - known)
+    assert set(COUNTER_KEYS_V2) >= set(counters.REGISTRY)

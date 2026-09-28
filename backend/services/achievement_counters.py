@@ -95,7 +95,7 @@ class Context:
     async def tournaments(self) -> dict[str, dict]:
         async def load():
             ids = list({r.get("tournament_id") for r in await self.registrations() if r.get("tournament_id")})
-            rows = await self.db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1}).to_list(2000) if ids else []
+            rows = await self.db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "registration_opens_at": 1, "registration_open_from": 1, "is_public": 1, "game_id": 1, "season_id": 1, "stream_url": 1, "format": 1}).to_list(2000) if ids else []
             return {row["id"]: row for row in rows}
         return await self._memo("tournaments", load)
 
@@ -105,7 +105,7 @@ class Context:
             ids = list(await self.registration_ids())
             if not ids:
                 return []
-            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1}).to_list(5000)
+            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}}, {"_id": 0, "id": 1, "tournament_id": 1, "status": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1, "scheduled_at": 1, "best_of": 1, "map": 1, "maps": 1, "disputes": 1, "forfeit_registration_id": 1, "section": 1, "bracket": 1, "round_name": 1, "group_id": 1}).to_list(5000)
         return await self._memo("matches", load)
 
     async def awards(self) -> list[dict]:
@@ -137,6 +137,30 @@ class Context:
             ids = list(await self.registration_ids())
             return await self.db.tournament_awards.find({"registration_id": {"$in": ids}}, {"_id": 0, "tournament_id": 1, "place": 1}).to_list(2000) if ids else []
         return await self._memo("awards_places", load)
+
+    async def opponent_registrations(self) -> dict[str, dict]:
+        """Die Anmeldungen der Gegner aus allen eigenen Matches (Check-in-Zeiten, Status) - Katalog A."""
+        async def load():
+            mine = await self.registration_ids()
+            ids = {slot.get("registration_id") for match in await self.matches() for slot in match.get("slots") or [] if slot.get("registration_id") and slot.get("registration_id") not in mine}
+            rows = await self.db.tournament_registrations.find({"id": {"$in": list(ids)}}, {"_id": 0, "id": 1, "status": 1, "checked_in_at": 1, "updated_at": 1, "user_id": 1, "team_id": 1}).to_list(5000) if ids else []
+            return {row["id"]: row for row in rows}
+        return await self._memo("opponent_registrations", load)
+
+    async def result_submissions(self) -> list[dict]:
+        """Eigene Ergebnismeldungen aus dem Protokoll (match.result.submit) - Katalog A."""
+        return await self._memo("result_submissions", lambda: self.db.audit_logs.find({"action": "match.result.submit", "actor_id": self.user_id}, {"_id": 0, "data": 1, "created_at": 1}).to_list(5000))
+
+    async def matches_by_ids(self, ids) -> dict[str, dict]:
+        ids = [i for i in set(ids) if i]
+        if not ids:
+            return {}
+        rows = await self.db.matches_v2.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "slots": 1, "disputes": 1}).to_list(5000)
+        return {row["id"]: row for row in rows}
+
+    async def group_matches(self, tournament_id: str, group_id: str) -> list[dict]:
+        key = f"group:{tournament_id}:{group_id}"
+        return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": "completed"}, {"_id": 0, "slots": 1, "results": 1}).to_list(2000))
 
 
 def _parse(value) -> datetime | None:
@@ -681,3 +705,226 @@ async def record_signal(user_id: str, name: str, count: int = 1) -> dict:
     stamp = now_utc().isoformat()
     await db[SIGNALS].update_one({"user_id": user_id, "name": name}, {"$inc": {"count": add, f"days.{day}": add}, "$set": {"last_at": stamp}, "$setOnInsert": {"user_id": user_id, "name": name, "first_at": stamp}}, upsert=True)
     return {"accepted": True, "count": int(doc.get("count") or 0) + add, "day_count": today + add}
+
+
+# ------------------------------------------------------------------ Katalog A (#612): Serien, Karten, Pünktlichkeit, Dispute, Turnierläufe
+
+def _score_pair(match: dict, mine: set[str]) -> tuple[int, int] | None:
+    """(eigene Punkte, Gegnerpunkte) aus results[].score - None, wenn keine Zahlen eingetragen sind."""
+    own = their = None
+    for entry in match.get("results") or []:
+        score = entry.get("score")
+        if not isinstance(score, (int, float)):
+            continue
+        if entry.get("registration_id") in mine:
+            own = max(own or 0, int(score))
+        else:
+            their = max(their or 0, int(score))
+    if own is None or their is None:
+        return None
+    return own, their
+
+
+def _best_of(match: dict) -> int:
+    try:
+        return int(match.get("best_of") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _full_distance(match: dict, mine: set[str]) -> bool:
+    """Volle Distanz: alle Karten gespielt - 2:1 im Bo3, 3:2 im Bo5."""
+    pair = _score_pair(match, mine)
+    best_of = _best_of(match)
+    return bool(pair) and best_of >= 3 and pair[0] + pair[1] == best_of
+
+
+def _is_lower_section(match: dict) -> bool:
+    section = str(match.get("section") or match.get("bracket") or "").strip().lower()
+    return section in {"lb", "loser", "losers", "lower", "lower_bracket", "loser bracket", "looser"} or section.startswith("lower")
+
+
+@counter("win_rate_qualified", "match")
+async def _win_rate(ctx):
+    """Siegquote in Prozent - erst ab 30 gespielten Matches, davor 0."""
+    rows = _completed_matches(await ctx.matches(), await ctx.registration_ids())
+    if len(rows) < 30:
+        return 0
+    return round(100 * sum(1 for _m, won, _w, _o in rows if won) / len(rows))
+
+
+@counter("clean_sheets", "match")
+async def _clean_sheets(ctx):
+    mine = await ctx.registration_ids()
+    count = 0
+    for match, won, _w, _o in _completed_matches(await ctx.matches(), mine):
+        pair = _score_pair(match, mine)
+        if won and pair and pair[1] == 0 and pair[0] > 0:
+            count += 1
+    return count
+
+
+@counter("full_distance_series", "match")
+async def _full_distance_series(ctx):
+    mine = await ctx.registration_ids()
+    return sum(1 for match, _w, _when, _o in _completed_matches(await ctx.matches(), mine) if _full_distance(match, mine))
+
+
+@counter("deciders_won", "match")
+async def _deciders_won(ctx):
+    mine = await ctx.registration_ids()
+    return sum(1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if won and _full_distance(match, mine))
+
+
+@counter("comebacks", "match")
+async def _comebacks(ctx):
+    """Sieg nach 0:1 oder 0:2 - braucht die Kartenreihenfolge (match.maps mit winner_registration_id); ohne sie zählt nichts."""
+    mine = await ctx.registration_ids()
+    count = 0
+    for match, won, _when, _o in _completed_matches(await ctx.matches(), mine):
+        maps = [m for m in (match.get("maps") or []) if isinstance(m, dict) and m.get("winner_registration_id")]
+        if won and maps and maps[0]["winner_registration_id"] not in mine:
+            count += 1
+    return count
+
+
+@counter("distinct_maps", "match")
+async def _distinct_maps(ctx):
+    names = {str(match.get("map") or "").strip().lower() for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids())}
+    return len({name for name in names if name})
+
+
+@counter("matches_ready_on_time", "match")
+async def _ready_on_time(ctx):
+    """Beide Seiten vor dem angesetzten Start eingecheckt, kein Forfeit."""
+    mine = await ctx.registration_ids()
+    own = {r["id"]: r for r in await ctx.registrations() if r.get("id")}
+    others = await ctx.opponent_registrations()
+    count = 0
+    for match, _won, _when, opponents in _completed_matches(await ctx.matches(), mine):
+        scheduled = _parse(match.get("scheduled_at"))
+        if not scheduled or match.get("forfeit_registration_id"):
+            continue
+        slots = {slot.get("registration_id") for slot in match.get("slots") or [] if slot.get("registration_id")}
+        stamps = []
+        for reg_id in slots:
+            reg = own.get(reg_id) or others.get(reg_id)
+            stamp = _parse((reg or {}).get("checked_in_at"))
+            if not stamp:
+                stamps = []
+                break
+            stamps.append(stamp)
+        if stamps and all(stamp <= scheduled for stamp in stamps):
+            count += 1
+    return count
+
+
+@counter("results_reported_accepted", "match")
+async def _results_reported(ctx):
+    """Eigene Ergebnismeldungen zu Matches, die damit abgeschlossen wurden - je Match einmal."""
+    completed = {match["id"] for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids())}
+    reported = {str((row.get("data") or {}).get("match_id") or "") for row in await ctx.result_submissions()}
+    return len(reported & completed)
+
+
+@counter("dispute_free_streak", "match")
+async def _dispute_free_streak(ctx):
+    rows = sorted(_completed_matches(await ctx.matches(), await ctx.registration_ids()), key=lambda row: row[2] or datetime.min.replace(tzinfo=timezone.utc))
+    best = streak = 0
+    for match, _w, _when, _o in rows:
+        if match.get("disputes"):
+            streak = 0
+            continue
+        streak += 1
+        best = max(best, streak)
+    return best
+
+
+@counter("bracket_resets_won", "match")
+async def _bracket_resets(ctx):
+    mine = await ctx.registration_ids()
+    return sum(1 for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if won and "reset" in str(match.get("round_name") or "").lower())
+
+
+@counter("streamed_matches", "match", "tournament")
+async def _streamed(ctx):
+    tournaments = await ctx.tournaments()
+    with_stream = {tid for tid, t in tournaments.items() if str(t.get("stream_url") or "").strip()}
+    return sum(1 for match, _w, _when, _o in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if match.get("tournament_id") in with_stream)
+
+
+@counter("tournaments_completed_no_forfeit", "tournament", "match")
+async def _completed_no_forfeit(ctx):
+    tournaments = await ctx.tournaments()
+    done = {tid for tid, t in tournaments.items() if t.get("status") in ("completed", "results_published", "archived")}
+    mine = await ctx.registration_ids()
+    forfeited = {match.get("tournament_id") for match in await ctx.matches() if match.get("forfeit_registration_id") in mine}
+    gave_up = {r.get("tournament_id") for r in await ctx.registrations() if r.get("status") in ("withdrawn", "disqualified", "no_show")}
+    return len({r.get("tournament_id") for r in await ctx.registrations() if r.get("tournament_id") in done and r.get("tournament_id") not in forfeited and r.get("tournament_id") not in gave_up})
+
+
+@counter("checkin_streak", "tournament")
+async def _checkin_streak(ctx):
+    """Turnier für Turnier eingecheckt, in der Reihenfolge der Anmeldungen - die längste Folge zählt."""
+    rows = sorted((r for r in await ctx.registrations() if r.get("tournament_id")), key=lambda r: str(r.get("created_at") or ""))
+    best = streak = 0
+    for reg in rows:
+        if reg.get("status") in ("checked_in", "ready") or reg.get("checked_in_at"):
+            streak += 1
+            best = max(best, streak)
+        else:
+            streak = 0
+    return best
+
+
+@counter("lower_bracket_top4", "tournament", "match")
+async def _lower_bracket_top4(ctx):
+    places = {row["tournament_id"]: int(row.get("place") or 99) for row in await ctx.awards_places() if row.get("tournament_id")}
+    lower = {match.get("tournament_id") for match in await ctx.matches() if match.get("status") == "completed" and _is_lower_section(match)}
+    return len({tid for tid, place in places.items() if place <= 4 and tid in lower})
+
+
+@counter("tournaments_won_undefeated", "tournament", "match")
+async def _undefeated(ctx):
+    mine = await ctx.registration_ids()
+    won_tournaments = {row["tournament_id"] for row in await ctx.awards_places() if row.get("tournament_id") and int(row.get("place") or 99) == 1}
+    lost_in = {match.get("tournament_id") for match, won, _when, _o in _completed_matches(await ctx.matches(), mine) if not won}
+    return len(won_tournaments - lost_in)
+
+
+@counter("group_stage_firsts", "tournament", "match")
+async def _group_firsts(ctx):
+    """Platz 1 in einer Gruppe: die meisten Siege unter allen Anmeldungen der Gruppe (Gleichstand zählt)."""
+    mine = await ctx.registration_ids()
+    groups = {(match.get("tournament_id"), match.get("group_id")) for match in await ctx.matches() if match.get("group_id") and match.get("status") == "completed"}
+    count = 0
+    for tournament_id, group_id in groups:
+        wins: dict[str, int] = {}
+        for match in await ctx.group_matches(tournament_id, group_id):
+            for result in match.get("results") or []:
+                reg = result.get("registration_id")
+                if reg:
+                    wins[reg] = wins.get(reg, 0) + (1 if result.get("outcome") == "winner" else 0)
+        if not wins:
+            continue
+        best = max(wins.values())
+        if best > 0 and any(wins.get(reg, 0) == best for reg in mine):
+            count += 1
+    return count
+
+
+@counter("disputes_resolved_as_staff", "tournament", "match")
+async def _disputes_resolved(ctx):
+    """Als Turnierleitung ein disputiertes Match mit einem Ergebnis abgeschlossen - je Match einmal."""
+    mine = await ctx.registration_ids()
+    ids = {str((row.get("data") or {}).get("match_id") or "") for row in await ctx.result_submissions()}
+    matches = await ctx.matches_by_ids(ids)
+    count = 0
+    for match in matches.values():
+        if match.get("status") != "completed" or not match.get("disputes"):
+            continue
+        slots = {slot.get("registration_id") for slot in match.get("slots") or []}
+        if slots & mine:
+            continue
+        count += 1
+    return count

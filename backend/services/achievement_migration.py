@@ -125,9 +125,9 @@ async def apply_group_mapping(db, mapping: dict | None = None, *, dry_run: bool 
     return report
 
 
-async def run_all(db, *, dry_run: bool = False) -> dict:
+async def run_all(db, *, dry_run: bool = False, compute_progress=None) -> dict:
     annotated = {"updated": 0, "orphans": 0} if dry_run else await annotate_awards(db)
-    mapped = await apply_group_mapping(db, dry_run=dry_run)
+    mapped = await apply_group_mapping(db, dry_run=dry_run, compute_progress=compute_progress)
     return {"annotated": annotated, "mapping": mapped}
 
 
