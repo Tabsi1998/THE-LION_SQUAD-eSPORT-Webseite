@@ -77,6 +77,11 @@ async def init_indexes():
     await db.f1_tracks.create_index("challenge_id")
     await db.f1_lap_times.create_index("id", unique=True)
     await db.f1_lap_times.create_index([("challenge_id", 1), ("track_id", 1), ("user_id", 1)])
+    # Erfolge II (#613): festgeschriebene Saison-Ranglisten und die täglichen Rang-Schnappschüsse
+    await db.season_standings.create_index([("season_id", 1), ("rank", 1)])
+    await db.season_standings.create_index([("user_id", 1), ("season_id", 1)])
+    await db.season_rank_snapshots.create_index([("season_id", 1), ("user_id", 1), ("day", 1)], unique=True)
+    await db.season_rank_snapshots.create_index([("user_id", 1), ("day", 1)])
     await db.f1_lap_times.create_index([("challenge_id", 1), ("track_id", 1), ("time_ms", 1)])
     # Stations
     await db.stations.create_index("id", unique=True)

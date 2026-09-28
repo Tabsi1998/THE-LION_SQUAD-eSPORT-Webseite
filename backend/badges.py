@@ -726,30 +726,22 @@ async def on_match_disconnect(user_id: str, match_id: str | None = None):
 
 # ---------- Phase B v4.1 — Season completion hook ----------
 async def on_season_completed(season_id: str) -> dict:
-    """Award season_climber + championship_top tiers based on final standings.
-
-    Pulls from `season_standings` if present, else from tournaments aggregation.
-    Returns a summary {awarded: int, ranked: int}.
+    """Saison abgeschlossen (#613): die Rangliste wird festgeschrieben (``season_standings``, vorher hat sie niemand
+    geschrieben), jede platzierte Person bekommt XP, dann werden die Saison-Zähler und -Stufen neu ausgewertet -
+    Saisonspitze, Saisonmeister, Volle Saison und Aufsteiger kommen aus dem Katalog B, nicht mehr aus festen Stufen.
+    Liefert {awarded, ranked}.
     """
     db = get_db()
-    standings = await db.season_standings.find({"season_id": season_id}, {"_id": 0}).sort("rank", 1).to_list(500)
-    if not standings:
-        # Fallback: aggregate by tournament_registrations + matches
-        return {"awarded": 0, "ranked": 0, "skipped": "no standings"}
+    from services.season_ranks import write_standings
+    standings = await write_standings(db, season_id)
     awarded_total = 0
-    targets = [
-        ("season_climber_p", 1), ("season_climber_g", 3),
-        ("season_climber_s", 10), ("season_climber_b", 25),
-    ]
     for s in standings:
         uid = s.get("user_id")
-        await _xp(uid, "season_completed", season_id)
-        rank = s.get("rank")
-        if not uid or not rank:
+        if not uid:
             continue
-        for code, max_rank in targets:
-            if rank <= max_rank:
-                if await award_achievement(uid, code,
-                                            {"season_id": season_id, "rank": rank}):
-                    awarded_total += 1
+        await _xp(uid, "season_completed", season_id)
+        try:
+            awarded_total += int(await evaluate_user_progress(uid, ["season"]) or 0)
+        except Exception:  # noqa: BLE001 - eine Person hält die anderen nicht auf
+            logger.warning("season evaluation failed for %s", uid, exc_info=True)
     return {"awarded": awarded_total, "ranked": len(standings)}

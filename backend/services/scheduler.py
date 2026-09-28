@@ -145,6 +145,18 @@ async def _safe_seasons_weather():
         _log_task_failure("seasons_weather", exc)
 
 
+async def _safe_season_rank_snapshots():
+    """Erfolge II (#613): täglich der Platz je Person in jeder laufenden Saison - daraus zählt „Aufsteiger“."""
+    try:
+        from database import get_db
+        from services.season_ranks import snapshot_ranks
+        n = await snapshot_ranks(get_db())
+        if n:
+            logger.info(f"[scheduler] season_rank_snapshots written={n}")
+    except Exception as exc:
+        _log_task_failure("season_rank_snapshots", exc)
+
+
 async def _safe_prize_expiry():
     try:
         from services.prize_service import expire_overdue
@@ -659,6 +671,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievements_reconcile", _safe_achievements_reconcile), CronTrigger(hour=4, minute=10, timezone="Europe/Vienna"),
                   id="achievements_reconcile", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("season_rank_snapshots", _safe_season_rank_snapshots), CronTrigger(hour=3, minute=35, timezone="Europe/Vienna"),
+                  id="season_rank_snapshots", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",

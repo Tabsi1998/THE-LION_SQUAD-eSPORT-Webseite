@@ -162,6 +162,79 @@ class Context:
         key = f"group:{tournament_id}:{group_id}"
         return await self._memo(key, lambda: self.db.matches_v2.find({"tournament_id": tournament_id, "group_id": group_id, "status": "completed"}, {"_id": 0, "slots": 1, "results": 1}).to_list(2000))
 
+    # ---- Katalog B (#613): Fast Lap, Saison, Team
+
+    async def lap_times(self) -> list[dict]:
+        """Eigene gültige Fast-Lap-Zeiten (nicht ungültig, keine Vereins-Referenzzeit)."""
+        from services.fastlap_standings import official_query
+        return await self._memo("lap_times", lambda: self.db.f1_lap_times.find(official_query({"user_id": self.user_id}), {"_id": 0, "id": 1, "challenge_id": 1, "track_id": 1, "time_ms": 1, "penalty_seconds": 1, "created_at": 1, "attempt_number": 1}).to_list(10000))
+
+    async def lap_tracks(self) -> dict[str, dict]:
+        """Die Strecken der eigenen Zeiten (Zielzeit)."""
+        async def load():
+            ids = list({row.get("track_id") for row in await self.lap_times() if row.get("track_id")})
+            rows = await self.db.f1_tracks.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "challenge_id": 1, "target_time_ms": 1}).to_list(1000) if ids else []
+            return {row["id"]: row for row in rows}
+        return await self._memo("lap_tracks", load)
+
+    async def track_bests(self) -> dict[str, tuple[str, int]]:
+        """Die schnellste gültige Zeit aller je Strecke, auf der die Person gefahren ist: (Person, Zeit)."""
+        async def load():
+            from services.fastlap_standings import effective_ms, official_query
+            ids = list({row.get("track_id") for row in await self.lap_times() if row.get("track_id")})
+            best: dict[str, tuple[str, int]] = {}
+            if ids:
+                async for row in self.db.f1_lap_times.find(official_query({"track_id": {"$in": ids}}), {"_id": 0, "user_id": 1, "track_id": 1, "time_ms": 1, "penalty_seconds": 1}):
+                    ms = effective_ms(row)
+                    tid = row.get("track_id")
+                    if tid and (tid not in best or ms < best[tid][1]):
+                        best[tid] = (row.get("user_id"), ms)
+            return best
+        return await self._memo("track_bests", load)
+
+    async def fastlap_challenges(self) -> list[dict]:
+        async def load():
+            ids = list({row.get("challenge_id") for row in await self.lap_times() if row.get("challenge_id")})
+            return await self.db.f1_challenges.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "status": 1, "points_per_position": 1}).to_list(500) if ids else []
+        return await self._memo("fastlap_challenges", load)
+
+    async def seasons(self) -> list[dict]:
+        return await self._memo("seasons", lambda: self.db.seasons.find({}, {"_id": 0, "id": 1, "status": 1, "tournament_ids": 1, "f1_challenge_ids": 1, "start_date": 1}).to_list(500))
+
+    async def season_points(self) -> list[dict]:
+        return await self._memo("season_points", lambda: self.db.season_points.find({"user_id": self.user_id}, {"_id": 0, "season_id": 1, "source_type": 1, "source_id": 1}).to_list(5000))
+
+    async def rank_snapshots(self) -> list[dict]:
+        from services.season_ranks import SNAPSHOTS
+        return await self._memo("rank_snapshots", lambda: self.db[SNAPSHOTS].find({"user_id": self.user_id}, {"_id": 0, "season_id": 1, "day": 1, "rank": 1}).to_list(10000))
+
+    async def season_tournaments(self) -> dict[str, dict]:
+        """Die Turniere aller Saisons mit Startdatum - für den Saisonstart."""
+        async def load():
+            ids = list({tid for season in await self.seasons() for tid in (season.get("tournament_ids") or []) if tid})
+            rows = await self.db.tournaments.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "start_date": 1, "created_at": 1}).to_list(2000) if ids else []
+            return {row["id"]: row for row in rows}
+        return await self._memo("season_tournaments", load)
+
+    async def team_memberships(self) -> dict[str, dict]:
+        async def load():
+            rows = await self.db.team_members.find({"user_id": self.user_id}, {"_id": 0, "team_id": 1, "joined_at": 1, "role": 1}).to_list(200)
+            return {row["team_id"]: row for row in rows if row.get("team_id")}
+        return await self._memo("team_memberships", load)
+
+    async def team_registrations(self) -> dict[str, dict]:
+        async def load():
+            ids = [team["id"] for team in await self.teams() if team.get("id")]
+            rows = await self.db.tournament_registrations.find({"team_id": {"$in": ids}}, {"_id": 0, "id": 1, "team_id": 1, "tournament_id": 1}).to_list(5000) if ids else []
+            return {row["id"]: row for row in rows}
+        return await self._memo("team_registrations", load)
+
+    async def team_matches(self) -> list[dict]:
+        async def load():
+            ids = list(await self.team_registrations())
+            return await self.db.matches_v2.find({"slots.registration_id": {"$in": ids}, "status": "completed"}, {"_id": 0, "id": 1, "slots": 1, "results": 1, "completed_at": 1, "updated_at": 1}).to_list(10000) if ids else []
+        return await self._memo("team_matches", load)
+
 
 def _parse(value) -> datetime | None:
     if not value:
@@ -928,3 +1001,172 @@ async def _disputes_resolved(ctx):
             continue
         count += 1
     return count
+
+
+# ------------------------------------------------------------------ Katalog B (#613): Fast Lap
+
+_INACTIVE_REGISTRATION = {"withdrawn", "rejected", "cancelled", "declined", "disqualified"}
+
+
+def _laps_by_track(times: list[dict]) -> dict[str, list[dict]]:
+    by_track: dict[str, list[dict]] = {}
+    for row in times:
+        if row.get("track_id"):
+            by_track.setdefault(row["track_id"], []).append(row)
+    return by_track
+
+
+@counter("pb_improvements", "fastlap")
+async def _pb_improvements(ctx):
+    """Jede gültige Runde, die die eigene bisherige Bestzeit auf der Strecke unterbietet (Strafsekunden eingerechnet)."""
+    from services.fastlap_standings import effective_ms
+    count = 0
+    for rows in _laps_by_track(await ctx.lap_times()).values():
+        best = None
+        for row in sorted(rows, key=lambda item: (str(item.get("created_at") or ""), int(item.get("attempt_number") or 0))):
+            ms = effective_ms(row)
+            if best is not None and ms < best:
+                count += 1
+            best = ms if best is None else min(best, ms)
+    return count
+
+
+@counter("sub_target_laps", "fastlap")
+async def _sub_target(ctx):
+    """Gültige Runden unter der Zielzeit der Strecke (Strecken ohne Zielzeit zählen nicht)."""
+    from services.fastlap_standings import effective_ms
+    tracks = await ctx.lap_tracks()
+    count = 0
+    for row in await ctx.lap_times():
+        target = (tracks.get(row.get("track_id")) or {}).get("target_time_ms")
+        if isinstance(target, (int, float)) and target > 0 and effective_ms(row) <= target:
+            count += 1
+    return count
+
+
+@counter("track_records_held", "fastlap")
+async def _track_records(ctx):
+    """Strecken, auf denen die eigene Bestzeit die schnellste gültige Zeit aller ist."""
+    from services.fastlap_standings import effective_ms
+    bests = await ctx.track_bests()
+    held = 0
+    for track_id, rows in _laps_by_track(await ctx.lap_times()).items():
+        mine = min(effective_ms(row) for row in rows)
+        overall = bests.get(track_id)
+        if overall and mine <= overall[1]:
+            held += 1
+    return held
+
+
+@counter("consistent_sessions", "fastlap")
+async def _consistency(ctx):
+    """Strecken mit mindestens zehn gültigen Runden binnen einem Prozent der eigenen Bestzeit."""
+    from services.fastlap_standings import effective_ms
+    count = 0
+    for rows in _laps_by_track(await ctx.lap_times()).values():
+        if len(rows) < 10:
+            continue
+        times = [effective_ms(row) for row in rows]
+        best = min(times)
+        if sum(1 for ms in times if ms <= best * 1.01) >= 10:
+            count += 1
+    return count
+
+
+@counter("championship_top3", "fastlap")
+async def _championship_top3(ctx):
+    """Abgeschlossene Challenges, deren Championship die Person auf Platz 1 bis 3 beendet hat."""
+    from services.fastlap_standings import challenge_standings
+    count = 0
+    for challenge in await ctx.fastlap_challenges():
+        if challenge.get("status") != "completed":
+            continue
+        standings, _per_track, _tracks = await challenge_standings(ctx.db, challenge)
+        if any(entry["user_id"] == ctx.user_id and entry["rank"] <= 3 for entry in standings):
+            count += 1
+    return count
+
+
+@counter("grand_prix_entries", "fastlap", "tournament")
+async def _grand_prix(ctx):
+    """Anmeldungen zu Turnieren im Format Grand Prix (zurückgezogene zählen nicht)."""
+    tournaments = await ctx.tournaments()
+    return sum(1 for reg in await ctx.registrations() if reg.get("status") not in _INACTIVE_REGISTRATION and (tournaments.get(reg.get("tournament_id")) or {}).get("format") == "grand_prix")
+
+
+# ------------------------------------------------------------------ Katalog B (#613): Saison
+
+def _finished(season: dict) -> bool:
+    return season.get("status") in ("completed", "archived")
+
+
+@counter("season_climbs_10", "season")
+async def _season_climbs(ctx):
+    """Saisons, in denen die Person laut den täglichen Schnappschüssen mindestens zehn Plätze gutgemacht hat."""
+    from services.season_ranks import climbs
+    return climbs(await ctx.rank_snapshots(), 10)
+
+
+@counter("seasons_fully_played", "season")
+async def _seasons_fully_played(ctx):
+    """Abgeschlossene Saisons, in denen die Person bei jedem Turnier und jeder Challenge Punkte geholt hat."""
+    points = await ctx.season_points()
+    count = 0
+    for season in await ctx.seasons():
+        if not _finished(season):
+            continue
+        tournaments = [tid for tid in season.get("tournament_ids") or [] if tid]
+        challenges = [cid for cid in season.get("f1_challenge_ids") or [] if cid]
+        if not tournaments and not challenges:
+            continue
+        sources = {str(row.get("source_id") or "") for row in points if row.get("season_id") == season["id"]}
+        played_tournaments = all(tid in sources for tid in tournaments)
+        played_challenges = all(any(source == cid or source.startswith(f"{cid}:") for source in sources) for cid in challenges)
+        if played_tournaments and played_challenges:
+            count += 1
+    return count
+
+
+@counter("season_openers_played", "season")
+async def _season_openers(ctx):
+    """Saisons, bei deren erstem Turnier (frühester Start) die Person angemeldet war oder Punkte geholt hat."""
+    tournaments = await ctx.season_tournaments()
+    registered = {reg.get("tournament_id") for reg in await ctx.registrations() if reg.get("status") not in _INACTIVE_REGISTRATION}
+    played = {str(row.get("source_id") or "") for row in await ctx.season_points()}
+    count = 0
+    for season in await ctx.seasons():
+        ids = [tid for tid in season.get("tournament_ids") or [] if tid in tournaments]
+        if not ids:
+            continue
+        opener = min(ids, key=lambda tid: str(tournaments[tid].get("start_date") or tournaments[tid].get("created_at") or "9999"))
+        if opener in registered or opener in played:
+            count += 1
+    return count
+
+
+# ------------------------------------------------------------------ Katalog B (#613): Team
+
+@counter("team_match_wins", "team", "match")
+async def _team_match_wins(ctx):
+    """Matches, die ein Team der Person gewonnen hat, nachdem sie beigetreten war."""
+    registrations = await ctx.team_registrations()
+    memberships = await ctx.team_memberships()
+    wins = 0
+    for match in await ctx.team_matches():
+        when = _parse(match.get("completed_at") or match.get("updated_at"))
+        for result in match.get("results") or []:
+            reg = registrations.get(result.get("registration_id"))
+            if not reg or result.get("outcome") != "winner":
+                continue
+            joined = _parse((memberships.get(reg.get("team_id")) or {}).get("joined_at"))
+            if joined and when and when < joined:
+                continue
+            wins += 1
+            break
+    return wins
+
+
+@counter("team_invites_accepted", "team")
+async def _team_invites_accepted(ctx):
+    """Einladungen der Person, die angenommen wurden."""
+    return await ctx.db.team_invites.count_documents({"invited_by": ctx.user_id, "status": "accepted"})

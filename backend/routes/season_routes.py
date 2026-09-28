@@ -1,5 +1,7 @@
 """Seasons and circuits: standings sources, scoring and public season pages."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -119,6 +121,14 @@ async def update_season(sid: str, body: SeasonUpdate, me: dict = Depends(require
             updates[k] = updates[k].isoformat() if updates[k] else None
     updates["updated_at"] = now_utc().isoformat()
     await db.seasons.update_one({"id": current["id"]}, {"$set": updates})
+    # Abschluss (#613): die Rangliste wird festgeschrieben, XP und Saison-Erfolge (Saisonspitze, Saisonmeister,
+    # Volle Saison) folgen daraus - einmal, beim Wechsel auf „abgeschlossen“.
+    if updates.get("status") == "completed" and current.get("status") != "completed":
+        try:
+            from badges import on_season_completed
+            await on_season_completed(current["id"])
+        except Exception:  # noqa: BLE001 - der Abschluss darf nicht an den Erfolgen scheitern
+            logging.getLogger("seasons").warning("season completion hook failed for %s", current["id"], exc_info=True)
     return await db.seasons.find_one({"id": current["id"]}, {"_id": 0})
 
 

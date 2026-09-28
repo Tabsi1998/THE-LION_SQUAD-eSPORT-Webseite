@@ -55,7 +55,7 @@ class TestCatalogExpansion:
         total_tiers = sum(len(g.get("tiers", [])) for g in data)
         assert total_tiers == 138, f"expected 138 tiers, got {total_tiers}"
         codes = {g["code"] for g in data}
-        for need in ["community_helper", "event_host", "season_consistency",
+        for need in ["community_helper", "event_host", "seasons_active",
                      "profile_completeness", "tutorial"]:
             assert need in codes, f"missing new group {need}"
         # No negative groups exposed publicly
