@@ -527,6 +527,34 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         return {"ok": True}
 
+    async def create_thread(self, channel_id: str, message_id: str, name: str) -> dict:
+        """Einen Thread unter einer eigenen Nachricht öffnen (#572); braucht „Öffentliche Threads erstellen“."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        from services.discord_threads import ARCHIVE_MINUTES
+
+        channel, problem = await self._channel(client, channel_id)
+        if problem:
+            return problem
+        try:
+            message = await channel.fetch_message(int(message_id))
+            thread = await message.create_thread(name=name[:100], auto_archive_duration=ARCHIVE_MINUTES,
+                                                 reason="LION Website: Thread je Turnier")
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_message"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden",
+                    "error": "Der Bot darf hier keine Threads öffnen – Rolle braucht „Öffentliche Threads erstellen“."}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Thread „{name[:40]}“ geöffnet ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "thread_id": str(thread.id)}
+
     async def create_scheduled_event(self, payload: dict) -> dict:
         """Einen Discord-Termin anlegen (#570) - „extern“ mit Ort oder Link; braucht „Events verwalten“."""
         client = self._client

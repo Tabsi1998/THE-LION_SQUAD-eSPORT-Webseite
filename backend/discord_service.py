@@ -255,8 +255,13 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
-                  footer: str | None = None, test: bool = False) -> dict:
-    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts."""
+                  footer: str | None = None, test: bool = False, thread_id: str | None = None) -> dict:
+    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
+
+    Mit ``thread_id`` geht die Meldung in den Thread des Turniers (#572). Kennt Discord
+    den Thread nicht mehr, geht sie doch in den Kanal: Eine verlorene Ordnung ist kein
+    Grund, eine Meldung ausfallen zu lassen.
+    """
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, target)
     log = _new_log(event_key, title, resolved["target"], test=test)
@@ -271,12 +276,20 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
         private = resolved["target"] in PRIVATE_TARGETS
         reason = f"{resolved['target']}_channel_missing" if private else "channel_missing"
         return await _skip(log, reason, REASON_TEXTS.get(reason) or REASON_TEXTS["channel_missing"])
+    if thread_id:
+        log["thread_id"] = str(thread_id)
+        sent = await _send_embed(str(thread_id), title=title, description=description, color=color, url=url,
+                                 fields=fields, image_url=image_url, log=dict(log), footer=footer)
+        if sent.get("ok") or sent.get("reason") not in ("unknown_channel", "forbidden"):
+            return sent
+        log["thread_missing"] = sent.get("reason")
     return await _send_embed(resolved["channel_id"], title=title, description=description, color=color, url=url,
                              fields=fields, image_url=image_url, log=log, footer=footer)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
-                     color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None) -> dict:
+                     color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
+                     thread_id: str | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if spec["target"] in PUBLIC_TARGETS and item is not None and not should_post_to_public_discord(item):
@@ -285,7 +298,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key)
+                         image_url=image_url, event_key=event_key, thread_id=thread_id)
 
 
 async def send_discord(title: str, description: str = "", *,
@@ -304,13 +317,14 @@ async def send_ops_discord(title: str, description: str = "", *,
 
 async def send_public_discord(item: dict | None, title: str, description: str = "", *,
                               color: int = 0x29B6E8, url: str = None,
-                              fields: list = None, event_key: str = "custom", image_url: str = None) -> dict:
+                              fields: list = None, event_key: str = "custom", image_url: str = None,
+                              thread_id: str | None = None) -> dict:
     """Send to a public Discord target only for publicly visible content."""
     if not should_post_to_public_discord(item):
         return {"ok": False, "reason": "private_visibility"}
     if event_key in EVENTS:
         return await send_event(event_key, title, description, item=item, color=color, url=url,
-                                fields=fields, image_url=image_url)
+                                fields=fields, image_url=image_url, thread_id=thread_id)
     return await send_discord(title, description, color=color, url=url, fields=fields, event_key=event_key)
 
 

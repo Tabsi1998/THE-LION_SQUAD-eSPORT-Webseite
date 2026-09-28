@@ -257,7 +257,12 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     if not cfg["bot"]["enabled"]:
         return {"ok": False, "reason": "bot_off", "error": REASON_TEXTS["bot_off"]}
     resolved = resolve_target(cfg, "events")
-    channel_id = str(state.get("channel_id") or resolved["channel_id"] or "")
+    # Der Thread des Turniers (#572) ist das Ziel, solange die Einbettung nicht
+    # schon woanders steht: Eine bestehende Nachricht wandert nicht um.
+    from services.discord_threads import thread_id as tournament_thread
+
+    thread = await tournament_thread(db, tournament_id)
+    channel_id = str(state.get("channel_id") or thread or resolved["channel_id"] or "")
     if not channel_id:
         return {"ok": False, "reason": "channel_missing", "error": REASON_TEXTS["channel_missing"]}
     last = _dt(state.get("updated_at"))

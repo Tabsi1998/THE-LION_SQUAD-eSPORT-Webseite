@@ -337,16 +337,26 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     if is_public_discord_status and prev != status and status in ("registration_open", "live", "completed", "results_published"):
         try:
             from discord_service import send_public_discord
+            from services import discord_threads
             from services.discord_announcements import tournament_message
             game_id = t.get("game_id")
             game = await db.games.find_one({"id": game_id}, {"name": 1}) if game_id else None
+            game_name = (game or {}).get("name")
             # Dieselbe Meldung wie in der Vorschau unter Verbindungen → Discord (#583).
-            message = tournament_message({**t, "id": tid}, status, game_name=(game or {}).get("name"))
-            await send_public_discord(
+            message = tournament_message({**t, "id": tid}, status, game_name=game_name)
+            # Alles zu einem Turnier gehört in seinen Thread (#572); die Ankündigung
+            # „Anmeldung offen“ öffnet ihn, jede weitere Meldung geht hinein.
+            thread = await discord_threads.thread_id(db, tid)
+            sent = await send_public_discord(
                 t, message["title"], message["description"],
                 color=message["color"], url=message["url"], fields=message["fields"],
                 event_key=message["event_key"], image_url=message["image_url"],
+                thread_id=thread or None,
             )
+            if not thread and status == "registration_open" and sent.get("ok"):
+                await discord_threads.ensure(
+                    db, {**t, "id": tid}, channel_id=str(sent.get("channel_id") or ""),
+                    message_id=str(sent.get("message_id") or ""), game_name=game_name)
         except Exception:
             pass
     return {
