@@ -23,6 +23,7 @@ import { MailQueueSection } from "./settings/sections/MailQueueSection";
 import { BrandSection } from "./settings/sections/BrandSection";
 import { SeoSection } from "./settings/sections/SeoSection";
 import { SystemSection } from "./settings/sections/SystemSection";
+import { SeasonsSettings } from "./settings/SeasonsSettings";
 
 export default function AdminSettingsPage() {
   const { user } = useAuth();
@@ -611,6 +612,7 @@ export default function AdminSettingsPage() {
 
 
       {tab === "system" && <SystemSection systemStatus={systemStatus} load={load} />}
+      {tab === "seasons" && <SeasonsSettings />}
 
     </AdminLayout>
   );

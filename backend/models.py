@@ -83,6 +83,7 @@ class UserUpdate(BaseModel):
     # Public profile features
     show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
     show_steam_status: Optional[bool] = None  # „Gerade in Steam“ im Mitgliederbereich (#584), Opt-in
+    seasonal_decorations: Optional[Literal["on", "subtle", "off"]] = None  # Saisonale Deko für mich (#632): an, dezent, aus
     # Socials (legacy fields for compatibility)
     discord_name: Optional[str] = None
     discord_id: Optional[str] = None
