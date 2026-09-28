@@ -1,4 +1,4 @@
-import { ANCHORS, EXTENT, HUB, RADII_CHOICES, RINGS_CHOICES, advanceBuild, advanceIdle, applyImpulse, buildPlan, createSim, createWebLayer, nodeId, resizeSim, spiderOrder, staticLines, stepPhysics, webRadius } from "./web";
+import { ANCHORS, EXTENT, GUST_AFTER, HUB, LEAVE_AFTER, RADII_CHOICES, RINGS_CHOICES, advanceBuild, advanceIdle, applyImpulse, buildPlan, createSim, createWebLayer, exitPath, nodeId, resizeSim, sendSpiderAway, spiderOrder, staticLines, stepPhysics, tearAnchor, webRadius } from "./web";
 
 // Rundes Netz (#660, #670): Bauplan in echter Reihenfolge mit Speichen, Windungen und Drehsinn aus dem Seed, die
 // Spinne springt nie; während des Baus steht alles fest, danach schwingt es; Physik reagiert auf Zeiger und Stoß,
@@ -225,4 +225,126 @@ test("Wetter (#666): der Wind aus dem Start und aus dem Ereignis skaliert und ri
   expect(layer.sim.wind.x).toBeGreaterThan(0);
   layer.dispose();
   expect(Object.keys(listeners)).toEqual([]);
+});
+
+test("Weg und zurück: die Spinne verlässt das fertige Netz über den Ankerfaden in die Ecke und kommt später in die Nabe zurück", () => {
+  const sim = createSim(buildPlan(0.42), { radius: 100, origin: { x: 0, y: 0 }, prebuilt: true });
+  const half = () => 0.5;
+  expect(sim.plan.exits.length).toBe(3);
+  expect(exitPath(sim)[0]).toBe(0);
+  expect(exitPath(sim).at(-1)).toBe(sim.plan.exits[0].anchor);
+  let seconds = 0;
+  while (!sim.spider.away && seconds < 400) {
+    advanceIdle(sim, 0.1, half);
+    seconds += 0.1;
+  }
+  expect(sim.spider.away).toBe(true);
+  expect(seconds).toBeGreaterThan(LEAVE_AFTER[0]);
+  // in der Ecke angekommen - dort sitzt der erste Anker
+  expect(sim.spider.x).toBeCloseTo(0, 0);
+  expect(sim.spider.y).toBeCloseTo(0, 0);
+  expect(sim.torn).toBe(0);
+  while (sim.spider.away && seconds < 800) {
+    advanceIdle(sim, 0.1, half);
+    seconds += 0.1;
+  }
+  expect(sim.spider.away).toBe(false);
+  expect(sim.torn).toBe(0);
+  expect(sim.spider.x).toBeCloseTo(sim.nodes[0].x, 0);
+  expect(sim.spider.y).toBeCloseTo(sim.nodes[0].y, 0);
+});
+
+test("Packen: die Hand hält das Netz und zieht - die Spinne flieht, die Anker reißen nacheinander, das Netz faltet sich und hängt am Zeiger; losgelassen fliegt es davon, und die Ebene spinnt ein neues", () => {
+  const listeners = {};
+  const win = { innerWidth: 1200, scrollY: 0, addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: (name) => { delete listeners[name]; } };
+  const layer = createWebLayer({ seed: 0.42, corner: "tl", factor: 1, build: false, rng: () => 0.5 }, win);
+  const ctx = fakeContext([]);
+  const viewport = { width: 1200, height: 800 };
+  layer.draw(ctx, 1 / 60, viewport);
+  const sim = layer.sim;
+  const hub = { x: sim.nodes[0].x, y: sim.nodes[0].y };
+  // Ein Klick ohne Ziehen tut dem Netz nichts.
+  listeners.mousedown({ button: 0, clientX: hub.x, clientY: hub.y });
+  listeners.mouseup({});
+  layer.draw(ctx, 1 / 60, viewport);
+  expect(sim.grab).toBeNull();
+  expect(sim.torn).toBe(0);
+  // Packen und ziehen: die Spinne sitzt noch drin und flieht über den Ankerfaden.
+  hub.x = sim.nodes[0].x;
+  hub.y = sim.nodes[0].y;
+  listeners.mousedown({ button: 0, clientX: hub.x, clientY: hub.y });
+  listeners.mousemove({ clientX: hub.x + 20, clientY: hub.y + 20 });
+  expect(sim.grab).not.toBeNull();
+  expect(sim.grab.nodes.map((entry) => entry.index)).toContain(0);
+  expect(sim.patrol).toMatchObject({ leaving: true });
+  for (let step = 1; step <= 40; step += 1) {
+    listeners.mousemove({ clientX: hub.x + 20 + step * 12, clientY: hub.y + 20 + step * 12 });
+    layer.draw(ctx, 1 / 60, viewport);
+  }
+  // die Hand hält die Nabe genau, alle drei Anker sind gerissen, das Netz ist frei und zusammengefaltet
+  expect(sim.nodes[0].x).toBeCloseTo(hub.x + 20 + 40 * 12, 3);
+  expect(sim.nodes[0].y).toBeCloseTo(hub.y + 20 + 40 * 12, 3);
+  expect(sim.torn).toBe(3);
+  expect(sim.free).toBe(true);
+  expect(sim.nodes.filter((node) => node.anchor).every((node) => !node.pinned)).toBe(true);
+  expect(sim.threads.filter((thread) => thread.kind === "spiral").every((thread) => thread.rest < thread.rest0)).toBe(true);
+  expect(sim.alpha).toBe(1);
+  // Losgelassen: es fliegt, verblasst und ist weg; nach der Pause beginnt ein neues Netz mit anderem Plan - und Bau.
+  listeners.mouseup({});
+  expect(sim.grab).toBeNull();
+  for (let n = 0; n < 60 * 8 && !sim.gone; n += 1) layer.draw(ctx, 1 / 60, viewport);
+  expect(sim.gone).toBe(true);
+  expect(layer.sim).toBeNull();
+  expect(layer.cycle).toBe(1);
+  for (let n = 0; n < 60 * 45 && !layer.sim; n += 1) layer.draw(ctx, 1 / 60, viewport);
+  expect(layer.sim).not.toBeNull();
+  expect(layer.sim.done).toBe(false);
+  expect(layer.sim.plan.seed).not.toBe(0.42);
+  layer.dispose();
+  expect(Object.keys(listeners)).toEqual([]);
+});
+
+test("Windstoß: bleibt die Spinne lange fort, reißt ein Anker - das Netz sackt zusammen und hängt, dann reißt der Rest und es fliegt davon", () => {
+  const sim = createSim(buildPlan(0.42), { radius: 100, origin: { x: 0, y: 0 }, prebuilt: true });
+  const half = () => 0.5;
+  sendSpiderAway(sim, half);
+  for (let n = 0; n < 600 && !sim.spider.away; n += 1) advanceIdle(sim, 0.1, half);
+  expect(sim.spider.away).toBe(true);
+  expect(sim.gustIn).toBeGreaterThanOrEqual(GUST_AFTER[0]);
+  sim.gustIn = 0.5;
+  sim.awayFor = 1000;
+  for (let n = 0; n < 8; n += 1) {
+    advanceIdle(sim, 0.1, half);
+    stepPhysics(sim, 1 / 60, half);
+  }
+  expect(sim.torn).toBe(1);
+  expect(sim.free).toBe(false);
+  // Angerissen: das Netz hängt an zwei Ankern und zieht sich zusammen (die Windungen werden kürzer) - und bleibt zusammen.
+  const spread = () => {
+    const free = sim.nodes.filter((node) => !node.anchor);
+    const cx = free.reduce((sum, node) => sum + node.x, 0) / free.length;
+    const cy = free.reduce((sum, node) => sum + node.y, 0) / free.length;
+    return free.reduce((sum, node) => sum + Math.hypot(node.x - cx, node.y - cy), 0) / free.length;
+  };
+  const before = spread();
+  for (let n = 0; n < 120; n += 1) stepPhysics(sim, 1 / 60, half);
+  expect(spread()).toBeLessThan(before * 0.85);
+  expect(sim.nodes.every((node) => Math.abs(node.x) < 600 && Math.abs(node.y) < 600)).toBe(true);
+  expect(sim.nodes.filter((node) => node.anchor && node.pinned).length).toBe(2);
+  for (let n = 0; n < 200 && !sim.free; n += 1) {
+    advanceIdle(sim, 0.1, half);
+    stepPhysics(sim, 1 / 60, half);
+  }
+  expect(sim.free).toBe(true);
+  for (let n = 0; n < 60 * 8 && !sim.gone; n += 1) stepPhysics(sim, 1 / 60, half);
+  expect(sim.gone).toBe(true);
+  // Ein loses Netz wird bei neuer Fenstergröße nicht neu ausgemessen, es ist dann weg (Ebene).
+  const listeners = {};
+  const win = { innerWidth: 1200, scrollY: 0, addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: () => {} };
+  const layer = createWebLayer({ seed: 0.42, corner: "tl", factor: 1, build: false, rng: half }, win);
+  const ctx = fakeContext([]);
+  layer.draw(ctx, 1 / 60, { width: 1200, height: 800 });
+  tearAnchor(layer.sim);
+  layer.draw(ctx, 1 / 60, { width: 1000, height: 800 });
+  expect(layer.sim).toBeNull();
 });

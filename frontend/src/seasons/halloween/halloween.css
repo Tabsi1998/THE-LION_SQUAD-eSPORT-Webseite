@@ -40,29 +40,31 @@
 @keyframes tls-thread-detach { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(90px, -160px) rotate(14deg); opacity: 0; } }
 @keyframes tls-runner-legs { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(9deg); } }
 .tls-rappel { position: absolute; top: 0; width: 0; border-left: 1px solid rgba(170, 225, 240, 0.34); z-index: 40; pointer-events: none; transform-origin: top center; }
-.tls-rappel--left { left: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
-.tls-rappel--right { right: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
+.tls-rappel--left, .tls-rappel-runner--left { left: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
+.tls-rappel--right, .tls-rappel-runner--right { right: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
 .tls-rappel--sway { animation: tls-thread-sway 1.7s ease-in-out infinite alternate; }
 .tls-rappel--detach { animation: tls-thread-detach 2.2s ease-in forwards; }
 .tls-rappel__spider { position: absolute; bottom: 0; left: 0; transform: translate(-50%, 0); }
 /* das lose Fadenende, wenn die Spinne weg ist: ein kleiner Bogen */
 .tls-rappel__end { position: absolute; bottom: -8px; left: -1px; width: 12px; height: 9px; border: 1px solid rgba(170, 225, 240, 0.34); border-top: 0; border-left: 0; border-radius: 0 0 9px 0; }
+/* die weglaufende Spinne: ein eigener Halter am Fußpunkt des Fadens - schwingt nicht mit dem Faden */
+.tls-rappel-runner { position: absolute; width: 0; height: 0; z-index: 40; pointer-events: none; }
 .tls-rappel__runner { position: absolute; bottom: -8px; left: 0; transform-origin: center; }
 .tls-rappel__runner .tls-spider__leg { animation: tls-runner-legs 0.28s ease-in-out infinite; }
 
-/* Hängende Fledermäuse (#661): am Ende einer Überschrift, unter einem Menüpunkt, am Löwen; klickbar */
-@keyframes tls-hbat-sway { 0%, 100% { rotate: calc(-2.5deg * var(--season-wind, 0.6) / 0.6); } 50% { rotate: calc(2.5deg * var(--season-wind, 0.6) / 0.6); } }
-@keyframes tls-hbat-twitch { 0%, 92%, 100% { transform: scaleX(1); } 94% { transform: scaleX(1.25); } 97% { transform: scaleX(0.9); } }
+/* Hängende Fledermäuse (#661, Runde V): still unter Menüpunkten (am Fenster - die Kopfzeile klebt oben), an
+   Buchstaben, Karten und dem Löwen (in der Seite). Keine eigene Bewegung; nur wer sie berührt, sieht die Flügel zucken,
+   und wer klickt, scheucht sie. */
 @keyframes tls-bat-flap { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.45); } }
-.tls-hbats { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 58; }
+.tls-hbats { top: 0; left: 0; width: 0; height: 0; z-index: 58; }
+.tls-hbats--fixed { position: fixed; }
+.tls-hbats--page { position: absolute; }
 .tls-hbat { position: absolute; top: 0; left: 0; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; }
-.tls-hbat--hanging { cursor: pointer; pointer-events: auto; transform-origin: 13px 0; animation: tls-hbat-sway 6s ease-in-out var(--hbat-delay, 0s) infinite; }
-.tls-hbat--hanging .tls-hbat__shape { margin-left: -13px; }
-.tls-hbat--hanging .tls-hbat__wing { transform-origin: 20px 12px; animation: tls-hbat-twitch 11s ease-in-out var(--hbat-delay, 0s) infinite; }
+.tls-hbat--hanging { cursor: pointer; pointer-events: auto; }
+.tls-hbat--hanging .tls-hbat__wing { transform-origin: 20px 12px; transition: transform 0.25s ease-out; }
 .tls-hbat--hanging:hover .tls-hbat__wing--l { transform: rotate(-14deg); }
 .tls-hbat--hanging:hover .tls-hbat__wing--r { transform: rotate(14deg); }
 .tls-hbat--flying { pointer-events: none; will-change: transform; }
-.tls-hbat--flying .tls-hbat__shape { margin-left: -22px; margin-top: -12px; }
 .tls-bat__wing { transform-origin: 40px 24px; animation: tls-bat-flap 0.18s ease-in-out infinite; }
 
 /* Mini-Friedhof (#662): winzige Grabsteine auf dem Strich über dem Impressum; Geister steigen auf und treiben davon */
@@ -92,12 +94,16 @@
 .tls-footer-cat { position: absolute; left: 2.5rem; bottom: 0; transform: translateY(-100%); line-height: 0; cursor: pointer; pointer-events: auto; transition: left var(--cat-seconds, 0s) linear; }
 .tls-footer-cat--line { bottom: auto; }
 .tls-footer-cat--flip { transform: translateY(-100%) scaleX(-1); }
-/* Beim Klick trottet die Katze ein Stück weiter: Beine laufen, der Körper wippt leicht */
-@keyframes tls-cat-trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.5px); } }
-@keyframes tls-cat-leg { 0%, 100% { transform: rotate(-14deg); } 50% { transform: rotate(14deg); } }
+/* Beim Klick trottet die Katze ein Stück weiter: die Beine schwingen aus der Hüfte (Gruppe a und b gegenläufig, ein
+   Trab), die Pfoten setzen sichtbar auf, der Körper wippt je Schritt, der Kopf nickt leicht mit */
+@keyframes tls-cat-trot { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes tls-cat-leg { 0%, 100% { transform: rotate(-26deg); } 50% { transform: rotate(26deg); } }
+@keyframes tls-cat-nod { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(3deg); } }
 .tls-footer-cat--walk .tls-cat-walking { animation: tls-cat-trot 0.42s ease-in-out infinite; }
-.tls-cat-walking__leg { transform-origin: 50% 0; animation: tls-cat-leg 0.42s ease-in-out infinite; }
+.tls-footer-cat--walk .tls-cat-walking .tls-cat__head { transform-origin: 30px 44px; animation: tls-cat-nod 0.42s ease-in-out infinite; }
+.tls-cat-walking__leg { animation: tls-cat-leg 0.42s ease-in-out infinite; }
 .tls-cat-walking__leg--b { animation-delay: -0.21s; }
+.tls-cat-walking__leg--far { opacity: 0.8; }
 .tls-cat-walking__tail { transform-origin: 68px 44px; animation: tls-cat-tail 1.4s ease-in-out infinite; }
 .tls-cat__tail { transform-origin: 60px 76px; animation: tls-cat-tail 4.5s ease-in-out infinite; }
 .tls-cat__head { transform-origin: 34px 34px; transform: rotate(var(--head-tilt, 0deg)); transition: transform 0.25s ease-out; }
@@ -121,9 +127,16 @@
 .tls-lantern__eyes { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform 0.12s ease-out; }
 .tls-lantern__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #FFB366; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(255, 179, 102, 0.35); padding: 0.3rem 0.55rem; border-radius: 0.25rem; z-index: 63; }
 .tls-footer-pumpkins { position: absolute; right: 2rem; bottom: 0; display: flex; align-items: flex-end; gap: 0.4rem; transform: translateY(-100%); }
+/* Jeder Kürbis im Footer grüßt beim Klick wie die Laterne (Rückmeldung 28.09.): hüpft kurz, der Gruß steht darüber */
+@keyframes tls-pumpkin-hop { 0%, 100% { transform: none; } 25% { transform: translateY(-7px) rotate(-5deg); } 55% { transform: translateY(0) rotate(3deg); } 80% { transform: translateY(-2px) rotate(0deg); } }
+.tls-pumpkin-spot { position: relative; display: block; line-height: 0; }
+.tls-pumpkin-button { display: block; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; cursor: pointer; pointer-events: auto; transform-origin: bottom center; }
+.tls-pumpkin-button:focus-visible { outline: 2px solid #FFB366; outline-offset: 2px; }
+.tls-pumpkin-button--open { animation: tls-pumpkin-hop 0.9s ease-out 1; }
+.tls-pumpkin__note { top: auto; bottom: 100%; left: auto; right: 0; margin-top: 0; margin-bottom: 0.5rem; line-height: 1.3; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-cat-walking, .tls-cat-walking__leg, .tls-cat-walking__tail, .tls-hbat--hanging, .tls-hbat__wing, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
+  .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-cat-walking, .tls-cat-walking .tls-cat__head, .tls-cat-walking__leg, .tls-cat-walking__tail, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
   .tls-footer-cat { transition: none; }
-  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-hbats, .tls-ghosts { display: none; }
+  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts { display: none; }
 }

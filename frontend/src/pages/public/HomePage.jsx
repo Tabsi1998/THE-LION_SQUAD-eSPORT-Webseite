@@ -260,7 +260,7 @@ function BoardTeaser({ contacts }) {
       <SectionHeader icon={Users} accent="#FFD700" title="Ansprechpartner" actionLabel="Ganzer Vorstand" actionTo="/board" />
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {contacts.map((contact) => (
-          <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
+          <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} data-season-anchor="card" className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
             {contact.avatar ? (
               <LazyImg src={contact.avatar} alt="" className="w-16 h-16 md:w-20 md:h-20 rounded-sm object-cover shrink-0" />
             ) : (
@@ -279,7 +279,7 @@ function BoardTeaser({ contacts }) {
 
 function FeaturedNews({ news }) {
   return (
-    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition min-w-0">
+    <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} data-season-anchor="card" className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition min-w-0">
       <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
           <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
@@ -400,6 +400,7 @@ function NewsCard({ news, featured = false }) {
     <Link
       to={`/news/${news.slug}`}
       data-testid={`home-news-${news.slug}`}
+      data-season-anchor="card"
       className={`group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden transition flex flex-col ${featured ? "lg:col-span-2 lg:row-span-2" : ""}`}
     >
       {news.banner_url ? (

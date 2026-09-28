@@ -194,7 +194,15 @@ test("Abseil-Spinne: seilt sich bis zum Strich ab, lässt los und läuft", async
   expect(thread.style.height).toBe(`${420 - 80}px`);
   expect(["release", "run"]).toContain(thread.getAttribute("data-phase"));
   await act(() => new Promise((resolve) => setTimeout(resolve, 800)));
-  expect(["run", "sway"]).toContain(screen.getByTestId("halloween-rappel").getAttribute("data-phase"));
+  const running = screen.getByTestId("halloween-rappel");
+  expect(running.getAttribute("data-phase")).toBe("run");
+  // Der Faden schwingt schon, sobald sie losgelassen hat - die Läuferin steht daneben, nicht im schwingenden Faden.
+  expect(running.className).toContain("tls-rappel--sway");
+  const runner = screen.getByTestId("halloween-rappel-runner");
+  expect(running.contains(runner)).toBe(false);
+  expect(runner.className).toContain("tls-rappel-runner--left");
+  expect(runner.style.top).toBe(running.style.height);
+  expect(runner.querySelector(".tls-rappel__runner")).not.toBeNull();
   render(<RappelSpider spec={null} active />);
   expect(screen.getAllByTestId("halloween-rappel").length).toBe(1);
 });
@@ -230,17 +238,27 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   mountFixture('<footer style="position:relative"><div data-season-line="footer"></div></footer>');
   Object.defineProperty(document.querySelector("[data-season-line]"), "offsetTop", { value: 250, configurable: true });
   const footer = mount(<Footer season={halloween()} />, footerPath);
-  const pumpkins = footer.container.querySelectorAll(".tls-footer-pumpkins > .tls-pumpkin");
+  const pumpkins = footer.container.querySelectorAll(".tls-footer-pumpkins .tls-pumpkin");
   expect(pumpkins.length).toBeGreaterThanOrEqual(1);
   expect(Number(pumpkins[0].getAttribute("width"))).toBeGreaterThanOrEqual(46);
+  // Jeder Kürbis grüßt beim Klick wie die Laterne; heute (nicht der 31.10.) zählt der Klick nicht.
+  const pumpkinButtons = screen.getAllByTestId("halloween-footer-pumpkin");
+  expect(pumpkinButtons.length).toBe(layout.footerPumpkins.length);
+  fireEvent.click(pumpkinButtons[pumpkinButtons.length - 1]);
+  expect(screen.getByTestId("halloween-pumpkin-note")).toHaveTextContent("Happy Halloween von THE LION SQUAD");
+  expect(pumpkinButtons[pumpkinButtons.length - 1].className).toContain("tls-pumpkin-button--open");
+  expect(signals.recordSignal).not.toHaveBeenCalled();
   const cat = screen.getByTestId("halloween-cat");
   expect(cat.style.top).toBe("250px");
   expect(cat.style.left).toBe(`${layout.cat.x}px`);
   expect(footer.container.querySelector(".tls-cat__tail")).not.toBeNull();
-  // Klick: die Katze trottet zu einer anderen Stelle des Strichs und sitzt danach wieder.
+  // Klick: die Katze trottet zu einer anderen Stelle des Strichs und sitzt danach wieder - mit vier Beinen samt Pfoten.
   fireEvent.click(cat);
   expect(cat.getAttribute("data-walking")).toBe("1");
   expect(footer.container.querySelector(".tls-cat-walking")).not.toBeNull();
+  expect(footer.container.querySelectorAll(".tls-cat-walking__leg").length).toBe(4);
+  expect(footer.container.querySelectorAll(".tls-cat-walking__paw").length).toBe(4);
+  expect(footer.container.querySelectorAll(".tls-cat-walking__leg--b").length).toBe(2);
   expect(cat.style.left).not.toBe(`${layout.cat.x}px`);
   expect(Math.abs(parseInt(cat.style.left, 10) - layout.cat.x)).toBeGreaterThanOrEqual(120);
   expect(screen.getAllByTestId("halloween-grave").length).toBe(layout.graves.length);

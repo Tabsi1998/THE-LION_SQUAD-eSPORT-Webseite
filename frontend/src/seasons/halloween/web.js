@@ -1,9 +1,13 @@
-// Rundes Netz mit Physik (#660, Nachbesserung nach #668 live): ein Bauplan in der Reihenfolge einer echten Radnetzspinne
-// (Ankerfäden und Rahmen, Speichen, Nabe, Fangspirale von außen nach innen), Verlet-Physik für jeden Faden
-// (Zeiger stupst an, Scrollen gibt einen Stoß, Wind bewegt), Zeichnen auf dem gemeinsamen Canvas samt Spinne,
+// Rundes Netz mit Physik (#660, Nachbesserung nach #668 live, Runde V): ein Bauplan in der Reihenfolge einer echten
+// Radnetzspinne (Ankerfäden und Rahmen, Speichen, Nabe, Fangspirale von außen nach innen), Verlet-Physik für jeden
+// Faden (Zeiger stupst an, Scrollen gibt einen Stoß, Wind bewegt), Zeichnen auf dem gemeinsamen Canvas samt Spinne,
 // der man beim Spinnen zuschauen kann - und ein statisches SVG für „dezent“ und „Bewegung reduzieren“.
 // Während des Baus steht das Netz straff (alle Knoten fest), erst das fertige Netz schwingt; jeder Knoten hat
 // eine weiche Rückstellung zur Ruheform, Stöße und Schritte sind begrenzt - so knautscht nichts mehr.
+// Neu (Rückmeldung 28.09.): Die Spinne verlässt ihr fertiges Netz zeitweise über den Ankerfaden in die Ecke. Wer
+// dann mit gedrückter Maus ins Netz greift und zieht, hat es an der Hand: die Ankerfäden reißen nacheinander, das
+// Netz faltet sich zusammen und hängt am Zeiger; losgelassen trägt es der Wind davon. Bleibt die Spinne lange fort,
+// reißt auch ein Windstoß die Anker. Danach kommt die Spinne zurück und spinnt ein neues Netz - jedes anders.
 // Der Plan rechnet in Nabe-Koordinaten mit Radius 1, erst die Simulation rechnet in Pixel um. Kein Paket.
 import { hashString, mulberry32 } from "../rng";
 
@@ -40,6 +44,36 @@ const IMPULSE_MAX = 1.5;
 export const IMPULSE_GAP_MS = 150;
 const POINTER_RADIUS = 42;
 const POINTER_PUSH = 2.2;
+
+/** Greifen: Knoten so nah am Zeiger kommen mit; erst nach so viel Weg ist es ein Ziehen und kein Klick. */
+export const GRAB_RADIUS = 34;
+export const GRAB_MIN_MOVE = 6;
+/** Die Anker reißen nacheinander, je nach Zugweg in Radien: der fernste zuerst. */
+export const TEAR_PULL = [0.35, 0.7, 1.05];
+/** Angerissen oder frei: Windungen und Speichen ziehen sich je Schritt zusammen, bis auf einen Teil der Ruhelänge. */
+const FOLD_SHRINK = 0.992;
+const FOLD_MIN = 0.35;
+/** Ein angerissenes Netz hängt schwer und faltet sich unter der Schwerkraft zusammen. */
+const FOLD_GRAVITY = 260;
+const FOLD_DAMPING = 0.965;
+/** Ein freies Netz ist leicht: wenig Schwerkraft, viel Wind, ein Hauch Auftrieb, Geflatter; es verblasst beim Davonfliegen. */
+const FLY_GRAVITY = 60;
+const FLY_DAMPING = 0.985;
+const FLY_STEP = 9;
+const FLY_WIND = 3;
+const FLY_LIFT = 40;
+const FLY_FLUTTER = 0.9;
+export const FADE_AFTER = 1.2;
+export const FADE_SECONDS = 2.4;
+/** Sekunden (von–bis): bis die Spinne das fertige Netz verlässt, wie lange sie fort ist, bis ein Windstoß reißt, bis ein neues Netz beginnt. */
+export const LEAVE_AFTER = [50, 110];
+export const AWAY_FOR = [40, 120];
+export const GUST_AFTER = [90, 300];
+export const RESPAWN_AFTER = [15, 40];
+
+function between(rng, [low, high]) {
+  return low + rng() * (high - low);
+}
 
 export function nodeId(i, k, rings = RINGS) {
   return 1 + i * (rings + 1) + k;
@@ -79,7 +113,8 @@ export function webRadius(width, factor = 1) {
 /**
  * Bauplan: Knoten (Einheitsradius, Nabe im Ursprung), Fäden mit Art und Ruhelänge, Reihenfolge des Baus als
  * Schritte { thread, from, to } (Faden spinnen) oder { walk: true, from, to } (nur laufen). Speichen, Windungen
- * und Drehsinn kommen aus dem Seed - kein Netz gleicht dem anderen.
+ * und Drehsinn kommen aus dem Seed - kein Netz gleicht dem anderen. `exits` sind die Ankerwege (Rahmenknoten,
+ * Zwischenknoten, Anker), über die die Spinne das Netz verlässt.
  */
 export function buildPlan(seed = 0.37) {
   const rng = mulberry32(hashString(`web:${seed}`));
@@ -187,7 +222,8 @@ export function buildPlan(seed = 0.37) {
   const dew = [];
   const dewRng = mulberry32(hashString(`dew:${seed}`));
   for (let n = 0; n < 7; n += 1) dew.push(id(Math.floor(dewRng() * radii), 2 + Math.floor(dewRng() * (rings - 3))));
-  return { nodes, threads, order, dew, seed, radii, rings, turn };
+  const exits = anchorAt.map((entry) => ({ frame: entry.frame, mid: entry.mid, anchor: entry.anchor }));
+  return { nodes, threads, order, dew, exits, seed, radii, rings, turn };
 }
 
 /** Knotenposition in Pixel: Ecke als Ursprung, `mirror` spiegelt für die rechte Ecke. */
@@ -207,16 +243,21 @@ export function staticLines(plan, radius, mirror = false) {
   });
 }
 
-/** Die Simulation in Pixel: Knoten mit Vorposition und Ruheform (Verlet), Fäden mit Ruhelänge und Baufortschritt. */
+/**
+ * Die Simulation in Pixel: Knoten mit Vorposition und Ruheform (Verlet), Fäden mit Ruhelänge und Baufortschritt;
+ * dazu der Zustand des Netzes: gerissene Anker (`torn`), frei (`free`), an der Hand (`grab`), Deckkraft, weg (`gone`),
+ * und die Uhren der Spinne (`leaveIn`, `awayFor`, `gustIn`).
+ */
 export function createSim(plan, { radius, origin, mirror = false, prebuilt = false }) {
   const nodes = plan.nodes.map((node) => {
     const p = toPixels(node, radius, mirror, origin);
-    return { x: p.x, y: p.y, px: p.x, py: p.y, rx: p.x, ry: p.y, anchor: Boolean(node.pinned), pinned: true, links: 0 };
+    return { x: p.x, y: p.y, px: p.x, py: p.y, rx: p.x, ry: p.y, anchor: Boolean(node.pinned), pinned: true, held: false, links: 0 };
   });
-  const threads = plan.threads.map((thread) => ({ ...thread, rest: thread.rest * radius, built: 0 }));
+  const threads = plan.threads.map((thread) => ({ ...thread, rest: thread.rest * radius, rest0: thread.rest * radius, built: 0 }));
   const sim = {
     plan, nodes, threads, radius, origin, mirror, step: 0, t: 0, done: false, pointer: null, wind: { x: 0, y: 0 }, impulse: { x: 0, y: 0 },
-    spider: { x: nodes[0].x, y: nodes[0].y, heading: 0, phase: 0, moving: false }, idle: 45, patrol: null,
+    spider: { x: nodes[0].x, y: nodes[0].y, heading: 0, phase: 0, moving: false, away: false }, idle: 45, patrol: null,
+    torn: 0, free: false, grab: null, alpha: 1, flying: 0, gone: false, leaveIn: null, awayFor: 0, gustIn: null,
   };
   if (prebuilt) {
     threads.forEach((thread) => finishThread(sim, thread));
@@ -257,6 +298,7 @@ export function resizeSim(sim, { radius, origin }) {
   });
   sim.threads.forEach((thread, index) => {
     thread.rest = sim.plan.threads[index].rest * radius;
+    thread.rest0 = thread.rest;
   });
   const item = sim.plan.order[Math.min(sim.step, sim.plan.order.length - 1)];
   const at = sim.nodes[sim.done ? 0 : item.from];
@@ -297,27 +339,77 @@ export function advanceBuild(sim, dt) {
   }
 }
 
-/** Fertiges Netz: die Spinne sitzt in der Nabe, atmet, und geht alle 40–90 s einmal eine Speiche hinaus und zurück. */
+/** Der Weg aus dem Netz: Nabe, die Speiche zum ersten Anker hinaus, Zwischenknoten, Anker (die Ecke). */
+export function exitPath(sim) {
+  const exit = sim.plan.exits[0];
+  const { rings } = sim.plan;
+  const path = [0];
+  for (let k = 0; k <= rings; k += 1) path.push(nodeId(exit.frame, k, rings));
+  path.push(exit.mid, exit.anchor);
+  return path;
+}
+
+/** Die Spinne verlässt das Netz über den Ankerfaden; `hurry`, wenn jemand ins Netz greift. */
+export function sendSpiderAway(sim, rng = Math.random, hurry = false) {
+  if (sim.spider.away || (sim.patrol && sim.patrol.leaving)) return;
+  sim.patrol = { path: exitPath(sim), index: 0, t: 0, leaving: true, speed: hurry ? 3 : 1.2 };
+  sim.leaveIn = between(rng, LEAVE_AFTER);
+}
+
+/**
+ * Fertiges Netz: die Spinne sitzt in der Nabe, atmet, geht alle 40–90 s einmal eine Speiche hinaus und zurück und
+ * verlässt das Netz nach 50–110 s über den Ankerfaden in die Ecke; nach 40–120 s kommt sie zurück - sofern das Netz
+ * noch ganz ist. Bleibt sie länger fort als ein Windstoß braucht, reißen die Anker nacheinander; ein angerissenes
+ * Netz reißt nach kurzer Zeit ganz.
+ */
 export function advanceIdle(sim, dt, rng = Math.random) {
   const spider = sim.spider;
   const { radii, rings } = sim.plan;
+  if (sim.torn > 0 && !sim.free && !sim.grab) {
+    if (sim.gustIn === null) sim.gustIn = 6 + rng() * 12;
+    sim.gustIn -= dt;
+    if (sim.gustIn <= 0) {
+      tearAnchor(sim);
+      sim.gustIn = 2 + rng() * 3;
+    }
+  }
   if (!sim.patrol) {
-    sim.idle -= dt;
-    spider.phase += dt * 1.5;
-    if (sim.idle > 0) return;
-    const radius = Math.floor(rng() * radii);
-    const path = [];
-    for (let k = 0; k <= rings; k += 1) path.push(nodeId(radius, k, rings));
-    sim.patrol = { path: [0, ...path, ...path.slice().reverse(), 0], index: 0, t: 0 };
-    sim.idle = 40 + rng() * 50;
+    if (spider.away) {
+      sim.awayFor -= dt;
+      if (sim.torn === 0 && !sim.grab) {
+        sim.gustIn -= dt;
+        if (sim.gustIn <= 0) {
+          tearAnchor(sim);
+          sim.gustIn = 2 + rng() * 3;
+        } else if (sim.awayFor <= 0) {
+          sim.patrol = { path: exitPath(sim).reverse(), index: 0, t: 0, returning: true, speed: 1.2 };
+        }
+      }
+      if (!sim.patrol) return;
+    } else {
+      if (sim.leaveIn === null) sim.leaveIn = between(rng, LEAVE_AFTER);
+      sim.idle -= dt;
+      sim.leaveIn -= dt;
+      spider.phase += dt * 1.5;
+      if (sim.leaveIn <= 0) {
+        sendSpiderAway(sim, rng);
+      } else {
+        if (sim.idle > 0) return;
+        const radius = Math.floor(rng() * radii);
+        const path = [];
+        for (let k = 0; k <= rings; k += 1) path.push(nodeId(radius, k, rings));
+        sim.patrol = { path: [0, ...path, ...path.slice().reverse(), 0], index: 0, t: 0, speed: 1 };
+        sim.idle = 40 + rng() * 50;
+      }
+    }
   }
   const patrol = sim.patrol;
   const from = sim.nodes[patrol.path[patrol.index]];
   const to = sim.nodes[patrol.path[patrol.index + 1]];
   const length = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
-  patrol.t += (dt * WALK_SPEED * 0.55) / length;
+  patrol.t += (dt * WALK_SPEED * 0.55 * (patrol.speed || 1)) / length;
   spider.moving = true;
-  spider.phase += dt * 16;
+  spider.phase += dt * 16 * (patrol.speed || 1);
   spider.heading = Math.atan2(to.y - from.y, to.x - from.x);
   spider.x = from.x + (to.x - from.x) * Math.min(1, patrol.t);
   spider.y = from.y + (to.y - from.y) * Math.min(1, patrol.t);
@@ -327,6 +419,15 @@ export function advanceIdle(sim, dt, rng = Math.random) {
     if (patrol.index >= patrol.path.length - 1) {
       sim.patrol = null;
       spider.moving = false;
+      if (patrol.leaving) {
+        spider.away = true;
+        sim.awayFor = between(rng, AWAY_FOR);
+        sim.gustIn = between(rng, GUST_AFTER);
+      } else if (patrol.returning) {
+        spider.away = false;
+        sim.leaveIn = between(rng, LEAVE_AFTER);
+        sim.idle = 20 + rng() * 30;
+      }
     }
   }
 }
@@ -341,41 +442,129 @@ function clamp(value, limit) {
   return Math.max(-limit, Math.min(limit, value));
 }
 
-/** Ein Physikschritt: Stoß, Kräfte (Schwerkraft, Wind, Zeiger), weiche Rückstellung, dann die Fäden auf Ruhelänge ziehen. */
-export function stepPhysics(sim, dt) {
+/** Ein Anker reißt: sein Knoten wird frei und der Faden hängt lose am Netz. Ohne Anker ist das Netz frei. */
+export function tearAnchor(sim, index = null) {
+  const pinned = sim.nodes.map((node, i) => ({ node, i })).filter((entry) => entry.node.anchor && entry.node.pinned);
+  if (!pinned.length) return false;
+  const pick = pinned.find((entry) => entry.i === index) || pinned[0];
+  pick.node.pinned = false;
+  sim.torn += 1;
+  sim.free = pinned.length === 1;
+  return true;
+}
+
+/** Knoten nahe dem Zeiger (keine Anker, nur verbundene): die Hand greift ins Netz. */
+export function grabNodes(sim, x, y, radius = GRAB_RADIUS) {
+  return sim.nodes
+    .map((node, index) => ({ index, node, d: Math.hypot(node.x - x, node.y - y) }))
+    .filter((entry) => entry.d < radius && !entry.node.anchor && entry.node.links > 0)
+    .sort((a, b) => a.d - b.d)
+    .slice(0, 5)
+    .map((entry) => ({ index: entry.index, dx: entry.node.x - x, dy: entry.node.y - y }));
+}
+
+export function startGrab(sim, x, y, nodes) {
+  sim.grab = { x, y, x0: x, y0: y, nodes };
+  nodes.forEach((entry) => {
+    sim.nodes[entry.index].held = true;
+  });
+}
+
+export function moveGrab(sim, x, y) {
+  if (!sim.grab) return;
+  sim.grab.x = x;
+  sim.grab.y = y;
+}
+
+/** Losgelassen: ein freies Netz fliegt davon, ein angerissenes hängt noch kurz und reißt dann von selbst. */
+export function releaseGrab(sim, rng = Math.random) {
+  if (!sim.grab) return;
+  sim.grab.nodes.forEach((entry) => {
+    sim.nodes[entry.index].held = false;
+  });
+  sim.grab = null;
+  if (sim.torn > 0 && !sim.free) sim.gustIn = 6 + rng() * 12;
+}
+
+/** Beim Ziehen reißen die Anker mit dem Zugweg, der fernste zuerst. */
+function tearByPull(sim) {
+  const pull = Math.hypot(sim.grab.x - sim.grab.x0, sim.grab.y - sim.grab.y0) / sim.radius;
+  while (sim.torn < TEAR_PULL.length && pull > TEAR_PULL[sim.torn]) {
+    const pinned = sim.nodes.map((node, i) => ({ node, i })).filter((entry) => entry.node.anchor && entry.node.pinned);
+    if (!pinned.length) break;
+    pinned.sort((a, b) => Math.hypot(b.node.x - sim.grab.x, b.node.y - sim.grab.y) - Math.hypot(a.node.x - sim.grab.x, a.node.y - sim.grab.y));
+    tearAnchor(sim, pinned[0].i);
+  }
+}
+
+/**
+ * Ein Physikschritt: Stoß, Kräfte (Schwerkraft, Wind, Zeiger), weiche Rückstellung, dann die Fäden auf Ruhelänge
+ * ziehen. An der Hand oder angerissen fällt die Rückstellung weg - das Netz verformt sich, faltet sich und hängt;
+ * frei fliegt es mit dem Wind und verblasst, bis es weg ist.
+ */
+export function stepPhysics(sim, dt, rng = Math.random) {
+  if (sim.gone) return;
   const ix = clamp(sim.impulse.x, IMPULSE_MAX);
   const iy = clamp(sim.impulse.y, IMPULSE_MAX);
   sim.impulse.x = 0;
   sim.impulse.y = 0;
   if (ix || iy) {
     sim.nodes.forEach((node) => {
-      if (node.pinned) return;
+      if (node.pinned || node.held) return;
       node.px -= ix;
       node.py -= iy;
     });
   }
+  const loose = sim.torn > 0 || Boolean(sim.grab);
+  const flying = sim.free && !sim.grab;
+  if (flying) {
+    sim.flying += dt;
+    sim.alpha = Math.max(0, 1 - Math.max(0, sim.flying - FADE_AFTER) / FADE_SECONDS);
+    if (sim.alpha <= 0) {
+      sim.gone = true;
+      return;
+    }
+  }
+  const damping = flying ? FLY_DAMPING : loose ? FOLD_DAMPING : DAMPING;
+  const maxStep = flying ? FLY_STEP : sim.grab ? 6 : MAX_STEP;
+  const gravity = flying ? FLY_GRAVITY : loose ? FOLD_GRAVITY : GRAVITY;
+  const windX = flying ? sim.wind.x * FLY_WIND : sim.wind.x;
+  const lift = flying ? -(Math.abs(sim.wind.x) * 0.5 + FLY_LIFT) : 0;
   const steps = Math.min(4, Math.max(1, Math.ceil(dt / 0.02)));
   const h = dt / steps;
   for (let s = 0; s < steps; s += 1) {
+    if (sim.grab) {
+      sim.grab.nodes.forEach((entry) => {
+        const node = sim.nodes[entry.index];
+        node.x = sim.grab.x + entry.dx;
+        node.y = sim.grab.y + entry.dy;
+        node.px = node.x;
+        node.py = node.y;
+      });
+    }
     sim.nodes.forEach((node) => {
-      if (node.pinned) return;
-      const vx = (node.x - node.px) * DAMPING;
-      const vy = (node.y - node.py) * DAMPING;
+      if (node.pinned || node.held) return;
+      const vx = (node.x - node.px) * damping;
+      const vy = (node.y - node.py) * damping;
       node.px = node.x;
       node.py = node.y;
-      node.x += clamp(vx + sim.wind.x * h * h, MAX_STEP);
-      node.y += clamp(vy + (GRAVITY + sim.wind.y) * h * h, MAX_STEP);
-      node.x += (node.rx - node.x) * REST_PULL;
-      node.y += (node.ry - node.y) * REST_PULL;
-      const driftX = node.x - node.rx;
-      const driftY = node.y - node.ry;
-      const drift = Math.hypot(driftX, driftY);
-      const maxDrift = MAX_DRIFT * sim.radius;
-      if (drift > maxDrift) {
-        node.x = node.rx + (driftX / drift) * maxDrift;
-        node.y = node.ry + (driftY / drift) * maxDrift;
+      const flutterX = flying ? (rng() - 0.5) * FLY_FLUTTER : 0;
+      const flutterY = flying ? (rng() - 0.5) * FLY_FLUTTER : 0;
+      node.x += clamp(vx + windX * h * h + flutterX, maxStep);
+      node.y += clamp(vy + (gravity + sim.wind.y + lift) * h * h + flutterY, maxStep);
+      if (!loose) {
+        node.x += (node.rx - node.x) * REST_PULL;
+        node.y += (node.ry - node.y) * REST_PULL;
+        const driftX = node.x - node.rx;
+        const driftY = node.y - node.ry;
+        const drift = Math.hypot(driftX, driftY);
+        const maxDrift = MAX_DRIFT * sim.radius;
+        if (drift > maxDrift) {
+          node.x = node.rx + (driftX / drift) * maxDrift;
+          node.y = node.ry + (driftY / drift) * maxDrift;
+        }
       }
-      if (sim.pointer) {
+      if (sim.pointer && !sim.grab) {
         const dx = node.x - sim.pointer.x;
         const dy = node.y - sim.pointer.y;
         const d = Math.hypot(dx, dy);
@@ -387,28 +576,37 @@ export function stepPhysics(sim, dt) {
         }
       }
     });
+    if (loose) {
+      sim.threads.forEach((thread) => {
+        if (thread.kind === "anchor" || thread.kind === "frame") return;
+        thread.rest = Math.max(thread.rest0 * FOLD_MIN, thread.rest * FOLD_SHRINK);
+      });
+    }
     for (let iteration = 0; iteration < ITERATIONS; iteration += 1) {
       sim.threads.forEach((thread) => {
         if (thread.built < 1) return;
         const a = sim.nodes[thread.a];
         const b = sim.nodes[thread.b];
-        if (a.pinned && b.pinned) return;
+        const fixedA = a.pinned || a.held;
+        const fixedB = b.pinned || b.held;
+        if (fixedA && fixedB) return;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.hypot(dx, dy) || 0.001;
         const diff = ((dist - thread.rest) / dist) * STIFFNESS[thread.kind];
-        const share = a.pinned || b.pinned ? 1 : 0.5;
-        if (!a.pinned) {
+        const share = fixedA || fixedB ? 1 : 0.5;
+        if (!fixedA) {
           a.x += dx * diff * share;
           a.y += dy * diff * share;
         }
-        if (!b.pinned) {
+        if (!fixedB) {
           b.x -= dx * diff * share;
           b.y -= dy * diff * share;
         }
       });
     }
   }
+  if (sim.grab && !sim.free) tearByPull(sim);
 }
 
 /** Die Spinne auf dem Canvas: Körper aus zwei Teilen, acht Beine mit Kniegelenk, Augen im Türkis der Saison. */
@@ -452,13 +650,15 @@ export function drawSpider(ctx, spider, scale = 1.1) {
   ctx.restore();
 }
 
-/** Zeichnet die gebauten Fäden (den laufenden nur bis zur Spinne), Tautropfen und die Spinne. */
+/** Zeichnet die gebauten Fäden (den laufenden nur bis zur Spinne), Tautropfen und die Spinne - mit der Deckkraft des Netzes. */
 export function drawSim(ctx, sim, { showSpider = true } = {}) {
+  if (sim.gone) return;
   const passes = [
     { kinds: ["anchor", "frame", "radius", "hubring"], style: THREAD_MAIN, width: 0.9 },
     { kinds: ["spiral"], style: THREAD_FINE, width: 0.65 },
   ];
   ctx.save();
+  if (sim.alpha < 1) ctx.globalAlpha = sim.alpha;
   ctx.lineCap = "round";
   // Ein weicher Schein nur unter Ankern und Rahmen - wenige Linien, kein Filter.
   ctx.strokeStyle = THREAD_GLOW;
@@ -496,8 +696,8 @@ export function drawSim(ctx, sim, { showSpider = true } = {}) {
     ctx.arc(node.x, node.y, 1.4, 0, Math.PI * 2);
     ctx.fill();
   });
+  if (showSpider && !sim.spider.away) drawSpider(ctx, sim.spider);
   ctx.restore();
-  if (showSpider) drawSpider(ctx, sim.spider);
 }
 
 /** Sanfter Wind: Grundstärke mal einem langsamen Auf und Ab, damit das Netz nie ganz still hängt. */
@@ -506,20 +706,40 @@ export function windAt(seconds, base = 0.6) {
 }
 
 /**
- * Die Ebene für den gemeinsamen Loop: baut die Simulation für die Fenstergröße, hört auf Zeiger und Scrollen
- * (nur solange sie lebt) und zeichnet. `win` ist nur für Tests austauschbar.
+ * Die Ebene für den gemeinsamen Loop: baut die Simulation für die Fenstergröße, hört auf Zeiger, Maustaste und
+ * Scrollen (nur solange sie lebt) und zeichnet. Ist ein Netz davongeflogen, beginnt nach einer Pause ein neues
+ * (anderer Plan, immer mit Bau). `win` ist nur für Tests austauschbar.
  */
 export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, windBase = 0.6, rng = Math.random, weather = null }, win = typeof window === "undefined" ? null : window) {
-  const plan = buildPlan(seed);
+  let plan = buildPlan(seed);
+  let cycle = 0;
   const mirror = corner === "tr";
   let sim = null;
   let size = null;
+  let respawn = 0;
   let lastScroll = win ? win.scrollY : 0;
   const pointer = { x: -9999, y: -9999, seen: 0 };
+  // Greifen: Maustaste unten nahe am Netz merkt sich die Knoten; erst Bewegung macht daraus ein Ziehen (ein Klick
+  // auf etwas unter dem Netz bleibt ein Klick). Sitzt die Spinne noch im Netz, flieht sie.
+  let pending = null;
   const onMove = (event) => {
     pointer.x = event.clientX;
     pointer.y = event.clientY;
     pointer.seen = 6;
+    if (sim && pending && !sim.grab && Math.hypot(event.clientX - pending.x, event.clientY - pending.y) > GRAB_MIN_MOVE) {
+      if (!sim.spider.away) sendSpiderAway(sim, rng, true);
+      startGrab(sim, pending.x, pending.y, pending.nodes);
+    }
+    if (sim && sim.grab) moveGrab(sim, event.clientX, event.clientY);
+  };
+  const onDown = (event) => {
+    if ((event.button || 0) !== 0 || !sim || !sim.done || sim.free || sim.grab) return;
+    const nodes = grabNodes(sim, event.clientX, event.clientY);
+    if (nodes.length) pending = { x: event.clientX, y: event.clientY, nodes };
+  };
+  const onUp = () => {
+    pending = null;
+    if (sim) releaseGrab(sim, rng);
   };
   // Scrollen: ein kleiner Stoß je Scrollbewegung (höchstens alle 150 ms), im Schritt begrenzt - kein Knäuel bei schnellem Rad.
   let lastImpulseAt = -Infinity;
@@ -545,14 +765,20 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
   const onWeather = (event) => applyWeather(event?.detail);
   if (win) {
     win.addEventListener("mousemove", onMove, { passive: true });
+    win.addEventListener("mousedown", onDown, { passive: true });
+    win.addEventListener("mouseup", onUp, { passive: true });
     win.addEventListener("scroll", onScroll, { passive: true });
     win.addEventListener("tls:season-weather", onWeather);
   }
   const ensure = (viewport) => {
     const radius = webRadius(viewport.width, factor);
     const origin = { x: mirror ? viewport.width : 0, y: 0 };
-    if (!sim) sim = createSim(plan, { radius, origin, mirror, prebuilt: !build });
-    else if (size.width !== viewport.width || size.height !== viewport.height) resizeSim(sim, { radius, origin });
+    if (!sim) sim = createSim(plan, { radius, origin, mirror, prebuilt: !build && cycle === 0 });
+    else if (size.width !== viewport.width || size.height !== viewport.height) {
+      // Ein loses oder gehaltenes Netz lässt sich nicht neu ausmessen - es ist dann eben weg.
+      if (sim.torn > 0 || sim.grab) sim.gone = true;
+      else resizeSim(sim, { radius, origin });
+    }
     size = { ...viewport };
     return sim;
   };
@@ -565,21 +791,38 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
     get wind() {
       return { scale: windScale, sign: windSign };
     },
+    get cycle() {
+      return cycle;
+    },
     draw(ctx, dt, viewport) {
-      const current = ensure(viewport);
       seconds += dt;
+      if (!sim && respawn > 0) {
+        respawn -= dt;
+        if (respawn > 0) return;
+      }
+      const current = ensure(viewport);
       const gust = windAt(seconds, windBase * windScale);
       current.wind = { x: gust.x * windSign, y: gust.y };
       current.pointer = pointer.seen > 0 ? { x: pointer.x, y: pointer.y } : null;
       if (pointer.seen > 0) pointer.seen -= 1;
       if (!current.done) advanceBuild(current, dt);
       else advanceIdle(current, dt, rng);
-      stepPhysics(current, dt);
+      stepPhysics(current, dt, rng);
+      if (current.gone) {
+        sim = null;
+        pending = null;
+        cycle += 1;
+        plan = buildPlan((seed + cycle * 0.1373) % 1);
+        respawn = between(rng, RESPAWN_AFTER);
+        return;
+      }
       drawSim(ctx, current);
     },
     dispose() {
       if (!win) return;
       win.removeEventListener("mousemove", onMove);
+      win.removeEventListener("mousedown", onDown);
+      win.removeEventListener("mouseup", onUp);
       win.removeEventListener("scroll", onScroll);
       win.removeEventListener("tls:season-weather", onWeather);
     },

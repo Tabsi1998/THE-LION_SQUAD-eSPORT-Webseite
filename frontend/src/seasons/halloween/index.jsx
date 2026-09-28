@@ -176,12 +176,20 @@ export function RappelSpider({ spec, active }) {
   const view = rappelView(state);
   if (!view.thread) return null;
   const classes = ["tls-rappel", `tls-rappel--${state.side}`, view.swaying ? "tls-rappel--sway" : "", view.detaching ? "tls-rappel--detach" : ""].filter(Boolean).join(" ");
+  // Die laufende Spinne steht neben dem Faden, nicht darin: der Faden schwingt schon, sobald sie losgelassen hat -
+  // sie selbst krabbelt gerade weiter (Rückmeldung 28.09.).
   return createPortal(
-    <div className={classes} style={{ height: `${Math.round(state.y)}px` }} aria-hidden="true" data-testid="halloween-rappel" data-phase={state.phase}>
-      {view.spiderOnThread && <Spider size={state.size} thread={false} className="tls-rappel__spider" />}
-      {view.running && <Spider size={state.size} thread={false} className="tls-rappel__runner" style={{ transform: `translate(${state.x.toFixed(0)}px, 0) rotate(${state.runDir > 0 ? 90 : -90}deg)` }} />}
-      {!view.spiderOnThread && !view.running && <span className="tls-rappel__end" />}
-    </div>,
+    <>
+      <div className={classes} style={{ height: `${Math.round(state.y)}px` }} aria-hidden="true" data-testid="halloween-rappel" data-phase={state.phase}>
+        {view.spiderOnThread && <Spider size={state.size} thread={false} className="tls-rappel__spider" />}
+        {!view.spiderOnThread && <span className="tls-rappel__end" />}
+      </div>
+      {view.running && (
+        <div className={`tls-rappel-runner tls-rappel-runner--${state.side}`} style={{ top: `${Math.round(state.y)}px` }} aria-hidden="true" data-testid="halloween-rappel-runner">
+          <Spider size={state.size} thread={false} className="tls-rappel__runner" style={{ transform: `translate(${state.x.toFixed(0)}px, 0) rotate(${state.runDir > 0 ? 90 : -90}deg)` }} />
+        </div>
+      )}
+    </>,
     document.body,
   );
 }
@@ -242,14 +250,36 @@ export function Backdrop({ season }) {
 export function Footer({ season }) {
   const layout = useLayout(season);
   const moving = season.effective !== "subtle";
+  const greeting = season.texts?.greeting || "Happy Halloween";
   return (
     <>
       {layout.cat && <CatOnEdge size={layout.cat.size} startX={layout.cat.x} moving={moving} />}
       {moving && <Graveyard graves={layout.graves} salt={LOAD_SALT} />}
       <div className="tls-footer-pumpkins" data-testid="halloween-pumpkins">
-        {layout.footerPumpkins.map((pumpkin, index) => <Pumpkin key={index} size={pumpkin.size} face={pumpkin.face} slow={pumpkin.slow} />)}
+        {layout.footerPumpkins.map((pumpkin, index) => <FooterPumpkin key={index} pumpkin={pumpkin} greeting={greeting} />)}
       </div>
     </>
+  );
+}
+
+/** Jeder Kürbis im Footer grüßt beim Klick wie die Laterne oben - und zählt am 31.10. ab 18 Uhr genauso (Rückmeldung 28.09.). */
+function FooterPumpkin({ pumpkin, greeting }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef(0);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const onClick = () => {
+    setOpen(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(false), 4000);
+    if (pumpkinCounts()) recordSignal(SIGNAL_KEY);
+  };
+  return (
+    <span className="tls-pumpkin-spot">
+      <button type="button" className={`tls-pumpkin-button ${open ? "tls-pumpkin-button--open" : ""}`} onClick={onClick} aria-label={greeting} title={greeting} data-testid="halloween-footer-pumpkin">
+        <Pumpkin size={pumpkin.size} face={pumpkin.face} slow={pumpkin.slow} />
+      </button>
+      {open && <span className="tls-lantern__note tls-pumpkin__note" role="status" data-testid="halloween-pumpkin-note">{greeting}</span>}
+    </span>
   );
 }
 
