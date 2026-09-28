@@ -16,13 +16,9 @@ export function ghostDrift(rng) {
   return { dx: Math.cos(angle) * distance, dy: Math.sin(angle) * distance, spin: (rng() - 0.5) * 30 };
 }
 
-export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COOLDOWN_MS }) {
+/** Wo der Strich über dem Impressum liegt (Abstand zur Oberkante des Footers) - null, wenn es keinen gibt. */
+export function useFooterLineTop(deps = []) {
   const [top, setTop] = useState(null);
-  const [ghosts, setGhosts] = useState([]);
-  const rngRef = useRef(mulberry32(hashString(`ghosts:${salt}`)));
-  const lastRef = useRef({});
-  const nextId = useRef(0);
-
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
     const measure = () => {
@@ -36,7 +32,17 @@ export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COO
       window.clearTimeout(timer);
       window.removeEventListener("resize", measure);
     };
-  }, [graves]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+  return top;
+}
+
+export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COOLDOWN_MS }) {
+  const top = useFooterLineTop([graves]);
+  const [ghosts, setGhosts] = useState([]);
+  const rngRef = useRef(mulberry32(hashString(`ghosts:${salt}`)));
+  const lastRef = useRef({});
+  const nextId = useRef(0);
 
   useEffect(() => {
     if (!ghosts.length) return undefined;

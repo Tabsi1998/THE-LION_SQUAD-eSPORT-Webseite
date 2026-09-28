@@ -1,7 +1,8 @@
-import { ANCHORS, EXTENT, HUB, RADII, RINGS, advanceBuild, advanceIdle, applyImpulse, buildPlan, createSim, createWebLayer, nodeId, resizeSim, staticLines, stepPhysics, webRadius } from "./web";
+import { ANCHORS, EXTENT, HUB, RADII_CHOICES, RINGS_CHOICES, advanceBuild, advanceIdle, applyImpulse, buildPlan, createSim, createWebLayer, nodeId, resizeSim, spiderOrder, staticLines, stepPhysics, webRadius } from "./web";
 
-// Rundes Netz (#660): Bauplan in echter Reihenfolge, die Spinne springt nie; Physik reagiert auf Zeiger und
-// Stoß, Anker bleiben, Fäden halten ihre Länge; Größe ändern behält den Fortschritt; statisches SVG ganz im Kasten.
+// Rundes Netz (#660, #670): Bauplan in echter Reihenfolge mit Speichen, Windungen und Drehsinn aus dem Seed, die
+// Spinne springt nie; während des Baus steht alles fest, danach schwingt es; Physik reagiert auf Zeiger und Stoß,
+// bleibt aber in Form (Rückstellung, begrenzte Schritte); Größe ändern behält den Fortschritt; SVG ganz im Kasten.
 
 function fakeContext(calls) {
   return new Proxy({}, { get: (_t, name) => (["fillStyle", "strokeStyle", "lineWidth", "lineCap"].includes(name) ? "" : () => calls.push(name)) });
@@ -9,25 +10,44 @@ function fakeContext(calls) {
 
 test("Bauplan: Anker zuerst, dann Rahmen, Speichen, Nabe, Fangspirale von außen nach innen - jeder Faden einmal, lückenlos", () => {
   const plan = buildPlan(0.42);
-  expect(plan.nodes.length).toBe(1 + RADII * (RINGS + 1) + ANCHORS.length * 2);
+  const { radii, rings } = plan;
+  expect(RADII_CHOICES).toContain(radii);
+  expect(RINGS_CHOICES).toContain(rings);
+  expect(plan.nodes.length).toBe(1 + radii * (rings + 1) + ANCHORS.length * 2);
   const spun = plan.order.filter((step) => !step.walk).map((step) => plan.threads[step.thread].kind);
   expect(spun[0]).toBe("anchor");
   expect(spun.filter((kind) => kind === "anchor").length).toBe(ANCHORS.length * 2);
-  expect(spun.filter((kind) => kind === "frame").length).toBe(RADII);
-  expect(spun.filter((kind) => kind === "radius").length).toBe(RADII * (RINGS + 1));
-  expect(spun.filter((kind) => kind === "hubring").length).toBe(RADII);
-  expect(spun.filter((kind) => kind === "spiral").length).toBe((RINGS - 1) * (RADII - 1) + (RINGS - 2));
+  expect(spun.filter((kind) => kind === "frame").length).toBe(radii);
+  expect(spun.filter((kind) => kind === "radius").length).toBe(radii * (rings + 1));
+  expect(spun.filter((kind) => kind === "hubring").length).toBe(radii);
+  expect(spun.filter((kind) => kind === "spiral").length).toBe((rings - 1) * (radii - 1) + (rings - 2));
   expect(spun.lastIndexOf("frame")).toBeLessThan(spun.indexOf("radius"));
   expect(spun.lastIndexOf("radius")).toBeLessThan(spun.indexOf("hubring"));
   expect(spun.lastIndexOf("hubring")).toBeLessThan(spun.indexOf("spiral"));
   const firstSpiral = plan.order.find((step) => !step.walk && plan.threads[step.thread].kind === "spiral");
-  expect(plan.nodes[firstSpiral.from].k).toBe(RINGS - 1);
+  expect(plan.nodes[firstSpiral.from].k).toBe(rings - 1);
   const threads = plan.order.filter((step) => !step.walk).map((step) => step.thread);
   expect(new Set(threads).size).toBe(plan.threads.length);
   for (let n = 1; n < plan.order.length; n += 1) expect(plan.order[n].from).toBe(plan.order[n - 1].to);
   expect(plan.dew.length).toBe(7);
   expect(buildPlan(0.42)).toEqual(plan);
-  expect(JSON.stringify(buildPlan(0.9))).not.toBe(JSON.stringify(plan));
+});
+
+test("Variation: verschiedene Seeds geben verschiedene Speichenzahlen, Windungen und Drehsinn - alle lückenlos", () => {
+  const seeds = [0.05, 0.13, 0.27, 0.42, 0.58, 0.66, 0.71, 0.84, 0.9, 0.97];
+  const plans = seeds.map((seed) => buildPlan(seed));
+  expect(new Set(plans.map((plan) => plan.radii)).size).toBeGreaterThan(1);
+  expect(new Set(plans.map((plan) => plan.rings)).size).toBeGreaterThan(1);
+  expect(new Set(plans.map((plan) => plan.turn)).size).toBe(2);
+  plans.forEach((plan) => {
+    for (let n = 1; n < plan.order.length; n += 1) expect(plan.order[n].from).toBe(plan.order[n - 1].to);
+    expect(new Set(plan.order.filter((step) => !step.walk).map((step) => step.thread)).size).toBe(plan.threads.length);
+  });
+  RADII_CHOICES.forEach((radii) => {
+    const order = spiderOrder(radii);
+    expect(new Set(order).size).toBe(radii);
+    expect(Math.abs(order[1] - order[0])).toBeGreaterThanOrEqual(radii / 2 - 2);
+  });
 });
 
 test("Radius: 56 bis 150 Pixel nach Fensterbreite, mal Seitenfaktor", () => {
@@ -37,11 +57,12 @@ test("Radius: 56 bis 150 Pixel nach Fensterbreite, mal Seitenfaktor", () => {
   expect(webRadius(1366, 0.5)).toBe(58);
 });
 
-test("Bau: die Spinne sitzt am Fadenende, Fäden wachsen hinter ihr her, am Ende ist alles da und die Nabe frei", () => {
+test("Bau: alles steht fest, die Spinne sitzt am Fadenende, am Ende ist alles da und das Netz wird frei", () => {
   const plan = buildPlan(0.42);
   const sim = createSim(plan, { radius: 100, origin: { x: 0, y: 0 } });
   expect(sim.done).toBe(false);
   expect(sim.threads.every((thread) => thread.built === 0)).toBe(true);
+  expect(sim.nodes.every((node) => node.pinned)).toBe(true);
   const start = sim.nodes[plan.order[0].from];
   expect(sim.spider).toMatchObject({ x: start.x, y: start.y });
   advanceBuild(sim, 0.3);
@@ -50,11 +71,16 @@ test("Bau: die Spinne sitzt am Fadenende, Fäden wachsen hinter ihr her, am Ende
   const a = sim.nodes[sim.threads[0].a];
   const b = sim.nodes[sim.threads[0].b];
   expect(sim.spider.x).toBeCloseTo(a.x + (b.x - a.x) * sim.threads[0].built, 5);
+  // Während des Baus bewegt die Physik nichts - die Fäden bleiben straff.
+  const frameNode = sim.nodes[nodeId(0, plan.rings, plan.rings)];
+  const before = { x: frameNode.x, y: frameNode.y };
+  for (let n = 0; n < 30; n += 1) stepPhysics(sim, 1 / 60);
+  expect(frameNode).toMatchObject(before);
   for (let n = 0; n < 600; n += 1) advanceBuild(sim, 0.5);
   expect(sim.done).toBe(true);
   expect(sim.threads.every((thread) => thread.built === 1)).toBe(true);
   expect(sim.nodes.filter((node) => node.anchor).every((node) => node.pinned)).toBe(true);
-  expect(sim.nodes[0].pinned).toBe(false);
+  expect(sim.nodes.filter((node) => !node.anchor).every((node) => !node.pinned)).toBe(true);
   expect(sim.spider).toMatchObject({ x: sim.nodes[0].x, y: sim.nodes[0].y });
 });
 
@@ -77,19 +103,23 @@ test("Physik: der Zeiger schiebt Knoten beiseite, sie kehren zurück; ein Stoß 
   const plan = buildPlan(0.42);
   const control = createSim(plan, { radius: 100, origin: { x: 0, y: 0 }, prebuilt: true });
   const sim = createSim(plan, { radius: 100, origin: { x: 0, y: 0 }, prebuilt: true });
-  const id = nodeId(3, 4);
+  const id = nodeId(3, 4, plan.rings);
   const node = sim.nodes[id];
-  const before = { x: node.x, y: node.y };
-  sim.pointer = { x: node.x + 10, y: node.y };
+  const pointer = { x: node.x + 10, y: node.y };
+  // Alle Knoten im Umkreis rücken im Schnitt vom Zeiger weg - eine Delle im Netz, kein einzelner Ausreißer.
+  const nearby = sim.nodes.map((entry, index) => ({ index, d: Math.hypot(entry.x - pointer.x, entry.y - pointer.y) })).filter((entry) => entry.d < 42 && !sim.nodes[entry.index].pinned);
+  expect(nearby.length).toBeGreaterThan(5);
+  sim.pointer = pointer;
   for (let n = 0; n < 10; n += 1) stepPhysics(sim, 1 / 60);
-  expect(node.x).toBeLessThan(before.x - 0.3);
+  const pushed = nearby.map((entry) => Math.hypot(sim.nodes[entry.index].x - pointer.x, sim.nodes[entry.index].y - pointer.y) - entry.d);
+  expect(pushed.reduce((sum, value) => sum + value, 0) / pushed.length).toBeGreaterThan(0.8);
   sim.pointer = null;
   for (let n = 0; n < 300; n += 1) {
     stepPhysics(sim, 1 / 60);
     stepPhysics(control, 1 / 60);
   }
-  expect(Math.abs(node.x - control.nodes[id].x)).toBeLessThan(3);
-  expect(Math.abs(node.y - control.nodes[id].y)).toBeLessThan(3);
+  expect(Math.abs(node.x - control.nodes[id].x)).toBeLessThan(2);
+  expect(Math.abs(node.y - control.nodes[id].y)).toBeLessThan(2);
   expect(sim.nodes.filter((entry) => entry.anchor).every((entry) => entry.pinned)).toBe(true);
   const hubY = sim.nodes[0].y;
   applyImpulse(sim, 0, -8);
@@ -103,6 +133,22 @@ test("Physik: der Zeiger schiebt Knoten beiseite, sie kehren zurück; ein Stoß 
   expect(worst).toBeLessThan(0.3);
 });
 
+test("Kein Knäuel: viele Scroll-Stöße hintereinander verformen das Netz nur wenig, es kehrt in seine Form zurück", () => {
+  const plan = buildPlan(0.42);
+  const sim = createSim(plan, { radius: 120, origin: { x: 0, y: 0 }, prebuilt: true });
+  for (let n = 0; n < 40; n += 1) {
+    applyImpulse(sim, 0, -30 * 0.12);
+    applyImpulse(sim, 0, -30 * 0.12);
+    applyImpulse(sim, 0, -30 * 0.12);
+    stepPhysics(sim, 1 / 60);
+  }
+  const drift = (node) => Math.hypot(node.x - node.rx, node.y - node.ry);
+  const worstDuring = Math.max(...sim.nodes.map(drift));
+  expect(worstDuring).toBeLessThan(0.3 * 120);
+  for (let n = 0; n < 240; n += 1) stepPhysics(sim, 1 / 60);
+  expect(Math.max(...sim.nodes.map(drift))).toBeLessThan(6);
+});
+
 test("Größe ändern: der Fortschritt bleibt, die Positionen folgen dem neuen Radius", () => {
   const plan = buildPlan(0.42);
   const sim = createSim(plan, { radius: 100, origin: { x: 0, y: 0 } });
@@ -113,6 +159,7 @@ test("Größe ändern: der Fortschritt bleibt, die Positionen folgen dem neuen R
   expect(sim.threads.filter((thread) => thread.built === 1).length).toBe(built);
   expect(sim.nodes[0].x).toBeCloseTo(HUB.x * 150, 5);
   expect(sim.nodes[0].y).toBeCloseTo(HUB.y * 150, 5);
+  expect(sim.nodes[0].rx).toBeCloseTo(HUB.x * 150, 5);
 });
 
 test("Statisches Netz: alle Linien liegen im Kasten, rechts gespiegelt", () => {
@@ -150,6 +197,10 @@ test("Ebene: zeichnet auf dem Canvas, hört auf Zeiger und Scrollen, räumt beim
   listeners.mousemove({ clientX: 10, clientY: 10 });
   win.scrollY = 120;
   listeners.scroll();
+  expect(layer.sim.impulse.y).toBeCloseTo(-30 * 0.05, 5);
+  win.scrollY = 240;
+  listeners.scroll();
+  expect(layer.sim.impulse.y).toBeCloseTo(-30 * 0.05, 5);
   layer.draw(ctx, 1 / 60, { width: 1000, height: 800 });
   expect(layer.sim.origin.x).toBe(1000);
   layer.dispose();

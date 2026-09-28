@@ -5,8 +5,8 @@
 export const TOP = 90;
 export const RUN_SPEED = 110;
 export const RELEASE_SECONDS = 0.7;
-export const SWAY_SECONDS = 5.5;
-export const DETACH_SECONDS = 3;
+export const SWAY_SECONDS = 3.5;
+export const DETACH_SECONDS = 2.2;
 
 export function createRappel(spec) {
   return { phase: "wait", timer: spec.first, side: spec.side, speed: spec.speed, rest: spec.rest, size: spec.size, y: TOP, x: 0, length: 0, runDir: spec.side === "left" ? 1 : -1, cycles: 0 };

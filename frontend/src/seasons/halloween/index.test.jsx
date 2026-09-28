@@ -58,7 +58,8 @@ test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere 
   expect(news.web.factor).toBeGreaterThanOrEqual(0.85);
   expect(news.spiders.length).toBe(1);
   expect(news.spiders[0].size).toBeLessThanOrEqual(30);
-  expect(news.spiders[0].offset).toBeGreaterThanOrEqual(6);
+  expect(news.spiders[0].offset).toBeGreaterThanOrEqual(2);
+  expect(news.spiders[0].offset).toBeLessThanOrEqual(9);
   expect(news.hangingBats).toBeGreaterThanOrEqual(1);
   expect(news.flock).toEqual([3, 5]);
   const layouts = PATHS.map((path) => pageLayout(path, "normal"));
@@ -100,7 +101,7 @@ test("Statisches Netz: fertig, ganz im Kasten, links oder rechts", () => {
   const { container } = render(<StaticWeb web={{ corner: "tr", factor: 1, seed: 0.3 }} width={1366} />);
   const svg = container.querySelector("svg");
   expect(svg.getAttribute("class")).toContain("tls-web--tr");
-  expect(svg.querySelectorAll("line").length).toBeGreaterThan(200);
+  expect(svg.querySelectorAll("line").length).toBeGreaterThan(150);
   const width = Number(svg.getAttribute("width"));
   svg.querySelectorAll("line").forEach((line) => {
     expect(Number(line.getAttribute("x1"))).toBeLessThanOrEqual(width + 0.5);
@@ -228,6 +229,7 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   expect(pumpkins.length).toBeGreaterThanOrEqual(1);
   expect(Number(pumpkins[0].getAttribute("width"))).toBeGreaterThanOrEqual(46);
   expect(screen.getByTestId("halloween-cat")).toBeInTheDocument();
+  expect(screen.getByTestId("halloween-cat").style.top).toBe("250px");
   expect(footer.container.querySelector(".tls-cat__tail")).not.toBeNull();
   expect(screen.getAllByTestId("halloween-grave").length).toBe(layout.graves.length);
   footer.unmount();

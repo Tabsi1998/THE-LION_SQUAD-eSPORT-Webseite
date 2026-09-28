@@ -19,9 +19,10 @@
 }
 @keyframes tls-spider-legs { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
 .tls-spider { filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.6)); }
-.tls-spider--drop { position: fixed; top: 64px; transform-origin: top center; animation: tls-spider-drop var(--spider-period, 60s) ease-in-out var(--spider-delay, 30s) infinite; transform: translateY(calc(-1 * var(--spider-drop, 160px) - 100px)); }
-.tls-spider--left { left: var(--spider-offset, 12vw); }
-.tls-spider--right { right: var(--spider-offset, 12vw); }
+/* immer vom oberen Rand, an den Seiten - nie mitten im Bild */
+.tls-spider--drop { position: fixed; top: 0; transform-origin: top center; animation: tls-spider-drop var(--spider-period, 60s) ease-in-out var(--spider-delay, 30s) infinite; transform: translateY(calc(-1 * var(--spider-drop, 160px) - 100px)); }
+.tls-spider--left { left: var(--spider-offset, 4vw); }
+.tls-spider--right { right: var(--spider-offset, 4vw); }
 .tls-spider__leg { transform-origin: 10px 64px; animation: tls-spider-legs 1.1s ease-in-out infinite; }
 
 /* Krabbler: läuft selten unten quer über den Bildschirm */
@@ -36,8 +37,10 @@
 .tls-rappel--left { left: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
 .tls-rappel--right { right: clamp(10px, calc((100vw - 1320px) / 2 - 30px), 120px); }
 .tls-rappel--sway { animation: tls-thread-sway 1.7s ease-in-out infinite alternate; }
-.tls-rappel--detach { animation: tls-thread-detach 3s ease-in forwards; }
+.tls-rappel--detach { animation: tls-thread-detach 2.2s ease-in forwards; }
 .tls-rappel__spider { position: absolute; bottom: 0; left: 0; transform: translate(-50%, 0); }
+/* das lose Fadenende, wenn die Spinne weg ist: ein kleiner Bogen */
+.tls-rappel__end { position: absolute; bottom: -8px; left: -1px; width: 12px; height: 9px; border: 1px solid rgba(170, 225, 240, 0.34); border-top: 0; border-left: 0; border-radius: 0 0 9px 0; }
 .tls-rappel__runner { position: absolute; bottom: -8px; left: 0; transform-origin: center; }
 .tls-rappel__runner .tls-spider__leg { animation: tls-runner-legs 0.28s ease-in-out infinite; }
 
@@ -81,6 +84,7 @@
 @keyframes tls-cat-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.06); } }
 @keyframes tls-cat-tail { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-12deg); } }
 .tls-footer-cat { position: absolute; left: 2.5rem; bottom: 0; transform: translateY(-100%); line-height: 0; }
+.tls-footer-cat--line { bottom: auto; }
 .tls-cat__tail { transform-origin: 60px 76px; animation: tls-cat-tail 4.5s ease-in-out infinite; }
 .tls-cat__head { transform-origin: 34px 34px; transform: rotate(var(--head-tilt, 0deg)); transition: transform 0.25s ease-out; }
 .tls-cat__eyes { transform-origin: 34px 30px; animation: tls-cat-blink 6s ease-in-out infinite; }
