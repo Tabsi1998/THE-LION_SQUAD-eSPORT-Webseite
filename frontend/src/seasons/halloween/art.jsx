@@ -1,65 +1,84 @@
-// Halloween-Kunst (#635, #655): Spinnweben mit Spiralfäden und Tautropfen, Spinnen mit Beinen und Augen,
-// geschnitzte Kürbisse in drei Gesichtern, Laternen, Geist, Mond, Zaun mit Grabsteinen - alles SVG,
-// keine Bilder, alles skaliert sauber bis zum Breitbild.
+// Halloween-Kunst (#655, #658): ein Eck-Netz wie ein echtes - Ankerfäden bis zum Rand, unregelmäßige
+// Strahlen, eine durchgehende Spirale mit Durchhang, Tautropfen; eine Spinne mit Gelenken; geschnitzte
+// Kürbisse; ein einzelner Grabstein; ein Sichelmond. Fäden in Silber-Türkis, passend zum Blau der Seite.
+// Alles SVG, nichts Kindliches, nichts Grelles.
+import { illumination, litPath, moonPhase } from "./moon";
 
-const WEB_RAYS = [0, 11, 22, 34, 46, 58, 70, 80, 90];
-const WEB_RINGS = [14, 26, 38, 50, 62, 74, 86, 98, 110];
+export const THREAD = "rgba(170, 225, 240, 0.72)";
+export const THREAD_SOFT = "rgba(170, 225, 240, 0.42)";
 
-function webRingPath(radius) {
-  return WEB_RAYS.slice(0, -1).map((angle, index) => {
-    const a1 = (angle * Math.PI) / 180;
-    const a2 = (WEB_RAYS[index + 1] * Math.PI) / 180;
-    const mid = (a1 + a2) / 2;
-    const sag = radius * 0.9;
-    return `${index === 0 ? "M" : "L"} ${(Math.cos(a1) * radius).toFixed(1)} ${(Math.sin(a1) * radius).toFixed(1)} Q ${(Math.cos(mid) * sag).toFixed(1)} ${(Math.sin(mid) * sag).toFixed(1)} ${(Math.cos(a2) * radius).toFixed(1)} ${(Math.sin(a2) * radius).toFixed(1)}`;
-  }).join(" ");
+/** Die Fäden eines Eck-Netzes als Liste - Anker, Strahlen, Spiralstücke - in der Reihenfolge, in der eine
+ * Spinne sie spinnen würde. Aus `seed` (0–1) kommt die Unregelmäßigkeit. */
+export function webSegments(seed = 0.37) {
+  const wobble = (i) => Math.sin(seed * 97 + i * 7.3) * 0.5 + Math.cos(seed * 31 + i * 3.1) * 0.5;
+  const rays = [0, 12, 24, 36, 48, 60, 72, 84, 90].map((angle, i) => angle + (i === 0 || i === 8 ? 0 : wobble(i) * 4));
+  const segments = [];
+  // Ankerfäden: an den Rändern entlang und ein langer Diagonalfaden, an dem alles hängt.
+  segments.push({ kind: "anchor", d: "M 0 0 L 240 0" });
+  segments.push({ kind: "anchor", d: "M 0 0 L 0 240" });
+  segments.push({ kind: "anchor", d: `M 0 0 L ${(Math.cos(0.8) * 200).toFixed(1)} ${(Math.sin(0.8) * 200).toFixed(1)}` });
+  rays.forEach((angle, i) => {
+    const rad = (angle * Math.PI) / 180;
+    const length = 118 + wobble(i + 20) * 10;
+    segments.push({ kind: "ray", d: `M 0 0 L ${(Math.cos(rad) * length).toFixed(1)} ${(Math.sin(rad) * length).toFixed(1)}`, angle: rad, length });
+  });
+  // Spirale: von innen nach außen, jedes Stück von Strahl zu Strahl mit leichtem Durchhang.
+  const turns = [14, 24, 34, 44, 54, 64, 74, 84, 94, 104];
+  turns.forEach((base, t) => {
+    for (let i = 0; i < rays.length - 1; i += 1) {
+      const a1 = (rays[i] * Math.PI) / 180;
+      const a2 = (rays[i + 1] * Math.PI) / 180;
+      const r1 = base + (i / (rays.length - 1)) * 10 + wobble(t * 9 + i) * 1.5;
+      const r2 = base + ((i + 1) / (rays.length - 1)) * 10 + wobble(t * 9 + i + 1) * 1.5;
+      const mid = (a1 + a2) / 2;
+      const sag = ((r1 + r2) / 2) * 0.93;
+      const gap = t >= 4 && wobble(t * 13 + i) > 0.82;
+      segments.push({ kind: "spiral", turn: t, gap, d: `M ${(Math.cos(a1) * r1).toFixed(1)} ${(Math.sin(a1) * r1).toFixed(1)} Q ${(Math.cos(mid) * sag).toFixed(1)} ${(Math.sin(mid) * sag).toFixed(1)} ${(Math.cos(a2) * r2).toFixed(1)} ${(Math.sin(a2) * r2).toFixed(1)}`,
+        end: { x: Math.cos(a2) * r2, y: Math.sin(a2) * r2 } });
+    }
+  });
+  return segments;
 }
 
-/** Spinnweb in einer Ecke: Strahlen, Ringe mit Durchhang, ein paar gerissene Fäden und Tautropfen. */
-export function Cobweb({ className = "", style, dew = true, torn = [] }) {
+/** Der Endpunkt eines Fadens - dort sitzt die Spinne, während sie spinnt. */
+export function segmentEnd(segment) {
+  if (segment.end) return segment.end;
+  const match = /L ([-\d.]+) ([-\d.]+)$/.exec(segment.d);
+  return match ? { x: Number(match[1]), y: Number(match[2]) } : { x: 0, y: 0 };
+}
+
+/** Das Eck-Netz. `progress` (0–1) zeichnet nur die ersten Fäden - für den Netzbau. */
+export function Cobweb({ className = "", style, seed = 0.37, progress = 1, dew = true }) {
+  const segments = webSegments(seed);
+  const shown = Math.round(segments.length * Math.max(0, Math.min(1, progress)));
   return (
-    <svg className={`tls-cobweb ${className}`} style={style} viewBox="0 0 120 120" fill="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="tls-web-thread" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="rgba(255,255,255,0.95)" />
-          <stop offset="1" stopColor="rgba(255,255,255,0.55)" />
-        </linearGradient>
-      </defs>
-      <g stroke="url(#tls-web-thread)" strokeWidth="0.75" strokeLinecap="round">
-        {WEB_RAYS.map((angle) => {
-          const rad = (angle * Math.PI) / 180;
-          return <line key={angle} x1="0" y1="0" x2={(Math.cos(rad) * 118).toFixed(1)} y2={(Math.sin(rad) * 118).toFixed(1)} />;
-        })}
-        {WEB_RINGS.map((radius, index) => (
-          <path key={radius} d={webRingPath(radius)} strokeWidth={index % 3 === 2 ? "0.9" : "0.6"} strokeDasharray={torn.includes(index) ? "22 6" : undefined} />
+    <svg className={`tls-cobweb ${className}`} style={style} viewBox="0 0 240 240" fill="none" aria-hidden="true">
+      <g strokeLinecap="round">
+        {segments.slice(0, shown).map((segment, index) => (
+          <path key={index} d={segment.d} stroke={segment.kind === "spiral" ? THREAD : THREAD_SOFT} strokeWidth={segment.kind === "anchor" ? 0.9 : segment.kind === "ray" ? 0.7 : 0.55} strokeDasharray={segment.gap ? "6 4" : undefined} opacity={segment.gap ? 0.55 : 1} />
         ))}
-        <path d="M 40 8 q 6 10 2 22" strokeWidth="0.5" opacity="0.7" />
-        <path d="M 8 52 q 12 -4 24 4" strokeWidth="0.5" opacity="0.7" />
       </g>
-      {dew && [[38, 21], [61, 44], [23, 66], [80, 38], [52, 79]].map(([x, y]) => (
-        <circle key={`${x}-${y}`} cx={x} cy={y} r="1.3" fill="rgba(255,255,255,0.9)" className="tls-dew" />
+      {dew && progress >= 1 && [[36, 22], [63, 47], [22, 70], [88, 40], [54, 86], [110, 18]].map(([x, y]) => (
+        <circle key={`${x}-${y}`} cx={x} cy={y} r="1.1" fill="rgba(200, 240, 255, 0.95)" className="tls-dew" />
       ))}
     </svg>
   );
 }
 
-/** Eine Spinne am Faden: Körper, Kopf, acht Beine, orange Augen - seilt sich per CSS ab. */
-export function Spider({ className = "", style, size = 44, ...rest }) {
+/** Eine Spinne: Körper mit Glanz, Kopf, acht Beine mit Gelenken, zwei Augen mit einem Hauch Türkis. */
+export function Spider({ className = "", style, size = 20, thread = true, ...rest }) {
+  // Die Spinne der ersten Fassung (#649): klein, dünne gebogene Beine, dunkler Körper - nur die Augen im Türkis der Saison.
   return (
-    <svg className={`tls-spider ${className}`} style={style} width={size} height={size * 2.4} viewBox="0 0 40 96" aria-hidden="true" {...rest}>
-      <line x1="20" y1="0" x2="20" y2="62" stroke="rgba(255,255,255,0.55)" strokeWidth="0.9" />
+    <svg className={`tls-spider ${className}`} style={style} width={size} height={size * 4} viewBox="0 0 20 80" aria-hidden="true" {...rest}>
+      {thread && <line x1="10" y1="0" x2="10" y2="62" stroke={THREAD_SOFT} strokeWidth="0.7" />}
       <g className="tls-spider__body">
-        <ellipse cx="20" cy="76" rx="9" ry="12" fill="#17121d" />
-        <ellipse cx="20" cy="76" rx="6" ry="8" fill="#241a2c" />
-        <circle cx="20" cy="62" r="5.5" fill="#17121d" />
-        <path d="M18 60 l4 0" stroke="#3a2b45" strokeWidth="1" />
+        <ellipse cx="10" cy="66" rx="4.5" ry="5.5" fill="#1a1520" />
+        <circle cx="10" cy="60.5" r="2.6" fill="#1a1520" />
         {[-1, 1].map((side) => [0, 1, 2, 3].map((leg) => (
-          <path key={`${side}-${leg}`} className="tls-spider__leg" style={{ animationDelay: `${leg * 0.13}s` }} d={`M ${20 + side * 6} ${64 + leg * 4} q ${side * 12} ${-8 + leg * 2} ${side * 17} ${3 + leg * 3.5} q ${side * 2} ${5} ${side * 6} ${11}`} stroke="#17121d" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+          <path key={`${side}-${leg}`} className="tls-spider__leg" style={{ animationDelay: `${leg * 0.11}s` }} d={`M ${10 + side * 3} ${63 + leg * 2} q ${side * 6} ${-4 + leg} ${side * 8} ${2 + leg * 1.5}`} stroke="#1a1520" strokeWidth="1.1" fill="none" strokeLinecap="round" />
         )))}
-        <circle cx="17.5" cy="61" r="1.2" fill="#ff9a3c" />
-        <circle cx="22.5" cy="61" r="1.2" fill="#ff9a3c" />
-        <circle cx="17.5" cy="61" r="0.4" fill="#fff5d0" />
-        <circle cx="22.5" cy="61" r="0.4" fill="#fff5d0" />
+        <circle cx="8.6" cy="60" r="0.6" fill="#9be7ff" />
+        <circle cx="11.4" cy="60" r="0.6" fill="#9be7ff" />
       </g>
     </svg>
   );
@@ -72,11 +91,10 @@ const FACES = {
       <path d="M9 31 q11 9 22 0 l-2.5 3.5 l-3 -2.2 l-3 2.2 l-3 -2.2 l-3 2.2 l-3 -2.2 l-3 2.2 z" fill="#ffd166" />
     </>
   ),
-  scared: (
+  calm: (
     <>
-      <circle cx="14" cy="24" r="3.4" fill="#ffd166" />
-      <circle cx="26" cy="24" r="3.4" fill="#ffd166" />
-      <ellipse cx="20" cy="33" rx="3" ry="4.2" fill="#ffd166" />
+      <path d="M12 23 q3 -3 6 0 q-3 3 -6 0 z M22 23 q3 -3 6 0 q-3 3 -6 0 z" fill="#ffd166" />
+      <path d="M12 31 q8 6 16 0 q-8 3 -16 0 z" fill="#ffd166" />
     </>
   ),
   wicked: (
@@ -87,142 +105,102 @@ const FACES = {
   ),
 };
 
-/** Geschnitzter Kürbis mit Gesicht, Stiel, Blatt und Schein. */
+/** Geschnitzter Kürbis mit Gesicht, Stiel, Blatt, Schattierung und warmem Schein - das einzige Warme im Bild. */
 export function Pumpkin({ size = 48, face = "grin", slow = false, className = "" }) {
   return (
     <svg className={`tls-pumpkin ${slow ? "tls-pumpkin--slow" : ""} ${className}`} width={size} height={size} viewBox="0 0 40 40" aria-hidden="true">
-      <path d="M20 9 q-3 -6 3 -8 q-1 4 1 7" stroke="#4d7c2a" strokeWidth="3.2" fill="none" strokeLinecap="round" />
-      <path d="M22 6 q6 -4 9 1 q-5 0 -8 2 z" fill="#5e9a34" />
-      <ellipse cx="20" cy="24" rx="18" ry="14" fill="#ff7a1a" />
-      <ellipse cx="9" cy="24" rx="6" ry="13" fill="#e8620b" opacity="0.85" />
-      <ellipse cx="31" cy="24" rx="6" ry="13" fill="#e8620b" opacity="0.85" />
-      <ellipse cx="20" cy="24" rx="7.5" ry="13.5" fill="#ff8b31" opacity="0.7" />
+      <path d="M20 9 q-3 -6 3 -8 q-1 4 1 7" stroke="#3f6a22" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M22 6 q6 -4 9 1 q-5 0 -8 2 z" fill="#4f8a2c" />
+      <ellipse cx="20" cy="24" rx="18" ry="14" fill="#e8620b" />
+      <ellipse cx="9" cy="24" rx="6" ry="13" fill="#c9500a" opacity="0.9" />
+      <ellipse cx="31" cy="24" rx="6" ry="13" fill="#c9500a" opacity="0.9" />
+      <ellipse cx="20" cy="24" rx="7.5" ry="13.5" fill="#ff7f26" opacity="0.75" />
+      <ellipse cx="20" cy="33" rx="14" ry="4" fill="rgba(0,0,0,0.22)" />
       <g className="tls-pumpkin__face">{FACES[face] || FACES.grin}</g>
-      <ellipse cx="14" cy="16" rx="4" ry="2" fill="rgba(255,255,255,0.12)" />
+      <ellipse cx="14" cy="15" rx="4" ry="1.8" fill="rgba(255,255,255,0.12)" />
     </svg>
   );
 }
 
-/** Die Laterne neben dem Löwen: großer Kürbis mit Deckel, aus dem beim Klick eine Fledermaus fliegt. */
+/** Die Laterne neben dem Löwen: Kürbis mit Deckel, aus dem beim Klick eine Fledermaus fliegt. */
 export function Lantern({ open, face = "grin" }) {
   return (
-    <svg width="44" height="44" viewBox="0 0 40 40" aria-hidden="true" className={`tls-pumpkin ${open ? "" : "tls-pumpkin--slow"}`}>
-      <ellipse cx="20" cy="25" rx="17" ry="13" fill="#ff7a1a" />
-      <ellipse cx="10.5" cy="25" rx="6" ry="12" fill="#e8620b" opacity="0.85" />
-      <ellipse cx="29.5" cy="25" rx="6" ry="12" fill="#e8620b" opacity="0.85" />
-      <ellipse cx="20" cy="25" rx="7" ry="12.5" fill="#ff8b31" opacity="0.7" />
+    <svg width="42" height="42" viewBox="0 0 40 40" aria-hidden="true" className={`tls-pumpkin ${open ? "" : "tls-pumpkin--slow"}`}>
+      <ellipse cx="20" cy="25" rx="17" ry="13" fill="#e8620b" />
+      <ellipse cx="10.5" cy="25" rx="6" ry="12" fill="#c9500a" opacity="0.9" />
+      <ellipse cx="29.5" cy="25" rx="6" ry="12" fill="#c9500a" opacity="0.9" />
+      <ellipse cx="20" cy="25" rx="7" ry="12.5" fill="#ff7f26" opacity="0.75" />
       <g className="tls-pumpkin__face">{FACES[face] || FACES.grin}</g>
+      <g className="tls-lantern__eyes" aria-hidden="true">
+        <circle cx="13.5" cy="24.5" r="1.3" fill="#fff4d6" />
+        <circle cx="26.5" cy="24.5" r="1.3" fill="#fff4d6" />
+      </g>
       <g className="tls-lantern__lid">
-        <path d="M8 14 q12 -7 24 0 q-12 3 -24 0 z" fill="#e8640a" />
-        <path d="M20 12 q-3 -6 3 -8 q-1 4 1 7" stroke="#4d7c2a" strokeWidth="3.2" fill="none" strokeLinecap="round" />
+        <path d="M8 14 q12 -7 24 0 q-12 3 -24 0 z" fill="#c9500a" />
+        <path d="M20 12 q-3 -6 3 -8 q-1 4 1 7" stroke="#3f6a22" strokeWidth="3" fill="none" strokeLinecap="round" />
       </g>
       <g className="tls-lantern__bat">
-        <path d="M20 16 q-5 -7 -9 -2 q3 0 4 3 q2 -2 5 0 q3 -2 5 0 q1 -3 4 -3 q-4 -5 -9 2 z" fill="#17121d" />
-        <circle cx="18.5" cy="16" r="0.6" fill="#ff9a3c" />
-        <circle cx="21.5" cy="16" r="0.6" fill="#ff9a3c" />
+        <path d="M20 16 q-5 -7 -9 -2 q3 0 4 3 q2 -2 5 0 q3 -2 5 0 q1 -3 4 -3 q-4 -5 -9 2 z" fill="#15111b" />
       </g>
     </svg>
   );
 }
 
-/** Eine Fledermaus als SVG (hängend oder flatternd) mit hellem Rand, damit sie auf Dunkel zu sehen ist. */
-export function BatShape({ size = 40, className = "", style }) {
+/** Ein einzelner Grabstein, schief, mit Gras - selten, in einer unteren Ecke. */
+export function Tombstone({ className = "", style, size = 74 }) {
   return (
-    <svg className={className} style={style} width={size} height={size * 0.55} viewBox="0 0 80 44" aria-hidden="true">
-      <path className="tls-bat__wings" d="M40 24 q-9 -20 -36 -16 q10 3 12 14 q6 -5 12 1 q4 -3 12 1 q8 -4 12 -1 q6 -6 12 -1 q2 -11 12 -14 q-27 -4 -36 16 z" fill="#17121d" stroke="rgba(255,255,255,0.45)" strokeWidth="1.2" strokeLinejoin="round" />
-      <ellipse cx="40" cy="25" rx="5" ry="9" fill="#241a2c" stroke="rgba(255,255,255,0.35)" strokeWidth="1" />
-      <path d="M36 17 l-3 -6 l5 3 z M44 17 l3 -6 l-5 3 z" fill="#241a2c" />
-      <circle cx="38" cy="21" r="1.3" fill="#ff9a3c" />
-      <circle cx="42" cy="21" r="1.3" fill="#ff9a3c" />
+    <svg className={`tls-tombstone ${className}`} style={style} width={size} height={size * 1.1} viewBox="0 0 70 78" aria-hidden="true">
+      <path d="M12 74 v-44 q0 -20 23 -20 q23 0 23 20 v44 z" fill="#14121a" />
+      <path d="M17 70 v-40 q0 -15 18 -15 q18 0 18 15 v40 z" fill="#1b1823" />
+      <text x="35" y="44" fontSize="11" textAnchor="middle" fill="rgba(170,225,240,0.35)" fontFamily="serif" letterSpacing="1">RIP</text>
+      <path d="M22 54 h26 M25 60 h20" stroke="rgba(170,225,240,0.18)" strokeWidth="1" />
+      <path d="M4 76 q6 -9 9 0 M18 76 q4 -12 8 0 M46 76 q5 -8 8 0 M58 76 q6 -10 9 0" stroke="#1f2a24" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <ellipse cx="35" cy="76" rx="33" ry="3" fill="rgba(0,0,0,0.5)" />
     </svg>
   );
 }
 
-/** Geisterlaterne oder Kürbislaterne an der Lichterkette. */
-export function StringLantern({ kind = "pumpkin", className = "", style }) {
+/** Sichelmond, klein und ruhig, mit einem Hauch Türkis - hinter dem Inhalt am oberen Rand. */
+export function Moon({ className = "", style, phase = moonPhase() }) {
+  // Echte Mondphase des Tages, ein Hauch Erdschein auf der dunklen Seite, zwei Mare - kein Strahlenkranz.
+  const lit = illumination(phase);
   return (
-    <svg className={`tls-string-lantern ${className}`} style={style} width="34" height="52" viewBox="0 0 34 52" aria-hidden="true">
-      <line x1="17" y1="0" x2="17" y2="12" stroke="rgba(255,255,255,0.45)" strokeWidth="1" />
-      {kind === "ghost" ? (
-        <g>
-          <path d="M6 30 q0 -18 11 -18 q11 0 11 18 v16 l-4 -4 l-3.5 4 l-3.5 -4 l-3.5 4 l-3.5 -4 l-4 4 z" fill="rgba(240,240,255,0.92)" />
-          <circle cx="13" cy="26" r="2" fill="#17121d" />
-          <circle cx="21" cy="26" r="2" fill="#17121d" />
-          <ellipse cx="17" cy="33" rx="2" ry="3" fill="#17121d" />
-        </g>
-      ) : (
-        <g className="tls-pumpkin tls-pumpkin--slow">
-          <ellipse cx="17" cy="30" rx="13" ry="11" fill="#ff7a1a" />
-          <ellipse cx="9" cy="30" rx="4.5" ry="10" fill="#e8620b" opacity="0.85" />
-          <ellipse cx="25" cy="30" rx="4.5" ry="10" fill="#e8620b" opacity="0.85" />
-          <path d="M12 27 l3 4 l-6 0 z M22 27 l-3 4 l6 0 z M10 34 q7 5 14 0 l-1.5 2.5 l-2.5 -1.5 l-2.5 1.5 l-2.5 -1.5 l-2.5 1.5 z" fill="#ffd166" />
-          <path d="M17 19 q-2 -4 2 -6" stroke="#4d7c2a" strokeWidth="2.4" fill="none" strokeLinecap="round" />
-        </g>
-      )}
-    </svg>
-  );
-}
-
-/** Ein treibender Geist - selten, nur bei „voll“. */
-export function Ghost({ size = 80, className = "", style }) {
-  return (
-    <svg className={`tls-ghost ${className}`} style={style} width={size} height={size * 1.3} viewBox="0 0 60 78" aria-hidden="true">
-      <path d="M8 42 q0 -34 22 -34 q22 0 22 34 v30 l-7 -6 l-7.5 6 l-7.5 -6 l-7.5 6 l-7.5 -6 l-7 6 z" fill="rgba(235,235,255,0.85)" />
-      <circle cx="22" cy="34" r="3.5" fill="#17121d" />
-      <circle cx="38" cy="34" r="3.5" fill="#17121d" />
-      <ellipse cx="30" cy="46" rx="4" ry="6" fill="#17121d" />
-    </svg>
-  );
-}
-
-/** Sichelmond mit Schein und zwei Wolken - hinter dem Inhalt. */
-export function Moon({ className = "", style }) {
-  return (
-    <svg className={`tls-moon ${className}`} style={style} width="220" height="160" viewBox="0 0 220 160" aria-hidden="true">
+    <svg className={`tls-moon ${className}`} style={style} width="150" height="150" viewBox="0 0 150 150" aria-hidden="true" data-phase={phase.toFixed(2)}>
       <defs>
         <radialGradient id="tls-moon-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor="rgba(255,222,150,0.35)" />
-          <stop offset="1" stopColor="rgba(255,222,150,0)" />
+          <stop offset="0" stopColor={`rgba(170, 225, 240, ${(0.06 + lit * 0.16).toFixed(2)})`} />
+          <stop offset="1" stopColor="rgba(170, 225, 240, 0)" />
         </radialGradient>
+        <clipPath id="tls-moon-disc"><circle cx="75" cy="75" r="36" /></clipPath>
       </defs>
-      <circle cx="90" cy="70" r="70" fill="url(#tls-moon-glow)" />
-      <path d="M90 22 a48 48 0 1 0 0 96 a38 38 0 1 1 0 -96 z" fill="#f4dfa3" />
-      <circle cx="78" cy="52" r="4" fill="rgba(0,0,0,0.08)" />
-      <circle cx="70" cy="80" r="6" fill="rgba(0,0,0,0.07)" />
-      <g className="tls-cloud" fill="rgba(60,60,80,0.75)">
-        <ellipse cx="150" cy="96" rx="34" ry="12" />
-        <ellipse cx="132" cy="90" rx="18" ry="11" />
-        <ellipse cx="168" cy="90" rx="16" ry="10" />
-      </g>
-      <g className="tls-cloud tls-cloud--slow" fill="rgba(60,60,80,0.6)">
-        <ellipse cx="60" cy="122" rx="30" ry="10" />
-        <ellipse cx="46" cy="116" rx="16" ry="9" />
+      <circle cx="75" cy="75" r="74" fill="url(#tls-moon-glow)" />
+      <circle cx="75" cy="75" r="36" fill="rgba(233, 238, 242, 0.09)" />
+      <path d={litPath(phase, 75, 75, 36)} fill="#e6ecf0" opacity="0.88" />
+      <g clipPath="url(#tls-moon-disc)" opacity="0.1">
+        <circle cx="64" cy="62" r="7" fill="#1a2028" />
+        <circle cx="86" cy="80" r="10" fill="#1a2028" />
+        <circle cx="70" cy="92" r="5" fill="#1a2028" />
       </g>
     </svg>
   );
 }
 
-/** Zaun mit Grabsteinen und kahlem Baum als Silhouette für die unteren Ecken am Breitbild. */
-export function Graveyard({ mirrored = false, className = "", style }) {
+
+/** Schwarze Katze auf der Footer-Kante: sitzt, blinzelt ab und zu, der Schwanz schwingt langsam. */
+export function Cat({ className = "", style, size = 64 }) {
   return (
-    <svg className={`tls-graveyard ${className}`} style={{ ...style, transform: mirrored ? "scaleX(-1)" : undefined }} viewBox="0 0 320 160" aria-hidden="true">
-      <path d="M0 160 v-22 q40 -10 80 -4 q40 6 80 -2 q40 -8 80 2 q40 10 80 4 v22 z" fill="#0b0810" />
-      <g fill="#100c15">
-        <path d="M22 138 v-34 q0 -12 12 -12 q12 0 12 12 v34 z" />
-        <path d="M70 140 v-26 q0 -9 9 -9 q9 0 9 9 v26 z" />
-        <path d="M118 139 v-30 h30 v30 z" />
+    <svg className={`tls-cat ${className}`} style={style} width={size} height={size * 1.15} viewBox="0 0 64 74" aria-hidden="true">
+      <path className="tls-cat__tail" d="M46 66 q16 -4 14 -22 q-1 -9 -8 -8" stroke="#0e0c12" strokeWidth="6" fill="none" strokeLinecap="round" />
+      <path d="M14 72 q-4 -30 14 -40 q10 -6 20 0 q16 10 12 40 z" fill="#0e0c12" />
+      <path d="M20 34 l-4 -16 l12 8 z M44 34 l4 -16 l-12 8 z" fill="#0e0c12" />
+      <ellipse cx="32" cy="34" rx="13" ry="12" fill="#0e0c12" />
+      <g className="tls-cat__eyes">
+        <ellipse cx="26" cy="33" rx="3" ry="2.4" fill="#9be7ff" />
+        <ellipse cx="38" cy="33" rx="3" ry="2.4" fill="#9be7ff" />
+        <ellipse cx="26" cy="33" rx="0.9" ry="2.2" fill="#0e0c12" />
+        <ellipse cx="38" cy="33" rx="0.9" ry="2.2" fill="#0e0c12" />
       </g>
-      <g stroke="#1a1422" strokeWidth="3" strokeLinecap="round">
-        {[170, 190, 210, 230, 250, 270].map((x, i) => <line key={x} x1={x} y1="140" x2={x} y2={i % 2 ? 108 : 114} />)}
-        <line x1="160" y1="118" x2="280" y2="118" />
-        <line x1="160" y1="132" x2="280" y2="132" />
-      </g>
-      <g stroke="#1a1422" strokeWidth="6" strokeLinecap="round" fill="none">
-        <path d="M290 140 v-50 q-4 -20 -22 -30" />
-        <path d="M290 100 q10 -14 24 -18" strokeWidth="4" />
-        <path d="M288 118 q-14 -6 -20 -20" strokeWidth="4" />
-      </g>
-      <text x="34" y="120" fontSize="10" fill="#2a2333" fontFamily="serif">RIP</text>
+      <path d="M8 36 l14 1 M8 40 l14 -1 M56 36 l-14 1 M56 40 l-14 -1" stroke="rgba(170,225,240,0.35)" strokeWidth="0.7" />
     </svg>
   );
 }

@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { between, pageRng, pick } from "../rng";
-import { BatShape, Cobweb, Ghost, Graveyard, Lantern, Moon, Pumpkin, Spider, StringLantern } from "./art";
+import { Cat, Cobweb, Lantern, Moon, Pumpkin, Spider, Tombstone, segmentEnd, webSegments } from "./art";
 import { advanceFlock, createFlock, drawBat, nextFlightDelay } from "./bats";
+import { advanceLeaves, createLeaves, drawLeaf } from "./leaves";
 import { recordSignal } from "../signals";
 import "./halloween.css";
 
-// Halloween (#635, #655): große Spinnweben mit Spinnen, die sich abseilen und ab und zu quer über den
-// Bildschirm krabbeln, sichtbare Fledermausschwärme, hängende Fledermäuse an der Kopfzeile, Lichterketten,
-// Friedhof und Mond in den Breitbild-Rändern, Nebel, geschnitzte Kürbisse am Footer, die Laterne neben
-// dem Löwen. Jede Seite bekommt aus ihrer Adresse eine eigene Anordnung - stabil je Seite, anders je Seite.
+// Halloween (#635, #655, #658): dunkel und edel. Ein großes Eck-Netz, das eine Spinne beim ersten Besuch
+// sichtbar spinnt - Faden für Faden, bis an den Rand verankert; eine Spinne, die sich ab und zu abseilt,
+// selten eine, die über den Bildschirm krabbelt; wenige Fledermäuse als Silhouetten; ein ruhiger Mond;
+// selten ein einzelner Grabstein; ein bis zwei Kürbisse am Footer und die Laterne neben dem Löwen.
+// Kein Nebel, keine Geister, keine Lichterketten. Jede Seite bekommt aus ihrer Adresse ihre Anordnung.
 
-export const ACCENT = "rgba(255, 140, 0, 0.45)";
+export const ACCENT = "rgba(170, 225, 240, 0.35)";
 export const SIGNAL_KEY = "halloween_pumpkin";
-export const FACES = ["grin", "scared", "wicked"];
+export const FACES = ["grin", "calm", "wicked"];
 
 /** Zählt der Klick? Nur am 31. Oktober ab 18:00 (Ortszeit des Geräts, der Server prüft später selbst). */
 export function pumpkinCounts(now = new Date()) {
@@ -25,30 +28,21 @@ export function pageLayout(pathname, intensity = "normal") {
   const rng = pageRng(pathname, "halloween");
   const full = intensity === "full";
   const subtle = intensity === "subtle";
-  const webs = [
-    { corner: "tl", scale: between(rng, 0.85, 1.2), rotate: between(rng, -5, 5), torn: rng() < 0.45 ? [pick(rng, [2, 4, 6])] : [] },
-    { corner: "tr", scale: between(rng, 0.7, 1.1), rotate: between(rng, -5, 5), torn: rng() < 0.45 ? [pick(rng, [3, 5])] : [] },
-  ];
-  if (rng() < 0.75) webs.push({ corner: "bl", scale: between(rng, 0.55, 0.85), rotate: 0, torn: [], wide: true });
-  if (rng() < 0.75) webs.push({ corner: "br", scale: between(rng, 0.55, 0.85), rotate: 0, torn: [], wide: true });
-  const spiders = subtle ? [] : [{ side: "left", period: between(rng, 34, 60), delay: 5, size: between(rng, 54, 78), drop: between(rng, 120, 220) }];
-  if (!subtle && (full || rng() < 0.6)) spiders.push({ side: "right", period: between(rng, 40, 70), delay: between(rng, 14, 30), size: between(rng, 46, 66), drop: between(rng, 90, 190) });
-  const hangingBats = subtle ? [] : Array.from({ length: 1 + Math.floor(rng() * 2) }, () => ({ x: between(rng, 18, 82), size: between(rng, 44, 64), delay: between(rng, 0, 20), period: between(rng, 18, 40) }));
-  const crawler = subtle ? null : { every: between(rng, 90, 240), first: between(rng, 20, 60), size: between(rng, 64, 96), edge: pick(rng, ["bottom", "bottom", "top"]), duration: between(rng, 14, 22) };
-  const footerPumpkins = [
-    { face: pick(rng, FACES), size: Math.round(between(rng, 60, 80)) },
-    { face: pick(rng, FACES), size: Math.round(between(rng, 44, 58)), slow: true },
-  ];
-  if (rng() < 0.5) footerPumpkins.push({ face: pick(rng, FACES), size: Math.round(between(rng, 34, 46)) });
-  const lanternCount = subtle ? 0 : 3 + Math.floor(rng() * 3);
-  const rails = {
-    lanterns: Array.from({ length: lanternCount }, () => ({ kind: rng() < 0.7 ? "pumpkin" : "ghost", delay: between(rng, 0, 4) })),
-    graveyard: rng() < 0.85,
-    moon: rng() < 0.9,
-    moonSide: pick(rng, ["right", "right", "left"]),
-  };
-  const ghost = full && rng() < 0.75 ? { every: between(rng, 110, 220), first: between(rng, 25, 70), side: pick(rng, ["left", "right"]), y: between(rng, 18, 62) } : null;
-  return { webs, spiders, hangingBats, crawler, footerPumpkins, rails, ghost, fog: full ? "dense" : subtle ? "none" : "light", vignette: full, lanternFace: pick(rng, FACES), night: false };
+  const mainCorner = rng() < 0.7 ? "tl" : "tr";
+  const webs = [{ corner: mainCorner, scale: between(rng, 1.0, 1.35), seed: rng(), build: !subtle && rng() < 0.65, stepMs: Math.round(between(rng, 260, 420)) }];
+  if (rng() < 0.45) webs.push({ corner: mainCorner === "tl" ? "tr" : "tl", scale: between(rng, 0.55, 0.8), seed: rng(), build: false, stepMs: 0 });
+  const spiders = subtle ? [] : [{ side: mainCorner === "tl" ? "left" : "right", period: between(rng, 45, 80), delay: between(rng, 25, 40), size: between(rng, 22, 30), drop: between(rng, 110, 200) }];
+  const crawler = !subtle && (full || rng() < 0.6) ? { every: between(rng, 150, 320), first: between(rng, 40, 90), size: between(rng, 26, 36), duration: between(rng, 16, 26) } : null;
+  // Abseil-Spinne (#658): hängt in der Seite, nicht im Fenster - sie seilt sich langsam nach unten ab, man kann ihr nachscrollen.
+  const rappel = !subtle && rng() < 0.45 ? { side: mainCorner === "tl" ? "right" : "left", size: between(rng, 20, 28), speed: between(rng, 14, 26), first: between(rng, 8, 20), rest: between(rng, 20, 45) } : null;
+  const footerPumpkins = [{ face: pick(rng, FACES), size: Math.round(between(rng, 46, 60)) }];
+  if (rng() < 0.5) footerPumpkins.push({ face: pick(rng, FACES), size: Math.round(between(rng, 34, 44)), slow: true });
+  const tombstone = rng() < 0.35 ? { side: pick(rng, ["left", "right"]), size: Math.round(between(rng, 64, 84)), tilt: between(rng, -5, 5) } : null;
+  const moon = !subtle && rng() < 0.7 ? { side: mainCorner === "tl" ? "right" : "left" } : null;
+  const flock = full ? [5, 8] : [3, 5];
+  const cat = rng() < 0.5 ? { size: Math.round(between(rng, 56, 72)) } : null;
+  const leaves = subtle ? 0 : full ? 6 + Math.floor(rng() * 4) : 3 + Math.floor(rng() * 3);
+  return { webs, spiders, crawler, rappel, footerPumpkins, tombstone, moon, flock, cat, leaves, lanternFace: pick(rng, FACES), night: false };
 }
 
 function useLayout(season) {
@@ -56,9 +50,9 @@ function useLayout(season) {
   return useMemo(() => ({ ...pageLayout(location.pathname, season.effective), night: Boolean(season.data?.night) }), [location.pathname, season.effective, season.data?.night]);
 }
 
-const CORNER_CLASS = { tl: "tls-web--tl", tr: "tls-web--tr", bl: "tls-web--bl", br: "tls-web--br" };
+const CORNER_CLASS = { tl: "tls-web--tl", tr: "tls-web--tr" };
 
-/** Ein Element, das nach einer Wartezeit immer wieder für `duration` Sekunden erscheint (Krabbler, Geist). */
+/** Ein Element, das nach einer Wartezeit immer wieder für `duration` Sekunden erscheint (Krabbler). */
 function useRecurring(spec, active) {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
@@ -82,68 +76,193 @@ function useRecurring(spec, active) {
   return visible;
 }
 
+/** Netzbau (#658): die Spinne spinnt das Netz Faden für Faden; sie sitzt am Ende des Fadens, den sie gerade zieht. */
+export function BuildingWeb({ web, corner, reducedMotion }) {
+  const segments = useMemo(() => webSegments(web.seed), [web.seed]);
+  const [count, setCount] = useState(reducedMotion || !web.build ? segments.length : 0);
+  useEffect(() => {
+    if (reducedMotion || !web.build) return undefined;
+    const handle = window.setInterval(() => setCount((current) => (current >= segments.length ? current : current + 1)), web.stepMs);
+    return () => window.clearInterval(handle);
+  }, [reducedMotion, web.build, web.stepMs, segments.length]);
+  const building = count < segments.length;
+  const tip = building ? segmentEnd(segments[Math.max(0, count - 1)]) : null;
+  const scale = web.scale;
+  return (
+    <div className={`tls-web ${CORNER_CLASS[corner]}`} style={{ "--web-scale": scale }} data-testid={building ? "halloween-web-building" : "halloween-web"}>
+      <Cobweb seed={web.seed} progress={count / segments.length} />
+      {building && tip && (
+        <div className="tls-web__spinner" style={{ left: `${(tip.x / 240) * 100}%`, top: `${(tip.y / 240) * 100}%` }} aria-hidden="true">
+          <Spider size={12} thread={false} className="tls-spider--spinning" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Scrollen bewegt die Deko mit: das Netz schwingt nach der Scrollgeschwindigkeit, der Mond wandert langsam. */
+export function useScrollEffects(active) {
+  const location = useLocation();
+  useEffect(() => {
+    if (!active || typeof window === "undefined") return undefined;
+    const root = document.documentElement;
+    let last = window.scrollY;
+    let sway = 0;
+    let frame = 0;
+    const tick = () => {
+      sway *= 0.9;
+      root.style.setProperty("--season-sway", `${sway.toFixed(3)}deg`);
+      if (Math.abs(sway) > 0.02) frame = window.requestAnimationFrame(tick);
+      else {
+        root.style.setProperty("--season-sway", "0deg");
+        frame = 0;
+      }
+    };
+    const onScroll = () => {
+      const now = window.scrollY;
+      const velocity = Math.max(-60, Math.min(60, now - last));
+      last = now;
+      sway = Math.max(-4, Math.min(4, sway + velocity * 0.04));
+      root.style.setProperty("--season-scroll", `${Math.round(now)}px`);
+      if (!frame) frame = window.requestAnimationFrame(tick);
+    };
+    root.style.setProperty("--season-scroll", `${Math.round(window.scrollY)}px`);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+      root.style.removeProperty("--season-sway");
+      root.style.removeProperty("--season-scroll");
+    };
+  }, [active]);
+  // Seitenwechsel: die Fledermäuse dürfen kurz darauf starten.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.dispatchEvent(new CustomEvent("tls:season-page", { detail: { pathname: location.pathname } }));
+    } catch {
+      // ohne CustomEvent kein Start beim Seitenwechsel - der Zeitplan bleibt.
+    }
+  }, [location.pathname]);
+}
+
+/** Die Abseil-Spinne (#658): sitzt in der Seite, nicht im Fenster. Sie seilt sich langsam bis unten ab - wer scrollt,
+ * findet sie weiter unten am Faden - rastet, und klettert schneller wieder hoch. */
+export function RappellingSpider({ spec, active }) {
+  const [top, setTop] = useState(90);
+  useEffect(() => {
+    if (!spec || !active || typeof window === "undefined") return undefined;
+    let y = 90;
+    let direction = 1;
+    let waitUntil = performance.now() + spec.first * 1000;
+    let last = performance.now();
+    let frame = 0;
+    // Eigene Uhr statt des rAF-Zeitstempels: der zählt je nach Umgebung ab einem anderen Nullpunkt.
+    const tick = () => {
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (now >= waitUntil) {
+        const floor = Math.max(300, document.documentElement.scrollHeight - 260);
+        y += direction * spec.speed * (direction > 0 ? 1 : 2.4) * dt;
+        if (y >= floor) {
+          y = floor;
+          direction = -1;
+          waitUntil = now + spec.rest * 1000;
+        } else if (y <= 90) {
+          y = 90;
+          direction = 1;
+          waitUntil = now + spec.rest * 2 * 1000;
+        }
+        setTop(Math.round(y));
+      }
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [spec, active]);
+  if (!spec || !active || typeof document === "undefined") return null;
+  return createPortal(
+    <div className={`tls-rappel tls-rappel--${spec.side}`} style={{ height: `${top}px` }} aria-hidden="true" data-testid="halloween-rappel">
+      <Spider size={spec.size} className="tls-rappel__spider" />
+    </div>,
+    document.body,
+  );
+}
+
 export function Corners({ season }) {
   const layout = useLayout(season);
   const moving = season.effective !== "subtle";
   const crawling = useRecurring(layout.crawler, moving);
-  const haunting = useRecurring(layout.ghost, moving);
+  useScrollEffects(moving);
   return (
     <>
-      {layout.webs.map((web) => (
-        <Cobweb key={web.corner} className={`${CORNER_CLASS[web.corner]} ${web.wide ? "tls-web--wide" : ""}`} torn={web.torn} style={{ "--web-scale": web.scale, "--web-rotate": `${web.rotate}deg` }} />
-      ))}
+      {layout.webs.map((web) => <BuildingWeb key={web.corner} web={web} corner={web.corner} reducedMotion={!moving} />)}
       {layout.spiders.map((spider) => (
-        <Spider key={spider.side} className={`tls-spider--${spider.side}`} size={spider.size} style={{ "--spider-period": `${spider.period}s`, "--spider-delay": `${spider.delay}s`, "--spider-drop": `${spider.drop}px` }} />
-      ))}
-      {layout.hangingBats.map((bat, index) => (
-        <BatShape key={`hang-${index}`} className="tls-hanging-bat" size={bat.size} style={{ left: `${bat.x}%`, "--bat-delay": `${bat.delay}s`, "--bat-period": `${bat.period}s` }} />
-      ))}
-      {layout.rails.lanterns.length > 0 && ["left", "right"].map((side) => (
-        <div key={side} className={`tls-rail tls-rail--${side}`} data-testid={`halloween-rail-${side}`}>
-          <svg className="tls-rail__wire" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><path d="M0 6 Q 25 34 50 10 T 100 8" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" fill="none" /></svg>
-          {layout.rails.lanterns.map((lantern, index) => (
-            <StringLantern key={index} kind={lantern.kind} style={{ left: `${10 + (index * 80) / Math.max(1, layout.rails.lanterns.length - 1)}%`, "--lantern-delay": `${lantern.delay}s` }} />
-          ))}
-          {layout.rails.graveyard && <Graveyard mirrored={side === "right"} className="tls-rail__graveyard" />}
-        </div>
+        <Spider key={spider.side} className={`tls-spider--drop tls-spider--${spider.side}`} size={spider.size} style={{ "--spider-period": `${spider.period}s`, "--spider-delay": `${spider.delay}s`, "--spider-drop": `${spider.drop}px` }} data-testid={`halloween-spider-${spider.side}`} />
       ))}
       {crawling && layout.crawler && (
-        <Spider className={`tls-crawler tls-crawler--${layout.crawler.edge}`} size={layout.crawler.size} style={{ "--crawl-duration": `${layout.crawler.duration}s` }} data-testid="halloween-crawler" />
+        <Spider className="tls-crawler" size={layout.crawler.size} thread={false} style={{ "--crawl-duration": `${layout.crawler.duration}s` }} data-testid="halloween-crawler" />
       )}
-      {haunting && layout.ghost && (
-        <Ghost className={`tls-ghost--drift tls-ghost--${layout.ghost.side}`} style={{ top: `${layout.ghost.y}%` }} />
-      )}
+      {layout.tombstone && <Tombstone className={`tls-tombstone--${layout.tombstone.side}`} size={layout.tombstone.size} style={{ "--tilt": `${layout.tombstone.tilt}deg` }} />}
+      <RappellingSpider spec={layout.rappel} active={moving} />
     </>
   );
 }
 
 export function Backdrop({ season }) {
   const layout = useLayout(season);
-  const full = season.effective === "full";
-  return (
-    <>
-      {layout.rails.moon && season.effective !== "subtle" && <Moon className={`tls-moon--${layout.rails.moonSide}`} />}
-      {full && <div className="tls-vignette" aria-hidden="true" />}
-      {layout.fog !== "none" && <div className={`tls-fog ${layout.fog === "dense" || layout.night ? "tls-fog--dense" : ""}`} aria-hidden="true" data-testid="halloween-fog" />}
-    </>
-  );
+  if (!layout.moon) return null;
+  return <Moon className={`tls-moon--${layout.moon.side}`} />;
 }
 
 export function Footer({ season }) {
   const layout = useLayout(season);
   return (
-    <div className="tls-footer-pumpkins" data-testid="halloween-pumpkins">
-      {layout.footerPumpkins.map((pumpkin, index) => <Pumpkin key={index} size={pumpkin.size} face={pumpkin.face} slow={pumpkin.slow} />)}
-      <svg className="tls-leaf" width="28" height="22" viewBox="0 0 28 22" aria-hidden="true"><path d="M2 20 q6 -18 24 -18 q-2 16 -18 18 q-2 -6 2 -10 q-6 3 -8 10 z" fill="#b5541c" /></svg>
-    </div>
+    <>
+      {layout.cat && <div className="tls-footer-cat" data-testid="halloween-cat"><Cat size={layout.cat.size} /></div>}
+      <div className="tls-footer-pumpkins" data-testid="halloween-pumpkins">
+        {layout.footerPumpkins.map((pumpkin, index) => <Pumpkin key={index} size={pumpkin.size} face={pumpkin.face} slow={pumpkin.slow} />)}
+      </div>
+    </>
   );
+}
+
+/** Die Pupillen der Laterne schauen zum Mauszeiger - ein paar Pixel, mehr nicht. */
+export function eyeOffset(pointer, center, reach = 2.2) {
+  const dx = pointer.x - center.x;
+  const dy = pointer.y - center.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const pull = Math.min(1, distance / 220);
+  return { x: (dx / distance) * reach * pull, y: (dy / distance) * reach * pull };
 }
 
 export function Widget({ season }) {
   const layout = useLayout(season);
   const [open, setOpen] = useState(false);
   const timer = useRef(0);
+  const buttonRef = useRef(null);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (typeof window === "undefined" || season.effective === "subtle") return undefined;
+    let frame = 0;
+    const onMove = (event) => {
+      if (frame || !buttonRef.current) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const box = buttonRef.current?.getBoundingClientRect();
+        if (!box) return;
+        const offset = eyeOffset({ x: event.clientX, y: event.clientY }, { x: box.left + box.width / 2, y: box.top + box.height / 2 });
+        buttonRef.current.style.setProperty("--eye-x", `${offset.x.toFixed(2)}px`);
+        buttonRef.current.style.setProperty("--eye-y", `${offset.y.toFixed(2)}px`);
+      });
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [season.effective]);
   const greeting = season.texts?.greeting || "Happy Halloween";
   const onClick = () => {
     setOpen(true);
@@ -153,7 +272,7 @@ export function Widget({ season }) {
   };
   return (
     <span className="relative">
-      <button type="button" onClick={onClick} className={`tls-lantern ${open ? "tls-lantern--open" : ""}`} aria-label={greeting} title={greeting} data-testid="halloween-lantern">
+      <button ref={buttonRef} type="button" onClick={onClick} className={`tls-lantern ${open ? "tls-lantern--open" : ""}`} aria-label={greeting} title={greeting} data-testid="halloween-lantern">
         <Lantern open={open} face={layout.lanternFace} />
       </button>
       {open && <span className="tls-lantern__note" role="status" data-testid="halloween-note">{greeting}</span>}
@@ -161,31 +280,40 @@ export function Widget({ season }) {
   );
 }
 
-/** Die Fledermäuse als Ebene für den gemeinsamen Canvas-Loop - Saat aus der Seite, erster Flug nach drei Sekunden. */
+/** Die Fledermäuse als Ebene für den gemeinsamen Canvas-Loop - wenige, als Silhouetten, erster Flug nach sechs Sekunden. */
 export function skyLayers({ season, reducedMotion }) {
   if (reducedMotion || season.effective === "subtle") return [];
   const night = Boolean(season.data?.night);
-  const rng = pageRng(typeof window !== "undefined" ? window.location.pathname : "/", "bats");
-  const state = { flock: null, wait: 3, lastPath: "", scrollArmed: true };
-  const onScroll = () => {
-    const path = typeof window !== "undefined" ? window.location.pathname : "";
-    if (!state.scrollArmed || path === state.lastPath) return;
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
+  const rng = pageRng(pathname, "bats");
+  const layout = pageLayout(pathname, season.effective);
+  const state = { flock: null, wait: 6, lastPath: pathname, pageArmed: true, leaves: null };
+  // Seitenwechsel: ein Schwarm darf kurz darauf starten - höchstens einmal je Minute.
+  const onPage = (event) => {
+    const path = event?.detail?.pathname || "";
+    if (!state.pageArmed || path === state.lastPath) return;
     state.lastPath = path;
-    state.scrollArmed = false;
-    if (!state.flock) state.wait = Math.min(state.wait, 0.5);
+    state.pageArmed = false;
+    if (!state.flock) state.wait = Math.min(state.wait, 1.5);
     window.setTimeout(() => {
-      state.scrollArmed = true;
-    }, 45000);
+      state.pageArmed = true;
+    }, 60000);
   };
-  if (typeof window !== "undefined") window.addEventListener("scroll", onScroll, { passive: true });
-  return [{
+  if (typeof window !== "undefined") window.addEventListener("tls:season-page", onPage);
+  const leafLayer = layout.leaves > 0 ? [{
+    key: "halloween-leaves",
+    draw(ctx, dt, size) {
+      if (!state.leaves) state.leaves = createLeaves(size, layout.leaves, rng);
+      advanceLeaves(state.leaves, dt, size, rng).forEach((leaf) => drawLeaf(ctx, leaf));
+    },
+  }] : [];
+  return [...leafLayer, {
     key: "halloween-bats",
     draw(ctx, dt, size) {
       if (!state.flock) {
         state.wait -= dt;
         if (state.wait > 0) return;
-        // Der Schwarm startet in diesem Bild - nur die Zeit über der Wartezeit zählt schon als Flug.
-        state.flock = createFlock(size, season.effective, rng);
+        state.flock = createFlock(size, layout.flock, rng);
         dt = Math.max(0, -state.wait);
         state.wait = 0;
       }
@@ -196,7 +324,7 @@ export function skyLayers({ season, reducedMotion }) {
       }
     },
     dispose() {
-      if (typeof window !== "undefined") window.removeEventListener("scroll", onScroll);
+      if (typeof window !== "undefined") window.removeEventListener("tls:season-page", onPage);
     },
   }];
 }
