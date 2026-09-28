@@ -228,11 +228,20 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   const subtle = mount(<Backdrop season={halloween({ effective: "subtle" })} />, path);
   expect(subtle.container.querySelector(".tls-moon")).toBeNull();
   subtle.unmount();
-  const normal = mount(<Backdrop season={halloween()} />, path);
-  const moon = normal.container.querySelector(".tls-moon");
+  // Der Mond steht am Himmel über Innsbruck: am 26.10.2026 um 23:30 UTC (Vollmond) hoch im Süden, mittags unter dem Horizont.
+  const night = mount(<Backdrop season={halloween()} now={() => new Date("2026-10-26T23:30:00Z")} />, path);
+  const holder = screen.getByTestId("season-moon");
+  expect(holder.getAttribute("data-visible")).toBe("1");
+  expect(Number(holder.getAttribute("data-altitude"))).toBeGreaterThan(40);
+  const moon = night.container.querySelector(".tls-moon");
   expect(moon).not.toBeNull();
   expect(Number(moon.getAttribute("data-phase"))).toBeGreaterThanOrEqual(0);
-  normal.unmount();
+  expect(parseFloat(holder.style.top)).toBeLessThan(window.innerHeight * 0.5);
+  night.unmount();
+  const day = mount(<Backdrop season={halloween()} now={() => new Date("2026-10-26T11:00:00Z")} />, path);
+  expect(screen.getByTestId("season-moon").getAttribute("data-visible")).toBe("0");
+  expect(day.container.querySelector(".tls-moon")).toBeNull();
+  day.unmount();
   const footerPath = PATHS.find((candidate) => pageLayout(candidate, "normal").cat && pageLayout(candidate, "normal").graves.length > 0);
   const layout = pageLayout(footerPath, "normal");
   mountFixture('<footer style="position:relative"><div data-season-line="footer"></div></footer>');

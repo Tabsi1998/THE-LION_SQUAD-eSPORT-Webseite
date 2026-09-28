@@ -83,13 +83,13 @@
 .tls-ghosts { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 59; pointer-events: none; }
 .tls-ghost { position: absolute; will-change: transform, opacity; animation: tls-ghost-rise var(--dur, 8s) ease-out forwards; }
 
-/* Mond: echte Phase, nur in den freien Rändern neben dem Inhalt (ab 1560 px), wandert leicht mit dem Scrollen */
-.tls-moon { position: fixed; top: 96px; z-index: 0; pointer-events: none; opacity: 0.85; display: none; transform: translateY(calc(var(--season-scroll, 0px) * -0.08)); }
-.tls-moon--right { right: calc((100vw - 1320px) / 4 - 60px); }
-.tls-moon--left { left: calc((100vw - 1320px) / 4 - 60px); }
-@media (min-width: 1560px) {
-  .tls-moon { display: block; }
-}
+/* Mond (#681): echte Phase und echter Stand am Himmel über dem Vereinsort - der Halter steht dort, wo der Mond gerade
+   ist, und wandert jede Minute weiter (weicher Übergang, beim ersten Bild ohne). Er liegt über dem Inhalt, aber als
+   Schein (mix-blend-mode: screen), nie klickbar, unter der Kopfzeile; nahe dem Horizont größer und wärmer, dazu die
+   leichte Parallaxe beim Scrollen. */
+.tls-moon-sky { position: fixed; left: 50vw; top: 20vh; width: 0; height: 0; z-index: 5; pointer-events: none; }
+.tls-moon-sky--settled { transition: left 60s linear, top 60s linear; }
+.tls-moon { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0.82; mix-blend-mode: screen; transform: translate(-50%, -50%) translateY(calc(var(--season-scroll, 0px) * -0.08)) scale(var(--moon-scale, 1)); filter: sepia(calc(var(--moon-warmth, 0) * 0.55)) saturate(calc(1 + var(--moon-warmth, 0) * 0.4)); transition: transform 0.6s ease-out; }
 
 /* Katze an der Footer-Kante: Schwanz wedelt, Augen blinzeln, Kopf und Pupillen folgen dem Zeiger ein wenig */
 @keyframes tls-cat-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(0.06); } }
