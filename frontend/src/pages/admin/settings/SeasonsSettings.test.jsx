@@ -70,13 +70,16 @@ test("Hauptschalter und Saison-Schalter speichern sofort, Texte mit eigenem Knop
   expect(toastMock.success).toHaveBeenCalledWith("Texte gespeichert.");
 });
 
-test("Vorschau merkt sich das Token nur in dieser Sitzung, Silvester mit Zeit", async () => {
+test("Vorschau merkt sich das Token nur in dieser Sitzung und sagt der Bühne sofort Bescheid, Silvester mit Zeit", async () => {
   const user = userEvent.setup();
+  let previewEvents = 0;
+  window.addEventListener("tls:season-preview", () => { previewEvents += 1; });
   render(<SeasonsSettings />);
   await user.click(await screen.findByTestId("season-halloween-preview"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/seasons/halloween/preview", {}));
   expect(JSON.parse(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).token).toBe("halloween.123.456.abc");
-  expect(toastMock.success).toHaveBeenCalledWith("Vorschau läuft 60 Sekunden – öffne die Startseite in diesem Tab.");
+  expect(toastMock.success).toHaveBeenCalledWith("Vorschau läuft 60 Sekunden – hier und auf jeder Seite in diesem Tab.");
+  expect(previewEvents).toBe(1);
   expect(screen.queryByTestId("season-halloween-preview-at")).toBeNull();
   await user.type(screen.getByTestId("season-new_year-preview-at"), "2026-12-31T23:59");
   await user.click(screen.getByTestId("season-new_year-preview"));

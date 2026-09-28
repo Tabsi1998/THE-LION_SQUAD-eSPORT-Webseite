@@ -6,9 +6,9 @@ import { isQuietPath, useSeasonModules } from "./SeasonStage";
 // Deko im Footer. Beide zeigen nur, was die Bühne auch zeigt.
 
 function useMountedSeasons() {
-  const { seasons, ready } = useSeason();
+  const { seasons, ready, preview } = useSeason();
   const location = useLocation();
-  const active = ready && !isQuietPath(location.pathname) ? seasons.filter((season) => season.effective !== "off") : [];
+  const active = ready && (preview || !isQuietPath(location.pathname)) ? seasons.filter((season) => season.effective !== "off") : [];
   const modules = useSeasonModules(active);
   return active.filter((season) => modules[season.key]).map((season) => ({ season, module: modules[season.key] }));
 }
