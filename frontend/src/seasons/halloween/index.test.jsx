@@ -74,7 +74,10 @@ test("Fledermaus-Ebene: keine bei Bewegung reduzieren, sonst eine, die nach der 
   const ctx = new Proxy({}, { get: (_t, name) => (name === "fillStyle" ? "" : () => calls.push(name)) });
   layer.draw(ctx, 1, { width: 1000, height: 600 });
   expect(calls.length).toBe(0);
-  layer.draw(ctx, 8, { width: 1000, height: 600 });
+  // Bild 8 Sekunden später: der Schwarm entsteht, aber die Zeit über der Wartezeit ist null - noch kein Tier zu sehen.
+  layer.draw(ctx, 7, { width: 1000, height: 600 });
+  expect(calls.length).toBe(0);
+  // Eine Sekunde weiter ist die erste Fledermaus (Startverzögerung unter 0,4 s) unterwegs.
   layer.draw(ctx, 1, { width: 1000, height: 600 });
   expect(calls.filter((name) => name === "fill").length).toBeGreaterThan(0);
   layer.dispose();

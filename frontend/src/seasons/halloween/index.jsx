@@ -83,7 +83,10 @@ export function skyLayers({ season, reducedMotion }) {
       if (!state.flock) {
         state.wait -= dt;
         if (state.wait > 0) return;
+        // Der Schwarm startet in diesem Bild - nur die Zeit über der Wartezeit zählt schon als Flug.
         state.flock = createFlock(size, season.effective);
+        dt = Math.max(0, -state.wait);
+        state.wait = 0;
       }
       advanceFlock(state.flock, dt).forEach((bat) => drawBat(ctx, bat));
       if (state.flock.done) {
