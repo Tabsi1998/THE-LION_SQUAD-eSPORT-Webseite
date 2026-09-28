@@ -87,7 +87,7 @@ async def test_vergabe_speichert_material_und_rang(flow):
     assert award["material"] == "silver" and award["rank"] == 4 and award["level"] == 2
     flow.act_as(user)
     shown = (await flow.get(f"/api/achievements/user/{user['id']}")).json()
-    mine = next(a for a in shown["awards"] if a["tier_code"] == "match_master_s")
+    mine = next(a for a in shown["awards"] if a["code"] == "match_master_s")  # die Vergabeliste trägt den Stufen-Code als „code“
     assert mine["material"] == "silver" and mine["material_color"] == "#C0C0C0" and mine["level_name"] == "Silber"
 
 
@@ -195,5 +195,5 @@ async def test_migration_ohne_gegenstueck_wird_vermaechtnis(flow):
     assert await db.achievement_groups.find_one({"code": "manual_old"}) is None
     flow.act_as(user)
     shown = (await flow.get(f"/api/achievements/user/{user['id']}")).json()
-    assert "legacy_manual_old_1" in {a["tier_code"] for a in shown["awards"]}, "im Profil bleibt die Vergabe sichtbar"
+    assert "legacy_manual_old_1" in {a["code"] for a in shown["awards"]}, "im Profil bleibt die Vergabe sichtbar"
     assert "legacy_manual_old" in {g["code"] for g in shown["groups"]}
