@@ -254,8 +254,8 @@ export function PublicLayout({ children }) {
             </div>
           </div>
         </div>
-        {/* Reihe 2 — Bottom Bar */}
-        <div className="border-t border-white/5">
+        {/* Reihe 2 — Bottom Bar; der Strich darüber ist die Kante, auf der die Saison-Deko steht (#662) */}
+        <div className="border-t border-white/5" data-season-line="footer">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40 min-w-0">
             <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-4">
