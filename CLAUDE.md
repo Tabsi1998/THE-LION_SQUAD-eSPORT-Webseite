@@ -2427,6 +2427,62 @@ Seit dem 15. September gilt:
 - Deutsch-Prüfung `test_german_copy.py` schlägt bei „fuer/ueber/weiss“ an –
   immer die ganze Suite laufen lassen, nicht nur den Zieltest.
 
+- Jahreszeiten (#632, #633; PRs #648, #653): `services/seasons.py` –
+  elf Saisonen mit Zeitfenstern (Gauß-Ostern, Adventsonntage, Halloween
+  25.10.–1.11., Advent, Schnee, Nikolaus, Adventkalender, Weihnachten,
+  Silvester mit Phasen ramp_29/ramp_30/evening_31/pre_countdown/countdown/
+  show/fade/greeting und stundenweise gesäten Salven, Fasching,
+  Vereinsgeburtstag aus `founded_on` in `about_page`, Ostern, Eiersuche),
+  `merge_settings` (je Saison enabled/mode auto|force_on|force_off/until/
+  intensity subtle|normal|full/channels web|app/texts), `active()`,
+  `calendar()`, `admin_view()`, Vorschau-Token (HMAC, 60 s). Sammlung
+  `settings` mit `id: seasons`. `routes/seasons_routes.py`: `GET
+  /api/seasonal/active` (ETag, `max-age=60`; `/api/seasons` gehört den
+  Wettkampf-Saisonen), `GET /api/seasonal/calendar`; mit Vorschau-Token
+  `no-store`. Admin in `routes/settings_routes.py`: `GET/PUT
+  /api/settings/seasons`, `POST /api/settings/seasons/{key}/preview`.
+  `UserUpdate.seasonal_decorations` on|subtle|off. Die
+  Sicherheits-Middleware erzwingt `no-store` auf `/api/` außer
+  `/api/stickers/files/` und `/api/seasonal/`. Halloween-Signal
+  `halloween_pumpkin` (31.10. ab 18 Uhr) läuft über die Erfolge-Signale.
+- Erfolge II, E1 Datenmodell v2 (#611, PR #652): Paket
+  `backend/achievement_catalog/` (`legacy.py` alter Katalog, `materials.py`
+  MATERIALS Holz→Diamant plus Legendär und Geheim mit rank/points/color/
+  legacy_level, LADDERS 7/5/3/1, CATEGORIES v2, `tier()`, `annotate_tier()`,
+  `annotate_group()`, `ladder_targets()`, `category_v2()`; `__init__.py`
+  annotiert alte Stufen, `migration_map.GROUP_MAPPING`),
+  `services/achievement_migration.py` (`annotate_awards`,
+  `apply_group_mapping` mit Trockenlauf/Marker/Rückfall `legacy_*`, CLI
+  `python -m services.achievement_migration --dry-run`), `badges.material_fields()`;
+  geheime Gruppen erscheinen erst nach dem Freischalten (Admins sehen
+  alles); Admin-CRUD nimmt `material`/`hidden`/`how_to`/`art`, `level`
+  bleibt 1–5 für alte Clients.
+- Erfolge II, E7 XP und Level (#617, PR #654): `services/levels.py`
+  (`xp_step = round(60·n^1.5/10)·10`, L60 = 683.150 XP, TITLES alle fünf
+  Level, Prestige ×1,25 je Stern, `level_view`, `legacy_square_curve` für
+  Team-Level), `services/xp.py` (SOURCES mit Tagesdeckeln, `grant()`
+  idempotent je `ref`, Mitgliederbonus 10 %, Benachrichtigung `kind:
+  level`, `daily_login_once`/`grant_daily_login` mit Serie und
+  Geburtstags-Logins, `prestige`/`undo_prestige` 24 h, `rebuild`/
+  `rebuild_missing`, `leaderboard`), Haken in badges/event/friend/auth
+  `/me`/discord/chat, Routen `GET /api/users/me/level`, `POST
+  /api/users/me/prestige[/undo]`, `GET /api/achievements/leaderboard?by=level`,
+  `POST /api/admin/achievements/xp`, Job `xp_baseline` (60 s).
+- Erfolge II, E6 Zähler (#616, PR #656): `services/achievement_counters.py`
+  (Registry `@counter(key, *sources)`, `Context`-Lader, rund 60 Zähler für
+  Signale/Profil/XP/Erfolge/Turniere/Matches – Zeitstempel und Seeds aus
+  den rohen `matches_v2` –/Teams/Events/Saison/Community, `compute`,
+  `refresh(user_id, sources)`, `stats()` mit Cache `user_achievement_stats`
+  10 min, `reconcile()`, `SIGNAL_RULES`, `record_signal`, `season_allows`),
+  `routes/achievement_signal_routes.py` (`POST /api/achievements/signal`,
+  `GET/POST /api/matches/{id}/commend`, `POST /api/news/{slug}/read`, `POST
+  /api/streams/watch`), `badges.evaluate_user_progress(user_id, sources)`,
+  `achievement_queue.request_evaluation(..., sources=)`, Cron
+  `achievements_reconcile` 04:10 Europe/Vienna, `COUNTER_KEYS_V2` im
+  Katalog. Test-Fakes der Auswertung müssen `sources` entgegennehmen.
+- Über-uns-Zahlen (#621, PR #651): `club_numbers` zeigt Preise vergeben,
+  Turniere gespielt, Mitglieder, Jahre aktiv.
+
 **Web**
 - Live-Aktualisierung: `frontend/src/hooks/useLiveRefresh.js`,
   Stream-Zustand in `frontend/src/lib/apiInvalidation.js`, Brücke
@@ -2513,6 +2569,46 @@ Seit dem 15. September gilt:
 - Web-Fehlersammlung ist standardmäßig **an** (`VITE_CLIENT_LOGGING` nur
   mit `"false"` aus; Compose `CLIENT_LOGGING_ENABLED` Standard `true`).
 
+- Jahreszeiten-Bühne (#634, PR #649; Vorschau #653): `frontend/src/seasons/` –
+  `SeasonContext.jsx` (`SeasonProvider` in `App.jsx`: Abfrage, alle 10 min
+  neu, 30 s um Mitternacht am 31.12., Vorschau-Token aus `sessionStorage`
+  `tls-season-preview` mit Ereignis `tls:season-preview`, Neuladen beim
+  Seitenwechsel, Wahl aus dem Konto oder `localStorage`
+  `tls-season-preference`), `SeasonStage.jsx` (Portale Backdrop/Sky-Canvas/
+  Corners/Toast; still auf /admin /display /setup /consent außer bei
+  Vorschau; Module lazy über `registry.js` mit Cache; setzt `data-season`
+  und `--season-accent` am `<html>`), `sky.js` (ein rAF-Loop, Partikelbudget
+  40/120/240, Pause bei verstecktem Tab), `SeasonSlots.jsx` (Widget neben
+  dem Logo, Footer-Platz), `DecoSwitch.jsx` (Footer „Deko: an · dezent ·
+  aus“), `signals.js`, `rng.js` (`pageRng`, `between`, `pick`). Modulvertrag
+  `{ key, accent, Corners, Backdrop, Footer, Widget, Toast, skyLayers({season,
+  budget, reducedMotion}) → [{ key, draw(ctx, dt, size, now), dispose }] }`.
+  Admin `pages/admin/settings/SeasonsSettings.jsx` (Schalter je Saison,
+  Vorschau-Knopf, Jahreskalender).
+- Halloween Web (#635, #655, #658, #660–#664; PRs #649, #657, #659, #668):
+  `seasons/halloween/` – `index.jsx` (`pageLayout(pathname, intensity)` aus
+  der Adresse gesät, alle Zufallszahlen unabhängig von der Stärke;
+  `LOAD_SALT` je Ladung; `Corners`, `Backdrop`, `Footer`, `Widget`,
+  `skyLayers`; `useScrollEffects` setzt `--season-scroll` und schickt
+  `tls:season-page`), `web.js` (rundes Radnetz: `buildPlan` in echter
+  Reihenfolge Anker→Rahmen→Speichen→Nabe→Spirale von außen, Verlet-Physik
+  `stepPhysics` mit Zeiger-Schub, `applyImpulse` beim Scrollen, `windAt`;
+  `createWebLayer` für den Canvas, `staticLines` für das SVG bei „dezent“/
+  „Bewegung reduzieren“), `HangingBats.jsx` (Anker aus `main h1, main h2,
+  header nav a, [data-season-anchor]`, Portal an `document.body` in
+  Seitenkoordinaten, Klick → Flugbahn), `graveyard.jsx` (Gräber auf
+  `footer [data-season-line]`, Geister per Klick, Sperre je Grab 60 s),
+  `rappel.js` (Zustandsfolge der Abseil-Spinne), `wisps.js` (Schwaden),
+  `bats.js` (Schwarm), `moon.js` (echte Mondphase, `litPath`), `art.jsx`
+  (Spinne, Kürbis, Laterne mit Pupillen, Mond, Katze, kleine Grabsteine,
+  Geist, Fledermäuse), `halloween.css`. Layout-Marker: `data-season-line="footer"`
+  an der Fußleiste in `PublicLayout.jsx`, `data-season-anchor="lion"` am
+  Hero-Löwen in `HomePage.jsx`. Nie `filter` auf inneren SVG-Gruppen
+  (rechteckige Kästen).
+- Erfolge II im Web (PR #656): `components/tls/CommendButton.jsx` (GG-Lob am
+  Match), Gelesen-Ping in `NewsDetailPage.jsx`, `useOptionalAuth` in
+  `context/AuthContext.jsx` (ohne Provider kein Fehler; Hooks nie in `try`).
+
 **nginx / Uploads (#232, PR #263)**
 - Compose hängt `uploads_data:/srv/uploads:ro` ins Frontend; nginx liefert
   `/api/static/uploads/` direkt von der Platte, `expires 30d`, Header
@@ -2547,10 +2643,25 @@ Seit dem 15. September gilt:
   die Irre). Vorlagen: `MoreScreen.test.tsx`, `TeamsScreen.test.tsx`,
   `InfoCenterScreen.test.tsx`.
 - Der e2e-Test `frontend/e2e/admin-navigation.spec.js` zählt die
-  Admin-Menüeinträge (**79** seit #561; 77 mit #556) – jeder neue Menüpunkt braucht
+  Admin-Menüeinträge (**80** seit #648 Jahreszeiten; 79 seit #561, 77 mit #556) – jeder neue Menüpunkt braucht
   die neue Zahl. **Falle:** zwei parallele PRs, die je eine Zahl setzen, ergeben nach dem
   zweiten Merge eine dritte (24.09.: #550 setzte 60, #552 setzte 73, richtig war 69) – den
   zweiten nach dem Merge des ersten rebasen und die Zahl neu rechnen.
+
+- Jahreszeiten in der App (#636, #655; PRs #650, #659): `mobile/src/seasons/` –
+  `SeasonProvider.tsx` (Wahl in SecureStore `season_preference`, Abfrage bei
+  AppState, `toast`/`showToast`), `SeasonStage.tsx` (Registry mit
+  Corners/Sky/Widget/TabIcon, `useCurrentScreen()` über
+  `navigationRef.addListener("state")`, Gruß als Karte unter der Kopfzeile
+  `season-toast`), `DecoSetting.tsx` unter Mehr → Darstellung,
+  `halloween.tsx` (`screenLayout(screen, intensity)` je Screen, Netzbau,
+  Spinne am Faden, Krabbler – Sichtbarkeit über die Uhr, nicht über das
+  Animationsende, das endet unter Jest sofort –, Kürbis-Widget und
+  Tab-Symbol), `bats.ts`, `rng.ts`, `signals.ts`. RNTL 14: `render`,
+  `fireEvent` und `screen.unmount()` sind async – immer `await`, sonst
+  „overlapping act() calls“ und alle späteren Fake-Timer-Tests kippen.
+  Builds: 1.0.1 = Build 80 (#650), 1.0.2 = Build 81 (#659); 1.0.3 kommt mit
+  #665 (Halloween III in der App) vor dem 25.10.
 
 ---
 
@@ -2750,7 +2861,7 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (25. September 2026)
+## 9. Aktueller Stand (28. September 2026)
 
 ### Gemergt zuletzt (16.–22. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
@@ -2835,7 +2946,31 @@ Am 25.09. (Nachmittag) gemergt: #599 (#579 Twitch-Clips und „Turnier live“; 
 Discord-Termine; `update.sh`, Bot-Rolle „Events verwalten“), #603 (#571 Bracket-Einbettung, Slash-Antworten
 nur für die fragende Person; `update.sh`) – die Meilensteine „Discord IV“ und „Kanäle II“ sind fertig.
 
+### Gemergt 26.–28. September
+#607/#608 (Dependabot), #648 (#632/#633 Jahreszeiten: Zeitplan-Dienst,
+Abfrage, Admin), #649 (#634/#635 Web-Bühne, Deko-Schalter, Halloween),
+#650 (#636 App-Bühne, Halloween in der App, 1.0.1 – Build 80), #651 (#621
+Über-uns-Zahlen), #653 (Vorschau wirkt sofort, auch im Admin – Ursache:
+Token nur in `sessionStorage`, Bühne im Admin still), #652 (Erfolge II E1),
+#657 (#655 Halloween groß – vom Betreiber als „zu übertrieben“ bewertet),
+#654 (E7 XP und Level), #656 (E6 Zähler; nach dem Rebase meldete GitHub
+„conflicting“, obwohl `git merge-tree` sauber war – ein leerer Commit stieß
+die Neuberechnung an), #659 (Halloween-Feinschliff Web + App 1.0.2 –
+Build 81; Nebel, Geister, Lichterketten, Friedhof raus, Netzbau, Abseil-
+Spinne, echter Mond). Alle vom Betreiber gemergt; `update.sh` danach.
+
 ### Offene PRs
+- Offen (28.09. abends): #668 Halloween III (ready; rundes Netz mit Physik,
+  hängende Fledermäuse, Friedhof mit Geistern, Abseil-Spinne v2, Katze und
+  Mond neu; schließt #660–#664). Danach: #665 App-Teil (Build 1.0.3 vor dem
+  25.10.), #666 echtes Wetter und Sonnenuntergang, Erfolge II Rest
+  (#612–#615 Kataloge, #618–#620, #622, #623), Jahreszeiten II (#637–#642
+  bis 27.11.), Discord VI (#624–#631), Jahreszeiten III (#643–#647). Der
+  Betreiber ist offen für neue Pakete (Skia, expo-sensors – #667), wenn das
+  Ergebnis zu 100 % passt. Erkenntnisse aus drei Runden Halloween stehen als
+  Kommentar an #637–#647 und #658 (Maßstab: edel, dunkel, detailreich, nichts
+  abgeschnitten, ein lebender Vorgang je Saison, Reaktionen auf Zeiger,
+  Scrollen und Seitenwechsel, je Seite gesät).
 - Offen (25.09. Nachmittag): keine Feature-PRs. Nächste Pakete nach der Pause: Discord V (#572
   Thread je Turnier, #573 Link-Knöpfe und Befehle – Antworten `ephemeral`, #574 Willkommensnachricht, #581
   Online-Zahl und Voice auf der Website über das Server-Widget). Idee des Betreibers vom 25.09. (offen):
@@ -2887,6 +3022,14 @@ nur für die fragende Person; `update.sh`) – die Meilensteine „Discord IV“
   rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
+- **Build 78** (`mobile-v0.18.0-beta-build78`, #585), **Build 79**
+  (`mobile-v1.0.0-build79`, #594 – App 1.0.0 für den offenen Play-Test),
+  **Build 80** (`mobile-v1.0.1-build80`, Commit 465a627, 28.09.; #650
+  Halloween in der App; AAB-SHA-256 beginnt mit `e0c2ac8d`, AAB auf dem
+  Desktop), **Build 81** (`mobile-v1.0.2-build81`, Commit 9db5555, 28.09.;
+  #659 Halloween-Feinschliff; AAB auf dem Desktop). Die Release-Notizen von
+  Build 81 wurden von Hand berichtigt – der CHANGELOG-Eintrag 1.0.2 beschreibt
+  noch die Zwischenfassung (Nebel, Geist); mit #665 korrigieren.
 - Veröffentlicht: Build 59 (`mobile-v0.3.0-beta-build59`), Build 60
   (`mobile-v0.3.1-beta-build60`), **Build 61** (`mobile-v0.4.0-beta-build61`,
   Commit ec89de6, am 16.09. vom Haupt-PC gebaut, APK-SHA-256 beginnt mit
@@ -3140,6 +3283,11 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt) – umgesetzt in #601; #570 Discord-Termine (Scheduled Events) – in #602; #571 Bracket als Text-Embed – in #603. Meilenstein fertig |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
 | Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – umgesetzt in #597; #580 Kalender-Knöpfe – in #596; #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) – in #598; #579 Twitch-Clips + Turnier live – in #599. Meilenstein fertig |
+| Jahreszeiten I: Kern und Halloween (bis 24.10.) | #632–#636 umgesetzt in #648, #649, #650, #653, #657, #659; #655 Rückmeldung (mit #657 geschlossen); #658 Maßstab für alle Saisonen; #660–#664 Halloween III (PR #668), #665 App-Teil Build 1.0.3, #666 echtes Wetter und Sonnenuntergang |
+| Jahreszeiten II: Advent, Weihnachten, Silvester (bis 27.11.) | #637 Adventkranz, #638 Schneefall, #639 Weihnachtsgruß und Nikolaus, #640 Silvester, #641 Adventkalender, #642 App (Build 1.0.3/1.0.4 bis 20.11.), #667 Skia und Neigungssensor |
+| Jahreszeiten III: Fasching, Vereinsgeburtstag, Ostern (bis 12.3.2027) | #643 Fasching, #644 Vereinsgeburtstag, #645 Ostern, #646 Eiersuche, #647 App 1.1.0 |
+| Erfolge II: Rework (bis 18.12.) | E1 #611 (#652), E7 #617 (#654), E6 #616 (#656) fertig; offen E2–E5 Kataloge #612–#615, E8 #618 Zeremonien, E9 #619 Sichtbarkeit, E10 #620 Admin, E12 #622 Benachrichtigungen, E13 #623 App 1.1.0 |
+| Discord VI: Mehrere Server (bis 29.1.2027) | #624–#631 (D1–D8: mehrere Server, Slash-Befehle je Server mit Spielfilter, Infos weitergeben) |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
 (#240 Freunde in der App, #227 Tageszentrale, #216 Kalender, #245 Laufbanner,
@@ -3214,6 +3362,16 @@ sinnvoll hältst“):
     Slash-Befehle nur für die fragende Person, Kanalweites nur als gepinnte Einbettung. Danach Pause;
     offen ist der offene Test der App in der Play Console (Bundle 79 aus der Bibliothek, Werbe-ID „Nein“).
 
+14. 28.09. („LOS GEHTS LETS GO!“ nach der Fragenliste – alle Antworten A, Frage 20 A/B/C/E):
+    Reihenfolge Jahreszeiten I → Erfolge II → Jahreszeiten II (bis 27.11.) → Discord VI →
+    Jahreszeiten III; App-Builds 1.0.1 Halloween, 1.0.2 Feinschliff, 1.0.3 Halloween III,
+    1.1.0 Erfolge und Ostern. Gemergt: #648–#651, #652–#654, #656, #657, #659; #668 ready.
+    Drei Runden Halloween-Rückmeldung (zu klein → zu übertrieben → dezent und detailreich):
+    kleine Silhouetten in Silber-Türkis, ein lebender Vorgang je Saison (Netzbau in echter
+    Reihenfolge, sichtbar), Physik statt Keyframes, nichts abgeschnitten, nichts über Inhalt,
+    je Seite gesät plus Salz je Ladung, genau ein klickbares Extra je Idee. Web und App
+    Halloween gingen als ein PR (#659), weil der Betreiber weniger Merges will.
+
 Vor jedem neuen Paket: Stand melden und auf das OK warten.
 
 ### Noch offene Doku
@@ -3269,6 +3427,20 @@ Vor jedem neuen Paket: Stand melden und auf das OK warten.
   EA, Ubisoft, Rockstar und GOG keine – die bleiben getippt; Instagram nur für Business-Konten
   über eine geprüfte Meta-App. Meta (Threads/Facebook), LinkedIn, Snap und Pinterest lassen fremde
   Konten erst nach einem App-Review zu – bis dahin nur eingetragene Tester.
+- Jahreszeiten (28.09.): `/api/seasons/active` gab 404 – Präfix-Konflikt mit den
+  Wettkampf-Saisonen, deshalb `/api/seasonal`. Die Sicherheits-Middleware erzwang `no-store`
+  und machte den ETag-Cache wirkungslos (Ausnahme in `server.py`). Der Vorschau-Knopf tat
+  nichts, weil das Token nur in `sessionStorage` lag und die Bühne im Admin still ist (#653).
+  Ein `filter: drop-shadow` auf einer inneren SVG-Gruppe ergibt einen rechteckigen Kasten –
+  Schein nur über Verläufe oder auf dem ganzen SVG. Vitest aus dem Worktree-Stamm startet ein
+  globales Vitest 5 ohne jsdom – immer aus `frontend/` mit `--root`.
+- App-Tests (28.09.): RNTL 14 macht auch `screen.unmount()` async; ohne `await` kippen alle
+  späteren Fake-Timer-Tests mit „overlapping act() calls“. Unter jest-expo endet eine native
+  `Animated.timing` sofort – Sichtbarkeit nie vom Animationsende ableiten.
+- GitHub (28.09.): nach `git rebase --onto origin/main` meldete #656 „dirty“, obwohl
+  `merge-tree` sauber war; ein leerer Commit erzwingt die Neuberechnung. Die Release-Notizen
+  erzeugt `npm run release:local` aus dem CHANGELOG und legt das GitHub-Release selbst an –
+  `gh release create` scheitert danach mit „already exists“, Text mit `gh release edit`.
 
 ---
 
