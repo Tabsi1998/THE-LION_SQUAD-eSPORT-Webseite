@@ -82,7 +82,9 @@ async def seed_badges():
     # Erfolge II (#611): Vergaben mit Material versehen und die Abbildung alt → neu anwenden.
     try:
         from services.achievement_migration import run_all
-        result = await run_all(db)
+        from services.achievement_counters import refresh as refresh_counters
+        # Die Abbildung alt → neu wertet mit allen Zählern aus (alter Block plus Registry), nicht nur mit dem alten Block.
+        result = await run_all(db, compute_progress=refresh_counters)
         if result["annotated"]["updated"] or result["mapping"]["groups"]:
             logger.info("[achievements] v2: %s", result)
     except Exception:  # noqa: BLE001 - ein Fehler hier darf den Start nicht stoppen
