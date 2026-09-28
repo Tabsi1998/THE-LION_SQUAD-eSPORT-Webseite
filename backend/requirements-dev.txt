@@ -1,7 +1,7 @@
 -r requirements.txt
 
 black==26.5.1
-flake8==7.3.0
+flake8==7.4.1
 isort==8.0.1
 mongomock-motor==0.0.36
 mypy==2.3.1
