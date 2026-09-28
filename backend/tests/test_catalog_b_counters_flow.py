@@ -232,3 +232,42 @@ async def test_katalog_b_ersetzt_alte_gruppen(flow):
     for code in ("laps_valid_7", "pole_1", "season_climber_5", "team_founder_3", "championship_top_1", "team_recruiter_5"):
         assert await flow.db.achievements.find_one({"code": code}, {"_id": 0, "code": 1}) is not None, code
     assert await flow.db.achievements.find_one({"code": "season_climber_p"}, {"_id": 0}) is None, "die alte rangbasierte Stufe ist weg"
+    assert set(catalog.REDEFINED_OLD_TIERS) >= {"season_points", "season_climber", "team_founder", "championship_top", "win_streak"}
+    assert "season_points_b" in catalog.REDEFINED_OLD_TIERS["season_points"]
+
+
+@pytest.mark.asyncio
+async def test_neu_definierte_gruppen_heben_alte_vergaben_und_raeumen_alte_stufen(flow):
+    """Gleicher Code, neue Leiter: alte Stufen-Codes verschwinden aus der Datenbank, Vergaben darauf werden nach den Zählern
+    auf die neuen Stufen gehoben (Datum bleibt) - je Gruppe einmal, von Hand angelegte Stufen bleiben."""
+    from services import achievement_migration as migration
+    me = await flow.add_user(name="Sammlerin")
+    other = await flow.add_user(name="Andere")
+    await season_world(flow.db, me, other)
+    db = flow.db
+    # Alte Stufen aus der Zeit vor Katalog B liegen noch in der Datenbank, dazu eine von Hand angelegte Stufe.
+    await db.achievements.insert_many([
+        {"id": "season_points_b", "code": "season_points_b", "group_code": "season_points", "level": 1, "material": "bronze", "rank": 3, "name": "Erste Ranglistenpunkte", "condition_key": "season_points_total", "progress_target": 25},
+        {"id": "season_points_s", "code": "season_points_s", "group_code": "season_points", "level": 2, "material": "silver", "rank": 4, "name": "Punktesammler", "condition_key": "season_points_total", "progress_target": 100},
+        {"id": "season_points_admin", "code": "season_points_admin", "group_code": "season_points", "level": 3, "material": "gold", "rank": 5, "name": "Sonderpreis", "manual_only": True, "is_admin_created": True},
+    ])
+    await db.user_achievements.insert_one({"id": "old-award", "user_id": me["id"], "tier_code": "season_points_b", "group_code": "season_points", "level": 1, "earned_at": "2026-04-06T00:00:00+00:00"})
+    # Der Start hat die Marker schon gesetzt (leere Datenbank): für diesen Fall die Gruppe noch einmal freigeben.
+    await db.settings.update_one({"id": migration.MARKER_ID}, {"$set": {"redefined": []}}, upsert=True)
+    # Ich habe 75 Saisonpunkte: das reicht für die neuen Stufen I (25) und nicht für II (100).
+    report = await migration.apply_redefined(db, compute_progress=counters.compute)
+    plan = next(entry for entry in report["groups"] if entry["group"] == "season_points")
+    assert plan["stale_tiers"] == 2 and plan["awards"] == 1
+    assert plan["moves"][0]["new_tiers"] == ["season_points_1"]
+    assert await db.achievements.find_one({"code": "season_points_b"}, {"_id": 0}) is None
+    assert await db.achievements.find_one({"code": "season_points_admin"}, {"_id": 0}) is not None, "Admin-Stufen bleiben"
+    assert await db.user_achievements.find_one({"tier_code": "season_points_b"}, {"_id": 0}) is None
+    moved = await db.user_achievements.find_one({"user_id": me["id"], "tier_code": "season_points_1"}, {"_id": 0})
+    assert moved and moved["earned_at"] == "2026-04-06T00:00:00+00:00" and moved["context"]["old_tiers"] == ["season_points_b"]
+    # Ein zweiter Lauf tut nichts mehr (Marker).
+    again = await migration.apply_redefined(db, compute_progress=counters.compute)
+    assert not any(entry["group"] == "season_points" for entry in again["groups"])
+    # Hand-Gruppen: die alte Höhe zählt (Stufe 2 alt → Stufen I und II neu).
+    manual = [{"code": "x_1", "manual_only": True}, {"code": "x_2", "manual_only": True}, {"code": "x_3", "manual_only": True}]
+    assert [t["code"] for t in migration._carry_over(manual, {}, [{"level": 2}])] == ["x_1", "x_2"]
+    assert migration._carry_over(manual, {}, [{"level": 9}]) == manual

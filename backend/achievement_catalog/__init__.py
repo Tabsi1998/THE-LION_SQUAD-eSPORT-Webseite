@@ -43,6 +43,13 @@ CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 # Katalog A (#612) und B (#613) ersetzen alte Gruppen: die abgelösten (REPLACED) und die neu definierten (REDEFINED)
 # weichen aus dem Katalog, ihre Vergaben wandern beim Start über die Abbildung (services/achievement_migration.py).
 _RETIRED = set(REPLACED) | set(REDEFINED) | set(REPLACED_B) | set(REDEFINED_B)
+# Gleicher Code, neue Leiter: die alten Stufen-Codes dieser Gruppen (noch aus der alten Liste gelesen) - die Migration
+# hebt Vergaben darauf auf die neuen Stufen und nimmt die alten Stufen aus der Datenbank (services/achievement_migration.py).
+_REDEFINED_CODES = set(REDEFINED) | set(REDEFINED_B)
+REDEFINED_OLD_TIERS: dict[str, list[str]] = {}
+for _old in ACHIEVEMENT_TIERS:
+    if _old["group_code"] in _REDEFINED_CODES:
+        REDEFINED_OLD_TIERS.setdefault(_old["group_code"], []).append(_old["code"])
 ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B
 ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B
 GROUP_MAPPING.update(REPLACED)
