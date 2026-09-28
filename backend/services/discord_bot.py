@@ -132,6 +132,97 @@ def achievements_text(awards: list[dict], total_points: int) -> str:
     return f"Deine Erfolge ({len(awards)}, {total_points} Punkte): " + ", ".join(names) + more
 
 
+def ranking_text(season: dict | None, rows: list[dict], base_url: str = "") -> str:
+    """Die Top 10 der laufenden Saison (#573). Dieselben Zahlen wie die Einbettung (#569)."""
+    if not rows:
+        return "Für die laufende Saison gibt es noch keine Wertung."
+    lines = []
+    for place, row in enumerate(rows[:10], start=1):
+        name = row.get("display_name") or row.get("username") or "Mitglied"
+        points = row.get("points") or row.get("total_points") or 0
+        marker = {1: "🥇", 2: "🥈", 3: "🥉"}.get(place, f"{place}.")
+        lines.append(f"{marker} {name} – {points} Punkte")
+    head = f"Rangliste {season.get('name')}" if (season or {}).get("name") else "Rangliste"
+    text = f"**{head}**\n" + "\n".join(lines)
+    if base_url:
+        text += f"\n{base_url}/ranking"
+    return text
+
+
+def running_tournaments_text(tournaments: list[dict], base_url: str = "") -> str:
+    """Welche Turniere gerade laufen - die Antwort, wenn /bracket kein passendes findet."""
+    rows = [t for t in tournaments if t.get("status") == "live"]
+    if not rows:
+        return "Gerade läuft kein Turnier."
+    lines = [f"• **{t.get('title') or 'Turnier'}**" for t in rows[:8]]
+    text = "Diese Turniere laufen gerade:\n" + "\n".join(lines)
+    if base_url:
+        text += f"\n{base_url}/tournaments"
+    return text
+
+
+def bracket_text(tournament: dict | None, base_url: str = "", *, played: int = 0, total: int = 0) -> str:
+    """Der Link zum Bracket eines Turniers, mit dem Stand in einer Zeile."""
+    if not tournament:
+        return "Dieses Turnier kenne ich nicht – wähle eines aus der Liste."
+    title = tournament.get("title") or "Turnier"
+    line = f"**{title}**"
+    if total:
+        line += f" – {played} von {total} Partien gespielt"
+    if base_url and tournament.get("slug"):
+        line += f"\n{base_url}/tournaments/{tournament['slug']}/bracket"
+    return line
+
+
+def streams_text(streams: list[dict], base_url: str = "") -> str:
+    """Wer gerade streamt (#573). Nur, wer auf der Startseite sichtbar wäre."""
+    if not streams:
+        return "Gerade streamt niemand aus dem Verein."
+    lines = []
+    for stream in streams[:8]:
+        name = stream.get("display_name") or stream.get("username") or stream.get("twitch_login") or "Mitglied"
+        title = (stream.get("title") or "").strip()
+        line = f"• **{name}**"
+        if stream.get("game_name"):
+            line += f" · {stream['game_name']}"
+        if title:
+            line += f" – {title[:60]}"
+        if stream.get("twitch_login"):
+            line += f"\nhttps://twitch.tv/{stream['twitch_login']}"
+        lines.append(line)
+    text = "Gerade live:\n" + "\n".join(lines)
+    if base_url:
+        text += f"\n{base_url}/live"
+    return text
+
+
+def membership_text(view: dict | None, base_url: str = "") -> str:
+    """Der eigene Mitgliedsstand - nur für einen selbst, nie Daten anderer (#573)."""
+    if not view:
+        return ("Zu deinem Konto gibt es keine Mitgliedschaft. Ein Mitgliedsantrag geht über die Website: "
+                + (f"{base_url}/mitglied-werden" if base_url else "Mitglied werden"))
+    membership = view.get("membership") or {}
+    status = membership.get("status") or ("aktiv" if view.get("is_active_member") else "offen")
+    labels = {"active": "aktiv", "pending": "in Prüfung", "paused": "ruhend", "ended": "beendet",
+              "rejected": "abgelehnt", "cancelled": "gekündigt"}
+    line = f"Dein Mitgliedsstand: **{labels.get(status, status)}**"
+    if membership.get("member_number"):
+        line += f" · Nummer {membership['member_number']}"
+    if membership.get("joined_at"):
+        line += f" · dabei seit {_when(membership['joined_at'])[:10]}"
+    if base_url:
+        line += f"\n{base_url}/konto"
+    return line
+
+
+def link_account_text(base_url: str = "", *, linked: bool = False) -> str:
+    """Der Weg zum Verknüpfen - der Knopf sitzt im Profil, nicht im Discord."""
+    where = f"{base_url}/profil" if base_url else "dein Profil auf der Website"
+    if linked:
+        return f"Dein Discord-Konto ist schon mit der Website verknüpft. Ändern kannst du das unter {where} → Socials."
+    return ("So verknüpfst du dein Konto: Profil auf der Website öffnen, unter **Socials** auf "
+            f"**Mit Discord verknüpfen** klicken.\n{where}")
+
 def friendly_bot_error(exc: BaseException) -> str:
     """Discord-Fehler in Worte, die sagen, was zu tun ist - ohne die Bibliothek zu importieren."""
     name = type(exc).__name__
@@ -201,6 +292,37 @@ def status_text(state: dict) -> str:
 
 
 # ---------------------------------------------------------------- Daten
+
+def link_buttons(buttons: list[dict] | None) -> list[dict]:
+    """Die Knöpfe, die Discord annimmt: Beschriftung und http(s)-Link, höchstens fünf.
+
+    Link-Knöpfe brauchen keine Rückmeldung an den Bot - sie funktionieren auch, wenn er
+    gerade offline ist. Alles andere wäre ein Knopf, der ins Leere klickt.
+    """
+    rows = []
+    for button in buttons or []:
+        label = str((button or {}).get("label") or "").strip()
+        url = str((button or {}).get("url") or "").strip()
+        if not label or not url.startswith(("http://", "https://")):
+            continue
+        rows.append({"label": label[:80], "url": url})
+        if len(rows) == 5:
+            break
+    return rows
+
+
+def _view(buttons: list[dict] | None):
+    """Die Knöpfe als discord.ui.View, oder nichts - dann sendet Discord ohne Komponenten."""
+    rows = link_buttons(buttons)
+    if not rows:
+        return {}
+    import discord
+
+    view = discord.ui.View()
+    for row in rows:
+        view.add_item(discord.ui.Button(style=discord.ButtonStyle.link, label=row["label"], url=row["url"]))
+    return {"view": view}
+
 
 async def linked_discord_ids(db) -> dict[str, str]:
     """Discord-Kennung → Nutzer, nur verknüpfte Konten (#260)."""
@@ -401,6 +523,68 @@ class BotRunner:
             state = {**await read_state(db), **runner.status(), "linked_count": len(links)}
             await interaction.response.send_message(status_text(state), ephemeral=True)
 
+        @tree.command(name="rangliste", description="Die Top 10 der laufenden Saison")
+        async def rangliste(interaction):
+            from services.season_service import _active_season, aggregate_leaderboard
+
+            season = await _active_season(db)
+            rows = await aggregate_leaderboard(season_id=season["id"], limit=10) if season else []
+            await interaction.response.send_message(ranking_text(season, rows, base_url), ephemeral=True)
+
+        @tree.command(name="bracket", description="Das Bracket eines laufenden Turniers")
+        @app_commands.describe(turnier="Welches Turnier? Leer lassen zeigt die laufenden.")
+        async def bracket(interaction, turnier: str = ""):
+            running = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}, "visibility": "public"},
+                                                {"_id": 0, "id": 1, "title": 1, "slug": 1, "status": 1}).to_list(20)
+            wanted = (turnier or "").strip().lower()
+            picked = next((t for t in running if wanted and wanted in (t.get("title") or "").lower()
+                           or wanted and wanted == (t.get("slug") or "").lower()), None)
+            if picked is None and len(running) == 1 and not wanted:
+                picked = running[0]
+            if picked is None:
+                await interaction.response.send_message(running_tournaments_text(running, base_url), ephemeral=True)
+                return
+            matches = await db.matches_v2.find({"tournament_id": picked["id"]}, {"_id": 0, "status": 1}).to_list(500)
+            played = sum(1 for match in matches if match.get("status") == "completed")
+            await interaction.response.send_message(
+                bracket_text(picked, base_url, played=played, total=len(matches)), ephemeral=True)
+
+        @bracket.autocomplete("turnier")
+        async def bracket_choices(interaction, current: str):
+            rows = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}, "visibility": "public"},
+                                             {"_id": 0, "title": 1}).to_list(20)
+            titles = [row.get("title") or "" for row in rows if (current or "").lower() in (row.get("title") or "").lower()]
+            return [app_commands.Choice(name=title[:100], value=title[:100]) for title in titles[:25]]
+
+        @tree.command(name="wer-streamt", description="Wer aus dem Verein streamt gerade?")
+        async def wer_streamt(interaction):
+            from services.stream_visibility import homepage_visibility
+
+            streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(50)
+            verdicts = await homepage_visibility(db, [stream.get("user_id") for stream in streams])
+            visible = [stream for stream in streams if (verdicts.get(stream.get("user_id")) or {}).get("visible")]
+            await interaction.response.send_message(streams_text(visible, base_url), ephemeral=True)
+
+        @tree.command(name="mitglied", description="Dein eigener Mitgliedsstand (nur mit verknüpftem Konto)")
+        async def mitglied(interaction):
+            # Nur die eigene Person: Mitgliedsdaten anderer beantwortet der Bot nie (#573).
+            links = await linked_discord_ids(db)
+            user_id = links.get(str(interaction.user.id))
+            if not user_id:
+                await interaction.response.send_message(link_account_text(base_url), ephemeral=True)
+                return
+            from services.membership_service import get_membership, is_active_member
+
+            membership = await get_membership(user_id)
+            view = {"membership": membership, "is_active_member": is_active_member(membership)} if membership else None
+            await interaction.response.send_message(membership_text(view, base_url), ephemeral=True)
+
+        @tree.command(name="verknuepfen", description="So verbindest du Discord mit deinem Konto")
+        async def verknuepfen(interaction):
+            links = await linked_discord_ids(db)
+            await interaction.response.send_message(
+                link_account_text(base_url, linked=str(interaction.user.id) in links), ephemeral=True)
+
         try:
             await client.start(token)
         except asyncio.CancelledError:
@@ -441,9 +625,12 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
 
-    async def send_embed(self, channel_id: str, embed: dict) -> dict:
-        """Ein Embed in genau diesen Kanal (#566). Kein Rückfall: ist der Bot aus oder darf er dort nicht
-        schreiben, kommt der Grund zurück - den Text dazu kennt discord_service.REASON_TEXTS."""
+    async def send_embed(self, channel_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+        """Ein Embed in genau diesen Kanal (#566), mit Link-Knöpfen darunter (#573).
+
+        Kein Rückfall: ist der Bot aus oder darf er dort nicht schreiben, kommt der Grund
+        zurück - den Text dazu kennt discord_service.REASON_TEXTS.
+        """
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -458,7 +645,7 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
-            message = await channel.send(embed=discord.Embed.from_dict(embed))
+            message = await channel.send(embed=discord.Embed.from_dict(embed), **_view(buttons))
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:

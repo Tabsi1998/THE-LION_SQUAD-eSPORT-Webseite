@@ -103,3 +103,71 @@ def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
     ])
     assert [row["name"] for row in rows] == ["allgemein", "news", "regeln"]
     assert "Kanal-ID" in discord_bot.CHANNEL_TEXTS["offline"]
+
+
+def test_ranking_text_names_the_season_and_the_top_ten():
+    rows = [{"display_name": f"Spieler {i}", "points": 100 - i} for i in range(1, 13)]
+
+    text = discord_bot.ranking_text({"name": "Saison 3"}, rows, "https://lionsquad.at")
+
+    assert text.startswith("**Rangliste Saison 3**")
+    assert "🥇 Spieler 1 – 99 Punkte" in text and "🥈 Spieler 2" in text and "🥉 Spieler 3" in text
+    assert "4. Spieler 4" in text
+    assert "Spieler 11" not in text, "nur die Top 10"
+    assert text.endswith("https://lionsquad.at/ranking")
+    assert discord_bot.ranking_text(None, [], "") == "Für die laufende Saison gibt es noch keine Wertung."
+
+
+def test_bracket_text_says_the_stand_and_lists_running_tournaments_when_nothing_matches():
+    text = discord_bot.bracket_text({"title": "Sommer-Cup", "slug": "cup"}, "https://lionsquad.at", played=3, total=7)
+    assert "**Sommer-Cup**" in text and "3 von 7 Partien gespielt" in text
+    assert text.endswith("https://lionsquad.at/tournaments/cup/bracket")
+
+    assert "kenne ich nicht" in discord_bot.bracket_text(None)
+
+    running = [{"title": "Sommer-Cup", "status": "live"}, {"title": "Winter-Cup", "status": "live"},
+               {"title": "Alt", "status": "completed"}]
+    listed = discord_bot.running_tournaments_text(running, "https://lionsquad.at")
+    assert "**Sommer-Cup**" in listed and "**Winter-Cup**" in listed and "Alt" not in listed
+    assert discord_bot.running_tournaments_text([]) == "Gerade läuft kein Turnier."
+
+
+def test_streams_text_names_who_is_live_with_the_link():
+    streams = [{"display_name": "Paula", "game_name": "Rocket League", "title": "Ranked bis Grand Champ",
+                "twitch_login": "paula"}]
+
+    text = discord_bot.streams_text(streams, "https://lionsquad.at")
+
+    assert "**Paula**" in text and "Rocket League" in text and "Ranked bis Grand Champ" in text
+    assert "https://twitch.tv/paula" in text and text.endswith("https://lionsquad.at/live")
+    assert discord_bot.streams_text([]) == "Gerade streamt niemand aus dem Verein."
+
+
+def test_membership_text_only_talks_about_the_own_state():
+    view = {"membership": {"status": "active", "member_number": "42"}, "is_active_member": True}
+
+    text = discord_bot.membership_text(view, "https://lionsquad.at")
+
+    assert "**aktiv**" in text and "Nummer 42" in text and text.endswith("https://lionsquad.at/konto")
+    assert "in Prüfung" in discord_bot.membership_text({"membership": {"status": "pending"}})
+    assert "keine Mitgliedschaft" in discord_bot.membership_text(None, "https://lionsquad.at")
+
+
+def test_link_account_text_points_at_the_profile():
+    text = discord_bot.link_account_text("https://lionsquad.at")
+    assert "Mit Discord verknüpfen" in text and "https://lionsquad.at/profil" in text
+    assert "schon mit der Website verknüpft" in discord_bot.link_account_text("https://lionsquad.at", linked=True)
+
+
+def test_only_http_links_become_buttons():
+    rows = discord_bot.link_buttons([
+        {"label": "Zur Anmeldung", "url": "https://lionsquad.at/tournaments/cup"},
+        {"label": "", "url": "https://lionsquad.at"},
+        {"label": "Ohne Ziel", "url": ""},
+        {"label": "Kein Netz", "url": "javascript:alert(1)"},
+        {"label": "Pfad", "url": "/tournaments/cup"},
+    ])
+
+    assert rows == [{"label": "Zur Anmeldung", "url": "https://lionsquad.at/tournaments/cup"}], \
+        "ein Knopf ohne gültigen Link klickt ins Leere"
+    assert len(discord_bot.link_buttons([{"label": f"L{i}", "url": "https://x.at"} for i in range(9)])) == 5

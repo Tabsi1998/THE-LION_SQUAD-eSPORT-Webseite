@@ -351,7 +351,7 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
                 t, message["title"], message["description"],
                 color=message["color"], url=message["url"], fields=message["fields"],
                 event_key=message["event_key"], image_url=message["image_url"],
-                thread_id=thread or None,
+                thread_id=thread or None, buttons=message.get("buttons"),
             )
             if not thread and status == "registration_open" and sent.get("ok"):
                 await discord_threads.ensure(

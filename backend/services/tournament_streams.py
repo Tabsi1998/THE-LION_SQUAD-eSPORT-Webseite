@@ -81,7 +81,8 @@ async def sync(db) -> dict:
             message = stream_live_message(tournament, stream)
             result = await send_event(message["event_key"], message["title"], message["description"], item=tournament, color=message["color"],
                                       url=message["url"], fields=message["fields"], image_url=message["image_url"],
-                                      thread_id=await tournament_thread(db, tournament["id"]) or None)
+                                      thread_id=await tournament_thread(db, tournament["id"]) or None,
+                                      buttons=message.get("buttons"))
             await db[ANNOUNCEMENTS].insert_one({"id": new_id(), **key, "user_id": stream.get("user_id"), "announced_at": now_utc().isoformat(),
                                                 "outcome": "sent" if result.get("ok") else (result.get("reason") or "failed")})
             announced += 1

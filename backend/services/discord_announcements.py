@@ -59,7 +59,9 @@ def plain_text(value: str | None, limit: int = 300) -> str:
 
 
 def news_message(post: dict) -> dict:
+    link = f"/news/{post.get('slug') or post.get('id')}"
     return {
+        "buttons": [{"label": "Beitrag lesen", "url": link}],
         "event_key": "news.published",
         "title": f"📰 {post.get('title') or 'News'}",
         "description": plain_text(post.get("excerpt") or post.get("content"), 400),
@@ -87,7 +89,9 @@ def event_message(event: dict) -> dict:
             fields.append({"name": "Anmeldung bis", "value": vienna(event["registration_closes_at"]), "inline": True})
         if event.get("max_participants"):
             fields.append({"name": "Plätze", "value": str(event["max_participants"]), "inline": True})
+    link = f"/events/{event.get('slug') or event.get('id')}"
     return {
+        "buttons": [{"label": "Event ansehen", "url": link}],
         "event_key": "event.announced",
         "title": f"📅 {event.get('name') or event.get('title') or 'Event'}",
         "description": plain_text(event.get("short_description") or event.get("description"), 400),
@@ -146,7 +150,8 @@ async def _announce(collection, item: dict, message: dict, published_at) -> str:
     outcome = reason
     if not reason:
         result = await send_event(message["event_key"], message["title"], message["description"], item=item,
-                                  color=message["color"], url=message["url"], fields=message["fields"], image_url=message["image_url"])
+                                  color=message["color"], url=message["url"], fields=message["fields"],
+                                  image_url=message["image_url"], buttons=message.get("buttons"))
         outcome = "sent" if result.get("ok") else (result.get("reason") or "failed")
     await collection.update_one({"id": item["id"]}, {"$set": {"discord_checked_at": now_utc().isoformat(), "discord_outcome": outcome}})
     return outcome
@@ -196,7 +201,13 @@ def tournament_message(tournament: dict, status: str, *, game_name: str | None =
         fields.append({"name": "Format", "value": tournament.get("format_label") or str(tournament["format"]).replace("_", " ").title(), "inline": True})
     if tournament.get("max_participants"):
         fields.append({"name": "Teilnehmer", "value": f"max. {tournament['max_participants']}", "inline": True})
+    # Ein Klick dorthin, wo der Status hinführt (#573): vor dem Start zur Anmeldung,
+    # ab „live“ zum Bracket - der Weg zum Turnier steht daneben.
+    link = f"/tournaments/{tournament.get('slug') or tournament.get('id')}"
+    buttons = ([{"label": "Zur Anmeldung", "url": link}] if status == "registration_open"
+               else [{"label": "Bracket ansehen", "url": f"{link}/bracket"}, {"label": "Turnier ansehen", "url": link}])
     return {
+        "buttons": buttons,
         "event_key": f"tournament.{status}",
         "title": f"🏆 {tournament.get('title') or 'Turnier'} · {spec['label']}",
         "description": tournament.get("description") or "",
@@ -234,7 +245,11 @@ def stream_live_message(tournament: dict, stream: dict) -> dict:
     fields = [{"name": "Turnier", "value": title, "inline": True}]
     if stream.get("game_name"):
         fields.append({"name": "Spiel", "value": str(stream["game_name"]), "inline": True})
+    watch = stream.get("stream_url") or ""
+    profile = stream.get("public_profile_url") or (f"/u/{stream['username']}" if stream.get("username") else "")
     return {
+        "buttons": ([{"label": "Zuschauen", "url": watch}] if watch else [])
+                   + ([{"label": "Profil", "url": profile}] if profile else []),
         "event_key": "tournament.stream_live",
         "title": f"🔴 {name} streamt den {title}",
         "description": "\n".join(lines),

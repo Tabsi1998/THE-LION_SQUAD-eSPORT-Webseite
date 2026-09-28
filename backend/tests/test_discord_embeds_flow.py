@@ -26,7 +26,7 @@ class FakeBot:
         self.deleted: set[str] = set()
         self.counter = 0
 
-    async def send_embed(self, channel_id, embed):
+    async def send_embed(self, channel_id, embed, buttons=None):
         self.counter += 1
         self.sent.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{self.counter}", "channel_id": channel_id}
@@ -167,3 +167,24 @@ async def test_channel_change_starts_a_new_message_and_refresh_route_forces(flow
     forced = (await flow.post("/api/settings/discord/embeds/live/refresh")).json()
     assert forced["reason"] == "posted" and bot.sent[-1]["channel_id"] == other
     assert (await flow.post("/api/settings/discord/embeds/gibt-es-nicht/refresh")).status_code == 404
+
+
+def test_every_message_carries_the_button_that_fits_it():
+    """#573: ein Klick dorthin, wohin die Meldung führt."""
+    from services.discord_announcements import (event_message, news_message,
+                                                stream_live_message, tournament_message)
+
+    offen = tournament_message({"title": "Cup", "slug": "cup"}, "registration_open")
+    assert offen["buttons"] == [{"label": "Zur Anmeldung", "url": "/tournaments/cup"}]
+
+    live = tournament_message({"title": "Cup", "slug": "cup"}, "live")
+    assert [button["label"] for button in live["buttons"]] == ["Bracket ansehen", "Turnier ansehen"]
+    assert live["buttons"][0]["url"] == "/tournaments/cup/bracket"
+
+    assert event_message({"name": "LAN", "slug": "lan"})["buttons"] == [{"label": "Event ansehen", "url": "/events/lan"}]
+    assert news_message({"title": "News", "slug": "n1"})["buttons"] == [{"label": "Beitrag lesen", "url": "/news/n1"}]
+
+    stream = stream_live_message({"title": "Cup", "slug": "cup"},
+                                 {"display_name": "Paula", "stream_url": "https://twitch.tv/paula",
+                                  "public_profile_url": "/u/paula"})
+    assert [button["label"] for button in stream["buttons"]] == ["Zuschauen", "Profil"]

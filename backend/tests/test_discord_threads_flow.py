@@ -30,11 +30,11 @@ class FakeBot:
         self.unknown: set[str] = set()
         self.thread_result: dict | None = None
 
-    async def send_embed(self, channel_id, embed):
+    async def send_embed(self, channel_id, embed, buttons=None):
         if str(channel_id) in self.unknown:
             return {"ok": False, "reason": "unknown_channel"}
         self.counter += 1
-        self.sent.append({"channel_id": str(channel_id), "title": embed.get("title")})
+        self.sent.append({"channel_id": str(channel_id), "title": embed.get("title"), "buttons": buttons or []})
         return {"ok": True, "message_id": f"m{self.counter}", "channel_id": str(channel_id)}
 
     async def create_thread(self, channel_id, message_id, name):
@@ -103,6 +103,9 @@ async def test_one_thread_per_tournament_and_every_later_message_inside_it(flow,
     await set_status(flow, tournament, "registration_open")
 
     assert len(bot.sent) == 1 and bot.sent[0]["channel_id"] == EVENTS_CHANNEL, "die Ankündigung steht im Kanal"
+    # Der Knopf aus #573 reist mit und trägt eine vollständige Adresse, keinen Pfad.
+    assert [button["label"] for button in bot.sent[0]["buttons"]] == ["Zur Anmeldung"]
+    assert bot.sent[0]["buttons"][0]["url"].startswith("http")
     assert bot.threads == [{"channel_id": EVENTS_CHANNEL, "message_id": "m1", "name": "Sommer-Cup"}]
     stored = await flow.db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0, discord_threads.FIELD: 1})
     assert discord_threads.stored(stored)["thread_id"] == THREAD_ID

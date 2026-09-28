@@ -229,15 +229,25 @@ async def _skip(log: dict, reason: str, error: str) -> dict:
 
 
 async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
-                      fields: list | None, image_url: str | None, log: dict, footer: str | None = None) -> dict:
-    """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID."""
+                      fields: list | None, image_url: str | None, log: dict, footer: str | None = None,
+                      buttons: list | None = None) -> dict:
+    """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID.
+
+    Die Link-Knöpfe (#573) bekommen dieselbe öffentliche Adresse wie der Titel-Link: Im
+    Embed steht ein Pfad, im Discord muss eine vollständige Adresse stehen.
+    """
     from services.discord_bot import bot
 
     db = get_db()
     embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url, footer=footer)
+    links = []
+    for button in buttons or []:
+        target = await _public_link_url((button or {}).get("url"))
+        if target:
+            links.append({"label": (button or {}).get("label"), "url": target})
     log["channel_id"] = channel_id
     try:
-        result = await bot.send_embed(channel_id, embed)
+        result = await bot.send_embed(channel_id, embed, links)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
         logger.error("[discord] %s", type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
@@ -255,7 +265,8 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
-                  footer: str | None = None, test: bool = False, thread_id: str | None = None) -> dict:
+                  footer: str | None = None, test: bool = False, thread_id: str | None = None,
+                  buttons: list | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
 
     Mit ``thread_id`` geht die Meldung in den Thread des Turniers (#572). Kennt Discord
@@ -279,17 +290,17 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     if thread_id:
         log["thread_id"] = str(thread_id)
         sent = await _send_embed(str(thread_id), title=title, description=description, color=color, url=url,
-                                 fields=fields, image_url=image_url, log=dict(log), footer=footer)
+                                 fields=fields, image_url=image_url, log=dict(log), footer=footer, buttons=buttons)
         if sent.get("ok") or sent.get("reason") not in ("unknown_channel", "forbidden"):
             return sent
         log["thread_missing"] = sent.get("reason")
     return await _send_embed(resolved["channel_id"], title=title, description=description, color=color, url=url,
-                             fields=fields, image_url=image_url, log=log, footer=footer)
+                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
                      color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
-                     thread_id: str | None = None) -> dict:
+                     thread_id: str | None = None, buttons: list | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if spec["target"] in PUBLIC_TARGETS and item is not None and not should_post_to_public_discord(item):
@@ -298,7 +309,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key, thread_id=thread_id)
+                         image_url=image_url, event_key=event_key, thread_id=thread_id, buttons=buttons)
 
 
 async def send_discord(title: str, description: str = "", *,
@@ -318,13 +329,13 @@ async def send_ops_discord(title: str, description: str = "", *,
 async def send_public_discord(item: dict | None, title: str, description: str = "", *,
                               color: int = 0x29B6E8, url: str = None,
                               fields: list = None, event_key: str = "custom", image_url: str = None,
-                              thread_id: str | None = None) -> dict:
+                              thread_id: str | None = None, buttons: list | None = None) -> dict:
     """Send to a public Discord target only for publicly visible content."""
     if not should_post_to_public_discord(item):
         return {"ok": False, "reason": "private_visibility"}
     if event_key in EVENTS:
         return await send_event(event_key, title, description, item=item, color=color, url=url,
-                                fields=fields, image_url=image_url, thread_id=thread_id)
+                                fields=fields, image_url=image_url, thread_id=thread_id, buttons=buttons)
     return await send_discord(title, description, color=color, url=url, fields=fields, event_key=event_key)
 
 

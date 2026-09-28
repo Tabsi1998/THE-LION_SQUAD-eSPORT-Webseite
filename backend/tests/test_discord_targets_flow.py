@@ -38,9 +38,10 @@ def posted(monkeypatch):
     """Der Bot gilt als verbunden: jedes Embed wird festgehalten statt an Discord geschickt; Einstellungen starten ihn nicht wirklich."""
     calls = []
 
-    async def fake_send(channel_id, embed):
+    async def fake_send(channel_id, embed, buttons=None):
         calls.append({"channel_id": channel_id, "title": embed.get("title"), "description": embed.get("description"),
-                      "url": embed.get("url"), "fields": embed.get("fields"), "image": (embed.get("image") or {}).get("url")})
+                      "url": embed.get("url"), "fields": embed.get("fields"), "image": (embed.get("image") or {}).get("url"),
+                      "buttons": buttons or []})
         return {"ok": True, "message_id": f"m{len(calls)}", "channel_id": channel_id}
 
     async def fake_apply():
@@ -137,7 +138,7 @@ async def test_without_the_bot_nothing_is_sent_and_the_log_says_why(flow, posted
 async def test_a_channel_the_bot_may_not_write_to_is_a_failed_attempt_with_a_click_path(flow, posted, monkeypatch):
     await configure(flow, events={"news.published": True})
 
-    async def refused(channel_id, embed):
+    async def refused(channel_id, embed, buttons=None):
         return {"ok": False, "reason": "forbidden"}
 
     monkeypatch.setattr(discord_bot.bot, "send_embed", refused)

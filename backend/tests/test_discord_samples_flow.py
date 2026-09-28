@@ -35,8 +35,8 @@ class Calls(list):
 def posted(monkeypatch):
     calls = Calls()
 
-    async def fake_send_embed(channel_id, embed):
-        calls.append({"channel_id": channel_id, "embed": embed})
+    async def fake_send_embed(channel_id, embed, buttons=None):
+        calls.append({"channel_id": channel_id, "embed": embed, "buttons": buttons or []})
         return {"ok": True, "message_id": f"m{len(calls)}", "channel_id": channel_id}
 
     async def fake_send_dm(discord_user_id, embed):
