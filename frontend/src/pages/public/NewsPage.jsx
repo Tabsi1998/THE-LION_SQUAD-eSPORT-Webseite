@@ -169,6 +169,7 @@ function NewsCard({ n, featured = false }) {
     <Link
       to={`/news/${n.slug}`}
       data-testid={`news-card-${n.slug}`}
+      data-season-anchor="card"
       className={`group border border-white/10 hover:border-white/30 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition ${featured ? "lg:col-span-1" : ""}`}
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">

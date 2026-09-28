@@ -120,7 +120,7 @@ export default function AboutPage() {
           </div>
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {board.map((contact) => (
-              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
+              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
                 {contact.avatar ? (
                   <LazyImg src={contact.avatar} alt="" className="w-16 h-16 rounded-sm object-cover shrink-0" />
                 ) : (

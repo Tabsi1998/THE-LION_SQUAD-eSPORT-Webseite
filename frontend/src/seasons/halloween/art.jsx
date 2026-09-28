@@ -222,16 +222,30 @@ export function FlyingBatShape({ size = 44 }) {
   );
 }
 
-/** Dieselbe Katze im Gang: Seitenansicht, vier Beine, die abwechselnd schwingen, Schwanz hoch. Blickt nach links. */
+/**
+ * Dieselbe Katze im Gang: Seitenansicht, vier Beine mit Knie und Pfote, die im Trab diagonal gegeneinander schwingen
+ * (vorne links mit hinten rechts), Schwanz hoch. Jedes Bein trägt denselben hellen Saum wie der Körper - sonst ist
+ * es auf dem dunklen Grund unsichtbar (Rückmeldung 28.09.). Blickt nach links.
+ */
 export function CatWalking({ className = "", style, size = 68 }) {
-  const legs = [[30, "a"], [38, "b"], [52, "a"], [60, "b"]];
+  // x der Hüfte, Gruppe (a/b schwingen gegenläufig), Seite (hinten liegende Beine etwas dunkler und kürzer)
+  const legs = [[31, "a", "far"], [38, "b", "near"], [53, "b", "far"], [60, "a", "near"]];
   return (
     <svg className={`tls-cat tls-cat-walking ${className}`} style={style} width={size} height={size * 0.9} viewBox="0 0 90 81" aria-hidden="true">
       <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={RIM} strokeWidth="7.4" fill="none" strokeLinecap="round" />
       <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" />
-      {legs.map(([x, group]) => (
-        <path key={x} className={`tls-cat-walking__leg tls-cat-walking__leg--${group}`} d={`M${x} 52 l0 22`} stroke={INK} strokeWidth="5.5" strokeLinecap="round" style={{ transformOrigin: `${x}px 52px` }} />
-      ))}
+      {legs.map(([x, group, depth]) => {
+        const shank = depth === "far" ? 24 : 27;
+        const leg = `M${x} 50 L${x - 1.5} ${50 + shank * 0.5} L${x + 1} ${50 + shank}`;
+        return (
+          <g key={x} className={`tls-cat-walking__leg tls-cat-walking__leg--${group} tls-cat-walking__leg--${depth}`} style={{ transformOrigin: `${x}px 50px` }}>
+            <path d={leg} stroke={RIM} strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={leg} stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <ellipse className="tls-cat-walking__paw" cx={x - 0.5} cy={50 + shank + 1} rx="4.4" ry="2.4" fill={RIM} />
+            <ellipse cx={x - 0.5} cy={50 + shank + 0.6} rx="3.6" ry="1.9" fill={INK} />
+          </g>
+        );
+      })}
       <ellipse cx="46" cy="46" rx="25.5" ry="12.8" fill={RIM} />
       <ellipse cx="46" cy="46" rx="24.5" ry="12" fill={INK} />
       <g className="tls-cat__head">

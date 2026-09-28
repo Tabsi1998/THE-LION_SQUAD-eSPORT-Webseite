@@ -183,7 +183,7 @@ function BoardCard({ p, compact = false, featured = false }) {
   const Wrapper = target ? Link : "div";
   const wrapperProps = target ? { to: target } : {};
   return (
-    <div className={`border rounded-sm bg-[#121212] hover:border-[#FFD700]/40 transition overflow-hidden ${featured ? "border-[#FFD700]/30" : "border-white/10"} ${compact ? "p-5" : ""}`}>
+    <div className={`border rounded-sm bg-[#121212] hover:border-[#FFD700]/40 transition overflow-hidden ${featured ? "border-[#FFD700]/30" : "border-white/10"} ${compact ? "p-5" : ""}`} data-season-anchor="card">
       {!compact && (
         <div className="px-5 pt-5">
           <Crown className="w-5 h-5 text-[#FFD700] mb-3" />
