@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { API, api, formatRequestError, parseTimeStr, resolveMediaUrl } from "@/lib/api";
+import { formatLapTime, parseLapTime } from "@/lib/laptime";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -36,7 +37,7 @@ export default function AdminF1EditPage() {
   const [staff, setStaff] = useState([]);
   const [times, setTimes] = useState([]);
   const [activeTrack, setActiveTrack] = useState(null);
-  const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "" });
+  const [newTrack, setNewTrack] = useState({ name: "", image_url: "", country: "", target_time: "" });
   const [editTrack, setEditTrack] = useState(null);
   const [newTime, setNewTime] = useState({ user_id: "", time_str: "", penalty_seconds: 0, proof_url: "", admin_note: "", score_scope: "official" });
   const [editTime, setEditTime] = useState(null);
@@ -79,9 +80,13 @@ export default function AdminF1EditPage() {
 
   const addTrack = async (e) => {
     e.preventDefault();
+    // Zielzeit (#613): leer = keine; unlesbar = Hinweis statt Speichern.
+    const targetMs = parseLapTime(newTrack.target_time);
+    if (Number.isNaN(targetMs)) { toast.error("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."); return; }
     try {
-      await api.post(`/f1/challenges/${id}/tracks`, { ...newTrack, order_index: tracks.length });
-      setNewTrack({ name: "", image_url: "", country: "" });
+      const { target_time: _targetText, ...fields } = newTrack;
+      await api.post(`/f1/challenges/${id}/tracks`, { ...fields, target_time_ms: targetMs, order_index: tracks.length });
+      setNewTrack({ name: "", image_url: "", country: "", target_time: "" });
       toast.success("Strecke hinzugefügt.");
       load();
     } catch (err) { toast.error(formatRequestError(err, "Strecke konnte nicht hinzugefügt werden.", { name: newTrack.name })); }
@@ -105,12 +110,15 @@ export default function AdminF1EditPage() {
   const saveTrack = async (e) => {
     e.preventDefault();
     if (!editTrack) return;
+    const targetMs = parseLapTime(editTrack.target_time);
+    if (Number.isNaN(targetMs)) { toast.error("Zielzeit bitte als m:ss.mmm angeben, z. B. 1:32.450."); return; }
     try {
       await api.patch(`/f1/tracks/${editTrack.id}`, {
         name: editTrack.name,
         image_url: editTrack.image_url || "",
         country: editTrack.country || "",
         order_index: Number(editTrack.order_index) || 0,
+        target_time_ms: targetMs,
       });
       toast.success("Strecke gespeichert.");
       setEditTrack(null);
@@ -230,7 +238,7 @@ export default function AdminF1EditPage() {
                   {tr.image_url && <img src={resolveMediaUrl(tr.image_url)} className="w-10 h-7 object-cover rounded-sm" alt="" />}
                   <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
                 </button>
-                {isAdmin && <button onClick={() => setEditTrack({ ...tr })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
+                {isAdmin && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
                 {isAdmin && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-[#FF3B30]" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
               </div>
             ))}
@@ -244,6 +252,7 @@ export default function AdminF1EditPage() {
               <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrackField("name", e.target.value)} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <ImageUpload value={editTrack.image_url || ""} onChange={(v) => setEditTrackField("image_url", v)} label="Streckenbild" testId="f1-edit-track-image-upload" variant="wide" allowLibrary />
               <input placeholder="Land" value={editTrack.country || ""} onChange={(e) => setEditTrackField("country", e.target.value)} data-testid="f1-edit-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+              <input placeholder="Zielzeit (m:ss.mmm, leer = keine)" value={editTrack.target_time || ""} onChange={(e) => setEditTrackField("target_time", e.target.value)} data-testid="f1-edit-track-target" title="Wer diese Zeit unterbietet, sammelt dafür den Erfolg „Zielzeit geknackt“." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrackField("order_index", e.target.value)} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
                 Strecke speichern
@@ -255,6 +264,7 @@ export default function AdminF1EditPage() {
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrackField("name", e.target.value)} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrackField("image_url", v)} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
             <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrackField("country", e.target.value)} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
+            <input placeholder="Zielzeit (m:ss.mmm, leer = keine)" value={newTrack.target_time} onChange={(e) => setNewTrackField("target_time", e.target.value)} data-testid="f1-new-track-target" title="Wer diese Zeit unterbietet, sammelt dafür den Erfolg „Zielzeit geknackt“." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
             </button>

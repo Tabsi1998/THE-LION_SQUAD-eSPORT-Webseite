@@ -96,7 +96,7 @@ class TestTaxonomy:
 
     def test_team_category(self, groups):
         team = sorted(g["code"] for g in groups if g["category"] == "team")
-        assert "team_founder" in team and "team_loyalty" in team, f"team={team}"
+        assert "team_founder" in team and "team_tenure" in team, f"team={team}"
 
     def test_all_categories_known(self, groups):
         allowed = {"match", "tournament", "fastlap", "team", "community", "content",

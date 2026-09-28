@@ -125,10 +125,75 @@ async def apply_group_mapping(db, mapping: dict | None = None, *, dry_run: bool 
     return report
 
 
+def _carry_over(new_tiers: list[dict], counters: dict, old_rows: list[dict]) -> list[dict]:
+    """Welche neuen Stufen eine Person bekommt: nach Zählern - oder, wenn die Gruppe nur von Hand vergeben wird,
+    nach der alten Höhe (alte Stufe 1 → neue Stufe 1 usw., alle darunter mit)."""
+    counted = [t for t in new_tiers if t.get("condition_key") and t.get("progress_target")]
+    if counted:
+        return [t for t in counted if counters.get(t["condition_key"], 0) >= int(t["progress_target"])]
+    manual = [t for t in new_tiers if t.get("manual_only")]
+    if not manual:
+        return []
+    highest = max((int(row.get("level") or 1) for row in old_rows), default=0)
+    return manual[: min(highest, len(manual))]
+
+
+async def apply_redefined(db, mapping: dict | None = None, *, dry_run: bool = False, compute_progress=None) -> dict:
+    """Gruppen mit gleichem Code, aber neuer Leiter (``REDEFINED`` der Kataloge): die alten Stufen-Codes verschwinden
+    aus der Datenbank, Vergaben darauf werden mit ihrem Datum auf die neuen Stufen gehoben (nach Zählern, bei
+    Hand-Gruppen nach der alten Höhe). Je Gruppe einmal, gemerkt im Marker; von Hand angelegte Stufen bleiben."""
+    from achievement_catalog import REDEFINED_OLD_TIERS
+    mapping = REDEFINED_OLD_TIERS if mapping is None else mapping
+    if compute_progress is None:
+        from badges import compute_user_progress
+        compute_progress = compute_user_progress
+    marker = await db.settings.find_one({"id": MARKER_ID}, {"_id": 0}) or {}
+    done = set(marker.get("redefined") or [])
+    report = {"dry_run": dry_run, "groups": []}
+    for group_code, old_codes in mapping.items():
+        if group_code in done or not old_codes:
+            continue
+        stale = await db.achievements.find({"code": {"$in": old_codes}}, {"_id": 0, "code": 1}).to_list(500)
+        awards = await db.user_achievements.find({"tier_code": {"$in": old_codes}}, {"_id": 0}).to_list(100000)
+        new_tiers = sorted(await db.achievements.find({"group_code": group_code, "code": {"$nin": old_codes}}, {"_id": 0}).to_list(500), key=lambda t: material_rank(t.get("material")))
+        plan = {"group": group_code, "stale_tiers": len(stale), "awards": len(awards), "users": len({a["user_id"] for a in awards}), "moves": []}
+        by_user: dict[str, list[dict]] = {}
+        for award in awards:
+            by_user.setdefault(award["user_id"], []).append(award)
+        for user_id, rows in by_user.items():
+            counters = await compute_progress(user_id)
+            earned_at = min(str(row.get("earned_at") or "") for row in rows) or now_utc().isoformat()
+            reached = _carry_over(new_tiers, counters, rows)
+            plan["moves"].append({"user_id": user_id, "old_tiers": [row["tier_code"] for row in rows], "new_tiers": [t["code"] for t in reached], "earned_at": earned_at})
+        report["groups"].append(plan)
+        if dry_run:
+            continue
+        stamp = now_utc().isoformat()
+        for move in plan["moves"]:
+            for code in move["new_tiers"]:
+                tier = await db.achievements.find_one({"code": code}, {"_id": 0})
+                if not tier or await db.user_achievements.find_one({"user_id": move["user_id"], "tier_code": code}):
+                    continue
+                await db.user_achievements.insert_one({
+                    "id": new_id(), "user_id": move["user_id"], "tier_code": code, "group_code": group_code,
+                    "level": tier.get("level", 1), "material": tier.get("material"), "rank": tier.get("rank"),
+                    "earned_at": move["earned_at"], "context": {"migrated_from": group_code, "old_tiers": move["old_tiers"]},
+                    "awarded_by": None, "migrated_at": stamp,
+                })
+            await db.user_achievements.delete_many({"user_id": move["user_id"], "tier_code": {"$in": old_codes}})
+        await db.achievements.delete_many({"code": {"$in": old_codes}})
+        done.add(group_code)
+        await db.settings.update_one({"id": MARKER_ID}, {"$set": {"id": MARKER_ID, "redefined": sorted(done), "updated_at": stamp}}, upsert=True)
+        if stale or awards:
+            logger.info("[achievements] Gruppe %s neu definiert: %s alte Stufen, %s Vergaben gehoben", group_code, len(stale), len(awards))
+    return report
+
+
 async def run_all(db, *, dry_run: bool = False, compute_progress=None) -> dict:
     annotated = {"updated": 0, "orphans": 0} if dry_run else await annotate_awards(db)
     mapped = await apply_group_mapping(db, dry_run=dry_run, compute_progress=compute_progress)
-    return {"annotated": annotated, "mapping": mapped}
+    redefined = await apply_redefined(db, dry_run=dry_run, compute_progress=compute_progress)
+    return {"annotated": annotated, "mapping": mapped, "redefined": redefined}
 
 
 def print_report(report: dict) -> None:

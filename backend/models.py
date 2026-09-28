@@ -793,6 +793,8 @@ class F1TrackCreate(BaseModel):
     image_url: Optional[str] = None
     country: Optional[str] = None
     order_index: int = 0
+    # Zielzeit der Strecke in Millisekunden (#613, „Zielzeit geknackt“) - leer heißt: keine Zielzeit.
+    target_time_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1TrackUpdate(BaseModel):
@@ -800,6 +802,7 @@ class F1TrackUpdate(BaseModel):
     image_url: Optional[str] = None
     country: Optional[str] = None
     order_index: Optional[int] = None
+    target_time_ms: Optional[int] = Field(default=None, ge=0)
 
 
 class F1ChallengeCreate(BaseModel):

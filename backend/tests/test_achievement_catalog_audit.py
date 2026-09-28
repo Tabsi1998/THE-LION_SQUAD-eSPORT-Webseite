@@ -126,3 +126,46 @@ def test_katalog_a_schluessel_sind_live_und_registriert():
     known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
     assert keys <= known, sorted(keys - known)
     assert set(COUNTER_KEYS_V2) >= set(counters.REGISTRY)
+
+
+# ---- Katalog B (#613): Fast Lap, Saison, Team
+from achievement_catalog import GROUPS_B, REDEFINED_B, REPLACED_B, TIERS_B  # noqa: E402
+
+
+def test_katalog_b_hat_26_gruppen_und_136_stufen_je_kategorie_und_loest_alte_ab():
+    assert len(GROUPS_B) == 26 and len(TIERS_B) == 136
+    assert len([g for g in GROUPS_B if g["category"] == "fastlap"]) == 9
+    assert len([g for g in GROUPS_B if g["category"] == "season"]) == 7
+    assert len([g for g in GROUPS_B if g["category"] == "team"]) == 10
+    assert sum(1 for t in TIERS_B if t["group_code"] in {g["code"] for g in GROUPS_B if g["category"] == "fastlap"}) == 53
+    assert sum(1 for t in TIERS_B if t["group_code"] in {g["code"] for g in GROUPS_B if g["category"] == "season"}) == 37
+    assert sum(1 for t in TIERS_B if t["group_code"] in {g["code"] for g in GROUPS_B if g["category"] == "team"}) == 46
+    codes = [g["code"] for g in GROUPS_A + GROUPS_B]
+    assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
+    tier_codes = [t["code"] for t in TIERS_A + TIERS_B]
+    assert len(tier_codes) == len(set(tier_codes))
+    in_catalog = {g["code"] for g in ACHIEVEMENT_GROUPS}
+    assert {g["code"] for g in GROUPS_B} <= in_catalog
+    assert not (set(REPLACED_B) & in_catalog), "abgelöste Gruppen sind aus dem Katalog"
+    assert all(GROUP_MAPPING.get(old) == new for old, new in REPLACED_B.items())
+    assert set(REDEFINED_B) <= set(codes)
+    assert all(g["catalog"] == "B" and g["public"] for g in GROUPS_B)
+
+
+def test_katalog_b_ziele_steigen_material_passt_texte_da_schluessel_live():
+    by_group = defaultdict(list)
+    for tier in TIERS_B:
+        by_group[tier["group_code"]].append(tier)
+    for group in GROUPS_B:
+        tiers = by_group[group["code"]]
+        targets = [t["progress_target"] for t in tiers]
+        assert targets == sorted(targets) and len(set(targets)) == len(targets), group["code"]
+        assert [t["material"] for t in tiers] == LADDERS[len(tiers)], group["code"]
+        assert all(t["condition_key"] == group["condition_key"] for t in tiers)
+        assert group["description"] and group["how_to"] and group["icon"] and group["art"]
+        assert all(t["description"] and t["how_to"] and t["points"] > 0 for t in tiers)
+        assert all(t["level"] in (1, 2, 3, 4) for t in tiers)
+    keys = {g["condition_key"] for g in GROUPS_B}
+    assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
+    known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
+    assert keys <= known, sorted(keys - known)

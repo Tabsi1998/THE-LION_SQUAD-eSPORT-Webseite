@@ -64,7 +64,7 @@ class TestAchievementTaxonomy:
 
     def test_team_group_membership(self, groups):
         by_code = {g["code"]: g for g in groups}
-        for code in ("team_founder", "team_loyalty"):
+        for code in ("team_founder", "team_tenure"):
             assert code in by_code, f"{code} missing from public catalog"
             assert by_code[code]["category"] == "team", (
                 f"{code} category = {by_code[code]['category']}, expected 'team'"

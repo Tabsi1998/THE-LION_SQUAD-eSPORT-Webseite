@@ -76,10 +76,10 @@ async def test_oeffentlicher_katalog_traegt_material_alte_felder_bleiben(flow):
     assert tiers[0]["material_name"] == "Holz" and tiers[0]["material_color"] == "#A0703C" and tiers[0]["level_name"] == "Holz"
     assert played["category"] == "match" and played["hidden"] is False and played["highest_earned_rank"] == 0
     assert not any(g["code"] == "match_master" for g in groups), "abgelöste Gruppen erscheinen nicht mehr"
-    # Eine alte Gruppe mit Level 1–5 trägt die abgeleiteten Materialien.
-    legacy = next(g for g in groups if g["code"] == "season_consistency")
-    assert [t["material"] for t in legacy["tiers"]] == ["bronze", "silver", "gold", "platinum", "legendary"]
-    assert [t["level"] for t in legacy["tiers"]] == [1, 2, 3, 4, 5]
+    # Eine alte Gruppe mit Level 1–4 trägt die abgeleiteten Materialien (Saison-Konstanz ist seit Katalog B abgelöst).
+    legacy = next(g for g in groups if g["code"] == "discord_active")
+    assert [t["material"] for t in legacy["tiers"]] == ["bronze", "silver", "gold", "platinum"]
+    assert [t["level"] for t in legacy["tiers"]] == [1, 2, 3, 4]
     categories = {g["category"] for g in groups}
     assert categories <= set(catalog.CATEGORIES) and "creator" in categories and "profile" in categories
     assert not any(g.get("hidden") for g in groups), "geheime Gruppen zeigt der Katalog anonym nie"

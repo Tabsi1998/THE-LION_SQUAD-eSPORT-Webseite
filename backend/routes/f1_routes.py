@@ -665,7 +665,7 @@ async def add_track(cid: str, body: F1TrackCreate, me: dict = Depends(require_ad
 @router.patch("/tracks/{tid}")
 async def update_track(tid: str, body: F1TrackUpdate, me: dict = Depends(require_admin())):
     db = get_db()
-    nullable_fields = {"image_url", "country"}
+    nullable_fields = {"image_url", "country", "target_time_ms"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     await db.f1_tracks.update_one({"id": tid}, {"$set": updates})
@@ -724,50 +724,25 @@ async def leaderboard(cid: str, track_id: str | None = None, access: str | None 
 
 @router.get("/challenges/{cid}/championship")
 async def championship_standings(cid: str, access: str | None = None, user=Depends(get_optional_user)):
-    """Championship standings across all tracks using points_per_position."""
+    """Championship standings across all tracks using points_per_position - dieselbe Rechnung wie der Zähler
+    „Meisterschafts-Top“ (services/fastlap_standings.py, #613)."""
     db = get_db()
+    from services.fastlap_standings import challenge_standings
     c = await _get_visible_challenge(cid, user, access=access)
-    cid = c["id"]
-    tracks = await db.f1_tracks.find({"challenge_id": cid}, {"_id": 0}).sort("order_index", 1).to_list(100)
-    points_system = c.get("points_per_position", [25, 18, 15, 12, 10, 8, 6, 4, 2, 1])
-    totals: dict = {}
-    per_track_results = {}
-    for track in tracks:
-        times = await db.f1_lap_times.find(
-            _official_time_query({"challenge_id": cid, "track_id": track["id"]}),
-            {"_id": 0},
-        ).to_list(5000)
-        best_per_user = {}
-        for t in times:
-            effective = t["time_ms"] + int(t.get("penalty_seconds", 0) * 1000)
-            uid = t["user_id"]
-            if uid not in best_per_user or effective < best_per_user[uid]:
-                best_per_user[uid] = effective
-        sorted_users = sorted(best_per_user.items(), key=lambda x: x[1])
-        track_results = []
-        for pos, (uid, ms) in enumerate(sorted_users):
-            pts = points_system[pos] if pos < len(points_system) else 0
-            totals.setdefault(uid, {"user_id": uid, "points": 0, "wins": 0, "races": 0})
-            totals[uid]["points"] += pts
-            totals[uid]["races"] += 1
-            if pos == 0:
-                totals[uid]["wins"] += 1
-            track_results.append({"user_id": uid, "rank": pos + 1, "time_ms": ms,
-                                    "time_str": _ms_to_time_str(ms), "points": pts})
-        per_track_results[track["id"]] = {"track": track, "results": track_results}
+    standings, per_track_results, tracks = await challenge_standings(db, c)
+    for entry in per_track_results.values():
+        for result in entry["results"]:
+            result["time_str"] = _ms_to_time_str(result["time_ms"])
     # enrich users
-    user_ids = list(totals.keys())
+    user_ids = [s["user_id"] for s in standings]
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
     arr = []
-    for uid, s in totals.items():
-        u = users.get(uid, {})
+    for s in standings:
+        u = users.get(s["user_id"], {})
         arr.append({**s, "username": u.get("username"),
                      "display_name": u.get("display_name") or u.get("username"),
                      "avatar_url": u.get("avatar_url")})
-    arr.sort(key=lambda s: (s["points"], s["wins"]), reverse=True)
-    for i, s in enumerate(arr):
-        s["rank"] = i + 1
     return {"challenge": c, "standings": arr, "per_track": per_track_results, "tracks": tracks}
 
 

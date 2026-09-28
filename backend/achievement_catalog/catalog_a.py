@@ -30,14 +30,14 @@ REDEFINED = ("win_streak", "fairplay", "early_bird_match", "night_owl_match", "c
 
 
 def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str, targets: list[int],
-           step: str, *, sort_order: int, unit: str = "", staff_only: bool = False) -> tuple[dict, list[dict]]:
-    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel."""
+           step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A") -> tuple[dict, list[dict]]:
+    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel. Katalog B–D nutzen denselben Helfer."""
     materials = LADDERS[len(targets)]
     group = {
         "code": code, "name": name, "category": category, "icon": icon, "art": art,
         "accent_color": CATEGORIES[category]["accent"], "description": description, "how_to": how_to,
         "condition_key": key, "public": True, "is_special": False, "is_negative": False, "sort_order": sort_order,
-        "staff_only": staff_only, "catalog": "A",
+        "staff_only": staff_only, "catalog": catalog,
     }
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
