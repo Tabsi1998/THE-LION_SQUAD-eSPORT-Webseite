@@ -1,8 +1,12 @@
 # Changelog
 
+## 1.0.3 - 2026-10-12
+
+- Mobile: Halloween wie im Web: ein rundes Netz, das die Spinne Faden für Faden in echter Reihenfolge spinnt (Anker, Rahmen, Speichen, Nabe, Spirale) und das je Screen anders ausfällt; Fledermäuse hängen unter der Kopfzeile und fliegen beim Antippen davon; ein winziger Friedhof über der Tab-Leiste gibt beim Antippen türkise Geister frei; die Spinne am Faden kommt vom oberen Rand, seilt sich bis über die Tab-Leiste ab, lässt los, läuft weg, und der Faden schwingt und reißt ab (#665).
+
 ## 1.0.2 - 2026-10-10
 
-- Mobile: Halloween mit mehr Leben: große Spinnweben mit Spinnen, die sich abseilen und ab und zu über den Screen krabbeln, Fledermausschwärme mit hellem Rand in Formation, hängende Fledermäuse unter der Kopfzeile, Nebel am unteren Rand, bei „voll“ ein Geist. Jeder Screen bekommt seine eigene Anordnung. Der Gruß der Laterne erscheint als Karte unter der Kopfzeile statt als Rahmen über dem halben Screen (#655).
+- Mobile: Halloween dezent und detailreich: Netz in Silber-Türkis, das eine Spinne auf vielen Screens sichtbar spinnt, eine kleine Spinne am Faden, selten ein Krabbler, wenige Fledermäuse in ruhiger Größe; jeder Screen mit eigener Anordnung, der Gruß der Laterne als Karte unter der Kopfzeile statt als Rahmen über dem halben Screen (#655).
 
 ## 1.0.1 - 2026-10-10
 

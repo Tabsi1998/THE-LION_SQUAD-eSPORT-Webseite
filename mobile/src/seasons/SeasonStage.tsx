@@ -7,7 +7,7 @@ import { colors } from "../theme";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
 
-// Die Bühne in der App (#636, #655): Ebenen über allen Tabs, die keine Berührung abfangen. Je Saison ein
+// Die Bühne in der App (#636, #655, #665): Ebenen über allen Tabs; nur Fledermäuse und Gräber nehmen Berührungen. Je Saison ein
 // Eintrag in der Registry; jeder Screen bekommt aus seinem Namen eine eigene Anordnung. Grüße kommen als
 // Overlay-Karte unter der Kopfzeile, nicht mehr als Text in einer Karte (#655: die Meldung hing als Rahmen
 // über dem halben Screen).
@@ -48,9 +48,10 @@ export function SeasonStage() {
   const screen = useCurrentScreen();
   if (!mounted.length && !toast) return null;
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="season-stage">
+    // box-none: die Buehne selbst nimmt keine Beruehrung, aber Fledermaeuse und Graeber der Saison duerfen (#665).
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="season-stage">
       {mounted.map(({ season, module }) => (module.Sky ? <module.Sky key={`${season.key}-sky`} season={season} screen={screen} reducedMotion={reducedMotion} /> : null))}
-      <View pointerEvents="none" style={[styles.corners, { top: insets.top }]}>
+      <View pointerEvents="box-none" style={[styles.corners, { top: insets.top }]}>
         {mounted.map(({ season, module }) => (module.Corners ? <module.Corners key={`${season.key}-corners`} season={season} screen={screen} /> : null))}
       </View>
       {toast ? (

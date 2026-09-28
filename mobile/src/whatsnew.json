@@ -1,8 +1,8 @@
 {
-  "version": "1.0.2",
-  "build": 81,
-  "date": "2026-10-10",
+  "version": "1.0.3",
+  "build": 82,
+  "date": "2026-10-12",
   "items": [
-    "Halloween mit mehr Leben: große Spinnweben mit Spinnen, die sich abseilen und ab und zu über den Screen krabbeln, Fledermausschwärme mit hellem Rand in Formation, hängende Fledermäuse unter der Kopfzeile, Nebel am unteren Rand, bei „voll“ ein Geist. Jeder Screen bekommt seine eigene Anordnung. Der Gruß der Laterne erscheint als Karte unter der Kopfzeile statt als Rahmen über dem halben Screen."
+    "Halloween wie im Web: ein rundes Netz, das die Spinne Faden für Faden in echter Reihenfolge spinnt (Anker, Rahmen, Speichen, Nabe, Spirale) und das je Screen anders ausfällt; Fledermäuse hängen unter der Kopfzeile und fliegen beim Antippen davon; ein winziger Friedhof über der Tab-Leiste gibt beim Antippen türkise Geister frei; die Spinne am Faden kommt vom oberen Rand, seilt sich bis über die Tab-Leiste ab, lässt los, läuft weg, und der Faden schwingt und reißt ab."
   ]
 }
