@@ -2547,6 +2547,39 @@ Handy ist dabei nur über Code und Browser-Tests beurteilt, nicht auf einem Ger�
 - Der Discord-Link in der App ist falsch; richtig ist `discord.com/invite/thelionsquadesports`.
   In #214 vermerkt.
 
+## Neu aufgenommen am 28. September
+
+Nach der Fragenliste des Betreibers (alle Antworten A, Frage 20 A/B/C/E) und „LOS GEHTS LETS
+GO!“: drei Meilensteine Jahreszeiten (40–42), Erfolge II (38) und Discord VI (39) als Issues.
+
+- **Jahreszeiten I** (#632–#636, PRs #648–#650, #653, #657, #659): Zeitplan-Dienst mit elf
+  Saisonen, öffentliche Abfrage `/api/seasonal/active`, Admin mit Vorschau, Web-Bühne mit
+  Portalen und einem Canvas-Loop, App-Bühne, Deko-Schalter an/dezent/aus je Person. Halloween
+  brauchte drei Runden Rückmeldung: erst zu klein und überall gleich, dann (#657) „zu zu zu
+  übertrieben“ – Nebel, Geister, Lichterketten, Friedhof, riesige Spinnen und Fledermäuse,
+  abgeschnittenes Netz, rechteckige Laternen-Glows –, dann (#659) dezent und detailreich.
+- **Der Maßstab** ([#658](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/658)):
+  edel, dunkel, detailreich, nicht kindlich, nichts abgeschnitten, Farben in Silber-Türkis zum
+  Blau der Seite, je Saison mindestens ein lebender Vorgang, dem man zuschauen kann (die Spinne
+  spinnt das Netz in echter Reihenfolge), Reaktionen auf Zeiger, Scrollen und Seitenwechsel,
+  jede Seite und jeder App-Screen aus der Adresse gesät. Die Erkenntnisse aus Halloween stehen
+  als Kommentar an jedem Saison-Issue #637–#647.
+- **Halloween III** (#660–#664, PR #668; #665 App-Teil Build 1.0.3 vor dem 25.10.): rundes
+  Radnetz mit Physik (Verlet, ohne Paket), hängende Fledermäuse an Überschriften, Menüpunkten
+  und dem Löwen (Klick → wegfliegen, nachscrollen), Mini-Friedhof am Strich über dem Impressum
+  mit Geistern per Klick, Abseil-Spinne, die unten loslässt, Katze und Mond neu.
+- **Echtes Wetter** ([#666](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/666)):
+  Open-Meteo ohne Schlüssel im Backend, Wind für Netz und Fäden, Schnee, wenn es in Tirol
+  schneit, Nacht ab echtem Sonnenuntergang. **App** ([#667](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/667)):
+  Skia-Zeichenfläche und Neigungssensor – der Betreiber ist offen für Pakete, wenn es zu 100 %
+  passt.
+- **Erfolge II** (#611–#623): E1 Datenmodell v2 (#652), E7 XP und Level 1–60 mit Prestige
+  (#654), E6 Zähler-Registry mit Signalen, GG-Lob und nächtlichem Abgleich (#656) sind drin;
+  Kataloge A–D (#612–#615), Zeremonien (#618), Sichtbarkeit (#619), Admin (#620),
+  Benachrichtigungen (#622) und App 1.1.0 (#623) folgen.
+- **Regel aus #656/#659:** Web und App einer Sache in einem PR, wenn der Betreiber weniger
+  Merges will; nach jedem Merge die Reste sofort auf `main` rebasen; Doku nur im Doku-Stand-PR.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
