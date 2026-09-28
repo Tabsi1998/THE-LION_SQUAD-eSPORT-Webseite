@@ -46,6 +46,7 @@ import { TournamentsScreen } from "../screens/main/TournamentsScreen";
 import { useAuth } from "../auth/AuthContext";
 import { isGuestUser } from "../live";
 import { useAppLock } from "../lock/AppLockProvider";
+import { SeasonStage, useSeasonTabIcon } from "../seasons/SeasonStage";
 import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
@@ -91,6 +92,8 @@ export function AppNavigator() {
           {/* Laufbanner (#245): über allen Tabs, dieselben Banner wie die Website mit Kanal „app“. */}
           <SiteBannerTicker />
           <View style={styles.mainWithBanner}><MainTabs /></View>
+          {/* Jahreszeiten (#636): Deko-Ebenen über den Tabs, nie klickbar. */}
+          <SeasonStage />
         </View>
       ) : <AuthScreens />}
       {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
@@ -116,6 +119,8 @@ function AuthScreens() {
 function MainTabs() {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 8);
+  // Jahreszeiten (#636): der Tab „Mehr“ trägt zur Saison ihr Symbol (Halloween: Kürbis).
+  const SeasonIcon = useSeasonTabIcon();
   return (
     <Tabs.Navigator
       screenOptions={({ route }) => ({
@@ -148,7 +153,7 @@ function MainTabs() {
         tabBarIcon: ({ color, focused, size }) => (
           <View style={styles.tabIconWrap}>
             <View style={[styles.tabActiveLine, focused && styles.tabActiveLineVisible]} />
-            <Ionicons name={iconFor(route.name)} color={color} size={focused ? size + 1 : size} />
+            {route.name === "More" && SeasonIcon ? <SeasonIcon size={focused ? size + 1 : size} /> : <Ionicons name={iconFor(route.name)} color={color} size={focused ? size + 1 : size} />}
           </View>
         ),
       })}

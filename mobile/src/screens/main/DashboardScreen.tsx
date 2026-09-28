@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { SeasonWidgetSlot } from "../../seasons/SeasonStage";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
@@ -200,6 +201,7 @@ export function DashboardScreen({ navigation }: Props) {
               <Badge label={isGuest ? "Gast" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
               {!isGuest && user?.is_tournament_staff ? <Badge label="Staff" /> : null}
             </View>
+            <SeasonWidgetSlot />
           </View>
           {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News aus der Website.</Body> : null}
         </Card>

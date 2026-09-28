@@ -13,6 +13,7 @@ export type User = {
   membership?: Record<string, unknown> | null;
   newsletter_consent?: boolean;
   notification_preferences?: Record<string, boolean>;
+  seasonal_decorations?: "on" | "subtle" | "off";  // Saisonale Deko für mich (#632)
   consent_required?: boolean;
   required_privacy_policy_version?: string;
   required_terms_version?: string;

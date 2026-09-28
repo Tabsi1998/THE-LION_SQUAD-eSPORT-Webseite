@@ -14,6 +14,7 @@ import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import { useAppUpdate } from "../../update/AppUpdateProvider";
+import { DecoSetting } from "../../seasons/DecoSetting";
 
 // "Mehr" ist das Verzeichnis: eine Zeile je Ziel, keine Beschreibungstexte.
 // Vorher war jedes Ziel eine große Karte mit Badge und zwei Zeilen Text, und
@@ -201,6 +202,8 @@ export function MoreScreen({ navigation }: Props) {
           );
         })}
 
+        {/* Saisonale Deko (#636): an, dezent, aus - für mich. */}
+        <DecoSetting />
         {socials.length ? (
           <View style={styles.group}>
             <Heading>Folge uns</Heading>

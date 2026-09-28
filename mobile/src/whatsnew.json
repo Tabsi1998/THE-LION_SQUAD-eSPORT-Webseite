@@ -1,9 +1,9 @@
 {
-  "version": "1.0.0",
-  "build": 79,
-  "date": "2026-09-25",
+  "version": "1.0.1",
+  "build": 80,
+  "date": "2026-10-10",
   "items": [
-    "Erste Version für Google Play. Updates kommen ab jetzt über den Play Store – der eigene Download mit Installer und die Berechtigung „Apps aus unbekannten Quellen installieren“ sind aus der App entfernt; Geräte ohne Google Play holen die APK vom GitHub-Release im Browser.",
-    "Der Profilstatus nennt offene Angaben in Klartext („Profilbild, Geburtsdatum“) statt als Feldnamen."
+    "Saisonale Deko: rund um Halloween schmücken Spinnweben, Fledermäuse und eine Kürbislaterne die App – der Verein schaltet sie, du stellst sie unter Mehr → Darstellung auf an, dezent oder aus.",
+    "Advent, Weihnachten, Silvester, Fasching und Ostern folgen mit den nächsten Updates, ohne dass du etwas tun musst."
   ]
 }
