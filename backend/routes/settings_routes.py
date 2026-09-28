@@ -344,9 +344,17 @@ class SeasonConfigPayload(BaseModel):
     texts: Optional[Dict[str, str]] = None
 
 
+class SeasonLocationPayload(BaseModel):
+    """Vereinsort für Wetter und Sonnenzeiten (#666)."""
+    lat: float
+    lon: float
+    name: Optional[str] = None
+
+
 class SeasonsSettings(BaseModel):
     enabled: Optional[bool] = None
     seasons: Optional[Dict[str, SeasonConfigPayload]] = None
+    location: Optional[SeasonLocationPayload] = None
 
 
 class SeasonPreviewPayload(BaseModel):
@@ -1693,9 +1701,11 @@ async def fetch_youtube(me: dict = Depends(require_club_admin())):
 @settings_router.get("/seasons")
 async def get_seasons(me: dict = Depends(require_club_admin())):
     from routes.seasons_routes import load_context
-    from services import seasons
-    stored, founded = await load_context(get_db())
-    return seasons.admin_view(stored, founded=founded)
+    from services import seasons, weather
+    db = get_db()
+    stored, founded = await load_context(db)
+    cache, location = await weather.load(db)
+    return seasons.admin_view(stored, founded=founded, weather=weather.current(cache, location))
 
 
 @settings_router.put("/seasons")
@@ -1735,12 +1745,34 @@ async def update_seasons(body: SeasonsSettings, me: dict = Depends(require_club_
         if cfg != current["seasons"][key]:
             updates[f"seasons.{key}"] = cfg
             changed_fields.append(f"seasons.{key}")
+    if body.location is not None:
+        if not (-90 <= body.location.lat <= 90 and -180 <= body.location.lon <= 180):
+            raise HTTPException(400, "Breite muss zwischen -90 und 90 liegen, Länge zwischen -180 und 180.")
+        location = {"lat": round(body.location.lat, 4), "lon": round(body.location.lon, 4),
+                    "name": str(body.location.name or "").strip()[:60] or seasons.DEFAULT_LOCATION["name"]}
+        if location != current["location"]:
+            updates["location"] = location
+            changed_fields.append("location")
     if updates:
         updates["updated_at"] = now_utc().isoformat()
         await db.settings.update_one({"id": seasons.SETTINGS_ID}, {"$set": updates, "$setOnInsert": {"id": seasons.SETTINGS_ID}}, upsert=True)
         await _audit_settings_change(db, "settings.seasons.update", "seasons", me["id"], changed_fields)
+    from services import weather
     stored, founded = await load_context(db)
-    return seasons.admin_view(stored, founded=founded)
+    cache, location = await weather.load(db)
+    return seasons.admin_view(stored, founded=founded, weather=weather.current(cache, location))
+
+
+@settings_router.post("/seasons/weather/refresh")
+async def refresh_seasons_weather(me: dict = Depends(require_club_admin())):
+    """Wetter jetzt abrufen (#666) - sonst holt es der Scheduler alle zehn Minuten."""
+    from routes.seasons_routes import load_context
+    from services import seasons, weather
+    db = get_db()
+    await weather.refresh(db)
+    stored, founded = await load_context(db)
+    cache, location = await weather.load(db)
+    return seasons.admin_view(stored, founded=founded, weather=weather.current(cache, location))
 
 
 @settings_router.post("/seasons/{key}/preview")

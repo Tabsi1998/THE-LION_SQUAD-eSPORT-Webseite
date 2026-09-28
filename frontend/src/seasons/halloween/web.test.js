@@ -210,3 +210,19 @@ test("Ebene: zeichnet auf dem Canvas, hört auf Zeiger und Scrollen, räumt beim
   expect(building.sim.done).toBe(false);
   building.dispose();
 });
+
+test("Wetter (#666): der Wind aus dem Start und aus dem Ereignis skaliert und richtet den Netzwind", () => {
+  const listeners = {};
+  const win = { innerWidth: 1200, scrollY: 0, addEventListener: (name, fn) => { listeners[name] = fn; }, removeEventListener: (name) => { delete listeners[name]; } };
+  const layer = createWebLayer({ seed: 0.42, corner: "tl", factor: 1, build: false, weather: { wind_factor: 1.2, wind_dir: 90 } }, win);
+  expect(layer.wind).toEqual({ scale: 2, sign: -1 });
+  listeners["tls:season-weather"]({ detail: { wind_factor: 0.3, wind_dir: 270 } });
+  expect(layer.wind).toEqual({ scale: 0.5, sign: 1 });
+  listeners["tls:season-weather"]({ detail: null });
+  expect(layer.wind).toEqual({ scale: 0.5, sign: 1 });
+  const calls = [];
+  layer.draw(fakeContext(calls), 1 / 60, { width: 1200, height: 800 });
+  expect(layer.sim.wind.x).toBeGreaterThan(0);
+  layer.dispose();
+  expect(Object.keys(listeners)).toEqual([]);
+});

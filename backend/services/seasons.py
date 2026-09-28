@@ -21,6 +21,8 @@ CHANNELS = ("web", "app")
 MODES = ("auto", "force_on", "force_off")
 PREFERENCES = ("on", "subtle", "off")
 PREVIEW_SECONDS = 60
+# Vereinsort für Wetter und Sonnenzeiten (#666); im Admin änderbar.
+DEFAULT_LOCATION = {"lat": 47.2692, "lon": 11.4041, "name": "Innsbruck"}
 # Erfolgs-Schlüssel, die die Jahreszeiten liefern (Zähler kommen mit Erfolge II, #616).
 ACHIEVEMENT_SIGNALS = ("halloween_pumpkin", "snowflakes_clicked", "online_at_new_year", "advent_doors_opened", "easter_eggs_found")
 
@@ -185,6 +187,20 @@ def default_config(key: str) -> dict:
     return {"enabled": True, "mode": "auto", "until": None, "intensity": "normal", "channels": list(CHANNELS), "texts": dict(SEASONS[key]["texts"])}
 
 
+def location_from(stored: dict | None) -> dict:
+    """Der Vereinsort aus den gespeicherten Einstellungen - oder die Vorgabe, wenn nichts Brauchbares da ist."""
+    saved = (stored or {}).get("location") or {}
+    try:
+        lat = float(saved.get("lat"))
+        lon = float(saved.get("lon"))
+    except (TypeError, ValueError):
+        return dict(DEFAULT_LOCATION)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return dict(DEFAULT_LOCATION)
+    name = str(saved.get("name") or "").strip()[:60] or DEFAULT_LOCATION["name"]
+    return {"lat": round(lat, 4), "lon": round(lon, 4), "name": name}
+
+
 def merge_settings(stored: dict | None) -> dict:
     """Gespeicherter Stand plus Vorgaben - für jede Saison ein vollständiger Eintrag."""
     stored = stored or {}
@@ -207,7 +223,7 @@ def merge_settings(stored: dict | None) -> dict:
             if isinstance(value, str) and value.strip():
                 cfg["texts"][name] = value.strip()
         seasons[key] = cfg
-    return {"enabled": stored.get("enabled", True) is not False, "seasons": seasons}
+    return {"enabled": stored.get("enabled", True) is not False, "seasons": seasons, "location": location_from(stored)}
 
 
 def parse_founded(value) -> date | None:
@@ -303,17 +319,17 @@ def new_year_salvos(now: datetime) -> list[int]:
     return sorted(rng.randrange(0, 3600) for _ in range(min(count, 1440)))
 
 
-def phase_data(key: str, window: dict, now: datetime, founded: date | None) -> dict:
-    """Was der Client außer der Phase wissen muss."""
+def phase_data(key: str, window: dict, now: datetime, founded: date | None, night: bool | None = None) -> dict:
+    """Was der Client außer der Phase wissen muss. ``night`` kommt aus der Sonne (#666), sonst aus festen Stunden."""
     day = now.date()
     if key == "halloween":
-        return {"night": now.hour >= 18 or now.hour < 6}
+        return {"night": night if night is not None else (now.hour >= 18 or now.hour < 6)}
     if key == "advent":
         return {"candles": candles_lit(day), "days_to_christmas": max(0, (date(window["year"], 12, 24) - day).days),
                 "sundays": [s.isoformat() for s in advent_sundays(window["year"])]}
     if key == "snow":
         stage = 1 if day < date(window["year"], 12, 10) else 2 if day < date(window["year"], 12, 24) else 3
-        return {"night": now.hour >= 20 or now.hour < 7, "snowcap_stage": stage}
+        return {"night": night if night is not None else (now.hour >= 20 or now.hour < 7), "snowcap_stage": stage}
     if key == "advent_calendar":
         return {"today_door": min(24, day.day) if (day.month == 12 and day.year == window["year"]) else 24, "catch_up": day.month == 1}
     if key == "new_year":
@@ -340,7 +356,7 @@ def render_texts(key: str, texts: dict, data: dict) -> dict:
 
 # ------------------------------------------------------------------ Was gerade aktiv ist
 
-def season_state(key: str, cfg: dict, now: datetime, founded: date | None, preview: bool = False) -> dict | None:
+def season_state(key: str, cfg: dict, now: datetime, founded: date | None, preview: bool = False, night: bool | None = None) -> dict | None:
     """Der Zustand einer Saison zu ``now`` - None, wenn nichts zu zeigen ist."""
     window = current_window(key, now, founded)
     forced = False
@@ -362,7 +378,7 @@ def season_state(key: str, cfg: dict, now: datetime, founded: date | None, previ
         window = next_window(key, now, founded) or {"phase": "deko", "start": now, "end": now, "year": now.year}
         if key == "new_year":
             window = {**window, "phase": "show"}
-    data = phase_data(key, window, now, founded)
+    data = phase_data(key, window, now, founded, night)
     return {
         "key": key,
         "label": SEASONS[key]["label"],
@@ -377,18 +393,18 @@ def season_state(key: str, cfg: dict, now: datetime, founded: date | None, previ
     }
 
 
-def active(now: datetime | None, stored: dict | None, founded=None, preview_key: str | None = None) -> dict:
+def active(now: datetime | None, stored: dict | None, founded=None, preview_key: str | None = None, night: bool | None = None) -> dict:
     """Die öffentliche Antwort: nur, was jetzt zu zeigen ist."""
     now = to_vienna(now)
     settings = merge_settings(stored)
     founded_on = parse_founded(founded)
     seasons = []
     if preview_key in SEASONS:
-        state = season_state(preview_key, settings["seasons"][preview_key], now, founded_on, preview=True)
+        state = season_state(preview_key, settings["seasons"][preview_key], now, founded_on, preview=True, night=night)
         seasons = [state] if state else []
     elif settings["enabled"]:
         for key, cfg in settings["seasons"].items():
-            state = season_state(key, cfg, now, founded_on)
+            state = season_state(key, cfg, now, founded_on, night=night)
             if state:
                 seasons.append(state)
     return {"now": now.isoformat(), "timezone": "Europe/Vienna", "enabled": settings["enabled"], "preview": preview_key in SEASONS, "seasons": seasons}
@@ -405,7 +421,7 @@ def calendar(year: int, founded=None) -> list[dict]:
     return rows
 
 
-def admin_view(stored: dict | None, now: datetime | None = None, founded=None) -> dict:
+def admin_view(stored: dict | None, now: datetime | None = None, founded=None, weather: dict | None = None) -> dict:
     """Der Stand für die Admin-Seite: Konfiguration je Saison plus „läuft gerade“ und „nächstes Fenster“."""
     now = to_vienna(now)
     settings = merge_settings(stored)
@@ -422,7 +438,7 @@ def admin_view(stored: dict | None, now: datetime | None = None, founded=None) -
             "needs_founded_on": key == "club_birthday" and founded_on is None,
         })
     return {"enabled": settings["enabled"], "now": now.isoformat(), "founded_on": founded_on.isoformat() if founded_on else None,
-            "seasons": items, "calendar": calendar(now.year, founded_on), "intensities": list(INTENSITIES), "channels": list(CHANNELS)}
+            "seasons": items, "calendar": calendar(now.year, founded_on), "intensities": list(INTENSITIES), "channels": list(CHANNELS), "location": settings["location"], "weather": weather}
 
 
 # ------------------------------------------------------------------ Vorschau-Token

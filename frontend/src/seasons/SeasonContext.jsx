@@ -111,6 +111,18 @@ export function SeasonProvider({ children, channel = "web" }) {
     return () => window.clearTimeout(timer.current);
   }, [payload, load]);
 
+  // Wetter (#666): der Windfaktor steht als Variable am <html> (CSS-Animationen), die Canvas-Ebenen hören auf das Ereignis.
+  useEffect(() => {
+    const weather = payload?.weather;
+    if (!weather || typeof document === "undefined") return;
+    document.documentElement.style.setProperty("--season-wind", String(weather.wind_factor ?? 0.6));
+    try {
+      window.dispatchEvent(new CustomEvent("tls:season-weather", { detail: weather }));
+    } catch {
+      // Ohne CustomEvent bleibt der Wind bei der Vorgabe.
+    }
+  }, [payload?.weather]);
+
   const preference = PREFERENCES.includes(user?.seasonal_decorations) ? user.seasonal_decorations : localPreference;
   const setPreference = useCallback(async (value) => {
     if (!PREFERENCES.includes(value)) return;
@@ -143,6 +155,7 @@ export function SeasonProvider({ children, channel = "web" }) {
       setPreference,
       reducedMotion,
       preview: Boolean(previewToken && payload?.preview),
+      weather: payload?.weather || null,
       reload: load,
     };
   }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load]);
@@ -150,7 +163,7 @@ export function SeasonProvider({ children, channel = "web" }) {
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
 
-const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, reload: () => {} };
+const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, reload: () => {} };
 
 export function useSeason() {
   return useContext(SeasonContext) || EMPTY;

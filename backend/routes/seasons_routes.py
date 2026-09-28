@@ -11,7 +11,7 @@ from datetime import datetime
 from fastapi import APIRouter, Query, Request, Response
 
 from database import get_db
-from services import seasons
+from services import seasons, weather
 
 router = APIRouter(prefix="/api/seasonal", tags=["seasonal"])  # /api/seasons gehört den Wettkampf-Saisonen
 ABOUT_SETTINGS_ID = "about_page"
@@ -28,13 +28,19 @@ async def load_context(db) -> tuple[dict, str | None]:
 async def active_seasons(request: Request, response: Response, preview: str | None = Query(None)):
     db = get_db()
     stored, founded = await load_context(db)
+    cache, location = await weather.load(db)
     token = seasons.read_preview_token(preview)
     if token:
         key, at_time = token
-        payload = seasons.active(at_time, stored, founded, preview_key=key)
+        conditions = weather.current(cache, location, at_time)
+        payload = seasons.active(at_time, stored, founded, preview_key=key, night=conditions["night"])
+        payload["weather"] = conditions
         response.headers["Cache-Control"] = "no-store"
         return payload
-    payload = seasons.active(None, stored, founded)
+    # Nacht nach der echten Sonne, Wind und Niederschlag vom Vereinsort (#666) - alles ohne Anmeldung, ohne Personenbezug.
+    conditions = weather.current(cache, location)
+    payload = seasons.active(None, stored, founded, night=conditions["night"])
+    payload["weather"] = conditions
     # Die Sekunde in „now“ würde jeden ETag brechen; für den Vergleich zählt nur, was gezeigt wird.
     etag = seasons.etag_for({k: v for k, v in payload.items() if k != "now"})
     response.headers["ETag"] = etag

@@ -30,7 +30,8 @@
 .tls-crawler { position: fixed; left: 0; bottom: -6px; animation: tls-crawl var(--crawl-duration, 20s) linear both; }
 
 /* Abseil-Spinne (#663): der Faden hängt in der Seite (scrollt mit), am Rand; schwingt im Wind, reißt ab und fliegt davon */
-@keyframes tls-thread-sway { 0% { transform: rotate(-2.2deg); } 100% { transform: rotate(2.2deg); } }
+/* Der Wind (#666) skaliert das Schwingen: --season-wind 0,3–1,6, Vorgabe 0,6 */
+@keyframes tls-thread-sway { 0% { transform: rotate(calc(-2.2deg * var(--season-wind, 0.6) / 0.6)); } 100% { transform: rotate(calc(2.2deg * var(--season-wind, 0.6) / 0.6)); } }
 @keyframes tls-thread-detach { 0% { transform: translate(0, 0) rotate(0deg); opacity: 1; } 100% { transform: translate(90px, -160px) rotate(14deg); opacity: 0; } }
 @keyframes tls-runner-legs { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(9deg); } }
 .tls-rappel { position: absolute; top: 0; width: 0; border-left: 1px solid rgba(170, 225, 240, 0.34); z-index: 40; pointer-events: none; transform-origin: top center; }
@@ -45,7 +46,7 @@
 .tls-rappel__runner .tls-spider__leg { animation: tls-runner-legs 0.28s ease-in-out infinite; }
 
 /* Hängende Fledermäuse (#661): am Ende einer Überschrift, unter einem Menüpunkt, am Löwen; klickbar */
-@keyframes tls-hbat-sway { 0%, 100% { rotate: -2.5deg; } 50% { rotate: 2.5deg; } }
+@keyframes tls-hbat-sway { 0%, 100% { rotate: calc(-2.5deg * var(--season-wind, 0.6) / 0.6); } 50% { rotate: calc(2.5deg * var(--season-wind, 0.6) / 0.6); } }
 @keyframes tls-hbat-twitch { 0%, 92%, 100% { transform: scaleX(1); } 94% { transform: scaleX(1.25); } 97% { transform: scaleX(0.9); } }
 @keyframes tls-bat-flap { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.45); } }
 .tls-hbats { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 58; }
