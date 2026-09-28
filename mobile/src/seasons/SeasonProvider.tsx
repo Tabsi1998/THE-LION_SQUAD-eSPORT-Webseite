@@ -60,6 +60,8 @@ export async function readStoredPreference(): Promise<SeasonPreference> {
   }
 }
 
+export type SeasonToast = { id: number; text: string };
+
 type SeasonContextValue = {
   ready: boolean;
   seasons: ActiveSeason[];
@@ -68,9 +70,12 @@ type SeasonContextValue = {
   setPreference: (value: SeasonPreference) => Promise<void>;
   reducedMotion: boolean;
   reload: () => Promise<void>;
+  /** Gruß als Overlay-Karte (#655): ein Text für ein paar Sekunden, unabhängig vom Screen-Layout. */
+  toast: SeasonToast | null;
+  showToast: (text: string, ms?: number) => void;
 };
 
-const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {} };
+const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {}, toast: null, showToast: () => {} };
 const SeasonContext = createContext<SeasonContextValue>(EMPTY);
 
 export function SeasonProvider({ children }: { children: React.ReactNode }) {
@@ -79,6 +84,16 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [stored, setStored] = useState<SeasonPreference>("on");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toast, setToast] = useState<SeasonToast | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((text: string, ms = 4000) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ id: Date.now(), text });
+    toastTimer.current = setTimeout(() => setToast(null), ms);
+  }, []);
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -135,8 +150,8 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     (payload?.seasons || []).filter((season) => (season.channels || []).includes("app")).forEach((season) => {
       byKey[season.key] = { ...season, effective: effectiveIntensity(season, preference, reducedMotion) };
     });
-    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load };
-  }, [payload, preference, reducedMotion, setPreference, load]);
+    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load, toast, showToast };
+  }, [payload, preference, reducedMotion, setPreference, load, toast, showToast]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }

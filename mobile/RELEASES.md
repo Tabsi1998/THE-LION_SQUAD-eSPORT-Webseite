@@ -193,6 +193,7 @@ Neueste oben.
 - `0.16.0-beta`: Build 76, kostenpflichtige Events in der App, Teilnehmer für Verwaltung und Vorstand, Melden und Blockieren (Meilenstein App 1.0.0, #396, #397, #414)
 - `1.0.0`: Build 79, erste Play-Store-Version – Updates über Google Play, kein eigener Installer mehr (Meilenstein App 1.0.0, #593, #592)
 - `1.0.1`: Build 80, saisonale Deko mit Halloween – Spinnweben, Fledermäuse, Kürbislaterne, Schalter unter Mehr → Darstellung (Meilenstein Jahreszeiten I, #636)
+- `1.0.2`: Build 81, Halloween-Feinschliff – Spinnen, große Fledermäuse, Nebel, Geist, je Screen anders, Gruß als Karte (Meilenstein Jahreszeiten I, #655)
 - `0.18.0-beta`: Build 78, Sticker und GIFs der Tastatur im Chat, Versammlungen und Abstimmungen, Konten verknüpfen (Meilenstein App 0.9.0-beta, #239)
 - `0.17.0-beta`: Build 77, Updates je nach Herkunft – Play-Installationen bekommen Googles Update-Dialog, Server-APK nur für Sideload (Meilenstein App 1.0.0, #421)
 - `0.2.0-beta`: Build 57, erste Version im neuen Schema
