@@ -213,6 +213,12 @@ async def count_message(db, user_id: str) -> None:
     now = now_utc().isoformat()
     await db.users.update_one({"id": user_id}, {"$inc": {"discord_messages_count": 1}, "$set": {"discord_last_message_at": now}})
     await db.discord_activity.update_one({"user_id": user_id, "day": club_day()}, {"$inc": {"count": 1}, "$setOnInsert": {"created_at": now}}, upsert=True)
+    # XP (#617): ein Punkt je Nachricht, höchstens 50 am Tag.
+    try:
+        from services import xp
+        await xp.grant(user_id, "discord_message", now)
+    except Exception:  # noqa: BLE001
+        pass
     # Erfolge „Discord-Aktiv“ sollen nicht auf den nächtlichen Durchlauf warten (#301: Schlange, je Person einmal).
     from services.achievement_queue import request_evaluation
     await request_evaluation([user_id], "discord_message")

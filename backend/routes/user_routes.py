@@ -11,6 +11,8 @@ from email_service import send_template
 from services.competition_privacy import registration_match_snapshot
 from services.competition_standings import registration_match_summary
 from services.membership_service import get_membership, derived_user_type, is_active_member
+from services import xp
+from services.levels import level_view
 from services.profile_references import empty_profile_references, personal_profile_references
 from services.visibility import user_can_see
 from services.notification_preferences import (
@@ -45,41 +47,7 @@ def _clean(u: dict) -> dict:
     return u
 
 
-def _achievement_level(points: int) -> dict:
-    points = max(int(points or 0), 0)
-    # Gentle curve: first levels come fast, later levels need visible commitment.
-    level = 1
-    while points >= (level * level * 100):
-        level += 1
-    current_floor = (level - 1) * (level - 1) * 100
-    next_floor = level * level * 100
-    span = max(next_floor - current_floor, 1)
-    progress = round(((points - current_floor) / span) * 100)
-    title = _achievement_level_title(level)
-    return {
-        "level": level,
-        "points": points,
-        "current_level_points": current_floor,
-        "next_level_points": next_floor,
-        "progress": max(0, min(progress, 100)),
-        "title": title,
-    }
-
-
-def _achievement_level_title(level: int) -> str:
-    if level >= 20:
-        return "Legendär"
-    if level >= 16:
-        return "Champion"
-    if level >= 12:
-        return "Elite"
-    if level >= 8:
-        return "Veteran"
-    if level >= 5:
-        return "Pro"
-    if level >= 3:
-        return "Challenger"
-    return "Rookie"
+# Level (#617): eine Kurve für alles in services/levels.py, der Stand je Person in services/xp.py.
 
 
 USER_NULLABLE_FIELDS = {
@@ -562,6 +530,7 @@ async def list_public_users(
         {"code": {"$in": tier_codes}}, {"_id": 0}).to_list(2000)} if tier_codes else {}
 
     from badges import compute_profile_completeness, _level_name, _color_for_level
+    xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": user_ids}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
 
     out = []
     for u in users:
@@ -581,7 +550,6 @@ async def list_public_users(
                     "points": t.get("points", 0),
                     "icon": t.get("icon"),
                 }
-        total_points = sum(tiers.get(a["tier_code"], {}).get("points", 0) for a in ua)
         out.append({
             "id": u["id"], "username": u["username"], "display_name": u.get("display_name"),
             "avatar_url": u.get("avatar_url"), "country": u.get("country"),
@@ -592,7 +560,7 @@ async def list_public_users(
             "profile_completeness": score,
             "achievements_count": len(ua),
             "top_achievement": top,
-            "achievement_level": _achievement_level(total_points),
+            "achievement_level": level_view((xp_docs.get(u["id"]) or {}).get("total", 0), (xp_docs.get(u["id"]) or {}).get("prestige", 0)),
         })
     if paged:
         return {"items": out, "total": total, "limit": safe_limit, "offset": safe_offset}
@@ -718,7 +686,7 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
             "group_accent": g.get("accent_color") if g else None,
         })
     total_points = sum(b.get("points", 0) for b in badges if not b.get("is_negative"))
-    achievement_level = _achievement_level(total_points)
+    achievement_level = await xp.view(user_id)
     # Tournament participation (only if public)
     tournaments = []
     f1_bests = []
@@ -899,16 +867,26 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
 
 @router.get("/me/level")
 async def get_my_level(me: dict = Depends(get_current_user)):
-    """Lightweight current achievement level for the logged-in user (level-up detection)."""
-    db = get_db()
-    neg_groups = {g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})}
-    tiers = await db.achievements.find({}, {"_id": 0, "code": 1, "points": 1}).to_list(4000)
-    points_map = {t["code"]: int(t.get("points", 0) or 0) for t in tiers}
-    awards = await db.user_achievements.find(
-        {"user_id": me["id"]}, {"_id": 0, "tier_code": 1, "group_code": 1}
-    ).to_list(2000)
-    total = sum(points_map.get(a["tier_code"], 0) for a in awards if a.get("group_code") not in neg_groups)
-    return _achievement_level(total)
+    """Der eigene Level-Stand (#617): XP, Level 1–60, Titel, Prestige - für Profil, Dashboard und Level-up."""
+    await xp.rebuild(me["id"])
+    return await xp.view(me["id"])
+
+
+@router.post("/me/prestige")
+async def prestige_me(me: dict = Depends(get_current_user)):
+    """Prestige (#617): ab Level 60, freiwillig - ein Stern, Level zurück auf 1, Erfolge bleiben; 24 Stunden rücknehmbar."""
+    try:
+        return await xp.prestige(me["id"])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.post("/me/prestige/undo")
+async def undo_prestige_me(me: dict = Depends(get_current_user)):
+    try:
+        return await xp.undo_prestige(me["id"])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @router.get("/me/notification-preferences")

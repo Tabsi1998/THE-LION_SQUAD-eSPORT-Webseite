@@ -111,6 +111,17 @@ async def _safe_scheduled_news():
         _log_task_failure("scheduled_news", exc)
 
 
+async def _safe_xp_baseline():
+    """XP (#617): Konten ohne Erstberechnung nachziehen, 200 je Lauf, bis nichts mehr fehlt."""
+    try:
+        from services.xp import rebuild_missing
+        n = await rebuild_missing(200)
+        if n:
+            logger.info(f"[scheduler] xp_baseline rebuilt={n}")
+    except Exception as exc:
+        _log_task_failure("xp_baseline", exc)
+
+
 async def _safe_prize_expiry():
     try:
         from services.prize_service import expire_overdue
@@ -618,6 +629,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("scheduled_news", _safe_scheduled_news), IntervalTrigger(seconds=60), id="scheduled_news",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("prize_expiry", _safe_prize_expiry), IntervalTrigger(minutes=60), id="prize_expiry",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("xp_baseline", _safe_xp_baseline), IntervalTrigger(seconds=60), id="xp_baseline",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)

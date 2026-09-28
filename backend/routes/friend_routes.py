@@ -147,6 +147,12 @@ async def accept_friend(friendship_id: str, me: dict = Depends(get_current_user)
     )
     await publish_user_change([me["id"], row["requester_id"]], "friends")
     try:
+        from services import xp
+        await xp.grant(me["id"], "friend", friendship_id)
+        await xp.grant(row["requester_id"], "friend", friendship_id)
+    except Exception:
+        pass
+    try:
         from badges import evaluate_user_progress
         await evaluate_user_progress(me["id"])
         await evaluate_user_progress(row["requester_id"])

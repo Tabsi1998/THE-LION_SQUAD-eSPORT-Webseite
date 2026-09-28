@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from datetime import date
 from database import get_db
 from auth import get_current_user, require_club_admin, get_optional_user, require_area, require_club_member
+from services.levels import level_view
 from services.membership_service import (
     upsert_membership, get_membership, get_user_with_membership,
     is_active_member, derived_user_type, VALID_STATUSES, VALID_TYPES,
@@ -122,40 +123,7 @@ def _age_from_birth_date(value: str | date | None) -> int | None:
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 
-def _achievement_level(points: int) -> dict:
-    points = max(int(points or 0), 0)
-    level = 1
-    while points >= (level * level * 100):
-        level += 1
-    current_floor = (level - 1) * (level - 1) * 100
-    next_floor = level * level * 100
-    span = max(next_floor - current_floor, 1)
-    progress = round(((points - current_floor) / span) * 100)
-    title = _achievement_level_title(level)
-    return {
-        "level": level,
-        "points": points,
-        "current_level_points": current_floor,
-        "next_level_points": next_floor,
-        "progress": max(0, min(progress, 100)),
-        "title": title,
-    }
-
-
-def _achievement_level_title(level: int) -> str:
-    if level >= 20:
-        return "Legendär"
-    if level >= 16:
-        return "Champion"
-    if level >= 12:
-        return "Elite"
-    if level >= 8:
-        return "Veteran"
-    if level >= 5:
-        return "Pro"
-    if level >= 3:
-        return "Challenger"
-    return "Rookie"
+# Level (#617): services/levels.py ist die einzige Kurve.
 
 
 def _title_for_position(position: dict, person: dict | None = None) -> str:
@@ -280,22 +248,11 @@ async def _account_map_for_profiles(db, rows: list[dict], public_only: bool = Tr
         "twitch_handle": 1,
     }
     users = await db.users.find(query, projection).to_list(2000)
-    neg_codes = [g["code"] async for g in db.achievement_groups.find(
-        {"is_negative": True}, {"_id": 0, "code": 1}
-    )]
-    awards = await db.user_achievements.find(
-        {"user_id": {"$in": list(set(user_ids))}, "group_code": {"$nin": neg_codes}},
-        {"_id": 0, "user_id": 1, "tier_code": 1},
-    ).to_list(10000)
-    tier_codes = list({award.get("tier_code") for award in awards if award.get("tier_code")})
-    tiers = {tier["code"]: tier for tier in await db.achievements.find(
-        {"code": {"$in": tier_codes}}, {"_id": 0, "code": 1, "points": 1}
-    ).to_list(2000)} if tier_codes else {}
-    points_by_user: dict[str, int] = {}
-    for award in awards:
-        points_by_user[award["user_id"]] = points_by_user.get(award["user_id"], 0) + int(tiers.get(award.get("tier_code"), {}).get("points") or 0)
+    # Level (#617) aus den XP je Person - eine Abfrage für alle.
+    xp_docs = {row["user_id"]: row async for row in db.user_xp.find({"user_id": {"$in": list(set(user_ids))}}, {"_id": 0, "user_id": 1, "total": 1, "prestige": 1})}
     for user in users:
-        user["achievement_level"] = _achievement_level(points_by_user.get(user["id"], 0))
+        row = xp_docs.get(user["id"]) or {}
+        user["achievement_level"] = level_view(row.get("total", 0), row.get("prestige", 0))
     return {user["id"]: user for user in users}
 
 

@@ -300,6 +300,12 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
     # Wortfilter (#417): zurückgehalten heißt gespeichert, aber nur für den Absender sichtbar - bis die Moderation entscheidet.
     verdict = await word_filter.screen_message(db, doc, kind="direct", context={"recipient_id": recipient["id"]})
     await db.direct_messages.insert_one(doc)
+    if verdict != "hold":
+        try:
+            from services import xp
+            await xp.grant(me["id"], "community_chat", doc["id"])
+        except Exception:  # noqa: BLE001
+            pass
     from services.change_events import publish_user_change
     if verdict == "hold":
         await publish_user_change([me["id"]], "messages")

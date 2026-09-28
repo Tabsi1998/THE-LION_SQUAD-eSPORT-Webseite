@@ -998,6 +998,12 @@ async def me(request: Request, response: Response, user: dict | None = Depends(g
         response.headers["X-Session-Refresh"] = "required"
     if user is not None:
         user = await with_areas(user)
+        # XP (#617): ein Tag mit Anmeldung - einmal je Tag, der Rest ist ein Blick in den Speicher.
+        try:
+            from services import xp
+            await xp.daily_login_once(user["id"])
+        except Exception:
+            pass
     return user
 
 

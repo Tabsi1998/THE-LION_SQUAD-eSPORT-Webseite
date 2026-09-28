@@ -410,6 +410,12 @@ async def _apply_event_checkin_rewards(event: dict, registration: dict) -> None:
         import logging
         logging.getLogger("tls.events").warning("event check-in season points failed", exc_info=True)
     try:
+        from services import xp
+        await xp.grant(user_id, "event_attended", f"{event['id']}:{registration['id']}")
+    except Exception:
+        import logging
+        logging.getLogger("tls.events").warning("event check-in xp failed", exc_info=True)
+    try:
         from badges import evaluate_user_progress
 
         await evaluate_user_progress(user_id)

@@ -29,21 +29,9 @@ _CACHE_TTL = 60
 
 
 def team_level_curve(points: int) -> dict:
-    points = max(int(points or 0), 0)
-    level = 1
-    while points >= (level * level * 100):
-        level += 1
-    current_floor = (level - 1) * (level - 1) * 100
-    next_floor = level * level * 100
-    span = max(next_floor - current_floor, 1)
-    progress = round(((points - current_floor) / span) * 100)
-    return {
-        "level": level,
-        "points": points,
-        "current_level_points": current_floor,
-        "next_level_points": next_floor,
-        "progress": max(0, min(progress, 100)),
-    }
+    """Team-Level: die alte Quadratkurve, seit #617 aus services/levels.py - Werte unverändert."""
+    from services.levels import legacy_square_curve
+    return legacy_square_curve(points)
 
 
 def _evaluate_achievements(stats: dict) -> list[dict]:

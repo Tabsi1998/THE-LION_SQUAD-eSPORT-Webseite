@@ -77,8 +77,11 @@ async def evaluate_self(user: dict = Depends(get_current_user)):
 
 
 @router.get("/leaderboard")
-async def achievements_leaderboard(limit: int = 24, viewer: dict | None = Depends(get_optional_user)):
-    """Public grind leaderboard ranked by achievement points (excl. negative groups)."""
+async def achievements_leaderboard(limit: int = 24, by: str = "points", viewer: dict | None = Depends(get_optional_user)):
+    """Public grind leaderboard ranked by achievement points (excl. negative groups) - or by level (#617)."""
+    if by == "level":
+        from services import xp
+        return await xp.leaderboard(limit)
     db = get_db()
     tiers = await db.achievements.find({}, {"_id": 0, "code": 1, "points": 1}).to_list(4000)
     points_map = {t["code"]: int(t.get("points", 0) or 0) for t in tiers}
@@ -341,6 +344,26 @@ async def admin_delete_tier(code: str, me: dict = Depends(require_area("content"
         raise HTTPException(404, "Tier nicht gefunden.")
     await db.user_achievements.delete_many({"tier_code": code})
     return {"ok": True}
+
+
+# ---- XP-Korrektur (#617) ----
+class XpCorrection(BaseModel):
+    user_id: str
+    amount: int = Field(ge=-100000, le=100000)
+    reason: str = Field(min_length=3, max_length=300)
+
+
+@admin_router.post("/xp")
+async def admin_xp_correction(body: XpCorrection, me: dict = Depends(require_area("content"))):
+    """XP von Hand berichtigen - plus oder minus, immer mit Grund, immer im Protokoll."""
+    from services import xp
+    db = get_db()
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    if body.amount == 0:
+        raise HTTPException(400, "Null XP ändern nichts.")
+    await xp.correct(body.user_id, body.amount, body.reason.strip(), me["id"])
+    return await xp.view(body.user_id)
 
 
 # ---- Manual award/revoke ----

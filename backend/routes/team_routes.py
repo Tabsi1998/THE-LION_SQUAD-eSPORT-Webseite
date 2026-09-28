@@ -416,6 +416,12 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     }
     verdict = await word_filter.screen_message(db, message, kind="team", context={"team_id": team_id, "member_ids": [*(team.get("member_ids") or []), me["id"]]})
     await db.team_chat_messages.insert_one(message)
+    if verdict != "hold":
+        try:
+            from services import xp
+            await xp.grant(me["id"], "team_chat", message["id"])
+        except Exception:  # noqa: BLE001
+            pass
     from services.change_events import publish_user_change
     if verdict == "hold":
         await publish_user_change([me["id"]], "teams")
