@@ -14,6 +14,7 @@ import { recordSignal } from "../signals";
 import { emitSound } from "../audio";
 import { MoonInSky } from "../MoonInSky";
 import { useSeason } from "../SeasonContext";
+import { ScareToggle, Scares } from "./Scare";
 import "./halloween.css";
 
 // Halloween (#635, #655, #658, #660–#664, Runde IV): dunkel und edel, und man kann Dingen beim Entstehen zuschauen.
@@ -229,6 +230,7 @@ export function Corners({ season }) {
       )}
       <RappelSpider spec={layout.rappel} active={moving} />
       <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={LOAD_SALT} />
+      {moving && <Scares season={season} />}
     </>
   );
 }
@@ -482,4 +484,4 @@ export function sounds({ season: current }) {
   return palette({ night: Boolean(current?.data?.night) });
 }
 
-export const season = { key: "halloween", accent: ACCENT, Corners, Backdrop, Footer, Widget, skyLayers, sounds };
+export const season = { key: "halloween", accent: ACCENT, Corners, Backdrop, Footer, Widget, skyLayers, sounds, ScareToggle };

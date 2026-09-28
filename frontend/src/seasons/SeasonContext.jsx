@@ -80,6 +80,26 @@ export function SeasonProvider({ children, channel = "web" }) {
     }
   }, []);
 
+  // Jumpscares (#680): ob diese Person welche bekommen darf (ab 18, Geburtsdatum), sagt der Server - persönlich, nie gecacht.
+  const [scaresAllowed, setScaresAllowed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setScaresAllowed(false);
+      return undefined;
+    }
+    api.get("/seasonal/me", { skipInvalidation: true })
+      .then(({ data }) => {
+        if (!cancelled) setScaresAllowed(Boolean(data?.scares_allowed));
+      })
+      .catch(() => {
+        if (!cancelled) setScaresAllowed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   // Laden, dann nach Plan nachfragen; nach einer Vorschau genau bei ihrem Ende noch einmal.
   useEffect(() => {
     load();
@@ -158,14 +178,15 @@ export function SeasonProvider({ children, channel = "web" }) {
       weather: payload?.weather || null,
       // Ort des Vereins (#681): Breite/Länge für den Himmel - fehlt er, rechnen die Module mit Innsbruck.
       location: payload?.location || null,
+      scaresAllowed,
       reload: load,
     };
-  }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load]);
+  }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load, scaresAllowed]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
 
-const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, location: null, reload: () => {} };
+const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, location: null, scaresAllowed: false, reload: () => {} };
 
 export function useSeason() {
   return useContext(SeasonContext) || EMPTY;

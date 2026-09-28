@@ -184,6 +184,35 @@ export const instruments = {
   },
 };
 
+/** Jumpscare-Klänge (#680): Fauchen der Katze, Flüstern des Schattens, der Schlag zum Auftritt - alle im Rahmen der Regler. */
+instruments.hiss = function hiss(ctx, dest, { noise }) {
+  const t0 = ctx.currentTime;
+  noiseBurst(ctx, dest, noise, { t: t0, seconds: 0.55, type: "bandpass", freq: 2600, q: 1.2, sweep: 4200, peak: 0.55, attack: 0.03 });
+  noiseBurst(ctx, dest, noise, { t: t0 + 0.05, seconds: 0.4, type: "highpass", freq: 5000, peak: 0.25, attack: 0.02 });
+  thump(ctx, dest, { t: t0, from: 160, to: 70, seconds: 0.12, peak: 0.3 });
+};
+instruments.whisper = function whisper(ctx, dest, { noise }) {
+  const t0 = ctx.currentTime;
+  for (let i = 0; i < 5; i += 1) {
+    noiseBurst(ctx, dest, noise, { t: t0 + i * 0.17, seconds: 0.14, type: "bandpass", freq: 1500 + (i % 2) * 900, q: 4, sweep: 900, peak: 0.28, attack: 0.03 });
+  }
+  const sub = ctx.createOscillator();
+  sub.type = "sine";
+  sub.frequency.value = 48;
+  const gain = ctx.createGain();
+  envelope(gain.gain, t0, 0.25, 0.3, 1.0);
+  sub.connect(gain);
+  gain.connect(dest);
+  sub.start(t0);
+  sub.stop(t0 + 1.4);
+};
+instruments.scare_hit = function scareHit(ctx, dest, { noise }) {
+  const t0 = ctx.currentTime;
+  thump(ctx, dest, { t: t0, from: 110, to: 32, seconds: 0.45, peak: 0.85 });
+  noiseBurst(ctx, dest, noise, { t: t0, seconds: 0.2, type: "lowpass", freq: 900, peak: 0.5, attack: 0.004 });
+  noiseBurst(ctx, dest, noise, { t: t0 + 0.02, seconds: 0.9, type: "bandpass", freq: 250, q: 0.8, sweep: 90, peak: 0.35, attack: 0.05 });
+};
+
 /** D-Moll für die Glocken - die Töne, aus denen die Motive gewürfelt werden (Hz). */
 export const BELL_NOTES = [146.83, 174.61, 220.0, 233.08, 261.63, 293.66];
 

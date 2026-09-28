@@ -16,10 +16,13 @@ function useMountedSeasons() {
 
 export function SeasonWidgetSlot() {
   const mounted = useMountedSeasons();
+  const { scaresAllowed } = useSeason();
   const withWidget = mounted.filter(({ module }) => module.Widget);
   // Der Klang-Schalter (#679) steht neben dem Widget, sobald eine Saison mit Klängen läuft - nicht bei „dezent“.
   const withSounds = mounted.some(({ season, module }) => module.sounds && season.effective !== "subtle");
-  if (!withWidget.length && !withSounds) return null;
+  // Der Schreck-Schalter (#680) nur für Personen, die Schrecken bekommen dürften (ab 18, Server-Flag).
+  const scareToggles = scaresAllowed ? mounted.filter(({ season, module }) => module.ScareToggle && season.effective !== "subtle") : [];
+  if (!withWidget.length && !withSounds && !scareToggles.length) return null;
   return (
     <div className="tls-season-widget-slot" data-testid="season-widget-slot">
       {withWidget.map(({ season, module }) => {
@@ -27,6 +30,10 @@ export function SeasonWidgetSlot() {
         return <Widget key={season.key} season={season} />;
       })}
       {withSounds && <SoundToggle />}
+      {scareToggles.map(({ season, module }) => {
+        const Toggle = module.ScareToggle;
+        return <Toggle key={`${season.key}-scare`} />;
+      })}
     </div>
   );
 }

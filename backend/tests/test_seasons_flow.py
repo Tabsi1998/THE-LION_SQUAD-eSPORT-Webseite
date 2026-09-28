@@ -256,3 +256,23 @@ async def test_persoenlicher_schalter_am_konto(flow):
     assert (await flow.patch("/api/users/me", json={"seasonal_decorations": "laut"})).status_code == 422
     stored = await flow.db.users.find_one({"id": user["id"]})
     assert stored["seasonal_decorations"] == "subtle"
+
+
+@pytest.mark.asyncio
+async def test_schreck_freigabe_nur_ab_18_mit_geburtsdatum(flow):
+    """Jumpscares (#680): der Server entscheidet - ohne Anmeldung, ohne Geburtsdatum oder unter 18 nie."""
+    assert seasons.adult_from_birth_date("2000-01-01", date(2026, 10, 30)) is True
+    assert seasons.adult_from_birth_date("2008-10-31", date(2026, 10, 30)) is False, "einen Tag vor dem 18. Geburtstag"
+    assert seasons.adult_from_birth_date("2008-10-30", date(2026, 10, 30)) is True, "am 18. Geburtstag"
+    assert seasons.adult_from_birth_date(None) is False and seasons.adult_from_birth_date("kaputt") is False
+    flow.act_as(None)
+    res = await flow.get("/api/seasonal/me")
+    assert res.status_code == 200 and res.json() == {"scares_allowed": False}
+    assert res.headers.get("cache-control") == "private, no-store"
+    user = await flow.add_user(name="Erwachsen")
+    flow.act_as(user)
+    assert (await flow.get("/api/seasonal/me")).json() == {"scares_allowed": False}, "ohne Geburtsdatum nichts"
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"birth_date": "2000-05-05"}})
+    assert (await flow.get("/api/seasonal/me")).json() == {"scares_allowed": True}
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"birth_date": "2012-05-05"}})
+    assert (await flow.get("/api/seasonal/me")).json() == {"scares_allowed": False}

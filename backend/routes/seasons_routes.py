@@ -8,8 +8,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Query, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
 
+from auth import get_optional_user
 from database import get_db
 from services import seasons, weather
 
@@ -57,3 +58,15 @@ async def seasons_calendar(response: Response, year: int | None = Query(None, ge
     year = year or datetime.now(tz=seasons.VIENNA).year
     response.headers["Cache-Control"] = "public, max-age=3600"
     return {"year": year, "items": seasons.calendar(year, founded)}
+
+
+@router.get("/me")
+async def seasonal_me(response: Response, user: dict | None = Depends(get_optional_user)):
+    """Was die Saison für diese Person darf (#680): Jumpscares nur ab 18 mit Geburtsdatum im Profil. Persönlich,
+    deshalb nie gecacht; ohne Anmeldung nichts."""
+    response.headers["Cache-Control"] = "private, no-store"
+    if not user or not user.get("id"):
+        return {"scares_allowed": False}
+    # Das Geburtsdatum frisch aus der Datenbank - der angemeldete Nutzer aus dem Token trägt es nicht immer mit.
+    stored = await get_db().users.find_one({"id": user["id"]}, {"_id": 0, "birth_date": 1}) or {}
+    return {"scares_allowed": seasons.adult_from_birth_date(stored.get("birth_date") or user.get("birth_date"))}

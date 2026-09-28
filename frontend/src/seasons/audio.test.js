@@ -200,7 +200,7 @@ test("Halloween-Palette: jedes Instrument baut einen endlichen Graph mit Start u
   expect(ctx.log.starts).toBeGreaterThan(20);
   expect(ctx.log.stops).toBe(ctx.log.starts);
   expect(ctx.log.connections).toBeGreaterThan(ctx.log.starts);
-  expect(Object.keys(instruments).sort()).toEqual(["bat_scare", "cat_walk", "ghost", "grave", "lantern", "pumpkin", "web_fly", "web_grab", "web_tear"]);
+  expect(Object.keys(instruments).sort()).toEqual(["bat_scare", "cat_walk", "ghost", "grave", "hiss", "lantern", "pumpkin", "scare_hit", "web_fly", "web_grab", "web_tear", "whisper"]);
 });
 
 test("Halloween-Musik: Drone und Wind laufen, bei Nacht kommen gewürfelte Glocken und ein Herzschlag, am Tag nicht; stop räumt", () => {
