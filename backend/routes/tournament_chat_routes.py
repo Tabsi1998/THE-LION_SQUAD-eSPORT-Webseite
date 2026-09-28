@@ -205,6 +205,11 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
     verdict = await word_filter.screen_message(db, doc, kind="tournament", context={"tournament_id": tid})
     await db.tournament_chat_messages.insert_one(doc)
     if verdict != "hold":
+        try:
+            from services import xp
+            await xp.grant(me["id"], "community_chat", doc["id"])
+        except Exception:  # noqa: BLE001
+            pass
         mentioned_user_ids = await _notify_tournament_mentions(db, tournament, me, doc)
         await _notify_tournament_chat_message(db, tournament, me, doc, mentioned_user_ids)
     try:

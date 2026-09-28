@@ -872,6 +872,11 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
     await db.match_chat_messages.insert_one(doc)
     if verdict != "hold":
         try:
+            from services import xp
+            await xp.grant(me["id"], "community_chat", doc["id"])
+        except Exception:  # noqa: BLE001
+            pass
+        try:
             await _notify_match_chat_message(db, match, collection, me, doc)
         except Exception:
             pass

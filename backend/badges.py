@@ -26,6 +26,7 @@ from achievement_catalog import (
     CONDITION_KEY_STATUS, apply_category_overrides, annotate_tier, material_color, material_name,
 )
 from services.membership_service import get_membership, is_active_member
+from services import xp
 from services.competition_read import load_competition_read_model, load_registration_matches
 from services.competition_standings import (
     registration_badge_match_progress,
@@ -77,6 +78,7 @@ async def seed_badges():
     await db.user_achievements.create_index([("user_id", 1), ("earned_at", -1)])
     await db.achievements.create_index([("group_code", 1), ("level", 1)])
     await db.achievements.create_index([("group_code", 1), ("rank", 1)])
+    await xp.ensure_indexes(db)
     # Erfolge II (#611): Vergaben mit Material versehen und die Abbildung alt → neu anwenden.
     try:
         from services.achievement_migration import run_all
@@ -130,6 +132,11 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
         # concurrent evaluation already awarded this tier — not an error
         return False
     if not group.get("is_negative"):
+        # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code.
+        try:
+            await xp.grant_achievement(user_id, tier)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"xp for achievement failed: {e}")
         try:
             from services.crown_events import schedule_crown_sync
             schedule_crown_sync()
@@ -569,19 +576,34 @@ async def evaluate_membership_badges(user_id: str):
     await evaluate_user_progress(user_id)
 
 
+async def _xp(user_id: str | None, source: str, ref: str, **kwargs) -> None:
+    """XP (#617) gutschreiben, ohne dass ein Fehler den Auslöser stört."""
+    if not user_id:
+        return
+    try:
+        await xp.grant(user_id, source, ref, **kwargs)
+    except Exception:  # noqa: BLE001
+        logger.debug("xp grant failed", exc_info=True)
+
+
 async def on_tournament_registered(user_id: str, tournament_id: str):
+    await _xp(user_id, "tournament_registered", tournament_id)
     await evaluate_user_progress(user_id)
 
 
 async def on_checked_in(user_id: str, tournament_id: str):
+    await _xp(user_id, "checked_in", tournament_id)
     await evaluate_user_progress(user_id)
 
 
 async def on_match_completed(winner_user_id: str, loser_user_id: str | None,
                               tournament_id: str, match_id: str):
     if winner_user_id:
+        await _xp(winner_user_id, "match_played", match_id)
+        await _xp(winner_user_id, "match_won", match_id)
         await evaluate_user_progress(winner_user_id)
     if loser_user_id:
+        await _xp(loser_user_id, "match_played", match_id)
         await evaluate_user_progress(loser_user_id)
 
 
@@ -589,8 +611,12 @@ async def on_tournament_completed(tournament_id: str, placements: list[dict]):
     for p in placements:
         uid = p.get("user_id")
         if uid:
+            await _xp(uid, "tournament_completed", tournament_id)
+            rank = p.get("rank")
+            if rank in (1, 2, 3):
+                await _xp(uid, f"podium_{rank}", tournament_id)
             await evaluate_user_progress(uid)
-            if p.get("rank") == 4:
+            if rank == 4:
                 await award_achievement(uid, "neg_holzmedaille", {"tournament_id": tournament_id})
 
 
@@ -605,14 +631,20 @@ async def on_lap_submitted(user_id: str, challenge_id: str, track_id: str,
             await award_achievement(user_id, "neg_invalid_lap",
                                     {"challenge_id": challenge_id, "invalids": invalids})
         return
+    stamp = now_utc().isoformat()
+    await _xp(user_id, "lap_valid", f"{challenge_id}:{track_id}:{stamp}")
+    if was_new_leader:
+        await _xp(user_id, "pole", f"{challenge_id}:{track_id}:{stamp}")
     await evaluate_user_progress(user_id)
 
 
 async def on_team_created(user_id: str, team_id: str):
+    await _xp(user_id, "team_joined", team_id)
     await evaluate_user_progress(user_id)
 
 
 async def on_team_joined(user_id: str, team_id: str):
+    await _xp(user_id, "team_joined", team_id)
     await evaluate_user_progress(user_id)
 
 
@@ -696,6 +728,7 @@ async def on_season_completed(season_id: str) -> dict:
     ]
     for s in standings:
         uid = s.get("user_id")
+        await _xp(uid, "season_completed", season_id)
         rank = s.get("rank")
         if not uid or not rank:
             continue
