@@ -28,7 +28,7 @@ test("lädt die Texte, Speichern schickt Texte, Listen und Rückfallfelder", asy
   expect(screen.getByTestId("about-pillars")).toHaveValue("Fairplay\nSpaß");
   expect(screen.getByTestId("about-founded-year")).toHaveValue("2019");
   expect(screen.getByTestId("about-founded-year")).not.toBeDisabled();
-  expect(screen.getByTestId("about-live-data")).toHaveTextContent("3");
+  expect(screen.getByTestId("about-numbers-picker")).toHaveTextContent("3");
 
   fireEvent.change(screen.getByTestId("about-hero-title"), { target: { value: "Neu" } });
   fireEvent.change(screen.getByTestId("about-pillars"), { target: { value: "Fairplay\n\n Mut " } });
@@ -36,8 +36,24 @@ test("lädt die Texte, Speichern schickt Texte, Listen und Rückfallfelder", asy
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(1));
   const [url, payload] = apiMock.put.mock.calls[0];
   expect(url).toBe("/home/about/admin");
-  expect(payload).toEqual(expect.objectContaining({ hero_title: "Neu", pillars: ["Fairplay", "Mut"], offline_items: ["Grillen"], founded_year: 2019, nonprofit: true, purpose: "Zweck" }));
+  expect(payload).toEqual(expect.objectContaining({ hero_title: "Neu", pillars: ["Fairplay", "Mut"], offline_items: ["Grillen"], founded_year: 2019, nonprofit: true, purpose: "Zweck", numbers_shown: ["prizes", "tournaments_completed", "members", "years_active"] }));
   await waitFor(() => expect(toastMock.success).toHaveBeenCalled());
+});
+
+test("Zahlen wählen und ordnen (#621): Häkchen, Pfeile, Preisgeld im Hinweis", async () => {
+  mockApi({ source: "manual" });
+  apiMock.get.mockResolvedValue({ data: { texts: { ...TEXTS, numbers_shown: ["members", "prizes"] }, defaults: {}, organization: { source: "manual" }, numbers: { members: 3, prizes: 4, prize_money_eur: 120.5, years_active: 0 }, games: 2, offline_events: 1 } });
+  render(<MemoryRouter><AdminAboutPage /></MemoryRouter>);
+  const picker = await screen.findByTestId("about-numbers-picker");
+  expect(picker).toHaveTextContent("4 (120,5 € Preisgeld)");
+  expect(picker).toHaveTextContent("0 – Gründungsjahr fehlt");
+  expect(screen.getByTestId("about-number-members-toggle")).toBeChecked();
+  expect(screen.getByTestId("about-number-events-toggle")).not.toBeChecked();
+  fireEvent.click(screen.getByTestId("about-number-prizes-up"));
+  fireEvent.click(screen.getByTestId("about-number-events-toggle"));
+  fireEvent.submit(screen.getByTestId("about-form"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledTimes(1));
+  expect(apiMock.put.mock.calls[0][1].numbers_shown).toEqual(["prizes", "members", "events"]);
 });
 
 test("mit Vereinsdaten aus Dolibarr sind Gründung und gemeinnützig gesperrt", async () => {

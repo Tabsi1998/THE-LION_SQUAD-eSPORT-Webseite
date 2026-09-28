@@ -78,7 +78,7 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
 test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Daten", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/board")) return { data: [{ id: "p1", is_active: true, display_title: "Obfrau", user: { display_name: "Obfrau Otti", slug: "otti" } }] };
-    return { data: { ...stateWith(3), news: NEWS, club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5 } } };
+    return { data: { ...stateWith(3), news: NEWS, club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5, prizes: 0 }, club_numbers_shown: ["members", "tournaments", "participations", "events", "prizes"] } };
   });
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");

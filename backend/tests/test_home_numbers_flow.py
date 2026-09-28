@@ -49,5 +49,8 @@ async def test_club_numbers_count_only_public_and_real_things(flow):
     flow.act_as(None)
     response = await flow.get("/api/home/state")
     assert response.status_code == 200, response.text
-    # Auszeichnungen (#406) zählen mit - die Startseite zeigt sie nicht, „Über den Verein“ schon.
-    assert response.json()["club_numbers"] == {"members": 2, "tournaments": 1, "events": 2, "participations": 3, "achievements": 0}
+    # Seit #621 zählen auch Preise, gespielte Turniere und Jahre; die Seite zeigt, was der Betreiber wählt.
+    numbers = response.json()["club_numbers"]
+    assert {k: numbers[k] for k in ("members", "tournaments", "events", "participations", "achievements")} == {"members": 2, "tournaments": 1, "events": 2, "participations": 3, "achievements": 0}
+    assert numbers["tournaments_completed"] == 1 and numbers["prizes"] == 0 and numbers["years_active"] == 0
+    assert response.json()["club_numbers_shown"] == ["prizes", "tournaments_completed", "members", "years_active"]

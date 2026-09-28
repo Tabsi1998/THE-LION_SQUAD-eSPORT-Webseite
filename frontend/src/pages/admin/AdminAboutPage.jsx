@@ -6,7 +6,8 @@ import { AdminFormPage, FormActions, FormGrid, FormSection } from "@/components/
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
-import { ExternalLink } from "lucide-react";
+import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import { DEFAULT_SHOWN, NUMBER_KEYS, NUMBER_LABELS, moveShown, toggleShown } from "@/lib/clubNumbers";
 
 // Über uns pflegen (#406): die Leitbild-Texte der Seite „Über den Verein“ - Hero, Werte, Spiele,
 // Offline, Aufruf - als eigene Seite im Rahmen der Admin-Formulare. Was die Seite sonst zeigt
@@ -23,6 +24,7 @@ export function textsToForm(texts) {
   form.offline_items = (texts?.offline_items || []).join("\n");
   form.founded_year = texts?.founded_year ? String(texts.founded_year) : "";
   form.nonprofit = texts?.nonprofit === true;
+  form.numbers_shown = Array.isArray(texts?.numbers_shown) && texts.numbers_shown.length ? texts.numbers_shown.filter((key) => NUMBER_LABELS[key]) : [...DEFAULT_SHOWN];
   return form;
 }
 
@@ -33,7 +35,41 @@ export function formToPayload(form) {
   payload.offline_items = String(form.offline_items || "").split("\n").map((line) => line.trim()).filter(Boolean);
   payload.founded_year = /^\d{4}$/.test(String(form.founded_year || "").trim()) ? Number(form.founded_year) : null;
   payload.nonprofit = Boolean(form.nonprofit);
+  payload.numbers_shown = (form.numbers_shown || []).filter((key) => NUMBER_LABELS[key]);
   return payload;
+}
+
+// Der Verein in Zahlen (#621): Häkchen je Zähler mit dem echten Stand, Reihenfolge per Pfeil.
+export function numberValueText(key, numbers) {
+  const value = Number(numbers?.[key] || 0);
+  if (key === "prizes" && Number(numbers?.prize_money_eur || 0) > 0) return `${value} (${Number(numbers.prize_money_eur).toLocaleString("de-AT")} € Preisgeld)`;
+  if (key === "years_active" && !value) return "0 – Gründungsjahr fehlt";
+  return String(value);
+}
+
+function NumbersPicker({ shown, numbers, onChange }) {
+  const order = [...shown, ...NUMBER_KEYS.filter((key) => !shown.includes(key))];
+  return (
+    <ul className="space-y-1.5" data-testid="about-numbers-picker">
+      {order.map((key) => {
+        const active = shown.includes(key);
+        const position = shown.indexOf(key);
+        return (
+          <li key={key} className="flex items-center gap-2 text-sm" data-testid={`about-number-${key}`}>
+            <input type="checkbox" checked={active} onChange={() => onChange(toggleShown(shown, key))} className="accent-[#29B6E8]" data-testid={`about-number-${key}-toggle`} aria-label={NUMBER_LABELS[key][0]} />
+            <span className={active ? "text-white" : "text-white/50"}>{NUMBER_LABELS[key][0]}</span>
+            <span className="text-xs text-white/45">{numberValueText(key, numbers)}</span>
+            {active && (
+              <span className="ml-auto inline-flex gap-1">
+                <button type="button" onClick={() => onChange(moveShown(shown, key, -1))} disabled={position === 0} aria-label={`${NUMBER_LABELS[key][0]} nach oben`} data-testid={`about-number-${key}-up`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
+                <button type="button" onClick={() => onChange(moveShown(shown, key, 1))} disabled={position === shown.length - 1} aria-label={`${NUMBER_LABELS[key][0]} nach unten`} data-testid={`about-number-${key}-down`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export default function AdminAboutPage() {
@@ -94,9 +130,12 @@ export default function AdminAboutPage() {
               <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />
               <p className="text-xs text-white/45">ZVR und Sitz kommen aus den Vereinsdaten (Einstellungen → Rechtliches).</p>
             </FormSection>
+            <FormSection title="Der Verein in Zahlen" accent={ACCENT} testId="about-numbers">
+              <p className="text-xs text-white/50">Gezählt, nicht getippt. Häkchen zeigen die Kachel auf „Über uns“ und der Startseite, die Pfeile bestimmen die Reihenfolge. Zähler mit null bleiben von selbst weg.</p>
+              <NumbersPicker shown={form.numbers_shown || []} numbers={numbers} onChange={(next) => set("numbers_shown", next)} />
+            </FormSection>
             <FormSection title="Was die Seite sonst zeigt" accent={ACCENT} plain testId="about-live-data">
               <ul className="text-xs text-white/60 space-y-1.5">
-                <li><span className="text-white">{numbers.members ?? 0}</span> Mitglieder, <span className="text-white">{numbers.tournaments ?? 0}</span> Turniere, <span className="text-white">{numbers.events ?? 0}</span> Events, <span className="text-white">{numbers.participations ?? 0}</span> Turnierteilnahmen, <span className="text-white">{numbers.achievements ?? 0}</span> Auszeichnungen – gezählt, nicht getippt.</li>
                 <li><span className="text-white">{data.games ?? 0}</span> Spiele aus <Link to="/admin/games" className="underline">Admin → Spiele</Link> mit der Zahl der Turniere je Spiel.</li>
                 <li>Ansprechpartner aus dem <Link to="/admin/board" className="underline">Vorstand</Link> – nur freigegebene Namen.</li>
                 <li><span className="text-white">{data.offline_events ?? 0}</span> vergangene Vereinsevents mit Bild als kleine Galerie (Typ Vereinsabend, LAN, Grillabend, Messe …).</li>
