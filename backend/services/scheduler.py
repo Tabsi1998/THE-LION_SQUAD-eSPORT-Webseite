@@ -19,6 +19,7 @@ from contextlib import suppress
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger("tls.scheduler")
@@ -109,6 +110,16 @@ async def _safe_scheduled_news():
             logger.info(f"[scheduler] scheduled_news {res}")
     except Exception as exc:
         _log_task_failure("scheduled_news", exc)
+
+
+async def _safe_achievements_reconcile():
+    """Erfolge (#616): nachts alle Aktiven der letzten sieben Tage komplett neu rechnen, Abweichungen ins Protokoll."""
+    try:
+        from services.achievement_counters import reconcile
+        result = await reconcile()
+        logger.info(f"[scheduler] achievements_reconcile {result}")
+    except Exception as exc:
+        _log_task_failure("achievements_reconcile", exc)
 
 
 async def _safe_xp_baseline():
@@ -632,6 +643,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("xp_baseline", _safe_xp_baseline), IntervalTrigger(seconds=60), id="xp_baseline",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("achievements_reconcile", _safe_achievements_reconcile), CronTrigger(hour=4, minute=10, timezone="Europe/Vienna"),
+                  id="achievements_reconcile", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",

@@ -137,6 +137,12 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
             await xp.grant_achievement(user_id, tier)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"xp for achievement failed: {e}")
+        # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf.
+        try:
+            from services.achievement_queue import request_evaluation
+            await request_evaluation([user_id], "award", sources={"achievement"})
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"queue after award failed: {e}")
         try:
             from services.crown_events import schedule_crown_sync
             schedule_crown_sync()
@@ -448,7 +454,8 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
     progress: dict = {}
     if user_id:
         awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).to_list(500)
-        progress = await compute_user_progress(user_id)
+        from services import achievement_counters
+        progress = await achievement_counters.stats(user_id)
     awarded_codes = {a["tier_code"]: a for a in awards}
     earned_group_codes = {a.get("group_code") for a in awards if a.get("group_code")}
 
@@ -548,9 +555,13 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
 
 
 # ---------------- Auto-eval ----------------
-async def evaluate_user_progress(user_id: str) -> int:
+async def evaluate_user_progress(user_id: str, sources=None) -> int:
+    """Stufen prüfen und vergeben. Mit ``sources`` (#616) werden nur die betroffenen Zähler neu gerechnet
+    und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles."""
     db = get_db()
-    counters = await compute_user_progress(user_id)
+    from services import achievement_counters
+    counters = await achievement_counters.refresh(user_id, sources)
+    only_keys = None if not sources else (achievement_counters.keys_for_sources(sources) | achievement_counters.LEGACY_KEYS)
     active_member = is_active_member(await get_membership(user_id))
     earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
     new_count = 0
@@ -563,6 +574,8 @@ async def evaluate_user_progress(user_id: str) -> int:
         ck = t.get("condition_key")
         target = t.get("progress_target") or 0
         if not ck or not target:
+            continue
+        if only_keys is not None and ck not in only_keys:
             continue
         if counters.get(ck, 0) >= target:
             ok = await award_achievement(user_id, t["code"], {"auto_progress": True, "current": counters.get(ck), "target": target})
@@ -588,12 +601,12 @@ async def _xp(user_id: str | None, source: str, ref: str, **kwargs) -> None:
 
 async def on_tournament_registered(user_id: str, tournament_id: str):
     await _xp(user_id, "tournament_registered", tournament_id)
-    await evaluate_user_progress(user_id)
+    await evaluate_user_progress(user_id, {"tournament"})
 
 
 async def on_checked_in(user_id: str, tournament_id: str):
     await _xp(user_id, "checked_in", tournament_id)
-    await evaluate_user_progress(user_id)
+    await evaluate_user_progress(user_id, {"tournament"})
 
 
 async def on_match_completed(winner_user_id: str, loser_user_id: str | None,
@@ -601,10 +614,10 @@ async def on_match_completed(winner_user_id: str, loser_user_id: str | None,
     if winner_user_id:
         await _xp(winner_user_id, "match_played", match_id)
         await _xp(winner_user_id, "match_won", match_id)
-        await evaluate_user_progress(winner_user_id)
+        await evaluate_user_progress(winner_user_id, {"match", "tournament"})
     if loser_user_id:
         await _xp(loser_user_id, "match_played", match_id)
-        await evaluate_user_progress(loser_user_id)
+        await evaluate_user_progress(loser_user_id, {"match", "tournament"})
 
 
 async def on_tournament_completed(tournament_id: str, placements: list[dict]):
@@ -615,7 +628,7 @@ async def on_tournament_completed(tournament_id: str, placements: list[dict]):
             rank = p.get("rank")
             if rank in (1, 2, 3):
                 await _xp(uid, f"podium_{rank}", tournament_id)
-            await evaluate_user_progress(uid)
+            await evaluate_user_progress(uid, {"tournament", "season"})
             if rank == 4:
                 await award_achievement(uid, "neg_holzmedaille", {"tournament_id": tournament_id})
 
@@ -635,17 +648,17 @@ async def on_lap_submitted(user_id: str, challenge_id: str, track_id: str,
     await _xp(user_id, "lap_valid", f"{challenge_id}:{track_id}:{stamp}")
     if was_new_leader:
         await _xp(user_id, "pole", f"{challenge_id}:{track_id}:{stamp}")
-    await evaluate_user_progress(user_id)
+    await evaluate_user_progress(user_id, {"fastlap"})
 
 
 async def on_team_created(user_id: str, team_id: str):
     await _xp(user_id, "team_joined", team_id)
-    await evaluate_user_progress(user_id)
+    await evaluate_user_progress(user_id, {"team"})
 
 
 async def on_team_joined(user_id: str, team_id: str):
     await _xp(user_id, "team_joined", team_id)
-    await evaluate_user_progress(user_id)
+    await evaluate_user_progress(user_id, {"team"})
 
 
 # ---------- Phase B v4.1 — Negative incident trigger ----------

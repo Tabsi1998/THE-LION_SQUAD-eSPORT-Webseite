@@ -171,3 +171,6 @@ export const useAuth = () => {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 };
+
+// Für Seiten, die auch ohne Anmeldeprovider laufen (Tests, Einbettungen): null statt Fehler.
+export const useOptionalAuth = () => useContext(AuthContext) || null;
