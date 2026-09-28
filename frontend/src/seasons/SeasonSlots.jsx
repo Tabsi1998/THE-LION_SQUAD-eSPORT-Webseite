@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useSeason } from "./SeasonContext";
 import { isQuietPath, useSeasonModules } from "./SeasonStage";
+import { SoundToggle } from "./SoundToggle";
 
 // Zwei Plätze im Layout (#634): das Widget neben dem Logo (klickbar, mit Tastatur erreichbar) und die
 // Deko im Footer. Beide zeigen nur, was die Bühne auch zeigt.
@@ -16,13 +17,16 @@ function useMountedSeasons() {
 export function SeasonWidgetSlot() {
   const mounted = useMountedSeasons();
   const withWidget = mounted.filter(({ module }) => module.Widget);
-  if (!withWidget.length) return null;
+  // Der Klang-Schalter (#679) steht neben dem Widget, sobald eine Saison mit Klängen läuft - nicht bei „dezent“.
+  const withSounds = mounted.some(({ season, module }) => module.sounds && season.effective !== "subtle");
+  if (!withWidget.length && !withSounds) return null;
   return (
     <div className="tls-season-widget-slot" data-testid="season-widget-slot">
       {withWidget.map(({ season, module }) => {
         const Widget = module.Widget;
         return <Widget key={season.key} season={season} />;
       })}
+      {withSounds && <SoundToggle />}
     </div>
   );
 }

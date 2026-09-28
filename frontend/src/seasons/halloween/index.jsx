@@ -9,7 +9,9 @@ import { Graveyard, useFooterLineTop } from "./graveyard";
 import { advanceRappel, createRappel, rappelView } from "./rappel";
 import { EXTENT, buildPlan, createWebLayer, staticLines, webRadius } from "./web";
 import { advanceWisp, createWisp, drawWisp, nextWispDelay } from "./wisps";
+import { palette } from "./sounds";
 import { recordSignal } from "../signals";
+import { emitSound } from "../audio";
 import "./halloween.css";
 
 // Halloween (#635, #655, #658, #660–#664, Runde IV): dunkel und edel, und man kann Dingen beim Entstehen zuschauen.
@@ -269,6 +271,7 @@ function FooterPumpkin({ pumpkin, greeting }) {
   useEffect(() => () => window.clearTimeout(timer.current), []);
   const onClick = () => {
     setOpen(true);
+    emitSound("pumpkin");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setOpen(false), 4000);
     if (pumpkinCounts()) recordSignal(SIGNAL_KEY);
@@ -329,6 +332,7 @@ function CatOnEdge({ size, startX = 40, moving }) {
     const width = ref.current?.parentElement?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1280);
     const target = catTarget(x, width);
     const seconds = Math.abs(target - x) / CAT_WALK_SPEED;
+    emitSound("cat_walk");
     setWalk({ to: target, facing: target < x ? 1 : -1, seconds });
     setX(target);
     window.clearTimeout(timer.current);
@@ -382,6 +386,7 @@ export function Widget({ season }) {
   const greeting = season.texts?.greeting || "Happy Halloween";
   const onClick = () => {
     setOpen(true);
+    emitSound("lantern");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setOpen(false), 4000);
     if (pumpkinCounts()) recordSignal(SIGNAL_KEY);
@@ -467,4 +472,9 @@ export function skyLayers({ season, reducedMotion, weather = null }) {
   return layers;
 }
 
-export const season = { key: "halloween", accent: ACCENT, Corners, Backdrop, Footer, Widget, skyLayers };
+/** Die Klang-Palette (#679) für die Engine der Bühne - bei Nacht mit Glocken und Herzschlag, am Tag nur Drone und Wind. */
+export function sounds({ season: current }) {
+  return palette({ night: Boolean(current?.data?.night) });
+}
+
+export const season = { key: "halloween", accent: ACCENT, Corners, Backdrop, Footer, Widget, skyLayers, sounds };

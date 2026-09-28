@@ -10,3 +10,9 @@
 
 /* Farbschein auf den Hauptknöpfen bei „normal“ und „voll“ - der Knopf bleibt, nur der Schein kommt dazu. */
 html[style*="--season-accent"] .bg-\[\#29B6E8\] { box-shadow: 0 0 18px var(--season-accent); }
+
+/* Klang-Schalter (#679): drei Staende im Kreis, sitzt neben dem Widget, gleiche Hoehe wie die Laterne */
+.tls-season-sound { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; margin-left: 0.15rem; border: 0; border-radius: 0.25rem; background: transparent; color: rgba(255, 255, 255, 0.55); cursor: pointer; transition: color 0.15s ease-out, background 0.15s ease-out; }
+.tls-season-sound:hover { color: var(--season-accent, #29B6E8); background: rgba(255, 255, 255, 0.06); }
+.tls-season-sound:focus-visible { outline: 2px solid var(--season-accent, #29B6E8); outline-offset: 2px; }
+.tls-season-sound--off { color: rgba(255, 255, 255, 0.3); }

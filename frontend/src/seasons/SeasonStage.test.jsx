@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Die Bühne (#634): ohne aktive Saison wird kein Modul geladen, im Admin bleibt sie leer, mit Saison
@@ -15,12 +15,14 @@ const loadModule = vi.fn(async () => ({
     Widget: () => <button type="button" data-testid="fake-widget">Kürbis</button>,
     Footer: () => <span data-testid="fake-footer" />,
     Toast: () => <span data-testid="fake-toast" />,
+    sounds: () => ({ key: "fake", instruments: { ping: () => {} }, music: null }),
   },
 }));
 vi.mock("./registry", () => ({ SEASON_MODULES: { halloween: () => loadModule() }, hasModule: (key) => key === "halloween" }));
 
 const { SeasonStage, isQuietPath, toastShownToday, markToastShown } = await import("./SeasonStage");
 const { SeasonWidgetSlot, SeasonFooterSlot } = await import("./SeasonSlots");
+const { getActiveEngine } = await import("./audio");
 
 function halloween(effective = "normal") {
   return { key: "halloween", phase: "deko", intensity: "normal", effective, channels: ["web"], texts: {}, data: {} };
@@ -96,4 +98,45 @@ test("mit Vorschau zeichnet die Bühne auch im Admin - sofort sichtbar nach dem 
   expect(await screen.findByTestId("fake-corners")).toBeInTheDocument();
   expect(screen.getByTestId("fake-widget")).toBeInTheDocument();
   seasonState.preview = false;
+});
+
+test("Klänge (#679): der Schalter steht neben dem Widget, die Engine wartet auf die erste Geste und kreist durch Töne/Musik/aus; dezent ohne", async () => {
+  class FakeAudioContext {
+    constructor() {
+      this.state = "running";
+      this.currentTime = 0;
+      this.sampleRate = 8000;
+      this.destination = {};
+      const gain = () => ({ gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {} }, connect() {} });
+      this.createGain = gain;
+      this.close = () => {};
+      this.resume = async () => {};
+    }
+  }
+  window.AudioContext = FakeAudioContext;
+  seasonState.seasons = [halloween("normal")];
+  const view = render(<MemoryRouter initialEntries={["/"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
+  const toggle = await screen.findByTestId("season-sound-toggle");
+  expect(toggle.getAttribute("data-state")).toBe("all");
+  await waitFor(() => expect(getActiveEngine()).not.toBeNull());
+  expect(getActiveEngine().unlocked).toBe(false);
+  fireEvent.pointerDown(window);
+  expect(getActiveEngine().unlocked).toBe(true);
+  expect(getActiveEngine().context).toBeInstanceOf(FakeAudioContext);
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("data-state")).toBe("sfx");
+  expect(getActiveEngine().prefs).toEqual({ sounds: true, music: false });
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("data-state")).toBe("off");
+  expect(JSON.parse(localStorage.getItem("tls-season-sound"))).toEqual({ sounds: false, music: false });
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("data-state")).toBe("all");
+  view.unmount();
+  expect(getActiveEngine()).toBeNull();
+  delete window.AudioContext;
+  localStorage.removeItem("tls-season-sound");
+  seasonState.seasons = [halloween("subtle")];
+  render(<MemoryRouter initialEntries={["/"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
+  await screen.findByTestId("fake-widget");
+  expect(screen.queryByTestId("season-sound-toggle")).toBeNull();
 });
