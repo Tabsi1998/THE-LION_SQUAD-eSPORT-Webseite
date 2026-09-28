@@ -48,13 +48,13 @@ def test_membership_tenure_is_marked_member_only():
     assert all(t.get("member_only") is True for t in membership_tiers)
 
 
-def test_level_progression_has_long_term_milestones():
-    tiers = [t for t in ACHIEVEMENT_TIERS if t["group_code"] == "level_progression"]
+def test_level_milestones_reach_the_top_level():
+    # Seit Katalog C (#614): „Levelaufstieg“ misst das Level selbst (5 bis 60), nicht mehr Punkte bis 8,9 Millionen.
+    tiers = [t for t in ACHIEVEMENT_TIERS if t["group_code"] == "level_milestones"]
     targets = {t["code"]: t["progress_target"] for t in tiers}
-    assert targets["level_progression_10"] == 8100
-    assert targets["level_progression_15"] == 19600
-    assert targets["level_progression_20"] == 36100
-    assert any(t["progress_target"] >= 8940100 for t in tiers)
+    assert targets["level_milestones_1"] == 5 and targets["level_milestones_7"] == 60
+    assert all(t["condition_key"] == "level" for t in tiers)
+    assert not any(t["group_code"] == "level_progression" for t in ACHIEVEMENT_TIERS), "abgelöst"
 
 
 def test_catalog_has_long_term_depth_and_secret_negative_awards():
@@ -78,9 +78,11 @@ def test_no_public_tier_uses_planned_automation():
     ] == []
 
 
-def test_event_host_group_is_hidden_from_public_catalog():
-    event_host = next(g for g in ACHIEVEMENT_GROUPS if g["code"] == "event_host")
-    assert event_host["public"] is False
+def test_events_hosted_group_is_public_and_counted():
+    # Seit Katalog C (#614): „Gastgeber“ zählt abgeschlossene eigene Events automatisch und ist öffentlich (vorher event_host, von Hand, versteckt).
+    hosted = next(g for g in ACHIEVEMENT_GROUPS if g["code"] == "events_hosted")
+    assert hosted["public"] is True and hosted["condition_key"] == "events_hosted_completed"
+    assert not any(g["code"] == "event_host" for g in ACHIEVEMENT_GROUPS)
 
 
 # ---------- Erfolge II, Katalog A (#612): Spielen und Turnier ----------
@@ -166,6 +168,55 @@ def test_katalog_b_ziele_steigen_material_passt_texte_da_schluessel_live():
         assert all(t["description"] and t["how_to"] and t["points"] > 0 for t in tiers)
         assert all(t["level"] in (1, 2, 3, 4) for t in tiers)
     keys = {g["condition_key"] for g in GROUPS_B}
+    assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
+    known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
+    assert keys <= known, sorted(keys - known)
+
+
+# ---- Katalog C (#614): Community, Creator, Profil
+from achievement_catalog import GROUPS_C, MATERIALS, REDEFINED_C, REPLACED_C, TIERS_C  # noqa: E402
+
+
+def test_katalog_c_hat_42_gruppen_je_kategorie_und_loest_alte_ab():
+    assert len(GROUPS_C) == 42
+    assert len([g for g in GROUPS_C if g["category"] == "community"]) == 17
+    assert len([g for g in GROUPS_C if g["category"] == "creator"]) == 10
+    assert len([g for g in GROUPS_C if g["category"] == "profile"]) == 15
+    assert len(TIERS_C) == sum(len([t for t in TIERS_C if t["group_code"] == g["code"]]) for g in GROUPS_C)
+    codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C]
+    assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
+    tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C]
+    assert len(tier_codes) == len(set(tier_codes))
+    in_catalog = {g["code"] for g in ACHIEVEMENT_GROUPS}
+    assert {g["code"] for g in GROUPS_C} <= in_catalog
+    assert not (set(REPLACED_C) & in_catalog), "abgelöste Gruppen sind aus dem Katalog"
+    assert all(GROUP_MAPPING.get(old) == new for old, new in REPLACED_C.items())
+    assert set(REDEFINED_C) <= set(codes)
+    assert all(g["catalog"] == "C" and g["public"] for g in GROUPS_C)
+    manual = {g["code"] for g in GROUPS_C if g["manual_only"]}
+    assert manual == {"community_helper", "mentor", "creator_spirit"}
+
+
+def test_katalog_c_ziele_material_texte_und_schluessel():
+    by_group = defaultdict(list)
+    for tier in TIERS_C:
+        by_group[tier["group_code"]].append(tier)
+    for group in GROUPS_C:
+        tiers = by_group[group["code"]]
+        targets = [t["progress_target"] for t in tiers]
+        assert targets == sorted(targets) and len(set(targets)) == len(targets), group["code"]
+        materials = [t["material"] for t in tiers]
+        assert all(m in MATERIALS for m in materials) and materials == sorted(materials, key=lambda m: MATERIALS[m]["rank"]), group["code"]
+        if len(tiers) in LADDERS and materials != LADDERS[len(tiers)]:
+            assert group["code"] in {"watchdog", "app_user", "passkey", "email_verified", "tutorial", "privacy_aware", "notifications", "birthday_login"}, group["code"]
+        assert group["description"] and group["how_to"] and group["icon"] and group["art"]
+        assert all(t["description"] and t["how_to"] and t["points"] > 0 for t in tiers)
+        assert all(t["level"] in (1, 2, 3, 4) for t in tiers)
+        if group["manual_only"]:
+            assert group["condition_key"] is None and all(t["manual_only"] and t["condition_key"] is None for t in tiers), group["code"]
+        else:
+            assert all(t["condition_key"] == group["condition_key"] for t in tiers)
+    keys = {g["condition_key"] for g in GROUPS_C if g["condition_key"]}
     assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
     known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
     assert keys <= known, sorted(keys - known)

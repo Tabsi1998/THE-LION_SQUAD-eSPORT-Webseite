@@ -1170,3 +1170,66 @@ async def _team_match_wins(ctx):
 async def _team_invites_accepted(ctx):
     """Einladungen der Person, die angenommen wurden."""
     return await ctx.db.team_invites.count_documents({"invited_by": ctx.user_id, "status": "accepted"})
+
+
+# ------------------------------------------------------------------ Katalog C (#614): Community, Creator, Profil
+
+@counter("discord_messages", "discord", "community")
+async def _discord_messages(ctx):
+    """Nachrichten auf dem Vereins-Discord - der Bot zählt je Nachricht am Nutzer hoch."""
+    return int((await ctx.user()).get("discord_messages_count") or 0)
+
+
+@counter("community_messages_sent", "community", "tournament", "match")
+async def _community_messages(ctx):
+    """Nachrichten in den offenen Chats: Turnier-Chat und Match-Chat."""
+    return await ctx.db.tournament_chat_messages.count_documents({"user_id": ctx.user_id}) + await ctx.db.match_chat_messages.count_documents({"user_id": ctx.user_id})
+
+
+@counter("gallery_uploads_approved", "community")
+async def _gallery_uploads(ctx):
+    """Fotos, die die Person in Galerie-Alben hochgeladen hat."""
+    return await ctx.db.gallery_photos.count_documents({"uploaded_by": ctx.user_id})
+
+
+@counter("stickers_collected", "community", "chat")
+async def _stickers(ctx):
+    """Verschiedene Sticker, die die Person in irgendeinem Chat verschickt hat."""
+    ids = set()
+    for name, field in (("direct_messages", "sender_id"), ("team_chat_messages", "user_id"), ("tournament_chat_messages", "user_id"), ("match_chat_messages", "user_id")):
+        async for row in ctx.db[name].find({field: ctx.user_id, "sticker.id": {"$exists": True}}, {"_id": 0, "sticker.id": 1}):
+            sticker_id = (row.get("sticker") or {}).get("id")
+            if sticker_id:
+                ids.add(sticker_id)
+    return len(ids)
+
+
+@counter("app_user_stage", "signal", "profile")
+async def _app_user_stage(ctx):
+    """1 = App genutzt, 2 = 30 Tage mit der App, 3 = dazu Push eingeschaltet."""
+    days = int(await REGISTRY["app_days"].compute(ctx) or 0)
+    push = int(await REGISTRY["push_enabled"].compute(ctx) or 0)
+    if days >= 30 and push:
+        return 3
+    if days >= 30:
+        return 2
+    return 1 if days >= 1 else 0
+
+
+@counter("own_tournament_streams", "stream", "tournament")
+async def _own_tournament_streams(ctx):
+    """Turniere, bei denen der eigene Stream während eigener Matches gezeigt wurde - je Turnier einmal."""
+    from services.tournament_streams import ANNOUNCEMENTS
+    return len([t for t in await ctx.db[ANNOUNCEMENTS].distinct("tournament_id", {"user_id": ctx.user_id}) if t])
+
+
+@counter("clips_synced", "stream")
+async def _clips(ctx):
+    """Clips auf dem Vereinskanal, die die Person erstellt hat - erkannt am Twitch-Namen aus dem Profil."""
+    user = await ctx.user()
+    handle = str(user.get("twitch_handle") or user.get("twitch_channel") or "").strip().lstrip("@").lower()
+    if not handle:
+        return 0
+    from services.twitch_clips import STATE_ID
+    doc = await ctx.db.settings.find_one({"id": STATE_ID}, {"_id": 0, "clips": 1}) or {}
+    return sum(1 for clip in doc.get("clips") or [] if str(clip.get("creator_name") or "").strip().lstrip("@").lower() == handle)

@@ -92,7 +92,7 @@ class TestTaxonomy:
 
     def test_club_only_membership_groups(self, groups):
         club = sorted(g["code"] for g in groups if g["category"] == "club")
-        assert club == ["event_attendance", "membership_tenure"], f"club groups={club}"
+        assert club == ["membership_tenure"], f"club groups={club}"
 
     def test_team_category(self, groups):
         team = sorted(g["code"] for g in groups if g["category"] == "team")
