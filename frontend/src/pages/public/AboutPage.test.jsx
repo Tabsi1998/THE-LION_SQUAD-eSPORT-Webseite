@@ -16,7 +16,8 @@ const { default: AboutPage, organizationFacts, gameLine } = await import("./Abou
 const ABOUT = {
   texts: { hero_eyebrow: "Der Verein", hero_title: "Ein Rudel.\nEine Familie.", hero_text: "Wir **fördern** eSports.", values_title: "Mehr als nur Zocken", values_text: "Absatz eins.\n\nAbsatz zwei.", pillars: ["Fairplay", "Gemeinschaft"], games_title: "Vom Casual bis zum Cup", games_text: "Text.", offline_title: "Offline", offline_text: "Grillen.", offline_items: ["Grillabende"], cta_title: "Mitmachen?", cta_text: "Komm vorbei." },
   organization: { name: "THE LION SQUAD", legal_name: "THE LION SQUAD - eSPORTS", founded_year: 2019, nonprofit: true, zvr_number: "123456789", registered_seat: "Innsbruck", purpose: "Förderung des eSports", source: "dolibarr" },
-  numbers: { members: 42, tournaments: 12, events: 0, participations: 7, achievements: 120 },
+  numbers: { members: 42, tournaments: 12, tournaments_completed: 9, prizes: 31, prize_money_eur: 250, years_active: 7, events: 0, participations: 7, achievements: 120 },
+  numbers_shown: ["prizes", "tournaments_completed", "members", "years_active", "events"],
   games: [{ id: "cod", name: "Call of Duty", slug: "cod", logo_url: "/uploads/cod.png", tournaments: 8, references: 2 }, { id: "rl", name: "Rocket League", slug: "rl", tournaments: 0, references: 0 }],
   offline_events: [{ id: "e1", slug: "grillen", name: "Grillabend", banner_url: "/uploads/g.jpg", start_date: "2026-08-15T16:00:00Z" }],
 };
@@ -40,8 +41,13 @@ test("Fakten, Zahlen, Spiele, Vorstand und Treffen aus den Daten", async () => {
   expect(screen.getByTestId("about-hero").querySelector("strong")).toHaveTextContent("fördern");
 
   expect(screen.getByTestId("about-number-members")).toHaveTextContent("42");
-  expect(screen.getByTestId("about-number-achievements")).toHaveTextContent("120");
+  expect(screen.getByTestId("about-number-prizes")).toHaveTextContent("31");
+  expect(screen.getByTestId("about-number-prizes")).toHaveTextContent("Preise vergeben");
+  expect(screen.getByTestId("about-number-years_active")).toHaveTextContent("Jahre aktiv");
+  // Vergebene Erfolge sind keine Kachel mehr (#621); Zähler mit null bleiben weg.
+  expect(screen.queryByTestId("about-number-achievements")).toBeNull();
   expect(screen.queryByTestId("about-number-events")).toBeNull();
+  expect(screen.queryByTestId("about-number-participations")).toBeNull();
 
   expect(screen.getByTestId("about-game-cod")).toHaveTextContent("8 Turniere · 2 Teilnahmen");
   expect(screen.getByTestId("about-game-cod").getAttribute("href")).toBe("/tournaments");

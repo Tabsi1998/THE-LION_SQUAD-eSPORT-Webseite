@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { boardContacts } from "@/lib/memberArea";
 import { formatDate } from "@/lib/datetime";
 import { useCountUp } from "@/hooks/useCountUp";
+import { numberItems } from "@/lib/clubNumbers";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
@@ -17,7 +18,6 @@ import { ArrowRight, Heart, Users, Trophy, Gamepad2, Mountain, Landmark, Medal, 
 // Admin → Verein → Über uns. Was leer ist, bleibt weg: kein Block mit Platzhaltern.
 
 const PILLAR_ICONS = [Heart, Users, Trophy, Gamepad2];
-const NUMBER_LABELS = [["members", "Mitglieder", "Mitglied"], ["tournaments", "Veranstaltete Turniere", "Veranstaltetes Turnier"], ["events", "Veranstaltete Events", "Veranstaltetes Event"], ["participations", "Turnierteilnahmen"], ["achievements", "Vergebene Auszeichnungen"]];
 
 export default function AboutPage() {
   useDocumentTitle(
@@ -64,7 +64,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <ClubNumbers numbers={about.numbers} />
+      <ClubNumbers numbers={about.numbers} shown={about.numbers_shown} />
 
       {/* Was uns ausmacht */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -223,16 +223,16 @@ export function Paragraphs({ text, className = "" }) {
   ));
 }
 
-function ClubNumbers({ numbers }) {
-  // Einzahl, wenn es genau eins ist („1 Mitglied“ statt „1 Mitglieder“).
-  const items = NUMBER_LABELS.map(([key, label, single]) => [key, Number(numbers?.[key] || 0) === 1 && single ? single : label, Number(numbers?.[key] || 0)]).filter(([, , value]) => value > 0);
+function ClubNumbers({ numbers, shown }) {
+  // Die Zähler, die der Betreiber gewählt hat (#621) - Einzahl, wenn es genau eins ist.
+  const items = numberItems(numbers, shown);
   if (!items.length) return null;
   return (
     <section className="border-b border-white/10 bg-[#080808]/35" data-testid="about-numbers">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2 text-[#FFD700]"><Medal className="w-3.5 h-3.5" /> Der Verein in Zahlen</div>
         <div className="mt-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {items.map(([key, label, value]) => <NumberTile key={key} id={key} label={label} value={value} />)}
+          {items.map(({ key, label, value }) => <NumberTile key={key} id={key} label={label} value={value} />)}
         </div>
       </div>
     </section>

@@ -56,7 +56,8 @@ async def seed(flow):
 async def test_about_counts_games_events_and_uses_hand_fields_without_dolibarr(flow):
     await seed(flow)
     page = (await flow.get("/api/home/about")).json()
-    assert page["numbers"] == {"members": 1, "tournaments": 2, "events": 5, "participations": 2, "achievements": 2}
+    assert {k: page["numbers"][k] for k in ("members", "tournaments", "events", "participations", "achievements")} == {"members": 1, "tournaments": 2, "events": 5, "participations": 2, "achievements": 2}
+    assert page["numbers"]["tournaments_completed"] == 1 and page["numbers_shown"] == ["prizes", "tournaments_completed", "members", "years_active"]
     assert [(g["id"], g["tournaments"], g["references"]) for g in page["games"]] == [("cod", 2, 0), ("rl", 0, 1), ("f1", 0, 0)], "Edition zählt zum Hauptspiel, keine Entwürfe, keine nicht-öffentlichen"
     assert page["games"][0]["logo_url"] == "/uploads/cod.png"
     assert [e["id"] for e in page["offline_events"]] == ["e1", "e2"], "nur vergangene, öffentliche Treffen mit Bild"

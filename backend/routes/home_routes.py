@@ -8,6 +8,7 @@ Aggregates:
 
 Hides drafts and respects per-object visibility.
 """
+import re
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from typing import List, Optional
@@ -283,6 +284,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
     }
     # Der Verein in Zahlen (#407, #425): dieselben Zähler wie auf „Über den Verein“ (#406).
     club_numbers = await _club_numbers(db)
+    club_numbers_shown = (await _about_texts(db)).get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"])
 
     await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
@@ -296,6 +298,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "featured_news": visible_news[:1],
         "stats": stats,
         "club_numbers": club_numbers,
+        "club_numbers_shown": club_numbers_shown,
     }
 
 
@@ -331,7 +334,12 @@ ABOUT_DEFAULTS = {
     "founded_year": None,
     "purpose": "",
     "nonprofit": None,
+    # Der Verein in Zahlen (#621): welche Zähler die Seite zeigt, in dieser Reihenfolge.
+    "numbers_shown": ["prizes", "tournaments_completed", "members", "years_active"],
 }
+# Zähler, die der Betreiber zeigen kann. „achievements“ (vergebene Erfolge) bleibt im JSON, ist aber keine Wahl mehr (#621).
+NUMBER_KEYS = ("prizes", "tournaments_completed", "members", "years_active", "tournaments", "events", "participations")
+EURO_RE = re.compile(r"(?:€|eur)\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{1,2})?)\s*(?:€|eur)", re.IGNORECASE)
 # Was „auch offline“ heißt: Termine, bei denen man sich trifft - keine Online-Events, keine internen Termine.
 OFFLINE_EVENT_TYPES = ("club_evening", "lan_party", "grill_evening", "expo", "community_evening", "public_event", "mario_kart_event", "tournament_finals", "sponsor_action")
 PUBLIC_TOURNAMENT_QUERY = {"status": {"$nin": ["draft", "cancelled"]}, "is_public": {"$ne": False}}
@@ -354,6 +362,29 @@ class AboutTexts(BaseModel):
     founded_year: Optional[int] = Field(None, ge=1900, le=2100)
     purpose: Optional[str] = Field(None, max_length=1000)
     nonprofit: Optional[bool] = None
+    numbers_shown: Optional[List[str]] = None
+
+
+def _clean_number_keys(values) -> list[str]:
+    """Nur bekannte Zähler, jeder einmal, höchstens sechs - leer heißt Vorgabe."""
+    out = []
+    for value in values or []:
+        key = str(value or "").strip()
+        if key in NUMBER_KEYS and key not in out:
+            out.append(key)
+    return out[:6]
+
+
+def euro_amount(value) -> float:
+    """Ein Betrag aus einem Preistext wie „50 €“, „EUR 12,50“ oder „Headset (30€)“ - sonst 0."""
+    match = EURO_RE.search(str(value or ""))
+    if not match:
+        return 0.0
+    raw = match.group(1) or match.group(2) or "0"
+    try:
+        return float(raw.replace(",", "."))
+    except ValueError:
+        return 0.0
 
 
 def _clean_lines(values, *, limit: int = 12, max_length: int = 80) -> list[str]:
@@ -371,6 +402,8 @@ async def _about_texts(db) -> dict:
     for key, value in saved.items():
         if key in ("pillars", "offline_items"):
             texts[key] = _clean_lines(value) or ABOUT_DEFAULTS[key]
+        elif key == "numbers_shown":
+            texts[key] = _clean_number_keys(value) or list(ABOUT_DEFAULTS[key])
         elif key in ("founded_year", "nonprofit"):
             texts[key] = value
         elif key in ABOUT_DEFAULTS and value not in (None, ""):
@@ -379,14 +412,26 @@ async def _about_texts(db) -> dict:
 
 
 async def _club_numbers(db) -> dict:
-    """Der Verein in Zahlen (#407, #425, #406): echte Zähler, nur was öffentlich zählt - keine Entwürfe,
+    """Der Verein in Zahlen (#407, #425, #406, #621): echte Zähler, nur was öffentlich zählt - keine Entwürfe,
     keine Absagen, keine nicht-öffentlichen Turniere, keine internen Events. „Turnierteilnahmen“ sind
-    die Referenzen (der Verein bei fremden Turnieren), „Auszeichnungen“ die vergebenen Achievements."""
+    die Referenzen (der Verein bei fremden Turnieren), „Preise“ die vergebenen Gewinne aus eigenen Turnieren
+    (mit Preisgeld in Euro, wo ein Betrag im Preistext steht), „Turniere gespielt“ die abgeschlossenen, „Jahre
+    aktiv“ aus dem Gründungsjahr. „Auszeichnungen“ (vergebene Erfolge) bleibt für alte Clients im JSON."""
+    organization = await _about_organization(db)
+    founded_year = organization.get("founded_year")
+    year = datetime.now(timezone.utc).year
+    prize_money = 0.0
+    async for prize in db.prize_pickups.find({}, {"_id": 0, "prize_value": 1}):
+        prize_money += euro_amount(prize.get("prize_value"))
     return {
         "members": await db.memberships.count_documents({"member_status": {"$in": ["active", "honorary"]}}),
         "tournaments": await db.tournaments.count_documents(PUBLIC_TOURNAMENT_QUERY),
+        "tournaments_completed": await db.tournaments.count_documents({**PUBLIC_TOURNAMENT_QUERY, "status": {"$in": ["completed", "results_published", "archived"]}}),
         "events": await db.events.count_documents({"status": {"$nin": ["draft", "cancelled"]}, "visibility": {"$in": [None, "public"]}}),
         "participations": await db.references.count_documents({}),
+        "prizes": await db.prize_pickups.count_documents({}),
+        "prize_money_eur": round(prize_money, 2),
+        "years_active": max(0, year - int(founded_year)) if founded_year else 0,
         "achievements": await db.user_achievements.count_documents({}),
     }
 
@@ -474,9 +519,10 @@ async def about_page():
     now = datetime.now(timezone.utc)
     texts = await _about_texts(db)
     return {
-        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "purpose", "nonprofit")},
+        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "purpose", "nonprofit", "numbers_shown")},
         "organization": await _about_organization(db),
         "numbers": await _club_numbers(db),
+        "numbers_shown": texts.get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"]),
         "games": await _about_games(db),
         "offline_events": await _about_offline_events(db, now),
     }
@@ -486,7 +532,7 @@ async def about_page():
 async def about_admin(me: dict = Depends(require_area("content"))):
     """Für Admin → Verein → Über uns: die Texte, was Dolibarr liefert und was die Seite sonst zeigt."""
     db = get_db()
-    return {"texts": await _about_texts(db), "defaults": ABOUT_DEFAULTS, "organization": await _about_organization(db), "numbers": await _club_numbers(db),
+    return {"texts": await _about_texts(db), "defaults": ABOUT_DEFAULTS, "organization": await _about_organization(db), "numbers": await _club_numbers(db), "number_keys": list(NUMBER_KEYS),
             "games": len(await _about_games(db)), "offline_events": len(await _about_offline_events(db, datetime.now(timezone.utc)))}
 
 
@@ -498,6 +544,8 @@ async def about_admin_save(body: AboutTexts, me: dict = Depends(require_area("co
     for key, value in raw.items():
         if key in ("pillars", "offline_items"):
             updates[key] = _clean_lines(value)
+        elif key == "numbers_shown":
+            updates[key] = _clean_number_keys(value)
         elif key in ("founded_year", "nonprofit"):
             updates[key] = value
         elif isinstance(value, str):
