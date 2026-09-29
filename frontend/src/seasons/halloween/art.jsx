@@ -102,6 +102,8 @@ export function Lantern({ open, face = "grin" }) {
 /** Schwarze Katze auf der Footer-Kante: sitzt, blinzelt ab und zu, der Schwanz schwingt langsam. */
 
 export const RIM = "rgba(170, 225, 240, 0.26)";
+/** Feiner Mondlicht-Saum für Figuren auf dunklem Grund (Fledermäuse an dunklen Kanten). */
+export const RIM_EDGE = "rgba(170, 225, 240, 0.55)";
 export const INK = "#0b0a0f";
 
 /** Der Mond: echte Phase des Tages, warmweiß statt grau, feine Krater, dünner Schein - nichts Rechteckiges. */
@@ -197,13 +199,31 @@ export function HangingBatShape({ size = 26 }) {
       <path d="M18 0 l2 6 l2 -6" stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" />
       <path d="M13 12 q-9 12 -3 28 q3 -7 7 -3 z" fill={RIM} transform="translate(-0.6 0)" />
       <path d="M27 12 q9 12 3 28 q-3 -7 -7 -3 z" fill={RIM} transform="translate(0.6 0)" />
-      <path className="tls-hbat__wing tls-hbat__wing--l" d="M13 12 q-9 12 -3 28 q3 -7 7 -3 z" fill={INK} />
-      <path className="tls-hbat__wing tls-hbat__wing--r" d="M27 12 q9 12 3 28 q-3 -7 -7 -3 z" fill={INK} />
-      <ellipse cx="20" cy="24" rx="6.5" ry="12" fill={INK} />
-      <circle cx="20" cy="40" r="5.6" fill={INK} />
-      <path d="M15 43 l-2.5 8 l6.5 -3.5 z M25 43 l2.5 8 l-6.5 -3.5 z" fill={INK} />
-      <circle cx="17.8" cy="40.5" r="0.9" fill="#9be7ff" />
-      <circle cx="22.2" cy="40.5" r="0.9" fill="#9be7ff" />
+      <path className="tls-hbat__wing tls-hbat__wing--l" d="M13 12 q-9 12 -3 28 q3 -7 7 -3 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <path className="tls-hbat__wing tls-hbat__wing--r" d="M27 12 q9 12 3 28 q-3 -7 -7 -3 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <ellipse cx="20" cy="24" rx="6.5" ry="12" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" />
+      <path d="M15 43 l-2.5 8 l6.5 -3.5 z M25 43 l2.5 8 l-6.5 -3.5 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.7" strokeLinejoin="round" />
+      <circle cx="20" cy="40" r="5.6" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" />
+      <circle cx="17.8" cy="40.5" r="1" fill="#bff3ff" />
+      <circle cx="22.2" cy="40.5" r="1" fill="#bff3ff" />
+    </svg>
+  );
+}
+
+/** Dieselbe Fledermaus aufrecht auf einer Kante: Füße unten, Flügel angelegt, Kopf oben mit Ohren und Augen. */
+export function SittingBatShape({ size = 22 }) {
+  return (
+    <svg className="tls-hbat__shape" width={size} height={size * 1.15} viewBox="0 0 40 46" aria-hidden="true">
+      <path d="M12 20 q-9 10 -4 24 q3 -6 7 -3 z" fill={RIM} transform="translate(-0.6 0)" />
+      <path d="M28 20 q9 10 4 24 q-3 -6 -7 -3 z" fill={RIM} transform="translate(0.6 0)" />
+      <path className="tls-hbat__wing tls-hbat__wing--l" d="M12 20 q-9 10 -4 24 q3 -6 7 -3 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <path className="tls-hbat__wing tls-hbat__wing--r" d="M28 20 q9 10 4 24 q-3 -6 -7 -3 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <ellipse cx="20" cy="29" rx="6.5" ry="11" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" />
+      <path d="M14 12 l-3 -9 l7 5 z M26 12 l3 -9 l-7 5 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.7" strokeLinejoin="round" />
+      <circle cx="20" cy="14" r="5.8" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" />
+      <circle cx="17.8" cy="13.5" r="1" fill="#bff3ff" />
+      <circle cx="22.2" cy="13.5" r="1" fill="#bff3ff" />
+      <path d="M16 41 l-2 4.5 M24 41 l2 4.5" stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" />
     </svg>
   );
 }
@@ -212,9 +232,9 @@ export function HangingBatShape({ size = 26 }) {
 export function FlyingBatShape({ size = 44 }) {
   return (
     <svg className="tls-hbat__shape" width={size} height={size * 0.55} viewBox="0 0 80 44" aria-hidden="true">
-      <path className="tls-bat__wing tls-bat__wing--l" d="M40 24 q-9 -20 -36 -16 q10 3 12 14 q6 -5 12 1 q4 -3 12 1 z" fill={INK} stroke={RIM} strokeWidth="0.8" strokeLinejoin="round" />
-      <path className="tls-bat__wing tls-bat__wing--r" d="M40 24 q9 -20 36 -16 q-10 3 -12 14 q-6 -5 -12 1 q-4 -3 -12 1 z" fill={INK} stroke={RIM} strokeWidth="0.8" strokeLinejoin="round" />
-      <ellipse cx="40" cy="25" rx="4.5" ry="8.5" fill={INK} />
+      <path className="tls-bat__wing tls-bat__wing--l" d="M40 24 q-9 -20 -36 -16 q10 3 12 14 q6 -5 12 1 q4 -3 12 1 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <path className="tls-bat__wing tls-bat__wing--r" d="M40 24 q9 -20 36 -16 q-10 3 -12 14 q-6 -5 -12 1 q-4 -3 -12 1 z" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" strokeLinejoin="round" />
+      <ellipse cx="40" cy="25" rx="4.5" ry="8.5" fill={INK} stroke={RIM_EDGE} strokeWidth="0.8" />
       <path d="M36 17 l-3 -6 l5 3 z M44 17 l3 -6 l-5 3 z" fill={INK} />
       <circle cx="38" cy="21" r="1.1" fill="#9be7ff" />
       <circle cx="42" cy="21" r="1.1" fill="#9be7ff" />

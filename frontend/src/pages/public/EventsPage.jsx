@@ -124,6 +124,7 @@ function EventCard({ e, meta }) {
     <Link
       to={`/events/${e.slug}`}
       data-testid={`event-card-${e.slug}`}
+      data-season-perch="card"
       className="group min-w-0 border border-white/10 hover:border-[#9F7AEA]/50 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition"
     >
       {e.banner_url ? (

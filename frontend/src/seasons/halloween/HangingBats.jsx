@@ -3,378 +3,332 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
-import { measureQuietZones, overlayZones, pointInQuiet, rectInQuiet, watchOverlays } from "../quiet";
-import { requestMotion } from "../motion";
-import { FlyingBatShape, HangingBatShape } from "./art";
+import { measureQuietZones, overlayZones, rectInQuiet, watchOverlays } from "../quiet";
+import { releaseMotion, requestMotion } from "../motion";
+import { FlyingBatShape, HangingBatShape, SittingBatShape } from "./art";
+import { KIND_WEIGHTS, MIN_DISTANCE, POSE, SHAPE_HEIGHT, choosePerches, measurePerches, nearestFreePerch } from "./perches";
+import { MAX_ACTIVE_FLIGHTS, SCROLL_STARTLE_SPEED, activeFlights, advanceBat, alert, createBat, fleePath, pointOn, reactToPointer, reactToScroll, startle } from "./batLife";
 
-// Hängende Fledermäuse (#661, Runde V): sie hängen still - unter einem Menüpunkt der Kopfzeile, an einem
-// Buchstaben der letzten Zeile einer Überschrift (genau an der Unterkante des Zeichens gemessen), an der
-// Oberkante einer News- oder Vorstandskarte oder am Löwen. Die Kopfzeile klebt oben, also hängen diese
-// Fledermäuse am Fenster fest; alle anderen hängen in der Seite und scrollen mit ihrem Anker. Nichts wackelt
-// von sich aus: erst ein Klick scheucht sie, dann fliegen sie auf einer Kurve aus dem Bild.
+// Fledermäuse (#661, Halloween IV H7–H9): sie sitzen auf Kanten und Ecken oder hängen unter ihnen (perches.js),
+// leben nach einer kleinen Zustandslogik (batLife.js) und reagieren auf Zeiger und Scrollen. Die Kopfzeile klebt
+// oben, also hängen deren Fledermäuse am Fenster; alle anderen scrollen mit ihrem Platz. Ein Klick scheucht wie
+// bisher; die Verscheuchte kommt nach einer Weile zu einem freien, sichtbaren Platz zurück. Diese Datei hält nur
+// noch DOM, Zeit und Anzeige.
 
-export const NAV_SELECTOR = "header nav a";
-export const HEADING_SELECTOR = "main h1, main h2";
-export const CARD_SELECTOR = "[data-season-anchor='card']";
-export const LION_SELECTOR = "[data-season-anchor='lion']";
-export const MIN_DISTANCE = 140;
-/** Wie oft welche Art drankommt, wenn es sie auf der Seite gibt. */
-export const KIND_WEIGHTS = { nav: 0.35, glyph: 0.3, card: 0.25, lion: 0.1 };
-const GLYPH = /[A-Za-z0-9ÄÖÜäöüß]/;
-const MAX_HEADINGS = 6;
+export { KIND_WEIGHTS, MIN_DISTANCE, pointOn };
+export const flightPath = fleePath;
+export const chooseAnchors = choosePerches;
 
-function scrollOf(win) {
-  return { x: (win && win.scrollX) || 0, y: (win && win.scrollY) || 0 };
+/** Alte Signatur: das dritte Argument durfte eine Liste von Ruhezonen sein. */
+export function measureAnchors(doc, win, zonesOrOptions) {
+  return measurePerches(doc, win, Array.isArray(zonesOrOptions) ? { zones: zonesOrOptions } : zonesOrOptions);
 }
 
-function clampSize(value) {
-  return Math.round(Math.max(18, Math.min(30, value)));
+const REFRESH_DELAYS = [400, 1500, 3500];
+const POINTER_EVERY_MS = 120;
+const SCROLL_EVERY_MS = 400;
+const SCROLL_WINDOW_MS = 200;
+const FLYING = new Set(["takeoff", "flying", "approaching", "landing"]);
+const AT_PERCH = new Set(["perched", "alert", "settle", "takeoff"]);
+const REACTIVE = new Set(["perched", "alert"]);
+
+function shapeHeight(bat) {
+  return bat.size * (SHAPE_HEIGHT[bat.pose] || SHAPE_HEIGHT.hang);
 }
 
-/** Das Rechteck eines einzelnen Zeichens - über einen Range; ohne Layout (Tests, alte Browser) nichts. */
-function glyphRect(doc, node, index) {
-  if (typeof doc.createRange !== "function") return null;
-  const range = doc.createRange();
-  range.setStart(node, index);
-  range.setEnd(node, index + 1);
-  if (typeof range.getBoundingClientRect !== "function") return null;
-  const rect = range.getBoundingClientRect();
-  return rect && rect.width >= 4 && rect.height >= 8 ? rect : null;
-}
-
-let metricsCanvas = null;
-let metricsUnsupported = false;
-
-/** Ein Canvas nur zum Messen der Schrift; ohne Canvas (Tests ohne Attrappe) keine Buchstaben-Anker - einmal geprüft, dann gemerkt. */
-function glyphMeasurer(doc) {
-  if (metricsUnsupported) return null;
-  if (!metricsCanvas) metricsCanvas = doc.createElement("canvas");
-  const ctx = typeof metricsCanvas.getContext === "function" ? metricsCanvas.getContext("2d") : null;
-  if (!ctx || typeof ctx.measureText !== "function") {
-    metricsUnsupported = true;
-    return null;
-  }
-  return ctx;
-}
-
-function fontOf(style) {
-  return style.font || `${style.fontStyle || "normal"} ${style.fontWeight || "400"} ${style.fontSize || "16px"} ${style.fontFamily || "sans-serif"}`;
-}
-
-/**
- * Die Tinte eines Zeichens: der Range gibt den Zeichenkasten (Schriftkasten, oben mehr Luft als der Buchstabe hat),
- * die Schriftmaße des Canvas die Grundlinie und die tatsächliche Ober- und Unterkante des Zeichens.
- */
-function inkBounds(ctx, rect, ch) {
-  const metrics = ctx.measureText(ch);
-  if (!metrics || !(metrics.actualBoundingBoxAscent > 0)) return null;
-  const baseline = rect.top + (metrics.fontBoundingBoxAscent > 0 ? metrics.fontBoundingBoxAscent : rect.height * 0.78);
-  return { top: baseline - metrics.actualBoundingBoxAscent, bottom: baseline + Math.max(0, metrics.actualBoundingBoxDescent || 0) };
-}
-
-function navAnchors(doc, win) {
-  const found = [];
-  const at = scrollOf(win);
-  doc.querySelectorAll(NAV_SELECTOR).forEach((element) => {
-    const rect = element.getBoundingClientRect();
-    if (rect.width < 24 || rect.height < 10 || rect.top > 160) return;
-    const measure = () => {
-      if (!element.isConnected) return null;
-      const again = element.getBoundingClientRect();
-      return again.width < 24 ? null : { x: again.left + again.width / 2, y: again.bottom + 2 };
-    };
-    const point = measure();
-    found.push({ kind: "nav", fixed: true, element, ...point, px: point.x + at.x, py: point.y + at.y, size: 24, measure });
-  });
-  return found;
-}
-
-/**
- * Buchstaben der Überschriften: die Fledermaus greift die Oberkante des Zeichens und hängt davor - dunkle Silhouette
- * auf dem hellen Buchstaben, nicht im Absatz darunter (am Livesystem gemessen, 28.09.). Größe nach der Zeichenhöhe.
- */
-function glyphAnchors(doc, win) {
-  const found = [];
-  const ctx = glyphMeasurer(doc);
-  if (!ctx || !win || typeof win.getComputedStyle !== "function") return found;
-  const at = scrollOf(win);
-  const headings = Array.from(doc.querySelectorAll(HEADING_SELECTOR)).slice(0, MAX_HEADINGS);
-  headings.forEach((heading) => {
-    const style = win.getComputedStyle(heading);
-    const font = fontOf(style);
-    const upper = style.textTransform === "uppercase";
-    const inkOf = (rect, ch) => {
-      ctx.font = font;
-      return inkBounds(ctx, rect, upper ? ch.toUpperCase() : ch);
-    };
-    const walker = doc.createTreeWalker(heading, 4 /* NodeFilter.SHOW_TEXT */);
-    let node = walker.nextNode();
-    while (node) {
-      const text = node.textContent || "";
-      for (let index = 0; index < text.length; index += 1) {
-        const ch = text[index];
-        if (!GLYPH.test(ch)) continue;
-        const rect = glyphRect(doc, node, index);
-        const ink = rect ? inkOf(rect, ch) : null;
-        if (!ink || ink.bottom - ink.top < 14) continue;
-        const textNode = node;
-        const measure = () => {
-          if (!textNode.isConnected) return null;
-          const again = glyphRect(doc, textNode, index);
-          const inkAgain = again ? inkOf(again, ch) : null;
-          if (!inkAgain) return null;
-          const now = scrollOf(win);
-          return { x: again.left + again.width / 2 + now.x, y: inkAgain.top + 1 + now.y };
-        };
-        const x = rect.left + rect.width / 2 + at.x;
-        const y = ink.top + 1 + at.y;
-        found.push({ kind: "glyph", fixed: false, element: heading, x, y, px: x, py: y, size: clampSize((ink.bottom - ink.top) * 0.5), measure });
-      }
-      node = walker.nextNode();
-    }
-  });
-  return found;
-}
-
-/** Karten (News, Vorstand): an der Oberkante, an einer je Karte festen Stelle zwischen 20 und 80 % der Breite. */
-function cardAnchors(doc, win) {
-  const found = [];
-  doc.querySelectorAll(CARD_SELECTOR).forEach((element, index) => {
-    const rect = element.getBoundingClientRect();
-    if (rect.width < 120 || rect.height < 60) return;
-    const fraction = 0.2 + ((hashString(`${index}:${(element.textContent || "").slice(0, 40)}`) % 1000) / 1000) * 0.6;
-    const measure = () => {
-      if (!element.isConnected) return null;
-      const again = element.getBoundingClientRect();
-      if (again.width < 120) return null;
-      const now = scrollOf(win);
-      return { x: again.left + again.width * fraction + now.x, y: again.top + 1 + now.y };
-    };
-    const point = measure();
-    found.push({ kind: "card", fixed: false, element, ...point, px: point.x, py: point.y, size: 24, measure });
-  });
-  return found;
-}
-
-function lionAnchors(doc, win) {
-  const found = [];
-  doc.querySelectorAll(LION_SELECTOR).forEach((element) => {
-    const rect = element.getBoundingClientRect();
-    if (rect.width < 80 || rect.height < 80) return;
-    const measure = () => {
-      if (!element.isConnected) return null;
-      const again = element.getBoundingClientRect();
-      if (again.width < 80) return null;
-      const now = scrollOf(win);
-      return { x: again.left + again.width * 0.68 + now.x, y: again.top + again.height * 0.16 + now.y };
-    };
-    const point = measure();
-    found.push({ kind: "lion", fixed: false, element, ...point, px: point.x, py: point.y, size: 26, measure });
-  });
-  return found;
-}
-
-/**
- * Alle Hängepunkte der Seite. `fixed` heißt: hängt am Fenster (Kopfzeile), `x`/`y` sind dann Fensterkoordinaten,
- * sonst Seitenkoordinaten; `px`/`py` sind immer Seitenkoordinaten (für Abstände), `measure()` misst frisch nach
- * und liefert null, wenn der Anker verschwunden ist.
- */
-export function measureAnchors(doc = document, win = typeof window === "undefined" ? null : window, zones = measureQuietZones(doc, win)) {
-  const all = [...navAnchors(doc, win), ...glyphAnchors(doc, win), ...cardAnchors(doc, win), ...lionAnchors(doc, win)];
-  // Ruhezonen (H10): kein Anker in Formularen, Dialogen, Menüs, Brackets, Ranglisten oder markierten Bereichen.
-  if (!zones?.length) return all;
-  return all.filter((anchor) => !pointInQuiet(anchor.fixed ? { x: anchor.x, y: anchor.y } : { x: anchor.px, y: anchor.py }, zones, { fixed: anchor.fixed }));
-}
-
-/** Liegt eine hängende Fledermaus unter einem geöffneten Dialog oder Menü? Dann weicht sie aus (unsichtbar, nicht klickbar). */
+/** Liegt eine ruhende Fledermaus unter einem geöffneten Dialog oder Menü? Dann weicht sie aus (unsichtbar, nicht klickbar). */
 export function yieldsToOverlay(bat, zones) {
   const overlays = overlayZones(zones);
   if (!overlays.length) return false;
-  const rect = { left: bat.x - bat.size / 2, top: bat.y, right: bat.x + bat.size / 2, bottom: bat.y + bat.size };
-  return rectInQuiet(rect, overlays, { fixed: bat.anchor.fixed, overlayOnly: true });
+  const top = bat.pose === POSE.sit ? bat.y - shapeHeight(bat) : bat.y;
+  const rect = { left: bat.x - bat.size / 2, top, right: bat.x + bat.size / 2, bottom: top + shapeHeight(bat) };
+  return rectInQuiet(rect, overlays, { fixed: bat.fixed ?? bat.anchor?.fixed ?? false, overlayOnly: true });
 }
 
-/** Auswahl: erst die Art nach Gewicht, dann ein Punkt dieser Art - nie zwei näher als der Mindestabstand (auch zu `taken`). */
-export function chooseAnchors(candidates, count, rng, taken = []) {
-  const chosen = [];
-  const pools = new Map();
-  candidates.forEach((candidate) => {
-    const key = candidate.kind || "any";
-    if (!pools.has(key)) pools.set(key, []);
-    pools.get(key).push(candidate);
-  });
-  const farEnough = (candidate) => [...taken, ...chosen].every((other) => Math.hypot((other.px ?? other.x) - (candidate.px ?? candidate.x), (other.py ?? other.y) - (candidate.py ?? candidate.y)) >= MIN_DISTANCE);
-  for (let n = 0; n < count; n += 1) {
-    const kinds = [...pools.keys()].filter((kind) => pools.get(kind).some(farEnough));
-    if (!kinds.length) break;
-    const weightOf = (kind) => KIND_WEIGHTS[kind] || 0.1;
-    let roll = rng() * kinds.reduce((sum, kind) => sum + weightOf(kind), 0);
-    let kind = kinds[kinds.length - 1];
-    for (let i = 0; i < kinds.length; i += 1) {
-      roll -= weightOf(kinds[i]);
-      if (roll <= 0) {
-        kind = kinds[i];
-        break;
-      }
-    }
-    const options = pools.get(kind).filter(farEnough);
-    chosen.push(options[Math.min(options.length - 1, Math.floor(rng() * options.length))]);
-  }
-  return chosen;
+function viewFor(fixed, win) {
+  const top = fixed ? 0 : win.scrollY || 0;
+  return { top, bottom: top + win.innerHeight, width: win.innerWidth };
 }
 
-/** Flugbahn beim Verscheuchen: erst ein Stück hoch, dann weit weg - meist unten aus dem Bild, sonst oben. */
-export function flightPath(from, rng, view = { top: 0, bottom: 800, width: 1280 }) {
-  const dir = rng() < 0.5 ? -1 : 1;
-  const dx = dir * (400 + rng() * 500);
-  const endY = rng() < 0.62 ? view.bottom + 120 + rng() * 200 : view.top - 120 - rng() * 120;
-  const dy = endY - from.y;
-  return {
-    p0: from,
-    p1: { x: from.x + dx * 0.25, y: from.y - 110 - rng() * 60 },
-    p2: { x: from.x + dx * 0.75, y: from.y + dy - 120 },
-    p3: { x: from.x + dx, y: from.y + dy },
-    facing: dir,
-  };
+function coarsePointer(win) {
+  return typeof win.matchMedia === "function" && Boolean(win.matchMedia("(pointer: coarse)").matches);
 }
 
-export function pointOn(path, t) {
-  const u = 1 - t;
-  return {
-    x: u * u * u * path.p0.x + 3 * u * u * t * path.p1.x + 3 * u * t * t * path.p2.x + t * t * t * path.p3.x,
-    y: u * u * u * path.p0.y + 3 * u * u * t * path.p1.y + 3 * u * t * t * path.p2.y + t * t * t * path.p3.y,
-  };
+/** Plätze, die eine Fledermaus gerade belegt: ihr Sitzplatz und, im Anflug, ihr Ziel. */
+function perchesOf(bat) {
+  const held = [];
+  if (AT_PERCH.has(bat.state) && bat.perch) held.push(bat.perch);
+  if (bat.target) held.push(bat.target);
+  return held;
 }
 
-function FlyingBat({ path, durationMs, size, onDone }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    let frame = 0;
-    const start = performance.now();
-    const tick = () => {
-      const t = Math.min(1, (performance.now() - start) / durationMs);
-      const point = pointOn(path, t);
-      if (ref.current) ref.current.style.transform = `translate(${(point.x - size * 0.85).toFixed(1)}px, ${(point.y - size * 0.47).toFixed(1)}px) scaleX(${path.facing})`;
-      if (t < 1) frame = requestAnimationFrame(tick);
-      else onDone();
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [path, durationMs, size, onDone]);
-  return (
-    <div ref={ref} className="tls-hbat tls-hbat--flying" style={{ transform: `translate(${path.p0.x - size * 0.85}px, ${path.p0.y - size * 0.47}px)` }} data-testid="halloween-bat-flying">
-      <FlyingBatShape size={size * 1.7} />
-    </div>
-  );
+function pagePoint(bat, win) {
+  return bat.fixed ? { x: bat.x, y: bat.y + (win.scrollY || 0) } : { x: bat.x, y: bat.y };
+}
+
+function inView(perch, win) {
+  if (!perch || perch.fixed) return true;
+  const top = win.scrollY || 0;
+  return perch.py >= top - 40 && perch.py <= top + win.innerHeight + 40;
+}
+
+function visiblyDifferent(a, b) {
+  return a.state !== b.state || a.x !== b.x || a.y !== b.y || a.rotation !== b.rotation || a.yield !== b.yield || a.pose !== b.pose;
 }
 
 /**
- * `count` Fledermäuse an den Ankern der Seite. Gemessen wird kurz nach dem Aufbau und noch zweimal (Schriften
- * und Karten kommen nach), bei Größenänderung und wenn sich die Seite umbaut (ResizeObserver); freie Plätze werden
- * dann nachbesetzt, verschwundene Anker lassen ihre Fledermaus lautlos gehen. Danach hängt alles still.
+ * `count` Fledermäuse an den Plätzen der Seite. Gemessen wird kurz nach dem Aufbau und noch zweimal (Schriften und
+ * Karten kommen nach), bei Größenänderung, nach dem Scrollen und wenn sich die Seite umbaut; freie Plätze werden
+ * dann nachbesetzt, verschwundene Plätze lassen ihre Fledermaus gehen - sie kommt zurück, sobald wieder einer frei
+ * ist. `timeScale`, `temperament` und `reactionRng` sind Stellschrauben für Tests.
  */
-export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
+export function HangingBats({ count, seed, salt, timeScale = 1, temperament = null, reactionRng = null }) {
   const location = useLocation();
   const [bats, setBats] = useState([]);
   const batsRef = useRef([]);
   const rngRef = useRef(mulberry32(hashString(`bats:${seed}:${salt}`)));
+  const tokensRef = useRef(new Map());
 
   useEffect(() => {
     batsRef.current = [];
     setBats([]);
     if (!count || typeof document === "undefined") return undefined;
-    rngRef.current = mulberry32(hashString(`bats:${seed}:${salt}:${location.pathname}`));
+    const win = window;
+    const rng = mulberry32(hashString(`bats:${seed}:${salt}:${location.pathname}`));
+    rngRef.current = rng;
+    const react = reactionRng || rng;
+    const tokens = tokensRef.current;
     let cancelled = false;
-    let placed = 0;
     let nextId = 0;
     const apply = (next) => {
       batsRef.current = next;
       setBats(next);
     };
+    const holdToken = (bat, kind, options) => {
+      const token = requestMotion(kind, options);
+      if (!token) return false;
+      tokens.set(bat.id, token);
+      return true;
+    };
+    const dropToken = (bat) => {
+      releaseMotion(tokens.get(bat.id));
+      tokens.delete(bat.id);
+    };
+    const others = (all, except) => all.filter((bat) => bat !== except).flatMap(perchesOf);
+    const heldKeys = (all, except) => new Set(others(all, except).map((perch) => perch.key));
+
+    /** Ein freier, sichtbarer Platz in der Nähe - mit Flugbudget; sonst null. Umziehen bleibt im selben Koordinatenraum. */
+    const findPerch = (bat, all) => {
+      const zones = measureQuietZones(document, win);
+      const candidates = measurePerches(document, win, { zones, taken: heldKeys(all, bat) })
+        .filter((perch) => inView(perch, win) && (bat.state === "gone" || perch.fixed === bat.fixed));
+      const perch = nearestFreePerch(candidates, pagePoint(bat, win), others(all, bat), rng, { avoidKey: bat.perch?.key });
+      if (!perch) return null;
+      return holdToken(bat, "bat_flight") ? perch : null;
+    };
+
     const refresh = () => {
       if (cancelled) return;
-      const zones = measureQuietZones();
-      let next = batsRef.current.map((bat) => {
-        if (bat.state !== "hanging") return bat;
-        const point = bat.anchor.measure();
-        if (!point) return { ...bat, state: "gone" };
-        const moved = point.x === bat.x && point.y === bat.y ? bat : { ...bat, x: point.x, y: point.y };
-        const yielding = yieldsToOverlay(moved, zones);
-        return yielding === Boolean(moved.yield) && moved === bat ? bat : { ...moved, yield: yielding };
+      const zones = measureQuietZones(document, win);
+      const current = batsRef.current;
+      let next = current.map((bat) => {
+        if (AT_PERCH.has(bat.state) && bat.state !== "takeoff") {
+          const point = bat.perch.measure();
+          if (!point) return { ...bat, state: "gone", timer: 6 + rng() * 6, path: null, target: null, yield: false };
+          const moved = point.x === bat.x && point.y === bat.y ? bat : { ...bat, x: point.x, y: point.y };
+          const yielding = yieldsToOverlay(moved, zones);
+          return yielding === Boolean(moved.yield) && moved === bat ? bat : { ...moved, yield: yielding };
+        }
+        if (bat.target && (bat.state === "approaching" || bat.state === "landing")) {
+          const point = bat.target.measure();
+          if (!point) {
+            dropToken(bat);
+            return { ...bat, state: "gone", timer: 6 + rng() * 6, path: null, target: null };
+          }
+          if (point.x === bat.target.x && point.y === bat.target.y) return bat;
+          const target = { ...bat.target, x: point.x, y: point.y };
+          const landing = bat.state === "landing";
+          return { ...bat, target, path: bat.path ? { ...bat.path, p3: { x: point.x, y: point.y } } : bat.path, x: landing ? point.x : bat.x, y: landing ? point.y : bat.y };
+        }
+        return bat;
       });
-      const open = count - placed;
+      const open = count - next.length;
       if (open > 0) {
-        const found = measureAnchors(document, window, zones);
+        const found = measurePerches(document, win, { zones, taken: heldKeys(next, null) });
         if (found.length) {
-          const taken = next.filter((bat) => bat.state === "hanging").map((bat) => bat.anchor);
-          const fresh = chooseAnchors(found, open, rngRef.current, taken).map((anchor) => ({ id: nextId++, anchor, x: anchor.x, y: anchor.y, size: anchor.size, state: "hanging" }));
-          placed += fresh.length;
+          const fresh = choosePerches(found, open, rng, others(next, null)).map((perch) => createBat(nextId++, perch, rng, temperament));
           next = [...next, ...fresh];
         }
       }
-      if (next !== batsRef.current) apply(next);
+      if (next.length !== current.length || next.some((bat, index) => bat !== current[index])) apply(next);
     };
-    const timers = [400, 1500, 3500].map((ms) => window.setTimeout(refresh, ms));
+
+    // Reaktionen (H9): Zeiger höchstens alle 120 ms, Scrollgeschwindigkeit über ein Fenster von 200 ms - keine
+    // Messung pro Ereignis, keine teuren DOM-Abfragen; nur ruhende, sichtbare Fledermäuse.
+    const pointer = { x: 0, y: 0, at: -Infinity, checkedAt: -Infinity };
+    const scrolling = { samples: [], speed: 0, evaluatedAt: -Infinity, pending: false };
+    let lastFleeAt = -Infinity;
+    let lastScrollStartleAt = -Infinity;
+
+    const step = (dt, now) => {
+      const current = batsRef.current;
+      if (!current.length) return;
+      let changed = false;
+      let next = current;
+      if (now - pointer.at < 2000 && now - pointer.checkedAt >= POINTER_EVERY_MS) {
+        pointer.checkedAt = now;
+        next = next.map((bat) => {
+          if (!REACTIVE.has(bat.state) || bat.yield) return bat;
+          const at = bat.fixed ? { x: pointer.x, y: pointer.y } : { x: pointer.x + (win.scrollX || 0), y: pointer.y + (win.scrollY || 0) };
+          const verdict = reactToPointer(bat, at, react, now, lastFleeAt);
+          if (verdict === "alert") {
+            changed = true;
+            return alert(bat, undefined, now);
+          }
+          if (verdict === "flee" && activeFlights(next) < MAX_ACTIVE_FLIGHTS && holdToken(bat, "bat_flight")) {
+            lastFleeAt = now;
+            changed = true;
+            return startle(bat, rng, viewFor(bat.fixed, win), now);
+          }
+          return bat;
+        });
+      }
+      if (scrolling.pending) {
+        scrolling.pending = false;
+        if (reactToScroll(scrolling.speed, react, now, lastScrollStartleAt)) {
+          const visible = next.filter((bat) => REACTIVE.has(bat.state) && !bat.yield && inView(bat.perch, win));
+          const victim = visible.length && activeFlights(next) < MAX_ACTIVE_FLIGHTS ? visible[Math.floor(rng() * visible.length) % visible.length] : null;
+          if (victim && holdToken(victim, "bat_flight")) {
+            lastScrollStartleAt = now;
+            changed = true;
+            next = next.map((bat) => (bat === victim ? startle(bat, rng, viewFor(bat.fixed, win), now) : bat));
+          }
+        }
+      }
+      const all = next;
+      const env = { rng, viewFor: (fixed) => viewFor(fixed, win), findPerch: (bat) => findPerch(bat, all), canFly: () => activeFlights(all) < MAX_ACTIVE_FLIGHTS };
+      next = next.map((bat) => {
+        const after = advanceBat(bat, dt, { ...env, view: viewFor(bat.fixed, win) });
+        if (after === bat) return bat;
+        if (FLYING.has(bat.state) && !FLYING.has(after.state)) dropToken(bat);
+        if (visiblyDifferent(bat, after)) changed = true;
+        return after;
+      });
+      batsRef.current = next;
+      if (changed) setBats(next);
+    };
+
+    let frame = 0;
+    let last = performance.now();
+    const loop = () => {
+      frame = win.requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = Math.min(0.1, (now - last) / 1000) * timeScale;
+      last = now;
+      if (document.hidden) return;
+      step(dt, now);
+    };
+    frame = win.requestAnimationFrame(loop);
+
+    const timers = REFRESH_DELAYS.map((ms) => win.setTimeout(refresh, ms));
     let debounce = 0;
     const onLayout = () => {
-      window.clearTimeout(debounce);
-      debounce = window.setTimeout(refresh, 200);
+      win.clearTimeout(debounce);
+      debounce = win.setTimeout(refresh, 200);
     };
-    window.addEventListener("resize", onLayout);
+    win.addEventListener("resize", onLayout);
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(onLayout) : null;
     observer?.observe(document.body);
     // Dialoge und Menüs (H10): öffnet sich eines über einer Fledermaus, weicht sie aus - und kommt zurück, wenn es zugeht.
     const stopWatching = watchOverlays(refresh);
+    const onMove = (event) => {
+      pointer.x = event.clientX;
+      pointer.y = event.clientY;
+      pointer.at = performance.now();
+    };
+    const fine = !coarsePointer(win);
+    if (fine) win.addEventListener("mousemove", onMove, { passive: true });
+    let scrollSettle = 0;
+    const onScroll = () => {
+      const now = performance.now();
+      const y = win.scrollY || 0;
+      scrolling.samples = scrolling.samples.filter((sample) => now - sample.at <= SCROLL_WINDOW_MS);
+      scrolling.samples.push({ y, at: now });
+      const oldest = scrolling.samples[0];
+      const seconds = (now - oldest.at) / 1000;
+      scrolling.speed = seconds >= 0.1 ? Math.abs(y - oldest.y) / seconds : 0;
+      if (scrolling.speed >= SCROLL_STARTLE_SPEED && now - scrolling.evaluatedAt >= SCROLL_EVERY_MS) {
+        scrolling.evaluatedAt = now;
+        scrolling.pending = true;
+      }
+      win.clearTimeout(scrollSettle);
+      scrollSettle = win.setTimeout(refresh, 300);
+    };
+    win.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       cancelled = true;
-      timers.forEach((timer) => window.clearTimeout(timer));
-      window.clearTimeout(debounce);
-      window.removeEventListener("resize", onLayout);
+      win.cancelAnimationFrame(frame);
+      timers.forEach((timer) => win.clearTimeout(timer));
+      win.clearTimeout(debounce);
+      win.clearTimeout(scrollSettle);
+      win.removeEventListener("resize", onLayout);
+      if (fine) win.removeEventListener("mousemove", onMove);
+      win.removeEventListener("scroll", onScroll);
       observer?.disconnect();
       stopWatching();
+      tokens.forEach((token) => releaseMotion(token));
+      tokens.clear();
     };
-  }, [location.pathname, count, seed, salt]);
+  }, [location.pathname, count, seed, salt, timeScale, temperament, reactionRng]);
 
-  const update = (mapper) => {
-    batsRef.current = batsRef.current.map(mapper);
+  const scare = (id) => {
+    const bat = batsRef.current.find((candidate) => candidate.id === id);
+    if (!bat || !REACTIVE.has(bat.state)) return;
+    const token = requestMotion("bat_scare", { force: true });
+    if (token) tokensRef.current.set(id, token);
+    emitSound("bat_scare");
+    const now = performance.now();
+    batsRef.current = batsRef.current.map((candidate) => (candidate.id === id ? startle(candidate, rngRef.current, viewFor(candidate.fixed, window), now) : candidate));
     setBats(batsRef.current);
   };
-  const scare = (id) => {
-    const scrollY = window.scrollY || 0;
-    requestMotion("bat_scare", { force: true });
-    emitSound("bat_scare");
-    update((bat) => {
-      if (bat.id !== id || bat.state !== "hanging") return bat;
-      const top = bat.anchor.fixed ? 0 : scrollY;
-      const view = { top, bottom: top + window.innerHeight, width: window.innerWidth };
-      return { ...bat, state: "flying", path: flightPath({ x: bat.x, y: bat.y }, rngRef.current, view) };
-    });
-  };
-  const done = (id) => update((bat) => (bat.id === id ? { ...bat, state: "gone" } : bat));
 
   if (typeof document === "undefined") return null;
   const alive = bats.filter((bat) => bat.state !== "gone");
   if (!alive.length) return null;
   const renderBat = (bat) => {
-    if (bat.state === "flying") return <FlyingBat key={bat.id} path={bat.path} durationMs={flightMs} size={bat.size} onDone={() => done(bat.id)} />;
+    if (bat.state === "flying" || bat.state === "approaching") {
+      const size = bat.size * 1.7;
+      const transform = `translate(${(bat.x - size / 2).toFixed(1)}px, ${(bat.y - size * 0.275).toFixed(1)}px) rotate(${(bat.rotation || 0).toFixed(1)}deg) scaleX(${bat.facing || 1})`;
+      return (
+        <div key={bat.id} className="tls-hbat tls-hbat--flying" style={{ transform }} data-testid="halloween-bat-flying" data-state={bat.state}>
+          <FlyingBatShape size={size} />
+        </div>
+      );
+    }
+    const sitting = bat.pose === POSE.sit;
+    const top = sitting ? bat.y - shapeHeight(bat) : bat.y;
+    const perch = bat.target || bat.perch;
     return (
       <button
         key={bat.id}
         type="button"
         tabIndex={-1}
-        className={`tls-hbat tls-hbat--hanging ${bat.yield ? "tls-hbat--yield" : ""}`}
-        style={{ transform: `translate(${(bat.x - bat.size / 2).toFixed(1)}px, ${bat.y.toFixed(1)}px)` }}
+        className={`tls-hbat ${sitting ? "tls-hbat--sitting" : "tls-hbat--hanging"} tls-hbat--${bat.state}${bat.yield ? " tls-hbat--yield" : ""}`}
+        style={{ transform: `translate(${(bat.x - bat.size / 2).toFixed(1)}px, ${top.toFixed(1)}px)` }}
         onClick={() => scare(bat.id)}
         data-testid="halloween-bat-hanging"
-        data-kind={bat.anchor.kind}
+        data-kind={perch?.kind}
+        data-pose={bat.pose}
+        data-state={bat.state}
+        data-temperament={bat.temperament}
         data-yield={bat.yield ? "1" : undefined}
       >
-        <HangingBatShape size={bat.size} />
+        {sitting ? <SittingBatShape size={bat.size} /> : <HangingBatShape size={bat.size} />}
       </button>
     );
   };
-  const fixedBats = alive.filter((bat) => bat.anchor.fixed);
-  const pageBats = alive.filter((bat) => !bat.anchor.fixed);
+  const fixedBats = alive.filter((bat) => bat.fixed);
+  const pageBats = alive.filter((bat) => !bat.fixed);
   return createPortal(
     <>
       {fixedBats.length > 0 && <div className="tls-hbats tls-hbats--fixed" aria-hidden="true" data-testid="halloween-hanging-bats-fixed">{fixedBats.map(renderBat)}</div>}
