@@ -141,7 +141,7 @@
 @media (prefers-reduced-motion: reduce) {
   .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-cat-walking, .tls-cat-walking .tls-cat__head, .tls-cat-walking__leg, .tls-cat-walking__tail, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
   .tls-footer-cat { transition: none; }
-  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts { display: none; }
+  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts, .tls-cweb__spider { display: none; }
 }
 
 /* Jumpscares (#680): ein Portal ueber allem, nie klickbar; dunkel -> Gestalt -> dunkel, hoechstens zwei
@@ -214,3 +214,30 @@
 .tls-hbat--settle .tls-hbat__wing--l { animation: tls-hbat-fold-l 1.2s ease-out forwards; }
 .tls-hbat--settle .tls-hbat__wing--r { animation: tls-hbat-fold-r 1.2s ease-out forwards; }
 .tls-hbat--flying { transform-origin: center; }
+
+/* Kleine Netze an echten Ecken (H12): in den oberen Innenecken von Karten und Fußzeile, feiner und blasser als das
+   große Netz; die winzige Spinne läuft selten über ihr Netz und zieht sich zurück, wenn der Zeiger näher kommt. */
+.tls-cwebs { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 41; pointer-events: none; }
+.tls-cweb { position: absolute; top: 0; left: 0; opacity: var(--cweb-opacity, 0.6); transition: opacity 0.3s ease; }
+.tls-cweb--yield { opacity: 0; }
+.tls-cweb__net { display: block; }
+.tls-cweb__spider { position: absolute; opacity: 0; filter: none; }
+@keyframes tls-cweb-walk { 0% { opacity: 0; transform: translate(var(--from-x), var(--from-y)); } 12% { opacity: 1; } 42% { transform: translate(0, 0); } 58% { transform: translate(0, 0); } 88% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--from-x), var(--from-y)); } }
+.tls-cweb__spider--walk { animation: tls-cweb-walk var(--walk-seconds, 6s) ease-in-out forwards; }
+@keyframes tls-cweb-retreat { 0% { opacity: 1; transform: translate(0, 0); } 100% { opacity: 0; transform: translate(var(--from-x), var(--from-y)); } }
+.tls-cweb__spider--retreat { animation: tls-cweb-retreat 0.9s ease-in forwards; }
+.tls-cweb__spider .tls-spider__leg { animation-duration: 0.5s; }
+
+/* Karten und Kacheln (H13): ein Hauch Tiefe im Saisonlicht beim Überfahren - nur Schatten, kein Layout, nichts
+   Dauerhaftes; auf ruhigen und stillen Seiten sowie bei "dezent" nichts. */
+:root[data-season~="halloween"]:not([data-season-page="calm"]):not([data-season-page="quiet"]):not([data-season-intensity~="subtle"]) :is([data-season-anchor="card"], [data-season-perch="card"]):hover { box-shadow: 0 18px 38px -22px rgba(120, 90, 210, 0.65), 0 0 0 1px rgba(170, 225, 240, 0.08); }
+
+/* Fußzeilen-Szene (H16): alles auf dem Strich über dem Impressum; während die Abseil-Spinne oder ein Geist unterwegs
+   ist, halten Katze und Kürbisse still; der erste Kürbis schaut dem Zeiger nach und glüht dabei etwas heller. */
+.tls-footer-scene { display: contents; }
+.tls-footer-pumpkins--line { bottom: auto; }
+.tls-footer-scene[data-busy="1"] .tls-cat__tail, .tls-footer-scene[data-busy="1"] .tls-pumpkin, .tls-footer-scene[data-busy="1"] .tls-pumpkin__face { animation-play-state: paused; }
+.tls-pumpkin-button { transition: filter 0.4s ease; }
+.tls-pumpkin-spot--near .tls-pumpkin-button { filter: drop-shadow(0 0 10px rgba(255, 190, 80, 0.7)); }
+.tls-pumpkin-spot--near .tls-pumpkin__face { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform 0.12s ease-out; }
+

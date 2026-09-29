@@ -5,6 +5,7 @@ import { between, pageRng, pick } from "../rng";
 import { Cat, CatWalking, Lantern, Moon, Pumpkin, Spider } from "./art";
 import { advanceFlock, createFlock, drawBat, nextFlightDelay } from "./bats";
 import { HangingBats } from "./HangingBats";
+import { CornerWebs } from "./CornerWebs";
 import { Graveyard, useFooterLineTop } from "./graveyard";
 import { advanceRappel, createRappel, rappelView } from "./rappel";
 import { EXTENT, buildPlan, createWebLayer, staticLines, webRadius } from "./web";
@@ -13,7 +14,7 @@ import { palette } from "./sounds";
 import { recordSignal } from "../signals";
 import { emitSound } from "../audio";
 import { capabilities, scaleForViewport } from "../intensity";
-import { releaseMotion, requestMotion } from "../motion";
+import { getMotionScheduler, releaseMotion, requestMotion } from "../motion";
 import { MoonInSky } from "../MoonInSky";
 import { useSeason } from "../SeasonContext";
 import { ScareToggle, Scares } from "./Scare";
@@ -93,6 +94,11 @@ export function applyCapabilities(layout, caps) {
     flock: caps.flock ? caps.flockRange : [0, 0],
     wisps: Boolean(caps.wisps),
     scares: Boolean(caps.scares),
+    // Kleine Netze an echten Ecken (H12) und die Fußzeilen-Szene (H16) je Seite und Fenster - Seed bleibt der des großen Netzes.
+    cornerWebs: caps.cornerWebs > 0 ? { count: caps.cornerWebs, seed: layout.web.seed } : null,
+    cat: caps.footerScene === "full" ? layout.cat : null,
+    graves: caps.footerScene === "none" ? [] : caps.footerScene === "small" ? layout.graves.slice(0, 2) : layout.graves,
+    footerPumpkins: caps.footerScene === "none" ? [] : caps.footerScene === "small" ? layout.footerPumpkins.slice(0, 1) : layout.footerPumpkins,
   };
 }
 
@@ -281,6 +287,7 @@ export function Corners({ season }) {
         <Spider className="tls-crawler" size={layout.crawler.size} thread={false} style={{ "--crawl-duration": `${layout.crawler.duration}s` }} data-testid="halloween-crawler" />
       )}
       <RappelSpider spec={layout.rappel} active={moving} />
+      {layout.cornerWebs && <CornerWebs count={layout.cornerWebs.count} seed={layout.cornerWebs.seed} salt={LOAD_SALT} moving={moving} />}
       <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={LOAD_SALT} />
       {moving && layout.scares && <Scares season={season} />}
     </>
@@ -308,26 +315,81 @@ export function Backdrop({ season, now }) {
   return <MoonInSky location={location} now={now} render={() => <Moon />} />;
 }
 
+/** Ist gerade eine große Bewegung in der Fußzeile unterwegs (Abseil-Spinne, Geist)? Dann halten Katze und Kürbisse still. */
+export function useSceneBusy(active) {
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!active) return undefined;
+    const scheduler = getMotionScheduler();
+    const check = () => setBusy(scheduler.snapshot().active.some((kind) => kind === "rappel" || kind === "ghost"));
+    check();
+    return scheduler.subscribe(check);
+  }, [active]);
+  return busy;
+}
+
+/**
+ * Die Fußzeilen-Szene (H16): Katze, Gräber, Kürbisse und (aus H7) Fledermäuse teilen sich den Strich über dem
+ * Impressum; Links und Impressum bleiben frei. Schmale Fenster bekommen die kleine Fassung (ein Kürbis, zwei Gräber,
+ * keine Katze), stille Seiten gar nichts. Während die Abseil-Spinne oder ein Geist unterwegs ist, ruhen die anderen.
+ */
 export function Footer({ season }) {
   const layout = useLayout(season);
   const moving = season.effective !== "subtle";
   const greeting = season.texts?.greeting || "Happy Halloween";
+  const lineTop = useFooterLineTop([layout.footerPumpkins.length]);
+  const busy = useSceneBusy(moving);
+  if (!layout.cat && !layout.graves.length && !layout.footerPumpkins.length) return null;
   return (
-    <>
+    <div className="tls-footer-scene" data-testid="halloween-footer-scene" data-busy={busy ? "1" : undefined} data-size={layout.caps?.footerScene}>
       {layout.cat && <CatOnEdge size={layout.cat.size} startX={layout.cat.x} moving={moving} />}
       {moving && <Graveyard graves={layout.graves} salt={LOAD_SALT} />}
-      <div className="tls-footer-pumpkins" data-testid="halloween-pumpkins">
-        {layout.footerPumpkins.map((pumpkin, index) => <FooterPumpkin key={index} pumpkin={pumpkin} greeting={greeting} />)}
-      </div>
-    </>
+      {layout.footerPumpkins.length > 0 && (
+        <div className={`tls-footer-pumpkins${lineTop === null ? "" : " tls-footer-pumpkins--line"}`} style={lineTop === null ? undefined : { top: `${lineTop}px` }} data-testid="halloween-pumpkins">
+          {layout.footerPumpkins.map((pumpkin, index) => <FooterPumpkin key={index} pumpkin={pumpkin} greeting={greeting} reactive={moving && index === 0} />)}
+        </div>
+      )}
+    </div>
   );
 }
 
-/** Jeder Kürbis im Footer grüßt beim Klick wie die Laterne oben - und zählt am 31.10. ab 18 Uhr genauso (Rückmeldung 28.09.). */
-function FooterPumpkin({ pumpkin, greeting }) {
+/**
+ * Jeder Kürbis im Footer grüßt beim Klick wie die Laterne oben - und zählt am 31.10. ab 18 Uhr genauso (Rückmeldung
+ * 28.09.). Der erste Kürbis (H16) schaut dem Zeiger nach, wenn er näher als 200 px kommt, und glüht dabei etwas heller.
+ */
+function FooterPumpkin({ pumpkin, greeting, reactive = false }) {
   const [open, setOpen] = useState(false);
+  const [near, setNear] = useState(false);
+  const spot = useRef(null);
   const timer = useRef(0);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (!reactive || typeof window === "undefined") return undefined;
+    let frame = 0;
+    let wasNear = false;
+    const onMove = (event) => {
+      if (frame || !spot.current) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const box = spot.current?.getBoundingClientRect();
+        if (!box) return;
+        const center = { x: box.left + box.width / 2, y: box.top + box.height * 0.55 };
+        const isNear = Math.hypot(event.clientX - center.x, event.clientY - center.y) < 200;
+        if (isNear !== wasNear) {
+          wasNear = isNear;
+          setNear(isNear);
+        }
+        const offset = eyeOffset({ x: event.clientX, y: event.clientY }, center, 1.4);
+        spot.current.style.setProperty("--eye-x", `${offset.x.toFixed(2)}px`);
+        spot.current.style.setProperty("--eye-y", `${offset.y.toFixed(2)}px`);
+      });
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [reactive]);
   const onClick = () => {
     setOpen(true);
     emitSound("pumpkin");
@@ -336,7 +398,7 @@ function FooterPumpkin({ pumpkin, greeting }) {
     if (pumpkinCounts()) recordSignal(SIGNAL_KEY);
   };
   return (
-    <span className="tls-pumpkin-spot">
+    <span ref={spot} className={`tls-pumpkin-spot${near ? " tls-pumpkin-spot--near" : ""}`} data-near={near ? "1" : undefined}>
       <button type="button" className={`tls-pumpkin-button ${open ? "tls-pumpkin-button--open" : ""}`} onClick={onClick} aria-label={greeting} title={greeting} data-testid="halloween-footer-pumpkin">
         <Pumpkin size={pumpkin.size} face={pumpkin.face} slow={pumpkin.slow} />
       </button>

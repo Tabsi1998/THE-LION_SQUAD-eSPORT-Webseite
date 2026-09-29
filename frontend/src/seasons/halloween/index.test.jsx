@@ -352,3 +352,73 @@ test("Himmel: ein Seitenwechsel lässt den Schwarm früher starten", () => {
   expect(calls.filter((name) => name === "fill").length).toBeGreaterThan(0);
   layers.forEach((layer) => layer.dispose?.());
 });
+
+test("Kleine Netze (H12): lebendige Seiten bis zu drei je Fensterhoehe, ruhige eine, stille keine, Handy keine, dezent eine", () => {
+  expect(pageLayout("/", "normal").cornerWebs).toEqual({ count: 3, seed: pageLayout("/", "normal").web.seed });
+  expect(pageLayout("/", "full").cornerWebs.count).toBe(4);
+  expect(pageLayout("/players", "normal").cornerWebs.count).toBe(2);
+  expect(pageLayout("/contact", "normal").cornerWebs.count).toBe(1);
+  expect(pageLayout("/admin", "normal").cornerWebs).toBeNull();
+  expect(pageLayout("/", "normal", "feinschliff", 390).cornerWebs).toBeNull();
+  expect(pageLayout("/", "normal", "feinschliff", 800).cornerWebs.count).toBe(1);
+  expect(pageLayout("/", "subtle").cornerWebs.count).toBe(1);
+});
+
+test("Fusszeilen-Szene (H16): schmale Fenster und ruhige Seiten bekommen die kleine Fassung, stille Seiten nichts", () => {
+  const full = PATHS.map((path) => pageLayout(path, "normal")).find((layout) => layout.cat && layout.graves.length > 2 && layout.footerPumpkins.length === 2);
+  expect(full).toBeTruthy();
+  const phone = pageLayout("/", "normal", "feinschliff", 390);
+  expect(phone.cat).toBeNull();
+  expect(phone.graves.length).toBeLessThanOrEqual(2);
+  expect(phone.footerPumpkins.length).toBe(1);
+  expect(phone.caps.footerScene).toBe("small");
+  const calm = pageLayout("/contact", "normal");
+  expect(calm.cat).toBeNull();
+  expect(calm.footerPumpkins.length).toBe(1);
+  const quiet = pageLayout("/admin", "normal");
+  expect(quiet.graves).toEqual([]);
+  expect(quiet.footerPumpkins).toEqual([]);
+  expect(quiet.cat).toBeNull();
+});
+
+test("Fusszeilen-Szene: Kuerbisse sitzen auf dem Strich, der erste schaut dem Zeiger nach; waehrend die Abseil-Spinne unterwegs ist, ruht die Szene", async () => {
+  vi.useFakeTimers();
+  mountFixture('<footer id="foot" style="position: relative"><div id="line" data-season-line="footer"></div></footer>');
+  const line = document.getElementById("line");
+  Object.defineProperty(line, "offsetTop", { value: 240, configurable: true });
+  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").footerPumpkins.length === 2);
+  const view = mount(<Footer season={halloween()} />, path);
+  const scene = screen.getByTestId("halloween-footer-scene");
+  expect(scene.getAttribute("data-busy")).toBeNull();
+  const pumpkins = screen.getByTestId("halloween-pumpkins");
+  expect(pumpkins.className).toContain("tls-footer-pumpkins--line");
+  expect(pumpkins.style.top).toBe("240px");
+  expect(screen.getAllByTestId("halloween-footer-pumpkin").length).toBe(2);
+  const spot = screen.getAllByTestId("halloween-footer-pumpkin")[0].parentElement;
+  spot.getBoundingClientRect = () => ({ left: 1000, right: 1060, top: 700, bottom: 760, width: 60, height: 60 });
+  fireEvent.mouseMove(window, { clientX: 1040, clientY: 720 });
+  await act(async () => {
+    vi.advanceTimersByTime(40);
+  });
+  expect(spot.getAttribute("data-near")).toBe("1");
+  expect(spot.className).toContain("tls-pumpkin-spot--near");
+  expect(spot.style.getPropertyValue("--eye-x")).not.toBe("");
+  fireEvent.mouseMove(window, { clientX: 100, clientY: 100 });
+  await act(async () => {
+    vi.advanceTimersByTime(40);
+  });
+  expect(spot.getAttribute("data-near")).toBeNull();
+  // Grosse Bewegung in der Fusszeile: der Planer meldet sie, die Szene haelt still - und laeuft danach weiter.
+  const { getMotionScheduler } = await import("../motion");
+  let token = null;
+  await act(async () => {
+    token = getMotionScheduler().request("rappel", { force: true });
+  });
+  expect(screen.getByTestId("halloween-footer-scene").getAttribute("data-busy")).toBe("1");
+  await act(async () => {
+    getMotionScheduler().release(token);
+  });
+  expect(screen.getByTestId("halloween-footer-scene").getAttribute("data-busy")).toBeNull();
+  view.unmount();
+});
+
