@@ -103,6 +103,7 @@ describe("AchievementsShowcasePage (#619)", () => {
     expect(within(week).getByTestId("week-award-user")).toHaveTextContent("Ben");
     expect(within(week).getByTestId("week-award-user")).toHaveAttribute("href", "/u/ben");
     expect(week).toHaveTextContent("Kalenderwoche 40");
+    expect(within(week).getByTestId("week-award-badge")).toHaveAttribute("data-material", "iron");
     expect(within(week).getByTestId("week-award-card")).toHaveAttribute("href", "/achievements/a/aw-week");
 
     const tiles = screen.getByTestId("achievements-categories");

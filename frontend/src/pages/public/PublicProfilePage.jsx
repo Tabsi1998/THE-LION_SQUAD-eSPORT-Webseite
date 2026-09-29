@@ -9,6 +9,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 import { categoryProgress } from "@/pages/user/profile/AchievementPanels";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/AccountLevel";
@@ -666,10 +667,8 @@ export default function PublicProfilePage() {
                   <SectionTitle icon={Medal} color="#29B6E8" kicker="Zuletzt" title="Achievements" action={badges.length > 6 ? { label: "Alle ansehen", onClick: () => setTab("badges") } : null} />
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2" data-testid="profile-recent-awards">
                     {badges.slice(0, 6).map((a) => (
-                      <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#121212]" style={{ boxShadow: `inset 2px 0 0 ${a.level_color}` }}>
-                        <div className="w-9 h-9 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: a.level_color + "55", backgroundColor: a.level_color + "12" }}>
-                          <Medal className="w-4 h-4" style={{ color: a.level_color }} />
-                        </div>
+                      <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#121212]" style={{ boxShadow: `inset 2px 0 0 ${a.material_color || a.level_color}` }}>
+                        <Badge material={a.material} level={a.level} rank={a.rank} art={a.art} icon={a.icon || a.group_icon} size="md" title={a.name} />
                         <div className="min-w-0 flex-1">
                           <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: a.level_color }}>{a.level_name}</div>
                           <div className="font-semibold truncate text-sm">{a.name}</div>
@@ -864,9 +863,7 @@ function PinnedAwardCard({ award }) {
   const color = award.material_color || award.level_color || "#FFD700";
   return (
     <div className="flex items-center gap-3 p-3 border rounded-sm bg-[#121212]" style={{ borderColor: `${color}55`, boxShadow: `inset 0 0 0 1px ${color}14` }} data-testid={`profile-pinned-${award.code}`}>
-      <div className="w-10 h-10 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: `${color}66`, backgroundColor: `${color}14` }}>
-        <AchievementIcon name={award.icon || award.group_icon} fallback="trophy" className="w-5 h-5" style={{ color, filter: `drop-shadow(0 0 4px ${color}66)` }} />
-      </div>
+      <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size="lg" title={award.name} />
       <div className="min-w-0 flex-1">
         <div className="text-[10px] font-bold uppercase tracking-widest truncate" style={{ color }}>{award.material_name || award.level_name}</div>
         <div className="font-semibold truncate text-sm">{award.name}</div>

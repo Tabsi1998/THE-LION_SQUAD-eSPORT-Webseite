@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Medal, Star, Target } from "lucide-react";
 import { api } from "@/lib/api";
-import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 import { AccountLevelProgress, accountLevelTier } from "@/components/tls/AccountLevel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
@@ -72,7 +72,7 @@ export function AchievementsTile({ className = "" }) {
           ) : null}
           {last ? (
             <div className="mt-2 flex items-center gap-2 text-sm" data-testid="dashboard-achievements-last">
-              <AchievementIcon name={last.icon} fallback="trophy" className="w-3.5 h-3.5 shrink-0" style={{ color: last.material_color || "#FFD700" }} />
+              <Badge material={last.material} rank={last.rank} art={last.art} icon={last.icon} size="xs" title={last.name} />
               <span className="text-white/45 text-[10px] uppercase tracking-widest font-bold shrink-0">Zuletzt</span>
               <span className="truncate font-semibold">{last.name}</span>
               <span className="ml-auto text-[10px] uppercase tracking-widest shrink-0" style={{ color: last.material_color || "#FFD700" }}>{last.material_name}</span>

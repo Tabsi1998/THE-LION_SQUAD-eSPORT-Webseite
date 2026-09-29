@@ -350,7 +350,7 @@ async def _pick_week_award(db, start: datetime, end: datetime) -> dict | None:
         return {
             "award_id": award.get("id"), "tier_code": tier["code"], "name": tier.get("name"), "description": tier.get("description"),
             "group_code": group["code"], "group_name": group.get("name"), "category": category_v2(group.get("category")),
-            "icon": tier.get("icon") or group.get("icon"), "art": tier.get("art"), "material": tier.get("material"),
+            "icon": tier.get("icon") or group.get("icon"), "art": tier.get("art"), "rank": int(tier.get("rank") or 0), "material": tier.get("material"),
             "material_name": tier.get("material_name"), "material_color": tier.get("material_color"),
             "level": tier.get("level"), "points": int(tier.get("points") or 0), "earned_at": award.get("earned_at"),
             "holders": rare["holders"], "percent": rare["percent"], "user": _public_user(user),
@@ -392,7 +392,7 @@ async def recent_unlocks(db, limit: int = 20) -> list[dict]:
         out.append({
             "award_id": award.get("id"), "tier_code": tier["code"], "name": tier.get("name"), "group_code": group["code"],
             "group_name": group.get("name"), "category": category_v2(group.get("category")), "icon": tier.get("icon") or group.get("icon"),
-            "art": tier.get("art"), "material": tier.get("material"), "material_name": tier.get("material_name"),
+            "art": tier.get("art"), "rank": int(tier.get("rank") or 0), "material": tier.get("material"), "material_name": tier.get("material_name"),
             "material_color": tier.get("material_color"), "level": tier.get("level"), "points": int(tier.get("points") or 0),
             "earned_at": award.get("earned_at"), "user": _public_user(user),
         })
@@ -414,7 +414,7 @@ async def my_summary(db, user_id: str, groups: list[dict], awards: list[dict]) -
     return {
         "level": await xp.view(user_id),
         "next_up": nxt[0] if nxt else None,
-        "last_award": {k: last.get(k) for k in ("award_id", "code", "name", "group_name", "material", "material_name", "material_color", "icon", "points", "earned_at")} if last else None,
+        "last_award": {k: last.get(k) for k in ("award_id", "code", "name", "group_name", "material", "material_name", "material_color", "icon", "art", "rank", "level", "points", "earned_at")} if last else None,
         "count": len(earned),
         "points": sum(int(a.get("points") or 0) for a in earned),
         "hidden": await hidden_summary(db, user_id),

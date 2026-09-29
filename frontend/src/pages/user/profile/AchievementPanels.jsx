@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Reorder } from "framer-motion";
 import { ArrowRight, Filter, GripVertical, Medal, Pin, Sparkles, Star, Target, User, X } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 import { CATEGORY_META, STATUS_FILTERS, formatPercent } from "@/components/tls/AchievementGroups";
 import { AccountLevelProgress } from "@/components/tls/AccountLevel";
 
@@ -109,9 +110,9 @@ export function NextUpPanel({ items = [] }) {
             return (
               <div key={tier.code} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 flex flex-col" data-testid={`next-achievement-${tier.code}`}>
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: `${accent}55`, backgroundColor: `${accent}12` }}>
-                    <AchievementIcon name={tier.icon || tier.group_icon} fallback="trophy" className="w-5 h-5" style={{ color: accent }} />
-                  </div>
+                  <span className="shrink-0" title={tier.how_to ? `So schaffst du es: ${tier.how_to}` : undefined}>
+                    <Badge material={tier.material} rank={tier.rank} art={tier.art} icon={tier.icon || tier.group_icon} earned={false} percent={percent} size="lg" title={tier.name} />
+                  </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] uppercase tracking-widest font-bold truncate" style={{ color: accent }}>{tier.group_name}</div>
                     <div className="font-heading font-bold text-base leading-tight truncate">{tier.name}</div>
@@ -159,9 +160,7 @@ function PinnedCard({ award, onRemove, dragging }) {
       data-testid={`pinned-award-${award.code}`}
     >
       <GripVertical className="w-4 h-4 text-white/25 shrink-0" aria-hidden="true" />
-      <div className="w-10 h-10 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: `${color}66`, backgroundColor: `${color}14` }}>
-        <AchievementIcon name={award.icon || award.group_icon} fallback="trophy" className="w-5 h-5" style={{ color }} />
-      </div>
+      <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size="lg" title={award.name} />
       <div className="min-w-0 flex-1">
         <div className="text-[10px] uppercase tracking-widest font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
         <div className="font-semibold text-sm truncate">{award.name}</div>
