@@ -141,7 +141,8 @@
 @media (prefers-reduced-motion: reduce) {
   .tls-spider--drop, .tls-spider__leg, .tls-crawler, .tls-pumpkin, .tls-pumpkin__face, .tls-lantern__lid, .tls-lantern__bat, .tls-cat__eyes, .tls-cat__tail, .tls-cat-walking, .tls-cat-walking .tls-cat__head, .tls-cat-walking__leg, .tls-cat-walking__tail, .tls-bat__wing, .tls-rappel--sway, .tls-ghost { animation: none !important; }
   .tls-footer-cat { transition: none; }
-  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts, .tls-cweb__spider { display: none; }
+  .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts, .tls-cweb__spider, .tls-eyes, .tls-edge { display: none; }
+  .tls-fog__layer { animation: none !important; transform: none !important; }
 }
 
 /* Jumpscares (#680): ein Portal ueber allem, nie klickbar; dunkel -> Gestalt -> dunkel, hoechstens zwei
@@ -240,4 +241,33 @@
 .tls-pumpkin-button { transition: filter 0.4s ease; }
 .tls-pumpkin-spot--near .tls-pumpkin-button { filter: drop-shadow(0 0 10px rgba(255, 190, 80, 0.7)); }
 .tls-pumpkin-spot--near .tls-pumpkin__face { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform 0.12s ease-out; }
+
+/* Nebel (H14): zwei sehr leise Ebenen unten im Bild als Screen-Mischung - hellt nur dunkle Flächen einen Hauch auf,
+   Schrift bleibt wie sie ist. Stärker am Seitenanfang und -ende (--fog-strength aus Fog.jsx), dazwischen fast
+   unsichtbar; Drift mit dem Wind (--season-wind), minimale Parallaxe (--season-scroll); still ohne Bewegung. */
+.tls-fog { position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; mix-blend-mode: screen; --fog-strength: 0.5; }
+.tls-fog__layer { position: absolute; left: -50vw; width: 200vw; bottom: -8vh; height: 60vh; will-change: transform; }
+.tls-fog__layer--far { opacity: calc(0.6 * var(--fog-strength)); background: radial-gradient(ellipse 36% 44% at 30% 88%, rgba(150, 205, 225, 0.13), transparent 70%), radial-gradient(ellipse 42% 38% at 72% 94%, rgba(150, 205, 225, 0.1), transparent 70%); animation: tls-fog-drift-far calc(120s * 0.6 / var(--season-wind, 0.6)) ease-in-out infinite; }
+.tls-fog__layer--near { opacity: calc(0.75 * var(--fog-strength)); height: 38vh; background: radial-gradient(ellipse 30% 54% at 18% 100%, rgba(170, 225, 240, 0.15), transparent 70%), radial-gradient(ellipse 32% 48% at 60% 100%, rgba(170, 225, 240, 0.12), transparent 70%), radial-gradient(ellipse 26% 44% at 90% 100%, rgba(170, 225, 240, 0.1), transparent 70%); animation: tls-fog-drift-near calc(75s * 0.6 / var(--season-wind, 0.6)) ease-in-out infinite; }
+@keyframes tls-fog-drift-far { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(6vw); } }
+@keyframes tls-fog-drift-near { 0%, 100% { transform: translateX(0) translateY(calc(var(--season-scroll, 0px) * -0.03)); } 50% { transform: translateX(-8vw) translateY(calc(var(--season-scroll, 0px) * -0.03)); } }
+.tls-fog--static .tls-fog__layer { animation: none; transform: none; }
+
+/* Augen im Dunkeln (H15): ein Paar in freier dunkler Fläche - langsam auf, ein- bis zweimal blinzeln, Pupillen
+   zum Zeiger, wieder weg. Nie klickbar, unter Kopfzeile und Dialogen. */
+.tls-eyes { position: fixed; z-index: 4; width: 0; height: 0; pointer-events: none; animation: tls-eyes-fade var(--eyes-seconds, 8s) ease-in-out forwards; }
+.tls-eyes__eye { position: absolute; top: -5px; width: 12px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, rgba(155, 231, 255, 0.95), rgba(155, 231, 255, 0.35) 70%, transparent 100%); box-shadow: 0 0 8px rgba(155, 231, 255, 0.45); transform-origin: center; animation: tls-eyes-blink 3.6s ease-in-out 1.8s var(--blinks, 1); }
+.tls-eyes__eye--l { left: -16px; }
+.tls-eyes__eye--r { left: 4px; }
+.tls-eyes__pupil { position: absolute; left: 4px; top: 2.5px; width: 4px; height: 4px; border-radius: 50%; background: #05070c; transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform 0.15s ease-out; }
+@keyframes tls-eyes-fade { 0% { opacity: 0; } 22% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tls-eyes-blink { 0%, 100% { transform: scaleY(1); } 6% { transform: scaleY(0.08); } 12% { transform: scaleY(1); } }
+
+/* Seltener Schatten am äußeren Rand (H15): ein weicher Hauch, ein bis zwei Sekunden, ohne Ton, hinter allem. */
+.tls-edge { position: fixed; z-index: 2; width: 72px; height: 220px; pointer-events: none; mix-blend-mode: screen; animation: tls-edge-pass var(--edge-seconds, 1.9s) ease-in-out forwards; }
+.tls-edge--left { left: -12px; }
+.tls-edge--right { right: -12px; }
+.tls-edge__shade { display: block; width: 100%; height: 100%; background: radial-gradient(ellipse 50% 50% at 30% 42%, rgba(150, 205, 225, 0.24), transparent 70%); filter: blur(6px); }
+.tls-edge--right .tls-edge__shade { transform: scaleX(-1); }
+@keyframes tls-edge-pass { 0% { opacity: 0; transform: translateY(26px); } 45% { opacity: 1; } 100% { opacity: 0; transform: translateY(-44px); } }
 

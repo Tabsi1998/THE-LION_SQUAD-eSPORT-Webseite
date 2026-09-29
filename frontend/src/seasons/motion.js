@@ -51,8 +51,9 @@ export function createMotionScheduler({ now = () => Date.now(), slots = DEFAULT_
     if (unlimited) return null;  // Testschalter: alles darf, Belegung wird trotzdem gezählt
     if (!force && at < state.armedAt) return "warmup";
     if (!force && at < state.resumeAt) return "resume";
-    const last = state.lastByKind[kind] || 0;
-    if (spec.cooldownMs && at - last < spec.cooldownMs) return "cooldown";
+    // Nie gestartete Klassen haben keine Abklingzeit - sonst sperrt eine kleine Uhr (Tests) den ersten Start.
+    const last = state.lastByKind[kind];
+    if (spec.cooldownMs && last !== undefined && at - last < spec.cooldownMs) return "cooldown";
     if (!force && spec.slots > 0 && at - state.lastStartAt < minGapMs) return "gap";
     if (spec.slots > 0 && used(at) + spec.slots > state.slots && !force) return "busy";
     return null;
