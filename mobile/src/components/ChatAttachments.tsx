@@ -23,6 +23,7 @@ import { colors } from "../theme";
 import type { ChatAttachment } from "../types";
 import { AuthorizedImage, type AuthorizedImageState } from "./AuthorizedImage";
 import { Muted } from "./Text";
+import { useSeasonOverlay } from "../seasons/anchors";
 
 const UPLOAD_TIMEOUT_MS = 120_000;
 
@@ -175,6 +176,7 @@ export function AttachmentDraftsRow({ drafts, onRemove }: { drafts: ChatAttachme
 export function MessageAttachments({ attachments }: { attachments?: ChatAttachment[] | null }) {
   const { accessToken } = useAuth();
   const [open, setOpen] = useState<ChatAttachment | null>(null);
+  useSeasonOverlay("attachment-viewer", open !== null);
   const items = attachments ?? [];
   if (!items.length) return null;
   const several = items.length > 1;

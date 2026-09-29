@@ -190,7 +190,7 @@ function TeamCard({ team, onPress, onChat }: { team: Team; onPress: () => void; 
   const lastMessage = team.chat_preview?.length ? team.chat_preview[team.chat_preview.length - 1] : null;
   return (
     <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.card}>
+      <Card style={styles.card} perch={`team-${team.id}`}>
         <View style={styles.teamTop}>
           <MediaImage
             uri={team.logo_url}

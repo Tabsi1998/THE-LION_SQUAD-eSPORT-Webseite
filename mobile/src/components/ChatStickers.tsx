@@ -7,6 +7,7 @@ import { searchStickers, stickerSource, type CatalogSticker, type StickerPack } 
 import { colors } from "../theme";
 import type { ChatSticker } from "../types";
 import { Body, Muted } from "./Text";
+import { useSeasonOverlay } from "../seasons/anchors";
 
 // Ein Katalog für alle Chats der App. Beim Öffnen wird er trotzdem neu geholt,
 // damit ein frisch angelegtes Paket ohne Neustart erscheint.
@@ -34,6 +35,7 @@ export function StickerPicker({ visible, onClose, onPick }: {
   onClose: () => void;
   onPick: (sticker: CatalogSticker) => void;
 }) {
+  useSeasonOverlay("sticker-picker", visible);
   const insets = useSafeAreaInsets();
   const [packs, setPacks] = useState<StickerPack[] | null>(cachedPacks);
   const [failed, setFailed] = useState(false);
