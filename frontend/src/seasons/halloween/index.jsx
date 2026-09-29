@@ -6,6 +6,8 @@ import { Cat, CatWalking, Lantern, Moon, Pumpkin, Spider } from "./art";
 import { advanceFlock, createFlock, drawBat, nextFlightDelay } from "./bats";
 import { HangingBats } from "./HangingBats";
 import { CornerWebs } from "./CornerWebs";
+import { Fog } from "./Fog";
+import { Eyes, RareEdge } from "./Watchers";
 import { Graveyard, useFooterLineTop } from "./graveyard";
 import { advanceRappel, createRappel, rappelView } from "./rappel";
 import { EXTENT, buildPlan, createWebLayer, staticLines, webRadius } from "./web";
@@ -289,6 +291,8 @@ export function Corners({ season }) {
       <RappelSpider spec={layout.rappel} active={moving} />
       {layout.cornerWebs && <CornerWebs count={layout.cornerWebs.count} seed={layout.cornerWebs.seed} salt={LOAD_SALT} moving={moving} />}
       <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={LOAD_SALT} />
+      <Eyes active={moving && Boolean(layout.caps?.eyes)} seed={layout.web.seed} salt={LOAD_SALT} />
+      <RareEdge active={moving && Boolean(layout.caps?.rareEvents)} seed={layout.web.seed} salt={LOAD_SALT} />
       {moving && layout.scares && <Scares season={season} />}
     </>
   );
@@ -308,11 +312,18 @@ function useReducedMotionFlag() {
 }
 
 /** Der Mond mit echter Phase dort, wo er über dem Vereinsort gerade steht (#681) - auf jeder Seite, wenn er über dem Horizont ist. */
+/** Hintergrund: der Nebel (H14) je Seitenklasse und Fensterbreite, dazu der Mond mit echter Phase ab „normal“. */
 export function Backdrop({ season, now }) {
   const layout = useLayout(season);
   const { location } = useSeason();
-  if (!layout.moon) return null;
-  return <MoonInSky location={location} now={now} render={() => <Moon />} />;
+  const { reducedMotion } = useReducedMotionFlag();
+  const moving = season.effective !== "subtle" && !reducedMotion;
+  return (
+    <>
+      <Fog level={layout.caps?.fog || "none"} moving={moving} />
+      {layout.moon && <MoonInSky location={location} now={now} render={() => <Moon />} />}
+    </>
+  );
 }
 
 /** Ist gerade eine große Bewegung in der Fußzeile unterwegs (Abseil-Spinne, Geist)? Dann halten Katze und Kürbisse still. */

@@ -422,3 +422,23 @@ test("Fusszeilen-Szene: Kuerbisse sitzen auf dem Strich, der erste schaut dem Ze
   view.unmount();
 });
 
+test("Hintergrund (H14): Nebel je Seitenklasse - lebendig nah (zwei Ebenen), ruhig fern, still keiner, dezent fern und still", () => {
+  const lively = mount(<Backdrop season={halloween()} />, "/");
+  const fog = screen.getByTestId("halloween-fog");
+  expect(fog.getAttribute("data-level")).toBe("near");
+  expect(fog.querySelectorAll(".tls-fog__layer").length).toBe(2);
+  expect(fog.className).not.toContain("tls-fog--static");
+  lively.unmount();
+  const calm = mount(<Backdrop season={halloween()} />, "/contact");
+  expect(screen.getByTestId("halloween-fog").getAttribute("data-level")).toBe("far");
+  calm.unmount();
+  const quiet = mount(<Backdrop season={halloween()} />, "/admin");
+  expect(screen.queryByTestId("halloween-fog")).toBeNull();
+  quiet.unmount();
+  const subtle = mount(<Backdrop season={halloween({ effective: "subtle" })} />, "/");
+  const still = screen.getByTestId("halloween-fog");
+  expect(still.getAttribute("data-level")).toBe("far");
+  expect(still.className).toContain("tls-fog--static");
+  subtle.unmount();
+});
+
