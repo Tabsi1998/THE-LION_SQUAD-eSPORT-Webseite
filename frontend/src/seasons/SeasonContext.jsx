@@ -156,6 +156,8 @@ export function SeasonProvider({ children, channel = "web" }) {
       reducedMotion,
       preview: Boolean(previewToken && payload?.preview),
       weather: payload?.weather || null,
+      // Ort des Vereins (#681): Breite/Länge für den Himmel - fehlt er, rechnen die Module mit Innsbruck.
+      location: payload?.location || null,
       reload: load,
     };
   }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load]);
@@ -163,7 +165,7 @@ export function SeasonProvider({ children, channel = "web" }) {
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
 
-const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, reload: () => {} };
+const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, location: null, reload: () => {} };
 
 export function useSeason() {
   return useContext(SeasonContext) || EMPTY;

@@ -12,6 +12,8 @@ import { advanceWisp, createWisp, drawWisp, nextWispDelay } from "./wisps";
 import { palette } from "./sounds";
 import { recordSignal } from "../signals";
 import { emitSound } from "../audio";
+import { MoonInSky } from "../MoonInSky";
+import { useSeason } from "../SeasonContext";
 import "./halloween.css";
 
 // Halloween (#635, #655, #658, #660–#664, Runde IV): dunkel und edel, und man kann Dingen beim Entstehen zuschauen.
@@ -55,8 +57,9 @@ export function pageLayout(pathname, intensity = "normal", salt = LOAD_SALT) {
   const hangingBats = subtle ? 0 : full ? 2 + batRoll : 1 + batRoll;
   const graves = rng() < 0.6 ? Array.from({ length: 2 + Math.floor(rng() * 3) }, (_, index) => ({ x: 0.08 + index * 0.16 + rng() * 0.09, size: Math.round(between(rng, 20, 28)), tilt: between(rng, -7, 7) })) : [];
   const cat = rng() < 0.45 ? { size: Math.round(between(rng, 60, 76)), x: Math.round(between(rng, 40, 200)) } : null;
+  // Der Mond (#681) ist kein Würfel mehr: er steht auf jeder Seite dort, wo er gerade wirklich steht - nur „dezent“ lässt ihn weg.
   const moonRoll = rng();
-  const moon = !subtle && moonRoll < 0.85 ? { side: corner === "tl" ? "right" : "left" } : null;
+  const moon = !subtle ? { side: corner === "tl" ? "right" : "left", roll: moonRoll } : null;
   const footerPumpkins = [{ face: pick(rng, FACES), size: Math.round(between(rng, 46, 60)) }];
   if (rng() < 0.5) footerPumpkins.push({ face: pick(rng, FACES), size: Math.round(between(rng, 34, 44)), slow: true });
   const flock = full ? [5, 8] : [3, 5];
@@ -243,10 +246,12 @@ function useReducedMotionFlag() {
   return { reducedMotion };
 }
 
-export function Backdrop({ season }) {
+/** Der Mond mit echter Phase dort, wo er über dem Vereinsort gerade steht (#681) - auf jeder Seite, wenn er über dem Horizont ist. */
+export function Backdrop({ season, now }) {
   const layout = useLayout(season);
+  const { location } = useSeason();
   if (!layout.moon) return null;
-  return <Moon className={`tls-moon--${layout.moon.side}`} />;
+  return <MoonInSky location={location} now={now} render={() => <Moon />} />;
 }
 
 export function Footer({ season }) {
