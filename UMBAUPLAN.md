@@ -2614,6 +2614,29 @@ der Erfolge - und vier neue Regeln, die für alles gelten.
   Fundstücke im Profil ([#678](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/678));
   der Standard steht als Kommentar auf jedem Saison-Issue #637–#647. Jede Runde endet mit
   Screenshots und einer Probe, nicht mit „Tests grün“.
+- **Erfolge II, Katalog D bis Admin** (#688–#694, #709): Katalog D mit 33 Gruppen Verein,
+  Besonders und Geheim (148 Gruppen, 615 Stufen insgesamt); Sichtbarkeit mit Seltenheit,
+  Erfolg der Woche, Anheften und einer Teilen-Karte als PNG mit Open-Graph-Seite; Abzeichen
+  als Relief in neun Materialien mit 142 Motiven, Zeremonien mit Warteschlange, elf Bewegungen
+  und sieben Klängen (Regler im Profil), das Abzeichen in jeder Liste; Admin-Backend mit
+  Vergabe samt Datum, Massenvergabe, Katalog-Prüfung mit Export und Import, Protokoll,
+  Saison-Vorschau, XP-Deckeln und Statistik als CSV. Die acht Admin-Reiter im Web fehlen noch.
+- **Halloween IV, Feinschliff** (Meilenstein 43, #695–#708, PRs #710–#714): der Betreiber wollte
+  „wirklich einen Stand“. Fundament: Ruhezonen (Formulare, Dialoge, Menüs, Brackets,
+  Tabellen), ein Bewegungsbudget (nie zwei große Bewegungen zugleich, Abklingzeiten je
+  Klasse, versteckter Tab pausiert) und Seitenklassen (Start/Events/News lebendig, Detail-
+  und Community-Seiten mittel, Bracket/Formulare/Login ruhig, Admin still). Fledermäuse
+  sitzen und hängen an echten Kanten statt in Buchstaben (Karten-Ecken, Menü, Kopfzeile,
+  Bilder, Löwe, Fußzeilen-Strich), leben nach Zuständen mit vier Temperamenten, fliegen auf
+  Bögen mit Drehung, kommen zurück und reagieren auf Zeiger und schnelles Scrollen – selten,
+  mit langen Pausen. Kleine Netze in Kartenecken, Karten mit einem Hauch Tiefe beim
+  Überfahren, die Fußzeile als eine Szene (Kürbisse auf dem Strich, der erste schaut dem
+  Zeiger nach). Nebel in zwei leisen Ebenen hinter allem Wichtigen, Augen im Dunkeln nur
+  in freier Fläche, ein seltener Schatten am Rand. Handy und Reduced Motion als feste Regeln,
+  ein Leistungsblick (Schleifen ruhen, wenn nichts passiert) und eine Playwright-Abnahme
+  über neun Seiten und fünf Breiten. Zwei Lehren: auf Windows verwechselt Vite Dateinamen,
+  die sich nur in der Schreibung unterscheiden; und „Closes #a, #b“ schließt auf GitHub nur
+  das erste Issue.
 
 ## Noch offen und bewusst getrennt
 
