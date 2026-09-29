@@ -51,6 +51,17 @@ def test_karte_ist_ein_png_in_1200_mal_630():
     png = share.render_card({**payload, "name": long_name, "description": "", "earned_at": None, "material_color": "kaputt", "holders": 0, "rank": 9})
     assert Image.open(io.BytesIO(png)).size == (1200, 630)
     assert share._hex("kaputt") == (255, 215, 0, 255)
+    assert share._blend((255, 255, 255, 255), 255) == (255, 255, 255, 255) and share._blend((255, 255, 255, 255), 0) == (10, 10, 10, 255)
+    # Die Fläche im Emblem ist dunkel (vorgemischt), das Rangzeichen darauf hell - sonst wäre es unsichtbar.
+    def bright_in_emblem(png: bytes) -> int:
+        image = Image.open(io.BytesIO(png)).convert("RGB")
+        assert max(image.getpixel((250, 300 - 120))) < 90, "Emblemfläche bleibt dunkel"
+        return sum(1 for x in range(170, 331, 2) for y in range(230, 371, 2) if max(image.getpixel((x, y))) > 150)
+
+    assert bright_in_emblem(share.render_card(payload)) > 300, "VII ist zu sehen"
+    assert bright_in_emblem(share.render_card({**payload, "rank": 8, "material": "legendary", "material_color": "#FF3B30"})) > 300, "der Stern für Legendär ist gezeichnet, kein Schrift-Kästchen"
+    assert bright_in_emblem(share.render_card({**payload, "rank": 9, "material": "hidden", "material_color": "#A855F7"})) > 100, "das ? für Geheim"
+    assert [len(line) > 0 for line in share._wrap(share.ImageDraw.Draw(image), "ein zwei drei vier fünf sechs sieben acht neun zehn elf zwölf dreizehn vierzehn fünfzehn sechzehn siebzehn achtzehn neunzehn zwanzig einundzwanzig", share._font(28, False), 300, 2)] == [True, True]
 
 
 @pytest.mark.asyncio

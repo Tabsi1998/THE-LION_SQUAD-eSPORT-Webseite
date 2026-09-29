@@ -38,7 +38,7 @@ FONT_REGULAR_CANDIDATES = (
     "C:/Windows/Fonts/arial.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
 )
-ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 8: "★", 9: "?"}
+ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI", 7: "VII", 9: "?"}  # Rang 8 (Legendär) = gezeichneter Stern
 
 
 # ------------------------------------------------------------------ Daten
@@ -104,6 +104,44 @@ def _hex(color: str, alpha: int = 255) -> tuple:
     return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16), alpha)
 
 
+def _blend(color: tuple, alpha: int, base: tuple = BACKGROUND) -> tuple:
+    """Farbe mit Deckkraft ``alpha`` (0–255) gegen den Grund vormischen - ImageDraw mischt selbst nichts."""
+    a = max(0, min(alpha, 255)) / 255.0
+    return tuple(int(round(base[i] * (1 - a) + color[i] * a)) for i in range(3)) + (255,)
+
+
+def _wrap(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, max_width: int, max_lines: int = 2) -> list[str]:
+    """Text an Wortgrenzen auf höchstens ``max_lines`` Zeilen umbrechen, die letzte mit „…“."""
+    words = str(text or "").split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        candidate = f"{current} {word}".strip()
+        if draw.textlength(candidate, font=font) <= max_width or not current:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+        if len(lines) == max_lines:
+            break
+    if len(lines) < max_lines and current:
+        lines.append(current)
+    if len(lines) == max_lines and (draw.textlength(lines[-1], font=font) > max_width or " ".join(lines) != " ".join(words)):
+        lines[-1] = _ellipsis(draw, " ".join(words[len(" ".join(lines[:-1]).split()):]), font, max_width)
+    return lines
+
+
+def _star(cx: float, cy: float, outer: float, inner: float, points: int = 5) -> list[tuple[float, float]]:
+    """Ein Stern als Polygon - Schriftarten haben nicht immer ein ★, ein Polygon hat jede."""
+    import math
+    out = []
+    for i in range(points * 2):
+        radius = outer if i % 2 == 0 else inner
+        angle = -math.pi / 2 + i * math.pi / points
+        out.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    return out
+
+
 def _fit(draw: ImageDraw.ImageDraw, text: str, size: int, max_width: int, *, bold: bool = True, min_size: int = 22) -> ImageFont.ImageFont:
     """Schrift so weit verkleinern, dass der Text in die Breite passt."""
     while size > min_size:
@@ -147,19 +185,24 @@ def render_card(payload: dict) -> bytes:
 
     draw = ImageDraw.Draw(image)
     # Rahmen mit doppelter Linie in der Materialfarbe
-    draw.rounded_rectangle((24, 24, WIDTH - 24, HEIGHT - 24), radius=8, outline=color[:3] + (150,), width=3)
-    draw.rounded_rectangle((36, 36, WIDTH - 36, HEIGHT - 36), radius=6, outline=color[:3] + (60,), width=1)
+    draw.rounded_rectangle((24, 24, WIDTH - 24, HEIGHT - 24), radius=8, outline=_blend(color, 150), width=3)
+    draw.rounded_rectangle((36, 36, WIDTH - 36, HEIGHT - 36), radius=6, outline=_blend(color, 60), width=1)
 
-    # Emblem links: Ring, Fläche, Rangzeichen
+    # Emblem links: drei Ringe (außen zart, innen satt), dunkle Fläche mit Materialschimmer, Rangzeichen
     cx, cy, radius = 250, 300, 150
     for offset, alpha in ((22, 40), (12, 90), (0, 255)):
-        draw.ellipse((cx - radius - offset, cy - radius - offset, cx + radius + offset, cy + radius + offset), outline=color[:3] + (alpha,), width=4)
-    draw.ellipse((cx - radius + 10, cy - radius + 10, cx + radius - 10, cy + radius - 10), fill=color[:3] + (36,))
+        draw.ellipse((cx - radius - offset, cy - radius - offset, cx + radius + offset, cy + radius + offset), outline=_blend(color, alpha), width=4)
+    draw.ellipse((cx - radius + 10, cy - radius + 10, cx + radius - 10, cy + radius - 10), fill=_blend(color, 34))
+    draw.ellipse((cx - radius + 26, cy - radius + 26, cx + radius - 26, cy + radius - 26), outline=_blend(color, 70), width=1)
     rank = int(payload.get("rank") or 0)
-    glyph = ROMAN.get(rank, str(rank or "•"))
-    glyph_font = _font(120 if len(glyph) < 3 else 92)
-    box = draw.textbbox((0, 0), glyph, font=glyph_font)
-    draw.text((cx - (box[2] - box[0]) / 2 - box[0], cy - (box[3] - box[1]) / 2 - box[1] - 6), glyph, font=glyph_font, fill=color)
+    if rank == 8:
+        draw.polygon(_star(cx, cy + 4, 78, 34), fill=color)
+        draw.polygon(_star(cx, cy + 4, 46, 20), fill=_blend(color, 60))
+    else:
+        glyph = ROMAN.get(rank, str(rank or "•"))
+        glyph_font = _font(120 if len(glyph) < 3 else 92)
+        box = draw.textbbox((0, 0), glyph, font=glyph_font)
+        draw.text((cx - (box[2] - box[0]) / 2 - box[0], cy - (box[3] - box[1]) / 2 - box[1] - 6), glyph, font=glyph_font, fill=color)
     material_font = _font(26)
     material = str(payload.get("material_name") or "").upper()
     mbox = draw.textbbox((0, 0), material, font=material_font)
@@ -180,8 +223,10 @@ def render_card(payload: dict) -> bytes:
     description = str(payload.get("description") or "")
     if description:
         body_font = _font(28, bold=False)
-        draw.text((left, y), _ellipsis(draw, description, body_font, max_width), font=body_font, fill=(255, 255, 255, 150))
-        y += 52
+        for line in _wrap(draw, description, body_font, max_width, max_lines=2):
+            draw.text((left, y), line, font=body_font, fill=(255, 255, 255, 150))
+            y += 40
+        y += 12
     user = payload.get("user") or {}
     person_font = _font(36)
     person = _ellipsis(draw, str(user.get("display_name") or "Spieler"), person_font, max_width - 260)
@@ -198,7 +243,7 @@ def render_card(payload: dict) -> bytes:
     holders = int(payload.get("holders") or 0)
     rare_text = f"+{int(payload.get('points') or 0)} Punkte · {('%.1f' % percent).replace('.', ',')} % haben das" if holders else f"+{int(payload.get('points') or 0)} Punkte"
     rare_font = _font(24, bold=False)
-    draw.text((right - draw.textlength(rare_text, font=rare_font), HEIGHT - 92), rare_text, font=rare_font, fill=color[:3] + (220,))
+    draw.text((right - draw.textlength(rare_text, font=rare_font), HEIGHT - 92), rare_text, font=rare_font, fill=_blend(color, 220))
 
     out = io.BytesIO()
     image.convert("RGB").save(out, format="PNG", optimize=True)
