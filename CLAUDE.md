@@ -2480,6 +2480,31 @@ Seit dem 15. September gilt:
   `achievement_queue.request_evaluation(..., sources=)`, Cron
   `achievements_reconcile` 04:10 Europe/Vienna, `COUNTER_KEYS_V2` im
   Katalog. Test-Fakes der Auswertung müssen `sources` entgegennehmen.
+- Erfolge II, E2–E4 Kataloge A–C (#612 PR #675, #613 PR #682, #614 PR #683):
+  `achievement_catalog/catalog_a.py` (Helfer `_group(code, name, category,
+  description, how_to, icon, art, key, targets, step, *, sort_order, unit,
+  staff_only, catalog, steps, materials, manual)` – Stufen `code_1..n`, Name
+  „Gruppe I…VII“, Leiter aus `LADDERS[len(targets)]` oder `materials`,
+  `manual` ohne Schlüssel; `REPLACED` alt→neu, `REDEFINED` gleicher Code mit
+  neuer Leiter), `catalog_b.py` (Fast Lap/Saison/Team, 26/136),
+  `catalog_c.py` (Community/Creator/Profil, 42 – vier Gruppen aus #614
+  bewusst offen: Discord-Server, Abstimmungen, Mitgestalter, Botschafter,
+  siehe #615), `__init__.py` (hängt A–C an, nimmt Abgelöste heraus,
+  `GROUP_MAPPING.update`, `REDEFINED_OLD_TIERS`). Zähler dazu in
+  `achievement_counters.py` (Kartenstände, Pünktlichkeit, Dispute-Serie,
+  Fast-Lap-Bestzeiten/Zielzeit `f1_tracks.target_time_ms`/Rekorde/Konstanz/
+  Championship über `services/fastlap_standings.py` – dieselbe Rechnung wie
+  die Route –, Grand Prix, Saison-Aufsteiger aus `season_rank_snapshots`
+  (Job 03:35), volle Saison, Saisonstart, Team-Siege nach Beitritt,
+  Einladungen, Discord-Nachrichten, offene Chats, Fotos, Sticker, App-Stufe,
+  Turnier-Streams, Clips). `services/season_ranks.py`: `write_standings`
+  beim Saisonabschluss (`PUT /api/seasons/{id}` auf `completed` und
+  `badges.on_season_completed`) – vorher schrieb niemand
+  `season_standings`. Migration: `apply_redefined` räumt alte Stufen-Codes
+  neu definierter Gruppen und hebt Vergaben (Zähler oder, bei Hand-Gruppen,
+  alte Höhe – `_carry_over`); `level_milestones` bleibt wie
+  `level_progression` aus den Erfolgspunkten ausgenommen. Frontend:
+  Zielzeit m:ss.mmm in `AdminF1EditPage.jsx` über `lib/laptime.js`.
 - Über-uns-Zahlen (#621, PR #651): `club_numbers` zeigt Preise vergeben,
   Turniere gespielt, Mitglieder, Jahre aktiv.
 
@@ -2585,26 +2610,65 @@ Seit dem 15. September gilt:
   budget, reducedMotion}) → [{ key, draw(ctx, dt, size, now), dispose }] }`.
   Admin `pages/admin/settings/SeasonsSettings.jsx` (Schalter je Saison,
   Vorschau-Knopf, Jahreskalender).
-- Halloween Web (#635, #655, #658, #660–#664; PRs #649, #657, #659, #668):
-  `seasons/halloween/` – `index.jsx` (`pageLayout(pathname, intensity)` aus
-  der Adresse gesät, alle Zufallszahlen unabhängig von der Stärke;
-  `LOAD_SALT` je Ladung; `Corners`, `Backdrop`, `Footer`, `Widget`,
-  `skyLayers`; `useScrollEffects` setzt `--season-scroll` und schickt
-  `tls:season-page`), `web.js` (rundes Radnetz: `buildPlan` in echter
-  Reihenfolge Anker→Rahmen→Speichen→Nabe→Spirale von außen, Verlet-Physik
-  `stepPhysics` mit Zeiger-Schub, `applyImpulse` beim Scrollen, `windAt`;
+- Halloween Web (#635, #655, #658, #660–#664, #679–#681; PRs #649, #657,
+  #659, #668, #670, #674, #676, #684, #685, #686): `seasons/halloween/` –
+  `index.jsx` (`pageLayout(pathname, intensity, salt = LOAD_SALT)` aus
+  Adresse plus Salz je Ladung gesät, alle Zufallszahlen unabhängig von der
+  Stärke; `Corners`, `Backdrop` (Mond am echten Himmel), `Footer` (Katze
+  läuft beim Klick, `catTarget`; Kürbisse grüßen wie die Laterne),
+  `Widget`, `skyLayers`, `sounds` (Palette), `ScareToggle`;
+  `useScrollEffects` setzt `--season-scroll` und schickt `tls:season-page`),
+  `web.js` (rundes Radnetz: `buildPlan` mit Speichen/Windungen/Drehsinn aus
+  dem Seed in echter Reihenfolge Anker→Rahmen→Speichen→Nabe→Spirale von
+  außen, `plan.exits`; Verlet-Physik `stepPhysics` mit Zeiger-Schub,
+  Stößen alle 150 ms, `MAX_STEP`/`REST_PULL`/`MAX_DRIFT`, Bau straff bis
+  fertig; die Spinne geht nach 50–110 s über den Ankerfaden weg
+  (`sendSpiderAway`) und kommt zurück; Greifen mit der Maus `grabNodes`/
+  `startGrab`/`tearByPull` – Anker reißen bei 0,35/0,7/1,05 R Zugweg, Falten
+  über schrumpfende Ruhelängen, frei = Wind + Auftrieb + Verblassen, danach
+  Neubau mit neuem Plan; Klasse `tls-web-grabbing` gegen Textmarkieren;
   `createWebLayer` für den Canvas, `staticLines` für das SVG bei „dezent“/
-  „Bewegung reduzieren“), `HangingBats.jsx` (Anker aus `main h1, main h2,
-  header nav a, [data-season-anchor]`, Portal an `document.body` in
-  Seitenkoordinaten, Klick → Flugbahn), `graveyard.jsx` (Gräber auf
-  `footer [data-season-line]`, Geister per Klick, Sperre je Grab 60 s),
-  `rappel.js` (Zustandsfolge der Abseil-Spinne), `wisps.js` (Schwaden),
-  `bats.js` (Schwarm), `moon.js` (echte Mondphase, `litPath`), `art.jsx`
-  (Spinne, Kürbis, Laterne mit Pupillen, Mond, Katze, kleine Grabsteine,
-  Geist, Fledermäuse), `halloween.css`. Layout-Marker: `data-season-line="footer"`
-  an der Fußleiste in `PublicLayout.jsx`, `data-season-anchor="lion"` am
-  Hero-Löwen in `HomePage.jsx`. Nie `filter` auf inneren SVG-Gruppen
-  (rechteckige Kästen).
+  „Bewegung reduzieren“), `HangingBats.jsx` (still, keine eigene Bewegung;
+  Anker: Menüpunkte `header nav a` in einem `fixed`-Halter, Buchstaben der
+  Überschriften `main h1, h2` an der Tintenkante – Range je Zeichen plus
+  `measureText` `fontBoundingBoxAscent`/`actualBoundingBoxAscent` –, Karten
+  `[data-season-anchor="card"]` an der Oberkante, Löwe; gewichtete Auswahl,
+  Nachbesetzen per `ResizeObserver`; Klick → eigener Flug je Fledermaus,
+  Startzeit in Refs), `graveyard.jsx` (Gräber auf `footer [data-season-line]`,
+  Geister per Klick, Sperre je Grab 60 s), `rappel.js` (Zustandsfolge der
+  Abseil-Spinne; die Läuferin steht in `.tls-rappel-runner` neben dem
+  schwingenden Faden), `wisps.js`, `bats.js` (Bahnen in Seitenkoordinaten:
+  quer, Sturzflug, Aufstieg), `moon.js` (Phase, `litPath`), `sounds.js`
+  (Instrumente aus Oszillatoren und gefiltertem Rauschen, Musik-Sequenzer mit
+  Drone, Wind, D-Moll-Glocken, Herzschlag – nur nachts), `scareRules.js`
+  (Regeln `shouldScare` mit Gründen, 128 kuratierte Varianten Figur ×
+  Auftritt × Klang × Rahmen, Speicher `tls-scare-*`), `Scare.jsx`
+  (`Scares` Wächter alle 5 s, Portal über allem, Hinweis „Nie wieder“,
+  `ScareToggle`; Guard-Element `halloween-scare-guard` mit `data-reason`),
+  `art.jsx` (Spinne, Kürbis, Laterne, Mond, Katze sitzend und `CatWalking`
+  mit Knie/Pfote/Saum, kleine Grabsteine, Geist, Fledermäuse),
+  `halloween.css`. Layout-Marker: `data-season-line="footer"` an der
+  Fußleiste in `PublicLayout.jsx`, `data-season-anchor="lion"` am
+  Hero-Löwen und `data-season-anchor="card"` an News-/Vorstandskarten
+  (HomePage, NewsPage, AboutPage, ClubPages). Nie `filter` auf inneren
+  SVG-Gruppen; Saison-SVGs in nullbreiten Haltern brauchen `max-width: none`
+  (Tailwind-Vorgabe `svg { max-width: 100% }` – Geister, Fledermäuse, Mond
+  waren sonst 0 px breit).
+- Saisonneutrale Bausteine (#679–#681): `seasons/audio.js`
+  (`createSoundEngine` – AudioContext erst nach der ersten Geste, Regler
+  Töne/Musik, `play` mit 150 ms je Quelle, Bus `tls:season-sound` über
+  `emitSound`, Ducking, Pause bei verstecktem Tab; `readSoundPrefs` in
+  `localStorage` `tls-season-sound`; `setActiveEngine`), `SoundToggle.jsx`
+  (drei Stände im Kreis, im Widget-Slot), `astronomy.js` (`moonPosition`
+  nach Meeus/SunCalc, `nextMoonEvent`, `skyPlacement` Kuppel Osten links →
+  Westen rechts, Horizont bei 86 %, 60° bei 20 %), `MoonInSky.jsx`
+  (Minutentakt, Übergang nach dem ersten Bild, `render` von der Saison; Ort
+  aus `SeasonContext.location`, Vorgabe Innsbruck). `SeasonStage` erzeugt die
+  Engine, sobald ein Modul `sounds` hat (nicht bei „dezent“/„Bewegung
+  reduzieren“/Admin); `SeasonContext` liefert `weather`, `location`,
+  `scaresAllowed` (`GET /api/seasonal/me`: ab 18 aus `birth_date`, nur
+  angemeldet, `private, no-store`). Modulvertrag erweitert um `sounds({season})`
+  und `ScareToggle`.
 - Erfolge II im Web (PR #656): `components/tls/CommendButton.jsx` (GG-Lob am
   Match), Gelesen-Ping in `NewsDetailPage.jsx`, `useOptionalAuth` in
   `context/AuthContext.jsx` (ohne Provider kein Fehler; Hooks nie in `try`).
@@ -2784,6 +2848,26 @@ npx expo install --check
   `--body-file` nutzen.
 - Nie Arbeit auf einem fremden Feature-Zweig beginnen; wenn doch passiert:
   `git rebase --onto main <alter-zweig> <neuer-zweig>`.
+- **Tailwind und Saison-SVGs:** die Vorgabe `svg { max-width: 100% }` lässt
+  ein SVG in einem 0 px breiten Halter (`.tls-hbats`, `.tls-ghosts`,
+  `.tls-moon-sky` …) auf 0 zusammenfallen – Geister, Fledermäuse und der
+  Mond waren so unsichtbar (28./29.09.). Für solche Halter `svg {
+  max-width: none }` setzen und in der Browser-Probe die Breite messen.
+- **Dateinamen nur in der Groß-/Kleinschreibung verschieden** (`scare.js`
+  neben `Scare.jsx`) brechen Importe auf Windows: `./Scare` löst auf die
+  Kleinschreibung auf, die Komponente ist `undefined` („Element type is
+  invalid“). Deshalb `scareRules.js`.
+- **Browser-Proben eines Zweigs:** der lokale Check lässt `frontend/dist`
+  liegen – `npx vite preview --port 3011` aus dem Worktree, Playwright mit
+  `context.route("**/api/**")` und nachgestellten Antworten
+  (`/seasonal/active` wie in `SeasonContext.test.jsx`, `/auth/me`,
+  `/seasonal/me`), Skript aus dem Scratchpad mit
+  `NODE_PATH=<worktree>/frontend/node_modules`. Canvas-Ebenen über
+  `getImageData` zählen. `page.clock.install()` fälscht auch
+  `requestAnimationFrame`: nie `runFor(Stunden)` (spielt jeden Frame nach),
+  sondern `setSystemTime` und dann `runFor(61000)` für einen Minutentakt.
+  Der Consent-Klick ist die erste Geste – vorher messen, was „vor der
+  Geste“ gelten soll, und die Klang-Engine erst laden lassen.
 
 ---
 
@@ -2959,18 +3043,32 @@ die Neuberechnung an), #659 (Halloween-Feinschliff Web + App 1.0.2 –
 Build 81; Nebel, Geister, Lichterketten, Friedhof raus, Netzbau, Abseil-
 Spinne, echter Mond). Alle vom Betreiber gemergt; `update.sh` danach.
 
+### Gemergt 28.–29. September
+#668 (Halloween III), #669 (Doku-Stand), #670 (Physik-Fix: kein Knäuel beim
+Scrollen, Gräber sichtbar, Katze auf dem Strich), #671 (#666 echtes Wetter
+und Sonnenuntergang), #672 (#665 App 1.0.3 Halloween III – Build 82), #674
+(Halloween IV: SVG-Fix, Bahnen in Seitenkoordinaten, Würfeln je Ladung,
+Katze läuft), #675 (E2 Katalog A), #676 (Halloween V: Fledermäuse still an
+Menü/Buchstaben/Karten, Netz packen und wegwerfen, Katzenbeine, Läufer,
+Kürbis-Gruß), #682 (E3 Katalog B samt Saison-Ranglisten und Hebung neu
+definierter Gruppen), #684 (Halloween VI Klänge und Musik), #685 (Mond nach
+Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
+ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
+
 ### Offene PRs
-- Offen (28.09. abends): #668 Halloween III (ready; rundes Netz mit Physik,
-  hängende Fledermäuse, Friedhof mit Geistern, Abseil-Spinne v2, Katze und
-  Mond neu; schließt #660–#664). Danach: #665 App-Teil (Build 1.0.3 vor dem
-  25.10.), #666 echtes Wetter und Sonnenuntergang, Erfolge II Rest
-  (#612–#615 Kataloge, #618–#620, #622, #623), Jahreszeiten II (#637–#642
-  bis 27.11.), Discord VI (#624–#631), Jahreszeiten III (#643–#647). Der
-  Betreiber ist offen für neue Pakete (Skia, expo-sensors – #667), wenn das
-  Ergebnis zu 100 % passt. Erkenntnisse aus drei Runden Halloween stehen als
-  Kommentar an #637–#647 und #658 (Maßstab: edel, dunkel, detailreich, nichts
-  abgeschnitten, ein lebender Vorgang je Saison, Reaktionen auf Zeiger,
-  Scrollen und Seitenwechsel, je Seite gesät).
+- Offen (29.09. früh): #686 Jumpscares ab 18 (auf `main` umgesetzt, ready
+  nach dem Check). Danach: Doku-Stand, Erfolge II Rest (E5 Katalog D #615 –
+  dort auch die vier zurückgestellten Gruppen aus #614 und die
+  Saison-Fundstücke #678 –, E8 #618, E9 #619, E10 #620, E12 #622, E13
+  #623), Halloween VII aus dem nächsten Live-Blick (#677: alles wird
+  überarbeitet), App-Fassung von Klang, Mond und Jumpscares (#667),
+  Jahreszeiten II (#637–#642 bis 27.11.) von Anfang an nach dem Standard,
+  der als Kommentar auf #637–#647 und #658 steht (Bild, Klang und Musik,
+  Schrecken mit Rahmen, Himmel nach Uhrzeit, Wetter #673, Fundstücke #678,
+  Überarbeitungsregel #677), Discord VI (#624–#631), Jahreszeiten III.
+  Owner-Regeln seit 28./29.09.: nichts gilt als fertig (#677); Jumpscares nur
+  ab 18 mit Geburtsdatum, 100 % zufällig, keine fremden Bilder (#680);
+  Musik live erzeugt (#679); Fledermäuse jede für sich.
 - Offen (25.09. Nachmittag): keine Feature-PRs. Nächste Pakete nach der Pause: Discord V (#572
   Thread je Turnier, #573 Link-Knöpfe und Befehle – Antworten `ephemeral`, #574 Willkommensnachricht, #581
   Online-Zahl und Voice auf der Website über das Server-Widget). Idee des Betreibers vom 25.09. (offen):
@@ -3283,10 +3381,10 @@ GitHub geschlossen. Die Einordnung der Dolibarr-Issues steht als Kommentar an
 | Discord IV: Live-Einbettungen und Termine | #569 Einbettungen, die sich aktualisieren (Rangliste, Nächste Events, Live jetzt) – umgesetzt in #601; #570 Discord-Termine (Scheduled Events) – in #602; #571 Bracket als Text-Embed – in #603. Meilenstein fertig |
 | Discord V: Komfort im Server | #572 Turnier-Threads, #573 Link-Knöpfe und Befehle, #574 Willkommensnachricht, #581 Discord online/Voice auf der Website |
 | Kanäle II: YouTube, Twitch, Kalender | #578 YouTube-Feed → News – umgesetzt in #597; #580 Kalender-Knöpfe – in #596; #584 „Gerade in Steam“ (Opt-in, nur Mitglieder) – in #598; #579 Twitch-Clips + Turnier live – in #599. Meilenstein fertig |
-| Jahreszeiten I: Kern und Halloween (bis 24.10.) | #632–#636 umgesetzt in #648, #649, #650, #653, #657, #659; #655 Rückmeldung (mit #657 geschlossen); #658 Maßstab für alle Saisonen; #660–#664 Halloween III (PR #668), #665 App-Teil Build 1.0.3, #666 echtes Wetter und Sonnenuntergang |
+| Jahreszeiten I: Kern und Halloween (bis 24.10.) | #632–#636 umgesetzt in #648, #649, #650, #653, #657, #659; #655 Rückmeldung (mit #657 geschlossen); #658 Maßstab für alle Saisonen; #660–#664 Halloween III (#668, #670), #665 App 1.0.3 (#672), #666 Wetter (#671), Halloween IV/V (#674, #676), #679 Klänge und Musik (#684), #681 Mond (#685), #680 Jumpscares (#686); offen #673 Wetter-Ebene, #678 Fundstücke, #677 Klammer |
 | Jahreszeiten II: Advent, Weihnachten, Silvester (bis 27.11.) | #637 Adventkranz, #638 Schneefall, #639 Weihnachtsgruß und Nikolaus, #640 Silvester, #641 Adventkalender, #642 App (Build 1.0.3/1.0.4 bis 20.11.), #667 Skia und Neigungssensor |
 | Jahreszeiten III: Fasching, Vereinsgeburtstag, Ostern (bis 12.3.2027) | #643 Fasching, #644 Vereinsgeburtstag, #645 Ostern, #646 Eiersuche, #647 App 1.1.0 |
-| Erfolge II: Rework (bis 18.12.) | E1 #611 (#652), E7 #617 (#654), E6 #616 (#656) fertig; offen E2–E5 Kataloge #612–#615, E8 #618 Zeremonien, E9 #619 Sichtbarkeit, E10 #620 Admin, E12 #622 Benachrichtigungen, E13 #623 App 1.1.0 |
+| Erfolge II: Rework (bis 18.12.) | E1 #611 (#652), E7 #617 (#654), E6 #616 (#656), E2 #612 (#675), E3 #613 (#682), E4 #614 (#683) fertig; offen E5 Katalog D #615 (plus vier zurückgestellte Gruppen aus #614 und #678 Fundstücke), E8 #618 Zeremonien, E9 #619 Sichtbarkeit, E10 #620 Admin, E12 #622 Benachrichtigungen, E13 #623 App 1.1.0 |
 | Discord VI: Mehrere Server (bis 29.1.2027) | #624–#631 (D1–D8: mehrere Server, Slash-Befehle je Server mit Spielfilter, Infos weitergeben) |
 
 Geprüft am 21.09.: Kein altes Issue ist durch die Merges seither erledigt
