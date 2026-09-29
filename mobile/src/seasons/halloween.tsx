@@ -6,10 +6,11 @@ import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
 import { colors } from "../theme";
 import { FlyingBatShape, HangingBatShape as HangingBatArt } from "./batArt";
 import { flightPath, keyframes, nextFlightDelaySeconds, planFlock, type FlightPath } from "./bats";
-import { endFlight, fleePath, startFlight, subscribeFlights, type Flight as PerchFlightData } from "./flights";
+import { approachPath, awayMs, flightDurationMs, hopPath, inView, rotationFrames, temperamentFor, type Temperament } from "./batLife";
+import { endFlight, fleePath, requestHop, startFlight, subscribeFlightEnd, subscribeFlights, subscribeHops, type Flight as PerchFlightData } from "./flights";
 import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
 import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
-import { assign, assignmentsFor, choosePerches, perchesFor, placementFor, subscribePerches } from "./perches";
+import { assign, assignmentsFor, choosePerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
 import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelState } from "./rappel";
 import { between, pick, screenRng } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
@@ -600,47 +601,134 @@ export function useAppActive(): boolean {
  * gesät auf angemeldeten Karten dieses Screens. Verlässt eine Karte den Screen oder fliegt eine Fledermaus davon,
  * bleibt ihr Platz eine Weile frei, dann wird ein anderer besetzt.
  */
-export function usePerchAssignments(screen: string, wanted: number, active: boolean) {
+export function usePerchAssignments(screen: string, wanted: number, active: boolean, view: { width: number; height: number }, timeScale = 1) {
   const vacatedRef = useRef<Record<string, number>>({});
+  const reservedRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
+  const viewRef = useRef(view);
+  viewRef.current = view;
   useEffect(() => {
+    initializedRef.current = false;
+    reservedRef.current = new Set();
+    // Kurz nach dem Betreten des Screens (die Karten melden sich erst nach und nach) sitzen Fledermäuse direkt da.
+    const enteredAt = Date.now();
+    const entering = () => Date.now() - enteredAt < ENTER_GRACE_MS / timeScale;
     if (!active || wanted <= 0) {
       assign([]);
       return undefined;
     }
+    const assignmentFor = (perch: Perch, landed: boolean): PerchAssignment => {
+      const rng = screenRng(perch.id, "placement");
+      return { perchId: perch.id, ...placementFor(perch, rng), temperament: temperamentFor(rng), landed };
+    };
+    const landingPoint = (rect: { x: number; y: number; width: number; height: number }, assignment: PerchAssignment) => {
+      const point = perchPoint(rect, assignment.corner);
+      const shape = assignment.size * (assignment.pose === "sit" ? 1.15 : 1.55);
+      return { x: point.x, y: assignment.pose === "sit" ? point.y - shape / 2 : point.y + shape / 2 };
+    };
+    // Anflug (A2): von außerhalb des Fensters zu einem sichtbaren freien Platz - erst nach dem Flug ist er belegt.
+    const approach = async (perch: Perch) => {
+      const rect = await perch.measure();
+      const assignment = assignmentFor(perch, true);
+      if (!rect) {
+        // Nicht messbar (abgebaut, kein Layout): ohne Flug zuteilen, damit der Platz nicht leer bleibt.
+        if (perchSnapshot().perches.some((entry) => entry.id === perch.id)) assign([...assignmentsFor(screen), { ...assignment, landed: false }]);
+        return true;
+      }
+      const target = landingPoint(rect, assignment);
+      if (!inView(target, viewRef.current)) {
+        // Nicht im Bild: ohne Flug zuteilen, niemand sieht die Landung.
+        assign([...assignmentsFor(screen), { ...assignment, landed: false }]);
+        return true;
+      }
+      const token = requestMotion("bat_flight");
+      if (!token) return false;
+      const rng = mulberry32Random();
+      const path = approachPath(target, viewRef.current, rng);
+      reservedRef.current.add(perch.id);
+      startFlight({ kind: "approach", screen, perchId: null, from: path.p0, size: assignment.size, temperament: assignment.temperament, path, durationMs: flightDurationMs(path) / timeScale, landOn: assignment });
+      setTimeout(() => releaseMotion(token), flightDurationMs(path) / timeScale + 200);
+      return true;
+    };
     const recompute = () => {
       const perches = perchesFor(screen);
       const now = Date.now();
       const vacated = Object.entries(vacatedRef.current).filter(([, until]) => until > now).map(([id]) => id);
       const current = assignmentsFor(screen).filter((entry) => perches.some((perch) => perch.id === entry.perchId));
-      const missing = wanted - current.length;
+      const missing = wanted - current.length - reservedRef.current.size;
       if (missing <= 0) return;
       const pickRng = screenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "perch-pick");
-      const chosen = choosePerches(perches, missing, pickRng, [...current.map((entry) => entry.perchId), ...vacated]);
+      const chosen = choosePerches(perches, missing, pickRng, [...current.map((entry) => entry.perchId), ...vacated, ...reservedRef.current]);
       if (!chosen.length) return;
-      assign([
-        ...current,
-        ...chosen.map((perch) => {
-          const rng = screenRng(perch.id, "placement");
-          return { perchId: perch.id, ...placementFor(perch, rng), temperament: pick(rng, ["sleepy", "skittish", "roamer", "curious"]) };
-        }),
-      ]);
+      if (!initializedRef.current || entering()) {
+        // Beim Betreten des Screens sitzen die Fledermäuse schon da - kein Flugschwarm zur Begrüßung.
+        initializedRef.current = true;
+        assign([...current, ...chosen.map((perch) => assignmentFor(perch, false))]);
+        return;
+      }
+      chosen.forEach((perch) => {
+        void approach(perch);
+      });
     };
     recompute();
+    initializedRef.current = true;
     const stopPerches = subscribePerches(recompute);
-    // Eine verscheuchte Fledermaus lässt ihren Platz 25–60 s frei; danach darf ein anderer besetzt werden.
+    // Eine verscheuchte Fledermaus lässt ihren Platz frei (Temperament: 20–90 s); danach darf ein anderer besetzt werden.
     const stopFlights = subscribeFlights((flights) => {
       flights.forEach((flight) => {
-        if (flight.perchId && !vacatedRef.current[flight.perchId]) vacatedRef.current[flight.perchId] = Date.now() + 25000 + Math.round(Math.random() * 35000);
+        if (flight.kind === "flee" && flight.perchId && !vacatedRef.current[flight.perchId]) {
+          vacatedRef.current[flight.perchId] = Date.now() + awayMs((flight.temperament || "sleepy") as Temperament, Math.random) / timeScale;
+        }
       });
     });
-    const timer = setInterval(recompute, 5000);
+    // Landung: Anflug oder Umzug zu Ende - der Platz wird jetzt belegt (Einfedern mit leichter Haptik im PerchBat).
+    const stopEnds = subscribeFlightEnd((flight) => {
+      if (!flight.landOn) return;
+      reservedRef.current.delete(flight.landOn.perchId);
+      const stillThere = perchSnapshot().perches.some((perch) => perch.id === flight.landOn?.perchId);
+      if (!stillThere) return;
+      assign([...assignmentsFor(screen).filter((entry) => entry.perchId !== flight.landOn?.perchId), { ...flight.landOn, landed: true }]);
+    });
+    // Umzug (A2): eine unruhige Fledermaus will zu einem anderen freien, sichtbaren Platz.
+    const stopHops = subscribeHops(async (request) => {
+      if (request.screen !== screen) return;
+      const perches = perchesFor(screen).filter((perch) => perch.id !== request.perchId);
+      const taken = new Set([...assignmentsFor(screen).map((entry) => entry.perchId), ...reservedRef.current]);
+      const free = perches.filter((perch) => !taken.has(perch.id));
+      if (!free.length) return;
+      const rng = mulberry32Random();
+      const candidates = await Promise.all(free.map(async (perch) => ({ perch, rect: await perch.measure() })));
+      const visible = candidates.filter((entry) => entry.rect && inView(perchPoint(entry.rect, "tl"), viewRef.current));
+      if (!visible.length) return;
+      const target = visible[Math.floor(rng() * visible.length) % visible.length];
+      const token = requestMotion("bat_flight");
+      if (!token) return;
+      const assignment = assignmentFor(target.perch, true);
+      const to = landingPoint(target.rect as { x: number; y: number; width: number; height: number }, assignment);
+      const path = hopPath(request.from, to, rng);
+      reservedRef.current.add(target.perch.id);
+      clearAssignment(request.perchId);
+      vacatedRef.current[request.perchId] = Date.now() + 20000 / timeScale;
+      startFlight({ kind: "hop", screen, perchId: request.perchId, from: request.from, size: request.size, temperament: request.temperament, path, durationMs: flightDurationMs(path) / timeScale, landOn: assignment });
+      setTimeout(() => releaseMotion(token), flightDurationMs(path) / timeScale + 200);
+    });
+    const timer = setInterval(recompute, 5000 / timeScale);
     return () => {
       stopPerches();
       stopFlights();
+      stopEnds();
+      stopHops();
       clearInterval(timer);
       assign([]);
     };
-  }, [screen, wanted, active]);
+  }, [screen, wanted, active, timeScale]);
+}
+
+/** So lange nach dem Betreten eines Screens werden Plätze ohne Anflug besetzt. */
+export const ENTER_GRACE_MS = 1500;
+
+function mulberry32Random(): () => number {
+  return screenRng(String(Date.now()), "flight");
 }
 
 /** Die Flüge verscheuchter Fledermäuse (flights.ts), in Fensterkoordinaten über allem gezeichnet. */
@@ -655,26 +743,29 @@ function FlightLayer({ top }: { top: number }) {
   );
 }
 
+/** Ein Flug der Bühne: Bogen mit Welle (keyframes) und Drehung der Nase entlang der Bahn (A2), am Ende abgebremst. */
 function PerchFlight({ flight }: { flight: PerchFlightData }) {
   const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(progress, { toValue: 1, duration: flight.durationMs, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(progress, { toValue: 1, duration: flight.durationMs, easing: flight.kind === "flee" ? Easing.inOut(Easing.quad) : Easing.out(Easing.cubic), useNativeDriver: true }).start();
     const handle = setTimeout(() => endFlight(flight.id), flight.durationMs);
     return () => clearTimeout(handle);
   }, [flight, progress]);
   const frames = keyframes(flight.path, { x: 0, y: 0 });
+  const rotations = rotationFrames(flight.path);
   const size = flight.size * 1.7;
   const translateX = progress.interpolate({ inputRange: frames.input, outputRange: frames.xs.map((x) => x - size / 2) });
   const translateY = progress.interpolate({ inputRange: frames.input, outputRange: frames.ys.map((y) => y - size * 0.275) });
+  const rotate = progress.interpolate({ inputRange: frames.input, outputRange: rotations.map((deg) => `${deg}deg`) });
   const flap = progress.interpolate({ inputRange: Array.from({ length: 33 }, (_, i) => i / 32), outputRange: Array.from({ length: 33 }, (_, i) => (i % 2 ? 0.5 : 1)) });
   return (
-    <Animated.View pointerEvents="none" style={[styles.bat, { transform: [{ translateX }, { translateY }, { scaleX: flight.path.facing }, { scaleY: flap }] }]} testID="halloween-bat-flying">
+    <Animated.View pointerEvents="none" style={[styles.bat, { transform: [{ translateX }, { translateY }, { rotate }, { scaleX: flight.path.facing }, { scaleY: flap }] }]} testID="halloween-bat-flying" data-kind={flight.kind}>
       <FlyingBatShape size={size} />
     </Animated.View>
   );
 }
 
-export function HalloweenCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
+export function HalloweenCorners({ season, screen, timeScale = 1 }: { season: ActiveSeason; screen: string; timeScale?: number }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { reducedMotion } = useSeason();
@@ -687,7 +778,7 @@ export function HalloweenCorners({ season, screen }: { season: ActiveSeason; scr
   const [salt, setSalt] = useState(0);
   const onScared = useCallback(() => setSalt((value) => value + 1), []);
   void salt;
-  usePerchAssignments(screen, moving ? layout.perchBats : 0, moving);
+  usePerchAssignments(screen, moving ? layout.perchBats : 0, moving, { width, height }, timeScale);
   useEffect(() => {
     getMotionScheduler().setHidden(!appActive);
   }, [appActive]);

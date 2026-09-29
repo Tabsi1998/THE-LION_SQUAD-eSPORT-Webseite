@@ -14,7 +14,7 @@ export type Perch = {
   /** Misst das Rechteck der Karte in Fensterkoordinaten - null, wenn sie gerade nicht messbar ist. */
   measure: () => Promise<PerchRect | null>;
 };
-export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string };
+export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string; /** nach einem Flug gelandet (Einfedern mit Haptik) */ landed?: boolean };
 export type PerchState = { perches: Perch[]; assignments: Record<string, PerchAssignment> };
 type Listener = (state: PerchState) => void;
 
@@ -25,8 +25,9 @@ const state: PerchState = { perches: [], assignments: {} };
 const listeners = new Set<Listener>();
 
 function emit() {
-  const snapshot = perchSnapshot();
-  listeners.forEach((listener) => listener(snapshot));
+  // Jeder Zuhörer bekommt den aktuellen Stand - ein Zuhörer darf selbst ändern (die Bühne teilt beim Anmelden zu),
+  // die Nachfolger sehen dann schon das Ergebnis statt eines veralteten Schnappschusses.
+  listeners.forEach((listener) => listener(perchSnapshot()));
 }
 
 export function perchSnapshot(): PerchState {

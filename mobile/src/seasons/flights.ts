@@ -2,30 +2,71 @@
 // weiß nur, wo sie war (Fensterkoordinaten), die Bühne zeichnet den Flug. Reiner Speicher mit Abo, ohne React.
 
 import type { FlightPath } from "./bats";
+import type { PerchAssignment } from "./perches";
 
-export type Flight = { id: number; screen: string; perchId: string | null; from: { x: number; y: number }; size: number; path: FlightPath; durationMs: number; startedAt: number };
+export type FlightKind = "flee" | "approach" | "hop";
+export type Flight = {
+  id: number;
+  screen: string;
+  perchId: string | null;
+  from: { x: number; y: number };
+  size: number;
+  path: FlightPath;
+  durationMs: number;
+  startedAt: number;
+  kind: FlightKind;
+  /** Anflug und Umzug landen hier: der Platz wird mit dem Ende des Flugs zugeteilt. */
+  landOn?: PerchAssignment | null;
+  temperament?: string;
+};
 type Listener = (flights: Flight[]) => void;
+type EndListener = (flight: Flight) => void;
+type HopRequest = { perchId: string; screen: string; from: { x: number; y: number }; size: number; temperament: string };
+type HopListener = (request: HopRequest) => void;
 
 let flights: Flight[] = [];
 let nextId = 1;
 const listeners = new Set<Listener>();
+const endListeners = new Set<EndListener>();
+const hopListeners = new Set<HopListener>();
 
 function emit() {
-  const snapshot = [...flights];
-  listeners.forEach((listener) => listener(snapshot));
+  listeners.forEach((listener) => listener([...flights]));
 }
 
-export function startFlight(flight: Omit<Flight, "id" | "startedAt">, now = Date.now()): Flight {
-  const entry: Flight = { ...flight, id: nextId++, startedAt: now };
+export function startFlight(flight: Omit<Flight, "id" | "startedAt" | "kind"> & { kind?: FlightKind }, now = Date.now()): Flight {
+  const entry: Flight = { kind: "flee", ...flight, id: nextId++, startedAt: now };
   flights = [...flights, entry];
   emit();
   return entry;
 }
 
+/** Ein Flug ist zu Ende: wer landen will, wird gemeldet (die Bühne teilt den Platz zu). */
 export function endFlight(id: number) {
-  const before = flights.length;
+  const ended = flights.find((flight) => flight.id === id);
+  if (!ended) return;
   flights = flights.filter((flight) => flight.id !== id);
-  if (flights.length !== before) emit();
+  emit();
+  endListeners.forEach((listener) => listener(ended));
+}
+
+export function subscribeFlightEnd(listener: EndListener): () => void {
+  endListeners.add(listener);
+  return () => {
+    endListeners.delete(listener);
+  };
+}
+
+/** Eine ruhende Fledermaus will umziehen (A2): die Bühne sucht einen freien Platz und startet den Umzug. */
+export function requestHop(request: HopRequest) {
+  hopListeners.forEach((listener) => listener(request));
+}
+
+export function subscribeHops(listener: HopListener): () => void {
+  hopListeners.add(listener);
+  return () => {
+    hopListeners.delete(listener);
+  };
 }
 
 export function activeFlights(): Flight[] {
@@ -43,6 +84,10 @@ export function subscribeFlights(listener: Listener): () => void {
 export function resetFlights() {
   flights = [];
   emit();
+}
+
+export function flightCount(): number {
+  return flights.length;
 }
 
 /** Flucht aus Fensterkoordinaten: erst ein Stück hoch, dann weit weg - meist nach unten aus dem Bild, sonst oben. */
