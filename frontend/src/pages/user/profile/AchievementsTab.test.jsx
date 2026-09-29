@@ -142,3 +142,26 @@ describe("AchievementsTab (#619)", () => {
     expect(screen.getByTestId("achievement-visibility-note")).toHaveTextContent("privat");
   });
 });
+
+describe("AchievementsTab – Teilen (#619)", () => {
+  it("bietet Teilen an erreichten Stufen und kopiert ohne Web Share den Link", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderTab();
+    fireEvent.click(within(screen.getByTestId("achievement-group-matches_played")).getAllByRole("button")[0]);
+    const shareButton = await screen.findByTestId("achievement-share-matches_played_2");
+    expect(screen.queryByTestId("achievement-share-matches_played_3")).toBeNull();
+    fireEvent.click(shareButton);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/achievements/a/aw2`));
+  });
+
+  it("teilt nichts, solange die Erfolge privat sind", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    renderTab({ privacy_achievements_public: false });
+    fireEvent.click(within(screen.getByTestId("achievement-group-matches_played")).getAllByRole("button")[0]);
+    fireEvent.click(await screen.findByTestId("achievement-share-matches_played_1"));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+    expect(writeText).not.toHaveBeenCalled();
+  });
+});

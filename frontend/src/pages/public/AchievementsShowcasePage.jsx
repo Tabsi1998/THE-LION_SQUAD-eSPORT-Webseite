@@ -393,6 +393,11 @@ function WeekTile({ week, loading }) {
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
               {award.earned_at && <span className="text-white/35 text-xs">{new Date(award.earned_at).toLocaleDateString("de-DE")}</span>}
             </Link>
+            {award.award_id && (
+              <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color }} data-testid="week-award-card">
+                Karte ansehen
+              </Link>
+            )}
           </div>
         </div>
       ) : (

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Eye, EyeOff, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
+import { shareAchievement } from "@/lib/shareAchievement";
 import { AchievementGroupsView, applyTierFilters } from "@/components/tls/AchievementGroups";
 import {
   AchievementFilters, AchievementLevelHeader, AchievementStatsRow, CategoryShowcase, MAX_PINS, NextUpPanel, PinnedPanel,
@@ -42,6 +43,17 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
   }, [pinnedCodes, savePins]);
 
   const publicSwitch = achData && achData.privacy_achievements_public === false;
+  // Teilen (#619): je erreichter Stufe die Vergabe-Kennung; private Erfolge lassen sich nicht teilen.
+  const shareIds = useMemo(() => Object.fromEntries((achData?.awards || []).filter((a) => a.award_id && !a.is_negative).map((a) => [a.code, a.award_id])), [achData]);
+  const onShare = useCallback(async ({ awardId, tier }) => {
+    if (publicSwitch) {
+      toast.error("Deine Erfolge sind privat – zum Teilen erst „Erfolge öffentlich“ einschalten.");
+      return;
+    }
+    const result = await shareAchievement({ awardId, name: tier.name, materialName: tier.material_name || tier.level_name });
+    if (result.status === "copied") toast.success("Link zur Teilen-Karte kopiert.");
+    else if (result.status === "failed") toast.error("Teilen geht in diesem Browser nicht.");
+  }, [publicSwitch]);
 
   return (
     <div className="space-y-6" data-testid="profile-achievements-tab">
@@ -76,6 +88,7 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
             filters={filters}
             hidden={achData.hidden}
             pins={{ codes: pinnedCodes, max: MAX_PINS, onToggle: togglePin }}
+            share={{ ids: shareIds, onShare }}
             emptyText={filters.material || filters.status !== "all" || category
               ? "Nichts passt zu diesem Filter."
               : "Spiel mit, melde dich für Turniere an oder schalte Fast-Lap-Runden frei – dann tauchen hier deine ersten Achievements auf."}

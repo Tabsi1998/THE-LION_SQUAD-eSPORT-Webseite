@@ -10,12 +10,12 @@
  *
  * Seit #619: Seltenheit je Gruppe und Stufe („4,2 % haben Diamant“), Sortierung nach Seltenheit,
  * die „?“-Karte mit dem Zähler für geheime Gruppen und die Vitrine „Für Vereinsmitglieder“;
- * im eigenen Profil Filter (Material, Status) und das Anheften einzelner Stufen.
+ * im eigenen Profil Filter (Material, Status), das Anheften einzelner Stufen und „Teilen“ je Vergabe.
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, CircleHelp, Lock, Pin, PinOff } from "lucide-react";
+import { ChevronDown, CircleHelp, Lock, Pin, PinOff, Share2 } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 
 const LEVEL_META = {
@@ -179,6 +179,7 @@ export function AchievementGroupsView({
   categoryFilter = null,
   filters = null,
   pins = null,
+  share = null,
 }) {
   const byCategory = categoryFilter ? groups.filter((group) => group.category === categoryFilter) : groups;
   const filtered = applyTierFilters(byCategory, filters);
@@ -212,7 +213,7 @@ export function AchievementGroupsView({
           <span className="text-[10px] uppercase tracking-widest text-white/40">{ordered.length} Gruppen</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} />)}
+          {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} share={share} />)}
           {showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
         </div>
       </div>
@@ -259,7 +260,7 @@ export function AchievementGroupsView({
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} />)}
+              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} share={share} />)}
               {cat === "hidden" && showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
             </div>
           </section>
@@ -303,7 +304,7 @@ function HiddenSummaryCard({ hidden }) {
   );
 }
 
-function GroupCard({ group, earnedOnly = false, rarity = null, pins = null }) {
+function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, share = null }) {
   const [open, setOpen] = useState(false);
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
   const lockedTiers = group.tiers.filter(t => !t.earned).sort((a, b) => a.level - b.level);
@@ -409,7 +410,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null }) {
             className="overflow-hidden"
           >
             <div className="border-t border-white/5 px-4 py-3 space-y-2" data-testid={`achievement-group-${group.code}-tiers`}>
-              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} rarityPercent={!isNegative ? rarity?.tiers?.[t.code] : undefined} pins={!isNegative ? pins : null} />)}
+              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} rarityPercent={!isNegative ? rarity?.tiers?.[t.code] : undefined} pins={!isNegative ? pins : null} share={!isNegative && !group.member_only ? share : null} />)}
             </div>
           </motion.div>
         )}
@@ -418,7 +419,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null }) {
   );
 }
 
-function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins = null }) {
+function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins = null, share = null }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
   const label = levelLabel(tier.level, group, tier);
   const rowGlow = tier.earned && tier.level >= 4 && !isNegative ? `tls-tierrow--${tier.level}` : "";
@@ -426,6 +427,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
   const pinned = Boolean(pins && (pins.codes || []).includes(tier.code));
   const pinFull = Boolean(pins && !pinned && (pins.codes || []).length >= (pins.max || 6));
   const canPin = Boolean(pins && tier.earned);
+  const shareId = share && tier.earned && !tier.member_only ? share.ids?.[tier.code] : null;
   return (
     <motion.div
       data-testid={`achievement-tier-${tier.code}`}
@@ -502,6 +504,18 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
           >
             {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
             {pinned ? "Angeheftet" : "Anheften"}
+          </button>
+        )}
+        {shareId && (
+          <button
+            type="button"
+            onClick={() => share.onShare({ awardId: shareId, tier })}
+            aria-label={`${tier.name} teilen`}
+            title="Teilen-Karte öffnen oder Link kopieren"
+            data-testid={`achievement-share-${tier.code}`}
+            className="mt-1.5 ml-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm border border-white/15 text-white/50 hover:text-white hover:border-white/40 transition"
+          >
+            <Share2 className="w-3 h-3" /> Teilen
           </button>
         )}
       </div>

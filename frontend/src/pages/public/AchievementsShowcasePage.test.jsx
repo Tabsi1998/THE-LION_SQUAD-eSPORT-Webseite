@@ -56,7 +56,7 @@ const OVERVIEW = {
   },
   hidden: { total: 13, earned: 0 },
   week: { week_key: "2026-W40", from: "2026-09-21T06:00:00+00:00", to: "2026-09-28T06:00:00+00:00",
-          award: { tier_code: "matches_played_2", name: "Spielmacher II", group_name: "Spielmacher", material: "iron", material_name: "Eisen", material_color: "#9AA0A6", icon: "swords",
+          award: { award_id: "aw-week", tier_code: "matches_played_2", name: "Spielmacher II", group_name: "Spielmacher", material: "iron", material_name: "Eisen", material_color: "#9AA0A6", icon: "swords",
                    holders: 1, percent: 25, earned_at: "2026-09-26T18:00:00+00:00", user: { id: "u2", username: "ben", display_name: "Ben" } } },
   recent: [
     { award_id: "a1", tier_code: "matches_played_2", name: "Spielmacher II", material_name: "Eisen", material_color: "#9AA0A6", group_name: "Spielmacher", earned_at: "2026-09-26T18:00:00+00:00", user: { id: "u2", username: "ben", display_name: "Ben" } },
@@ -103,6 +103,7 @@ describe("AchievementsShowcasePage (#619)", () => {
     expect(within(week).getByTestId("week-award-user")).toHaveTextContent("Ben");
     expect(within(week).getByTestId("week-award-user")).toHaveAttribute("href", "/u/ben");
     expect(week).toHaveTextContent("Kalenderwoche 40");
+    expect(within(week).getByTestId("week-award-card")).toHaveAttribute("href", "/achievements/a/aw-week");
 
     const tiles = screen.getByTestId("achievements-categories");
     expect(within(tiles).getByTestId("category-tile-match")).toHaveTextContent("37,5 %");
