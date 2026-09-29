@@ -12,14 +12,17 @@ export const VIEW = { width: 76, height: 44 };
 export const RING = { cx: 38, cy: 31, rx: 31, ry: 8.5 };
 /** Wo die vier Kerzen stehen (auf der vorderen Hälfte des Rings, damit man sie ganz sieht). */
 export const CANDLE_X = [15, 30.5, 45.5, 61];
-export const CANDLE_WIDTH = 5.2;
+export const CANDLE_WIDTH = 4.6;
 /** Flammen-Dauern: keine zwei Kerzen gleich (0,9/1,3/1,7 s aus #637 plus eine vierte). */
 const FLAME_DURATIONS = [0.9, 1.3, 1.7, 1.1];
-const NEEDLE_SHADES = ["#2f6b3a", "#3f8a4a", "#245a30", "#356f3f"];
+const NEEDLE_SHADES = ["#2f6b3a", "#3f8a4a", "#245a30", "#356f3f", "#1f4f29"];
+const NEEDLE_LIGHT = "#5aa35f";
 const WAX_TINTS = ["#f6ead2", "#f3e4c8", "#f8eedb", "#f1e0c4"];
 /** Wie weit eine Kerze in vier Wochen herunterbrennt und wie lang die Wachsspur wird (SVG-Einheiten). */
 export const BURN_DOWN = 2.6;
 export const DRIP_LENGTH = 7;
+/** Beeren wachsen zu dritt: die Versätze um den Mittelpunkt (mal Radius). */
+export const BERRY_TRIAD = [[0, -0.9], [-0.95, 0.6], [0.95, 0.6]];
 
 /** Ein Punkt auf dem Ring: Winkel 0 = rechts, 90 = vorne (unten im Bild). */
 export function ringPoint(angleDeg, ring = RING) {
@@ -53,7 +56,7 @@ export function wreathLayout(year, salt = "") {
     index,
     x,
     y: ringFrontY(x),
-    height: between(rng, 12.5, 15),
+    height: between(rng, 13, 16),
     lean: between(rng, -2.2, 2.2),
     flameDuration: Math.round((durations[index] + between(rng, -0.08, 0.08)) * 100) / 100,
     flameDelay: -Math.round(between(rng, 0, 2) * 100) / 100,
@@ -64,18 +67,20 @@ export function wreathLayout(year, salt = "") {
     dripLength: Math.round(between(rng, 0.6, 1.4) * 100) / 100,
     tint: pick(rng, WAX_TINTS),
   }));
-  const clusters = Array.from({ length: 22 }, (_, i) => {
-    const angle = (i / 22) * 360 + between(rng, -6, 6);
+  // Dicht besetzt: 34 Büschel, jedes mit vier bis fünf Nadeln nach außen und innen, ein Teil heller (Licht von oben).
+  const clusters = Array.from({ length: 34 }, (_, i) => {
+    const angle = (i / 34) * 360 + between(rng, -5, 5);
+    const light = rng() < 0.28;
     return {
       angle,
       front: Math.sin((angle * Math.PI) / 180) > 0.15,
-      shade: pick(rng, NEEDLE_SHADES),
+      shade: light ? NEEDLE_LIGHT : pick(rng, NEEDLE_SHADES),
       swayDelay: -Math.round(between(rng, 0, 12) * 10) / 10,
-      needles: Array.from({ length: 3 + Math.floor(rng() * 2) }, () => ({ length: between(rng, 3, 5.5), spread: between(rng, -40, 40), tilt: between(rng, -25, 25) })),
+      needles: Array.from({ length: 4 + Math.floor(rng() * 2) }, () => ({ length: between(rng, 3.5, 7), spread: between(rng, -45, 45), tilt: between(rng, -30, 30) })),
     };
   });
-  const berries = Array.from({ length: 6 }, () => ({ angle: between(rng, 0, 360), inset: between(rng, 0.82, 0.98), radius: between(rng, 0.9, 1.3) }));
-  const bows = [between(rng, 150, 200), between(rng, 330, 380) % 360].map((angle) => ({ angle, size: between(rng, 0.85, 1.1), tilt: between(rng, -18, 18) }));
+  const berries = Array.from({ length: 6 }, () => ({ angle: between(rng, 0, 360), inset: between(rng, 0.84, 0.98), radius: between(rng, 0.85, 1.15), turn: between(rng, 0, 120) }));
+  const bows = [between(rng, 150, 200), between(rng, 330, 380) % 360].map((angle) => ({ angle, size: between(rng, 1.25, 1.5), tilt: between(rng, -18, 18) }));
   return { year, candles, clusters, berries, bows };
 }
 

@@ -13,15 +13,16 @@ test("Kranz aus dem Jahres-Seed: gleich im Jahr, anders je Jahr und Salz; vier K
   expect(new Set(a.candles.map((c) => c.flameDuration)).size).toBe(4);
   expect(new Set(a.candles.map((c) => `${c.height}:${c.lean}:${c.flameAmp}`)).size).toBe(4);
   a.candles.forEach((candle) => {
-    expect(candle.height).toBeGreaterThanOrEqual(12.5);
-    expect(candle.height).toBeLessThanOrEqual(15);
+    expect(candle.height).toBeGreaterThanOrEqual(13);
+    expect(candle.height).toBeLessThanOrEqual(16);
     expect(candle.flameDuration).toBeGreaterThan(0.8);
     expect(candle.flameDuration).toBeLessThan(1.8);
     expect(candle.flameDelay).toBeLessThanOrEqual(0);
     expect([-1, 1]).toContain(candle.dripSide);
     expect(candle.y).toBeGreaterThan(RING.cy);
   });
-  expect(a.clusters.length).toBe(22);
+  expect(a.clusters.length).toBe(34);
+  expect(a.clusters.every((c) => c.needles.length >= 4 && c.needles.length <= 5)).toBe(true);
   expect(a.clusters.some((c) => c.front)).toBe(true);
   expect(a.clusters.some((c) => !c.front)).toBe(true);
   expect(a.berries).toHaveLength(6);

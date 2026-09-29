@@ -1,7 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { seasonYear } from "../rng";
 import { adventSundays, candlesLit, daysToChristmas, todayIso } from "./calendar";
-import { CANDLE_WIDTH, RING, VIEW, adventLabel, candleBurn, daysLitFor, ringPoint, wreathLayout } from "./wreath";
+import { BERRY_TRIAD, CANDLE_WIDTH, RING, VIEW, adventLabel, candleBurn, daysLitFor, ringPoint, wreathLayout } from "./wreath";
 import { CALM_MS, LIGHTING_MS, dueIgnitions, markIgnited } from "./ignition";
 import "./advent.css";
 
@@ -52,10 +52,11 @@ export function dripPath(x, y, length, side) {
 function Cluster({ cluster }) {
   const base = ringPoint(cluster.angle);
   const lines = cluster.needles.map((needle, index) => {
-    // Abwechselnd nach außen und nach innen, damit der Ring buschig wirkt.
+    // Abwechselnd nach außen und nach innen, damit der Ring buschig wirkt; nach außen etwas länger.
     const outward = index % 2 === 0;
     const direction = ((cluster.angle + (outward ? needle.spread : 180 + needle.tilt)) * Math.PI) / 180;
-    return <line key={index} x1={base.x} y1={base.y} x2={base.x + Math.cos(direction) * needle.length} y2={base.y + Math.sin(direction) * needle.length * 0.55} stroke={cluster.shade} strokeWidth="1.1" strokeLinecap="round" />;
+    const length = outward ? needle.length * 1.15 : needle.length * 0.85;
+    return <line key={index} x1={base.x} y1={base.y} x2={base.x + Math.cos(direction) * length} y2={base.y + Math.sin(direction) * length * 0.55} stroke={cluster.shade} strokeWidth="1" strokeLinecap="round" />;
   });
   return <g>{lines}</g>;
 }
@@ -66,7 +67,9 @@ function Bow({ bow }) {
     <g transform={`translate(${point.x} ${point.y}) rotate(${bow.tilt}) scale(${bow.size})`}>
       <ellipse cx="-2.4" cy="-0.6" rx="2.4" ry="1.5" fill="#b8262e" transform="rotate(-28)" />
       <ellipse cx="2.4" cy="-0.6" rx="2.4" ry="1.5" fill="#b8262e" transform="rotate(28)" />
-      <path d="M -0.6 0.4 l -1.6 3.4 l 1.4 -0.4 z M 0.6 0.4 l 1.6 3.4 l -1.4 -0.4 z" fill="#9d1f27" />
+      <ellipse cx="-2.2" cy="-0.9" rx="1.2" ry="0.5" fill="#d9454d" opacity="0.7" transform="rotate(-28)" />
+      <ellipse cx="2.2" cy="-0.9" rx="1.2" ry="0.5" fill="#d9454d" opacity="0.7" transform="rotate(28)" />
+      <path d="M -0.6 0.4 l -1.8 3.8 l 1.6 -0.5 z M 0.6 0.4 l 1.8 3.8 l -1.6 -0.5 z" fill="#9d1f27" />
       <circle cx="0" cy="0" r="1" fill="#d33a42" />
     </g>
   );
@@ -81,19 +84,22 @@ function Candle({ candle, lit, daysLit, lighting, calm, ids }) {
   const fireClass = `tls-advent__fire${lighting ? " tls-advent__fire--lighting" : ""}${calm ? " tls-advent__fire--calm" : ""}`;
   return (
     <g className={`tls-advent__candle${lit ? " tls-advent__candle--lit" : ""}`} transform={`rotate(${candle.lean} ${x} ${candle.y})`} data-testid="advent-candle" data-lit={lit ? "1" : "0"} data-index={candle.index + 1}>
-      <rect x={x - half} y={top} width={CANDLE_WIDTH} height={height} rx="0.9" fill={`url(#${ids}-wax-${candle.index})`} />
-      <ellipse cx={x} cy={top} rx={half} ry="0.95" fill="#fbf3e3" />
-      {drip > 0 && <path d={dripPath(x + candle.dripSide * (half - 0.7), top + 0.6, drip, candle.dripSide)} fill="#f4e8d0" opacity="0.95" />}
-      <text x={x} y={candle.y - 1.6} textAnchor="middle" fontSize="3.4" fill="#8a7457" opacity="0.85" fontFamily="system-ui, sans-serif">{candle.index + 1}</text>
+      <ellipse cx={x} cy={candle.y + 0.5} rx={half + 1.4} ry="1.2" fill="#0f2a15" opacity="0.5" />
+      <rect x={x - half} y={top} width={CANDLE_WIDTH} height={height} rx="0.8" fill={`url(#${ids}-wax-${candle.index})`} />
+      <line x1={x - half + 0.8} y1={top + 1.2} x2={x - half + 0.8} y2={candle.y - 1} stroke="rgba(255, 255, 255, 0.35)" strokeWidth="0.55" strokeLinecap="round" />
+      <ellipse cx={x} cy={top} rx={half} ry="0.9" fill="#fbf3e3" />
+      <ellipse cx={x} cy={top} rx={half - 0.9} ry="0.45" fill="#eadcbf" opacity="0.6" />
+      {drip > 0 && <path d={dripPath(x + candle.dripSide * (half - 0.6), top + 0.7, drip, candle.dripSide)} fill="#f4e8d0" opacity="0.95" />}
+      <text x={x} y={candle.y - 1.5} textAnchor="middle" fontSize="3.2" fill="#8a7457" opacity="0.85" fontFamily="system-ui, sans-serif">{candle.index + 1}</text>
       <line x1={x} y1={top} x2={x} y2={top - 1.7} stroke={lit ? "#4a2f1a" : "#5f5a54"} strokeWidth="0.7" strokeLinecap="round" />
       {lit && (
         <g className={fireClass} style={{ "--flame-dur": `${candle.flameDuration}s`, "--flame-delay": `${candle.flameDelay}s`, "--flame-amp": candle.flameAmp, "--glow-dur": `${candle.glowDuration}s`, "--wick-glow": candle.wickGlow }} data-testid="advent-flame">
-          <circle className="tls-advent__glow" cx={x} cy={top - 4.2} r="7.5" fill={`url(#${ids}-glow)`} />
+          <circle className="tls-advent__glow" cx={x} cy={top - 4.4} r="8.5" fill={`url(#${ids}-glow)`} />
           <circle className="tls-advent__ember" cx={x} cy={top - 1.6} r="0.55" fill="#ff9a3c" />
           <g className="tls-advent__flame" style={{ transformOrigin: `${x}px ${top - 1.4}px` }}>
-            <ellipse cx={x} cy={top - 4.6} rx="1.9" ry="4.1" fill={`url(#${ids}-flame)`} />
-            <ellipse cx={x} cy={top - 4.2} rx="1.15" ry="2.9" fill="#ffd27a" opacity="0.95" />
-            <ellipse cx={x} cy={top - 3.6} rx="0.55" ry="1.6" fill="#fff8e6" />
+            <ellipse cx={x} cy={top - 5} rx="1.9" ry="4.6" fill={`url(#${ids}-flame)`} />
+            <ellipse cx={x} cy={top - 4.5} rx="1.15" ry="3.2" fill="#ffd27a" opacity="0.95" />
+            <ellipse cx={x} cy={top - 3.8} rx="0.55" ry="1.8" fill="#fff8e6" />
             <ellipse cx={x} cy={top - 2.1} rx="0.95" ry="0.75" fill="#7fb2ff" opacity="0.55" />
           </g>
           {lighting && <circle className="tls-advent__match" cx={x} cy={top - 2} r="6" fill={`url(#${ids}-match)`} data-testid="advent-match" />}
@@ -103,7 +109,7 @@ function Candle({ candle, lit, daysLit, lighting, calm, ids }) {
   );
 }
 
-/** Der Kranz als SVG: Zweige hinten, Kerzen, Zweige vorne, Beeren und Schleifen. */
+/** Der Kranz als SVG: Ring in zwei Grüntönen, Zweige hinten, Kerzen, Zweige vorne, Beeren zu dritt, Schleifen. */
 export function Wreath({ layout, candles, daysLit = [], lighting = [], calm = [] }) {
   const ids = useId().replace(/[^a-zA-Z0-9]/g, "");
   const back = layout.clusters.filter((cluster) => !cluster.front);
@@ -113,9 +119,9 @@ export function Wreath({ layout, candles, daysLit = [], lighting = [], calm = []
       <defs>
         {layout.candles.map((candle) => (
           <linearGradient key={candle.index} id={`${ids}-wax-${candle.index}`} x1="0" x2="1" y1="0" y2="0">
-            <stop offset="0" stopColor="#fbf3e3" />
-            <stop offset="0.45" stopColor={candle.tint} />
-            <stop offset="1" stopColor="#d9c4a0" />
+            <stop offset="0" stopColor="#fdf7ea" />
+            <stop offset="0.4" stopColor={candle.tint} />
+            <stop offset="1" stopColor="#cdb48c" />
           </linearGradient>
         ))}
         <radialGradient id={`${ids}-flame`} cx="50%" cy="68%" r="60%">
@@ -133,7 +139,8 @@ export function Wreath({ layout, candles, daysLit = [], lighting = [], calm = []
           <stop offset="1" stopColor="rgba(255, 190, 110, 0)" />
         </radialGradient>
       </defs>
-      <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#1f4a28" strokeWidth="4.5" opacity="0.9" />
+      <ellipse cx={RING.cx} cy={RING.cy + 0.8} rx={RING.rx} ry={RING.ry} fill="none" stroke="#12331a" strokeWidth="7" opacity="0.95" />
+      <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#24552d" strokeWidth="4.5" />
       <g className="tls-advent__branches tls-advent__branches--back">
         {back.map((cluster, index) => <Cluster key={index} cluster={cluster} />)}
       </g>
@@ -144,7 +151,16 @@ export function Wreath({ layout, candles, daysLit = [], lighting = [], calm = []
         {front.map((cluster, index) => <Cluster key={index} cluster={cluster} />)}
         {layout.berries.map((berry, index) => {
           const point = ringPoint(berry.angle, { ...RING, rx: RING.rx * berry.inset, ry: RING.ry * berry.inset });
-          return <circle key={index} cx={point.x} cy={point.y} r={berry.radius} fill="#c8323a" />;
+          const turn = (berry.turn * Math.PI) / 180;
+          return (
+            <g key={index}>
+              {BERRY_TRIAD.map(([dx, dy], n) => {
+                const ox = (dx * Math.cos(turn) - dy * Math.sin(turn)) * berry.radius;
+                const oy = (dx * Math.sin(turn) + dy * Math.cos(turn)) * berry.radius * 0.7;
+                return <circle key={n} cx={point.x + ox} cy={point.y + oy} r={berry.radius * 0.72} fill="#c8323a" stroke="#7d151c" strokeWidth="0.25" />;
+              })}
+            </g>
+          );
         })}
         {layout.bows.map((bow, index) => <Bow key={index} bow={bow} />)}
       </g>
