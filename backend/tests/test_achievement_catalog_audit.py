@@ -220,3 +220,49 @@ def test_katalog_c_ziele_material_texte_und_schluessel():
     assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
     known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
     assert keys <= known, sorted(keys - known)
+
+
+# ---- Katalog D (#615): Verein, Besonders, Geheim
+from achievement_catalog import GROUPS_D, REDEFINED_D, REPLACED_D, TIERS_D  # noqa: E402
+
+
+def test_katalog_d_hat_33_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
+    assert len(GROUPS_D) == 33 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1) + 15 + 13  # Verein 19, Besonders 15, Geheim 13
+    codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D]
+    assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
+    tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C + TIERS_D]
+    assert len(tier_codes) == len(set(tier_codes))
+    in_catalog = {g["code"] for g in ACHIEVEMENT_GROUPS}
+    assert {g["code"] for g in GROUPS_D} <= in_catalog
+    assert REPLACED_D == {}
+    assert set(REDEFINED_D) <= set(codes)
+    assert all(g["catalog"] == "D" and g["public"] for g in GROUPS_D)
+    # Die sieben Negativ-Gruppen bleiben unverändert im alten Block.
+    negative = [g for g in ACHIEVEMENT_GROUPS if g.get("is_negative")]
+    assert len(negative) == 7 and all("catalog" not in g for g in negative)
+
+
+def test_katalog_d_ziele_material_texte_und_schluessel():
+    by_group = defaultdict(list)
+    for tier in TIERS_D:
+        by_group[tier["group_code"]].append(tier)
+    for group in GROUPS_D:
+        tiers = by_group[group["code"]]
+        targets = [t["progress_target"] for t in tiers]
+        assert targets == sorted(targets) and len(set(targets)) == len(targets), group["code"]
+        assert group["description"] and group["how_to"] and group["icon"] and group["art"]
+        assert all(t["description"] and t["how_to"] and t["points"] > 0 for t in tiers)
+        if group["category"] == "special":
+            assert [t["material"] for t in tiers] == ["legendary"], group["code"]
+        elif group["category"] == "hidden":
+            assert [t["material"] for t in tiers] == ["hidden"], group["code"]
+        else:
+            assert all(t["material"] in MATERIALS for t in tiers)
+        if group["manual_only"]:
+            assert group["condition_key"] is None and all(t["manual_only"] and t["condition_key"] is None for t in tiers), group["code"]
+        else:
+            assert all(t["condition_key"] == group["condition_key"] for t in tiers)
+    keys = {g["condition_key"] for g in GROUPS_D if g["condition_key"]}
+    assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
+    known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
+    assert keys <= known, sorted(keys - known)
