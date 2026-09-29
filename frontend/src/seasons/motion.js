@@ -19,6 +19,7 @@ export const EFFECTS = {
   wisp: { slots: 0, cooldownMs: 90000, priority: 1, ttlMs: 30000 },
   ghost: { slots: 1, cooldownMs: 0, priority: 4, ttlMs: 9000, user: true },
   web_tear: { slots: 1, cooldownMs: 0, priority: 4, ttlMs: 8000, user: true },
+  web_spider: { slots: 0, cooldownMs: 25000, priority: 1, ttlMs: 8000 },
   eyes: { slots: 0, cooldownMs: 120000, priority: 1, ttlMs: 9000 },
   rare_edge: { slots: 1, cooldownMs: 240000, priority: 1, ttlMs: 3000 },
   jumpscare: { slots: 2, cooldownMs: 0, priority: 6, ttlMs: 3000 },

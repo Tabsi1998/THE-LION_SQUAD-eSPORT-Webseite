@@ -24,20 +24,20 @@ export function pageClass(pathname = "/") {
 
 // Fähigkeiten je Klasse bei normaler Stärke. `full` (Höhepunkt der Saison) hebt an, `subtle` senkt alles auf still.
 const MATRIX = {
-  lively: { hangingBats: 4, flock: true, flockRange: [3, 5], webs: 2, rappel: true, crawler: true, wisps: true, eyes: true, rareEvents: true, fog: "near", scares: true, slots: 2, footerScene: "full" },
-  medium: { hangingBats: 2, flock: true, flockRange: [2, 4], webs: 1, rappel: true, crawler: false, wisps: true, eyes: true, rareEvents: false, fog: "far", scares: true, slots: 2, footerScene: "full" },
-  calm: { hangingBats: 1, flock: false, flockRange: [0, 0], webs: 1, rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: "far", scares: false, slots: 1, footerScene: "small" },
-  quiet: { hangingBats: 0, flock: false, flockRange: [0, 0], webs: 0, rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: "none", scares: false, slots: 0, footerScene: "none" },
+  lively: { hangingBats: 4, flock: true, flockRange: [3, 5], webs: 2, cornerWebs: 3, rappel: true, crawler: true, wisps: true, eyes: true, rareEvents: true, fog: "near", scares: true, slots: 2, footerScene: "full" },
+  medium: { hangingBats: 2, flock: true, flockRange: [2, 4], webs: 1, cornerWebs: 2, rappel: true, crawler: false, wisps: true, eyes: true, rareEvents: false, fog: "far", scares: true, slots: 2, footerScene: "full" },
+  calm: { hangingBats: 1, flock: false, flockRange: [0, 0], webs: 1, cornerWebs: 1, rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: "far", scares: false, slots: 1, footerScene: "small" },
+  quiet: { hangingBats: 0, flock: false, flockRange: [0, 0], webs: 0, cornerWebs: 0, rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: "none", scares: false, slots: 0, footerScene: "none" },
 };
 
 export function capabilitiesFor(cls = "medium", intensity = "normal") {
   const base = { ...(MATRIX[cls] || MATRIX.medium) };
   if (intensity === "subtle") {
-    return { ...base, hangingBats: 0, flock: false, flockRange: [0, 0], rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: base.fog === "none" ? "none" : "far", scares: false, slots: 0, footerScene: base.footerScene === "none" ? "none" : "small", subtle: true };
+    return { ...base, hangingBats: 0, flock: false, flockRange: [0, 0], cornerWebs: Math.min(base.cornerWebs, 1), rappel: false, crawler: false, wisps: false, eyes: false, rareEvents: false, fog: base.fog === "none" ? "none" : "far", scares: false, slots: 0, footerScene: base.footerScene === "none" ? "none" : "small", subtle: true };
   }
   if (intensity === "full" && cls !== "quiet") {
     const lively = cls === "lively";
-    return { ...base, hangingBats: base.hangingBats + 1, flockRange: lively ? [5, 8] : base.flock ? [3, 5] : [0, 0], crawler: base.crawler || cls === "medium", webs: Math.min(2, base.webs + (lively ? 0 : 0)), full: true };
+    return { ...base, hangingBats: base.hangingBats + 1, flockRange: lively ? [5, 8] : base.flock ? [3, 5] : [0, 0], crawler: base.crawler || cls === "medium", webs: Math.min(2, base.webs + (lively ? 0 : 0)), cornerWebs: Math.min(4, base.cornerWebs + 1), full: true };
   }
   return base;
 }
@@ -56,6 +56,8 @@ export function scaleForViewport(caps, width = typeof window === "undefined" ? 1
     hangingBats: Math.min(caps.hangingBats, mobile ? 1 : 2),
     flockRange: caps.flock ? [Math.min(caps.flockRange[0], 2), Math.min(caps.flockRange[1], 3)] : [0, 0],
     webs: Math.min(caps.webs, 1),
+    cornerWebs: mobile ? 0 : Math.min(caps.cornerWebs, 1),
+    footerScene: mobile && caps.footerScene !== "none" ? "small" : caps.footerScene,
     crawler: false,
     eyes: mobile ? false : caps.eyes,
     rareEvents: false,

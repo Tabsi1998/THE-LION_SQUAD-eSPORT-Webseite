@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
+import { pageClass } from "./intensity";
 import { useSeason } from "./SeasonContext";
 import { SEASON_MODULES, hasModule } from "./registry";
 import { budgetFor, createSkyLoop } from "./sky";
@@ -99,13 +100,15 @@ export function SeasonStage() {
     const accents = mounted.filter((season) => modules[season.key].accent && season.effective !== "subtle");
     root.dataset.season = mounted.map((season) => season.key).join(" ") || "";
     root.dataset.seasonIntensity = mounted.map((season) => season.effective).join(" ") || "";
+    root.dataset.seasonPage = pageClass(location.pathname);
     if (accents.length) root.style.setProperty("--season-accent", modules[accents[0].key].accent);
     else root.style.removeProperty("--season-accent");
     if (!mounted.length) {
       delete root.dataset.season;
       delete root.dataset.seasonIntensity;
+      delete root.dataset.seasonPage;
     }
-  }, [mounted, modules]);
+  }, [mounted, modules, location.pathname]);
 
   // Die Ebenen leben, bis sich Saison, Stärke, Phase oder Seite ändert - nicht bei jeder Antwort des Servers,
   // sonst finge das Netz alle zehn Minuten neu an zu wachsen. Das Wetter holen sie sich über das Ereignis.
