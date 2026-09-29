@@ -114,7 +114,7 @@ export function CornerWebs({ count, seed, salt, moving = true, walkDelayMs = DEF
     let pointer = null;
     let frame = 0;
     const tick = () => {
-      if (cancelled || !moving) return;
+      if (cancelled || !moving || document.hidden) return;
       const now = performance.now();
       let changed = false;
       const next = websRef.current.map((web) => {

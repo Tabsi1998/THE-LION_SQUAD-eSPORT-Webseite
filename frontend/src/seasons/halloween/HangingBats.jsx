@@ -25,6 +25,7 @@ export function measureAnchors(doc, win, zonesOrOptions) {
 }
 
 const REFRESH_DELAYS = [400, 1500, 3500];
+export const IDLE_TICK_MS = 250;
 const POINTER_EVERY_MS = 120;
 const SCROLL_EVERY_MS = 400;
 const SCROLL_WINDOW_MS = 200;
@@ -88,6 +89,7 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
   const batsRef = useRef([]);
   const rngRef = useRef(mulberry32(hashString(`bats:${seed}:${salt}`)));
   const tokensRef = useRef(new Map());
+  const wakeRef = useRef(() => {});
 
   useEffect(() => {
     batsRef.current = [];
@@ -218,17 +220,35 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
       if (changed) setBats(next);
     };
 
+    // Leistung (H19): ruhen alle Fledermäuse und ist nichts angestoßen, tickt die Schleife viermal je Sekunde über
+    // setTimeout statt in jedem Bild; sobald sich etwas bewegt (Start, Flug, Landung, Aufmerksamkeit) oder Zeiger und
+    // Scrollen etwas anstoßen könnten, läuft sie wieder mit requestAnimationFrame. Versteckter Tab: nur alle 2 s prüfen.
     let frame = 0;
+    let idleTimer = 0;
     let last = performance.now();
+    const busy = (now) => batsRef.current.some((bat) => !REACTIVE.has(bat.state) || bat.state === "alert") || scrolling.pending || now - pointer.at < 2000;
     const loop = () => {
-      frame = win.requestAnimationFrame(loop);
+      frame = 0;
+      idleTimer = 0;
       const now = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000) * timeScale;
       last = now;
-      if (document.hidden) return;
+      if (document.hidden) {
+        idleTimer = win.setTimeout(loop, 2000);
+        return;
+      }
       step(dt, now);
+      if (busy(performance.now())) frame = win.requestAnimationFrame(loop);
+      else idleTimer = win.setTimeout(loop, IDLE_TICK_MS);
     };
     frame = win.requestAnimationFrame(loop);
+    // Ein Klick (Verscheuchen) weckt die Schleife sofort, statt auf den nächsten groben Takt zu warten.
+    wakeRef.current = () => {
+      if (cancelled || frame) return;
+      win.clearTimeout(idleTimer);
+      idleTimer = 0;
+      frame = win.requestAnimationFrame(loop);
+    };
 
     const timers = REFRESH_DELAYS.map((ms) => win.setTimeout(refresh, ms));
     let debounce = 0;
@@ -267,7 +287,9 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
     win.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       cancelled = true;
-      win.cancelAnimationFrame(frame);
+      wakeRef.current = () => {};
+      if (frame) win.cancelAnimationFrame(frame);
+      win.clearTimeout(idleTimer);
       timers.forEach((timer) => win.clearTimeout(timer));
       win.clearTimeout(debounce);
       win.clearTimeout(scrollSettle);
@@ -290,6 +312,7 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
     const now = performance.now();
     batsRef.current = batsRef.current.map((candidate) => (candidate.id === id ? startle(candidate, rngRef.current, viewFor(candidate.fixed, window), now) : candidate));
     setBats(batsRef.current);
+    wakeRef.current();
   };
 
   if (typeof document === "undefined") return null;

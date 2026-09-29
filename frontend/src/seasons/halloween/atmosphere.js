@@ -5,15 +5,12 @@
 // frei sind - am liebsten am Rand.
 
 import { measureQuietZones, pointInQuiet } from "../quiet";
+import { blocksPoint } from "../glyphs";
 
 export const CELL = 80;
 export const TOP_SKIP = 90;
 export const EDGE_WIDTH = 64;
-const BLOCKING = "p, h1, h2, h3, h4, h5, h6, li, a, button, time, label, input, select, textarea, span, strong, em, small, td, th, figcaption, img, picture, video, svg, canvas, [role='img'], [data-season-anchor], [data-season-perch], [data-season-quiet]";
-
-function hasOwnText(node) {
-  return Array.from(node.childNodes || []).some((child) => child.nodeType === 3 && child.textContent.trim().length > 0);
-}
+const CONTAINERS = "[data-season-anchor], [data-season-perch], [data-season-quiet]";
 
 /** Helligkeit einer CSS-Farbe (0 dunkel … 1 hell), null für durchsichtig oder unbekannt. */
 export function luminance(color) {
@@ -40,8 +37,8 @@ export function spotFree(probe, x, y, win = null) {
   if (!hit) return false;
   let node = hit;
   while (node && node.nodeType === 1 && node.tagName !== "BODY" && node.tagName !== "HTML") {
-    if (typeof node.matches === "function" && node.matches(BLOCKING)) return false;
-    if (hasOwnText(node)) return false;
+    if (typeof node.matches === "function" && node.matches(CONTAINERS)) return false;
+    if (blocksPoint(node, x, y)) return false;
     if (win && typeof win.getComputedStyle === "function") {
       const style = win.getComputedStyle(node);
       // Ein Bild als Hintergrund des getroffenen Elements sperrt (Foto, Grafik); Muster und Verläufe auf Vorfahren

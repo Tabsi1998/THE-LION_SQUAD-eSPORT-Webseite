@@ -313,3 +313,28 @@ test("Scrollen (H9): erst ein schneller Ruck über mindestens 100 ms schreckt ei
   await scrollTo(3100, 50);
   expect(states()).toEqual(["takeoff"]);
 });
+
+test("Leistung (H19): ruhen alle Fledermäuse, tickt die Schleife grob (250 ms) statt in jedem Bild - und wieder fein, sobald eine fliegt", async () => {
+  vi.useFakeTimers();
+  mountNav(["n1"]);
+  const rafSpy = vi.spyOn(window, "requestAnimationFrame");
+  render(<MemoryRouter initialEntries={["/"]}><HangingBats count={1} seed={0.3} salt="x" /></MemoryRouter>);
+  await act(async () => {
+    vi.advanceTimersByTime(450);
+  });
+  expect(states()).toEqual(["perched"]);
+  rafSpy.mockClear();
+  await act(async () => {
+    vi.advanceTimersByTime(1000);
+  });
+  // Grober Takt: höchstens eine Handvoll Bilder je Sekunde statt sechzig.
+  expect(rafSpy.mock.calls.length).toBeLessThanOrEqual(6);
+  fireEvent.click(screen.getByTestId("halloween-bat-hanging"));
+  rafSpy.mockClear();
+  await act(async () => {
+    vi.advanceTimersByTime(500);
+  });
+  expect(rafSpy.mock.calls.length).toBeGreaterThan(15);
+  rafSpy.mockRestore();
+});
+
