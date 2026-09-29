@@ -90,14 +90,17 @@ async def test_seltenheit_kategorien_und_geheim_zaehler(flow):
     hidden = next(c for c in data["categories"] if c["key"] == "hidden")
     assert hidden["hidden"] is True and hidden["groups"] >= 1
     assert "negative" not in {c["key"] for c in data["categories"]}
-    assert data["hidden"] == {"total": 1, "earned": 0}, "anonym: nur die Zahl"
+    # Die Zahl der geheimen Gruppen haengt vom Katalog ab (Katalog D bringt 13 mit) - gezaehlt wird gegen die Datenbank.
+    hidden_total = await flow.db.achievement_groups.count_documents({"hidden": True, "is_negative": {"$ne": True}})
+    assert hidden_total >= 1
+    assert data["hidden"] == {"total": hidden_total, "earned": 0}, "anonym: nur die Zahl"
     assert isinstance(data["week"], dict) and "week_key" in data["week"] and isinstance(data["recent"], list)
 
     flow.act_as(users[0])
     data = (await flow.get("/api/achievements/overview")).json()
-    assert data["hidden"] == {"total": 1, "earned": 1}
+    assert data["hidden"] == {"total": hidden_total, "earned": 1}
     mine = (await flow.get("/api/achievements/me")).json()
-    assert mine["hidden"] == {"total": 1, "earned": 1} and mine["privacy_achievements_public"] is True
+    assert mine["hidden"] == {"total": hidden_total, "earned": 1} and mine["privacy_achievements_public"] is True
     assert mine["level"]["level"] >= 1 and "title" in mine["level"]
     assert mine["pinned"] == [] and mine["pinned_codes"] == []
 
