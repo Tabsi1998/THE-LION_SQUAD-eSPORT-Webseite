@@ -103,8 +103,13 @@ function snowKeys(fx) {
   };
 }
 
+/** Weihnachten: Kette an der Kopfzeile außer auf stillen Seiten, Kette in der Fußzeile mit der Szene, Lichtinseln mit der Atmosphäre. */
+function christmasKeys(fx) {
+  return { chain: fx.cls !== "quiet", footerChain: fx.scene !== "none", glow: fx.ambient !== "none" };
+}
+
 /** Je Saison die Übersetzung der Effektklassen in ihre eigenen Schlüssel - eine neue Saison trägt sich hier ein. */
-export const SEASON_CAPABILITIES = { halloween: halloweenKeys, snow: snowKeys };
+export const SEASON_CAPABILITIES = { halloween: halloweenKeys, snow: snowKeys, christmas: christmasKeys };
 
 export function capabilitiesFor(cls = "medium", intensity = "normal", season = "halloween") {
   const fx = effectClasses(cls, intensity);

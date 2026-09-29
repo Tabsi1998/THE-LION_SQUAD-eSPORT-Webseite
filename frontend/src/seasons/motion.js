@@ -108,6 +108,13 @@ export function createMotionScheduler({ now = () => Date.now(), slots = DEFAULT_
     snapshot,
     setHidden,
     canRun: (kind, at = now()) => reason(kind, at) === null,
+    /** Plätze zur Laufzeit ändern (Feiertage: einer statt zwei) - gibt die vorherige Zahl zurück. */
+    setSlots(next) {
+      const previous = state.slots;
+      state.slots = Math.max(0, Number(next) || 0);
+      emit();
+      return previous;
+    },
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     reset(at = now()) { state.active.clear(); state.lastByKind = {}; state.lastStartAt = 0; state.armedAt = at + initialDelayMs; state.resumeAt = 0; emit(); },
     dispose() { doc?.removeEventListener?.("visibilitychange", onVisibility); listeners.clear(); },
