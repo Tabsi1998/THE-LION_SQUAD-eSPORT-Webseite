@@ -62,7 +62,9 @@ def test_saison_uhr_steht_im_test_auf_einem_ruhigen_tag(season_clock):
     assert season_clock == at(2026, 9, 15, 12)
     assert seasons.to_vienna(None) == season_clock and seasons.to_vienna() == season_clock
     assert seasons.active(None, {})["now"] == "2026-09-15T12:00:00+02:00"
-    assert seasons.active(None, {})["seasons"] == [], "ein Tag ohne Saison"
+    running = [s["key"] for s in seasons.active(None, {})["seasons"]]
+    assert all(seasons.runs_all_year(key) for key in running), f"ein Tag ohne Saison mit Termin - nur was das ganze Jahr läuft: {running}"
+    assert running == ["weather"]
     assert seasons.to_vienna(datetime(2026, 10, 31, 20, 0)) == at(2026, 10, 31, 20)
     assert seasons.to_vienna(datetime(2026, 12, 31, 23, 0, tzinfo=timezone.utc)) == at(2027, 1, 1, 0)
     assert "halloween" in {s["key"] for s in seasons.active(at(2026, 10, 31, 20), {})["seasons"]}
