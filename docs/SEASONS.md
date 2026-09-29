@@ -1,6 +1,6 @@
 # Jahreszeiten: der gemeinsame Kern (Seasonal Core)
 
-Stand: 29. September 2026 (Seasonal Core C1–C6, #721–#726). Gilt für Web (`frontend/src/seasons/`) und App
+Stand: 29. September 2026 abends (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766; Weihnachten #767 offen). Gilt für Web (`frontend/src/seasons/`) und App
 (`mobile/src/seasons/`). Halloween ist die erste Saison auf diesem Kern; Winter, Weihnachten, Silvester, Fasching,
 Ostern und Geburtstage bringen nur noch ihre Figuren und ihren Plan mit, nicht ihre eigenen Regeln.
 
@@ -13,7 +13,7 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy) | `halloween.tsx` über `SEASON_MODULES` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, advent, snow; christmas mit #767) | `halloween.tsx` über `SEASON_MODULES` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
@@ -128,8 +128,9 @@ Ankern), `corner` (Ecken), `ambient` (none/far/near), `watch` (Beobachter), `mot
 - **Fensterbreite/Bildschirm**: `scaleForViewport` (Web: unter 900 px weniger, unter 640 px keine Ecken und keine
   Beobachter), `scaleForScreen` (App).
 - **Saison-Übersetzung**: `SEASON_CAPABILITIES[saison]` übersetzt die Klassen in eigene Schlüssel (Halloween:
-  `hangingBats`, `cornerWebs`, `fog`, `eyes`, `flock`, `rappel`, `crawler`, `scares`, `footerScene`). Eine neue Saison
-  trägt sich dort ein; Komponenten fragen nur ihre Schlüssel.
+  `hangingBats`, `cornerWebs`, `fog`, `eyes`, `flock`, `rappel`, `crawler`, `scares`, `footerScene`; Schnee: `flakes`,
+  `caps`, `capsMax`, `tint`; Weihnachten mit #767: `chain`, `footerChain`, `glow`). Eine neue Saison trägt sich dort ein;
+  Komponenten fragen nur ihre Schlüssel. Mit #767 kommt `setSlots(n)` in `motion.js` für ruhige Tage (Feiertage ein Platz).
 
 ## 7. Abnahme: „nichts wird schlechter“ (C6)
 
@@ -155,8 +156,9 @@ Verbindlich für jede Saison, Web und App:
   offPieces, yielding, countPieces, mobileLimits, reducedMotionState, reducedMotion })` erzeugt die vier Prüfungen
   (PC, Handy/Tablet, Reduced Motion, Saison aus). Beispiel: `e2e/halloween-regression.spec.js`. Lauf:
   `E2E_PORT=3017 E2E_ISOLATED=1 npx playwright test e2e/<saison>-regression.spec.js --project=chromium --project=mobile`.
-- App: `mobile/src/seasons/acceptance.test.tsx` je Saison - je Screen-Klasse nur das Erlaubte, Bühne `box-none`,
-  Reduced Motion, Hintergrund, Saison aus.
+- App: `mobile/src/seasons/seasonQa.tsx` - `defineSeasonAcceptance({ key, label, Corners, Card, setScreen,
+  setReducedMotion, reset, moving, stage, passive, Stage })` erzeugt die gemeinsamen Prüfungen (still bleibt still, „dezent“
+  und Reduced Motion ohne Bewegung, Bühne `box-none`, Saison aus); `acceptance.test.tsx` nutzt ihn für Halloween.
 - Einheitstests des Kerns: `anchors.test.js`, `quiet.test.js`, `motion.test.js`, `intensity.test.js`, `rng.test.js`
   (Web) und die gleichnamigen `.ts`-Tests der App.
 

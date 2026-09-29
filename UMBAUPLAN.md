@@ -2638,6 +2638,18 @@ der Erfolge - und vier neue Regeln, die für alles gelten.
   die sich nur in der Schreibung unterscheiden; und „Closes #a, #b“ schließt auf GitHub nur
   das erste Issue.
 
+- **Seasonal Core und Winter-Saisons** (C1–C6 #721–#726, PRs #763/#764; Adventkranz #765,
+  Schnee #766, Weihnachten #767): Aus den Halloween-Regeln wurde der Kern für alle Jahreszeiten –
+  echte Kanten und Ecken als Anker (Web und App), Ruhezonen und Bewegungsbudget als feste
+  Regeln, ein Jahres-Seed (dieses Jahr immer gleich, nächstes Jahr anders, ein Neuladen ändert
+  nichts), Effektklassen je Seite statt Zahlen je Figur, und ein Abnahme-Standard, den jede
+  Saison mit wenigen Zeilen aufruft. Darauf die ersten Winter-Bausteine: der Adventkranz neben
+  dem Logo (vier Kerzen, jede anders, angezündet je Adventsonntag mit sichtbarem Anzünden),
+  Schnee in drei Tiefen mit Wind und Böen aus dem echten Wetter und Hauben auf Karten, die
+  wachsen und tauen, dazu die Weihnachtskette mit Draht und einzelnen Lämpchen und der Gruß als
+  Karte des Vereins. Lehre: ein globales `max-width: 100%` für SVGs lässt absolut positionierte
+  Grafiken in leeren Behältern verschwinden – Breite immer auch als Stil setzen.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen

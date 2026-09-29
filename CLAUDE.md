@@ -2709,6 +2709,38 @@ Seit dem 15. September gilt:
   `achievements_reconcile_last`. Testfalle: `add_staff()` ist Superadmin –
   für „Staff ohne Vorstand“ `club_admin` nehmen; `award_achievement` legt
   `user_xp` an (Upsert in Tests).
+- Seasonal Core (C1–C6, #721–#726; PRs #763 Web, #764 App) und die ersten
+  Winter-Saisons (#765 Adventkranz, #766 Schnee; #767 Weihnachten offen):
+  Kern der Jahreszeiten in `frontend/src/seasons/` – `anchors.js` (echte
+  Kanten und Ecken: `measureAnchors` je Art nav/header/card/frame/image/hero/
+  footer/footerLine mit stabilen Schlüsseln, `edgeSlot`/`pointSlot`/
+  `cornerSlot`, Sonde `roomAt` (Behälter) und `areaFree` (Zeichenkästen),
+  `freeSlots` gegen Ruhezonen, `chooseSlots`/`nearestFreeSlot`;
+  `halloween/perches.js` und `webCorners.js` sind nur noch Adapter), `rng.js`
+  (`seasonYear`, `seasonSeed`, `seasonRng` – Saat `saison:jahr:route[:salz]`,
+  `SPANS_NEW_YEAR` für winter/snow/new_year/advent_calendar/christmas;
+  Halloween würfelt je Saisonjahr über `YEAR_SALT`/`setYearSalt` statt je
+  Ladung), `intensity.js` (`effectClasses` perch/corner/ambient/watch/motion/
+  slots/crawl/rare/scene/interact je Seitenklasse, `allows`,
+  `SEASON_CAPABILITIES` übersetzt je Saison – halloween, snow; christmas und
+  `motion.js` `setSlots` kommen mit #767), `e2e/seasonQa.js` (`defineSeasonQa` – PC 1366/
+  1440/1920, Handy 375, Tablet 768, Reduced Motion, Saison aus; jede Saison
+  hat ihre `<saison>-regression.spec.js`), `docs/SEASONS.md` (Semantik,
+  Checkliste, neue Saison anlegen). App: `mobile/src/seasons/rng.ts`
+  (`seasonSeed`), `intensity.ts` (`effectClasses`, `seasonCapabilities`),
+  `seasonQa.tsx` (`defineSeasonAcceptance`). Saisonmodule: `advent/`
+  (`calendar.js` Adventsonntage wie der Server, `wreath.js` Kranz aus dem
+  Jahres-Seed, `ignition.js` Anzünden einmal je Tag und Kerze, Widget neben
+  dem Logo), `snow/` (`flakes.js` drei Tiefen und Böen aus dem Wetter,
+  `layer.js` für den Canvas-Loop, `caps.js`/`SnowCaps.jsx` Hauben auf Kanten
+  mit Stufe und Tauwetter, Schneeflocke mit Signal `snowflakes_clicked`),
+  `christmas/` (offen in #767: `lights.js`/`LightChain.jsx` Kette mit Draht
+  in den untersten 16 px der Kopfzeile und oben in der Fußzeile, Lücken für
+  Logo/Knöpfe/Schrift; `Toast` einmal je Tag; Feiertage ein Platz im
+  Budget). Falle: das globale `img,
+  video, canvas, svg { max-width: 100% }` in `index.css` lässt absolut
+  positionierte SVGs in 0 px breiten Behältern kollabieren – `max-width:
+  none` plus Breite als Stil.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3149,6 +3181,16 @@ die Neuberechnung an), #659 (Halloween-Feinschliff Web + App 1.0.2 –
 Build 81; Nebel, Geister, Lichterketten, Friedhof raus, Netzbau, Abseil-
 Spinne, echter Mond). Alle vom Betreiber gemergt; `update.sh` danach.
 
+### Gemergt 29. September (Nachmittag und Abend)
+#714 (Halloween IV Paket 5), #720 (Doku-Stand), #760–#762 (Halloween IV App
+1–3: Plätze, Fledermausleben, Spinnen/Netz/Friedhof/Katze/Nebel, Abnahme –
+Meilenstein 43 leer), #763 (Seasonal Core Web), #764 (Seasonal Core App –
+schließt #721–#726), #765 (Adventkranz Web), #766 (Schnee Web). #762 war rot
+wegen einer Expo-Drift (`expo install --check` verlangt expo ~57.0.26,
+expo-constants ~57.0.20) – nur package.json und Lockfile angehoben. Die
+Sichtproben laufen gegen einen Vite-Dev-Server je Worktree (`probe_*.cjs`
+mit Playwright, Screenshots an den Betreiber).
+
 ### Gemergt 29. September (Vormittag)
 #686 (Jumpscares ab 18), #687 (Doku-Stand), #688 (E5 Katalog D), #689–#691
 (E9 Sichtbarkeit: Schaukasten, Profil-Reiter, Teilen-Karte), #692–#694 (E8
@@ -3173,9 +3215,15 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (29.09. mittags): #714 Halloween IV Paket 5 (Handy/Reduced Motion,
-  Leistung, Abnahme-Test; nach dem Merge von #713 auf `main` umgesetzt, ready
-  nach den Checks). Danach: Doku-Stand, Erfolge II Rest (E10 Teil 2 – acht
+- Offen (29.09. abends): #767 Weihnachten Web (S8 #639 mit X1/X2/X4, auf
+  `main`), #768 Rückmeldung des Betreibers (Schneeflocken gehören zur Seite
+  statt zum Fenster – `scrollFlake` mit Tiefen 1/0,8/0,55; die
+  Halloween-Katze miaut – `cat_meow` in `halloween/sounds.js`).
+  Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, Silvester S9 #640 mit
+  N1–N5 (#739–#743), Adventkalender S10 #641 mit W6 #732 (braucht Server:
+  Sammlung `advent_doors`, Öffnen, Ziehung), Nikolausstiefel X3 #736 (braucht
+  einen Sticker-Grant in `services/stickers.py`), App S11 #642 (Kranz, Schnee,
+  Kette, Gruß nativ). Offen bleibt: Erfolge II Rest (E10 Teil 2 – acht
   Admin-Reiter im Web –, E12 #622, E13 #623; die vier zurückgestellten
   Gruppen aus #614 und die Saison-Fundstücke #678 warten auf Datenquellen),
   Halloween VII aus dem nächsten Live-Blick (#677: alles wird
