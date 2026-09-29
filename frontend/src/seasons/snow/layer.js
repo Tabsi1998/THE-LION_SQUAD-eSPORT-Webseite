@@ -4,7 +4,7 @@
 // (Reduced Motion, „dezent“) wird sie gar nicht erst erzeugt (index.jsx).
 
 import { hashString, mulberry32 } from "../rng";
-import { DEPTHS, DEPTH_ORDER, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, nextGust, scrollFlake, windAt, windFrom } from "./flakes";
+import { DEPTHS, DEPTH_ORDER, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, nextGust, scrollFlake, snowfallFactor, windAt, windFrom } from "./flakes";
 
 /** Sprite-Größen (Radius), auf die eine Flocke gerundet wird. */
 export const SPRITE_RADII = [1.6, 2.6, 4, 6.2];
@@ -116,30 +116,35 @@ function spriteFor(sprites, flake) {
  * Die Ebene. `budget` (sky.js) und `share` (Seitenklasse) bestimmen die Zahl, `weather` Wind und ob es schneit,
  * `endsAt` den Ausklang. `win`/`doc`/`now`/`random` sind für Tests austauschbar.
  */
-export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weather = null, endsAt = "", win = typeof window === "undefined" ? null : window, doc = typeof document === "undefined" ? null : document, now = () => Date.now(), ratio = 1 } = {}) {
+export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weather = null, endsAt = "", baseFactor = 0.55, win = typeof window === "undefined" ? null : window, doc = typeof document === "undefined" ? null : document, now = () => Date.now(), ratio = 1 } = {}) {
   const rng = mulberry32(hashString(`snow:${seed}`));
-  const state = { t: 0, wind: windFrom(weather), snowing: Boolean(weather && Number(weather.snow_cm) > 0), gust: nextGust(rng, 0), flakes: { back: [], mid: [], front: [] }, counts: null, sprites: null, lastCount: -1e9, spawned: 0 };
+  const state = { t: 0, wind: windFrom(weather), snowing: snowfallFactor(weather, baseFactor) > baseFactor, factor: snowfallFactor(weather, baseFactor), active: true, gust: nextGust(rng, 0), flakes: { back: [], mid: [], front: [] }, counts: null, sprites: null, lastCount: -1e9, spawned: 0 };
   // Scrollstand des letzten Bildes: die Flocken gehören zur Seite, der Unterschied schiebt sie (scrollFlake).
   let lastScrollY = win ? Number(win.scrollY) || 0 : 0;
   const onWeather = (event) => {
     const detail = event && event.detail;
     if (!detail) return;
     state.wind = windFrom(detail);
-    state.snowing = Number(detail.snow_cm) > 0;
+    state.factor = snowfallFactor(detail, baseFactor);
+    state.snowing = state.factor > baseFactor;
     state.lastCount = -1e9;
   };
   if (win && typeof win.addEventListener === "function") win.addEventListener("tls:season-weather", onWeather);
 
   const settle = (size, first) => {
-    const counts = flakeCounts(budget, { share, snowing: state.snowing, fade: fadeAt(endsAt, now()) });
+    const counts = flakeCounts(budget, { share, factor: state.active ? state.factor : 0, fade: fadeAt(endsAt, now()) });
     state.counts = counts;
     DEPTH_ORDER.forEach((depth) => {
       const list = state.flakes[depth];
-      while (list.length < counts[depth]) {
+      const staying = list.filter((flake) => !flake.leaving);
+      // Weniger Schnee: die Überzähligen fallen noch zu Ende. Mehr Schnee: neue kommen von oben.
+      staying.slice(counts[depth]).forEach((flake) => {
+        flake.leaving = true;
+      });
+      for (let n = staying.length; n < counts[depth]; n += 1) {
         list.push(createFlake(depth, size, rng, { index: state.spawned, anywhere: first }));
         state.spawned += 1;
       }
-      if (list.length > counts[depth]) list.length = counts[depth];
     });
   };
 
@@ -149,7 +154,9 @@ export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weathe
       if (!state.sprites) state.sprites = makeSprites(doc, ratio) || false;
       state.t += dt;
       if (state.t - state.lastCount > 5) {
-        settle(size, state.lastCount < -1e8);
+        // Nur beim allerersten Bild stehen die Flocken schon im Bild; später kommen neue von oben.
+        settle(size, !state.started);
+        state.started = true;
         state.lastCount = state.t;
       }
       if (state.t > state.gust.at + state.gust.length + 4) state.gust = nextGust(rng, state.t);
@@ -159,10 +166,14 @@ export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weathe
       lastScrollY = scrollY;
       DEPTH_ORDER.forEach((depth) => {
         const soft = DEPTHS[depth].soft;
-        state.flakes[depth].forEach((flake) => {
+        const list = state.flakes[depth];
+        for (let i = list.length - 1; i >= 0; i -= 1) {
+          if (list[i].done) list.splice(i, 1);
+        }
+        list.forEach((flake) => {
           if (scrolled) scrollFlake(flake, scrolled, size);
           advanceFlake(flake, dt, wind, size);
-          if (flake.y < -20 || flake.y > size.height + 20) return;
+          if (flake.done || flake.y < -20 || flake.y > size.height + 20) return;
           ctx.save();
           ctx.globalAlpha = flake.opacity;
           ctx.translate(flake.x, flake.y);
@@ -179,12 +190,22 @@ export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weathe
         });
       });
     },
+    /** Schneien lassen oder auslaufen lassen (Wetter-Ebene: es schneit draußen nicht mehr). */
+    setActive(active) {
+      if (Boolean(active) === state.active) return;
+      state.active = Boolean(active);
+      state.lastCount = -1e9;
+    },
+    /** Nichts zu zeichnen: es schneit nicht und keine Flocke ist mehr im Bild. */
+    idle() {
+      return (!state.active || state.factor <= 0) && DEPTH_ORDER.every((depth) => state.flakes[depth].length === 0);
+    },
     dispose() {
       if (win && typeof win.removeEventListener === "function") win.removeEventListener("tls:season-weather", onWeather);
     },
     /** Nur für Tests. */
     state() {
-      return { t: state.t, wind: state.wind, snowing: state.snowing, counts: state.counts, gust: state.gust, flakes: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].length])), positions: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].map((flake) => ({ x: flake.x, y: flake.y }))])) };
+      return { t: state.t, wind: state.wind, snowing: state.snowing, factor: state.factor, counts: state.counts, gust: state.gust, flakes: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].filter((flake) => !flake.leaving).length])), leaving: DEPTH_ORDER.reduce((sum, depth) => sum + state.flakes[depth].filter((flake) => flake.leaving).length, 0), positions: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].map((flake) => ({ x: flake.x, y: flake.y }))])) };
     },
   };
 }

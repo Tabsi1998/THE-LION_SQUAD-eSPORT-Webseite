@@ -92,6 +92,11 @@ def end_of(day: date) -> datetime:
     return at(day, 23, 59, 59)
 
 
+def _windows_weather(year: int, _founded) -> list[dict]:
+    """Das Wetter läuft das ganze Jahr - was es zeigt, entscheidet der Niederschlag am Vereinsort."""
+    return [{"phase": "wetter", "start": at(date(year, 1, 1)), "end": end_of(date(year, 12, 31))}]
+
+
 def _windows_halloween(year: int, _founded) -> list[dict]:
     return [{"phase": "deko", "start": at(date(year, 10, 25)), "end": end_of(date(year, 11, 1))}]
 
@@ -158,6 +163,8 @@ def _windows_easter_hunt(year: int, _founded) -> list[dict]:
 
 # Saisonen in der Reihenfolge des Jahres. ``texts``: Vorgaben, die der Betreiber überschreiben kann.
 SEASONS: dict[str, dict] = {
+    "weather": {"label": "Wetter", "description": "Regen, Schnee und Wetterleuchten vom Vereinsort auf der Seite – das ganze Jahr. In der Schnee-Saison wird Regen zu Schnee.",
+                "windows": _windows_weather, "texts": {}},
     "halloween": {"label": "Halloween", "description": "Spinnweben, Fledermäuse und Kürbisse in der Woche um den 31. Oktober.",
                   "windows": _windows_halloween, "texts": {"greeting": "Happy Halloween von THE LION SQUAD"}},
     "advent": {"label": "Adventkranz", "description": "Vier Kerzen, angezündet je Adventsonntag, bis zum 26. Dezember.",

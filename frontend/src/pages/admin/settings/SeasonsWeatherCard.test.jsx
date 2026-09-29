@@ -45,3 +45,15 @@ test("Karte: Satz, Sonnenzeiten, Ort speichern nur bei Änderung und gültigen Z
   fireEvent.click(screen.getByTestId("seasons-weather-refresh"));
   expect(onRefresh).toHaveBeenCalledTimes(1);
 });
+
+test("Was die Seite aus dem Wetter macht: Regen das ganze Jahr, Schnee statt Regen im Winter, aus ohne die Saison Wetter", () => {
+  const props = { location: LOCATION, busy: false, onSave: vi.fn(), onRefresh: vi.fn() };
+  const { rerender } = render(<SeasonsWeatherCard weather={{ ...FRESH, rain_mm: 1.2, snow_cm: 0 }} seasons={[{ key: "weather", effective: "normal" }, { key: "halloween", effective: "normal" }]} {...props} />);
+  expect(screen.getByTestId("seasons-weather-layer")).toHaveTextContent("Auf der Seite regnet es: leichter Regen (65 % der Tropfen).");
+  rerender(<SeasonsWeatherCard weather={{ ...FRESH, rain_mm: 1.2, snow_cm: 0 }} seasons={[{ key: "snow", effective: "normal" }, { key: "advent", effective: "normal" }]} {...props} />);
+  expect(screen.getByTestId("seasons-weather-layer")).toHaveTextContent("aus dem Regen draußen wird Schnee");
+  rerender(<SeasonsWeatherCard weather={{ ...FRESH, rain_mm: 0, snow_cm: 2 }} seasons={[{ key: "snow", effective: "normal" }]} {...props} />);
+  expect(screen.getByTestId("seasons-weather-layer")).toHaveTextContent("es schneit draußen, auf der Seite schneit es dichter (125 % der Flocken)");
+  rerender(<SeasonsWeatherCard weather={{ ...FRESH, rain_mm: 1.2 }} {...props} />);
+  expect(screen.getByTestId("seasons-weather-layer")).toHaveTextContent("Das Wetter auf der Seite ist ausgeschaltet");
+});

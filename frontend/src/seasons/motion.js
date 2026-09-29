@@ -23,6 +23,8 @@ export const EFFECTS = {
   eyes: { slots: 0, cooldownMs: 120000, priority: 1, ttlMs: 9000 },
   rare_edge: { slots: 1, cooldownMs: 240000, priority: 1, ttlMs: 3000 },
   jumpscare: { slots: 2, cooldownMs: 0, priority: 6, ttlMs: 3000 },
+  // Wetterleuchten (Saison „Wetter“): braucht keinen Platz, hält aber Abstand zu sich selbst.
+  lightning: { slots: 0, cooldownMs: 8000, priority: 1, ttlMs: 600 },
 };
 
 export function createMotionScheduler({ now = () => Date.now(), slots = DEFAULT_SLOTS, initialDelayMs = INITIAL_DELAY_MS, minGapMs = MIN_GAP_MS, doc = typeof document === "undefined" ? null : document, unlimited = false } = {}) {

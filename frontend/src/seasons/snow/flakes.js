@@ -94,8 +94,12 @@ export function advanceFlake(flake, dt, wind, size) {
   if (flake.x < -margin) flake.x = size.width + margin;
   else if (flake.x > size.width + margin) flake.x = -margin;
   if (flake.y > size.height + margin) {
-    flake.y = -margin;
-    flake.x = Math.random() * size.width;
+    // Lässt der Schneefall nach, fällt die Flocke zu Ende und kommt nicht wieder.
+    if (flake.leaving) flake.done = true;
+    else {
+      flake.y = -margin;
+      flake.x = Math.random() * size.width;
+    }
   }
   return flake;
 }
@@ -119,14 +123,31 @@ export function scrollFlake(flake, deltaY, size, random = Math.random) {
 }
 
 /**
- * Wie viele Flocken je Tiefe: `budget` vom Gerät und der Stärke (sky.js), `share` der Seite (Klasse), `weather`
- * (echter Schneefall → volle Zahl, sonst 55 %), `fade` 0–1 gegen Ende der Saison.
+ * Wie viele Flocken je Tiefe: `budget` vom Gerät und der Stärke (sky.js), `share` der Seite (Klasse), `factor` aus
+ * dem Wetter (`snowfallFactor`; ohne Angabe `snowing` → volle Zahl, sonst 55 %), `fade` 0–1 gegen Ende der Saison.
  */
-export function flakeCounts(budget, { share = 1, snowing = false, fade = 1 } = {}) {
-  const total = Math.round(Math.max(0, budget) * Math.max(0, Math.min(1, share)) * (snowing ? 1 : 0.55) * Math.max(0, Math.min(1, fade)));
+export function flakeCounts(budget, { share = 1, snowing = false, factor = null, fade = 1 } = {}) {
+  const weight = factor === null || factor === undefined ? (snowing ? 1 : 0.55) : Math.max(0, Number(factor) || 0);
+  const total = Math.round(Math.max(0, budget) * Math.max(0, Math.min(1, share)) * weight * Math.max(0, Math.min(1, fade)));
   const back = Math.round(total * DEPTHS.back.share);
   const mid = Math.round(total * DEPTHS.mid.share);
   return { back, mid, front: Math.max(0, total - back - mid), total };
+}
+
+/**
+ * Wie dicht es schneit (#673, Betreiber 29.09.): ohne Niederschlag draußen 55 %, mit echtem Schnee mehr - und weil es
+ * in der Schnee-Saison nie regnet, zählt Regen wie Schnee (1 mm Regen wie 1 cm Schnee). Bei starkem Niederschlag bis
+ * 125 % des Budgets. `base` ist die Menge ohne Niederschlag (außerhalb der Schnee-Saison 0: dann schneit es nur,
+ * wenn es wirklich schneit).
+ */
+export function snowfallFactor(weather, base = 0.55) {
+  const snow = Math.max(0, Number(weather && weather.snow_cm) || 0);
+  const rain = Math.max(0, Number(weather && weather.rain_mm) || 0);
+  const amount = snow + rain;
+  if (amount <= 0) return base;
+  if (amount < 0.3) return 0.8;
+  if (amount < 1.5) return 1;
+  return 1.25;
 }
 
 /** Der Ausklang (S7): in den letzten zehn Minuten der Saison werden es weniger, kein hartes Abschalten. */

@@ -229,7 +229,7 @@ export function SeasonsSettings() {
           <span>Saisonale Deko</span>
         </label>
       </div>
-      <SeasonsWeatherCard weather={data.weather} location={data.location} busy={busy} onSave={(location) => save({ location }, "Vereinsort gespeichert – das Wetter kommt beim nächsten Abruf.")} onRefresh={refreshWeather} />
+      <SeasonsWeatherCard weather={data.weather} location={data.location} seasons={(data.seasons || []).filter((season) => season.active_now).map((season) => ({ key: season.key, effective: season.intensity || "normal" }))} busy={busy} onSave={(location) => save({ location }, "Vereinsort gespeichert – das Wetter kommt beim nächsten Abruf.")} onRefresh={refreshWeather} />
       <div className={`grid gap-4 ${data.enabled ? "" : "opacity-60"}`}>
         {data.seasons.map((season) => (
           <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />

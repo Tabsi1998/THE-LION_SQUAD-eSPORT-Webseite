@@ -2,6 +2,8 @@
 // bei verstecktem Tab, ein requestAnimationFrame für alles, Zeitbudget je Bild im Dev-Modus messbar.
 
 export const TIERS = { low: 40, mid: 120, high: 240 };
+/** Ruhen alle Ebenen (`layer.idle()`), schläft der Loop und schaut so oft wieder nach (Wetter ohne Niederschlag). */
+export const IDLE_CHECK_MS = 2000;
 
 /** Wie viele Partikel dieses Gerät verträgt - grob nach Kernen, Speicher und Fensterbreite. */
 export function particleBudget(env = typeof window === "undefined" ? {} : window) {
@@ -31,6 +33,9 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
   let frame = 0;
   let last = 0;
   let running = false;
+  let idleTimer = 0;
+  let sleptAt = 0;
+  const clock = () => (typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now());
   const ctx = canvas.getContext("2d");
 
   const resize = () => {
@@ -51,11 +56,28 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
     const size = { width: win.innerWidth, height: win.innerHeight };
     layers.forEach((layer) => layer.draw(ctx, dt, size, now));
     if (onFrameTime && typeof performance !== "undefined") onFrameTime(performance.now() - started);
+    // Ruhen alle Ebenen, schläft der Loop: kein Bild je Sekunde sechzigmal für einen leeren Himmel.
+    if (layers.size > 0 && [...layers].every((layer) => typeof layer.idle === "function" && layer.idle())) {
+      running = false;
+      frame = 0;
+      last = 0;
+      sleptAt = clock();
+      idleTimer = win.setTimeout(start, IDLE_CHECK_MS);
+      return;
+    }
     frame = win.requestAnimationFrame(tick);
   };
 
   const start = () => {
+    win.clearTimeout(idleTimer);
+    idleTimer = 0;
     if (running || layers.size === 0 || doc.hidden) return;
+    if (sleptAt) {
+      // Die Uhren der Ebenen laufen auch im Schlaf weiter (der nächste Blitz kommt, wann er kommen soll).
+      const seconds = Math.max(0, (clock() - sleptAt) / 1000);
+      layers.forEach((layer) => layer.slept?.(seconds));
+      sleptAt = 0;
+    }
     running = true;
     last = 0;
     frame = win.requestAnimationFrame(tick);
@@ -64,6 +86,9 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
     running = false;
     if (frame) win.cancelAnimationFrame(frame);
     frame = 0;
+    win.clearTimeout(idleTimer);
+    idleTimer = 0;
+    sleptAt = 0;
   };
   const visibility = () => (doc.hidden ? stop() : start());
 
@@ -85,6 +110,10 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
     },
     get running() {
       return running;
+    },
+    /** Schläft der Loop gerade, weil alle Ebenen ruhen? */
+    get sleeping() {
+      return Boolean(idleTimer);
     },
     destroy() {
       stop();

@@ -18,7 +18,9 @@ const loadModule = vi.fn(async () => ({
     sounds: () => ({ key: "fake", instruments: { ping: () => {} }, music: null }),
   },
 }));
-vi.mock("./registry", () => ({ SEASON_MODULES: { halloween: () => loadModule() }, hasModule: (key) => key === "halloween" }));
+const skyDispose = vi.fn();
+const loadSnow = vi.fn(async () => ({ season: { key: "snow", skyLayers: () => [{ key: "fake-snow", draw: () => {}, dispose: skyDispose }] } }));
+vi.mock("./registry", () => ({ SEASON_MODULES: { halloween: () => loadModule(), snow: () => loadSnow() }, hasModule: (key) => key === "halloween" || key === "snow" }));
 
 const { SeasonStage, isQuietPath, toastShownToday, markToastShown } = await import("./SeasonStage");
 const { SeasonWidgetSlot, SeasonFooterSlot } = await import("./SeasonSlots");
@@ -32,6 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   seasonState.seasons = [];
+  seasonState.weather = null;
   delete document.documentElement.dataset.season;
   document.documentElement.style.removeProperty("--season-accent");
 });
@@ -139,4 +142,16 @@ test("Klänge (#679): der Schalter steht neben dem Widget, die Engine wartet auf
   render(<MemoryRouter initialEntries={["/"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
   await screen.findByTestId("fake-widget");
   expect(screen.queryByTestId("season-sound-toggle")).toBeNull();
+});
+
+test("Ebenen einer Saison bekommen ihre Zeichenfläche und räumen beim Gehen hinter sich auf", async () => {
+  seasonState.seasons = [{ key: "snow", phase: "schnee", intensity: "normal", effective: "normal", channels: ["web"], texts: {}, data: {} }];
+  seasonState.weather = { rain_mm: 2, snow_cm: 0, wind_factor: 0.9, wind_dir: 270, night: false };
+  const { unmount } = render(<MemoryRouter initialEntries={["/"]}><SeasonStage /></MemoryRouter>);
+  expect(await screen.findByTestId("season-sky")).toBeInTheDocument();
+  await waitFor(() => expect(document.documentElement.dataset.season).toBe("snow"));
+  expect(skyDispose).not.toHaveBeenCalled();
+  unmount();
+  await new Promise((resolve) => setTimeout(resolve, 30));
+  expect(skyDispose).toHaveBeenCalledTimes(1);
 });

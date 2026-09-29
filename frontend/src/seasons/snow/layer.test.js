@@ -110,3 +110,21 @@ test("Scrollen schiebt die Flocken: vorne so weit wie die Seite, hinten weniger 
   returned.forEach((delta) => expect(delta).toBeCloseTo(60, 5));
   layer.dispose();
 });
+
+test("Regen wird im Winter zu Schnee: regnet es draußen, schneit es auf der Seite dichter - starker Regen am dichtesten", () => {
+  const win = fakeWindow();
+  const layer = createSnowLayer({ budget: 40, share: 1, seed: "rain", weather: { snow_cm: 0, rain_mm: 0 }, win, doc: null, now: () => 0 });
+  const ctx = fakeContext([]);
+  layer.draw(ctx, 0.016, SIZE);
+  expect(layer.state()).toMatchObject({ snowing: false, factor: 0.55 });
+  expect(layer.state().counts.total).toBe(22);
+  win.emit("tls:season-weather", { snow_cm: 0, rain_mm: 0.8 });
+  layer.draw(ctx, 0.016, SIZE);
+  expect(layer.state()).toMatchObject({ snowing: true, factor: 1 });
+  expect(layer.state().counts.total).toBe(40);
+  win.emit("tls:season-weather", { snow_cm: 0.4, rain_mm: 3 });
+  layer.draw(ctx, 0.016, SIZE);
+  expect(layer.state().factor).toBe(1.25);
+  expect(layer.state().counts.total).toBe(50);
+  layer.dispose();
+});

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CloudSun, MapPin, RefreshCw } from "lucide-react";
+import { describeWeather } from "../../../seasons/weather";
 
 // Wetter am Vereinsort (#666): was der Server alle zehn Minuten von Open-Meteo holt (ohne Schlüssel), in Worten -
 // und der Ort selbst (Breite, Länge, Name), den der Verein hier ändert. Die Deko nimmt Wind, Regen, Schnee und
@@ -47,7 +48,7 @@ export function weatherText(weather) {
   return parts.join(", ");
 }
 
-export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh }) {
+export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh, seasons = [] }) {
   const [form, setForm] = useState({ lat: "", lon: "", name: "" });
   useEffect(() => {
     if (location) setForm({ lat: String(location.lat ?? ""), lon: String(location.lon ?? ""), name: location.name || "" });
@@ -63,11 +64,12 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh 
           <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><CloudSun className="w-4 h-4 text-[#29B6E8]" /> Wetter am Vereinsort</div>
           <p className="mt-1 text-xs text-white/50 max-w-2xl">
             Der Server holt alle zehn Minuten das Wetter für den Vereinsort (Open-Meteo, ohne Schlüssel). Die Deko nimmt daraus den Wind für Netz und Fäden,
-            Schnee, wenn es wirklich schneit, und die Nacht ab dem echten Sonnenuntergang. Fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
+            Regen und Schnee, wenn es wirklich regnet oder schneit (im Winter wird Regen zu Schnee), und die Nacht ab dem echten Sonnenuntergang. Fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
           </p>
           <div className="mt-2 text-sm" data-testid="seasons-weather-text">
             <span className="text-white/85">{weather?.location || location?.name || "Innsbruck"}:</span> {weatherText(weather)}
           </div>
+          <div className="mt-1 text-xs text-white/60" data-testid="seasons-weather-layer">{describeWeather({ seasons, weather })}</div>
           <div className="mt-1 text-xs text-white/45" data-testid="seasons-weather-sun">
             Sonnenaufgang {timeText(weather?.sunrise)}, Sonnenuntergang {timeText(weather?.sunset)}{weather?.night ? " – gerade Nacht" : ""}
             {weather?.fetched_at ? ` · Stand ${timeText(weather.fetched_at)}` : ""}

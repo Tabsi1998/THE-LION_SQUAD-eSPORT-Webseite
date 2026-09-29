@@ -63,6 +63,26 @@ export function useSeasonModules(seasons) {
   return modules;
 }
 
+/**
+ * Räumt Ebenen auf (Hörer am Fenster), sobald sie ersetzt werden oder die Bühne geht - verzögert, damit ein doppelter
+ * Effektlauf (StrictMode) nichts abräumt, was noch lebt.
+ */
+function useLayerDisposal(layers) {
+  const current = useRef(layers);
+  useEffect(() => {
+    current.current = layers;
+    return () => {
+      const old = layers;
+      window.setTimeout(() => {
+        if (current.current !== old) old.forEach((layer) => layer.dispose?.());
+      }, 0);
+    };
+  }, [layers]);
+  useEffect(() => () => {
+    current.current = null;
+  }, []);
+}
+
 function SkyCanvas({ layers }) {
   const canvasRef = useRef(null);
   const loopRef = useRef(null);
@@ -126,6 +146,7 @@ export function SeasonStage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mountedSignature, modules, reducedMotion, location.pathname],
   );
+  useLayerDisposal(skyLayers);
 
   // Klänge (#679): eine Engine für die Bühne, solange eine Saison mit Palette läuft (nicht bei „dezent“ oder
   // „Bewegung reduzieren“); sie wartet selbst auf die erste Geste. Die Palette folgt Saison und Phase (Tag/Nacht).
