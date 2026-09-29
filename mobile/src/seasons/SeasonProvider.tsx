@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useReduceMotion } from "../components/FadeIn";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
+import { useSignalSync } from "./signalSync";
 
 // Jahreszeiten in der App (#636): dieselbe Quelle wie die Website (/seasonal/active, Kanal „app“),
 // alle zehn Minuten im Vordergrund nachgefragt, rund um Mitternacht am 31.12. alle 30 Sekunden.
@@ -123,6 +124,12 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
       if (timer.current) clearTimeout(timer.current);
     };
   }, [payload, load]);
+
+  // Saison-Fundstücke (#678): was in der App gesammelt wird, geht an den Server - nicht für Gäste. Vergibt der
+  // Server dabei eine Stufe, sagt es die App gleich.
+  useSignalSync(user?.id && !isGuestUser(user) ? user.id : null, (count) => {
+    showToast(count > 1 ? `${count} neue Erfolge freigeschaltet` : "Neuer Erfolg freigeschaltet", 5000);
+  });
 
   const accountPreference = (user as { seasonal_decorations?: string } | null)?.seasonal_decorations;
   const preference: SeasonPreference = PREFERENCES.includes(accountPreference as SeasonPreference) ? (accountPreference as SeasonPreference) : stored;

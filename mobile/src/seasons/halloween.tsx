@@ -54,6 +54,9 @@ const INK = "#0b0a0f";
 /** Höhe der Tab-Leiste ohne den unteren Sicherheitsrand (AppNavigator). */
 export const TAB_BAR = 62;
 export const GHOST_COOLDOWN_MS = 60000;
+/** Saison-Fundstücke (#678): jede verscheuchte Fledermaus und jeder befreite Geist zählt - der Server deckelt je Tag. */
+export const SCARED_SIGNAL = "halloween_bats_scared";
+export const FREED_SIGNAL = "halloween_ghosts_freed";
 
 export function pumpkinCounts(now: Date = new Date()): boolean {
   return now.getMonth() === 9 && now.getDate() === 31 && now.getHours() >= 18;
@@ -566,6 +569,7 @@ function HangingBat({ spec, width, height, reduced, onScared }: { spec: ScreenLa
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const token = requestMotion("bat_scare", { force: true });
     if (token) setTimeout(() => releaseMotion(token), 3600);
+    void recordSignal(SCARED_SIGNAL, { onceIf: false });
     setFlight(fleePath(start, { width, height: height - TAB_BAR }, Math.random));
   };
   const rotate = swing.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] });
@@ -590,6 +594,7 @@ function Graveyard({ graves, width, bottom, reduced }: { graves: ScreenLayout["g
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const token = requestMotion("ghost", { force: true });
     if (token) setTimeout(() => releaseMotion(token), 6500);
+    void recordSignal(FREED_SIGNAL, { onceIf: false });
     nextId.current += 1;
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
     const distance = 220 + Math.random() * 260;
