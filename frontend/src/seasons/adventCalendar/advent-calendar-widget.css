@@ -1,0 +1,18 @@
+/* Adventkalender (#641): das kleine Türchen neben dem Logo. Durch den Spalt fällt Licht, das langsam atmet.
+   „dezent“ und „Bewegung reduzieren“: das Licht steht. Am Handy ist es schmaler, damit die Kopfzeile Platz behält. */
+.tls-advcal { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.75rem; margin-left: 0.15rem; border-radius: 0.35rem; color: inherit; text-decoration: none; flex: none; transition: transform 0.18s ease-out; }
+.tls-advcal:hover { transform: translateY(-1px); }
+.tls-advcal:focus-visible { outline: 2px solid #e9c46a; outline-offset: 2px; }
+.tls-advcal__svg { width: 100%; height: 100%; overflow: visible; display: block; }
+.tls-advcal__light { opacity: 0.5; transform-box: fill-box; transform-origin: center; animation: tls-advcal-breathe 4.6s ease-in-out infinite; }
+.tls-advcal--waiting .tls-advcal__light { opacity: 0.18; animation: none; }
+@keyframes tls-advcal-breathe {
+  0%, 100% { opacity: 0.32; transform: scale(0.94); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+@media (max-width: 640px) { .tls-advcal { width: 2.05rem; height: 2.5rem; margin-left: 0; } }
+html[data-season-intensity~="subtle"] .tls-advcal__light, .tls-advcal--subtle .tls-advcal__light { animation: none; opacity: 0.4; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-advcal, .tls-advcal:hover { transition: none; transform: none; }
+  .tls-advcal__light { animation: none !important; opacity: 0.4; transform: none; }
+}

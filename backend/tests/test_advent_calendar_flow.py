@@ -283,6 +283,31 @@ async def test_ein_client_kann_kein_tuerchen_melden(flow, monkeypatch):
     assert (await counters.compute(user["id"]))["advent_doors_opened"] == 0
 
 
+@pytest.mark.asyncio
+async def test_die_aktive_saison_sagt_ob_tuerchen_angelegt_sind(flow, monkeypatch):
+    """Web und App zeigen den Einstieg in den Kalender nur, wenn es ihn gibt (``ready``)."""
+    staff = await flow.add_staff("Redaktion")
+    set_clock(monkeypatch, vienna(2026, 12, 5, 10))
+    flow.act_as(None)
+
+    async def calendar():
+        res = await flow.get("/api/seasonal/active")
+        assert res.status_code == 200
+        return next(season for season in res.json()["seasons"] if season["key"] == "advent_calendar"), res.headers["etag"]
+
+    before, tag = await calendar()
+    assert before["data"] == {"today_door": 5, "catch_up": False, "door_hour": 6, "ready": False}
+    await save(flow, staff, 1, year=2027)
+    flow.act_as(None)
+    assert (await calendar())[0]["data"]["ready"] is False, "Türchen eines anderen Jahres zählen nicht"
+    await save(flow, staff, 1)
+    flow.act_as(None)
+    after, changed = await calendar()
+    assert after["data"] == {"today_door": 5, "catch_up": False, "door_hour": 6, "ready": True}
+    assert changed != tag, "die Kennung der Antwort ändert sich mit"
+    assert (await flow.get("/api/seasonal/active", headers={"If-None-Match": changed})).status_code == 304
+
+
 # ------------------------------------------------------------------ Verweise
 
 @pytest.mark.asyncio

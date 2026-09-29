@@ -1,5 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { seasonYear } from "../rng";
+import { useSeason } from "../SeasonContext";
 import { adventSundays, candlesLit, daysToChristmas, todayIso } from "./calendar";
 import { BERRY_TRIAD, CANDLE_WIDTH, RING, VIEW, adventLabel, candleBurn, daysLitFor, ringPoint, wreathLayout } from "./wreath";
 import { CALM_MS, LIGHTING_MS, dueIgnitions, markIgnited } from "./ignition";
@@ -197,7 +198,10 @@ export function Widget({ season, now = null, storage = typeof window === "undefi
     timers.current.push(first, second);
     return undefined;
   }, [info.year, info.sundays, info.candles, info.today, storage]);
-  const label = adventLabel(info);
+  // Läuft der Adventkalender (#641), sagt der Kranz auch, welches Türchen offen ist.
+  const calendar = useSeason().byKey?.advent_calendar?.data;
+  const door = calendar?.ready && !calendar.catch_up ? Math.round(Number(calendar.today_door) || 0) : 0;
+  const label = door > 0 ? `${adventLabel(info)} · Türchen ${door} ist offen` : adventLabel(info);
   const onClick = () => {
     setOpen(true);
     window.clearTimeout(noteTimer.current);

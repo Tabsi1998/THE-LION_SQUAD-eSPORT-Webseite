@@ -33,6 +33,7 @@ const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
+import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../lib/prizes";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
 type TabKey = "overview" | "references" | "awards" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
@@ -914,7 +915,6 @@ function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizeP
   const isReady = status === "ready";
   const sourceTitle = item.fastlap_challenge_title || item.tournament_title || "Gewinn";
   const prizeText = item.prize_value || item.prize_label || "Preis";
-  const placeText = item.place_label || (item.place ? `Platz ${item.place}` : "Platz");
   const deadline = item.pickup_deadline ? formatDate(item.pickup_deadline) : "";
   const pickedUp = item.picked_up_at ? formatDate(item.picked_up_at) : "";
   const overdue = item.pickup_deadline ? Date.parse(item.pickup_deadline) < Date.now() && status !== "picked_up" : false;
@@ -922,7 +922,7 @@ function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizeP
     <Card style={[styles.referenceCard, isReady && { borderColor: "rgba(240, 180, 41, 0.48)" }, overdue && { borderColor: "rgba(255, 65, 84, 0.56)" }]}>
       <View style={styles.referenceTop}>
         <View style={[styles.referenceIcon, isFastlap ? styles.referenceIconFastlap : styles.referenceIconTournament]}>
-          <Body style={styles.referenceIconText}>{isFastlap ? "FL" : "T"}</Body>
+          <Body style={styles.referenceIconText}>{prizeKindMark(target.kind)}</Body>
         </View>
         <View style={styles.referenceText}>
           <Body style={styles.strong}>{prizeText}</Body>
@@ -930,7 +930,7 @@ function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizeP
           <Muted>{prizeSourceLabel(item)} - {formatStatus(status)}</Muted>
         </View>
         <View style={styles.referenceRank}>
-          <Body style={[styles.referenceRankText, styles.gold]}>{placeText.replace(/^Platz\s*/i, "#")}</Body>
+          <Body style={[styles.referenceRankText, styles.gold]}>{prizePlaceText(item)}</Body>
           <Muted>{item.recipient_type === "team" ? item.recipient_label || "Team" : "Du"}</Muted>
         </View>
       </View>
@@ -939,7 +939,7 @@ function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizeP
         {deadline ? <Pill label={`Frist ${deadline}`} tone={overdue ? "gold" : "default"} /> : null}
         {pickedUp ? <Pill label={`Abgeholt ${pickedUp}`} tone="success" /> : null}
         {item.fastlap_track_name ? <Pill label={item.fastlap_track_name} tone="cyan" /> : null}
-        <Pill label={isFastlap ? "Fast Lap" : "Turnier"} />
+        <Pill label={prizeKindLabel(target.kind)} />
       </View>
     </Card>
   );
@@ -949,19 +949,6 @@ function PrizeCard({ item, onOpen }: { item: PrizePickup; onOpen?: (item: PrizeP
       {content}
     </Pressable>
   );
-}
-
-function prizeTarget(item: PrizePickup) {
-  if (item.source_type === "fastlap") {
-    return { kind: "fastlap", id: item.fastlap_challenge_slug || item.fastlap_challenge_id || "" };
-  }
-  return { kind: "tournament", id: item.tournament_slug || item.tournament_id || "" };
-}
-
-function prizeSourceLabel(item: PrizePickup) {
-  if (item.fastlap_source_label) return item.fastlap_source_label;
-  if (item.source_type === "fastlap") return "Fast Lap";
-  return "Turnier";
 }
 
 function ProgressBar({ value, color }: { value: number; color: string }) {

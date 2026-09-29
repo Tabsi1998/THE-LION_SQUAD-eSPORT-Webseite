@@ -1,0 +1,452 @@
+/* Adventkalender (#641, #732). Der Kalender ist ein Bild, aus dem 24 Türchen geschnitten sind: der Flügel trägt
+   sein Stück der Winternacht (dieselbe Grafik, verschoben um die Lage des Türchens), dahinter liegt die Nische mit
+   dem Licht. Form, Scharnier, Licht, Neigung des Schildchens und Tempo kommen je Türchen aus der Saat des Jahres.
+   „Bewegung reduzieren“: nichts schwingt, nichts pulsiert - offen ist offen. */
+
+.tls-adv { --adv-gold: #e9c46a; --adv-gold-bright: #fff1b8; --adv-gold-deep: #b8862b; --adv-ink: #060a18; }
+
+.tls-adv__frame {
+  position: relative;
+  padding: clamp(8px, 1.4vw, 16px);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #1a1408, #0d0b07 38%, #17120a);
+  box-shadow: 0 0 0 1px rgba(233, 196, 106, 0.42), inset 0 0 0 1px rgba(255, 241, 184, 0.08), 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+/* Die feine Goldlinie im Rahmen, wie eine Intarsie. */
+.tls-adv__frame::before {
+  content: "";
+  position: absolute;
+  inset: clamp(3px, 0.55vw, 6px);
+  border-radius: 12px;
+  border: 1px solid rgba(233, 196, 106, 0.28);
+  pointer-events: none;
+}
+
+.tls-adv__board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr));
+  border-radius: 9px;
+  background-color: #0a1230;
+  background-image: var(--advent-scene);
+  background-size: var(--board-w, 100%) var(--board-h, 100%);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6);
+  isolation: isolate;
+}
+
+.tls-adv__cell {
+  --cell: calc(var(--board-w, 600px) / var(--cols, 6));
+  --pad: calc(var(--cell) * var(--inset, 0.1));
+  --leaf: calc(var(--cell) - 2 * var(--pad));
+  --radius: 7px;
+  --radius-a: 7px 0 0 7px;
+  --radius-b: 0 7px 7px 0;
+  position: relative;
+  aspect-ratio: 1;
+  perspective: 900px;
+  perspective-origin: 50% 50%;
+  z-index: 1;
+}
+.tls-adv__cell[data-shape="arch"] { --radius: 50% 50% 7px 7px / 36% 36% 7px 7px; --radius-a: 100% 0 0 7px / 36% 0 0 7px; --radius-b: 0 100% 7px 0 / 0 36% 7px 0; }
+.tls-adv__cell[data-shape="round"] { --radius: 50%; }
+.tls-adv__cell[data-state="opened"] { z-index: 3; }
+.tls-adv__cell:hover, .tls-adv__cell:focus-within { z-index: 4; }
+
+.tls-adv__door {
+  position: absolute;
+  inset: var(--pad);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transform-style: preserve-3d;
+  -webkit-tap-highlight-color: transparent;
+}
+.tls-adv__door:focus-visible { outline: 2px solid var(--adv-gold); outline-offset: 4px; }
+.tls-adv__cell[data-state="locked"] .tls-adv__door { cursor: default; }
+.tls-adv__cell[data-busy="1"] .tls-adv__door { cursor: progress; }
+
+/* ---------- Die Nische: dunkel, warm, mit dem Licht des Türchens ---------- */
+.tls-adv__niche {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background:
+    radial-gradient(120% 95% at 50% 62%, var(--light-soft), rgba(40, 22, 6, 0.0) 62%),
+    linear-gradient(180deg, #1d1208, #0c0703);
+  box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.4), inset 0 7px 16px rgba(0, 0, 0, 0.75), inset 0 -3px 10px rgba(0, 0, 0, 0.5);
+}
+.tls-adv__glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(closest-side, var(--light), rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+.tls-adv__cell[data-state="opened"] .tls-adv__glow { opacity: 0.16; animation: tls-adv-burst calc(var(--swing) * 1.5) ease-out 1 both; }
+@keyframes tls-adv-burst {
+  0% { opacity: 0; transform: scale(0.4); }
+  45% { opacity: 0.75; transform: scale(1.05); }
+  100% { opacity: 0.16; transform: scale(1); }
+}
+
+.tls-adv__preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--leaf) * 0.04);
+  padding: calc(var(--leaf) * 0.1);
+  text-align: center;
+  animation: tls-adv-rise 520ms ease-out calc(var(--swing) * 0.55) 1 both;
+}
+@keyframes tls-adv-rise {
+  0% { opacity: 0; transform: translateY(14%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.tls-adv__preview-icon { width: calc(var(--leaf) * 0.3); height: calc(var(--leaf) * 0.3); color: var(--light); filter: drop-shadow(0 0 6px var(--light-soft)); flex: none; }
+.tls-adv__preview-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.9; }
+.tls-adv__preview-image--sticker { position: static; width: 58%; height: 58%; object-fit: contain; opacity: 1; flex: none; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.6)); }
+.tls-adv__preview-image:not(.tls-adv__preview-image--sticker) + .tls-adv__preview-title {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 18% 8% 9%;
+  background: linear-gradient(180deg, rgba(6, 4, 2, 0), rgba(6, 4, 2, 0.86) 58%);
+}
+.tls-adv__preview-title {
+  position: relative;
+  max-width: 100%;
+  font-size: clamp(10px, calc(var(--leaf) * 0.088), 14px);
+  line-height: 1.22;
+  font-weight: 600;
+  color: #fff3d6;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* Ein langer Titel wird kleiner gesetzt statt abgeschnitten; das Fenster zeigt ihn ganz. */
+.tls-adv__preview[data-long="1"] .tls-adv__preview-title { font-size: clamp(9px, calc(var(--leaf) * 0.074), 12px); }
+.tls-adv__preview[data-long="1"] .tls-adv__preview-icon { width: calc(var(--leaf) * 0.22); height: calc(var(--leaf) * 0.22); }
+.tls-adv__cell[data-shape="round"] .tls-adv__preview { padding: calc(var(--leaf) * 0.17); }
+
+/* ---------- Der Flügel ---------- */
+.tls-adv__leaf {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform-origin: 0% 50%;
+  transition: transform var(--swing) cubic-bezier(0.22, 0.9, 0.3, 1.06);
+  will-change: transform;
+}
+.tls-adv__leaf--a { right: 50%; transform-origin: 0% 50%; }
+.tls-adv__leaf--b { left: 50%; transform-origin: 100% 50%; }
+.tls-adv__cell[data-hinge="right"] .tls-adv__leaf--single { transform-origin: 100% 50%; }
+.tls-adv__cell[data-hinge="top"] .tls-adv__leaf--single { transform-origin: 50% 0%; }
+
+.tls-adv__face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.tls-adv__leaf--a .tls-adv__face { border-radius: var(--radius-a); }
+.tls-adv__leaf--b .tls-adv__face { border-radius: var(--radius-b); }
+
+/* Vorne: das Stück des Bildes, das an dieser Stelle des Kalenders liegt. */
+.tls-adv__face--front {
+  background-color: #0a1230;
+  background-image: var(--advent-scene);
+  background-size: var(--board-w, 100%) var(--board-h, 100%);
+  background-repeat: no-repeat;
+  background-position: calc(-1 * (var(--col) * var(--cell) + var(--pad))) calc(-1 * (var(--row) * var(--cell) + var(--pad)));
+  box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.62), inset 0 0 0 2px rgba(6, 10, 24, 0.35), inset 0 0 14px rgba(0, 0, 0, 0.4);
+}
+.tls-adv__leaf--b .tls-adv__face--front {
+  background-position: calc(-1 * (var(--col) * var(--cell) + var(--pad) + var(--leaf) / 2)) calc(-1 * (var(--row) * var(--cell) + var(--pad)));
+}
+/* Ein Hauch Papier: oben heller, unten dunkler - der Flügel liegt nicht ganz plan im Bild. */
+.tls-adv__face--front::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0) 38%, rgba(0, 0, 0, 0.16));
+  pointer-events: none;
+}
+/* Verschlossen: das Bild tritt zurück. */
+.tls-adv__face--front::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #22356e;
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 400ms ease;
+  pointer-events: none;
+}
+.tls-adv__cell[data-state="locked"] .tls-adv__face--front::after { opacity: 0.78; }
+.tls-adv__cell[data-state="locked"] .tls-adv__face--front { box-shadow: inset 0 0 0 1px rgba(233, 196, 106, 0.3), inset 0 0 14px rgba(0, 0, 0, 0.4); }
+
+/* Hinten: cremefarbenes Papier mit der Zahl. */
+.tls-adv__face--back {
+  transform: rotateY(180deg);
+  background:
+    repeating-linear-gradient(96deg, rgba(120, 90, 40, 0.05) 0 1px, rgba(255, 255, 255, 0) 1px 5px),
+    linear-gradient(135deg, #f3ead6, #d9caa6);
+  box-shadow: inset 0 0 0 1px rgba(120, 90, 40, 0.45), inset 0 0 18px rgba(90, 60, 20, 0.28);
+  display: grid;
+  place-items: center;
+}
+.tls-adv__cell[data-hinge="top"] .tls-adv__face--back { transform: rotateX(180deg); }
+.tls-adv__back-number { font: italic 600 clamp(12px, calc(var(--leaf) * 0.2), 26px)/1 Georgia, "Noto Serif", "Times New Roman", serif; color: rgba(110, 78, 30, 0.6); }
+
+/* ---------- Schildchen, Schmuck, Knauf ---------- */
+.tls-adv__plaque {
+  position: absolute;
+  min-width: 2.05em;
+  height: 2.05em;
+  padding: 0 0.42em;
+  display: grid;
+  place-items: center;
+  font: 600 clamp(14px, calc(var(--cell) * 0.155), 28px)/1 Georgia, "Noto Serif", "Times New Roman", serif;
+  font-variant-numeric: lining-nums;
+  border-radius: 999px;
+  background: radial-gradient(120% 120% at 30% 20%, rgba(28, 36, 70, 0.9), rgba(6, 10, 24, 0.86));
+  box-shadow: 0 0 0 1px rgba(233, 196, 106, 0.75), 0 0 0 3px rgba(6, 10, 24, 0.55), 0 3px 8px rgba(0, 0, 0, 0.55);
+  transform: rotate(var(--tilt, 0deg));
+  transition: opacity 400ms ease;
+}
+.tls-adv__number {
+  background: linear-gradient(180deg, var(--adv-gold-bright), var(--adv-gold) 48%, var(--adv-gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.01em;
+}
+.tls-adv__cell[data-plaque="tl"] .tls-adv__plaque { top: 9%; left: 9%; }
+.tls-adv__cell[data-plaque="tr"] .tls-adv__plaque { top: 9%; right: 9%; }
+.tls-adv__cell[data-plaque="bl"] .tls-adv__plaque { bottom: 9%; left: 9%; }
+.tls-adv__cell[data-plaque="br"] .tls-adv__plaque { bottom: 9%; right: 9%; }
+.tls-adv__cell[data-plaque="center"] .tls-adv__plaque { top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(var(--tilt, 0deg)); }
+/* Im Bogen sitzt das Schildchen nie in der runden Ecke oben. */
+.tls-adv__cell[data-shape="arch"][data-plaque="tl"] .tls-adv__plaque { top: 24%; }
+.tls-adv__cell[data-shape="arch"][data-plaque="tr"] .tls-adv__plaque { top: 24%; }
+.tls-adv__cell[data-hinge="double"] .tls-adv__plaque { left: auto; right: auto; }
+.tls-adv__cell[data-hinge="double"][data-plaque="tl"] .tls-adv__plaque, .tls-adv__cell[data-hinge="double"][data-plaque="bl"] .tls-adv__plaque { left: 16%; }
+.tls-adv__cell[data-hinge="double"][data-plaque="tr"] .tls-adv__plaque, .tls-adv__cell[data-hinge="double"][data-plaque="br"] .tls-adv__plaque { right: 16%; }
+.tls-adv__cell[data-state="locked"] .tls-adv__plaque { opacity: 0.72; }
+
+.tls-adv__ornament {
+  position: absolute;
+  width: calc(var(--leaf) * 0.17);
+  height: calc(var(--leaf) * 0.17);
+  color: var(--adv-gold);
+  opacity: 0.62;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+/* Der Schmuck sitzt dem Schildchen schräg gegenüber. */
+.tls-adv__cell[data-plaque="tl"] .tls-adv__ornament { bottom: 10%; right: 10%; }
+.tls-adv__cell[data-plaque="tr"] .tls-adv__ornament { bottom: 10%; left: 10%; }
+.tls-adv__cell[data-plaque="bl"] .tls-adv__ornament { top: 10%; right: 10%; }
+.tls-adv__cell[data-plaque="br"] .tls-adv__ornament { top: 10%; left: 10%; }
+.tls-adv__cell[data-plaque="center"] .tls-adv__ornament { bottom: 13%; left: 50%; transform: translateX(-50%); }
+.tls-adv__cell[data-shape="arch"][data-plaque="bl"] .tls-adv__ornament, .tls-adv__cell[data-shape="arch"][data-plaque="br"] .tls-adv__ornament { top: 24%; }
+.tls-adv__cell[data-hinge="double"] .tls-adv__ornament { left: auto; right: auto; }
+.tls-adv__cell[data-hinge="double"] .tls-adv__leaf--a .tls-adv__ornament { left: 16%; }
+.tls-adv__cell[data-hinge="double"] .tls-adv__leaf--b .tls-adv__ornament { right: 16%; }
+.tls-adv__cell[data-state="locked"] .tls-adv__ornament { opacity: 0.34; }
+
+.tls-adv__knob {
+  position: absolute;
+  top: 50%;
+  right: 5%;
+  width: calc(var(--leaf) * 0.062);
+  height: calc(var(--leaf) * 0.062);
+  min-width: 5px;
+  min-height: 5px;
+  margin-top: calc(var(--leaf) * -0.031);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, var(--adv-gold-bright), var(--adv-gold) 45%, #7a5514);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+.tls-adv__cell[data-hinge="right"] .tls-adv__knob { right: auto; left: 5%; }
+.tls-adv__cell[data-hinge="top"] .tls-adv__knob { top: auto; bottom: 5%; right: 50%; margin: 0 calc(var(--leaf) * -0.031) 0 0; }
+.tls-adv__leaf--a .tls-adv__knob { right: 7%; }
+.tls-adv__leaf--b .tls-adv__knob { right: auto; left: 7%; }
+
+/* ---------- Licht durch den Spalt: ein Türchen, das aufgehen darf ---------- */
+.tls-adv__door::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px var(--light-soft), 0 0 calc(var(--leaf) * 0.12) calc(var(--leaf) * 0.02) var(--light-soft);
+  opacity: 0;
+  pointer-events: none;
+}
+.tls-adv__cell[data-state="available"] .tls-adv__door::before { opacity: 0.55; animation: tls-adv-breathe var(--pulse) ease-in-out var(--delay) infinite; }
+.tls-adv__cell[data-state="available"][data-today="1"] .tls-adv__door::before { box-shadow: 0 0 0 1px var(--light), 0 0 calc(var(--leaf) * 0.2) calc(var(--leaf) * 0.05) var(--light-soft); }
+@keyframes tls-adv-breathe {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 0.8; }
+}
+
+.tls-adv__today {
+  position: absolute;
+  top: calc(var(--pad) * 0.16);
+  left: 50%;
+  z-index: 5;
+  transform: translateX(-50%);
+  padding: 0.16em 0.62em 0.14em;
+  border-radius: 999px;
+  font-size: clamp(8px, calc(var(--cell) * 0.064), 11px);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: #1c1303;
+  background: linear-gradient(180deg, var(--adv-gold-bright), var(--adv-gold));
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* ---------- Zustände des Flügels ---------- */
+/* Einen Spalt weit: wer über ein offenes Türchen fährt, sieht schon das Licht. */
+@media (hover: hover) {
+  .tls-adv__cell[data-state="available"] .tls-adv__door:hover .tls-adv__leaf--single { transform: rotateY(-9deg); }
+  .tls-adv__cell[data-state="available"][data-hinge="right"] .tls-adv__door:hover .tls-adv__leaf--single { transform: rotateY(9deg); }
+  .tls-adv__cell[data-state="available"][data-hinge="top"] .tls-adv__door:hover .tls-adv__leaf--single { transform: rotateX(9deg); }
+  .tls-adv__cell[data-state="available"] .tls-adv__door:hover .tls-adv__leaf--a { transform: rotateY(-9deg); }
+  .tls-adv__cell[data-state="available"] .tls-adv__door:hover .tls-adv__leaf--b { transform: rotateY(9deg); }
+}
+.tls-adv__cell[data-state="available"] .tls-adv__door:focus-visible .tls-adv__leaf--single { transform: rotateY(-9deg); }
+.tls-adv__cell[data-state="available"][data-hinge="right"] .tls-adv__door:focus-visible .tls-adv__leaf--single { transform: rotateY(9deg); }
+.tls-adv__cell[data-state="available"][data-hinge="top"] .tls-adv__door:focus-visible .tls-adv__leaf--single { transform: rotateX(9deg); }
+
+.tls-adv__cell[data-state="opened"] .tls-adv__leaf--single { transform: rotateY(calc(var(--angle) * -1deg)); }
+.tls-adv__cell[data-state="opened"][data-hinge="right"] .tls-adv__leaf--single { transform: rotateY(calc(var(--angle) * 1deg)); }
+.tls-adv__cell[data-state="opened"][data-hinge="top"] .tls-adv__leaf--single { transform: rotateX(calc(var(--angle) * 1deg)); }
+.tls-adv__cell[data-state="opened"] .tls-adv__leaf--a { transform: rotateY(calc(var(--angle) * -1deg)); }
+.tls-adv__cell[data-state="opened"] .tls-adv__leaf--b { transform: rotateY(calc(var(--angle) * 1deg)); }
+
+/* Verschlossen und angeklickt: es rüttelt kurz an der Tür. */
+.tls-adv__cell[data-rattle="1"] .tls-adv__door { animation: tls-adv-rattle 420ms ease-in-out 1; }
+@keyframes tls-adv-rattle {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  20% { transform: translateX(-2.5px) rotate(-0.6deg); }
+  40% { transform: translateX(2.5px) rotate(0.6deg); }
+  60% { transform: translateX(-1.5px) rotate(-0.3deg); }
+  80% { transform: translateX(1.5px) rotate(0.3deg); }
+}
+/* Der Server antwortet gleich: der Knauf dreht sich. */
+.tls-adv__cell[data-busy="1"] .tls-adv__knob { animation: tls-adv-knob 700ms ease-in-out infinite; }
+@keyframes tls-adv-knob {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); box-shadow: 0 0 8px var(--light); }
+}
+
+/* ---------- Der Inhalt im Fenster ---------- */
+.tls-adv-dialog {
+  --adv-gold: #e9c46a;
+  width: min(calc(100vw - 24px), 640px);
+  max-height: min(calc(100dvh - 24px), 860px);
+  overflow-y: auto;
+  padding: 0;
+  gap: 0;
+  border: 1px solid rgba(233, 196, 106, 0.45);
+  border-radius: 14px;
+  color: #f4ecdc;
+  background:
+    radial-gradient(120% 70% at 50% 0%, var(--dialog-light, rgba(255, 180, 84, 0.22)), rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, #14100a, #0a0806);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 241, 184, 0.06);
+}
+.tls-adv-dialog__head { padding: 22px 56px 0 24px; }
+.tls-adv-dialog__eyebrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--adv-gold); }
+.tls-adv-dialog__eyebrow svg { width: 14px; height: 14px; }
+.tls-adv-dialog__title { margin-top: 8px; font: 600 clamp(24px, 4.6vw, 34px)/1.15 Georgia, "Noto Serif", "Times New Roman", serif; color: #fff6e0; overflow-wrap: anywhere; }
+.tls-adv-dialog__body { padding: 16px 24px 24px; display: grid; gap: 16px; }
+.tls-adv-dialog__text { font-size: 15.5px; line-height: 1.62; color: rgba(244, 236, 220, 0.86); white-space: pre-line; overflow-wrap: anywhere; }
+.tls-adv-dialog__image { width: 100%; max-height: 60vh; object-fit: contain; border-radius: 8px; background: #000; border: 1px solid rgba(255, 255, 255, 0.08); }
+.tls-adv-dialog__sticker { width: min(240px, 62%); margin: 0 auto; filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.6)); }
+.tls-adv-dialog__frame { aspect-ratio: 16 / 9; width: 100%; border: 0; border-radius: 8px; background: #000; }
+
+.tls-adv-card { display: grid; grid-template-columns: minmax(0, 0.4fr) minmax(0, 1fr); gap: 0; border: 1px solid rgba(233, 196, 106, 0.3); border-radius: 10px; overflow: hidden; background: rgba(255, 255, 255, 0.03); color: inherit; text-decoration: none; transition: border-color 200ms ease, background-color 200ms ease; }
+.tls-adv-card:hover, .tls-adv-card:focus-visible { border-color: rgba(233, 196, 106, 0.7); background: rgba(255, 255, 255, 0.06); }
+.tls-adv-card--plain { grid-template-columns: minmax(0, 1fr); }
+.tls-adv-card__image { width: 100%; height: 100%; min-height: 96px; object-fit: cover; }
+.tls-adv-card__text { padding: 14px 16px; display: grid; gap: 4px; align-content: center; min-width: 0; }
+.tls-adv-card__kicker { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--adv-gold); }
+.tls-adv-card__title { font-weight: 700; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.tls-adv-card__meta { font-size: 13px; color: rgba(244, 236, 220, 0.62); overflow-wrap: anywhere; }
+
+.tls-adv-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 10px 20px; border-radius: 8px; border: 1px solid rgba(233, 196, 106, 0.7);
+  font-weight: 700; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: #1c1303; background: linear-gradient(180deg, #fff1b8, #e9c46a 55%, #c99a3a);
+  cursor: pointer; text-decoration: none; transition: filter 160ms ease, transform 160ms ease;
+}
+.tls-adv-button:hover { filter: brightness(1.07); }
+.tls-adv-button:active { transform: translateY(1px); }
+.tls-adv-button:focus-visible { outline: 2px solid #fff1b8; outline-offset: 3px; }
+.tls-adv-button[disabled] { opacity: 0.55; cursor: not-allowed; filter: none; }
+.tls-adv-button--quiet { color: #f4ecdc; background: rgba(255, 255, 255, 0.05); border-color: rgba(233, 196, 106, 0.4); }
+
+.tls-adv-quiz__question { font: 600 19px/1.35 Georgia, "Noto Serif", "Times New Roman", serif; color: #fff6e0; }
+.tls-adv-quiz__answers { display: grid; gap: 10px; }
+.tls-adv-quiz__answer {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; padding: 10px 14px; text-align: left;
+  border-radius: 8px; border: 1px solid rgba(233, 196, 106, 0.32); background: rgba(255, 255, 255, 0.04); color: inherit;
+  font-size: 15px; cursor: pointer; transition: border-color 160ms ease, background-color 160ms ease;
+}
+.tls-adv-quiz__answer:hover:not([disabled]) { border-color: rgba(233, 196, 106, 0.8); background: rgba(255, 255, 255, 0.08); }
+.tls-adv-quiz__answer:focus-visible { outline: 2px solid var(--adv-gold); outline-offset: 2px; }
+.tls-adv-quiz__answer[disabled] { cursor: default; }
+.tls-adv-quiz__letter { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; border: 1px solid rgba(233, 196, 106, 0.6); font: 600 14px/1 Georgia, serif; color: var(--adv-gold); }
+.tls-adv-quiz__answer[data-result="right"] { border-color: #5fd38d; background: rgba(95, 211, 141, 0.14); }
+.tls-adv-quiz__answer[data-result="right"] .tls-adv-quiz__letter { border-color: #5fd38d; color: #5fd38d; }
+.tls-adv-quiz__answer[data-result="wrong"] { border-color: #ff7a6b; background: rgba(255, 122, 107, 0.12); }
+.tls-adv-quiz__answer[data-result="wrong"] .tls-adv-quiz__letter { border-color: #ff7a6b; color: #ff7a6b; }
+.tls-adv-quiz__answer[data-result="other"] { opacity: 0.55; }
+.tls-adv-note { padding: 12px 14px; border-radius: 8px; border: 1px solid rgba(233, 196, 106, 0.28); background: rgba(233, 196, 106, 0.07); font-size: 14px; line-height: 1.5; }
+.tls-adv-note--good { border-color: rgba(95, 211, 141, 0.5); background: rgba(95, 211, 141, 0.1); }
+.tls-adv-note--bad { border-color: rgba(255, 122, 107, 0.5); background: rgba(255, 122, 107, 0.09); }
+
+.tls-adv-prize { display: grid; gap: 14px; padding: 18px; border-radius: 12px; border: 1px solid rgba(233, 196, 106, 0.45); background: radial-gradient(110% 90% at 0% 0%, rgba(233, 196, 106, 0.16), rgba(233, 196, 106, 0.03) 60%); }
+.tls-adv-prize__head { display: flex; align-items: flex-start; gap: 14px; }
+.tls-adv-prize__icon { flex: none; width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; color: #1c1303; background: linear-gradient(180deg, #fff1b8, #e9c46a 55%, #c99a3a); box-shadow: 0 4px 14px rgba(233, 196, 106, 0.3); }
+.tls-adv-prize__icon svg { width: 24px; height: 24px; }
+.tls-adv-prize__label { font: 600 21px/1.25 Georgia, "Noto Serif", "Times New Roman", serif; color: #fff6e0; overflow-wrap: anywhere; }
+.tls-adv-prize__value { margin-top: 2px; font-size: 14px; color: rgba(244, 236, 220, 0.7); overflow-wrap: anywhere; }
+.tls-adv-prize__facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.tls-adv-prize__fact { padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.14); font-size: 12px; color: rgba(244, 236, 220, 0.8); background: rgba(0, 0, 0, 0.25); }
+.tls-adv-prize__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.tls-adv-prize__terms summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--adv-gold); }
+.tls-adv-prize__terms summary:focus-visible { outline: 2px solid var(--adv-gold); outline-offset: 3px; }
+.tls-adv-prize__terms ol { margin: 10px 0 0; padding-left: 1.3em; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.5; color: rgba(244, 236, 220, 0.78); list-style: decimal; }
+
+/* ---------- Kopf der Seite ---------- */
+.tls-adv__progress { position: relative; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.tls-adv__progress-bar { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: linear-gradient(90deg, var(--adv-gold-deep), var(--adv-gold), var(--adv-gold-bright)); transition: width 700ms ease; }
+
+/* ---------- Bewegung reduzieren ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .tls-adv__leaf { transition: none; }
+  .tls-adv__preview, .tls-adv__glow, .tls-adv__door::before, .tls-adv__knob, .tls-adv__door { animation: none !important; }
+  .tls-adv__cell[data-state="opened"] .tls-adv__glow { opacity: 0.16; }
+  .tls-adv__cell[data-state="available"] .tls-adv__door::before { opacity: 0.6; }
+  .tls-adv__cell[data-state="available"] .tls-adv__door:hover .tls-adv__leaf,
+  .tls-adv__cell[data-state="available"] .tls-adv__door:focus-visible .tls-adv__leaf { transform: none; }
+  .tls-adv__progress-bar { transition: none; }
+}
