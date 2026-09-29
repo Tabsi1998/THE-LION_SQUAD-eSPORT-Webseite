@@ -220,6 +220,7 @@ def privacy_page(legal: dict, facts: dict) -> dict:
             "Profildaten: Avatar, Banner, Bio, Geburtsdatum, Ort, Land, Social- und Gaming-Handles.",
             "Mitgliedschaftsdaten: Antrag, Status, Mitgliedsnummer, Eintrittsdatum, Funktion, Verlauf.",
             "Turnier- und Eventdaten: Anmeldungen, Check-ins, Teams, Spiele, Ergebnisse, F1-Zeiten, Preise, Strafen.",
+            "Erfolge: freigeschaltete Erfolge und die Zählerstände dahinter, zum Beispiel gelesene News oder Fundstücke der Jahreszeiten.",
             "Zahlungs- und Nachweisdaten, sofern bei kostenpflichtigen Turnieren oder Mitgliedschaft erforderlich.",
             "Kommunikationsdaten: Kontaktformular, E-Mails, Systemnachrichten, Discord-Benachrichtigungen.",
             "Technische Daten: IP-Adresse, Zeitpunkte, Browser-/Request-Daten, Sicherheits- und Fehlerlogs.",
@@ -238,6 +239,13 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                 p("Nutzerprofile, Ranglisten, Turnierergebnisse und Achievements können öffentlich sichtbar sein, soweit dies für Community- und "
                   "Wettbewerbsfunktionen vorgesehen ist. Nutzer können die Sichtbarkeit ihres öffentlichen Profils im Profilbereich einschränken. "
                   "Negative oder geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt."),
+                # Zähler hinter den Erfolgen (#616, #678): was gezählt wird, wer es sieht, wann es weg ist.
+                p("Damit Erfolge freigeschaltet werden können, zählen Website und LionsAPP mit, wenn du angemeldet bist: gelesene News, "
+                  "geöffnete Streams und Fundstücke der Jahreszeiten – etwa aufgescheuchte Fledermäuse, gefangene Schneeflocken oder der "
+                  "Kürbis zu Halloween. Gespeichert wird nur, wie oft und an welchem Tag; ohne Anmeldung wird nichts übertragen. Diese Zahlen "
+                  "sind nicht öffentlich – sichtbar wird erst der freigeschaltete Erfolg. Sie stehen in deinem Datenexport und werden "
+                  "gelöscht, wenn du dein Konto löschst. Grundlage ist die Nutzung der Plattform, zu der die Erfolge gehören "
+                  "(Art. 6 Abs. 1 lit. b DSGVO).", "privacy-achievement-counters"),
                 p("Öffentliche Community-Profile registrierter Benutzer werden nicht in die Sitemap aufgenommen und mit einem technischen "
                   "Noindex-Hinweis für Suchmaschinen versehen. Sichtbar bleiben sie nur, wenn die Profilfreigabe aktiv ist. Offizielle "
                   "Vereinsmitglieder-Profile werden separat gepflegt und können als Teil der Vereinsdarstellung öffentlich auffindbar sein.")),
@@ -331,8 +339,9 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   f"oder auf der Website nach der Anmeldung unter {link('Datenschutz → Meine Daten → „Account anonymisieren“', '/privacy-account')}. "
                   "Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr anmelden kann, schreibt an "
                   f"{_contact_or_form(legal)}."),
-                p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, Bilder, verknüpfte Konten, Push-Geräte, Freundschaften "
-                  "und Anmeldedaten; eigene Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben Turnier-Ergebnisse ohne Namen "
+                p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, Bilder, verknüpfte Konten, Push-Geräte, Freundschaften, "
+                  "die Zählerstände hinter den Erfolgen und Anmeldedaten; eigene Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben "
+                  "Turnier-Ergebnisse ohne Namen "
                   "(sportliche Integrität) und – wenn du Rechnungen hattest – die Belege in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
                   "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
                   "lässt sich nicht rückgängig machen.")),

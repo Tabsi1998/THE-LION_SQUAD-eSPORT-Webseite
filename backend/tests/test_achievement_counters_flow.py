@@ -368,3 +368,32 @@ async def test_meldung_wertet_sofort_aus_und_nur_die_signal_zaehler(flow, monkey
     assert res.status_code == 200 and res.json()["accepted"] == 1 and res.json()["newly_awarded"] == 0
     queued = await flow.db.achievement_eval_queue.find_one({"user_id": user["id"]}, {"_id": 0})
     assert queued and "signal" in queued["sources"]
+
+
+@pytest.mark.asyncio
+async def test_auskunft_nennt_die_signale_und_konto_loeschen_nimmt_sie_mit(flow, monkeypatch):
+    """Datenschutz (#678): was für die Erfolge gezählt wurde, steht in der Auskunft - und verschwindet mit dem Konto.
+    Die Zahlen einer anderen Person bleiben unberührt."""
+    set_clock(monkeypatch, HALLOWEEN_EVE)
+    user = await flow.add_user(name="Auskunft")
+    other = await flow.add_user(name="Andere")
+    await flow.db.news.insert_one({"id": "n1", "slug": "neu", "status": "published", "title": "Neu"})
+    for person in (user, other):
+        flow.act_as(person)
+        sent = [{"name": "halloween_bats_scared", "count": 4}, {"name": "logo_clicks", "count": 3}]
+        assert (await flow.post("/api/achievements/signals", json={"items": sent})).json()["accepted"] == 2
+        assert (await flow.post("/api/news/neu/read")).status_code == 200
+        assert (await flow.post("/api/streams/watch", json={"key": "twitch:lionsquad"})).status_code == 200
+    flow.act_as(user)
+    export = (await flow.get("/api/dsgvo/export-my-data")).json()
+    signals = sorted((row["name"], row["count"], row["days"]) for row in export["achievement_signals"])
+    assert signals == [("halloween_bats_scared", 4, {"2026-10-30": 4}), ("logo_clicks", 3, {"2026-10-30": 3})]
+    assert [row["news_id"] for row in export["news_reads"]] == ["n1"]
+    assert [row["key"] for row in export["stream_watches"]] == ["twitch:lionsquad"]
+    assert all(row["user_id"] == user["id"] for key in ("achievement_signals", "news_reads", "stream_watches") for row in export[key])
+    assert export["achievement_counters"]["user_id"] == user["id"] and export["achievement_counters"]["values"]["logo_clicks"] == 3
+    assert export["commendations_given"] == []
+    assert (await flow.post("/api/dsgvo/anonymize-me")).status_code == 200
+    for collection in (counters.SIGNALS, "news_reads", "stream_watches", counters.STATS):
+        assert await flow.db[collection].count_documents({"user_id": user["id"]}) == 0, collection
+        assert await flow.db[collection].count_documents({"user_id": other["id"]}) == (2 if collection == counters.SIGNALS else 1), collection
