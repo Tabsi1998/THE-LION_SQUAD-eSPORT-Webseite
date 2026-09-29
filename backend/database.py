@@ -314,6 +314,11 @@ async def init_indexes():
     await db.twitch_stream_sessions.create_index("stream_id", unique=True)
     await db.twitch_stream_sessions.create_index([("user_id", 1), ("started_at", -1)])
     await db.twitch_stream_sessions.create_index("is_live")
+    # Adventkalender (#641): ein Türchen je Jahr und Tag; eine Person öffnet jedes höchstens einmal.
+    await db.advent_doors.create_index([("year", 1), ("day", 1)], unique=True)
+    await db.advent_openings.create_index([("user_id", 1), ("year", 1), ("day", 1)], unique=True)
+    await db.advent_openings.create_index([("year", 1), ("day", 1)])
+    await db.advent_views.create_index([("year", 1), ("day", 1)], unique=True)
 
 
 async def close_client():
