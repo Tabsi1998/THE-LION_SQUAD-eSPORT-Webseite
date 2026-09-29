@@ -323,6 +323,18 @@ async def _eggs(ctx):
     return _signal_count(await ctx.signals(), "easter_egg")
 
 
+@counter("halloween_bats_scared", "signal")
+async def _bats(ctx):
+    return _signal_count(await ctx.signals(), "halloween_bats_scared")
+
+
+@counter("season_collectibles_total", "signal")
+async def _collectibles(ctx):
+    """Alle Saison-Fundstücke zusammen (#678) - die Liste steht in services/collectibles.py."""
+    from services.collectibles import total_of
+    return total_of(await ctx.signals())
+
+
 # ------------------------------------------------------------------ Profil und Konten
 
 @counter("discord_linked", "profile")

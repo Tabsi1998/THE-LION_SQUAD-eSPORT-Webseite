@@ -320,4 +320,33 @@ export const PEOPLE = {
       <path d="M32 18 C29 14 30 10 32 8 C34 10 35 14 32 18 Z" fill="currentColor" stroke="none" />
     </>
   ),
+  // Saison-Fundstücke (#678): Fledermaus mit Echo, Kescher mit Schneeflocke, Glas mit Fundstücken.
+  bat: (
+    <>
+      <path d="M32 23 L27 14 L26 24 C18 17 10 18 5 22 C10 25 13 29 14 33 C17 30 21 31 23 36 C26 33 30 36 32 44 C34 36 38 33 41 36 C43 31 47 30 50 33 C51 29 54 25 59 22 C54 18 46 17 38 24 L37 14 Z" fill="currentColor" stroke="none" />
+      <circle cx="29.4" cy="28.5" r="1.4" fill="#000" fillOpacity="0.6" stroke="none" />
+      <circle cx="34.6" cy="28.5" r="1.4" fill="#000" fillOpacity="0.6" stroke="none" />
+      <path d="M25 50 C29 53 35 53 39 50" strokeWidth="3" opacity="0.7" />
+      <path d="M21 56 C28 61 36 61 43 56" strokeWidth="3" opacity="0.4" />
+    </>
+  ),
+  "snow-catch": (
+    <>
+      <path d="M26 4 V18 M19.9 7.5 L32.1 14.5 M32.1 7.5 L19.9 14.5" strokeWidth="3" />
+      <path d="M10 28 C11 44 20 56 26 56 C32 56 41 44 42 28" />
+      <path d="M18 33 L22 52 M26 34 V56 M34 33 L30 52" strokeWidth="2" opacity="0.5" />
+      <ellipse cx="26" cy="28" rx="16" ry="5.5" />
+      <path d="M42 28 L58 42" strokeWidth="5" />
+    </>
+  ),
+  "season-collector": (
+    <>
+      <path d="M16 12 H48 V21 H16 Z" fill="currentColor" stroke="none" />
+      <path d="M19 21 V50 C19 54 22 57 26 57 H38 C42 57 45 54 45 50 V21" />
+      <path d="M27 29 V39 M22.7 31.5 L31.3 36.5 M31.3 31.5 L22.7 36.5" strokeWidth="2.5" />
+      <ellipse cx="38" cy="45" rx="3.6" ry="4.8" fill="currentColor" stroke="none" />
+      <circle cx="27.5" cy="48.5" r="3.4" fill="currentColor" stroke="none" opacity="0.7" />
+      <path d="M35 31 L37 28 L39 31 L41 28 L43 31" strokeWidth="2.5" />
+    </>
+  ),
 };

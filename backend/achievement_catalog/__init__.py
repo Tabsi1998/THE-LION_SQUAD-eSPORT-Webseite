@@ -1,7 +1,8 @@
 """Erfolgskatalog (#611): der alte Katalog v4 (``legacy``) mit der neuen Stufenleiter aus ``materials``
 versehen - jede Stufe trägt Material, Rang, Namen und Farbe, jede Gruppe eine Kategorie v2 und das
 Kennzeichen ``hidden``. Die Kataloge A–D (#612–#615) ersetzen die alten Gruppen Stück für Stück; die
-Abbildung alt → neu steht in ``migration_map`` und wird beim Start angewendet.
+Abbildung alt → neu steht in ``migration_map`` und wird beim Start angewendet. Katalog E (#678) bringt die
+Saison-Fundstücke dazu.
 """
 from .legacy import (  # noqa: F401 - Namen bleiben für alle Aufrufer gleich
     ACHIEVEMENT_GROUPS, ACHIEVEMENT_TIERS, CONDITION_KEY_STATUS, CATEGORY_OVERRIDES,
@@ -20,6 +21,7 @@ from .catalog_c import CONDITION_KEYS_C, GROUPS_C, TIERS_C  # noqa: F401
 from .catalog_c import REDEFINED as REDEFINED_C, REPLACED as REPLACED_C  # noqa: F401
 from .catalog_d import CONDITION_KEYS_D, GROUPS_D, TIERS_D  # noqa: F401
 from .catalog_d import REDEFINED as REDEFINED_D, REPLACED as REPLACED_D  # noqa: F401
+from .catalog_e import CONDITION_KEYS_E, GROUPS_E, TIERS_E  # noqa: F401
 
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (
@@ -48,6 +50,8 @@ COUNTER_KEYS_V2 = (
     "member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
     "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",
     "leap_day_logins",
+    # Katalog E (#678): Saison-Fundstücke
+    "halloween_bats_scared", "season_collectibles_total",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 
@@ -62,8 +66,8 @@ REDEFINED_OLD_TIERS: dict[str, list[str]] = {}
 for _old in ACHIEVEMENT_TIERS:
     if _old["group_code"] in _REDEFINED_CODES:
         REDEFINED_OLD_TIERS.setdefault(_old["group_code"], []).append(_old["code"])
-ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D
-ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C + TIERS_D
+ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D + GROUPS_E
+ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C + TIERS_D + TIERS_E
 GROUP_MAPPING.update(REPLACED)
 GROUP_MAPPING.update(REPLACED_B)
 GROUP_MAPPING.update(REPLACED_C)

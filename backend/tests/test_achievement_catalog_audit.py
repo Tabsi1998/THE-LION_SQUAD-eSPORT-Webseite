@@ -276,3 +276,32 @@ def test_die_katalog_pruefung_des_admins_findet_im_code_katalog_keinen_fehler():
     report = validate_catalog(groups, ACHIEVEMENT_TIERS, CONDITION_KEY_STATUS)
     assert report["errors"] == [], report["errors"][:10]
     assert report["counts"]["groups"] == len(groups) and report["counts"]["tiers"] == len(ACHIEVEMENT_TIERS)
+
+
+# ---- Katalog E (#678): Saison-Fundstücke
+from achievement_catalog import GROUPS_E, TIERS_E  # noqa: E402
+
+
+def test_katalog_e_saison_fundstuecke():
+    assert [g["code"] for g in GROUPS_E] == ["bat_whisperer", "snow_catcher", "season_collector"]
+    assert len(TIERS_E) == 15 and all(g["catalog"] == "E" and g["category"] == "community" and g["public"] for g in GROUPS_E)
+    codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D + GROUPS_E]
+    assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
+    tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C + TIERS_D + TIERS_E]
+    assert len(tier_codes) == len(set(tier_codes))
+    assert {g["code"] for g in GROUPS_E} <= {g["code"] for g in ACHIEVEMENT_GROUPS}
+    by_group = defaultdict(list)
+    for tier in TIERS_E:
+        by_group[tier["group_code"]].append(tier)
+    for group in GROUPS_E:
+        tiers = by_group[group["code"]]
+        assert [t["material"] for t in tiers] == ["bronze", "silver", "gold", "platinum", "diamond"], group["code"]
+        targets = [t["progress_target"] for t in tiers]
+        assert targets == sorted(targets) and len(set(targets)) == 5
+        assert group["description"] and group["how_to"] and group["icon"] and group["art"]
+        assert all(t["condition_key"] == group["condition_key"] and t["description"] and t["points"] > 0 for t in tiers)
+        assert CONDITION_KEY_STATUS.get(group["condition_key"]) == "live"
+        assert group["condition_key"] in counters.REGISTRY and "signal" in counters.REGISTRY[group["condition_key"]].sources
+    # Die Deckel machen die oberen Stufen zu einer Sache von Jahren: acht Tage Halloween mit 30 am Tag sind 240.
+    assert counters.SIGNAL_RULES["halloween_bats_scared"]["per_day"] * 8 < by_group["bat_whisperer"][3]["progress_target"]
+    assert by_group["bat_whisperer"][0]["progress_target"] <= counters.SIGNAL_RULES["halloween_bats_scared"]["per_day"], "die erste Stufe geht an einem Abend"

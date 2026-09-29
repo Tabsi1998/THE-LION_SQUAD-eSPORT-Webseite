@@ -68,6 +68,17 @@ async def post_signals(body: SignalBatch, request: Request, me: dict = Depends(g
     return {"results": results, "accepted": sum(1 for row in results if row.get("accepted")), "newly_awarded": newly}
 
 
+@router.get("/api/achievements/collectibles")
+async def my_collectibles(me: dict = Depends(get_current_user)):
+    """Die eigenen Saison-Fundstücke (#678): je Saison, was gesammelt wurde - insgesamt, in dieser Saison, heute.
+    Persönlich, deshalb nur für die Person selbst."""
+    from routes.seasons_routes import load_context
+    from services import collectibles
+    db = get_db()
+    stored, founded = await load_context(db)
+    return await collectibles.overview(db, me["id"], stored, founded)
+
+
 # ------------------------------------------------------------------ GG-Lob
 
 async def _sides(db, match: dict) -> dict[str, set[str]]:

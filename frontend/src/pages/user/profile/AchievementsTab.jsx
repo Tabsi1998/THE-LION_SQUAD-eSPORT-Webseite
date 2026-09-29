@@ -8,10 +8,11 @@ import { AchievementGroupsView, applyTierFilters } from "@/components/tls/Achiev
 import {
   AchievementFilters, AchievementLevelHeader, AchievementStatsRow, CategoryShowcase, MAX_PINS, NextUpPanel, PinnedPanel,
 } from "./AchievementPanels";
+import { SeasonFindsPanel } from "./SeasonFindsPanel";
 
 // Reiter „Achievements“ (#619): Kopf (Level, Titel, Prestige, XP), Zahlen, „Als Nächstes“, Angeheftete,
-// Vitrinen je Kategorie, Filter (Status, Material) und darunter der Katalog mit „Anheften“ an jeder
-// erreichten Stufe. Alles, was die Seite braucht, kommt aus /achievements/me.
+// Saison-Fundstücke (#678), Vitrinen je Kategorie, Filter (Status, Material) und darunter der Katalog mit
+// „Anheften“ an jeder erreichten Stufe. Alles außer den Fundstücken kommt aus /achievements/me.
 export function AchievementsTab({ achData, achInsights, completeness, evaluateAchievements, evaluatingAchievements, onAchDataChange }) {
   const [category, setCategory] = useState(null);
   const [filters, setFilters] = useState({ status: "all", material: "" });
@@ -80,6 +81,7 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
           <AchievementStatsRow insights={achInsights} profileScore={completeness?.score || 0} hidden={achData.hidden} />
           <NextUpPanel items={achData.next_up || []} />
           <PinnedPanel pinned={achData.pinned || []} codes={pinnedCodes} onChange={savePins} />
+          <SeasonFindsPanel />
           <CategoryShowcase groups={groups} active={category} onPick={setCategory} />
           <AchievementFilters filters={filters} onChange={setFilters} resultCount={visibleCount} />
           <AchievementGroupsView
