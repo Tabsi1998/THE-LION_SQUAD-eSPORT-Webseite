@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { CloudSun, MapPin, RefreshCw } from "lucide-react";
+import { CloudSun, Eye, MapPin, RefreshCw } from "lucide-react";
+import { describeWeather } from "../../../seasons/weather";
 
 // Wetter am Vereinsort (#666): was der Server alle zehn Minuten von Open-Meteo holt (ohne Schlüssel), in Worten -
 // und der Ort selbst (Breite, Länge, Name), den der Verein hier ändert. Die Deko nimmt Wind, Regen, Schnee und
 // die echte Nacht daraus; fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
+// Das Wetter auf der Seite (#673) wird auch hier geschaltet - an, aus, Stärke, Vorschau: ein Ort für das Wetter.
 
 export const COMPASS = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
+/** Stärken für das Wetter: „dezent“ gibt es nicht - ohne Bewegung hat das Wetter nichts zu zeigen. */
+export const WEATHER_INTENSITIES = { normal: "normal", full: "kräftig" };
 
 export function compass(degrees) {
   const index = Math.round((((Number(degrees) % 360) + 360) % 360) / 45) % 8;
@@ -47,7 +51,35 @@ export function weatherText(weather) {
   return parts.join(", ");
 }
 
-export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh }) {
+/** Die Schalter der Saison „Wetter“: an/aus, Stärke, Vorschau - die Saison läuft das ganze Jahr, deshalb ohne Datum. */
+function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
+  const intensities = season.intensity === "subtle" ? { subtle: "dezent (nichts zu sehen)", ...WEATHER_INTENSITIES } : WEATHER_INTENSITIES;
+  return (
+    <div className="pt-3 border-t border-white/5 space-y-2" data-testid="season-weather">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={!!season.enabled} disabled={busy} onChange={(e) => onSeasonSave({ enabled: e.target.checked }, e.target.checked ? "Wetter auf der Seite an." : "Wetter auf der Seite aus.")} className="accent-[#29B6E8]" data-testid="season-weather-enabled" />
+          <span>Wetter auf der Seite zeigen</span>
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="text-white/45 uppercase tracking-wider text-[10px]">Stärke</span>
+          <select value={season.intensity} disabled={busy || !season.enabled} onChange={(e) => onSeasonSave({ intensity: e.target.value }, `Wetter: ${intensities[e.target.value]}.`)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="season-weather-intensity">
+            {Object.entries(intensities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={onPreview} disabled={busy} data-testid="season-weather-preview" className="px-3 py-1.5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+          <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
+        </button>
+      </div>
+      <p className="text-[11px] text-white/40 max-w-2xl">
+        Das ganze Jahr: regnet, schneit oder gewittert es am Vereinsort, zeigt es die Website – sonst nichts. Vom 1. Advent bis Dreikönig schneit es immer, Regen wird zu Schnee.
+        Die Vorschau zeigt einen Gewitterregen, auch wenn es draußen trocken ist – nur dir, sofort, in diesem Tab.
+      </p>
+    </div>
+  );
+}
+
+export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh, seasons = [], season = null, onSeasonSave = () => {}, onPreview = () => {} }) {
   const [form, setForm] = useState({ lat: "", lon: "", name: "" });
   useEffect(() => {
     if (location) setForm({ lat: String(location.lat ?? ""), lon: String(location.lon ?? ""), name: location.name || "" });
@@ -63,11 +95,12 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh 
           <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><CloudSun className="w-4 h-4 text-[#29B6E8]" /> Wetter am Vereinsort</div>
           <p className="mt-1 text-xs text-white/50 max-w-2xl">
             Der Server holt alle zehn Minuten das Wetter für den Vereinsort (Open-Meteo, ohne Schlüssel). Die Deko nimmt daraus den Wind für Netz und Fäden,
-            Schnee, wenn es wirklich schneit, und die Nacht ab dem echten Sonnenuntergang. Fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
+            Regen und Schnee, wenn es wirklich regnet oder schneit (im Winter wird Regen zu Schnee), und die Nacht ab dem echten Sonnenuntergang. Fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
           </p>
           <div className="mt-2 text-sm" data-testid="seasons-weather-text">
             <span className="text-white/85">{weather?.location || location?.name || "Innsbruck"}:</span> {weatherText(weather)}
           </div>
+          <div className="mt-1 text-xs text-white/60" data-testid="seasons-weather-layer">{describeWeather({ seasons, weather })}</div>
           <div className="mt-1 text-xs text-white/45" data-testid="seasons-weather-sun">
             Sonnenaufgang {timeText(weather?.sunrise)}, Sonnenuntergang {timeText(weather?.sunset)}{weather?.night ? " – gerade Nacht" : ""}
             {weather?.fetched_at ? ` · Stand ${timeText(weather.fetched_at)}` : ""}
@@ -103,6 +136,7 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh 
         </button>
         {!valid && <span className="text-xs text-[#FF6B6B]">Breite −90 bis 90, Länge −180 bis 180.</span>}
       </form>
+      {season && <WeatherSwitch season={season} busy={busy} onSeasonSave={onSeasonSave} onPreview={onPreview} />}
     </div>
   );
 }

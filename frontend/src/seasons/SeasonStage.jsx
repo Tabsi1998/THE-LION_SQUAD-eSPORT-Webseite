@@ -63,6 +63,26 @@ export function useSeasonModules(seasons) {
   return modules;
 }
 
+/**
+ * Räumt Ebenen auf (Hörer am Fenster), sobald sie ersetzt werden oder die Bühne geht - verzögert, damit ein doppelter
+ * Effektlauf (StrictMode) nichts abräumt, was noch lebt.
+ */
+function useLayerDisposal(layers) {
+  const current = useRef(layers);
+  useEffect(() => {
+    current.current = layers;
+    return () => {
+      const old = layers;
+      window.setTimeout(() => {
+        if (current.current !== old) old.forEach((layer) => layer.dispose?.());
+      }, 0);
+    };
+  }, [layers]);
+  useEffect(() => () => {
+    current.current = null;
+  }, []);
+}
+
 function SkyCanvas({ layers }) {
   const canvasRef = useRef(null);
   const loopRef = useRef(null);
@@ -99,7 +119,9 @@ export function SeasonStage() {
     const root = document.documentElement;
     const accents = mounted.filter((season) => modules[season.key].accent && season.effective !== "subtle");
     root.dataset.season = mounted.map((season) => season.key).join(" ") || "";
-    root.dataset.seasonIntensity = mounted.map((season) => season.effective).join(" ") || "";
+    // Die Stärke am <html> beruhigt CSS-Animationen. Eine Saison, die nur Himmel ist (Wetter), redet da nicht mit -
+    // sonst stünde bei „Wetter: dezent“ auch der Adventkranz still.
+    root.dataset.seasonIntensity = mounted.filter((season) => !modules[season.key].skyOnly).map((season) => season.effective).join(" ") || "";
     root.dataset.seasonPage = pageClass(location.pathname);
     if (accents.length) root.style.setProperty("--season-accent", modules[accents[0].key].accent);
     else root.style.removeProperty("--season-accent");
@@ -121,11 +143,12 @@ export function SeasonStage() {
     () => mountedRef.current.flatMap((season) => {
       const factory = modules[season.key].skyLayers;
       const budget = budgetFor(season.effective);
-      return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current }) : [];
+      return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current, preview }) : [];
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mountedSignature, modules, reducedMotion, location.pathname],
+    [mountedSignature, modules, reducedMotion, location.pathname, preview],
   );
+  useLayerDisposal(skyLayers);
 
   // Klänge (#679): eine Engine für die Bühne, solange eine Saison mit Palette läuft (nicht bei „dezent“ oder
   // „Bewegung reduzieren“); sie wartet selbst auf die erste Geste. Die Palette folgt Saison und Phase (Tag/Nacht).

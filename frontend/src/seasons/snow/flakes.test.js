@@ -1,4 +1,4 @@
-import { DEPTHS, DEPTH_ORDER, FAST_EVERY, GUST, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, gustAt, nextGust, scrollFlake, windAt, windFrom } from "./flakes";
+import { DEPTHS, DEPTH_ORDER, FAST_EVERY, GUST, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, gustAt, nextGust, scrollFlake, snowfallFactor, windAt, windFrom } from "./flakes";
 import { mulberry32 } from "../rng";
 
 // Schneefall (S7, W2): drei Tiefen mit klar verschiedenen Größen und Tempi, keine zwei Flocken gleich, Wind aus
@@ -132,4 +132,20 @@ test("Scrollen: die Flocken gehören zur Seite - vorne ganz, hinten weniger; was
     expect(flake.y).toBeGreaterThanOrEqual(-margin);
     expect(flake.y).toBeLessThan(SIZE.height + margin);
   });
+});
+
+test("Dichte nach dem Wetter: ohne Niederschlag 55 %, Schnee und - im Winter wird Regen zu Schnee - Regen machen es dichter", () => {
+  expect(snowfallFactor(null)).toBe(0.55);
+  expect(snowfallFactor({ snow_cm: 0, rain_mm: 0 })).toBe(0.55);
+  expect(snowfallFactor({ snow_cm: 0.1 })).toBe(0.8);
+  expect(snowfallFactor({ rain_mm: 0.2 })).toBe(0.8);
+  expect(snowfallFactor({ snow_cm: 1 })).toBe(1);
+  expect(snowfallFactor({ rain_mm: 1.2 })).toBe(1);
+  expect(snowfallFactor({ snow_cm: 0.8, rain_mm: 0.9 })).toBe(1.25);
+  expect(snowfallFactor({ rain_mm: 6 })).toBe(1.25);
+  expect(snowfallFactor({ snow_cm: -3, rain_mm: "x" })).toBe(0.55);
+  expect(flakeCounts(240, { factor: 1.25 }).total).toBe(300);
+  expect(flakeCounts(240, { factor: 0.8, share: 0.5 }).total).toBe(96);
+  expect(flakeCounts(240, { factor: 0.55 }).total).toBe(flakeCounts(240, { snowing: false }).total);
+  expect(flakeCounts(240, { factor: 1 }).total).toBe(flakeCounts(240, { snowing: true }).total);
 });

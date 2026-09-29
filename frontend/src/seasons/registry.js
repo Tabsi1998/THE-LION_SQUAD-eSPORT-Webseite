@@ -5,6 +5,7 @@
 
 export const SEASON_MODULES = {
   halloween: () => import("./halloween/index.jsx"),
+  weather: () => import("./weather/module.js"),
   advent: () => import("./advent/index.jsx"),
   snow: () => import("./snow/index.jsx"),
   christmas: () => import("./christmas/index.jsx"),

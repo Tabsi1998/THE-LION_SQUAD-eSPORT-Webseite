@@ -159,6 +159,29 @@ def test_schalter_erzwingen_und_kanaele():
     assert [row["key"] for row in view["calendar"]][:2] == ["carnival", "easter"]
 
 
+def test_wetter_laeuft_das_ganze_jahr_nur_im_web_und_nicht_im_kalender():
+    """Die Saison „Wetter“ (#673): das ganze Jahr aktiv und ohne Lücke zu Silvester, nur Kanal Web (die App hat noch
+    keine Wetter-Ebene), kein Termin im Kalender, ausschaltbar wie jede andere."""
+    for moment in (at(2026, 1, 1, 0, 0, 0), at(2026, 7, 14, 16), at(2026, 10, 31, 20), at(2026, 12, 31, 23, 59, 59), at(2027, 1, 1, 0, 0, 0)):
+        weather = keys(seasons.active(moment, {}))["weather"]
+        assert weather["phase"] == "wetter" and weather["forced"] is False and weather["channels"] == ["web"], moment
+    assert "weather" in keys(seasons.active(at(2026, 12, 31, 23, 59, 59, 500000), {})), "auch die letzte Sekunde des Jahres"
+    assert "weather" not in keys(seasons.active(at(2026, 7, 14, 16), {"seasons": {"weather": {"enabled": False}}}))
+    assert "weather" not in keys(seasons.active(at(2026, 7, 14, 16), {"seasons": {"weather": {"mode": "force_off"}}}))
+    assert "weather" not in keys(seasons.active(at(2026, 7, 14, 16), {"enabled": False}))
+    # Neben einer anderen Saison läuft es weiter - Halloween im Regen.
+    assert {"weather", "halloween"} <= set(keys(seasons.active(at(2026, 10, 31, 20), {})))
+    # Gespeicherte Kanäle, die eine Saison nicht bedienen kann, zählen nicht.
+    merged = seasons.merge_settings({"seasons": {"weather": {"channels": ["app", "web"]}, "halloween": {"channels": ["app"]}}})["seasons"]
+    assert merged["weather"]["channels"] == ["web"] and merged["halloween"]["channels"] == ["app"]
+    assert seasons.merge_settings({"seasons": {"weather": {"channels": ["app"]}}})["seasons"]["weather"]["channels"] == []
+    assert seasons.supported_channels("weather") == ("web",) and seasons.supported_channels("snow") == ("web", "app")
+    assert all(row["key"] != "weather" for row in seasons.calendar(2026))
+    by_key = {s["key"]: s for s in seasons.admin_view({}, at(2026, 7, 14, 16))["seasons"]}
+    assert by_key["weather"]["always"] is True and by_key["weather"]["active_now"] is True and by_key["weather"]["supported_channels"] == ["web"]
+    assert by_key["halloween"]["always"] is False and by_key["halloween"]["supported_channels"] == ["web", "app"]
+
+
 def test_vorschau_token_nur_gueltig_und_kurz():
     token = seasons.preview_token("halloween", at(2026, 6, 1, 12), at_time=at(2026, 10, 31, 20))
     assert seasons.read_preview_token(token, at(2026, 6, 1, 12, 0, 30)) == ("halloween", at(2026, 10, 31, 20))
@@ -276,3 +299,24 @@ async def test_schreck_freigabe_nur_ab_18_mit_geburtsdatum(flow):
     assert (await flow.get("/api/seasonal/me")).json() == {"scares_allowed": True}
     await flow.db.users.update_one({"id": user["id"]}, {"$set": {"birth_date": "2012-05-05"}})
     assert (await flow.get("/api/seasonal/me")).json() == {"scares_allowed": False}
+
+
+@pytest.mark.asyncio
+async def test_wetter_kanal_app_wird_nicht_gespeichert(flow):
+    """Das Wetter gibt es vorerst nur im Web (#673): die App bekommt die Saison nie, auch wenn jemand den Kanal schickt."""
+    admin = await flow.add_user(role="club_admin", name="Vorstand")
+    flow.act_as(admin)
+    res = await flow.put("/api/settings/seasons", json={"seasons": {"weather": {"channels": ["web", "app"], "intensity": "full"}}})
+    assert res.status_code == 200, res.text
+    weather = next(s for s in res.json()["seasons"] if s["key"] == "weather")
+    assert weather["channels"] == ["web"] and weather["intensity"] == "full" and weather["always"] is True
+    assert all(row["key"] != "weather" for row in res.json()["calendar"])
+    flow.act_as(None)
+    public = (await flow.get("/api/seasonal/active")).json()
+    assert next(s for s in public["seasons"] if s["key"] == "weather")["channels"] == ["web"]
+    assert all(row["key"] != "weather" for row in (await flow.get("/api/seasonal/calendar?year=2027")).json()["items"])
+    # Ausgeschaltet verschwindet es aus der öffentlichen Antwort - wie jede andere Saison.
+    flow.act_as(admin)
+    await flow.put("/api/settings/seasons", json={"seasons": {"weather": {"enabled": False}}})
+    flow.act_as(None)
+    assert all(s["key"] != "weather" for s in (await flow.get("/api/seasonal/active")).json()["seasons"])

@@ -34,6 +34,9 @@ async def active_seasons(request: Request, response: Response, preview: str | No
     if token:
         key, at_time = token
         conditions = weather.current(cache, location, at_time)
+        if key == "weather":
+            # Die Vorschau soll auch an einem trockenen Tag etwas zeigen: ein Gewitterregen, nur für diese Person.
+            conditions = weather.demo(conditions)
         payload = seasons.active(at_time, stored, founded, preview_key=key, night=conditions["night"])
         payload["weather"] = conditions
         response.headers["Cache-Control"] = "no-store"
