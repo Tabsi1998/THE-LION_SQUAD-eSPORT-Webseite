@@ -11,8 +11,9 @@ const state: QuietState = { overlays: [], zones: {} };
 const listeners = new Set<Listener>();
 
 function emit() {
-  const snapshot = quietSnapshot();
-  listeners.forEach((listener) => listener(snapshot));
+  // Jeder Zuhörer bekommt den aktuellen Stand - ein Zuhörer darf selbst ändern (die Bühne teilt beim Anmelden zu),
+  // die Nachfolger sehen dann schon das Ergebnis statt eines veralteten Schnappschusses.
+  listeners.forEach((listener) => listener(quietSnapshot()));
 }
 
 export function quietSnapshot(): QuietState {
