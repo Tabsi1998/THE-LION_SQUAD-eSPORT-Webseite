@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
+import { requestMotion } from "../motion";
 import { Ghost, MiniTombstone } from "./art";
 
 // Mini-Friedhof (#662): zwei bis vier winzige Grabsteine stehen auf dem Strich über der Impressum-Leiste. Ein
@@ -59,6 +60,7 @@ export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COO
     lastRef.current[index] = now;
     const rect = event.currentTarget.getBoundingClientRect();
     const drift = ghostDrift(rngRef.current);
+    requestMotion("ghost", { force: true });
     emitSound("ghost");
     nextId.current += 1;
     setGhosts((current) => [...current, { id: nextId.current, x: rect.left + rect.width / 2 + window.scrollX, y: rect.top + window.scrollY, until: now + ghostMs, ...drift }]);

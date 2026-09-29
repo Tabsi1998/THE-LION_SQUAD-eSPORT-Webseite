@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
+import { measureQuietZones, overlayZones, pointInQuiet, rectInQuiet, watchOverlays } from "../quiet";
+import { requestMotion } from "../motion";
 import { FlyingBatShape, HangingBatShape } from "./art";
 
 // Hängende Fledermäuse (#661, Runde V): sie hängen still - unter einem Menüpunkt der Kopfzeile, an einem
@@ -177,8 +179,19 @@ function lionAnchors(doc, win) {
  * sonst Seitenkoordinaten; `px`/`py` sind immer Seitenkoordinaten (für Abstände), `measure()` misst frisch nach
  * und liefert null, wenn der Anker verschwunden ist.
  */
-export function measureAnchors(doc = document, win = typeof window === "undefined" ? null : window) {
-  return [...navAnchors(doc, win), ...glyphAnchors(doc, win), ...cardAnchors(doc, win), ...lionAnchors(doc, win)];
+export function measureAnchors(doc = document, win = typeof window === "undefined" ? null : window, zones = measureQuietZones(doc, win)) {
+  const all = [...navAnchors(doc, win), ...glyphAnchors(doc, win), ...cardAnchors(doc, win), ...lionAnchors(doc, win)];
+  // Ruhezonen (H10): kein Anker in Formularen, Dialogen, Menüs, Brackets, Ranglisten oder markierten Bereichen.
+  if (!zones?.length) return all;
+  return all.filter((anchor) => !pointInQuiet(anchor.fixed ? { x: anchor.x, y: anchor.y } : { x: anchor.px, y: anchor.py }, zones, { fixed: anchor.fixed }));
+}
+
+/** Liegt eine hängende Fledermaus unter einem geöffneten Dialog oder Menü? Dann weicht sie aus (unsichtbar, nicht klickbar). */
+export function yieldsToOverlay(bat, zones) {
+  const overlays = overlayZones(zones);
+  if (!overlays.length) return false;
+  const rect = { left: bat.x - bat.size / 2, top: bat.y, right: bat.x + bat.size / 2, bottom: bat.y + bat.size };
+  return rectInQuiet(rect, overlays, { fixed: bat.anchor.fixed, overlayOnly: true });
 }
 
 /** Auswahl: erst die Art nach Gewicht, dann ein Punkt dieser Art - nie zwei näher als der Mindestabstand (auch zu `taken`). */
@@ -280,15 +293,18 @@ export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
     };
     const refresh = () => {
       if (cancelled) return;
+      const zones = measureQuietZones();
       let next = batsRef.current.map((bat) => {
         if (bat.state !== "hanging") return bat;
         const point = bat.anchor.measure();
         if (!point) return { ...bat, state: "gone" };
-        return point.x === bat.x && point.y === bat.y ? bat : { ...bat, x: point.x, y: point.y };
+        const moved = point.x === bat.x && point.y === bat.y ? bat : { ...bat, x: point.x, y: point.y };
+        const yielding = yieldsToOverlay(moved, zones);
+        return yielding === Boolean(moved.yield) && moved === bat ? bat : { ...moved, yield: yielding };
       });
       const open = count - placed;
       if (open > 0) {
-        const found = measureAnchors();
+        const found = measureAnchors(document, window, zones);
         if (found.length) {
           const taken = next.filter((bat) => bat.state === "hanging").map((bat) => bat.anchor);
           const fresh = chooseAnchors(found, open, rngRef.current, taken).map((anchor) => ({ id: nextId++, anchor, x: anchor.x, y: anchor.y, size: anchor.size, state: "hanging" }));
@@ -307,12 +323,15 @@ export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
     window.addEventListener("resize", onLayout);
     const observer = typeof ResizeObserver === "function" ? new ResizeObserver(onLayout) : null;
     observer?.observe(document.body);
+    // Dialoge und Menüs (H10): öffnet sich eines über einer Fledermaus, weicht sie aus - und kommt zurück, wenn es zugeht.
+    const stopWatching = watchOverlays(refresh);
     return () => {
       cancelled = true;
       timers.forEach((timer) => window.clearTimeout(timer));
       window.clearTimeout(debounce);
       window.removeEventListener("resize", onLayout);
       observer?.disconnect();
+      stopWatching();
     };
   }, [location.pathname, count, seed, salt]);
 
@@ -322,6 +341,7 @@ export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
   };
   const scare = (id) => {
     const scrollY = window.scrollY || 0;
+    requestMotion("bat_scare", { force: true });
     emitSound("bat_scare");
     update((bat) => {
       if (bat.id !== id || bat.state !== "hanging") return bat;
@@ -342,11 +362,12 @@ export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
         key={bat.id}
         type="button"
         tabIndex={-1}
-        className="tls-hbat tls-hbat--hanging"
+        className={`tls-hbat tls-hbat--hanging ${bat.yield ? "tls-hbat--yield" : ""}`}
         style={{ transform: `translate(${(bat.x - bat.size / 2).toFixed(1)}px, ${bat.y.toFixed(1)}px)` }}
         onClick={() => scare(bat.id)}
         data-testid="halloween-bat-hanging"
         data-kind={bat.anchor.kind}
+        data-yield={bat.yield ? "1" : undefined}
       >
         <HangingBatShape size={bat.size} />
       </button>

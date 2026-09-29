@@ -11,6 +11,11 @@ const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
 const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT, catTarget } = await import("./index.jsx");
+import { createMotionScheduler, resetMotionScheduler } from "../motion";
+
+// Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
+beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
+afterAll(() => resetMotionScheduler(null));
 
 const PATHS = ["/", "/news", "/events", "/tournaments", "/teams", "/about", "/shop", "/faq", "/contact", "/gallery", "/members", "/stream", "/discord", "/sponsors", "/awards", "/rules", "/calendar", "/players"];
 
@@ -64,9 +69,28 @@ test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere 
   expect(news.flock).toEqual([3, 5]);
   const layouts = PATHS.map((path) => pageLayout(path, "normal"));
   expect(new Set(layouts.map((layout) => layout.web.corner)).size).toBe(2);
-  expect(new Set(layouts.map((layout) => layout.spiders[0].offset)).size).toBeGreaterThan(3);
-  expect(layouts.every((layout) => layout.rappel)).toBe(true);
-  expect(layouts.every((layout) => layout.rappel.first >= 5 && layout.rappel.first <= 12)).toBe(true);
+  // Seitenintensität (H17): ruhige Seiten (Kontakt, Bracket, Formulare) bekommen weder Spinnen noch Abseil-Spinne noch Schwarm.
+  const lively = layouts.filter((layout) => layout.caps.cls === "lively" || layout.caps.cls === "medium");
+  const calm = layouts.filter((layout) => layout.caps.cls === "calm");
+  expect(lively.length).toBeGreaterThan(5);
+  expect(calm.length).toBeGreaterThan(0);
+  expect(new Set(lively.map((layout) => layout.spiders[0].offset)).size).toBeGreaterThan(3);
+  expect(lively.every((layout) => layout.rappel)).toBe(true);
+  expect(lively.every((layout) => layout.rappel.first >= 5 && layout.rappel.first <= 12)).toBe(true);
+  expect(calm.every((layout) => !layout.rappel && layout.spiders.length === 0 && layout.hangingBats <= 1 && layout.flock[1] === 0 && !layout.scares)).toBe(true);
+  const home = pageLayout("/", "normal");
+  const bracket = pageLayout("/tournaments/cup/bracket", "normal");
+  expect(home.caps.cls).toBe("lively");
+  expect(bracket.caps.cls).toBe("calm");
+  expect(bracket.hangingBats).toBeLessThanOrEqual(1);
+  expect(bracket.secondWeb).toBeNull();
+  expect(home.flock).toEqual([3, 5]);
+  // Schmale Fenster (H18): weniger Fledermäuse, kleinerer Schwarm, ein Netz.
+  const phone = pageLayout("/", "normal", "abc", 390);
+  expect(phone.hangingBats).toBeLessThanOrEqual(1);
+  expect(phone.flock[1]).toBeLessThanOrEqual(3);
+  expect(phone.secondWeb).toBeNull();
+  expect(phone.crawler).toBeNull();
   // Jede Ladung würfelt neu: ein anderes Salz gibt eine andere Anordnung, dasselbe Salz dieselbe.
   expect(JSON.stringify(pageLayout("/news", "normal", "abc"))).not.toBe(JSON.stringify(pageLayout("/news", "normal", "xyz")));
   expect(pageLayout("/news", "normal", "abc")).toEqual(pageLayout("/news", "normal", "abc"));

@@ -1,5 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Graveyard, ghostDrift } from "./graveyard";
+import { createMotionScheduler, resetMotionScheduler } from "../motion";
+
+// Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
+beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
+afterAll(() => resetMotionScheduler(null));
 
 // Mini-Friedhof (#662): Gräber stehen auf dem Strich über dem Impressum, ein Klick lässt einen Geist aufsteigen,
 // je Grab höchstens einer je Sperrzeit; ohne Strich oder ohne Gräber nichts.
