@@ -7,7 +7,8 @@ import { ALERT_MS, TAKEOFF_MS, alertEveryMs, restMs, wantsToRoam, type Temperame
 import { fleePath, requestHop, startFlight } from "./flights";
 import { getMotionScheduler, requestMotion } from "./motion";
 import { hashString, mulberry32 } from "./rng";
-import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type PerchAssignment, type PerchKind, type PerchRect } from "./perches";
+import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type PerchAssignment, type PerchKind, type PerchRect, type WebAssignment } from "./perches";
+import { CornerWeb } from "./cornerWeb";
 import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quiet";
 
 // Anker in der App (A1, #715): eine Karte, die einen Platz anbietet, legt `SeasonPerch` als unsichtbare Ebene über
@@ -85,13 +86,18 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1 }: { id: string; 
   const screen = useRouteNameSafe();
   const ref = useRef<View>(null);
   const [assignment, setAssignment] = useState<PerchAssignment | null>(() => perchSnapshot().assignments[id] || null);
+  const [web, setWeb] = useState<WebAssignment | null>(() => perchSnapshot().webs[id] || null);
   const [covered, setCovered] = useState(anyOverlayOpen());
   useEffect(() => {
     // Erst zuhören, dann anmelden: die Bühne teilt oft schon während der Anmeldung zu.
-    const stop = subscribePerches((state) => setAssignment(state.assignments[id] || null));
+    const stop = subscribePerches((state) => {
+      setAssignment(state.assignments[id] || null);
+      setWeb(state.webs[id] || null);
+    });
     const stopQuiet = subscribeQuiet((state) => setCovered(state.overlays.length > 0));
     registerPerch({ id, screen, kind, measure: () => measureNode(ref.current) });
     setAssignment(perchSnapshot().assignments[id] || null);
+    setWeb(perchSnapshot().webs[id] || null);
     return () => {
       stop();
       stopQuiet();
@@ -100,6 +106,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1 }: { id: string; 
   }, [id, screen, kind]);
   return (
     <View ref={ref} collapsable={false} pointerEvents="box-none" style={StyleSheet.absoluteFill} testID={`season-perch-${id}`}>
+      {web && !covered ? <CornerWeb side={web.side} seed={web.seed} radius={web.radius} /> : null}
       {assignment && !covered ? <PerchBat perchId={id} screen={screen} assignment={assignment} landed={Boolean(assignment.landed)} timeScale={timeScale} measure={() => measurePerch(id, () => measureNode(ref.current))} /> : null}
     </View>
   );

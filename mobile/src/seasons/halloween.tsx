@@ -4,13 +4,14 @@ import { Animated, AppState, Easing, Pressable, StyleSheet, View, useWindowDimen
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
 import { colors } from "../theme";
+import { CatOnEdge, Fog } from "./atmosphere";
 import { FlyingBatShape, HangingBatShape as HangingBatArt } from "./batArt";
 import { flightPath, keyframes, nextFlightDelaySeconds, planFlock, type FlightPath } from "./bats";
 import { approachPath, awayMs, flightDurationMs, hopPath, inView, rotationFrames, temperamentFor, type Temperament } from "./batLife";
 import { endFlight, fleePath, requestHop, startFlight, subscribeFlightEnd, subscribeFlights, subscribeHops, type Flight as PerchFlightData } from "./flights";
 import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
 import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
-import { assign, assignmentsFor, choosePerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
+import { assign, assignWebs, assignmentsFor, choosePerches, chooseWebPerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
 import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelState } from "./rappel";
 import { between, pick, screenRng } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
@@ -269,7 +270,7 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
   const hub = toPixels(plan.nodes[0], radius, mirror);
   const spiderSize = Math.max(14, Math.round(radius * 0.22));
   return (
-    <Animated.View pointerEvents="none" style={[styles.web, web.corner === "tl" ? { left: 0 } : { right: 0 }, { width: boxWidth, height: boxHeight, transform: [{ rotate }] }]} testID={done ? "halloween-web-built" : "halloween-web-building"}>
+    <Animated.View pointerEvents="box-none" style={[styles.web, web.corner === "tl" ? { left: 0 } : { right: 0 }, { width: boxWidth, height: boxHeight, transform: [{ rotate }] }]} testID={done ? "halloween-web-built" : "halloween-web-building"}>
       <Svg width={boxWidth} height={boxHeight}>
         {lines.map((line, index) => (builtThreads.has(index) ? (
           <Line key={index} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={line.kind === "spiral" ? THREAD_SOFT : THREAD} strokeWidth={line.kind === "spiral" ? 0.65 : 0.9} strokeLinecap="round" />
@@ -280,14 +281,47 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
         }) : null}
       </Svg>
       {done ? (
-        <View pointerEvents="none" style={{ position: "absolute", left: hub.x - spiderSize / 2, top: hub.y - spiderSize / 2 }}>
-          <SpiderBody size={spiderSize} heading={0} />
-        </View>
+        <HubSpider hub={hub} corner={web.corner} boxWidth={boxWidth} size={spiderSize} reduced={reduced} />
       ) : (
         <Animated.View pointerEvents="none" style={{ position: "absolute", left: -spiderSize / 2, top: -spiderSize / 2, transform: [{ translateX: position.x }, { translateY: position.y }] }}>
           <SpiderBody size={spiderSize} heading={heading} />
         </Animated.View>
       )}
+    </Animated.View>
+  );
+}
+
+export const SPIDER_RETREAT_MS = 25000;
+export const SPIDER_RETREAT_COOLDOWN_MS = 30000;
+
+/**
+ * Die Spinne in der Nabe des fertigen Netzes (A4): Antippen lässt sie am Ankerfaden in die Ecke huschen; nach einer
+ * Weile kommt sie zurück, und in den nächsten 30 s reagiert sie nicht wieder - subtil statt dauernd.
+ */
+function HubSpider({ hub, corner, boxWidth, size, reduced }: { hub: { x: number; y: number }; corner: "tl" | "tr"; boxWidth: number; size: number; reduced: boolean }) {
+  const away = useRef(new Animated.Value(0)).current;
+  const [hidden, setHidden] = useState(false);
+  const lastRef = useRef(0);
+  useEffect(() => () => away.stopAnimation(), [away]);
+  const onPress = () => {
+    const now = Date.now();
+    if (reduced || hidden || now - lastRef.current < SPIDER_RETREAT_COOLDOWN_MS) return;
+    lastRef.current = now;
+    setHidden(true);
+    Animated.timing(away, { toValue: 1, duration: 700, easing: Easing.in(Easing.quad), useNativeDriver: true }).start();
+    setTimeout(() => {
+      Animated.timing(away, { toValue: 0, duration: 1200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => setHidden(false));
+    }, SPIDER_RETREAT_MS);
+  };
+  const cornerX = corner === "tl" ? 0 : boxWidth;
+  const translateX = away.interpolate({ inputRange: [0, 1], outputRange: [0, cornerX - hub.x] });
+  const translateY = away.interpolate({ inputRange: [0, 1], outputRange: [0, -hub.y] });
+  const scale = away.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] });
+  return (
+    <Animated.View style={{ position: "absolute", left: hub.x - size / 2, top: hub.y - size / 2, transform: [{ translateX }, { translateY }, { scale }] }} testID="halloween-web-spider" data-hidden={hidden ? "1" : "0"}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Spinne" onPress={onPress} hitSlop={8} disabled={reduced} testID="halloween-web-spider-press">
+        <SpiderBody size={size} heading={0} />
+      </Pressable>
     </Animated.View>
   );
 }
@@ -727,6 +761,28 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
 /** So lange nach dem Betreten eines Screens werden Plätze ohne Anflug besetzt. */
 export const ENTER_GRACE_MS = 1500;
 
+/** Kleine Netze in Kartenecken (A4): `count` je Screen, gesät aus Screen und Kartenliste, nie an einer Karte mit Fledermaus. */
+export function useWebAssignments(screen: string, count: number, active: boolean) {
+  useEffect(() => {
+    if (!active || count <= 0) {
+      assignWebs([]);
+      return undefined;
+    }
+    const recompute = () => {
+      const perches = perchesFor(screen);
+      const rng = screenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "corner-webs");
+      const withBats = assignmentsFor(screen).map((entry) => entry.perchId);
+      assignWebs(chooseWebPerches(perches, count, rng, withBats));
+    };
+    recompute();
+    const stop = subscribePerches(recompute);
+    return () => {
+      stop();
+      assignWebs([]);
+    };
+  }, [screen, count, active]);
+}
+
 function mulberry32Random(): () => number {
   return screenRng(String(Date.now()), "flight");
 }
@@ -779,11 +835,13 @@ export function HalloweenCorners({ season, screen, timeScale = 1 }: { season: Ac
   const onScared = useCallback(() => setSalt((value) => value + 1), []);
   void salt;
   usePerchAssignments(screen, moving ? layout.perchBats : 0, moving, { width, height }, timeScale);
+  useWebAssignments(screen, caps.cornerWebs, season.effective !== "off");
   useEffect(() => {
     getMotionScheduler().setHidden(!appActive);
   }, [appActive]);
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="halloween-corners" data-class={caps.cls}>
+      <Fog level={caps.fog} width={width} height={height} bottom={bottom - 4} />
       <OrbWeb web={layout.web} width={width} reduced={!moving} />
       {layout.secondWeb ? <OrbWeb web={layout.secondWeb} width={width} reduced={!moving} /> : null}
       {layout.spider ? <DropSpider spec={layout.spider} width={width} reduced={!moving} /> : null}
@@ -791,6 +849,7 @@ export function HalloweenCorners({ season, screen, timeScale = 1 }: { season: Ac
       {layout.rappel && moving ? <RappelSpider spec={layout.rappel} width={width} floorY={floorY} reduced={!moving} /> : null}
       {moving ? layout.hangingBats.map((bat, index) => <HangingBat key={`${screen}-${index}`} spec={bat} width={width} height={height} reduced={!moving} onScared={onScared} />) : null}
       {moving ? <Graveyard graves={layout.graves} width={width} bottom={bottom} reduced={!moving} /> : null}
+      {caps.cat && season.effective !== "subtle" ? <CatOnEdge bottom={bottom} width={width} moving={moving} /> : null}
       {moving ? <FlightLayer top={insets.top} /> : null}
     </View>
   );
