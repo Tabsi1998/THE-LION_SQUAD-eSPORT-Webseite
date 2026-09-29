@@ -191,3 +191,26 @@
 
 /* Ruhezonen (H10): eine Fledermaus unter einem geöffneten Dialog oder Menü weicht aus. */
 .tls-hbat--yield { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+
+/* Halloween IV (H7–H9): Fledermäuse sitzen auf Kanten und Ecken, werden aufmerksam, starten, landen und setzen sich. */
+.tls-hbat--sitting { cursor: pointer; pointer-events: auto; }
+/* Auf dunklen Kanten braucht die Silhouette einen Hauch Mondlicht, sonst verschwindet sie im Grund. */
+.tls-hbat--hanging .tls-hbat__shape, .tls-hbat--sitting .tls-hbat__shape, .tls-hbat--flying .tls-hbat__shape { filter: drop-shadow(0 0 1.6px rgba(170, 225, 240, 0.38)); }
+.tls-hbat--sitting .tls-hbat__wing { transform-origin: 20px 20px; transition: transform 0.25s ease-out; }
+.tls-hbat--sitting:hover .tls-hbat__wing--l, .tls-hbat--alert .tls-hbat__wing--l { transform: rotate(-16deg); }
+.tls-hbat--sitting:hover .tls-hbat__wing--r, .tls-hbat--alert .tls-hbat__wing--r { transform: rotate(16deg); }
+@keyframes tls-hbat-shiver { 0%, 100% { transform: translateX(0) rotate(0); } 30% { transform: translateX(-0.7px) rotate(-1.5deg); } 70% { transform: translateX(0.7px) rotate(1.5deg); } }
+.tls-hbat--alert .tls-hbat__shape { animation: tls-hbat-shiver 0.45s ease-in-out 2; }
+@keyframes tls-hbat-flutter-l { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(-34deg); } }
+@keyframes tls-hbat-flutter-r { 0%, 100% { transform: rotate(6deg); } 50% { transform: rotate(34deg); } }
+.tls-hbat--takeoff .tls-hbat__wing--l, .tls-hbat--landing .tls-hbat__wing--l { animation: tls-hbat-flutter-l 0.14s ease-in-out infinite; transition: none; }
+.tls-hbat--takeoff .tls-hbat__wing--r, .tls-hbat--landing .tls-hbat__wing--r { animation: tls-hbat-flutter-r 0.14s ease-in-out infinite; transition: none; }
+@keyframes tls-hbat-takeoff { 0% { transform: translateY(0) scaleY(1); } 45% { transform: translateY(2px) scaleY(0.94); } 100% { transform: translateY(-7px) scaleY(1.03); } }
+.tls-hbat--takeoff .tls-hbat__shape { animation: tls-hbat-takeoff 0.45s ease-in forwards; }
+@keyframes tls-hbat-land { 0% { transform: translateY(-9px) scaleY(1.05); opacity: 0.5; } 55% { transform: translateY(2px) scaleY(0.9); opacity: 1; } 100% { transform: translateY(0) scaleY(1); } }
+.tls-hbat--landing .tls-hbat__shape { animation: tls-hbat-land 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; }
+@keyframes tls-hbat-fold-l { 0% { transform: rotate(-24deg); } 60% { transform: rotate(4deg); } 100% { transform: rotate(0); } }
+@keyframes tls-hbat-fold-r { 0% { transform: rotate(24deg); } 60% { transform: rotate(-4deg); } 100% { transform: rotate(0); } }
+.tls-hbat--settle .tls-hbat__wing--l { animation: tls-hbat-fold-l 1.2s ease-out forwards; }
+.tls-hbat--settle .tls-hbat__wing--r { animation: tls-hbat-fold-r 1.2s ease-out forwards; }
+.tls-hbat--flying { transform-origin: center; }
