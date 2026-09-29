@@ -1,6 +1,7 @@
-import { capabilities, capabilitiesFor, pageClass, scaleForViewport } from "./intensity";
+import { EFFECT_CLASSES, PAGE_CLASSES, SEASON_CAPABILITIES, allows, capabilities, capabilitiesFor, effectClasses, pageClass, scaleForViewport } from "./intensity";
 
 // Seitenintensität (H17): Klasse aus der Adresse, Fähigkeiten aus Klasse und Stärke, schmale Fenster bekommen weniger.
+// Effektklassen (C5, #725): welche Art Effekt eine Seite tragen darf, saisonneutral; Halloween leitet seine Schlüssel daraus ab.
 
 test("ordnet Seiten ihren Klassen zu", () => {
   expect(pageClass("/")).toBe("lively");
@@ -63,4 +64,58 @@ test("schmale Fenster bekommen weniger, Handys am wenigsten", () => {
   expect(phone.mobile).toBe(true);
   expect(phone.fog).toBe("far");
   expect(scaleForViewport(home, 1440)).toBe(home);
+});
+
+test("Effektklassen je Seitenklasse: nicht nur wie viel, sondern welche Art - Stärke vom Server bleibt übergeordnet", () => {
+  expect(PAGE_CLASSES).toEqual(["lively", "medium", "calm", "quiet"]);
+  const lively = effectClasses("lively");
+  const calm = effectClasses("calm");
+  const quiet = effectClasses("quiet");
+  EFFECT_CLASSES.forEach((effect) => expect(lively).toHaveProperty(effect));
+  expect(lively).toMatchObject({ cls: "lively", perch: 4, corner: 3, ambient: "near", watch: true, motion: true, slots: 2, crawl: true, rare: true, scene: "full", interact: true });
+  expect(calm).toMatchObject({ perch: 1, corner: 1, ambient: "far", watch: false, motion: false, slots: 1, crawl: false, rare: false, scene: "small", interact: false });
+  expect(EFFECT_CLASSES.every((effect) => !allows(quiet, effect))).toBe(true);
+  expect(allows(lively, "motion")).toBe(true);
+  expect(allows(calm, "motion")).toBe(false);
+  expect(allows(calm, "ambient")).toBe(true);
+  expect(allows(quiet, "ambient")).toBe(false);
+  expect(allows(null, "perch")).toBe(false);
+  // Server-Stärke: „dezent“ nimmt jede Bewegung, lässt eine Ecke und ferne Atmosphäre; „voll“ hebt an, still bleibt still.
+  const subtle = effectClasses("lively", "subtle");
+  expect(subtle).toMatchObject({ perch: 0, corner: 1, ambient: "far", watch: false, motion: false, slots: 0, crawl: false, rare: false, scene: "small", interact: false, subtle: true });
+  expect(effectClasses("medium", "full")).toMatchObject({ perch: 3, corner: 3, crawl: true, full: true });
+  expect(effectClasses("quiet", "full")).toEqual(quiet);
+  expect(effectClasses("unbekannt")).toMatchObject({ cls: "unbekannt", perch: 2 });
+});
+
+test("Saison-Übersetzung: Halloween leitet seine Schlüssel aus den Effektklassen ab, eine Saison ohne Übersetzung bekommt nur die Klassen", () => {
+  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween"]);
+  ["lively", "medium", "calm", "quiet"].forEach((cls) => {
+    ["normal", "subtle", "full"].forEach((intensity) => {
+      const caps = capabilitiesFor(cls, intensity);
+      expect(caps.season).toBe("halloween");
+      expect(caps.hangingBats).toBe(caps.perch);
+      expect(caps.cornerWebs).toBe(caps.corner);
+      expect(caps.fog).toBe(caps.ambient);
+      expect(caps.eyes).toBe(caps.watch);
+      expect(caps.flock).toBe(caps.motion);
+      expect(caps.rappel).toBe(caps.motion);
+      expect(caps.wisps).toBe(caps.motion);
+      expect(caps.crawler).toBe(caps.crawl);
+      expect(caps.rareEvents).toBe(caps.rare);
+      expect(caps.scares).toBe(caps.interact);
+      expect(caps.footerScene).toBe(caps.scene);
+      expect(caps.flockRange[1] > 0).toBe(caps.motion);
+    });
+  });
+  const plain = capabilities("/", "normal", "winter");
+  expect(plain).toMatchObject({ cls: "lively", season: "winter", perch: 4, motion: true });
+  expect(plain.hangingBats).toBeUndefined();
+  // Schmale Fenster: die Klassen schrumpfen, die Saison-Schlüssel folgen ihnen.
+  const phone = scaleForViewport(capabilities("/", "normal"), 390);
+  expect(phone).toMatchObject({ perch: 1, corner: 0, watch: false, crawl: false, rare: false, ambient: "far", slots: 1, scene: "small", mobile: true, narrow: true });
+  expect(phone).toMatchObject({ hangingBats: 1, cornerWebs: 0, eyes: false, crawler: false, rareEvents: false, fog: "far", footerScene: "small", webs: 1 });
+  const winterPhone = scaleForViewport(plain, 390);
+  expect(winterPhone).toMatchObject({ perch: 1, corner: 0, season: "winter" });
+  expect(winterPhone.hangingBats).toBeUndefined();
 });

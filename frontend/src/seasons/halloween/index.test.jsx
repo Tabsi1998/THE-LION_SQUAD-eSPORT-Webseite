@@ -10,12 +10,12 @@ import userEvent from "@testing-library/user-event";
 const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
-const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT, setLoadSalt, catTarget } = await import("./index.jsx");
+const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, YEAR_SALT, setYearSalt, catTarget } = await import("./index.jsx");
 import { createMotionScheduler, resetMotionScheduler } from "../motion";
 
 // Der Salt je Seitenaufruf ist im Browser zufällig; hier fest, damit die Erwartungen (Krabbler, zweites Netz,
 // Katze, leere Friedhöfe) nicht vom Zufall des Laufs abhängen.
-setLoadSalt(process.env.TLS_SEASON_SALT || "feinschliff");
+setYearSalt(process.env.TLS_SEASON_SALT || "feinschliff");
 
 // Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
 beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
@@ -120,7 +120,7 @@ test("Anordnung je Seite: gleich für dieselbe Adresse, anders für eine andere 
   expect(full.flock).toEqual([5, 8]);
   expect(full.hangingBats).toBeGreaterThanOrEqual(2);
   expect(full.crawler).not.toBeNull();
-  expect(LOAD_SALT.length).toBeGreaterThan(0);
+  expect(YEAR_SALT.length).toBeGreaterThan(0);
 });
 
 test("Signal zählt nur am 31. Oktober ab 18 Uhr", () => {
@@ -237,9 +237,11 @@ test("Abseil-Spinne: seilt sich bis zum Strich ab, lässt los und läuft", async
 
 test("Krabbler kommt nach der Wartezeit quer über den Bildschirm und geht wieder", async () => {
   vi.useFakeTimers();
-  const path = PATHS.find((candidate) => pageLayout(candidate, "normal").crawler);
-  const layout = pageLayout(path, "normal");
-  mount(<Corners season={halloween({ effective: "normal" })} />, path);
+  // Auf dem Höhepunkt (full) hat jede lebendige Seite einen Krabbler - unabhängig vom Jahres-Salz (C4).
+  const path = PATHS.find((candidate) => pageLayout(candidate, "full").crawler) || "/";
+  const layout = pageLayout(path, "full");
+  expect(layout.crawler).toBeTruthy();
+  mount(<Corners season={halloween({ effective: "full" })} />, path);
   expect(screen.queryByTestId("halloween-crawler")).toBeNull();
   await act(async () => {
     vi.advanceTimersByTime(layout.crawler.first * 1000 + 100);

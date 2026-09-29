@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { between, pageRng, pick } from "../rng";
+import { between, pick, seasonRng, seasonYear } from "../rng";
 import { Cat, CatWalking, Lantern, Moon, Pumpkin, Spider } from "./art";
 import { advanceFlock, createFlock, drawBat, nextFlightDelay } from "./bats";
 import { HangingBats } from "./HangingBats";
@@ -29,17 +29,18 @@ import "./halloween.css";
 // Eine Spinne seilt sich auf jeder Seite bis zum Fußzeilen-Strich ab und lässt los, die Spinne am Faden hängt am
 // oberen Seitenrand (scrollt mit der Seite weg); auf dem Strich steht ein winziger Friedhof, dessen Gräber Geister
 // freigeben, und eine Katze, die beim Klick ein Stück weiterläuft. Dazu Schwaden im Himmel, der Mond mit echter
-// Phase, Kürbisse. Jede Ladung würfelt die Anordnung neu (Adresse plus Salz je Ladung).
+// Phase, Kürbisse. Die Anordnung kommt aus Saison, Jahr und Adresse (C4, #724): ein Neuladen ändert nichts, das
+// nächste Jahr würfelt neu.
 
 export const ACCENT = "rgba(170, 225, 240, 0.35)";
 export const SIGNAL_KEY = "halloween_pumpkin";
 export const FACES = ["grin", "calm", "wicked"];
-/** Salz je Ladung: die ganze Anordnung würfelt sich bei jedem Laden neu - innerhalb einer Sitzung bleibt sie je Seite. */
-export let LOAD_SALT = Math.random().toString(36).slice(2, 8);
+/** Jahres-Salz (C4, #724): die Anordnung bleibt das ganze Saisonjahr gleich und würfelt sich im nächsten Jahr neu. */
+export let YEAR_SALT = String(seasonYear("halloween"));
 
-/** Nur für Tests: ein fester Salt, damit die Anordnung je Seite reproduzierbar ist. */
-export function setLoadSalt(value) {
-  LOAD_SALT = String(value);
+/** Nur für Tests: ein festes Salz, damit die Anordnung je Seite reproduzierbar ist. */
+export function setYearSalt(value) {
+  YEAR_SALT = String(value);
 }
 
 /** Zählt der Klick? Nur am 31. Oktober ab 18:00 (Ortszeit des Geräts, der Server prüft später selbst). */
@@ -48,12 +49,12 @@ export function pumpkinCounts(now = new Date()) {
 }
 
 /**
- * Was diese Seite bekommt - aus Adresse und Ladungs-Salz berechnet: gleiche Seite in dieser Sitzung gleich, jede
- * Ladung neu. Alle Zufallszahlen werden immer gezogen; danach kappen die Fähigkeiten der Seite (H17: Startseite
- * lebendig, Bracket und Formulare ruhig) und die Fensterbreite (H18), was tatsächlich erscheint.
+ * Was diese Seite bekommt - aus Saison, Jahr und Adresse berechnet (C4): dieselbe Seite bleibt das ganze Saisonjahr
+ * gleich, im nächsten Jahr würfelt sie neu. Alle Zufallszahlen werden immer gezogen; danach kappen die Fähigkeiten
+ * der Seite (H17: Startseite lebendig, Bracket und Formulare ruhig) und die Fensterbreite (H18), was tatsächlich erscheint.
  */
-export function pageLayout(pathname, intensity = "normal", salt = LOAD_SALT, width = typeof window === "undefined" ? 1280 : window.innerWidth) {
-  const rng = pageRng(`${pathname}|${salt}`, "halloween");
+export function pageLayout(pathname, intensity = "normal", salt = YEAR_SALT, width = typeof window === "undefined" ? 1280 : window.innerWidth) {
+  const rng = seasonRng({ season: "halloween", year: salt, route: pathname }, "halloween");
   const full = intensity === "full";
   const subtle = intensity === "subtle";
   const caps = scaleForViewport(capabilities(pathname, intensity), width);
@@ -293,10 +294,10 @@ export function Corners({ season }) {
         <Spider className="tls-crawler" size={layout.crawler.size} thread={false} style={{ "--crawl-duration": `${layout.crawler.duration}s` }} data-testid="halloween-crawler" />
       )}
       <RappelSpider spec={layout.rappel} active={moving} />
-      {layout.cornerWebs && <CornerWebs count={layout.cornerWebs.count} seed={layout.cornerWebs.seed} salt={LOAD_SALT} moving={moving} />}
-      <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={LOAD_SALT} />
-      <Eyes active={moving && Boolean(layout.caps?.eyes)} seed={layout.web.seed} salt={LOAD_SALT} />
-      <RareEdge active={moving && Boolean(layout.caps?.rareEvents)} seed={layout.web.seed} salt={LOAD_SALT} />
+      {layout.cornerWebs && <CornerWebs count={layout.cornerWebs.count} seed={layout.cornerWebs.seed} salt={YEAR_SALT} moving={moving} />}
+      <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={YEAR_SALT} />
+      <Eyes active={moving && Boolean(layout.caps?.eyes)} seed={layout.web.seed} salt={YEAR_SALT} />
+      <RareEdge active={moving && Boolean(layout.caps?.rareEvents)} seed={layout.web.seed} salt={YEAR_SALT} />
       {moving && layout.scares && <Scares season={season} />}
     </>
   );
@@ -358,7 +359,7 @@ export function Footer({ season }) {
   return (
     <div className="tls-footer-scene" data-testid="halloween-footer-scene" data-busy={busy ? "1" : undefined} data-size={layout.caps?.footerScene}>
       {layout.cat && <CatOnEdge size={layout.cat.size} startX={layout.cat.x} moving={moving} />}
-      {moving && <Graveyard graves={layout.graves} salt={LOAD_SALT} />}
+      {moving && <Graveyard graves={layout.graves} salt={YEAR_SALT} />}
       {layout.footerPumpkins.length > 0 && (
         <div className={`tls-footer-pumpkins${lineTop === null ? "" : " tls-footer-pumpkins--line"}`} style={lineTop === null ? undefined : { top: `${lineTop}px` }} data-testid="halloween-pumpkins">
           {layout.footerPumpkins.map((pumpkin, index) => <FooterPumpkin key={index} pumpkin={pumpkin} greeting={greeting} reactive={moving && index === 0} />)}
@@ -548,7 +549,7 @@ export function skyLayers({ season, reducedMotion, weather = null }) {
   if (reducedMotion || season.effective === "subtle") return [];
   const night = Boolean(season.data?.night);
   const pathname = typeof window !== "undefined" ? window.location.pathname : "/";
-  const rng = pageRng(`${pathname}|${LOAD_SALT}`, "bats");
+  const rng = seasonRng({ season: "halloween", year: YEAR_SALT, route: pathname }, "bats");
   const layout = pageLayout(pathname, season.effective);
   const layers = [createWebLayer({ ...layout.web, weather })];
   if (layout.secondWeb) layers.push(createWebLayer({ ...layout.secondWeb, weather }));
