@@ -478,3 +478,16 @@ def read_preview_token(token: str | None, now: datetime | None = None) -> tuple[
 def etag_for(payload: dict) -> str:
     import json
     return '"' + hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:20] + '"'
+
+
+def adult_from_birth_date(value, today: date | None = None) -> bool:
+    """Ab 18 (#680, Jumpscares): nur mit Geburtsdatum im Profil und mindestens 18 Jahren - sonst nie."""
+    if not value:
+        return False
+    try:
+        born = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return False
+    today = today or date.today()
+    age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+    return age >= 18

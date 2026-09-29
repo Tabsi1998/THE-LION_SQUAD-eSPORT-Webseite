@@ -143,3 +143,48 @@
   .tls-footer-cat { transition: none; }
   .tls-spider--drop, .tls-crawler, .tls-rappel, .tls-rappel-runner, .tls-hbats, .tls-ghosts { display: none; }
 }
+
+/* Jumpscares (#680): ein Portal ueber allem, nie klickbar; dunkel -> Gestalt -> dunkel, hoechstens zwei
+   Helligkeitswechsel, kein Vollweiss. Auftritt (Klasse tls-scare--rise usw.) und Rahmen (--frame-dim usw.) kommen
+   aus der Variante. Jeder Klick beendet ihn (Scare.jsx), spaetestens nach 1,8 s ist er weg. */
+@keyframes tls-scare-dim { 0% { background: rgba(0, 0, 0, 0); } 25%, 85% { background: rgba(0, 0, 0, 0.78); } 100% { background: rgba(0, 0, 0, 0); } }
+@keyframes tls-scare-flicker { 0% { background: rgba(0, 0, 0, 0); } 20% { background: rgba(0, 0, 0, 0.82); } 40% { background: rgba(0, 0, 0, 0.5); } 60%, 85% { background: rgba(0, 0, 0, 0.82); } 100% { background: rgba(0, 0, 0, 0); } }
+@keyframes tls-scare-pulse { 0%, 100% { box-shadow: inset 0 0 0 0 rgba(41, 182, 232, 0); } 30% { box-shadow: inset 0 0 160px 40px rgba(41, 182, 232, 0.35); } 70% { box-shadow: inset 0 0 90px 20px rgba(41, 182, 232, 0.2); } }
+@keyframes tls-scare-shake { 0%, 100% { transform: translate(0, 0); } 15% { transform: translate(-9px, 4px); } 30% { transform: translate(8px, -5px); } 45% { transform: translate(-6px, 6px); } 60% { transform: translate(5px, -3px); } 80% { transform: translate(-3px, 2px); } }
+@keyframes tls-scare-rise { 0% { transform: translateY(110vh) scale(0.7); opacity: 0.4; } 60% { transform: translateY(-4vh) scale(1.05); opacity: 1; } 100% { transform: translateY(0) scale(1); opacity: 1; } }
+@keyframes tls-scare-drop { 0% { transform: translateY(-120vh); } 70% { transform: translateY(3vh); } 100% { transform: translateY(0); } }
+@keyframes tls-scare-tilt { 0% { transform: translateX(70vw) rotate(-28deg) scale(0.8); opacity: 0; } 60% { transform: translateX(-2vw) rotate(4deg) scale(1.05); opacity: 1; } 100% { transform: translateX(0) rotate(0deg) scale(1); opacity: 1; } }
+@keyframes tls-scare-fade { 0% { transform: scale(1.6); opacity: 0; filter: blur(12px); } 45% { transform: scale(1); opacity: 1; filter: blur(0); } 100% { transform: scale(1.02); opacity: 1; filter: blur(0); } }
+@keyframes tls-scare-dash { 0% { transform: translateX(-120vw) scaleX(1); opacity: 1; } 100% { transform: translateX(120vw) scaleX(1); opacity: 1; } }
+@keyframes tls-scare-figure-jitter { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(2px, -2px); } }
+.tls-scare { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; pointer-events: none; overflow: hidden; }
+.tls-scare--frame-dim { animation: tls-scare-dim 1.6s ease-out both; }
+.tls-scare--frame-flicker { animation: tls-scare-flicker 1.6s steps(1, end) both; }
+.tls-scare--frame-pulse { animation: tls-scare-dim 1.6s ease-out both, tls-scare-pulse 1.4s ease-out both; }
+.tls-scare--frame-shake { animation: tls-scare-dim 1.6s ease-out both, tls-scare-shake 0.45s ease-in-out 0.12s both; }
+.tls-scare__figure { position: relative; display: inline-flex; align-items: center; justify-content: center; filter: drop-shadow(0 0 40px rgba(0, 0, 0, 0.9)); will-change: transform, opacity; }
+.tls-scare--rise .tls-scare__figure { animation: tls-scare-rise 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.tls-scare--drop .tls-scare__figure { animation: tls-scare-drop 0.34s cubic-bezier(0.3, 1, 0.5, 1) both; }
+.tls-scare--tilt .tls-scare__figure { animation: tls-scare-tilt 0.4s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.tls-scare--fade .tls-scare__figure { animation: tls-scare-fade 0.5s ease-out both; }
+.tls-scare--dash .tls-scare__figure { animation: tls-scare-dash 0.7s cubic-bezier(0.5, 0, 0.7, 1) both; }
+.tls-scare__figure svg { max-width: none; }
+.tls-scare__spider { transform: scale(6.5); transform-origin: center; filter: blur(0.6px); animation: tls-scare-figure-jitter 0.08s linear infinite; }
+.tls-scare__ghost { opacity: 0.95; filter: blur(0.4px); }
+.tls-scare__cat { transform: scaleX(-1); }
+.tls-scare__lantern { display: inline-block; transform: scale(7); transform-origin: center; }
+.tls-scare__bats { position: relative; display: inline-block; width: 60vw; height: 40vh; }
+.tls-scare__bat { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+.tls-scare__bat--1 { transform: translate(-90%, -120%) rotate(-12deg); }
+.tls-scare__bat--2 { transform: translate(10%, 30%) rotate(14deg); }
+.tls-scare__shadow { display: block; width: 46vw; height: 70vh; border-radius: 48% 52% 40% 60% / 60% 40% 60% 40%; background: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0) 75%); filter: blur(6px); }
+.tls-scare-note { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 101; display: inline-flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.9rem; border: 1px solid rgba(170, 225, 240, 0.35); border-radius: 0.25rem; background: rgba(10, 10, 10, 0.94); color: #dfe9ee; font-size: 12px; letter-spacing: 0.04em; }
+.tls-scare-note button { border: 0; background: transparent; color: #29B6E8; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.12em; cursor: pointer; }
+.tls-scare-note button:hover { text-decoration: underline; }
+.tls-season-scare { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; margin-left: 0.15rem; border: 0; border-radius: 0.25rem; background: transparent; color: rgba(255, 255, 255, 0.55); cursor: pointer; transition: color 0.15s ease-out, background 0.15s ease-out; }
+.tls-season-scare:hover { color: var(--season-accent, #29B6E8); background: rgba(255, 255, 255, 0.06); }
+.tls-season-scare:focus-visible { outline: 2px solid var(--season-accent, #29B6E8); outline-offset: 2px; }
+.tls-season-scare--off { color: rgba(255, 255, 255, 0.3); }
+@media (prefers-reduced-motion: reduce) {
+  .tls-scare { display: none; }
+}

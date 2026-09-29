@@ -15,11 +15,12 @@ vi.mock("@/hooks/useLiveChanges", () => ({ useReducedMotion: () => reduced }));
 const { SeasonProvider, useSeason, effectiveIntensity, refreshDelayFor, PREVIEW_STORAGE_KEY, PREFERENCE_STORAGE_KEY, REFRESH_MS, FAST_REFRESH_MS } = await import("./SeasonContext");
 
 function Probe() {
-  const { seasons, preference, setPreference, ready, preview } = useSeason();
+  const { seasons, preference, setPreference, ready, preview, scaresAllowed } = useSeason();
   return (
     <div>
       <span data-testid="ready">{String(ready)}</span>
       <span data-testid="preview">{String(preview)}</span>
+      <span data-testid="scares">{String(scaresAllowed)}</span>
       <span data-testid="keys">{seasons.map((s) => `${s.key}:${s.effective}`).join(",")}</span>
       <span data-testid="pref">{preference}</span>
       <button type="button" onClick={() => setPreference("subtle")}>dezent</button>
@@ -100,4 +101,16 @@ test("Serverfehler: die Seite läuft ohne Deko weiter", async () => {
   render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
   expect(screen.getByTestId("keys")).toHaveTextContent("");
+});
+
+test("Jumpscares (#680): ob jemand welche bekommen darf, fragt der Client nur angemeldet beim Server nach", async () => {
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
+  expect(screen.getByTestId("scares")).toHaveTextContent("false");
+  expect(apiMock.get.mock.calls.some(([url]) => url === "/seasonal/me")).toBe(false);
+  authState.user = { id: "u-18", seasonal_decorations: "on" };
+  apiMock.get.mockImplementation(async (url) => (url === "/seasonal/me" ? { data: { scares_allowed: true } } : { data: PAYLOAD }));
+  render(<MemoryRouter><SeasonProvider><Probe /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(screen.getAllByTestId("scares")[1]).toHaveTextContent("true"));
+  expect(apiMock.get).toHaveBeenCalledWith("/seasonal/me", { skipInvalidation: true });
 });
