@@ -1,10 +1,31 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Gem, Play, Pause } from "lucide-react";
+import { ArrowLeft, Gem, Play, Pause, Sparkles } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { Badge } from "@/components/achievements/Badge";
 import { BADGE_ART_KEYS } from "@/components/achievements/badgeArt";
 import { MATERIAL_LOOKS, MATERIAL_ORDER } from "@/components/achievements/materials";
+import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
+import { createCeremonyQueue } from "@/components/achievements/ceremony/queue";
+import { MOTIONS, SEQUENCE_KEYS, SEQUENCES } from "@/components/achievements/ceremony/select";
+
+const previewQueue = createCeremonyQueue();
+const CATEGORY_LABELS = { match: "Spielen", tournament: "Turnier", fastlap: "Fast Lap", season: "Saison", team: "Team", community: "Community", creator: "Streaming & Creator", profile: "Profil & Konto", club: "Verein", special: "Besonders", hidden: "Geheim" };
+
+// Ein Beispielpaket für die Zeremonie-Vorschau: Material, Kategorie und Ablauf frei kombinierbar.
+export function sampleCeremony({ material, category, sequence, art }) {
+  const rank = MATERIAL_LOOKS[material]?.rank || 5;
+  const make = (i, m = material) => ({
+    code: `preview_${m}_${i}`, name: `Beispiel ${["I", "II", "III"][i]}`, description: `So sieht ${MATERIAL_LOOKS[m].name} in „${CATEGORY_LABELS[category] || category}“ aus.`,
+    material: m, material_name: MATERIAL_LOOKS[m].name, rank: MATERIAL_LOOKS[m].rank, category, icon: "trophy", art, group_name: CATEGORY_LABELS[category] || category, points: 10 * (MATERIAL_LOOKS[m].rank || rank), award_id: "vorschau", hidden: category === "hidden",
+  });
+  if (sequence === "levelup") return { tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 1, prestigeGained: true } };
+  if (sequence === "stack") return { tiers: [make(0), make(1, "silver"), make(2, "wood")] };
+  if (sequence === "diamond") return { tiers: [make(0, "diamond")] };
+  if (sequence === "legendary") return { tiers: [make(0, "legendary")] };
+  const context = { first: { firstEver: true }, group: { groupCompleted: "preview" }, category: { categoryCompleted: category } }[sequence] || {};
+  return { tiers: [make(0)], context };
+}
 
 // Vorschau der Abzeichen-Kunst (E8, #618; verlinkt aus E10): jedes Motiv in jedem Material, Größen,
 // Rang-Kerben, Silhouette mit Fortschritt, Bewegung an/aus - damit man sieht, was die Leute sehen,
@@ -21,6 +42,13 @@ export default function AdminAchievementPreviewPage() {
   const [focus, setFocus] = useState("crossed-swords");
   const keys = useMemo(() => BADGE_ART_KEYS.filter((key) => !query || key.includes(query.trim().toLowerCase())), [query]);
   const look = MATERIAL_LOOKS[material];
+  const [ceremonyMaterial, setCeremonyMaterial] = useState("gold");
+  const [ceremonyCategory, setCeremonyCategory] = useState("match");
+  const [ceremonySequence, setCeremonySequence] = useState("single");
+  const playCeremony = () => {
+    previewQueue.clear();
+    previewQueue.enqueue({ id: `preview-${Date.now()}`, ...sampleCeremony({ material: ceremonyMaterial, category: ceremonyCategory, sequence: ceremonySequence, art: focus }) });
+  };
 
   return (
     <AdminLayout>
@@ -53,6 +81,30 @@ export default function AdminAchievementPreviewPage() {
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Motiv suchen" aria-label="Motiv suchen" data-testid="preview-search" className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs text-white/80 w-40" />
           </div>
         </div>
+
+        {/* Zeremonie abspielen: jede Kombination aus Material, Bewegung (Kategorie) und Sonderablauf */}
+        <section className="mt-8 border border-[#FFD700]/25 rounded-sm bg-[#121212] p-5" data-testid="preview-ceremony">
+          <div className="flex items-center gap-2 mb-1">
+            <Sparkles className="w-4 h-4 text-[#FFD700]" />
+            <h2 className="font-heading text-lg font-bold uppercase">Zeremonie abspielen</h2>
+          </div>
+          <p className="text-xs text-white/50 mb-4">Material bestimmt Look und Klang, die Kategorie die Bewegung, der Ablauf die Sonderteile. Ton und „dezent“ folgen deinen Profileinstellungen; die Bewegung oben schaltet die Abzeichen-Effekte.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={ceremonyMaterial} onChange={(e) => setCeremonyMaterial(e.target.value)} aria-label="Material der Zeremonie" data-testid="ceremony-material" className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs uppercase tracking-widest text-white/80">
+              {MATERIAL_ORDER.map((key) => <option key={key} value={key}>{MATERIAL_LOOKS[key].name}</option>)}
+            </select>
+            <select value={ceremonyCategory} onChange={(e) => setCeremonyCategory(e.target.value)} aria-label="Kategorie (Bewegung)" data-testid="ceremony-category" className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs uppercase tracking-widest text-white/80">
+              {Object.keys(MOTIONS).map((key) => <option key={key} value={key}>{CATEGORY_LABELS[key] || key} · {MOTIONS[key]}</option>)}
+            </select>
+            <select value={ceremonySequence} onChange={(e) => setCeremonySequence(e.target.value)} aria-label="Sonderablauf" data-testid="ceremony-sequence" className="bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1.5 text-xs uppercase tracking-widest text-white/80">
+              {SEQUENCE_KEYS.map((key) => <option key={key} value={key}>{SEQUENCES[key].label}</option>)}
+            </select>
+            <button type="button" onClick={playCeremony} data-testid="ceremony-play" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#FFD700]/60 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-[#FFD700]/10">
+              <Play className="w-3 h-3" /> Abspielen
+            </button>
+          </div>
+        </section>
+        <CeremonyHost queue={previewQueue} quietPrefixes={[]} />
 
         {/* Ein Motiv in allen Materialien */}
         <section className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="preview-material-row">

@@ -84,6 +84,10 @@ class UserUpdate(BaseModel):
     show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
     show_steam_status: Optional[bool] = None  # „Gerade in Steam“ im Mitgliederbereich (#584), Opt-in
     seasonal_decorations: Optional[Literal["on", "subtle", "off"]] = None  # Saisonale Deko für mich (#632): an, dezent, aus
+    # Zeremonien (E8, #618): Ton an/aus, Lautstärke 0–100, volle Bewegung oder dezent.
+    ceremony_sound: Optional[bool] = None
+    ceremony_volume: Optional[int] = Field(default=None, ge=0, le=100)
+    ceremony_mode: Optional[Literal["full", "subtle"]] = None
     # Socials (legacy fields for compatibility)
     discord_name: Optional[str] = None
     discord_id: Optional[str] = None

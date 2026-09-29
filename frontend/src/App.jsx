@@ -10,6 +10,7 @@ import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
+import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -192,6 +193,7 @@ function App() {
             <ApiInvalidationBridge />
             <ScrollManager />
             <AchievementCatchUp />
+            <CeremonyHost />
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
             <SeasonStage />
             <Toaster theme="dark" position="top-right" richColors />

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, notificationPreferenceKey } from "./constants";
 import { Section } from "./fields";
@@ -49,6 +49,47 @@ export function NotificationsTab({ form, set, setNotificationPreference, notific
         {discord?.linked && discord?.hint ? (
           <p className="text-[11px] text-[#FFD700] mt-2" data-testid="profile-notification-discord-hint">{discord.hint}</p>
         ) : null}
+      </div>
+
+      <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="profile-ceremony-card">
+        <div className="flex items-start gap-3 mb-4">
+          <Sparkles className="w-5 h-5 text-[#FFD700] mt-1 shrink-0" />
+          <div>
+            <h3 className="font-heading font-black uppercase mb-1">Zeremonien</h3>
+            <p className="text-xs text-white/50">Wie ein freigeschalteter Erfolg gefeiert wird: mit Klang und voller Bewegung oder dezent, nur mit Einblenden.</p>
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <SwitchRow
+            label="Ton"
+            description="Klang je Material und Ablauf – erst nach einer Berührung der Seite, wie der Browser es verlangt."
+            checked={form.ceremony_sound !== false}
+            onCheckedChange={(checked) => set("ceremony_sound", checked)}
+            testId="profile-ceremony-sound"
+          />
+          <SwitchRow
+            label="Zeremonien dezent"
+            description="Kein Feuerwerk, keine Partikel, kurze Einblendung. Gilt auch, wenn dein Gerät weniger Bewegung wünscht."
+            checked={form.ceremony_mode === "subtle"}
+            onCheckedChange={(checked) => set("ceremony_mode", checked ? "subtle" : "full")}
+            testId="profile-ceremony-subtle"
+          />
+        </div>
+        <label className="mt-3 block" htmlFor="profile-ceremony-volume">
+          <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Lautstärke · <span data-testid="profile-ceremony-volume-value">{Number(form.ceremony_volume ?? 80)} %</span></span>
+          <input
+            id="profile-ceremony-volume"
+            type="range"
+            min="0"
+            max="100"
+            step="5"
+            value={Number(form.ceremony_volume ?? 80)}
+            disabled={form.ceremony_sound === false}
+            onChange={(e) => set("ceremony_volume", Number(e.target.value))}
+            data-testid="profile-ceremony-volume"
+            className="mt-1 w-full accent-[#FFD700] disabled:opacity-40"
+          />
+        </label>
       </div>
 
       <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">

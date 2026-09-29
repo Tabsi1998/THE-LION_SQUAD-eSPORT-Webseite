@@ -70,6 +70,10 @@ export function profileToForm(user) {
     privacy_public_profile: user.privacy_public_profile ?? true,
     // Erfolge II (#619): Standard an - fehlt das Feld, gilt „öffentlich“.
     privacy_achievements_public: user.privacy_achievements_public ?? true,
+    // Zeremonien (E8, #618): Ton an, volle Lautstärke, volle Bewegung - außer die Person will es dezent.
+    ceremony_sound: user.ceremony_sound ?? true,
+    ceremony_volume: Number.isFinite(Number(user.ceremony_volume)) && user.ceremony_volume !== null && user.ceremony_volume !== undefined ? Number(user.ceremony_volume) : 80,
+    ceremony_mode: user.ceremony_mode || "full",
     newsletter_consent: !!user.newsletter_consent,
     notification_preferences: user.notification_preferences || {},
     profile_visibility: user.profile_visibility || {},
