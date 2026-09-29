@@ -489,6 +489,7 @@ async def list_groups_for_user(user_id: str | None, viewer: dict | None) -> list
                 **material_fields(t, g),
                 "earned": bool(earned_doc),
                 "earned_at": earned_doc["earned_at"] if earned_doc else None,
+                "silent": bool(earned_doc.get("silent")) if earned_doc else False,
                 "current": min(cur, target) if target else cur,
                 "target": target,
                 "percent": (round(100 * min(cur, target) / target) if target else (100 if earned_doc else 0)),
@@ -553,6 +554,7 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
             "condition_status": CONDITION_KEY_STATUS.get(t.get("condition_key")) if t.get("condition_key") else None,
             **material_fields(t, g),
             "earned_at": a["earned_at"],
+            "silent": bool(a.get("silent")),
         })
     return out
 

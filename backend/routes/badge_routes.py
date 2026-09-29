@@ -22,8 +22,11 @@ Admin endpoints (prefix /api/admin/achievements):
   POST   /tiers
   PATCH  /tiers/{code}
   DELETE /tiers/{code}
-  POST   /award                           — manual award {user_id, tier_code, note}
-  DELETE /award                           — revoke {user_id, tier_code}
+  POST   /award                           — manual award {user_id, tier_code, note, earned_at?, silent?}
+  DELETE /award                           — revoke {user_id, tier_code, note}
+  POST   /award/bulk                      — Massenvergabe (E10, nur Vorstand/Superadmin)
+  GET    /overview, /catalog/check, /catalog/export, POST /catalog/import, GET /events,
+         /season/{id}/preview, /xp/caps, POST /xp/prestige-reset, GET /stats, /stats.csv   (E10)
   GET    /negative/awards                 — admin-only list of negative awards
 """
 import logging
@@ -436,48 +439,61 @@ async def admin_xp_correction(body: XpCorrection, me: dict = Depends(require_are
         raise HTTPException(404, "Nutzer nicht gefunden.")
     if body.amount == 0:
         raise HTTPException(400, "Null XP ändern nichts.")
+    await _require_board(me)
     await xp.correct(body.user_id, body.amount, body.reason.strip(), me["id"])
+    from services import achievement_admin
+    await achievement_admin.log_event(db, "xp", me, user_id=body.user_id, note=body.reason.strip(), data={"amount": body.amount})
     return await xp.view(body.user_id)
 
 
-# ---- Manual award/revoke ----
+# ---- Manual award/revoke (E10, #620: Datum wahlweise rückwirkend, „ohne Zeremonie“, Grund, Protokoll) ----
 class AwardBody(BaseModel):
     user_id: str
     tier_code: str
     note: Optional[str] = None
+    earned_at: Optional[str] = None
+    silent: bool = False
+
+
+async def _require_board(me: dict) -> None:
+    """Massenvergabe, Import und XP-Eingriffe: nur Superadmin oder wer einen Vorstandsposten hält."""
+    from services.permissions import is_board_holder
+    if me.get("role") == "superadmin":
+        return
+    if await is_board_holder(get_db(), me.get("id")):
+        return
+    raise HTTPException(403, "Nur der Vorstand oder die Systemverwaltung darf das.")
 
 
 @admin_router.post("/award")
 async def admin_award(body: AwardBody, me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
     db = get_db()
-    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
-        raise HTTPException(404, "Nutzer nicht gefunden.")
-    tier = await db.achievements.find_one({"code": body.tier_code}, {"_id": 0})
-    if not tier:
-        raise HTTPException(404, "Tier nicht gefunden.")
-    if not await can_award_tier_to_user(body.user_id, tier):
-        raise HTTPException(400, "Dieses Achievement ist nur für aktive Vereinsmitglieder.")
-    awarded = await award_achievement(body.user_id, body.tier_code,
-                                       context={"manual": True, "by": me["id"], "note": body.note},
-                                       awarded_by=me["id"])
-    if not awarded:
-        return {"ok": True, "already_awarded": True}
-    await db.audit_logs.insert_one({
-        "id": new_id(),
-        "action": "achievement.manual_award",
-        "actor_id": me["id"], "target_id": body.user_id,
-        "data": {"tier_code": body.tier_code, "note": body.note},
-        "created_at": now_utc().isoformat(),
-    })
-    return {"ok": True, "newly_awarded": True}
+    try:
+        result = await achievement_admin.award_with_options(db, me, body.user_id, body.tier_code, note=body.note, earned_at=body.earned_at, silent=body.silent)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if result.get("newly_awarded"):
+        await db.audit_logs.insert_one({
+            "id": new_id(),
+            "action": "achievement.manual_award",
+            "actor_id": me["id"], "target_id": body.user_id,
+            "data": {"tier_code": body.tier_code, "note": body.note, "earned_at": result.get("earned_at"), "silent": body.silent},
+            "created_at": now_utc().isoformat(),
+        })
+    return result
 
 
 @admin_router.delete("/award")
 async def admin_revoke(body: AwardBody, me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
     db = get_db()
-    res = await db.user_achievements.delete_one({"user_id": body.user_id, "tier_code": body.tier_code})
-    if res.deleted_count == 0:
-        raise HTTPException(404, "Nicht vergeben.")
+    try:
+        await achievement_admin.revoke_with_reason(db, me, body.user_id, body.tier_code, note=body.note)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
     try:
         from services.crown_events import schedule_crown_sync
         schedule_crown_sync()
@@ -491,6 +507,124 @@ async def admin_revoke(body: AwardBody, me: dict = Depends(require_area("content
         "created_at": now_utc().isoformat(),
     })
     return {"ok": True}
+
+
+class BulkAwardBody(BaseModel):
+    tier_code: str
+    user_ids: list[str] = Field(default_factory=list, max_length=600)
+    tournament_id: Optional[str] = None
+    event_id: Optional[str] = None
+    team_id: Optional[str] = None
+    members: bool = False
+    role: Optional[str] = None
+    note: Optional[str] = None
+    earned_at: Optional[str] = None
+    silent: bool = False
+    dry_run: bool = False
+
+
+@admin_router.post("/award/bulk")
+async def admin_bulk_award(body: BulkAwardBody, me: dict = Depends(require_area("content"))):
+    """Massenvergabe (E10): Liste, Turnier-/Event-Teilnehmer, Team, Mitglieder oder Rolle - bis 500 auf einmal."""
+    await _require_board(me)
+    from services import achievement_admin
+    selection = {"user_ids": body.user_ids, "tournament_id": body.tournament_id, "event_id": body.event_id, "team_id": body.team_id, "members": body.members, "role": body.role}
+    try:
+        return await achievement_admin.bulk_award(get_db(), me, body.tier_code, selection, note=body.note, earned_at=body.earned_at, silent=body.silent, dry_run=body.dry_run)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@admin_router.get("/events")
+async def admin_events(limit: int = 100, kind: Optional[str] = None, user_id: Optional[str] = None, me: dict = Depends(require_area("content"))):
+    """Das Protokoll (E10): Vergaben, Rücknahmen, Massenvergaben, XP, Prestige, Saison, Import."""
+    from services import achievement_admin
+    return await achievement_admin.list_events(get_db(), limit=limit, kind=kind, user_id=user_id)
+
+
+@admin_router.get("/overview")
+async def admin_overview(me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
+    return await achievement_admin.overview(get_db())
+
+
+@admin_router.get("/catalog/check")
+async def admin_catalog_check(me: dict = Depends(require_area("content"))):
+    """Die Katalog-Prüfung (E10): dieselben Regeln wie der Test, auf dem Stand der Datenbank."""
+    from services import achievement_admin
+    return await achievement_admin.catalog_check(get_db())
+
+
+@admin_router.get("/catalog/export")
+async def admin_catalog_export(me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
+    return await achievement_admin.export_catalog(get_db())
+
+
+class CatalogImportBody(BaseModel):
+    groups: list = Field(default_factory=list)
+    tiers: list = Field(default_factory=list)
+    dry_run: bool = False
+
+
+@admin_router.post("/catalog/import")
+async def admin_catalog_import(body: CatalogImportBody, me: dict = Depends(require_area("content"))):
+    await _require_board(me)
+    from services import achievement_admin
+    try:
+        return await achievement_admin.import_catalog(get_db(), {"groups": body.groups, "tiers": body.tiers}, me, dry_run=body.dry_run)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@admin_router.get("/season/{season_id}/preview")
+async def admin_season_preview(season_id: str, me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
+    try:
+        return await achievement_admin.season_preview(get_db(), season_id)
+    except LookupError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@admin_router.get("/xp/caps")
+async def admin_xp_caps(user_id: str, me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    return await achievement_admin.xp_caps(db, user_id)
+
+
+class PrestigeResetBody(BaseModel):
+    user_id: str
+    reason: str = Field(min_length=3, max_length=300)
+
+
+@admin_router.post("/xp/prestige-reset")
+async def admin_prestige_reset(body: PrestigeResetBody, me: dict = Depends(require_area("content"))):
+    await _require_board(me)
+    from services import achievement_admin
+    db = get_db()
+    if not await db.users.find_one({"id": body.user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    return await achievement_admin.prestige_reset(db, me, body.user_id, body.reason.strip())
+
+
+@admin_router.get("/stats")
+async def admin_stats(me: dict = Depends(require_area("content"))):
+    from services import achievement_admin
+    return await achievement_admin.stats(get_db())
+
+
+@admin_router.get("/stats.csv")
+async def admin_stats_csv(me: dict = Depends(require_area("content"))):
+    from fastapi.responses import Response
+    from services import achievement_admin
+    data = await achievement_admin.stats(get_db())
+    return Response(content=achievement_admin.stats_csv(data), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="achievements-statistik.csv"'})
 
 
 @admin_router.get("/negative/awards")
@@ -585,6 +719,8 @@ async def admin_season_award(season_id: str, me: dict = Depends(require_area("co
     if not await db.seasons.find_one({"id": season_id}, {"_id": 0, "id": 1}):
         raise HTTPException(404, "Saison nicht gefunden.")
     result = await on_season_completed(season_id)
+    from services import achievement_admin
+    await achievement_admin.log_event(db, "season_award", me, data={"season_id": season_id, **result})
     await db.audit_logs.insert_one({
         "id": new_id(),
         "action": "achievement.season_award",

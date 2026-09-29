@@ -122,7 +122,8 @@ async def test_rangliste_nach_level_und_admin_korrektur(flow):
     rows = (await flow.get("/api/achievements/leaderboard?by=level")).json()
     assert [r["display_name"] for r in rows] == ["Anna", "Bernd"] and rows[0]["rank"] == 1 and rows[0]["level"] == levels.level_for_xp(2000)
     assert rows[0]["title"] == levels.title_for_level(rows[0]["level"])
-    admin = await flow.add_user(role="club_admin", name="Admin")
+    # XP-Korrektur (E10, #620): nur Vorstand oder Systemverwaltung.
+    admin = await flow.add_user(role="superadmin", name="Admin")
     flow.act_as(admin)
     res = await flow.post("/api/admin/achievements/xp", json={"user_id": b["id"], "amount": -100, "reason": "Doppelt gezählt"})
     assert res.status_code == 200 and res.json()["xp"] == 400
