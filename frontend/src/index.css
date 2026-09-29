@@ -1951,3 +1951,21 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   .tls-changed { box-shadow: 0 0 0 2px rgba(41,182,232,0.6); }
   .tls-changed-row { background-color: rgba(41,182,232,0.18); }
 }
+
+/* Erfolge II (#619): das Laufband der neuesten Freischaltungen - läuft von rechts nach links,
+   hält beim Zeigen an und steht still, wenn jemand weniger Bewegung wünscht. */
+.tls-unlock-ticker__track {
+  width: max-content;
+  min-width: max-content;
+  white-space: nowrap;
+  will-change: transform;
+  animation: tls-unlock-ticker var(--ticker-duration, 40s) linear infinite;
+}
+.tls-unlock-ticker__track:hover { animation-play-state: paused; }
+@keyframes tls-unlock-ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-unlock-ticker__track { animation: none; transform: none; }
+}

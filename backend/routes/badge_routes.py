@@ -5,6 +5,10 @@ Public/User endpoints (prefix /api/achievements):
   GET  /api/achievements/me                — my catalog with progress + earned
   GET  /api/achievements/user/{user_id}    — public profile achievements
   POST /api/achievements/evaluate          — re-evaluate (auto-award) for self
+  PUT  /api/achievements/me/pins           — bis zu sechs eigene Erfolge anheften (#619)
+  GET  /api/achievements/overview          — Kategorien, Seltenheit, Geheim-Zähler, Woche, Laufband (#619)
+  GET  /api/achievements/leaderboard       — Punkte (je Kategorie/Zeitraum) oder Level
+  GET  /api/achievements/week, /recent     — Erfolg der Woche, neueste Freischaltungen
 
 Admin endpoints (prefix /api/admin/achievements):
   GET    /groups                          — all groups (incl. negative)
@@ -34,6 +38,8 @@ from badges import (
 )
 from models import now_utc, new_id
 from achievement_catalog import CATEGORIES, CONDITION_KEY_STATUS, MATERIALS, annotate_tier
+from services import achievement_visibility as visibility
+from services import xp
 
 
 logger = logging.getLogger(__name__)
@@ -50,24 +56,91 @@ async def public_groups(viewer: dict | None = Depends(get_optional_user)):
 
 @router.get("/me")
 async def my_achievements(user: dict = Depends(get_current_user)):
+    """Der eigene Stand: Katalog mit Fortschritt, Vergaben, dazu (#619) „Als Nächstes“, die Zahl der
+    geheimen Gruppen, die angehefteten Erfolge, der Schalter „Erfolge öffentlich“ und der Level-Stand."""
+    db = get_db()
     groups = await list_groups_for_user(user["id"], user)
     awards = await list_user_awards(user["id"], user)
-    return {"groups": groups, "awards": awards}
+    stored = await db.users.find_one({"id": user["id"]}, {"_id": 0, "pinned_achievements": 1, "privacy_achievements_public": 1}) or {}
+    return {
+        "groups": groups, "awards": awards,
+        "next_up": visibility.next_up(groups),
+        "hidden": await visibility.hidden_summary(db, user["id"]),
+        "pinned": visibility.pinned_awards(stored, awards),
+        "pinned_codes": list(stored.get("pinned_achievements") or []),
+        "privacy_achievements_public": visibility.achievements_public(stored),
+        "level": await xp.view(user["id"]),
+    }
+
+
+class PinsBody(BaseModel):
+    tier_codes: list[str] = Field(default_factory=list, max_length=12)
+
+
+@router.put("/me/pins")
+async def set_my_pins(body: PinsBody, user: dict = Depends(get_current_user)):
+    """Bis zu sechs eigene Erfolge anheften (#619) - die Reihenfolge ist die Anzeige-Reihenfolge."""
+    db = get_db()
+    try:
+        codes = await visibility.set_pins(db, user["id"], body.tier_codes)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    awards = await list_user_awards(user["id"], user)
+    return {"pinned_codes": codes, "pinned": visibility.pinned_awards({"pinned_achievements": codes}, awards)}
 
 
 @router.get("/user/{user_id}")
 async def user_achievements(user_id: str, viewer: dict | None = Depends(get_optional_user)):
+    """Erfolge einer anderen Person (#619): nur mit öffentlichem Profil und dem Schalter „Erfolge
+    öffentlich“; die Verein-Kategorie sehen nur Mitglieder und das Admin-Team."""
     db = get_db()
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "privacy_public_profile": 1})
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "privacy_public_profile": 1, "privacy_achievements_public": 1, "pinned_achievements": 1})
     if not user:
         raise HTTPException(404, "Nutzer nicht gefunden.")
     viewer_is_owner = bool(viewer and viewer.get("id") == user_id)
     viewer_is_staff = bool(viewer and viewer.get("role") in STAFF_ROLES)
     if not user.get("privacy_public_profile") and not (viewer_is_owner or viewer_is_staff):
         raise HTTPException(404, "Nutzer nicht gefunden.")
+    if not visibility.achievements_public(user) and not (viewer_is_owner or viewer_is_staff):
+        return {"groups": [], "awards": [], "pinned": [], "hidden": {"total": 0, "earned": 0}, "achievements_hidden": True}
     groups = await list_groups_for_user(user_id, viewer)
     awards = await list_user_awards(user_id, viewer)
-    return {"groups": groups, "awards": awards}
+    if not await visibility.viewer_sees_club(db, viewer, user_id):
+        groups, awards = visibility.without_club(groups, awards)
+    return {
+        "groups": groups, "awards": awards,
+        "pinned": visibility.pinned_awards(user, awards),
+        "hidden": await visibility.hidden_summary(db, user_id),
+        "achievements_hidden": False,
+    }
+
+
+@router.get("/overview")
+async def achievements_overview(viewer: dict | None = Depends(get_optional_user)):
+    """Alles für den Schaukasten (#619) in einem Aufruf: Kategorien mit dem Fortschritt der Community,
+    Seltenheit je Gruppe und Stufe, die Zahl der geheimen Gruppen, der Erfolg der Woche, das Laufband."""
+    db = get_db()
+    rarity_data = await visibility.rarity(db)
+    return {
+        "categories": await visibility.category_overview(db, rarity_data=rarity_data),
+        "rarity": {"base": rarity_data["base"], "members_base": rarity_data["members_base"], "groups": rarity_data["groups"],
+                   "tiers": {code: row["percent"] for code, row in rarity_data["tiers"].items()}},
+        "hidden": await visibility.hidden_summary(db, viewer["id"] if viewer else None),
+        "week": await visibility.achievement_of_week(db),
+        "recent": await visibility.recent_unlocks(db, 20),
+    }
+
+
+@router.get("/week")
+async def achievement_of_week():
+    """Der Erfolg der Woche (#619) - dieselbe Kachel für Web, App und Discord (E12)."""
+    return await visibility.achievement_of_week(get_db())
+
+
+@router.get("/recent")
+async def recent_unlocks(limit: int = 20):
+    """Die neuesten Freischaltungen öffentlicher Profile (#619) - das Laufband."""
+    return await visibility.recent_unlocks(get_db(), limit)
 
 
 @router.post("/evaluate")
@@ -77,49 +150,17 @@ async def evaluate_self(user: dict = Depends(get_current_user)):
 
 
 @router.get("/leaderboard")
-async def achievements_leaderboard(limit: int = 24, by: str = "points", viewer: dict | None = Depends(get_optional_user)):
-    """Public grind leaderboard ranked by achievement points (excl. negative groups) - or by level (#617)."""
+async def achievements_leaderboard(limit: int = 24, by: str = "points", category: str | None = None, period: str = "all",
+                                   viewer: dict | None = Depends(get_optional_user)):
+    """Rangliste nach Erfolgspunkten (ohne Negatives, nur öffentliche Profile) oder nach Level (#617);
+    seit #619 wahlweise je Kategorie und Zeitraum (gesamt, Jahr, Saison, Monat)."""
     if by == "level":
-        from services import xp
         return await xp.leaderboard(limit)
-    db = get_db()
-    tiers = await db.achievements.find({}, {"_id": 0, "code": 1, "points": 1}).to_list(4000)
-    points_map = {t["code"]: int(t.get("points", 0) or 0) for t in tiers}
-    neg_groups = {g["code"] async for g in db.achievement_groups.find({"is_negative": True}, {"_id": 0, "code": 1})}
-    awards = await db.user_achievements.find({}, {"_id": 0, "user_id": 1, "tier_code": 1, "group_code": 1}).to_list(50000)
-
-    agg: dict = {}
-    for a in awards:
-        if a.get("group_code") in neg_groups:
-            continue
-        entry = agg.setdefault(a["user_id"], {"count": 0, "points": 0})
-        entry["count"] += 1
-        entry["points"] += points_map.get(a["tier_code"], 0)
-
-    if not agg:
-        return []
-    users = await db.users.find(
-        {"id": {"$in": list(agg.keys())}},
-        {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "privacy_public_profile": 1},
-    ).to_list(5000)
-    rows = []
-    for u in users:
-        if not u.get("privacy_public_profile"):
-            continue
-        stats = agg.get(u["id"], {})
-        rows.append({
-            "user_id": u["id"],
-            "username": u.get("username"),
-            "display_name": u.get("display_name") or u.get("username") or "Spieler",
-            "avatar_url": u.get("avatar_url"),
-            "count": stats.get("count", 0),
-            "points": stats.get("points", 0),
-        })
-    rows.sort(key=lambda r: (-r["points"], -r["count"], (r["display_name"] or "").lower()))
-    capped = max(1, min(int(limit or 24), 100))
-    for index, row in enumerate(rows[:capped]):
-        row["rank"] = index + 1
-    return rows[:capped]
+    if category and category not in CATEGORIES:
+        raise HTTPException(422, "Unbekannte Kategorie.")
+    if period not in visibility.PERIODS:
+        raise HTTPException(422, "Unbekannter Zeitraum.")
+    return await visibility.leaderboard(get_db(), category=category or None, period=period, limit=limit)
 
 
 @router.get("/crowns")
