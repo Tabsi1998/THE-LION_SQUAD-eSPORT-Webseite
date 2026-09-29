@@ -442,3 +442,31 @@ test("Hintergrund (H14): Nebel je Seitenklasse - lebendig nah (zwei Ebenen), ruh
   subtle.unmount();
 });
 
+test("Reduced Motion (H18): Ecken ohne Fledermäuse, Spinnen und Beobachter, Netz statisch; Hintergrund mit stillem Nebel", async () => {
+  vi.useFakeTimers();
+  const original = window.matchMedia;
+  window.matchMedia = (query) => ({ matches: query.includes("reduced-motion"), media: query, addEventListener() {}, removeEventListener() {} });
+  mountFixture('<header style="position: sticky"><nav><a id="n1">News</a></nav></header><main><a id="c1" data-season-anchor="card">Karte</a></main>');
+  const rectOf = (el, rect) => { el.getBoundingClientRect = () => ({ ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top }); };
+  rectOf(document.querySelector("header"), { left: 0, right: 1200, top: 0, bottom: 64 });
+  rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
+  rectOf(document.getElementById("c1"), { left: 40, right: 400, top: 200, bottom: 400 });
+  const corners = mount(<Corners season={halloween()} />, "/");
+  await act(async () => {
+    vi.advanceTimersByTime(5000);
+  });
+  expect(screen.queryByTestId("halloween-web-static")).not.toBeNull();
+  expect(screen.queryAllByTestId("halloween-bat-hanging").length).toBe(0);
+  expect(screen.queryByTestId("halloween-spiders")).toBeNull();
+  expect(screen.queryByTestId("halloween-rappel")).toBeNull();
+  expect(screen.queryByTestId("halloween-corner-spider")).toBeNull();
+  expect(screen.queryByTestId("halloween-eyes")).toBeNull();
+  expect(screen.queryByTestId("halloween-edge")).toBeNull();
+  corners.unmount();
+  const backdrop = mount(<Backdrop season={halloween()} />, "/");
+  expect(screen.getByTestId("halloween-fog").className).toContain("tls-fog--static");
+  backdrop.unmount();
+  window.matchMedia = original;
+  vi.useRealTimers();
+});
+

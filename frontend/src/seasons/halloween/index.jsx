@@ -203,6 +203,7 @@ export function RappelSpider({ spec, active }) {
     let last = performance.now();
     let acc = 0;
     let frame = 0;
+    let sleeper = 0;
     let token = null;
     setState(current);
     const env = () => {
@@ -230,11 +231,14 @@ export function RappelSpider({ spec, active }) {
         setState(next);
       }
       current = next;
-      frame = window.requestAnimationFrame(tick);
+      // Leistung (H19): in der Wartephase (noch mehr als eine Sekunde) genügt ein grober Takt statt jedes Bild.
+      if (next.phase === "wait" && next.timer > 1) sleeper = window.setTimeout(() => { frame = window.requestAnimationFrame(tick); }, 500);
+      else frame = window.requestAnimationFrame(tick);
     };
     frame = window.requestAnimationFrame(tick);
     return () => {
       window.cancelAnimationFrame(frame);
+      window.clearTimeout(sleeper);
       if (token) releaseMotion(token);
     };
   }, [spec, active]);

@@ -5,6 +5,7 @@
 
 import { hashString, mulberry32 } from "../rng";
 import { measureQuietZones, pointInQuiet } from "../quiet";
+import { blocksPoint } from "../glyphs";
 import { EXTENT, HUB } from "./web";
 
 export const BOX_SELECTOR = "[data-season-anchor='card'], [data-season-perch='card'], [data-season-perch='frame']";
@@ -13,12 +14,7 @@ export const MIN_DISTANCE = 320;
 export const RADIUS = [22, 34];
 export const OPACITY = [0.45, 0.68];
 export const MAX_BOXES = 24;
-const BLOCKING = "p, h1, h2, h3, h4, h5, h6, li, a, button, time, label, input, select, textarea, span, strong, em, small, td, th, figcaption, img, picture, video, svg, [role='img']";
 
-/** Hat ein Element eigenen Text (nicht nur Kinder)? Dann liegt dort Schrift, egal welches Tag. */
-function hasOwnText(node) {
-  return Array.from(node.childNodes || []).some((child) => child.nodeType === 3 && child.textContent.trim().length > 0);
-}
 
 const ids = new WeakMap();
 let nextId = 1;
@@ -53,8 +49,10 @@ export function hubOf(spec, side) {
 }
 
 /**
- * Ist die Fläche des Netzes frei? Die Sonde (`elementFromPoint`) prüft zwei Punkte im Netzkasten: alles, was zwischen
- * dem Treffer und dem Element selbst Text, Bild oder Bedienelement ist, blockiert; das Element und nackte Behälter nicht.
+ * Ist die Fläche des Netzes frei? Die Sonde (`elementFromPoint`) prüft sechs Punkte im Netzkasten: zwischen Treffer
+ * und Element darf kein Bild, keine Grafik und kein Bedienelement liegen, und keine Schrift - Schrift zählt nur mit
+ * ihren Zeichenkästen (`glyphs.js`), nicht mit dem oft kartenbreiten Kasten ihres Behälters. Das Element selbst und
+ * nackte Behälter sind frei.
  */
 function areaFree(probe, owner, points) {
   if (!probe) return true;
@@ -64,8 +62,7 @@ function areaFree(probe, owner, points) {
     if (!owner.contains(hit)) return false;
     let node = hit;
     while (node && node !== owner) {
-      if (typeof node.matches === "function" && node.matches(BLOCKING)) return false;
-      if (hasOwnText(node)) return false;
+      if (blocksPoint(node, x, y)) return false;
       node = node.parentElement;
     }
     return true;
@@ -77,8 +74,8 @@ function cornerCandidate({ kind, element, side, rect, win, probe, spec }) {
   const x = side === "tl" ? rect.left + 1 : rect.right - 1;
   const y = rect.top + 1;
   const dir = side === "tl" ? 1 : -1;
-  // Vier Punkte im Netzkasten - die Ecke selbst ist meist frei, die Ränder des Kastens nicht immer.
-  const points = [[0.25, 0.3], [0.75, 0.3], [0.25, 0.65], [0.75, 0.65]].map(([fx, fy]) => [x + dir * spec.width * fx, y + spec.height * fy]);
+  // Sechs Punkte im Netzkasten - die Ecke selbst ist meist frei, die Ränder des Kastens nicht immer.
+  const points = [[0.25, 0.3], [0.75, 0.3], [0.5, 0.5], [0.25, 0.65], [0.75, 0.65], [0.9, 0.9]].map(([fx, fy]) => [x + dir * spec.width * fx, y + spec.height * fy]);
   if (!areaFree(probe, element, points)) return null;
   const measure = () => {
     if (!element.isConnected) return null;
