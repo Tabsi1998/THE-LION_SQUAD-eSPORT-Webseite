@@ -79,3 +79,15 @@ def test_nacht_ueberschreibt_die_festen_stunden():
     assert [s for s in by_sun["seasons"] if s["key"] == "halloween"][0]["data"]["night"] is True
     preview = seasons.active(noon, {}, preview_key="snow", night=True)
     assert preview["seasons"][0]["data"]["night"] is True
+
+
+def test_vorschau_stand_ist_ein_gewitterregen():
+    """Die Vorschau der Saison „Wetter“ (#673) zeigt auch an einem trockenen Tag etwas - Ort und Sonne bleiben echt."""
+    base = weather.current(None, None, datetime(2026, 7, 14, 12, 0, tzinfo=V))
+    assert base["stale"] is True and base["rain_mm"] == 0.0
+    shown = weather.demo(base)
+    assert shown["rain_mm"] == 2.5 and shown["snow_cm"] == 0.0 and shown["code"] == 95
+    assert shown["stale"] is False and shown["demo"] is True and shown["source"] == "demo" and shown["error"] is None
+    assert shown["wind_kmh"] == 24.0 and shown["wind_factor"] == weather.wind_factor(24.0)
+    assert (shown["night"], shown["sunrise"], shown["sunset"], shown["location"]) == (base["night"], base["sunrise"], base["sunset"], base["location"])
+    assert "demo" not in base and base["source"] == "default", "der echte Stand bleibt unberührt"

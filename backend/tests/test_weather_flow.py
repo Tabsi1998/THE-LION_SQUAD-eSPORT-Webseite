@@ -105,3 +105,30 @@ async def test_admin_sieht_wetter_und_ort_und_aendert_den_ort(flow, open_meteo):
     assert open_meteo.calls[-1]["latitude"] == "47.3069"
     flow.act_as(None)
     assert (await flow.post("/api/settings/seasons/weather/refresh")).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_vorschau_der_saison_wetter_zeigt_einen_gewitterregen(flow, open_meteo):
+    """Die Vorschau der Saison „Wetter“ (#673): ein Gewitterregen nur für die Person mit dem Token. Für alle anderen
+    und im Speicher bleibt der echte Stand."""
+    await weather.refresh(flow.db)
+    admin = await flow.add_user(role="club_admin", name="Vorstand")
+    flow.act_as(admin)
+    token = (await flow.post("/api/settings/seasons/weather/preview", json={})).json()["token"]
+    flow.act_as(None)
+    preview = await flow.get(f"/api/seasonal/active?preview={token}")
+    body = preview.json()
+    assert preview.status_code == 200 and preview.headers["cache-control"] == "no-store" and body["preview"] is True
+    assert [s["key"] for s in body["seasons"]] == ["weather"]
+    assert body["weather"]["demo"] is True and body["weather"]["source"] == "demo" and body["weather"]["stale"] is False
+    assert body["weather"]["rain_mm"] == weather.DEMO_RAIN_MM and body["weather"]["code"] == weather.DEMO_CODE and body["weather"]["snow_cm"] == 0
+    assert body["weather"]["location"] == "Innsbruck" and "sunset" in body["weather"]
+    # Die Vorschau einer anderen Saison und die normale Abfrage tragen das echte Wetter.
+    flow.act_as(admin)
+    other = (await flow.post("/api/settings/seasons/halloween/preview", json={})).json()["token"]
+    flow.act_as(None)
+    assert "demo" not in (await flow.get(f"/api/seasonal/active?preview={other}")).json()["weather"]
+    normal = (await flow.get("/api/seasonal/active")).json()
+    assert "demo" not in normal["weather"] and normal["weather"]["rain_mm"] == 0.2 and normal["weather"]["source"] == "open-meteo"
+    saved = await flow.db.settings.find_one({"id": weather.CACHE_ID}, {"_id": 0})
+    assert saved["weather"]["rain_mm"] == 0.2, "die Vorschau speichert nichts"

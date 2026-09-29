@@ -40,6 +40,6 @@ test("In Worten für den Admin", () => {
   expect(describeWeather({ seasons: [weather, snow], weather: RAIN })).toContain("aus dem Regen draußen wird Schnee");
   expect(describeWeather({ seasons: [snow], weather: SNOWFALL })).toContain("125 % der Flocken");
   expect(describeWeather({ seasons: [snow], weather: DRY })).toContain("55 % der Flocken");
-  expect(describeWeather({ seasons: [halloween], weather: RAIN })).toBe("Das Wetter auf der Seite ist ausgeschaltet (Saison „Wetter“).");
+  expect(describeWeather({ seasons: [halloween], weather: RAIN })).toBe("Das Wetter auf der Seite ist ausgeschaltet.");
   expect(describeWeather({ seasons: [weather], weather: { ...RAIN, stale: true } })).toContain("Kein frischer Wetterstand");
 });

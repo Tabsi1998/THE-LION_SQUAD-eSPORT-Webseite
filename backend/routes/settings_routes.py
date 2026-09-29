@@ -1738,7 +1738,7 @@ async def update_seasons(body: SeasonsSettings, me: dict = Depends(require_club_
                 cleaned = str(value or "").strip()[:200]
                 cfg["texts"][name] = cleaned or seasons.SEASONS[key]["texts"][name]
         if "channels" in data:
-            data["channels"] = [c for c in seasons.CHANNELS if c in (data["channels"] or [])]
+            data["channels"] = [c for c in seasons.supported_channels(key) if c in (data["channels"] or [])]
         for name, value in data.items():
             if value is not None or name == "until":
                 cfg[name] = value

@@ -137,6 +137,18 @@ def _parse_time(value) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=VIENNA)
 
 
+DEMO_RAIN_MM = 2.5
+DEMO_WIND_KMH = 24.0
+DEMO_CODE = 95  # WMO: Gewitter
+
+
+def demo(conditions: dict) -> dict:
+    """Der Stand für „Vorschau 60 Sekunden“ der Saison „Wetter“: ein Gewitterregen, damit es auch an einem
+    trockenen Tag etwas zu sehen gibt. Ort, Sonne und Nacht bleiben echt; gespeichert wird nichts."""
+    return {**conditions, "rain_mm": DEMO_RAIN_MM, "snow_cm": 0.0, "code": DEMO_CODE, "wind_kmh": DEMO_WIND_KMH,
+            "wind_factor": wind_factor(DEMO_WIND_KMH), "stale": False, "error": None, "source": "demo", "demo": True}
+
+
 def current(cache: dict | None, location: dict | None = None, now: datetime | None = None) -> dict:
     """Was Web und App bekommen: Nacht nach der Sonne, Wind als Faktor, Regen, Schnee, Temperatur - aus dem Cache oder Vorgaben."""
     now = to_vienna(now)

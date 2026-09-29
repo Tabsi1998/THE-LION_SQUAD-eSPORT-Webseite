@@ -20,7 +20,12 @@ const loadModule = vi.fn(async () => ({
 }));
 const skyDispose = vi.fn();
 const loadSnow = vi.fn(async () => ({ season: { key: "snow", skyLayers: () => [{ key: "fake-snow", draw: () => {}, dispose: skyDispose }] } }));
-vi.mock("./registry", () => ({ SEASON_MODULES: { halloween: () => loadModule(), snow: () => loadSnow() }, hasModule: (key) => key === "halloween" || key === "snow" }));
+const weatherLayers = vi.fn(() => [{ key: "fake-weather", draw: () => {}, idle: () => true }]);
+const loadWeather = vi.fn(async () => ({ season: { key: "weather", skyOnly: true, skyLayers: weatherLayers } }));
+vi.mock("./registry", () => ({
+  SEASON_MODULES: { halloween: () => loadModule(), snow: () => loadSnow(), weather: () => loadWeather() },
+  hasModule: (key) => ["halloween", "snow", "weather"].includes(key),
+}));
 
 const { SeasonStage, isQuietPath, toastShownToday, markToastShown } = await import("./SeasonStage");
 const { SeasonWidgetSlot, SeasonFooterSlot } = await import("./SeasonSlots");
@@ -30,12 +35,18 @@ function halloween(effective = "normal") {
   return { key: "halloween", phase: "deko", intensity: "normal", effective, channels: ["web"], texts: {}, data: {} };
 }
 
+function weatherSeason(effective = "normal") {
+  return { key: "weather", phase: "wetter", intensity: effective, effective, channels: ["web"], texts: {}, data: {} };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   seasonState.seasons = [];
   seasonState.weather = null;
+  seasonState.preview = false;
   delete document.documentElement.dataset.season;
+  delete document.documentElement.dataset.seasonIntensity;
   document.documentElement.style.removeProperty("--season-accent");
 });
 
@@ -154,4 +165,35 @@ test("Ebenen einer Saison bekommen ihre Zeichenfläche und räumen beim Gehen hi
   unmount();
   await new Promise((resolve) => setTimeout(resolve, 30));
   expect(skyDispose).toHaveBeenCalledTimes(1);
+});
+
+test("das Wetter ist nur Himmel: es läuft neben jeder Saison, redet bei der Stärke am <html> nicht mit und bekommt das Wetter mit", async () => {
+  seasonState.seasons = [weatherSeason("full"), halloween("subtle")];
+  seasonState.weather = { rain_mm: 2, snow_cm: 0, code: 95, wind_factor: 0.9, wind_dir: 270, night: false };
+  const view = render(<MemoryRouter initialEntries={["/"]}><SeasonStage /><SeasonWidgetSlot /></MemoryRouter>);
+  expect(await screen.findByTestId("season-sky")).toBeInTheDocument();
+  await waitFor(() => expect(document.documentElement.dataset.season).toBe("weather halloween"));
+  expect(document.documentElement.dataset.seasonIntensity).toBe("subtle");
+  expect(screen.getByTestId("fake-widget")).toBeInTheDocument();
+  expect(weatherLayers).toHaveBeenLastCalledWith(expect.objectContaining({ preview: false, reducedMotion: false, weather: seasonState.weather, season: expect.objectContaining({ key: "weather", effective: "full" }) }));
+  view.unmount();
+  // Umgekehrt: das Wetter auf „dezent“ hält den Adventkranz nicht an - am <html> steht nur die Stärke der anderen.
+  seasonState.seasons = [weatherSeason("subtle"), halloween("normal")];
+  render(<MemoryRouter initialEntries={["/"]}><SeasonStage /></MemoryRouter>);
+  await waitFor(() => expect(document.documentElement.dataset.season).toBe("weather halloween"));
+  expect(document.documentElement.dataset.seasonIntensity).toBe("normal");
+});
+
+test("Vorschau des Wetters: die Ebene erfährt davon und zeichnet auch im Admin", async () => {
+  seasonState.seasons = [weatherSeason("normal")];
+  seasonState.weather = { rain_mm: 2.5, snow_cm: 0, code: 95, demo: true };
+  const quiet = render(<MemoryRouter initialEntries={["/admin/settings/jahreszeiten"]}><SeasonStage /></MemoryRouter>);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(loadWeather).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("season-sky")).toBeNull();
+  quiet.unmount();
+  seasonState.preview = true;
+  render(<MemoryRouter initialEntries={["/admin/settings/jahreszeiten"]}><SeasonStage /></MemoryRouter>);
+  expect(await screen.findByTestId("season-sky")).toBeInTheDocument();
+  expect(weatherLayers).toHaveBeenLastCalledWith(expect.objectContaining({ preview: true, weather: expect.objectContaining({ demo: true }) }));
 });

@@ -119,7 +119,9 @@ export function SeasonStage() {
     const root = document.documentElement;
     const accents = mounted.filter((season) => modules[season.key].accent && season.effective !== "subtle");
     root.dataset.season = mounted.map((season) => season.key).join(" ") || "";
-    root.dataset.seasonIntensity = mounted.map((season) => season.effective).join(" ") || "";
+    // Die Stärke am <html> beruhigt CSS-Animationen. Eine Saison, die nur Himmel ist (Wetter), redet da nicht mit -
+    // sonst stünde bei „Wetter: dezent“ auch der Adventkranz still.
+    root.dataset.seasonIntensity = mounted.filter((season) => !modules[season.key].skyOnly).map((season) => season.effective).join(" ") || "";
     root.dataset.seasonPage = pageClass(location.pathname);
     if (accents.length) root.style.setProperty("--season-accent", modules[accents[0].key].accent);
     else root.style.removeProperty("--season-accent");
@@ -141,10 +143,10 @@ export function SeasonStage() {
     () => mountedRef.current.flatMap((season) => {
       const factory = modules[season.key].skyLayers;
       const budget = budgetFor(season.effective);
-      return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current }) : [];
+      return factory && budget > 0 ? factory({ season, budget, reducedMotion, weather: weatherRef.current, preview }) : [];
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mountedSignature, modules, reducedMotion, location.pathname],
+    [mountedSignature, modules, reducedMotion, location.pathname, preview],
   );
   useLayerDisposal(skyLayers);
 

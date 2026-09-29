@@ -10,7 +10,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(d
 vi.mock("sonner", () => ({ toast: toastMock }));
 vi.mock("@/hooks/useLiveRefresh", () => ({ useLiveRefresh: () => {} }));
 
-const { SeasonsSettings, stateText, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
+const { SeasonsSettings, runningSeasons, stateText, PREVIEW_STORAGE_KEY } = await import("./SeasonsSettings");
 
 function season(overrides) {
   return {
@@ -102,4 +102,54 @@ test("Ladefehler in Worten", async () => {
   apiMock.get.mockRejectedValue(new Error("down"));
   render(<SeasonsSettings />);
   expect(await screen.findByTestId("seasons-error")).toHaveTextContent("konnte nicht geladen werden");
+});
+
+// Das Wetter (#673) läuft das ganze Jahr: keine eigene Saison-Karte, kein Termin - seine Schalter stehen in der
+// Karte „Wetter am Vereinsort“. Kanäle, die eine Saison nicht bedienen kann, werden nicht angeboten.
+const WEATHER = season({ key: "weather", label: "Wetter", description: "Regen, Schnee und Wetterleuchten.", channels: ["web"], supported_channels: ["web"], always: true, texts: {}, defaults: {}, active_now: true, phase: "wetter" });
+const WITH_WEATHER = {
+  ...VIEW,
+  seasons: [WEATHER, season({ supported_channels: ["web", "app"], always: false }), season({ key: "snow", label: "Schneefall", texts: {}, defaults: {}, supported_channels: ["web"], always: false })],
+  weather: { location: "Innsbruck", night: false, temp_c: 14, wind_kmh: 12, wind_dir: 270, wind_factor: 0.8, rain_mm: 1.2, snow_cm: 0, code: 61, stale: false },
+  location: { lat: 47.2692, lon: 11.4041, name: "Innsbruck" },
+};
+
+test("was gerade läuft: nur aktive Saisonen, und nichts, solange der Hauptschalter aus ist", () => {
+  expect(runningSeasons(WITH_WEATHER)).toEqual([{ key: "weather", effective: "normal" }]);
+  expect(runningSeasons({ ...WITH_WEATHER, enabled: false })).toEqual([]);
+  expect(runningSeasons(null)).toEqual([]);
+});
+
+test("Wetter: Schalter, Stärke und Vorschau stehen in der Wetter-Karte - keine eigene Saison-Karte", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockResolvedValue({ data: WITH_WEATHER });
+  apiMock.put.mockResolvedValue({ data: WITH_WEATHER });
+  apiMock.post.mockResolvedValue({ data: { token: "weather.123..abc", seconds: 60, key: "weather" } });
+  render(<SeasonsSettings />);
+  const card = await screen.findByTestId("seasons-weather");
+  expect(card).toContainElement(screen.getByTestId("season-weather"));
+  expect(screen.getAllByTestId("season-weather")).toHaveLength(1);
+  expect(screen.queryByTestId("season-weather-state")).toBeNull();
+  expect(screen.queryByTestId("season-weather-mode")).toBeNull();
+  expect(screen.getByTestId("seasons-weather-layer")).toHaveTextContent("Auf der Seite regnet es: leichter Regen (65 % der Tropfen).");
+  // Stärke ohne „dezent“ - ohne Bewegung hätte das Wetter nichts zu zeigen.
+  expect([...screen.getByTestId("season-weather-intensity").querySelectorAll("option")].map((option) => option.value)).toEqual(["normal", "full"]);
+  await user.selectOptions(screen.getByTestId("season-weather-intensity"), "full");
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/seasons", { seasons: { weather: { intensity: "full" } } }));
+  await user.click(screen.getByTestId("season-weather-enabled"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/seasons", { seasons: { weather: { enabled: false } } }));
+  expect(toastMock.success).toHaveBeenCalledWith("Wetter auf der Seite aus.");
+  await user.click(screen.getByTestId("season-weather-preview"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/seasons/weather/preview", {}));
+  expect(JSON.parse(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).token).toBe("weather.123..abc");
+  // Die anderen Saisonen behalten ihre Karte; angeboten wird nur, was die Saison bedienen kann.
+  expect(screen.getByTestId("season-halloween-channel-app")).toBeInTheDocument();
+  expect(screen.getByTestId("season-snow-channel-web")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-snow-channel-app")).toBeNull();
+});
+
+test("Hauptschalter aus: die Wetter-Karte sagt, dass das Wetter auf der Seite aus ist", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...WITH_WEATHER, enabled: false } });
+  render(<SeasonsSettings />);
+  expect(await screen.findByTestId("seasons-weather-layer")).toHaveTextContent("Das Wetter auf der Seite ist ausgeschaltet.");
 });

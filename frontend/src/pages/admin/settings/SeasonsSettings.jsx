@@ -34,6 +34,12 @@ export function stateText(season) {
   return `Nächstes Mal ${dateText(season.next_start, { withTime: false })} bis ${dateText(season.next_end, { withTime: false })}.`;
 }
 
+/** Was gerade wirklich läuft (für den Satz zum Wetter): nichts, solange der Hauptschalter aus ist. */
+export function runningSeasons(data) {
+  if (!data || !data.enabled) return [];
+  return (data.seasons || []).filter((season) => season.active_now).map((season) => ({ key: season.key, effective: season.intensity || "normal" }));
+}
+
 export function toLocalInput(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -98,7 +104,7 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
         <div className="space-y-1">
           <span className="block text-white/45 uppercase tracking-wider text-[10px]">Wo</span>
           <div className="flex gap-3 py-1.5">
-            {Object.entries(CHANNEL_LABELS).map(([value, label]) => (
+            {Object.entries(CHANNEL_LABELS).filter(([value]) => !season.supported_channels || season.supported_channels.includes(value)).map(([value, label]) => (
               <label key={value} className="flex items-center gap-1.5">
                 <input type="checkbox" checked={season.channels.includes(value)} disabled={busy} onChange={(e) => {
                   const next = e.target.checked ? [...season.channels, value] : season.channels.filter((c) => c !== value);
@@ -229,9 +235,19 @@ export function SeasonsSettings() {
           <span>Saisonale Deko</span>
         </label>
       </div>
-      <SeasonsWeatherCard weather={data.weather} location={data.location} seasons={(data.seasons || []).filter((season) => season.active_now).map((season) => ({ key: season.key, effective: season.intensity || "normal" }))} busy={busy} onSave={(location) => save({ location }, "Vereinsort gespeichert – das Wetter kommt beim nächsten Abruf.")} onRefresh={refreshWeather} />
+      <SeasonsWeatherCard
+        weather={data.weather}
+        location={data.location}
+        seasons={runningSeasons(data)}
+        season={data.seasons.find((season) => season.key === "weather") || null}
+        busy={busy}
+        onSave={(location) => save({ location }, "Vereinsort gespeichert – das Wetter kommt beim nächsten Abruf.")}
+        onRefresh={refreshWeather}
+        onSeasonSave={(patch, message) => save({ seasons: { weather: patch } }, message)}
+        onPreview={() => preview("weather")}
+      />
       <div className={`grid gap-4 ${data.enabled ? "" : "opacity-60"}`}>
-        {data.seasons.map((season) => (
+        {data.seasons.filter((season) => !season.always).map((season) => (
           <SeasonCard key={season.key} season={season} busy={busy} onSave={(patch, message, after) => save({ seasons: { [season.key]: patch } }, message, after)} onPreview={(at) => preview(season.key, at)} />
         ))}
       </div>

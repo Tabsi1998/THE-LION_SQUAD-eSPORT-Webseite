@@ -11,6 +11,7 @@ import { measureQuietZones, pointInQuiet } from "../quiet";
 import { nextGust, windAt, windFrom } from "../snow/flakes";
 import { createSnowLayer } from "../snow/layer";
 import { requestMotion, releaseMotion } from "../motion";
+import { areaFactor } from "../sky";
 import { RAIN_DEPTHS, RAIN_ORDER, advanceDrop, createDrop, createSplash, crossedEdge, driftOf, dropCounts, rainFactor, scrollDrop, splashPoints } from "./rain";
 import { BOLT_ALPHA, GLOW_ALPHA, GLOW_REACH, createFlash, flashDone, flashLevel, isThunderstorm, nextFlashAt } from "./storm";
 
@@ -58,7 +59,7 @@ export function createRainLayer({ budget = 120, share = 1, seed = "rain", weathe
   if (win && typeof win.addEventListener === "function") win.addEventListener("tls:season-weather", onWeather);
 
   const settle = (size, first) => {
-    const counts = dropCounts(budget, { share, factor: factor(), night: state.night });
+    const counts = dropCounts(budget, { share, factor: factor(), night: state.night, area: areaFactor(size) });
     state.counts = counts;
     RAIN_ORDER.forEach((depth) => {
       const list = state.drops[depth];
@@ -131,12 +132,14 @@ export function createRainLayer({ budget = 120, share = 1, seed = "rain", weathe
           state.splashes.splice(i, 1);
           continue;
         }
+        // Ein Spritzer ist eine Form: wo seine Tröpfchen übereinander liegen (am Anfang alle drei), addiert sich nichts.
+        ctx.fillStyle = `rgba(${COLOR}, ${points[0].alpha.toFixed(3)})`;
+        ctx.beginPath();
         points.forEach((point) => {
-          ctx.fillStyle = `rgba(${COLOR}, ${point.alpha.toFixed(3)})`;
-          ctx.beginPath();
+          ctx.moveTo(point.x + point.radius, point.y);
           ctx.arc(point.x, point.y, point.radius, 0, Math.PI * 2);
-          ctx.fill();
         });
+        ctx.fill();
       }
       ctx.restore();
     },

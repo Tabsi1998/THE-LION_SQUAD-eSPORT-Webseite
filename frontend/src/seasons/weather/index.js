@@ -43,7 +43,7 @@ export function describeWeather({ seasons = [], weather = null } = {}) {
     if (plan.rain > 0) return `Schnee-Saison: aus dem Regen draußen wird Schnee, auf der Seite schneit es dichter (${percent} % der Flocken).`;
     return "Schnee-Saison: kein Niederschlag draußen, auf der Seite schneit es leicht (55 % der Flocken).";
   }
-  if (plan.kind === "off") return "Das Wetter auf der Seite ist ausgeschaltet (Saison „Wetter“).";
+  if (plan.kind === "off") return "Das Wetter auf der Seite ist ausgeschaltet.";
   if (weather && weather.stale) return "Kein frischer Wetterstand – die Wetter-Ebene ruht.";
   if (plan.kind === "rain") return `Auf der Seite regnet es: ${rainLabel(weather)} (${Math.round(rainFactor(weather) * 100)} % der Tropfen).`;
   if (plan.kind === "snow") return "Auf der Seite fällt leichter Schnee.";

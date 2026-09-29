@@ -93,8 +93,9 @@ def end_of(day: date) -> datetime:
 
 
 def _windows_weather(year: int, _founded) -> list[dict]:
-    """Das Wetter läuft das ganze Jahr - was es zeigt, entscheidet der Niederschlag am Vereinsort."""
-    return [{"phase": "wetter", "start": at(date(year, 1, 1)), "end": end_of(date(year, 12, 31))}]
+    """Das Wetter läuft das ganze Jahr - was es zeigt, entscheidet der Niederschlag am Vereinsort. Das Fenster
+    reicht bis zum ersten Augenblick des nächsten Jahres, damit zu Silvester keine Sekunde ohne Wetter bleibt."""
+    return [{"phase": "wetter", "start": at(date(year, 1, 1)), "end": at(date(year + 1, 1, 1))}]
 
 
 def _windows_halloween(year: int, _founded) -> list[dict]:
@@ -162,9 +163,10 @@ def _windows_easter_hunt(year: int, _founded) -> list[dict]:
 
 
 # Saisonen in der Reihenfolge des Jahres. ``texts``: Vorgaben, die der Betreiber überschreiben kann.
+# ``always``: läuft das ganze Jahr (kein Termin im Kalender). ``channels``: was die Saison bedienen kann, wenn nicht alle.
 SEASONS: dict[str, dict] = {
     "weather": {"label": "Wetter", "description": "Regen, Schnee und Wetterleuchten vom Vereinsort auf der Seite – das ganze Jahr. In der Schnee-Saison wird Regen zu Schnee.",
-                "windows": _windows_weather, "texts": {}},
+                "windows": _windows_weather, "texts": {}, "always": True, "channels": ("web",)},
     "halloween": {"label": "Halloween", "description": "Spinnweben, Fledermäuse und Kürbisse in der Woche um den 31. Oktober.",
                   "windows": _windows_halloween, "texts": {"greeting": "Happy Halloween von THE LION SQUAD"}},
     "advent": {"label": "Adventkranz", "description": "Vier Kerzen, angezündet je Adventsonntag, bis zum 26. Dezember.",
@@ -190,8 +192,17 @@ SEASONS: dict[str, dict] = {
 }
 
 
+def supported_channels(key: str) -> tuple[str, ...]:
+    """Die Kanäle, die eine Saison bedienen kann - das Wetter gibt es vorerst nur im Web (die App folgt mit #667)."""
+    return tuple(SEASONS[key].get("channels") or CHANNELS)
+
+
+def runs_all_year(key: str) -> bool:
+    return bool(SEASONS[key].get("always"))
+
+
 def default_config(key: str) -> dict:
-    return {"enabled": True, "mode": "auto", "until": None, "intensity": "normal", "channels": list(CHANNELS), "texts": dict(SEASONS[key]["texts"])}
+    return {"enabled": True, "mode": "auto", "until": None, "intensity": "normal", "channels": list(supported_channels(key)), "texts": dict(SEASONS[key]["texts"])}
 
 
 def location_from(stored: dict | None) -> dict:
@@ -224,7 +235,7 @@ def merge_settings(stored: dict | None) -> dict:
         if saved.get("intensity") in INTENSITIES:
             cfg["intensity"] = saved["intensity"]
         if isinstance(saved.get("channels"), list):
-            cfg["channels"] = [c for c in CHANNELS if c in saved["channels"]]
+            cfg["channels"] = [c for c in supported_channels(key) if c in saved["channels"]]
         for name in cfg["texts"]:
             value = (saved.get("texts") or {}).get(name)
             if isinstance(value, str) and value.strip():
@@ -422,6 +433,8 @@ def calendar(year: int, founded=None) -> list[dict]:
     founded_on = parse_founded(founded)
     rows = []
     for key, meta in SEASONS.items():
+        if runs_all_year(key):  # kein Termin: eine Zeile „1.1. bis 31.12.“ sagt im Kalender nichts
+            continue
         for window in windows_for(key, year, founded_on):
             rows.append({"key": key, "label": meta["label"], "phase": window["phase"], "start": window["start"].isoformat(), "end": window["end"].isoformat()})
     rows.sort(key=lambda row: row["start"])
@@ -443,6 +456,7 @@ def admin_view(stored: dict | None, now: datetime | None = None, founded=None, w
             "active_now": bool(state), "phase": state["phase"] if state else None, "forced": bool(state and state["forced"]),
             "next_start": upcoming["start"].isoformat() if upcoming else None, "next_end": upcoming["end"].isoformat() if upcoming else None,
             "needs_founded_on": key == "club_birthday" and founded_on is None,
+            "always": runs_all_year(key), "supported_channels": list(supported_channels(key)),
         })
     return {"enabled": settings["enabled"], "now": now.isoformat(), "founded_on": founded_on.isoformat() if founded_on else None,
             "seasons": items, "calendar": calendar(now.year, founded_on), "intensities": list(INTENSITIES), "channels": list(CHANNELS), "location": settings["location"], "weather": weather}

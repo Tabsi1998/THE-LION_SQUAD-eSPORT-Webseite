@@ -39,9 +39,13 @@ export function rainLabel(weather) {
   return "starker Regen";
 }
 
-/** Wie viele Tropfen je Tiefe: Budget (Gerät, Stärke) mal Seite mal Regenmenge; nachts etwas ruhiger. */
-export function dropCounts(budget, { share = 1, factor = 0, night = false } = {}) {
-  const total = Math.round(Math.max(0, budget) * RAIN_BUDGET * Math.max(0, Math.min(1, share)) * Math.max(0, factor) * (night ? 0.8 : 1));
+/**
+ * Wie viele Tropfen je Tiefe: Budget (Gerät, Stärke) mal Seite mal Regenmenge; nachts etwas ruhiger. `area` ist der
+ * Faktor für große Fenster (sky.js `areaFactor`), damit der Regen auf 2560 px so dicht fällt wie auf 1440.
+ */
+export function dropCounts(budget, { share = 1, factor = 0, night = false, area = 1 } = {}) {
+  const wide = Math.max(1, Number(area) || 1);
+  const total = Math.round(Math.max(0, budget) * RAIN_BUDGET * Math.max(0, Math.min(1, share)) * Math.max(0, factor) * (night ? 0.8 : 1) * wide);
   const back = Math.round(total * RAIN_DEPTHS.back.share);
   const mid = Math.round(total * RAIN_DEPTHS.mid.share);
   return { back, mid, front: Math.max(0, total - back - mid), total };

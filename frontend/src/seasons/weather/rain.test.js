@@ -24,6 +24,10 @@ test("Zahl der Tropfen: Budget mal Seite mal Menge, nachts ruhiger, Anteile je T
   expect(dropCounts(100, { factor: 1, night: true }).total).toBe(96);
   expect(dropCounts(100, { factor: 0 }).total).toBe(0);
   expect(dropCounts(0, { factor: 1 }).total).toBe(0);
+  // Große Fenster: mehr Tropfen für dieselbe Dichte - nie weniger als ohne den Faktor.
+  expect(dropCounts(100, { factor: 1, area: 2 }).total).toBe(240);
+  expect(dropCounts(100, { factor: 1, area: 1.6 }).total).toBe(192);
+  expect(dropCounts(100, { factor: 1, area: 0.3 }).total).toBe(120);
 });
 
 test("drei Tiefen: hinten kurz, blass und langsamer, vorne lang, heller und schnell - nie deckender als 0,35; nur vordere spritzen", () => {
