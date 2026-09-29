@@ -13,7 +13,7 @@ import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
 import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
 import { assign, assignWebs, assignmentsFor, choosePerches, chooseWebPerches, clearAssignment, perchSnapshot, perchesFor, placementFor, subscribePerches, perchPoint, type Perch, type PerchAssignment } from "./perches";
 import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelState } from "./rappel";
-import { between, pick, screenRng } from "./rng";
+import { between, pick, screenRng, seasonRng, seasonYear } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
 import { useSeason } from "./SeasonProvider";
 import { recordSignal } from "./signals";
@@ -31,6 +31,18 @@ import { EXTENT, buildPlan, planLines, stepDurationMs, toPixels, webRadius, type
 // gesät zu und zeichnet die Flüge (flights.ts); im App-Hintergrund ruht alles, offene Dialoge sperren.
 
 export const SIGNAL_KEY = "halloween_pumpkin";
+/** Jahres-Salz (C4, #724): die Anordnung bleibt das ganze Saisonjahr gleich und würfelt sich im nächsten Jahr neu. */
+export let YEAR_SALT = String(seasonYear("halloween"));
+
+/** Nur für Tests: ein festes Salz, damit die Anordnung je Screen reproduzierbar ist. */
+export function setYearSalt(value: string) {
+  YEAR_SALT = String(value);
+}
+
+/** Der Zufallsstrom von Halloween auf einem Screen (oder für einen Platz): Saison + Jahr + Screen, `use` trennt Verwendungen. */
+function halloweenRng(screen: string, use: string): () => number {
+  return seasonRng({ season: "halloween", year: YEAR_SALT, screen }, use);
+}
 export const FACES = ["grin", "scared", "wicked"] as const;
 export type Face = (typeof FACES)[number];
 export const THREAD = "rgba(170,225,240,0.62)";
@@ -63,7 +75,8 @@ export type ScreenLayout = {
 };
 
 /**
- * Was dieser Screen bekommt - aus dem Namen berechnet; alle Zufallszahlen immer gezogen, die Stärke schaltet nur ab,
+ * Was dieser Screen bekommt - aus Saison, Jahr und Namen berechnet (C4: ein Neustart ändert nichts, das nächste Jahr
+ * würfelt neu); alle Zufallszahlen immer gezogen, die Stärke schaltet nur ab,
  * danach kappen die Fähigkeiten der Screen-Klasse (`caps`, A3) - gleiche Anordnung, nur weniger davon.
  */
 export function screenLayout(screen: string, intensity: string, caps: Capabilities = capabilities(screen, intensity)): ScreenLayout {
@@ -87,7 +100,7 @@ export function applyCapabilities(layout: ScreenLayout, caps: Capabilities): Scr
 }
 
 function drawLayout(screen: string, intensity: string): ScreenLayout {
-  const rng = screenRng(screen, "halloween");
+  const rng = halloweenRng(screen, "halloween");
   const full = intensity === "full";
   const subtle = intensity === "subtle";
   const corner: "tl" | "tr" = rng() < 0.7 ? "tl" : "tr";
@@ -652,7 +665,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       return undefined;
     }
     const assignmentFor = (perch: Perch, landed: boolean): PerchAssignment => {
-      const rng = screenRng(perch.id, "placement");
+      const rng = halloweenRng(perch.id, "placement");
       return { perchId: perch.id, ...placementFor(perch, rng), temperament: temperamentFor(rng), landed };
     };
     const landingPoint = (rect: { x: number; y: number; width: number; height: number }, assignment: PerchAssignment) => {
@@ -691,7 +704,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       const current = assignmentsFor(screen).filter((entry) => perches.some((perch) => perch.id === entry.perchId));
       const missing = wanted - current.length - reservedRef.current.size;
       if (missing <= 0) return;
-      const pickRng = screenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "perch-pick");
+      const pickRng = halloweenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "perch-pick");
       const chosen = choosePerches(perches, missing, pickRng, [...current.map((entry) => entry.perchId), ...vacated, ...reservedRef.current]);
       if (!chosen.length) return;
       if (!initializedRef.current || entering()) {
@@ -770,7 +783,7 @@ export function useWebAssignments(screen: string, count: number, active: boolean
     }
     const recompute = () => {
       const perches = perchesFor(screen);
-      const rng = screenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "corner-webs");
+      const rng = halloweenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "corner-webs");
       const withBats = assignmentsFor(screen).map((entry) => entry.perchId);
       assignWebs(chooseWebPerches(perches, count, rng, withBats));
     };
@@ -913,12 +926,12 @@ export function HalloweenBats({ season, screen, reducedMotion }: { season: Activ
   const { width, height } = useWindowDimensions();
   const [flight, setFlight] = useState<Flight | null>(null);
   const [remaining, setRemaining] = useState(0);
-  const rngRef = useRef(screenRng(screen, "bats"));
+  const rngRef = useRef(halloweenRng(screen, "bats"));
   const night = Boolean(season.data?.night);
   const active = !reducedMotion && season.effective !== "subtle";
 
   useEffect(() => {
-    rngRef.current = screenRng(screen, "bats");
+    rngRef.current = halloweenRng(screen, "bats");
   }, [screen]);
 
   const caps = useMemo(() => scaleForScreen(capabilities(screen, season.effective), width, height), [screen, season.effective, width, height]);

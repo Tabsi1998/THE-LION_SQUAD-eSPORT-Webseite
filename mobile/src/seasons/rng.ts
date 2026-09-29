@@ -1,6 +1,8 @@
 // Zufall, der je Screen gleich bleibt (#655): aus dem Screen-Namen wird eine Saat, aus der Saat ein
 // Zufallsstrom - jeder Screen sieht anders aus, derselbe Screen bei jedem Besuch gleich. Dieselbe
-// Rechnung wie im Web (frontend/src/seasons/rng.js).
+// Rechnung wie im Web (frontend/src/seasons/rng.js). Seit dem Jahres-Seed (Seasonal Core C4, #724) kommt die
+// Saat einer Saison aus Saison + Jahr + Screen (+ Salz): ein Neustart ändert die Szene nicht, das nächste Jahr
+// würfelt sie neu.
 
 export function hashString(value: string): number {
   let hash = 2166136261;
@@ -26,6 +28,41 @@ export function mulberry32(seed: number): () => number {
 
 export function screenRng(screen: string, salt = ""): () => number {
   return mulberry32(hashString(`${screen || "Dashboard"}::${salt}`));
+}
+
+/** Eine Saison als Schlüssel oder als Objekt vom Server (dann zählt `starts_at` für das Jahr). */
+export type SeasonLike = string | { key: string; starts_at?: string | null } | null | undefined;
+
+/** Saisons, die über Silvester gehen: im Januar bis Juni zählen sie noch zum Jahr ihres Beginns. */
+export const SPANS_NEW_YEAR = ["winter", "new_year"];
+
+/**
+ * Das Jahr einer Saison: aus `starts_at` des Servers, sonst aus der Uhr - eine Saison, die über Silvester geht,
+ * zählt zum Jahr ihres Beginns. Kein fester Jahres-Check: die Engine kennt nur „dieses Saisonjahr“.
+ */
+export function seasonYear(season: SeasonLike = null, now: Date = new Date()): number {
+  const key = typeof season === "string" ? season : season?.key;
+  const start = season && typeof season === "object" ? Date.parse(season.starts_at || "") : NaN;
+  if (Number.isFinite(start)) return new Date(start).getFullYear();
+  const year = now.getFullYear();
+  return key && SPANS_NEW_YEAR.includes(key) && now.getMonth() < 6 ? year - 1 : year;
+}
+
+export type SeasonSeedSpec = { season?: SeasonLike; year?: number | string | null; screen?: string; salt?: string };
+
+/**
+ * Die Saat einer Saison: `saison:jahr:screen[:salz]`. `salt` ist frei für Gerät oder Nutzer - ohne Salz sehen alle
+ * dasselbe, was Abnahmen reproduzierbar macht.
+ */
+export function seasonSeed({ season = "season", year = null, screen = "Dashboard", salt = "" }: SeasonSeedSpec = {}): string {
+  const key = (typeof season === "string" ? season : season?.key) || "season";
+  const seasonYearOf = year === null || year === undefined ? seasonYear(season) : year;
+  return `${key}:${seasonYearOf}:${screen || "Dashboard"}${salt ? `:${salt}` : ""}`;
+}
+
+/** Der Zufallsstrom einer Saison auf einem Screen - `use` trennt Verwendungen wie bei `screenRng`. */
+export function seasonRng(spec: SeasonSeedSpec, use = ""): () => number {
+  return screenRng(seasonSeed(spec), use);
 }
 
 export function between(rng: () => number, min: number, max: number): number {
