@@ -9,6 +9,13 @@ import { between, seasonRng } from "../rng";
 /** Das Band, in dem die Kette hängt (px): unter der Kopfzeile bleibt es innerhalb der freien Unterkante. */
 export const BAND_HEIGHT = 18;
 export const INSET = 12;
+/** Der Schein um ein Lämpchen: Vielfaches seines Radius und die größte Ausdehnung in px (für Lücken und Bänder). */
+export const GLOW_FACTOR = 2.1;
+export const GLOW = 7;
+/** Die Kopfzeile trägt die Kette in ihren untersten 16 px; die Fußzeile braucht oben so viel freien Abstand. */
+export const HEADER_BAND = 16;
+export const FOOTER_OFFSET = 2;
+export const FOOTER_FREE = BAND_HEIGHT + GLOW + FOOTER_OFFSET + 3;
 /** Farben: Vereinsblau, warmes Weiß, Gold, ein Hauch Rot, kaltes Weiß. */
 export const COLORS = { blue: "#29B6E8", warm: "#ffd9a0", gold: "#ffc857", red: "#e8453c", white: "#eef7ff" };
 /** Wie oft welche Farbe vorkommt - das Blau des Vereins führt, warmes Weiß trägt, Gold und Rot setzen Akzente. */

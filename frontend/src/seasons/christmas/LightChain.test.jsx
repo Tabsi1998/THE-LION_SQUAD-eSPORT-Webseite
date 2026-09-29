@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
-import { LightChain, bandGaps } from "./LightChain";
-import { BAND_HEIGHT } from "./lights";
+import { LightChain, bandGaps, freeTop } from "./LightChain";
+import { FOOTER_FREE, FOOTER_OFFSET, GLOW, HEADER_BAND } from "./lights";
 
 // Lichterkette (X1): unter der klebenden Kopfzeile am Fenster, in der Fußzeile auf der Seite; Logo im Band wird zur
 // Lücke ohne Lämpchen; unter 768 px keine Kette; ohne Fußzeilen-Erlaubnis nur die Kopfzeile; beim Verlassen weg.
@@ -45,10 +45,10 @@ test("Ketten an Kopfzeile (Fenster) und Fußzeile (Seite), Logo als Lücke, Läm
   const chains = screen.getAllByTestId("christmas-lights");
   expect(chains.map((chain) => chain.getAttribute("data-anchor"))).toEqual(["header", "footer"]);
   expect(chains[0].style.position).toBe("fixed");
-  expect(chains[0].style.top).toBe(`${80 - BAND_HEIGHT - 1}px`);
+  expect(chains[0].style.top).toBe(`${80 - HEADER_BAND}px`);
   expect(chains[0].getAttribute("data-gaps")).toBe("1");
   expect(chains[1].style.position).toBe("absolute");
-  expect(chains[1].style.top).toBe("1510px");
+  expect(chains[1].style.top).toBe(`${1500 + FOOTER_OFFSET}px`);
   expect(chains[1].getAttribute("data-gaps")).toBe("0");
   const bulbs = screen.getAllByTestId("christmas-bulb");
   expect(bulbs.length).toBeGreaterThan(20);
@@ -57,7 +57,9 @@ test("Ketten an Kopfzeile (Fenster) und Fußzeile (Seite), Logo als Lücke, Läm
   // Kein Lämpchen der Kopfzeile im Bereich des Logos (32–232 plus Rand).
   const headerBulbs = Array.from(chains[0].querySelectorAll("[data-testid='christmas-bulb'] .tls-lights__bulbBody")).map((body) => Number(body.getAttribute("cx")));
   expect(headerBulbs.length).toBeGreaterThan(10);
-  expect(headerBulbs.every((x) => x < 26 || x > 238)).toBe(true);
+  expect(headerBulbs.every((x) => x < 32 - GLOW - 3 || x > 232 + GLOW + 3)).toBe(true);
+  // Der Schein bleibt klein: kein Lämpchen leuchtet weiter als GLOW.
+  Array.from(document.querySelectorAll(".tls-lights__glow")).forEach((glow) => expect(Number(glow.getAttribute("r"))).toBeLessThanOrEqual(GLOW));
   unmount();
   expect(screen.queryAllByTestId("christmas-lights")).toHaveLength(0);
 });
@@ -77,7 +79,33 @@ test("unter 768 px keine Kette; ohne Fußzeile nur die Kopfzeile; Lücken aus de
   });
   expect(screen.getAllByTestId("christmas-lights").map((chain) => chain.getAttribute("data-anchor"))).toEqual(["header"]);
   const head = document.getElementById("head");
-  expect(bandGaps(head, { bandTop: 61, bandBottom: 79, left: 0 })).toEqual([[26, 238]]);
-  expect(bandGaps(head, { bandTop: 72, bandBottom: 90, left: 0 })).toEqual([]);
-  expect(bandGaps(null, { bandTop: 0, bandBottom: 10, left: 0 })).toEqual([]);
+  expect(bandGaps(head, { top: 62, bottom: 89, left: 0 })).toEqual([[32 - GLOW - 3, 232 + GLOW + 3]]);
+  expect(bandGaps(head, { top: 72, bottom: 90, left: 0 })).toEqual([]);
+  // Der Menüpunkt (bis 60) liegt über dem Bild der Kette - erst wenn es höher reicht, wird er zur Lücke.
+  expect(bandGaps(head, { top: 55, bottom: 89, left: 0 })).toEqual([[32 - GLOW - 3, 232 + GLOW + 3], [400 - GLOW - 3, 460 + GLOW + 3]]);
+  expect(bandGaps(null, { top: 0, bottom: 10, left: 0 })).toEqual([]);
+});
+
+test("Fußzeile: die Kette hängt nur, wenn oben genug freier Abstand ist; Schrift gleich welchen Tags zählt", async () => {
+  vi.useFakeTimers();
+  mountFixture(`<header id="head" style="position: sticky"><nav><a id="n1" href="/news">News</a></nav></header><main></main><footer id="foot"><div id="cta">Dabei sein</div></footer>`);
+  box(document.getElementById("head"), { left: 0, right: 1200, top: 0, bottom: 80 });
+  box(document.getElementById("n1"), { left: 400, right: 460, top: 20, bottom: 60 });
+  box(document.getElementById("foot"), { left: 0, right: 1200, top: 1500, bottom: 1800 });
+  const cta = document.getElementById("cta");
+  box(cta, { left: 40, right: 200, top: 1500 + FOOTER_FREE - 6, bottom: 1560 });
+  expect(freeTop(document.getElementById("foot"))).toBe(FOOTER_FREE - 6);
+  const tight = render(<LightChain salt="2026" footer width={1200} />);
+  await act(async () => {
+    vi.advanceTimersByTime(350);
+  });
+  expect(screen.getAllByTestId("christmas-lights").map((chain) => chain.getAttribute("data-anchor"))).toEqual(["header"]);
+  tight.unmount();
+  box(cta, { left: 40, right: 200, top: 1500 + FOOTER_FREE + 4, bottom: 1560 });
+  render(<LightChain salt="2026" footer width={1200} />);
+  await act(async () => {
+    vi.advanceTimersByTime(350);
+  });
+  expect(screen.getAllByTestId("christmas-lights").map((chain) => chain.getAttribute("data-anchor"))).toEqual(["header", "footer"]);
+  expect(freeTop(null)).toBe(0);
 });

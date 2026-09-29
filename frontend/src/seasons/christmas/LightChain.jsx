@@ -1,24 +1,29 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { measureAnchors } from "../anchors";
-import { BAND_HEIGHT, COLORS, MIN_WIDTH, chainLayout } from "./lights";
+import { BAND_HEIGHT, COLORS, FOOTER_FREE, FOOTER_OFFSET, GLOW, GLOW_FACTOR, HEADER_BAND, MIN_WIDTH, chainLayout } from "./lights";
 
 // Die Lichterkette an echten Kanten (X1, #734): unter der Kopfzeile in deren freier Unterkante (klebt sie oben, hängt
-// die Kette am Fenster) und oben in der Fußzeile. Nie über Menü, Logo oder Knöpfen: was in das Band ragt, wird zur
-// Lücke ohne Lämpchen; nie klickbar. Der Wind (`--season-wind`) lässt die Kette minimal schwingen; ohne Bewegung
+// die Kette am Fenster) und oben in der Fußzeile, wenn dort genug freier Abstand ist. Nie über Menü, Logo, Knöpfen
+// oder Schrift: was in das Bild der Kette ragt (Draht, Lämpchen, Schein), wird zur Lücke ohne Lämpchen; nie klickbar. Der Wind (`--season-wind`) lässt die Kette minimal schwingen; ohne Bewegung
 // hängt sie still und leuchtet ruhig.
 
 const REFRESH_DELAYS = [300, 1200, 3000];
-/** Was im Band eine Lücke erzwingt: Bilder, Bedienung und Schrift, die bis in das Band reicht. */
-const GAP_SELECTOR = "img, svg, button, a, input, select, [role='img'], [role='button'], p, h1, h2, h3, h4, h5, h6, li, span, label, time";
-const GAP_MARGIN = 6;
+/** Was im Bild der Kette eine Lücke erzwingt: Bilder und Bedienung mit ihrem Kasten - und jedes Element mit eigener Schrift. */
+const CONTROL_SELECTOR = "img, picture, video, svg, canvas, button, a, input, select, textarea, label, time, [role='img'], [role='button']";
+/** Abstand eines Lämpchens zu einem Kasten: sein Schein plus ein wenig Luft. */
+const GAP_MARGIN = GLOW + 3;
+
+function hasOwnText(node) {
+  return Array.from(node.childNodes || []).some((child) => child.nodeType === 3 && child.textContent.trim().length > 0);
+}
 
 /** Ein Lämpchen: Fassung am Draht, Kolben, Schein - Glimmen und Flackern über Custom Properties je Lämpchen. */
 function Bulb({ bulb, ids }) {
   const color = COLORS[bulb.color] || COLORS.warm;
   return (
     <g className={`tls-lights__bulb${bulb.flicker ? " tls-lights__bulb--flicker" : ""}`} style={{ "--glow-dur": `${bulb.glowDuration}s`, "--glow-delay": `${bulb.glowDelay}s`, "--brightness": bulb.brightness, "--flicker-delay": `${bulb.flickerDelay}s` }} data-testid="christmas-bulb" data-color={bulb.color}>
-      <circle className="tls-lights__glow" cx={bulb.x} cy={bulb.y} r={bulb.radius * 3.2} fill={`url(#${ids}-glow-${bulb.color})`} />
+      <circle className="tls-lights__glow" cx={bulb.x} cy={bulb.y} r={Math.min(GLOW, bulb.radius * GLOW_FACTOR)} fill={`url(#${ids}-glow-${bulb.color})`} />
       <line x1={bulb.x} y1={bulb.wire} x2={bulb.x} y2={bulb.y - bulb.radius} stroke="#3b3b3b" strokeWidth="1.1" strokeLinecap="round" />
       <rect x={bulb.x - 1.1} y={bulb.y - bulb.radius - 1.6} width="2.2" height="1.8" rx="0.4" fill="#2a2a2a" />
       <ellipse className="tls-lights__bulbBody" cx={bulb.x} cy={bulb.y} rx={bulb.radius * 0.85} ry={bulb.radius} fill={color} />
@@ -59,14 +64,21 @@ function Chain({ chain, layout }) {
   );
 }
 
-/** Lücken: Elemente im Anker, die in das Band ragen (Logo, Knöpfe, Links) - als x-Bereiche in Ketten-Koordinaten. */
-export function bandGaps(element, { bandTop, bandBottom, left }) {
+/** Was die Kette sperren kann: Bilder und Bedienung, dazu jedes Element mit eigener Schrift (gleich welches Tag). */
+function blockers(element) {
   if (!element || typeof element.querySelectorAll !== "function") return [];
+  return Array.from(element.querySelectorAll("*")).filter((node) => typeof node.getBoundingClientRect === "function" && ((typeof node.matches === "function" && node.matches(CONTROL_SELECTOR)) || hasOwnText(node)));
+}
+
+/**
+ * Lücken: was im Anker in das Bild der Kette ragt (von `top` bis `bottom`, Fensterkoordinaten - Draht, Lämpchen und
+ * Schein) - als x-Bereiche in Ketten-Koordinaten, mit dem Schein als Abstand.
+ */
+export function bandGaps(element, { top, bottom, left }) {
   const gaps = [];
-  element.querySelectorAll(GAP_SELECTOR).forEach((node) => {
-    if (typeof node.getBoundingClientRect !== "function") return;
+  blockers(element).forEach((node) => {
     const rect = node.getBoundingClientRect();
-    if (rect.width === 0 || rect.bottom <= bandTop || rect.top >= bandBottom) return;
+    if (rect.width === 0 || rect.height === 0 || rect.bottom <= top || rect.top >= bottom) return;
     gaps.push([rect.left - left - GAP_MARGIN, rect.right - left + GAP_MARGIN]);
   });
   // Überlappende Lücken (Logo im Link) zu einer zusammenfassen.
@@ -77,6 +89,14 @@ export function bandGaps(element, { bandTop, bandBottom, left }) {
     else merged.push([gap[0], gap[1]]);
     return merged;
   }, []);
+}
+
+/** Wie viel freier Abstand oben im Anker liegt, bevor Schrift, Bild oder Bedienung beginnt (px; ohne Inhalt unendlich). */
+export function freeTop(element) {
+  if (!element || typeof element.getBoundingClientRect !== "function") return 0;
+  const top = element.getBoundingClientRect().top;
+  const first = blockers(element).map((node) => node.getBoundingClientRect()).filter((rect) => rect.width > 0 && rect.height > 0).reduce((min, rect) => Math.min(min, rect.top), Infinity);
+  return first - top;
 }
 
 /**
@@ -101,11 +121,13 @@ export function LightChain({ salt = "", footer = true, width = typeof window ===
         const fixed = isHeader && anchor.fixed;
         const scrollX = fixed ? 0 : win.scrollX || 0;
         const scrollY = fixed ? 0 : win.scrollY || 0;
-        // Kopfzeile: im Band über der Unterkante; Fußzeile: im oberen Abstand unter der Oberkante.
-        const bandTop = isHeader ? rect.bottom - BAND_HEIGHT - 1 : rect.top + 10;
-        const gaps = bandGaps(anchor.element, { bandTop, bandBottom: bandTop + BAND_HEIGHT, left: rect.left });
+        // Kopfzeile: in den untersten 16 px über der Unterkante; Fußzeile: direkt unter der Oberkante, aber nur, wenn
+        // der freie Abstand darunter für Draht, Lämpchen und Schein reicht - sonst hängt dort keine Kette.
+        if (!isHeader && freeTop(anchor.element) < FOOTER_FREE) return null;
+        const bandTop = isHeader ? rect.bottom - HEADER_BAND : rect.top + FOOTER_OFFSET;
+        const gaps = bandGaps(anchor.element, { top: bandTop - 2, bottom: bandTop + BAND_HEIGHT + GLOW, left: rect.left });
         return { anchor: anchor.kind, key: anchor.key, fixed, x: rect.left + scrollX, y: bandTop + scrollY, width: rect.width, gaps };
-      });
+      }).filter(Boolean);
       const current = chainsRef.current;
       const same = next.length === current.length && next.every((chain, index) => chain.key === current[index].key && chain.x === current[index].x && chain.y === current[index].y && chain.width === current[index].width && JSON.stringify(chain.gaps) === JSON.stringify(current[index].gaps));
       if (!same) {
