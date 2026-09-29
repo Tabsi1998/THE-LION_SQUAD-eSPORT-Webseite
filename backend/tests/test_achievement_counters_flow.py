@@ -377,13 +377,13 @@ async def test_auskunft_nennt_die_signale_und_konto_loeschen_nimmt_sie_mit(flow,
     set_clock(monkeypatch, HALLOWEEN_EVE)
     user = await flow.add_user(name="Auskunft")
     other = await flow.add_user(name="Andere")
-    await flow.db.news.insert_one({"id": "n1", "slug": "neu", "status": "published", "title": "Neu"})
     for person in (user, other):
         flow.act_as(person)
         sent = [{"name": "halloween_bats_scared", "count": 4}, {"name": "logo_clicks", "count": 3}]
         assert (await flow.post("/api/achievements/signals", json={"items": sent})).json()["accepted"] == 2
-        assert (await flow.post("/api/news/neu/read")).status_code == 200
-        assert (await flow.post("/api/streams/watch", json={"key": "twitch:lionsquad"})).status_code == 200
+        # Gelesen und gesehen direkt in der Sammlung: hier geht es um Auskunft und Löschen, nicht um die Meldewege.
+        await flow.db.news_reads.insert_one({"user_id": person["id"], "news_id": "n1", "read_at": HALLOWEEN_EVE.isoformat()})
+        await flow.db.stream_watches.insert_one({"user_id": person["id"], "key": "twitch:lionsquad", "day": "2026-10-30", "at": HALLOWEEN_EVE.isoformat()})
     flow.act_as(user)
     export = (await flow.get("/api/dsgvo/export-my-data")).json()
     signals = sorted((row["name"], row["count"], row["days"]) for row in export["achievement_signals"])
