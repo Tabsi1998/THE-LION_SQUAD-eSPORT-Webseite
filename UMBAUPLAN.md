@@ -2580,6 +2580,41 @@ GO!“: drei Meilensteine Jahreszeiten (40–42), Erfolge II (38) und Discord VI
 - **Regel aus #656/#659:** Web und App einer Sache in einem PR, wenn der Betreiber weniger
   Merges will; nach jedem Merge die Reste sofort auf `main` rebasen; Doku nur im Doku-Stand-PR.
 
+## Neu aufgenommen am 29. September
+
+Halloween lief in drei weiteren Runden aus den Screenshots des Betreibers, dazu drei Kataloge
+der Erfolge - und vier neue Regeln, die für alles gelten.
+
+- **Halloween IV und V** (#674, #676): Geister, Fledermäuse und die Abseil-Spinne waren am
+  Livesystem unsichtbar - Tailwinds `svg { max-width: 100% }` in nullbreiten Haltern; seither
+  misst jede Runde mit einer Playwright-Probe nach. Fledermäuse hängen still an Menüpunkten (am
+  Fenster), an einzelnen Buchstaben der Überschriften (Tintenkante per `measureText`), an News-
+  und Vorstandskarten und am Löwen; ein Klick lässt jede für sich fliegen. Das Netz lässt sich
+  mit der Maus packen: die Anker reißen nacheinander, es faltet sich, fliegt davon, und die
+  Spinne spinnt ein neues. Die Katze läuft mit sichtbaren Beinen, die Läuferin schwingt nicht
+  mehr mit dem Faden, jeder Kürbis grüßt wie die Laterne.
+- **Halloween VI** (#684, #685, #686): Klänge zu jeder Aktion und ein leiser, live erzeugter
+  Klangteppich (Web Audio, keine Dateien, Schalter Töne/Musik/aus neben der Laterne); der Mond
+  steht dort, wo er über Innsbruck wirklich steht, geht auf, wandert jede Minute weiter und
+  geht unter (Meeus-Näherung ohne Paket); Jumpscares nur für Angemeldete ab 18 mit Geburtsdatum
+  (Server-Flag), höchstens einer je Tag und Gerät, nie ohne Ton, nie in Formularen oder neben
+  Videos, sofort weg per Klick, 128 kuratierte Varianten aus eigenen Figuren, Auftritten,
+  Klängen und Rahmen.
+- **Erfolge II, Kataloge A–C** (#675, #682, #683): 108 Gruppen als Daten mit demselben Helfer,
+  35 neue Zähler aus echten Daten, Abbildung alt → neu für die Migration. Zwei Fehler nebenbei:
+  Saison-Ranglisten wurden nie gespeichert (Saisonspitze und Saisonmeister blieben 0 - jetzt
+  schreibt der Saisonabschluss sie und ein täglicher Job hält den Rangverlauf für „Aufsteiger“
+  fest), und neu definierte Gruppen ließen alte Stufen in der Datenbank stehen (die Migration
+  hebt Vergaben und räumt). Vier Gruppen aus Katalog C warten auf ihre Datenquelle (#615).
+- **Regeln des Betreibers vom 28./29.09.:** nichts gilt als fertig - jedes Design, jede
+  Animation, jedes Achievement wird überarbeitet ([#677](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/677));
+  jede Saison bekommt Klang und Musik ([#679](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/679)),
+  Jumpscares ab 18 mit vielen zufälligen Varianten ([#680](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/680)),
+  den Himmel nach Uhrzeit und Ort ([#681](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/681)),
+  Fundstücke im Profil ([#678](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/678));
+  der Standard steht als Kommentar auf jedem Saison-Issue #637–#647. Jede Runde endet mit
+  Screenshots und einer Probe, nicht mit „Tests grün“.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
