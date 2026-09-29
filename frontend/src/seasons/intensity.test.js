@@ -89,7 +89,11 @@ test("Effektklassen je Seitenklasse: nicht nur wie viel, sondern welche Art - St
 });
 
 test("Saison-Übersetzung: Halloween leitet seine Schlüssel aus den Effektklassen ab, eine Saison ohne Übersetzung bekommt nur die Klassen", () => {
-  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween"]);
+  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween", "snow"]);
+  expect(capabilities("/", "normal", "snow")).toMatchObject({ season: "snow", flakes: 1, caps: true, capsMax: 18, tint: true });
+  expect(capabilities("/login", "normal", "snow")).toMatchObject({ flakes: 0.6, caps: true, capsMax: 6 });
+  expect(capabilities("/admin", "normal", "snow")).toMatchObject({ flakes: 0, caps: false, capsMax: 0, tint: false });
+  expect(scaleForViewport(capabilities("/", "normal", "snow"), 390)).toMatchObject({ flakes: 0.6, caps: false, capsMax: 0, mobile: true });
   ["lively", "medium", "calm", "quiet"].forEach((cls) => {
     ["normal", "subtle", "full"].forEach((intensity) => {
       const caps = capabilitiesFor(cls, intensity);

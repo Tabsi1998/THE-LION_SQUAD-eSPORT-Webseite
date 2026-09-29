@@ -1,0 +1,38 @@
+/* Schnee (S7, #638; W2/W3, #728/#729): Hauben auf Kanten (eigene Ebene über der Seite, nie klickbar), Blauschein
+   nachts bei „voll“ hinter dem Inhalt, die Schneeflocke neben dem Logo mit Splittern beim Fangen. */
+.tls-snowcaps { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 41; pointer-events: none; }
+.tls-snowcap { position: absolute; top: 0; left: 0; display: block; max-width: none; opacity: 0.94; transition: opacity 0.3s ease; filter: drop-shadow(0 1px 1px rgba(30, 60, 100, 0.35)); overflow: visible; }
+.tls-snowcap--yield { opacity: 0; }
+
+.tls-snow-tint { background: radial-gradient(ellipse 80% 60% at 50% 12%, rgba(110, 150, 220, 0.09), transparent 70%); }
+
+.tls-snow-widget { display: inline-flex; align-items: center; }
+.tls-snowflake { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; border: 0; border-radius: 0.35rem; background: transparent; color: #cfe6ff; cursor: pointer; }
+.tls-snowflake:focus-visible { outline: 2px solid #9cc9ff; outline-offset: 2px; }
+.tls-snowflake__svg { width: 28px; height: 28px; transition: transform 0.25s ease; filter: drop-shadow(0 0 3px rgba(160, 200, 255, 0.45)); }
+.tls-snowflake:hover .tls-snowflake__svg { transform: rotate(18deg); }
+.tls-snowflake__burst { position: absolute; inset: 0; pointer-events: none; }
+.tls-snowflake__shard { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 1px; background: #e9f4ff; opacity: 0; }
+.tls-snowflake--burst .tls-snowflake__shard { animation: tls-snow-shard 0.7s ease-out forwards; }
+@keyframes tls-snow-shard {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(180deg); }
+}
+.tls-snowflake--burst .tls-snowflake__svg { animation: tls-snow-pop 0.7s ease-out; }
+@keyframes tls-snow-pop {
+  0% { transform: scale(1); opacity: 1; }
+  30% { transform: scale(0.35); opacity: 0.2; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.tls-snowflake__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #dbeeff; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(160, 200, 255, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
+@media (max-width: 640px) {
+  .tls-snowflake { width: 2.25rem; height: 2.25rem; }
+  .tls-snowflake__svg { width: 22px; height: 22px; }
+}
+
+/* „dezent“ und „Bewegung reduzieren“: keine Splitter, kein Aufpoppen - die Hauben bleiben, sie bewegen sich ohnehin nicht. */
+html[data-season-intensity~="subtle"] .tls-snowflake--burst .tls-snowflake__shard, html[data-season-intensity~="subtle"] .tls-snowflake--burst .tls-snowflake__svg { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-snowflake--burst .tls-snowflake__shard, .tls-snowflake--burst .tls-snowflake__svg { animation: none !important; }
+  .tls-snowflake__svg { transition: none; }
+}
