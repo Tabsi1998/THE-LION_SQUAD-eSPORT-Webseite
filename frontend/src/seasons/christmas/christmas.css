@@ -1,0 +1,80 @@
+/* Weihnachten (S8, #639; X1/X2/X4): Lichterkette an Kopf- und Fußzeile, warme Lichtinseln hinter dem Inhalt, der
+   Gruß als Karte des Vereins. Wind (--season-wind) lässt die Kette minimal schwingen; jedes Lämpchen glimmt in seinem
+   eigenen Takt, ein paar flackern selten. „dezent“: Kette ohne Glimmen. „Bewegung reduzieren“: alles still. */
+.tls-lights { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
+.tls-lights__chain { display: block; max-width: none; z-index: 52; pointer-events: none; overflow: visible; transform-origin: top center; animation: tls-lights-sway 7s ease-in-out infinite; }
+.tls-lights__chain--footer { z-index: 41; }
+@keyframes tls-lights-sway {
+  0%, 100% { transform: translateX(calc(var(--season-wind, 0.6) * -1.2px)); }
+  50% { transform: translateX(calc(var(--season-wind, 0.6) * 1.2px)); }
+}
+.tls-lights__glow { opacity: calc(var(--brightness, 0.9) * 0.8); animation: tls-lights-glow var(--glow-dur, 4s) ease-in-out var(--glow-delay, 0s) infinite; }
+.tls-lights__bulbBody { opacity: var(--brightness, 0.9); animation: tls-lights-body var(--glow-dur, 4s) ease-in-out var(--glow-delay, 0s) infinite; }
+@keyframes tls-lights-glow {
+  0%, 100% { opacity: calc(var(--brightness, 0.9) * 0.55); }
+  50% { opacity: calc(var(--brightness, 0.9) * 0.95); }
+}
+@keyframes tls-lights-body {
+  0%, 100% { opacity: calc(var(--brightness, 0.9) * 0.85); }
+  50% { opacity: 1; }
+}
+/* Seltenes Flackern: ein kurzer Aussetzer alle paar Sekunden, je Lämpchen zu einer anderen Zeit. */
+.tls-lights__bulb--flicker .tls-lights__bulbBody, .tls-lights__bulb--flicker .tls-lights__glow { animation-name: tls-lights-flicker; animation-duration: 11s; animation-delay: var(--flicker-delay, 5s); }
+@keyframes tls-lights-flicker {
+  0%, 88%, 100% { opacity: var(--brightness, 0.9); }
+  90% { opacity: 0.25; }
+  92% { opacity: var(--brightness, 0.9); }
+  94% { opacity: 0.4; }
+  96% { opacity: var(--brightness, 0.9); }
+}
+
+/* Warme Lichtinseln (X2): hinter dem Inhalt, lokal statt Vollfläche - Schrift bleibt, wie sie ist. */
+.tls-xmas-glow { background: radial-gradient(ellipse 34% 26% at 18% 6%, rgba(255, 190, 120, 0.09), transparent 70%), radial-gradient(ellipse 30% 24% at 82% 8%, rgba(255, 170, 100, 0.07), transparent 70%), radial-gradient(ellipse 60% 30% at 50% 100%, rgba(255, 180, 110, 0.07), transparent 70%); }
+/* Schneehauben im warmen Licht (X2) - nur solange Weihnachten läuft. */
+html[data-season~="christmas"] .tls-snowcap { filter: drop-shadow(0 1px 1px rgba(90, 60, 30, 0.35)) sepia(0.28) saturate(1.15); }
+
+/* Der Gruß: Karte des Vereins mit Sternenlicht und Lichterfolge. */
+.tls-xmas-toast { width: min(92vw, 30rem); padding: 0; overflow: hidden; border-radius: 0.9rem; border: 1px solid rgba(255, 200, 140, 0.35); background: radial-gradient(ellipse at 20% 0%, #14202c, #0a0d12 70%); color: #fff4e6; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 40px rgba(255, 180, 110, 0.12); cursor: pointer; animation: tls-xmas-toast-in 0.7s ease-out both; }
+@keyframes tls-xmas-toast-in {
+  0% { opacity: 0; transform: translate(-50%, 14px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.tls-xmas-toast__stars { position: absolute; inset: 0; pointer-events: none; }
+.tls-xmas-toast__star { position: absolute; border-radius: 50%; background: #fff7dc; opacity: 0.5; box-shadow: 0 0 4px rgba(255, 240, 200, 0.8); animation: tls-xmas-twinkle 3.6s ease-in-out var(--twinkle-delay, 0s) infinite; }
+@keyframes tls-xmas-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.9; }
+}
+.tls-xmas-toast__lights { position: relative; display: flex; justify-content: space-between; padding: 0.55rem 1.4rem 0; }
+.tls-xmas-toast__light { width: 9px; height: 12px; border-radius: 45% 45% 50% 50%; opacity: 0.25; animation: tls-xmas-light-on 0.5s ease-out calc(0.35s + var(--light-index, 0) * 0.28s) both, tls-xmas-light-glow 3.2s ease-in-out calc(2.8s + var(--light-index, 0) * 0.4s) infinite; }
+.tls-xmas-toast__light--blue { background: #29B6E8; box-shadow: 0 0 10px rgba(41, 182, 232, 0.8); }
+.tls-xmas-toast__light--warm { background: #ffd9a0; box-shadow: 0 0 10px rgba(255, 217, 160, 0.8); }
+.tls-xmas-toast__light--gold { background: #ffc857; box-shadow: 0 0 10px rgba(255, 200, 87, 0.8); }
+.tls-xmas-toast__light--red { background: #e8453c; box-shadow: 0 0 10px rgba(232, 69, 60, 0.8); }
+@keyframes tls-xmas-light-on {
+  0% { opacity: 0.25; transform: scale(0.85); }
+  60% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes tls-xmas-light-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+.tls-xmas-toast__body { position: relative; display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem 2.4rem 1.1rem 1.1rem; }
+.tls-xmas-toast__logo { height: 2.75rem; width: auto; filter: drop-shadow(0 0 8px rgba(255, 200, 140, 0.35)); }
+.tls-xmas-toast__title { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-xmas-toast__text { margin: 0.15rem 0 0; font-size: 1rem; line-height: 1.35; color: #fff4e6; }
+.tls-xmas-toast__link { display: inline-block; margin-top: 0.4rem; font-size: 0.85rem; color: #29B6E8; text-decoration: underline; }
+.tls-xmas-toast__close { position: absolute; top: 0.35rem; right: 0.45rem; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.tls-xmas-toast__close:hover { background: rgba(255, 255, 255, 0.14); }
+.tls-xmas-toast__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
+
+/* „dezent“: Kette und Karte ohne Glimmen. */
+html[data-season-intensity~="subtle"] .tls-lights__glow, html[data-season-intensity~="subtle"] .tls-lights__bulbBody, html[data-season-intensity~="subtle"] .tls-lights__chain, .tls-xmas-toast--subtle .tls-xmas-toast__light, .tls-xmas-toast--subtle .tls-xmas-toast__star { animation: none; opacity: 0.9; }
+/* „Bewegung reduzieren“: alles still, die Lämpchen leuchten ruhig, die Karte steht. */
+@media (prefers-reduced-motion: reduce) {
+  .tls-lights__chain, .tls-lights__glow, .tls-lights__bulbBody, .tls-xmas-toast, .tls-xmas-toast__star, .tls-xmas-toast__light { animation: none !important; }
+  .tls-lights__chain { transform: none; }
+  .tls-xmas-toast__light { opacity: 1; }
+  .tls-xmas-toast__star { opacity: 0.6; }
+}

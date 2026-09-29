@@ -100,3 +100,19 @@ test("unbegrenzt (Testschalter): alles darf, nur versteckt nicht", () => {
   s.setHidden(true);
   expect(s.request("flock")).toBeNull();
 });
+
+test("Plätze zur Laufzeit: ein Platz an Feiertagen sperrt die zweite große Bewegung, danach wieder zwei", () => {
+  let clock = 100000;
+  const scheduler = createMotionScheduler({ now: () => clock, initialDelayMs: 0, minGapMs: 0, doc: null });
+  expect(scheduler.setSlots(1)).toBe(2);
+  expect(scheduler.snapshot().slots).toBe(1);
+  const first = scheduler.request("flock");
+  expect(first).not.toBeNull();
+  clock += 3000;
+  expect(scheduler.request("rappel")).toBeNull();
+  expect(scheduler.lastReason()).toBe("busy");
+  expect(scheduler.setSlots(2)).toBe(1);
+  expect(scheduler.request("rappel")).not.toBeNull();
+  scheduler.release(first);
+  scheduler.dispose();
+});
