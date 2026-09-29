@@ -10,6 +10,7 @@
 // reißt auch ein Windstoß die Anker. Danach kommt die Spinne zurück und spinnt ein neues Netz - jedes anders.
 // Der Plan rechnet in Nabe-Koordinaten mit Radius 1, erst die Simulation rechnet in Pixel um. Kein Paket.
 import { hashString, mulberry32 } from "../rng";
+import { emitSound } from "../audio";
 
 export const RADII = 16;
 export const RINGS = 9;
@@ -743,6 +744,7 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
       if (!sim.spider.away) sendSpiderAway(sim, rng, true);
       startGrab(sim, pending.x, pending.y, pending.nodes);
       setGrabbing(true);
+      emitSound("web_grab", {}, win);
     }
     if (sim && sim.grab) moveGrab(sim, event.clientX, event.clientY);
   };
@@ -827,7 +829,12 @@ export function createWebLayer({ seed, corner = "tl", factor = 1, build = true, 
       if (pointer.seen > 0) pointer.seen -= 1;
       if (!current.done) advanceBuild(current, dt);
       else advanceIdle(current, dt, rng);
+      const tornBefore = current.torn;
+      const flyingBefore = current.free && !current.grab;
       stepPhysics(current, dt, rng);
+      // Klänge (#679): jeder gerissene Anker knackt, das losgelassene Netz rauscht davon.
+      if (current.torn > tornBefore) emitSound("web_tear", {}, win);
+      if (current.free && !current.grab && !flyingBefore) emitSound("web_fly", {}, win);
       if (current.gone) {
         sim = null;
         pending = null;

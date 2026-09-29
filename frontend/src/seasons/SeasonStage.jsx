@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import { useSeason } from "./SeasonContext";
 import { SEASON_MODULES, hasModule } from "./registry";
 import { budgetFor, createSkyLoop } from "./sky";
+import { createSoundEngine, setActiveEngine } from "./audio";
 import "./seasons.css";
 
 // Die Bühne (#634): Ebenen als Portale an document.body - Backdrop hinter dem Inhalt, Sky (ein Canvas
@@ -122,6 +123,32 @@ export function SeasonStage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [mountedSignature, modules, reducedMotion, location.pathname],
   );
+
+  // Klänge (#679): eine Engine für die Bühne, solange eine Saison mit Palette läuft (nicht bei „dezent“ oder
+  // „Bewegung reduzieren“); sie wartet selbst auf die erste Geste. Die Palette folgt Saison und Phase (Tag/Nacht).
+  const soundSeason = mounted.find((season) => modules[season.key].sounds && season.effective !== "subtle" && !reducedMotion) || null;
+  const soundKey = soundSeason ? `${soundSeason.key}:${soundSeason.phase}:${soundSeason.data?.night ? "night" : "day"}` : "";
+  const engineRef = useRef(null);
+  useEffect(() => {
+    if (!soundSeason || quiet) {
+      engineRef.current?.dispose();
+      engineRef.current = null;
+      setActiveEngine(null);
+      return undefined;
+    }
+    if (!engineRef.current) {
+      engineRef.current = createSoundEngine();
+      setActiveEngine(engineRef.current);
+    }
+    engineRef.current.setPalette(modules[soundSeason.key].sounds({ season: soundSeason }));
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [soundKey, quiet, modules]);
+  useEffect(() => () => {
+    engineRef.current?.dispose();
+    engineRef.current = null;
+    setActiveEngine(null);
+  }, []);
 
   if (!ready || !mounted.length || typeof document === "undefined") return null;
   return createPortal(

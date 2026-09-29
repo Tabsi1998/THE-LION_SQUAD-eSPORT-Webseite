@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { hashString, mulberry32 } from "../rng";
+import { emitSound } from "../audio";
 import { FlyingBatShape, HangingBatShape } from "./art";
 
 // Hängende Fledermäuse (#661, Runde V): sie hängen still - unter einem Menüpunkt der Kopfzeile, an einem
@@ -321,6 +322,7 @@ export function HangingBats({ count, seed, salt, flightMs = 3000 }) {
   };
   const scare = (id) => {
     const scrollY = window.scrollY || 0;
+    emitSound("bat_scare");
     update((bat) => {
       if (bat.id !== id || bat.state !== "hanging") return bat;
       const top = bat.anchor.fixed ? 0 : scrollY;
