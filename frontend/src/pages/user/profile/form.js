@@ -68,6 +68,8 @@ export function profileToForm(user) {
     website: user.website || "",
     // privacy
     privacy_public_profile: user.privacy_public_profile ?? true,
+    // Erfolge II (#619): Standard an - fehlt das Feld, gilt „öffentlich“.
+    privacy_achievements_public: user.privacy_achievements_public ?? true,
     newsletter_consent: !!user.newsletter_consent,
     notification_preferences: user.notification_preferences || {},
     profile_visibility: user.profile_visibility || {},

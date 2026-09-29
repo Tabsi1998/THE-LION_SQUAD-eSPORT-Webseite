@@ -325,3 +325,24 @@ async def test_fremde_erfolge_schalter_und_verein_nur_fuer_mitglieder(flow):
     assert (await flow.put("/api/users/me", json={"privacy_achievements_public": True})).status_code == 200
     flow.act_as(ben)
     assert (await flow.get(f"/api/achievements/user/{anna['id']}")).json()["achievements_hidden"] is False
+
+
+# ------------------------------------------------------------------ Dashboard-Kachel
+
+@pytest.mark.asyncio
+async def test_dashboard_kachel_liefert_level_naechstes_und_letzte_freischaltung(flow):
+    anna = await flow.add_user(name="anna")
+    flow.act_as(anna)
+    empty = (await flow.get("/api/achievements/me/summary")).json()
+    assert empty["count"] == 0 and empty["points"] == 0 and empty["last_award"] is None
+    assert empty["level"]["level"] >= 1 and empty["next_up"] and empty["next_up"]["link"].startswith("/")
+    assert await badges.award_achievement(anna["id"], "matches_played_1")
+    assert await badges.award_achievement(anna["id"], "matches_played_2")
+    assert await badges.award_achievement(anna["id"], "neg_dispute")
+    summary = (await flow.get("/api/achievements/me/summary")).json()
+    assert summary["count"] == 2 and summary["points"] == catalog.MATERIALS["wood"]["points"] + catalog.MATERIALS["iron"]["points"]
+    assert summary["last_award"]["code"] == "matches_played_2" and summary["last_award"]["material"] == "iron" and summary["last_award"]["award_id"]
+    hidden_total = await flow.db.achievement_groups.count_documents({"hidden": True, "is_negative": {"$ne": True}})
+    assert summary["hidden"] == {"total": hidden_total, "earned": 0}
+    mine = (await flow.get("/api/achievements/me")).json()
+    assert all(a.get("award_id") for a in mine["awards"]), "jede Vergabe trägt ihre Kennung"

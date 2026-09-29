@@ -539,6 +539,7 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
         is_negative = bool(g.get("is_negative"))
         out.append({
             **t,
+            "award_id": a.get("id"),
             "description": _safe_negative_description() if is_negative else t.get("description"),
             "condition_key": None if is_negative else t.get("condition_key"),
             "progress_target": None if is_negative else t.get("progress_target"),
