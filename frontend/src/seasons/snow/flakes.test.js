@@ -1,4 +1,4 @@
-import { DEPTHS, DEPTH_ORDER, FAST_EVERY, GUST, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, gustAt, nextGust, windAt, windFrom } from "./flakes";
+import { DEPTHS, DEPTH_ORDER, FAST_EVERY, GUST, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, gustAt, nextGust, scrollFlake, windAt, windFrom } from "./flakes";
 import { mulberry32 } from "../rng";
 
 // Schneefall (S7, W2): drei Tiefen mit klar verschiedenen Größen und Tempi, keine zwei Flocken gleich, Wind aus
@@ -101,4 +101,35 @@ test("Zahl der Flocken: Budget mal Seite mal Wetter mal Ausklang, Anteile je Tie
   expect(fadeAt("2027-01-06T23:59:59+01:00", now - 60 * 60 * 1000)).toBe(1);
   expect(fadeAt("2027-01-06T23:59:59+01:00", now + 60 * 60 * 1000)).toBe(0);
   expect(fadeAt("", now)).toBe(1);
+});
+
+test("Scrollen: die Flocken gehören zur Seite - vorne ganz, hinten weniger; was hinausgeschoben wird, kommt an neuer Stelle wieder herein", () => {
+  const front = { depth: "front", radius: 5, x: 300, y: 400 };
+  const back = { depth: "back", radius: 2, x: 300, y: 400 };
+  scrollFlake(front, 100, SIZE);
+  scrollFlake(back, 100, SIZE);
+  expect(front).toMatchObject({ x: 300, y: 300 });
+  expect(back.y).toBeCloseTo(400 - 100 * DEPTHS.back.scroll, 5);
+  expect(back.x).toBe(300);
+  expect(DEPTHS.front.scroll).toBe(1);
+  expect(DEPTHS.mid.scroll).toBeLessThan(DEPTHS.front.scroll);
+  expect(DEPTHS.back.scroll).toBeLessThan(DEPTHS.mid.scroll);
+  // Nach oben scrollen schiebt sie nach unten.
+  scrollFlake(front, -50, SIZE);
+  expect(front.y).toBe(350);
+  // Kein Scrollen: nichts ändert sich.
+  expect(scrollFlake({ ...front }, 0, SIZE)).toMatchObject({ x: 300, y: 350 });
+  // Oben hinaus: unten wieder herein, an einer neuen Stelle.
+  const margin = 5 * 3 + 10;
+  const top = { depth: "front", radius: 5, x: 300, y: 10 };
+  scrollFlake(top, 100, SIZE, () => 0.25);
+  expect(top.y).toBeCloseTo(10 - 100 + SIZE.height + margin * 2, 5);
+  expect(top.x).toBe(SIZE.width * 0.25);
+  // Ein Sprung über viele Fensterhöhen bleibt im Bild - in beide Richtungen.
+  [7321, -9105, 50000].forEach((jump) => {
+    const flake = { depth: "front", radius: 5, x: 300, y: 200 };
+    scrollFlake(flake, jump, SIZE, () => 0.5);
+    expect(flake.y).toBeGreaterThanOrEqual(-margin);
+    expect(flake.y).toBeLessThan(SIZE.height + margin);
+  });
 });

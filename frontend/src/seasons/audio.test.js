@@ -1,5 +1,5 @@
 import { DUCK_LEVEL, MIN_GAP_MS, MUSIC_LEVEL, SFX_LEVEL, SOUND_EVENT, SOUND_STORAGE_KEY, createSoundEngine, emitSound, getActiveEngine, noiseBuffer, readSoundPrefs, setActiveEngine, writeSoundPrefs } from "./audio";
-import { BELL_NOTES, instruments, music, palette } from "./halloween/sounds";
+import { BELL_NOTES, MEOWS, instruments, meow, music, palette } from "./halloween/sounds";
 
 // Saison-Klänge (#679): die Engine wartet auf die erste Geste, spielt Instrumente der Palette, begrenzt die Dichte,
 // duckt die Musik, merkt sich Töne/Musik an oder aus; die Halloween-Palette baut für jedes Geräusch einen endlichen
@@ -200,7 +200,7 @@ test("Halloween-Palette: jedes Instrument baut einen endlichen Graph mit Start u
   expect(ctx.log.starts).toBeGreaterThan(20);
   expect(ctx.log.stops).toBe(ctx.log.starts);
   expect(ctx.log.connections).toBeGreaterThan(ctx.log.starts);
-  expect(Object.keys(instruments).sort()).toEqual(["bat_scare", "cat_walk", "ghost", "grave", "hiss", "lantern", "pumpkin", "scare_hit", "web_fly", "web_grab", "web_tear", "whisper"]);
+  expect(Object.keys(instruments).sort()).toEqual(["bat_scare", "cat_meow", "cat_walk", "ghost", "grave", "hiss", "lantern", "pumpkin", "scare_hit", "web_fly", "web_grab", "web_tear", "whisper"]);
 });
 
 test("Halloween-Musik: Drone und Wind laufen, bei Nacht kommen gewürfelte Glocken und ein Herzschlag, am Tag nicht; stop räumt", () => {
@@ -231,4 +231,28 @@ test("Halloween-Musik: Drone und Wind laufen, bei Nacht kommen gewürfelte Glock
   const quiet = set.music(fakeAudioContext(), dest, { noise: noiseBuffer, interval: (fn) => { fn(); return 3; }, clear: vi.fn() });
   expect(quiet.scheduled).toEqual([]);
   quiet.stop();
+});
+
+test("Die Katze miaut in drei Arten und läuft danach los: Tonhöhenbogen, zwei Formanten, Tapser erst nach dem Laut", () => {
+  const voices = [0.1, 0.5, 0.9].map((roll) => {
+    const ctx = fakeAudioContext();
+    const dest = ctx.createGain();
+    instruments.cat_meow(ctx, dest, { noise: noiseBuffer, rng: () => roll });
+    expect(ctx.log.stops).toBe(ctx.log.starts);
+    const pitches = ctx.log.params.filter(([name]) => name === "frequency");
+    const filters = ctx.log.params.filter(([name]) => name === "filter");
+    return { ctx, start: pitches[0][2], peak: pitches[1][2], end: pitches[2][2], filters: filters.length, steps: pitches.filter(([, kind, value]) => kind === "set" && value === 220).map(([, , , at]) => at) };
+  });
+  expect(voices.map((voice) => Math.round(voice.start))).toEqual(MEOWS.map((kind) => Math.round(430 * kind.pitch)));
+  voices.forEach((voice, index) => {
+    expect(voice.peak).toBeGreaterThan(voice.start);
+    expect(voice.end).toBeLessThan(voice.start);
+    expect(voice.filters).toBeGreaterThanOrEqual(6);
+    expect(voice.steps).toHaveLength(4);
+    expect(voice.steps[0]).toBeCloseTo(MEOWS[index].seconds + 0.12, 5);
+  });
+  const ctx = fakeAudioContext();
+  meow(ctx, ctx.createGain(), { t: 2 });
+  expect(ctx.log.params.every(([, , , at]) => at >= 2)).toBe(true);
+  expect(ctx.log.nodes.filter((node) => node.kind === "osc")).toHaveLength(2);
 });

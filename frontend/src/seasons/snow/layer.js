@@ -1,10 +1,10 @@
 // Die Schnee-Ebene für den gemeinsamen Canvas-Loop (S7, #638; W2, #728): hält die Flocken je Tiefe, zeichnet sie
 // als vorgezeichnete Sprites (sechs Formen in drei Größen, hinten weich), hört auf das Wetter (Wind und ob es
-// wirklich schneit), führt die Böen und den Ausklang. Pausiert wird sie vom Loop (versteckter Tab); ohne Bewegung
+// wirklich schneit), führt die Böen und den Ausklang und schiebt die Flocken mit dem Scrollen (sie gehören zur Seite). Pausiert wird sie vom Loop (versteckter Tab); ohne Bewegung
 // (Reduced Motion, „dezent“) wird sie gar nicht erst erzeugt (index.jsx).
 
 import { hashString, mulberry32 } from "../rng";
-import { DEPTHS, DEPTH_ORDER, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, nextGust, windAt, windFrom } from "./flakes";
+import { DEPTHS, DEPTH_ORDER, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, nextGust, scrollFlake, windAt, windFrom } from "./flakes";
 
 /** Sprite-Größen (Radius), auf die eine Flocke gerundet wird. */
 export const SPRITE_RADII = [1.6, 2.6, 4, 6.2];
@@ -119,6 +119,8 @@ function spriteFor(sprites, flake) {
 export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weather = null, endsAt = "", win = typeof window === "undefined" ? null : window, doc = typeof document === "undefined" ? null : document, now = () => Date.now(), ratio = 1 } = {}) {
   const rng = mulberry32(hashString(`snow:${seed}`));
   const state = { t: 0, wind: windFrom(weather), snowing: Boolean(weather && Number(weather.snow_cm) > 0), gust: nextGust(rng, 0), flakes: { back: [], mid: [], front: [] }, counts: null, sprites: null, lastCount: -1e9, spawned: 0 };
+  // Scrollstand des letzten Bildes: die Flocken gehören zur Seite, der Unterschied schiebt sie (scrollFlake).
+  let lastScrollY = win ? Number(win.scrollY) || 0 : 0;
   const onWeather = (event) => {
     const detail = event && event.detail;
     if (!detail) return;
@@ -152,9 +154,13 @@ export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weathe
       }
       if (state.t > state.gust.at + state.gust.length + 4) state.gust = nextGust(rng, state.t);
       const wind = windAt(state.t, state.wind, state.gust);
+      const scrollY = win ? Number(win.scrollY) || 0 : 0;
+      const scrolled = scrollY - lastScrollY;
+      lastScrollY = scrollY;
       DEPTH_ORDER.forEach((depth) => {
         const soft = DEPTHS[depth].soft;
         state.flakes[depth].forEach((flake) => {
+          if (scrolled) scrollFlake(flake, scrolled, size);
           advanceFlake(flake, dt, wind, size);
           if (flake.y < -20 || flake.y > size.height + 20) return;
           ctx.save();
@@ -178,7 +184,7 @@ export function createSnowLayer({ budget = 120, share = 1, seed = "snow", weathe
     },
     /** Nur für Tests. */
     state() {
-      return { t: state.t, wind: state.wind, snowing: state.snowing, counts: state.counts, gust: state.gust, flakes: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].length])) };
+      return { t: state.t, wind: state.wind, snowing: state.snowing, counts: state.counts, gust: state.gust, flakes: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].length])), positions: Object.fromEntries(DEPTH_ORDER.map((depth) => [depth, state.flakes[depth].map((flake) => ({ x: flake.x, y: flake.y }))])) };
     },
   };
 }

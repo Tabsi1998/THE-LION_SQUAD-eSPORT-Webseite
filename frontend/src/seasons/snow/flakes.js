@@ -2,14 +2,14 @@
 // und schnell, in der Mitte mittel, vorne groß, langsam und als Kristall. Keine zwei Flocken gleich: eigene Form,
 // Größe, Fallgeschwindigkeit, Taumeln (Drehung), Schwingen oder Spiralen mit eigener Phase, ein paar schnelle
 // Ausreißer. Der Wind kommt aus dem Wetter (Stärke und Richtung), dazu Böen alle 20–40 s, die alle Ebenen
-// gemeinsam schieben - vorne mehr als hinten. Reine Rechnung für den gemeinsamen Canvas-Loop (sky.js); das
-// Zeichnen liegt in layer.js.
+// gemeinsam schieben - vorne mehr als hinten. Die Flocken gehören zur Seite: beim Scrollen fährt man an ihnen
+// vorbei (`scrollFlake`). Reine Rechnung für den gemeinsamen Canvas-Loop (sky.js); das Zeichnen liegt in layer.js.
 
 /** Die drei Tiefen: Anteil am Budget, Größe, Fallgeschwindigkeit (px/s), Anteil des Winds, Schwingweite. */
 export const DEPTHS = {
-  back: { share: 0.5, size: [1.2, 2.2], fall: [42, 70], wind: 0.45, sway: [4, 10], spin: 0, soft: true },
-  mid: { share: 0.32, size: [2.2, 3.6], fall: [30, 52], wind: 0.75, sway: [8, 18], spin: 0.6, soft: false },
-  front: { share: 0.18, size: [3.8, 6.5], fall: [18, 36], fall2: 26, wind: 1.1, sway: [12, 26], spin: 1.2, soft: false },
+  back: { share: 0.5, size: [1.2, 2.2], fall: [42, 70], wind: 0.45, sway: [4, 10], spin: 0, soft: true, scroll: 0.55 },
+  mid: { share: 0.32, size: [2.2, 3.6], fall: [30, 52], wind: 0.75, sway: [8, 18], spin: 0.6, soft: false, scroll: 0.8 },
+  front: { share: 0.18, size: [3.8, 6.5], fall: [18, 36], wind: 1.1, sway: [12, 26], spin: 1.2, soft: false, scroll: 1 },
 };
 export const DEPTH_ORDER = ["back", "mid", "front"];
 /** Sechs Formen: weicher Punkt, Sternkristall, Plättchen, Nadelpaar, Klümpchen, Dendrit. */
@@ -97,6 +97,24 @@ export function advanceFlake(flake, dt, wind, size) {
     flake.y = -margin;
     flake.x = Math.random() * size.width;
   }
+  return flake;
+}
+
+/**
+ * Scrollen (Rückmeldung des Betreibers, 29.09.): die Flocken gehören zur Seite, nicht zum Fenster. Wer scrollt,
+ * fährt an ihnen vorbei - vorne ganz (`scroll` 1: die Flocke steht in der Seite), in der Mitte und hinten weniger
+ * (Ferne). Was oben oder unten hinausgeschoben wird, kommt auf der anderen Seite an einer neuen Stelle herein, damit
+ * es überall gleich dicht schneit; auch ein Sprung über viele Fensterhöhen bleibt im Bild.
+ */
+export function scrollFlake(flake, deltaY, size, random = Math.random) {
+  if (!deltaY) return flake;
+  const depth = DEPTHS[flake.depth] || DEPTHS.mid;
+  const margin = flake.radius * 3 + 10;
+  const span = size.height + margin * 2;
+  const moved = flake.y - deltaY * depth.scroll;
+  const wrapped = ((((moved + margin) % span) + span) % span) - margin;
+  if (Math.abs(wrapped - moved) > 0.5) flake.x = random() * size.width;
+  flake.y = wrapped;
   return flake;
 }
 
