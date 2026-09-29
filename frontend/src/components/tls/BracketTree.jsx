@@ -131,7 +131,7 @@ function StageBracketTree({ stages, matches, regMap, podiumMap, compact = false,
   }, [matches]);
 
   return (
-    <div className={isTv ? "space-y-4 h-full overflow-hidden" : "space-y-10"}>
+    <div className={isTv ? "space-y-4 h-full overflow-hidden" : "space-y-10"} data-season-quiet="bracket">
       {stagesForView.map((stage) => {
         const stageSections = byStage[stage.id] || {};
         const sectionNames = Object.keys(stageSections);

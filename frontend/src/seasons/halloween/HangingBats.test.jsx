@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { HangingBats, KIND_WEIGHTS, MIN_DISTANCE, chooseAnchors, flightPath, measureAnchors, pointOn } from "./HangingBats";
+import { createMotionScheduler, resetMotionScheduler } from "../motion";
+
+// Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
+beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
+afterAll(() => resetMotionScheduler(null));
 
 // Hängende Fledermäuse (#661, Runde V): Anker sind Menüpunkte (am Fenster), Buchstaben der letzten Zeile einer
 // Überschrift, Karten und der Löwe (in der Seite); sie hängen still, ein Klick lässt sie aus dem Bild fliegen.
@@ -231,4 +236,45 @@ test("ohne Anzahl oder ohne Anker nichts", async () => {
   });
   expect(screen.queryByTestId("halloween-hanging-bats")).toBeNull();
   expect(screen.queryByTestId("halloween-hanging-bats-fixed")).toBeNull();
+});
+
+test("Ruhezonen (H10): kein Anker in Formularen, Dialogen oder markierten Bereichen", () => {
+  mountFixture('<header><nav><a id="n1">News</a><a id="n2">Events</a></nav></header><main><div id="quiet" data-season-quiet></div><form id="f"><a id="c1" data-season-anchor="card">Karte im Formular</a></form><a id="c2" data-season-anchor="card">Freie Karte</a></main>');
+  rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
+  rectOf(document.getElementById("n2"), { left: 300, right: 380, top: 20, bottom: 44 });
+  rectOf(document.getElementById("quiet"), { left: 80, right: 180, top: 0, bottom: 60 });
+  rectOf(document.getElementById("f"), { left: 0, right: 500, top: 600, bottom: 900 });
+  rectOf(document.getElementById("c1"), { left: 40, right: 400, top: 650, bottom: 850 });
+  rectOf(document.getElementById("c2"), { left: 40, right: 400, top: 1000, bottom: 1200 });
+  const found = measureAnchors();
+  expect(found.filter((anchor) => anchor.kind === "nav").map((anchor) => anchor.element.id)).toEqual(["n2"]);
+  expect(found.filter((anchor) => anchor.kind === "card").map((anchor) => anchor.element.id)).toEqual(["c2"]);
+  expect(measureAnchors(document, window, []).filter((anchor) => anchor.kind === "nav").length).toBe(2);
+});
+
+test("Ausweichen (H10): öffnet sich ein Dialog über einer Fledermaus, wird sie unsichtbar - und kommt zurück", async () => {
+  vi.useFakeTimers();
+  mountFixture('<header><nav><a id="n1">News</a></nav></header><main></main>');
+  rectOf(document.getElementById("n1"), { left: 100, right: 160, top: 20, bottom: 44 });
+  render(<MemoryRouter initialEntries={["/"]}><HangingBats count={1} seed={0.3} salt="x" /></MemoryRouter>);
+  await act(async () => {
+    vi.advanceTimersByTime(450);
+  });
+  const bat = screen.getByTestId("halloween-bat-hanging");
+  expect(bat.getAttribute("data-yield")).toBeNull();
+  const dialog = document.createElement("div");
+  dialog.setAttribute("role", "dialog");
+  rectOf(dialog, { left: 60, right: 300, top: 0, bottom: 200 });
+  document.body.appendChild(dialog);
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300);
+  });
+  expect(screen.getByTestId("halloween-bat-hanging").getAttribute("data-yield")).toBe("1");
+  expect(screen.getByTestId("halloween-bat-hanging").className).toContain("tls-hbat--yield");
+  dialog.remove();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(300);
+  });
+  expect(screen.getByTestId("halloween-bat-hanging").getAttribute("data-yield")).toBeNull();
+  vi.useRealTimers();
 });

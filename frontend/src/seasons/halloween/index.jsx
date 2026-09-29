@@ -12,6 +12,8 @@ import { advanceWisp, createWisp, drawWisp, nextWispDelay } from "./wisps";
 import { palette } from "./sounds";
 import { recordSignal } from "../signals";
 import { emitSound } from "../audio";
+import { capabilities, scaleForViewport } from "../intensity";
+import { releaseMotion, requestMotion } from "../motion";
 import { MoonInSky } from "../MoonInSky";
 import { useSeason } from "../SeasonContext";
 import { ScareToggle, Scares } from "./Scare";
@@ -30,18 +32,28 @@ export const ACCENT = "rgba(170, 225, 240, 0.35)";
 export const SIGNAL_KEY = "halloween_pumpkin";
 export const FACES = ["grin", "calm", "wicked"];
 /** Salz je Ladung: die ganze Anordnung würfelt sich bei jedem Laden neu - innerhalb einer Sitzung bleibt sie je Seite. */
-export const LOAD_SALT = Math.random().toString(36).slice(2, 8);
+export let LOAD_SALT = Math.random().toString(36).slice(2, 8);
+
+/** Nur für Tests: ein fester Salt, damit die Anordnung je Seite reproduzierbar ist. */
+export function setLoadSalt(value) {
+  LOAD_SALT = String(value);
+}
 
 /** Zählt der Klick? Nur am 31. Oktober ab 18:00 (Ortszeit des Geräts, der Server prüft später selbst). */
 export function pumpkinCounts(now = new Date()) {
   return now.getMonth() === 9 && now.getDate() === 31 && now.getHours() >= 18;
 }
 
-/** Was diese Seite bekommt - aus Adresse und Ladungs-Salz berechnet: gleiche Seite in dieser Sitzung gleich, jede Ladung neu. */
-export function pageLayout(pathname, intensity = "normal", salt = LOAD_SALT) {
+/**
+ * Was diese Seite bekommt - aus Adresse und Ladungs-Salz berechnet: gleiche Seite in dieser Sitzung gleich, jede
+ * Ladung neu. Alle Zufallszahlen werden immer gezogen; danach kappen die Fähigkeiten der Seite (H17: Startseite
+ * lebendig, Bracket und Formulare ruhig) und die Fensterbreite (H18), was tatsächlich erscheint.
+ */
+export function pageLayout(pathname, intensity = "normal", salt = LOAD_SALT, width = typeof window === "undefined" ? 1280 : window.innerWidth) {
   const rng = pageRng(`${pathname}|${salt}`, "halloween");
   const full = intensity === "full";
   const subtle = intensity === "subtle";
+  const caps = scaleForViewport(capabilities(pathname, intensity), width);
   // Alle Zufallszahlen werden immer gezogen - die Stärke schaltet nur ab, damit „dezent“ dieselbe Seite zeigt, nur ruhiger.
   const corner = rng() < 0.7 ? "tl" : "tr";
   const web = { corner, factor: between(rng, 0.85, 1.15), seed: rng(), build: rng() < 0.7 && !subtle, windBase: between(rng, 0.4, 0.9) };
@@ -64,7 +76,24 @@ export function pageLayout(pathname, intensity = "normal", salt = LOAD_SALT) {
   const footerPumpkins = [{ face: pick(rng, FACES), size: Math.round(between(rng, 46, 60)) }];
   if (rng() < 0.5) footerPumpkins.push({ face: pick(rng, FACES), size: Math.round(between(rng, 34, 44)), slow: true });
   const flock = full ? [5, 8] : [3, 5];
-  return { web, secondWeb, spiders, crawler, rappel, hangingBats, graves, cat, moon, footerPumpkins, flock, lanternFace: pick(rng, FACES), night: false };
+  const drawn = { web, secondWeb, spiders, crawler, rappel, hangingBats, graves, cat, moon, footerPumpkins, flock, lanternFace: pick(rng, FACES), night: false };
+  return applyCapabilities(drawn, caps);
+}
+
+/** Die gewürfelte Anordnung an die Fähigkeiten der Seite anpassen - nur kappen, nie neu würfeln. */
+export function applyCapabilities(layout, caps) {
+  return {
+    ...layout,
+    caps,
+    secondWeb: caps.webs >= 2 ? layout.secondWeb : null,
+    spiders: caps.rappel ? layout.spiders : [],
+    crawler: caps.crawler ? layout.crawler : null,
+    rappel: caps.rappel ? layout.rappel : null,
+    hangingBats: Math.min(layout.hangingBats, caps.hangingBats),
+    flock: caps.flock ? caps.flockRange : [0, 0],
+    wisps: Boolean(caps.wisps),
+    scares: Boolean(caps.scares),
+  };
 }
 
 function useLayout(season) {
@@ -89,11 +118,20 @@ function useRecurring(spec, active) {
     if (!spec || !active) return undefined;
     let timer = 0;
     let stopped = false;
+    let token = null;
     const show = () => {
       if (stopped) return;
+      // Bewegungsbudget (H11): ohne freien Platz später noch einmal fragen.
+      token = requestMotion("crawler");
+      if (!token) {
+        timer = window.setTimeout(show, 20000);
+        return;
+      }
       setVisible(true);
       timer = window.setTimeout(() => {
         setVisible(false);
+        releaseMotion(token);
+        token = null;
         timer = window.setTimeout(show, spec.every * 1000);
       }, (spec.duration || 16) * 1000);
     };
@@ -101,6 +139,7 @@ function useRecurring(spec, active) {
     return () => {
       stopped = true;
       window.clearTimeout(timer);
+      if (token) releaseMotion(token);
     };
   }, [spec, active]);
   return visible;
@@ -156,6 +195,7 @@ export function RappelSpider({ spec, active }) {
     let last = performance.now();
     let acc = 0;
     let frame = 0;
+    let token = null;
     setState(current);
     const env = () => {
       const line = document.querySelector("footer [data-season-line]");
@@ -166,7 +206,16 @@ export function RappelSpider({ spec, active }) {
       const now = performance.now();
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
+      // Bewegungsbudget (H11): kurz vor dem Abseilen einen Platz holen - sonst noch acht Sekunden warten.
+      if (current.phase === "wait" && current.timer - dt <= 0 && !token) {
+        token = requestMotion("rappel");
+        if (!token) current = { ...current, timer: 8 };
+      }
       const next = advanceRappel(current, dt, env());
+      if (token && next.phase === "wait" && current.phase !== "wait") {
+        releaseMotion(token);
+        token = null;
+      }
       acc += dt;
       if (next.phase !== current.phase || acc >= 0.04) {
         acc = 0;
@@ -176,7 +225,10 @@ export function RappelSpider({ spec, active }) {
       frame = window.requestAnimationFrame(tick);
     };
     frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (token) releaseMotion(token);
+    };
   }, [spec, active]);
   if (!spec || !active || !state || typeof document === "undefined") return null;
   const view = rappelView(state);
@@ -230,7 +282,7 @@ export function Corners({ season }) {
       )}
       <RappelSpider spec={layout.rappel} active={moving} />
       <HangingBats count={moving ? layout.hangingBats : 0} seed={layout.web.seed} salt={LOAD_SALT} />
-      {moving && <Scares season={season} />}
+      {moving && layout.scares && <Scares season={season} />}
     </>
   );
 }
@@ -423,7 +475,8 @@ export function skyLayers({ season, reducedMotion, weather = null }) {
   const layout = pageLayout(pathname, season.effective);
   const layers = [createWebLayer({ ...layout.web, weather })];
   if (layout.secondWeb) layers.push(createWebLayer({ ...layout.secondWeb, weather }));
-  const state = { flock: null, wait: 6, lastPath: pathname, pageArmed: true, wisp: null, wispWait: nextWispDelay(night, rng) };
+  const state = { flock: null, flockToken: null, wait: 6, lastPath: pathname, pageArmed: true, wisp: null, wispWait: nextWispDelay(night, rng) };
+  const flockAllowed = layout.flock[1] > 0;
   // Seitenwechsel: ein Schwarm darf kurz darauf starten - höchstens einmal je Minute.
   const onPage = (event) => {
     const path = event?.detail?.pathname || "";
@@ -436,12 +489,18 @@ export function skyLayers({ season, reducedMotion, weather = null }) {
     }, 60000);
   };
   if (typeof window !== "undefined") window.addEventListener("tls:season-page", onPage);
-  layers.push({
+  if (flockAllowed) layers.push({
     key: "halloween-bats",
     draw(ctx, dt, size) {
       if (!state.flock) {
         state.wait -= dt;
         if (state.wait > 0) return;
+        // Bewegungsbudget (H11): der Schwarm ist eine große Bewegung - ohne Platz in 5–15 s noch einmal.
+        state.flockToken = requestMotion("flock");
+        if (!state.flockToken) {
+          state.wait = 5 + rng() * 10;
+          return;
+        }
         state.flock = createFlock(size, layout.flock, rng, pageView(size));
         dt = Math.max(0, -state.wait);
         state.wait = 0;
@@ -454,19 +513,27 @@ export function skyLayers({ season, reducedMotion, weather = null }) {
       });
       if (state.flock.done) {
         state.flock = null;
+        releaseMotion(state.flockToken);
+        state.flockToken = null;
         state.wait = nextFlightDelay(night, rng);
       }
     },
     dispose() {
       if (typeof window !== "undefined") window.removeEventListener("tls:season-page", onPage);
+      if (state.flockToken) releaseMotion(state.flockToken);
     },
   });
-  layers.push({
+  if (layout.wisps) layers.push({
     key: "halloween-wisps",
     draw(ctx, dt, size) {
       if (!state.wisp) {
         state.wispWait -= dt;
         if (state.wispWait > 0) return;
+        // Schwaden zählen keinen Platz, halten aber Abstand zu ihresgleichen (Abklingzeit).
+        if (!requestMotion("wisp")) {
+          state.wispWait = 20;
+          return;
+        }
         state.wisp = createWisp(size, rng);
       }
       drawWisp(ctx, advanceWisp(state.wisp, dt, size));

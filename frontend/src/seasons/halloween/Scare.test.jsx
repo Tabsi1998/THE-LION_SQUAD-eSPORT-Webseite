@@ -15,6 +15,11 @@ vi.mock("../SeasonContext", () => ({ useSeason: () => seasonState }));
 
 const { ScareToggle, Scares } = await import("./Scare");
 const { emitSound } = await import("../audio");
+import { createMotionScheduler, resetMotionScheduler } from "../motion";
+
+// Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
+beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
+afterAll(() => resetMotionScheduler(null));
 
 function halloween(night = true) {
   return { key: "halloween", effective: "full", data: { night } };

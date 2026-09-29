@@ -188,3 +188,6 @@
 @media (prefers-reduced-motion: reduce) {
   .tls-scare { display: none; }
 }
+
+/* Ruhezonen (H10): eine Fledermaus unter einem geöffneten Dialog oder Menü weicht aus. */
+.tls-hbat--yield { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }

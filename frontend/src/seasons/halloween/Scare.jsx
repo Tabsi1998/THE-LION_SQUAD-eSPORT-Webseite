@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { Skull } from "lucide-react";
 import { emitSound, getActiveEngine } from "../audio";
+import { requestMotion } from "../motion";
 import { useSeason } from "../SeasonContext";
 import { isQuietPath } from "../SeasonStage";
 import { Cat, FlyingBatShape, Ghost, Lantern, Spider } from "./art";
@@ -63,6 +64,11 @@ export function Scares({ season, allowed, rng = Math.random, now = () => Date.no
       }, now());
       setReason(verdict.reason);
       if (!verdict.ok) return;
+      // Bewegungsbudget (H11): der Schreck braucht beide Plätze - läuft gerade etwas Großes, dann nicht jetzt.
+      if (!requestMotion("jumpscare")) {
+        setReason("budget");
+        return;
+      }
       const variant = pickVariant(rng, { night, lastFigure: lastFigure.current });
       lastFigure.current = variant.figure;
       markScared(storage, today);
