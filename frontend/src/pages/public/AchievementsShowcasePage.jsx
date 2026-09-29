@@ -6,6 +6,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AchievementGroupsView, formatPercent } from "@/components/tls/AchievementGroups";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -379,9 +380,7 @@ function WeekTile({ week, loading }) {
       </div>
       {award ? (
         <div className="mt-3 flex items-start gap-4">
-          <div className="w-14 h-14 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: `${color}66`, backgroundColor: `${color}14` }}>
-            <AchievementIcon name={award.icon} fallback="trophy" className="w-7 h-7" style={{ color, filter: `drop-shadow(0 0 6px ${color}88)` }} />
-          </div>
+          <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon} size="xl" animate title={award.name} testId="week-award-badge" />
           <div className="min-w-0 flex-1">
             <div className="font-heading text-lg md:text-xl font-black uppercase leading-tight truncate" data-testid="week-award-name">{award.name}</div>
             <div className="text-[10px] uppercase tracking-widest text-white/45 mt-0.5 truncate">{award.group_name} · <span style={{ color }}>{award.material_name}</span></div>

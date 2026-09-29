@@ -8,6 +8,7 @@
  * Secret negative/fun groups appear only after a user has earned at least one
  * tier. Locked negative tiers are never sent by the API.
  *
+ * Seit #618 zeigen die Zeilen das Abzeichen (Material, Rang-Kerben, Motiv; Silhouette mit Fortschrittsring).
  * Seit #619: Seltenheit je Gruppe und Stufe („4,2 % haben Diamant“), Sortierung nach Seltenheit,
  * die „?“-Karte mit dem Zähler für geheime Gruppen und die Vitrine „Für Vereinsmitglieder“;
  * im eigenen Profil Filter (Material, Status), das Anheften einzelner Stufen und „Teilen“ je Vergabe.
@@ -15,8 +16,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, CircleHelp, Lock, Pin, PinOff, Share2 } from "lucide-react";
+import { ChevronDown, CircleHelp, Pin, PinOff, Share2 } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 
 const LEVEL_META = {
   1: { name: "Bronze",   color: "#CD7F32" },
@@ -51,47 +53,27 @@ export function formatPercent(value) {
   return `${n.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
 }
 
-// Escalating, animated medal per tier level. Every rarity has its own signature:
-// Bronze ember, Silver sheen, Gold spark orbit, Platinum float+ring, Legendary flames.
-export function TierMedal({ level, icon, earned = true, size = "md" }) {
-  const lvl = LEVEL_META[level] || LEVEL_META[1];
-  const dim = size === "lg" ? "w-12 h-12" : size === "sm" ? "w-8 h-8" : "w-9 h-9";
-  const iconDim = size === "lg" ? "w-5 h-5" : "w-4 h-4";
-  const framed = earned && level >= 3;
-  const innerClass = framed
-    ? `tls-frame tls-frame--${level}`
-    : earned && level === 2
-      ? "tls-medal-silver"
-      : earned && level === 1
-        ? "tls-medal-bronze"
-        : "";
-  const staticStyle = framed
-    ? {}
-    : {
-        borderWidth: 1,
-        borderStyle: "solid",
-        borderColor: earned ? lvl.color + "66" : "rgba(255,255,255,0.07)",
-        backgroundColor: earned ? lvl.color + "14" : "transparent",
-      };
-  const orbitColor = level === 5 ? "#FFD700" : level === 4 ? "#7FDBFF" : "#FFE58A";
+// Das Abzeichen (E8, #618) in Listen: Material und Motiv aus dem Katalog, nicht erreichte Stufen als
+// Silhouette mit Fortschrittsring; der Hover sagt, wie man es schafft.
+function ListBadge({ tier, group, earned = true, size = "md", animate = false, percent = 0 }) {
+  const howTo = !earned ? (tier?.how_to || group?.how_to || tier?.description || "") : "";
   return (
-    <motion.div
-      className={`${dim} relative shrink-0 ${earned && level === 4 ? "tls-float" : ""}`}
-      whileHover={earned ? { scale: 1.14, rotate: -6 } : undefined}
-      transition={{ type: "spring", stiffness: 320, damping: 14 }}
-    >
-      <div className={`w-full h-full rounded-sm flex items-center justify-center overflow-hidden relative ${innerClass}`} style={staticStyle}>
-        {earned
-          ? <AchievementIcon name={icon} className={`${iconDim} relative z-[1] ${level >= 5 ? "tls-flame" : ""}`} style={{ color: lvl.color, filter: framed && level < 5 ? `drop-shadow(0 0 4px ${lvl.color})` : undefined }} />
-          : <Lock className="w-3.5 h-3.5 text-white/25" />}
-      </div>
-      {framed && (
-        <span className="tls-orbit" style={{ "--orbit-color": orbitColor, "--orbit-speed": level === 5 ? "2.6s" : level === 4 ? "3.6s" : "4.6s" }} aria-hidden="true"><i /></span>
-      )}
-      {earned && level === 5 && (
-        <span className="tls-orbit tls-orbit--rev" style={{ "--orbit-color": "#FF3B30", "--orbit-speed": "3.8s" }} aria-hidden="true"><i /></span>
-      )}
-    </motion.div>
+    <span className="inline-flex shrink-0" title={howTo ? `So schaffst du es: ${howTo}` : undefined} data-testid={tier?.code ? `badge-${tier.code}` : undefined}>
+      <Badge
+        material={tier?.material}
+        level={tier?.level}
+        rank={tier?.rank}
+        art={group?.art || tier?.art}
+        icon={tier?.icon || group?.icon}
+        earned={earned}
+        percent={percent}
+        size={size}
+        animate={animate}
+        special={group?.is_special || group?.category === "special"}
+        negative={Boolean(group?.is_negative)}
+        title={tier?.name}
+      />
+    </span>
   );
 }
 
@@ -343,12 +325,8 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
         className="w-full flex items-center gap-4 p-4 text-left hover:bg-white/[0.02] transition"
       >
         {hasAny
-          ? <TierMedal level={highest.level} icon={group.icon} earned size="lg" />
-          : (
-            <div className="w-12 h-12 rounded-sm flex items-center justify-center border border-white/8 shrink-0">
-              <Lock className="w-4 h-4 text-white/30" />
-            </div>
-          )}
+          ? <ListBadge tier={highest} group={group} earned size="lg" animate={prestige} />
+          : <ListBadge tier={nextLocked || group.tiers[0]} group={group} earned={false} size="lg" percent={isNegative ? 0 : Number(nextLocked?.percent || 0)} />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="font-heading text-base md:text-lg font-bold uppercase truncate">{group.name}</div>
@@ -440,7 +418,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
         ? { duration: 6, repeat: Infinity, ease: "easeInOut" }
         : undefined}
     >
-      <TierMedal level={tier.level} icon={tier.icon} earned={tier.earned} size="sm" />
+      <ListBadge tier={tier} group={group} earned={tier.earned} size="md" percent={Number(tier.percent || 0)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>

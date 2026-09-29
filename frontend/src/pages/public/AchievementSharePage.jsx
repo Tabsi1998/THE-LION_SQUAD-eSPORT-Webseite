@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Lock, Share2, Trophy } from "lucide-react";
 import { toast } from "sonner";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
-import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { Badge } from "@/components/achievements/Badge";
 import { formatPercent } from "@/components/tls/AchievementGroups";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { shareAchievement } from "@/lib/shareAchievement";
@@ -79,7 +79,7 @@ export default function AchievementSharePage() {
             <div className="p-5 md:p-6 grid md:grid-cols-[minmax(0,1fr)_auto] gap-5 items-start">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.35em]" style={{ color }}>
-                  <AchievementIcon name={card.icon} fallback="trophy" className="w-3.5 h-3.5" /> {card.group_name}
+                  <Badge material={card.material} rank={card.rank} art={card.art} icon={card.icon} size="sm" title={card.name} /> {card.group_name}
                 </div>
                 <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase leading-none" data-testid="share-name">{card.name}</h1>
                 <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-white/60">

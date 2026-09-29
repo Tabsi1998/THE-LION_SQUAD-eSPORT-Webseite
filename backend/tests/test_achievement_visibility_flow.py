@@ -232,6 +232,7 @@ async def test_erfolg_der_woche_und_laufband(flow):
     assert week["week_key"] == key and week["from"] == start.isoformat() and week["to"] == end.isoformat()
     assert week["award"]["tier_code"] == tournament_tier["code"] and week["award"]["user"]["username"] == "ben", "am wenigsten Leute haben es"
     assert week["award"]["holders"] == 1 and week["award"]["percent"] == round(100 / 3, 1)
+    assert week["award"]["rank"] >= 1 and "art" in week["award"], "Rang und Motiv fürs Abzeichen der Woche"
     assert "id" in week["award"]["user"] and "email" not in week["award"]["user"]
     # Festgelegt bleibt festgelegt - auch wenn Ben sein Profil danach schließt; erst force rechnet neu.
     await flow.db.users.update_one({"id": ben["id"]}, {"$set": {"privacy_public_profile": False}})
@@ -246,7 +247,7 @@ async def test_erfolg_der_woche_und_laufband(flow):
     assert ("anna", "matches_played_1") in names
     assert not any(r["user"]["username"] in ("ben", "dora") for r in recent), "nur öffentliche Profile"
     assert not any(r["tier_code"].startswith("neg_") for r in recent), "Negatives läuft nie mit"
-    assert all({"material", "material_color", "group_name", "earned_at", "category"} <= set(r) for r in recent)
+    assert all({"material", "material_color", "group_name", "earned_at", "category", "rank", "art"} <= set(r) for r in recent)
     assert recent == sorted(recent, key=lambda r: r["earned_at"], reverse=True)
 
 
@@ -342,6 +343,7 @@ async def test_dashboard_kachel_liefert_level_naechstes_und_letzte_freischaltung
     summary = (await flow.get("/api/achievements/me/summary")).json()
     assert summary["count"] == 2 and summary["points"] == catalog.MATERIALS["wood"]["points"] + catalog.MATERIALS["iron"]["points"]
     assert summary["last_award"]["code"] == "matches_played_2" and summary["last_award"]["material"] == "iron" and summary["last_award"]["award_id"]
+    assert summary["last_award"]["rank"] == 2 and summary["last_award"]["art"] and summary["last_award"]["level"] == 1, "das Abzeichen braucht Rang, Motiv und Level"
     hidden_total = await flow.db.achievement_groups.count_documents({"hidden": True, "is_negative": {"$ne": True}})
     assert summary["hidden"] == {"total": hidden_total, "earned": 0}
     mine = (await flow.get("/api/achievements/me")).json()

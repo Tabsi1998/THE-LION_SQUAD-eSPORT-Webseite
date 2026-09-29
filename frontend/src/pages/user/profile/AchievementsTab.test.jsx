@@ -120,6 +120,14 @@ describe("AchievementsTab (#619)", () => {
     fireEvent.click(screen.getByTestId("achievement-showcase-clear"));
     expect(screen.getByTestId("achievement-group-matches_played")).toBeInTheDocument();
 
+    // Abzeichen (E8): erreichte Stufen im Material, offene als Silhouette mit Fortschrittsring und Hinweis.
+    fireEvent.click(within(screen.getByTestId("achievement-group-matches_played")).getAllByRole("button")[0]);
+    expect(within(screen.getByTestId("badge-matches_played_2")).getByRole("img")).toHaveAttribute("data-material", "iron");
+    const locked = screen.getByTestId("badge-matches_played_3");
+    expect(within(locked).getByRole("img")).toHaveAttribute("data-locked", "true");
+    expect(locked.querySelector("[data-progress='80']")).not.toBeNull();
+    expect(locked).toHaveAttribute("title", expect.stringContaining("So schaffst du es"));
+    fireEvent.click(within(screen.getByTestId("achievement-group-matches_played")).getAllByRole("button")[0]);
     fireEvent.click(screen.getByTestId("achievement-filter-status-earned"));
     expect(screen.getByTestId("achievement-filter-count")).toHaveTextContent("1 Gruppen");
     expect(screen.queryByTestId("achievement-group-lap_hunter")).toBeNull();
