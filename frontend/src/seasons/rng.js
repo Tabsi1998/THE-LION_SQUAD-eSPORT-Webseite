@@ -32,7 +32,7 @@ export function pageRng(pathname, salt = "") {
 }
 
 /** Saisons, die über Silvester gehen: im Januar bis Juni zählen sie noch zum Jahr ihres Beginns. */
-export const SPANS_NEW_YEAR = ["winter", "new_year"];
+export const SPANS_NEW_YEAR = ["winter", "snow", "new_year", "advent_calendar", "christmas"];
 
 /**
  * Das Jahr einer Saison: aus `starts_at` des Servers, sonst aus der Uhr - eine Saison, die über Silvester geht,

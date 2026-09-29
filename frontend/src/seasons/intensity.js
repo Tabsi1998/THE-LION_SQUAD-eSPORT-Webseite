@@ -93,8 +93,18 @@ function halloweenKeys(fx, { narrow = false } = {}) {
   };
 }
 
+/** Schnee: Anteil der Flocken aus der Atmosphäre, Hauben aus den Ecken (Handy keine), Blauschein wo Atmosphäre erlaubt ist. */
+function snowKeys(fx) {
+  return {
+    flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6,
+    caps: fx.corner > 0,
+    capsMax: fx.corner * 6,
+    tint: fx.ambient !== "none",
+  };
+}
+
 /** Je Saison die Übersetzung der Effektklassen in ihre eigenen Schlüssel - eine neue Saison trägt sich hier ein. */
-export const SEASON_CAPABILITIES = { halloween: halloweenKeys };
+export const SEASON_CAPABILITIES = { halloween: halloweenKeys, snow: snowKeys };
 
 export function capabilitiesFor(cls = "medium", intensity = "normal", season = "halloween") {
   const fx = effectClasses(cls, intensity);

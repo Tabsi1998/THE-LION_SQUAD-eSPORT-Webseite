@@ -35,6 +35,8 @@ test("Saisonjahr: aus dem Serverbeginn, sonst aus der Uhr - Saisons über Silves
   expect(seasonYear("winter", new Date(2027, 0, 15))).toBe(2026);
   expect(seasonYear("winter", new Date(2026, 11, 1))).toBe(2026);
   expect(seasonYear("new_year", new Date(2027, 0, 1, 0, 30))).toBe(2026);
+  expect(seasonYear("snow", new Date(2027, 0, 6))).toBe(2026);
+  expect(seasonYear("advent_calendar", new Date(2027, 0, 3))).toBe(2026);
   expect(seasonYear("easter", new Date(2027, 3, 4))).toBe(2027);
   expect(seasonYear({ key: "winter", starts_at: "2027-12-01T00:00:00+01:00" }, new Date(2028, 1, 1))).toBe(2027);
   expect(seasonYear({ key: "halloween", starts_at: "" }, new Date(2026, 9, 5))).toBe(2026);
