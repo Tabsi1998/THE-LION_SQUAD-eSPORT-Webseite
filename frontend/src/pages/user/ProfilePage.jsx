@@ -8,7 +8,8 @@ import { buildDirtyPayload, hasPayloadChanges, sameValue } from "@/lib/dirtyPayl
 import { toast } from "sonner";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Save, Crown } from "lucide-react";
-import { AchievementUnlockOverlay } from "@/components/tls/AchievementUnlockOverlay";
+import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
+import { describePackage } from "@/components/achievements/ceremony/select";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { EMAIL_PREFERENCES, NOTIFICATION_CHANNELS, TABS, notificationPreferenceKey } from "./profile/constants";
 import { achievementInsights, profileFormPayload, profileToForm } from "./profile/form";
@@ -67,7 +68,6 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [evaluatingAchievements, setEvaluatingAchievements] = useState(false);
   const [achData, setAchData] = useState(null);
-  const [unlockedTiers, setUnlockedTiers] = useState([]);
   const [completeness, setCompleteness] = useState(null);
   const [games, setGames] = useState([]);
   const initialProfileFormRef = useRef(null);
@@ -310,11 +310,13 @@ export default function ProfilePage() {
         for (const group of fresh.data.groups) {
           if (group.is_negative) continue;
           for (const tier of group.tiers || []) {
-            if (tier.earned && tier.earned_at) earned.push(tier);
+            if (tier.earned && tier.earned_at) earned.push({ ...tier, category: group.category, group_name: group.name, group_code: group.code, hidden: group.hidden });
           }
         }
         earned.sort((a, b) => new Date(b.earned_at) - new Date(a.earned_at));
-        setUnlockedTiers(earned.slice(0, data.newly_awarded));
+        const fresh_tiers = earned.slice(0, data.newly_awarded);
+        // Zeremonie (E8): Paket mit Kontext - erster Erfolg, Gruppe oder Kategorie vollständig.
+        enqueueCeremony(fresh_tiers, describePackage(fresh.data.groups, fresh_tiers));
       } else {
         toast.success("Achievements aktualisiert.");
       }
@@ -333,7 +335,6 @@ export default function ProfilePage() {
     && hasPayloadChanges(buildDirtyPayload(profileFormPayload(form), profileFormPayload(initialProfileFormRef.current)));
   return (
     <PublicLayout>
-      <AchievementUnlockOverlay tiers={unlockedTiers} onClose={() => setUnlockedTiers([])} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
           <div>

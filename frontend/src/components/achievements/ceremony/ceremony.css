@@ -1,0 +1,49 @@
+/* Erfolge II (E8, #618): die Zeremonie-Bühne. Alles per transform/opacity; bei reduzierter Bewegung
+   nur Einblenden. Die Bewegungen je Kategorie (motions.jsx) nutzen diese Klassen für Dauerläufer. */
+.tls-ceremony { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.tls-ceremony__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.86); backdrop-filter: blur(4px); }
+.tls-ceremony__canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tls-ceremony__card { position: relative; width: 100%; max-width: 34rem; border-radius: 0.5rem; border: 1px solid var(--cer-accent, #FFD700); background: linear-gradient(180deg, #141414, #0A0A0A); box-shadow: 0 0 70px color-mix(in srgb, var(--cer-accent, #FFD700) 22%, transparent); overflow: hidden; }
+.tls-ceremony__stage { position: relative; height: 15rem; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+@media (max-width: 640px) { .tls-ceremony__stage { height: 12rem; } .tls-ceremony__stage .tls-badge { width: 120px; height: 120px; } }
+.tls-ceremony__beams { position: absolute; inset: -45%; background: repeating-conic-gradient(from 0deg, transparent 0deg 14deg, color-mix(in srgb, var(--cer-accent, #FFD700) 10%, transparent) 14deg 22deg); animation: tls-spin 16s linear infinite; pointer-events: none; }
+.tls-ceremony__flash { position: absolute; inset: 0; pointer-events: none; background: var(--cer-accent, #FFD700); animation: tls-cer-flash 0.9s ease-out both; }
+.tls-ceremony__flood { position: fixed; inset: 0; pointer-events: none; background: var(--cer-accent, #FFD700); animation: tls-cer-flood 1.4s ease-in-out both; }
+.tls-ceremony__prism { position: fixed; inset: 0; pointer-events: none; background: linear-gradient(115deg, transparent 20%, rgba(255, 122, 217, 0.18), rgba(255, 224, 102, 0.18), rgba(122, 255, 178, 0.18), rgba(122, 184, 255, 0.18), transparent 80%); background-size: 260% 100%; animation: tls-cer-prism 4s linear infinite; mix-blend-mode: screen; }
+.tls-ceremony__banner { position: absolute; left: 0; right: 0; top: 0; z-index: 5; padding: 0.75rem 1rem; text-align: center; background: linear-gradient(180deg, #B3160E, #7A0E08); color: #FFE8E5; font-weight: 900; letter-spacing: 0.35em; text-transform: uppercase; transform-origin: top center; box-shadow: 0 8px 24px rgba(255, 59, 48, 0.35); }
+.tls-ceremony__live { position: absolute; top: 0.9rem; left: 50%; transform: translateX(-50%); padding: 0.2rem 0.6rem; border-radius: 2px; background: #FF3B30; color: #fff; font-size: 10px; font-weight: 900; letter-spacing: 0.3em; animation: tls-cer-blink 1.2s steps(2, jump-none) infinite; }
+.tls-ceremony__scanlines { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 4px); animation: tls-cer-scan 6s linear infinite; }
+.tls-ceremony__spot { position: absolute; top: -20%; left: 50%; width: 60%; height: 140%; transform: translateX(-50%); background: radial-gradient(ellipse at top, color-mix(in srgb, var(--cer-accent, #FFD700) 35%, transparent), transparent 60%); animation: tls-cer-spot 3s ease-in-out infinite alternate; pointer-events: none; }
+.tls-ceremony__curtain { position: absolute; top: 0; bottom: 0; width: 52%; background: repeating-linear-gradient(90deg, #6B0F0A 0 14px, #8A1912 14px 28px); box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6); }
+.tls-ceremony__curtain--left { left: 0; transform-origin: left center; }
+.tls-ceremony__curtain--right { right: 0; transform-origin: right center; }
+.tls-ceremony__smoke { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(168, 85, 247, 0.55), rgba(90, 40, 140, 0.15) 60%, transparent 72%); filter: blur(10px); pointer-events: none; }
+.tls-ceremony__skid { position: absolute; bottom: 22%; left: 8%; right: 42%; height: 6px; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 18px, transparent 18px 26px); transform: skewX(-30deg); border-radius: 3px; }
+.tls-ceremony__speedline { position: absolute; height: 2px; background: linear-gradient(90deg, transparent, var(--cer-accent, #fff)); opacity: 0.7; }
+.tls-ceremony__wave { position: absolute; left: 50%; bottom: 14%; width: 40px; height: 14px; border-radius: 50%; border: 2px solid var(--cer-accent, #fff); transform: translateX(-50%); animation: tls-cer-wave 0.9s ease-out both; }
+.tls-ceremony__bubble { position: absolute; padding: 0.15rem 0.45rem; border-radius: 999px; font-size: 10px; background: color-mix(in srgb, var(--cer-accent, #29B6E8) 25%, #111); border: 1px solid color-mix(in srgb, var(--cer-accent, #29B6E8) 60%, transparent); color: #fff; }
+.tls-ceremony__page { position: absolute; width: 5.5rem; height: 6.5rem; border-radius: 4px; background: linear-gradient(180deg, #f5f5f5, #d9d9d9); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5); transform-origin: top center; }
+.tls-ceremony__page::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1rem; background: var(--cer-accent, #29B6E8); border-radius: 4px 4px 0 0; }
+.tls-ceremony__half { position: absolute; width: 5rem; height: 10rem; background: color-mix(in srgb, var(--cer-accent, #00FF88) 30%, #111); border: 1px solid color-mix(in srgb, var(--cer-accent, #00FF88) 70%, transparent); }
+.tls-ceremony__half--left { border-radius: 10rem 0 0 10rem; }
+.tls-ceremony__half--right { border-radius: 0 10rem 10rem 0; }
+.tls-ceremony__cardframe { position: absolute; width: 16rem; height: 9rem; border: 1px solid color-mix(in srgb, var(--cer-accent, #00FF88) 60%, transparent); border-radius: 6px; background: rgba(255, 255, 255, 0.02); }
+.tls-ceremony__cardline { position: absolute; left: 7.5rem; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--cer-accent, #00FF88) 45%, transparent); transform-origin: left center; }
+.tls-ceremony__flag { position: absolute; top: 0; left: 50%; width: 11rem; height: 12rem; transform-origin: top center; background: linear-gradient(180deg, #B3160E, #7A0E08); clip-path: polygon(0 0, 100% 0, 100% 78%, 50% 100%, 0 78%); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.tls-ceremony__pedestal { display: block; width: 100%; height: 2.2rem; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, color-mix(in srgb, var(--cer-accent, #B9F2FF) 60%, #222), #0d0d0f); transform-origin: bottom center; }
+.tls-ceremony__vitrine { position: absolute; inset: 1rem 2.5rem; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 6px; background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 40%, rgba(255, 255, 255, 0.05)); transform-origin: center; }
+.tls-ceremony__levelnum { font-family: var(--font-display, inherit); font-weight: 900; font-size: 5.5rem; line-height: 1; color: var(--cer-accent, #29B6E8); text-shadow: 0 0 24px color-mix(in srgb, var(--cer-accent, #29B6E8) 60%, transparent); }
+.tls-ceremony__live-text { position: absolute; left: -9999px; }
+
+@keyframes tls-cer-flash { 0% { opacity: 0; } 20% { opacity: 0.35; } 100% { opacity: 0; } }
+@keyframes tls-cer-flood { 0% { opacity: 0; } 30% { opacity: 0.55; } 100% { opacity: 0; } }
+@keyframes tls-cer-prism { from { background-position: 0% 0; } to { background-position: 200% 0; } }
+@keyframes tls-cer-blink { 0% { opacity: 1; } 100% { opacity: 0.35; } }
+@keyframes tls-cer-scan { from { transform: translateY(0); } to { transform: translateY(8px); } }
+@keyframes tls-cer-spot { from { opacity: 0.6; transform: translateX(-52%) rotate(-3deg); } to { opacity: 1; transform: translateX(-48%) rotate(3deg); } }
+@keyframes tls-cer-wave { from { transform: translateX(-50%) scale(0.4); opacity: 0.9; } to { transform: translateX(-50%) scale(6); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-ceremony__beams, .tls-ceremony__flash, .tls-ceremony__flood, .tls-ceremony__prism, .tls-ceremony__live, .tls-ceremony__scanlines, .tls-ceremony__spot, .tls-ceremony__wave { animation: none !important; }
+  .tls-ceremony__flood, .tls-ceremony__prism, .tls-ceremony__flash { opacity: 0 !important; }
+}

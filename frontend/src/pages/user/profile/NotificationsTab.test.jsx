@@ -45,3 +45,28 @@ test("mit Verknüpfung steht Discord als Kanal da; eine abgelehnte Direktnachric
   expect(screen.getByTestId("profile-notification-push-achievements")).toBeInTheDocument();
   expect(screen.getByTestId("profile-notification-discord-achievements")).toBeInTheDocument();
 });
+
+test("Zeremonien: Ton, Lautstärke und „dezent“ stehen in der Karte und schreiben über set()", async () => {
+  apiMock.get.mockResolvedValue({ data: { discord: { linked: false } } });
+  const set = vi.fn();
+  const props = {
+    form: { newsletter_consent: false, notification_preferences: {}, ceremony_sound: true, ceremony_volume: 60, ceremony_mode: "full" },
+    set,
+    setNotificationPreference: vi.fn(),
+    notificationEnabled: () => true,
+    notificationTopicEnabled: () => true,
+    autosave: { status: "idle", message: "" },
+  };
+  const { fireEvent } = await import("@testing-library/react");
+  render(<NotificationsTab {...props} />);
+  expect(screen.getByTestId("profile-ceremony-card")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-ceremony-sound")).toHaveAttribute("aria-checked", "true");
+  expect(screen.getByTestId("profile-ceremony-subtle")).toHaveAttribute("aria-checked", "false");
+  expect(screen.getByTestId("profile-ceremony-volume-value")).toHaveTextContent("60 %");
+  fireEvent.click(screen.getByTestId("profile-ceremony-subtle"));
+  expect(set).toHaveBeenCalledWith("ceremony_mode", "subtle");
+  fireEvent.change(screen.getByTestId("profile-ceremony-volume"), { target: { value: "25" } });
+  expect(set).toHaveBeenCalledWith("ceremony_volume", 25);
+  fireEvent.click(screen.getByTestId("profile-ceremony-sound"));
+  expect(set).toHaveBeenCalledWith("ceremony_sound", false);
+});

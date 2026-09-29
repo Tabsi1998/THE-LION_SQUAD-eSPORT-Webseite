@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { AchievementUnlockOverlay } from "./AchievementUnlockOverlay";
+import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
+import { describePackage } from "@/components/achievements/ceremony/select";
 
 const seenKey = (id) => `tls_ach_seen:${id}`;
 
-/** Shows a catch-up unlock ceremony for achievements earned since the last visit. */
+/** Nachgeholte Erfolge seit dem letzten Besuch als eine Zeremonie (E8: über die Warteschlange, nie doppelt). */
 export function AchievementCatchUp() {
   const { user } = useAuth();
-  const { pathname } = useLocation();
-  const [tiers, setTiers] = useState([]);
   const ranForRef = useRef(null);
   const userId = user?.id;
 
@@ -24,7 +22,7 @@ export function AchievementCatchUp() {
         for (const group of data?.groups || []) {
           if (group.is_negative) continue;
           for (const tier of group.tiers || []) {
-            if (tier.earned && tier.earned_at) earned.push(tier);
+            if (tier.earned && tier.earned_at && !tier.silent) earned.push({ ...tier, category: group.category, group_name: group.name, group_code: group.code, hidden: group.hidden });
           }
         }
         const key = seenKey(userId);
@@ -38,31 +36,18 @@ export function AchievementCatchUp() {
           .sort((a, b) => new Date(b.earned_at) - new Date(a.earned_at))
           .slice(0, 8);
         if (fresh.length) {
-          setTiers(fresh);
+          // Der Marker rückt erst vor, wenn die Zeremonie wirklich gezeigt wurde.
+          enqueueCeremony(fresh, { ...describePackage(data?.groups || [], fresh), catchUp: true, heading: "Während du weg warst!", sub: "Nachgeholte Erfolge" }, {
+            onDone: () => { try { localStorage.setItem(key, new Date().toISOString()); } catch { /* egal */ } },
+          });
         } else {
           localStorage.setItem(key, new Date().toISOString());
         }
       } catch {
-        /* silent — purely cosmetic feature */
+        /* rein kosmetisch */
       }
     })();
   }, [userId]);
 
-  // Marker is only advanced once the user actually saw the ceremony.
-  const closeAndMark = () => {
-    if (userId) localStorage.setItem(seenKey(userId), new Date().toISOString());
-    setTiers([]);
-  };
-
-  // Nicht im Adminbereich und nicht auf Anzeige-Seiten: dort stört das Fenster die Arbeit; es kommt beim nächsten Besuch der Website.
-  if (pathname.startsWith("/display") || pathname.startsWith("/admin")) return null;
-
-  return (
-    <AchievementUnlockOverlay
-      tiers={tiers}
-      onClose={closeAndMark}
-      heading="Während du weg warst!"
-      sub="Nachgeholte Erfolge"
-    />
-  );
+  return null;
 }
