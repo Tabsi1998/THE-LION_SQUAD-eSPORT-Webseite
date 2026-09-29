@@ -242,7 +242,7 @@ async def _achievement_summaries(db, user_ids: list[str]) -> dict[str, dict]:
             continue
         summary = summaries.setdefault(award.get("user_id"), {"achievement_count": 0, "achievement_points": 0})
         summary["achievement_count"] += 1
-        if group_code != "level_progression":
+        if group_code not in ("level_progression", "level_milestones"):
             summary["achievement_points"] += int(tier.get("points") or 0)
     return summaries
 

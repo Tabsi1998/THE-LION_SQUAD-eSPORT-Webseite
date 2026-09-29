@@ -29,21 +29,24 @@ REPLACED: dict[str, str] = {
 REDEFINED = ("win_streak", "fairplay", "early_bird_match", "night_owl_match", "checkin_streak", "registration_speed")
 
 
-def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str, targets: list[int],
-           step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A") -> tuple[dict, list[dict]]:
-    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel. Katalog B–D nutzen denselben Helfer."""
-    materials = LADDERS[len(targets)]
+def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str | None, targets: list[int],
+           step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A",
+           steps: list[str] | None = None, materials: list[str] | None = None, manual: bool = False) -> tuple[dict, list[dict]]:
+    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel; ``steps`` ersetzt ihn durch einen
+    eigenen Satz je Stufe, ``materials`` die Leiter (z. B. eine einzelne Silber-Stufe). ``manual`` heißt: nur von Hand
+    vergeben, kein Bedingungsschlüssel. Katalog B–D nutzen denselben Helfer."""
+    materials = list(materials or LADDERS[len(targets)])
     group = {
         "code": code, "name": name, "category": category, "icon": icon, "art": art,
         "accent_color": CATEGORIES[category]["accent"], "description": description, "how_to": how_to,
-        "condition_key": key, "public": True, "is_special": False, "is_negative": False, "sort_order": sort_order,
-        "staff_only": staff_only, "catalog": catalog,
+        "condition_key": None if manual else key, "public": True, "is_special": False, "is_negative": False, "sort_order": sort_order,
+        "staff_only": staff_only, "catalog": catalog, "manual_only": manual,
     }
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
-        text = step.format(n=f"{target}{unit}")
-        tiers.append(tier(f"{code}_{index + 1}", code, material, f"{name} {ROMAN[index]}", text, condition_key=key,
-                          progress_target=target, icon=icon, art=art, how_to=how_to))
+        text = steps[index] if steps else step.format(n=f"{target}{unit}")
+        tiers.append(tier(f"{code}_{index + 1}", code, material, f"{name} {ROMAN[index]}", text, condition_key=None if manual else key,
+                          progress_target=target, icon=icon, art=art, how_to=how_to, manual_only=manual))
     return group, tiers
 
 

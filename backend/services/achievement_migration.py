@@ -67,7 +67,8 @@ async def _plan_for_group(db, old_code: str, new_code: str | None, compute_progr
     new_group = await db.achievement_groups.find_one({"code": new_code}, {"_id": 0})
     if not new_group:
         return {**plan, "skipped": f"neue Gruppe {new_code} nicht in der Datenbank"}
-    new_tiers = sorted(await db.achievements.find({"group_code": new_code, "manual_only": {"$ne": True}}, {"_id": 0}).to_list(500), key=lambda t: material_rank(t.get("material")))
+    # Auch Hand-Gruppen (z. B. Mentor) kommen mit: dort zählt die alte Höhe statt eines Zählers (_carry_over).
+    new_tiers = sorted(await db.achievements.find({"group_code": new_code}, {"_id": 0}).to_list(500), key=lambda t: material_rank(t.get("material")))
     plan["mode"] = "remap"
     by_user: dict[str, list[dict]] = {}
     for award in awards:
@@ -75,7 +76,7 @@ async def _plan_for_group(db, old_code: str, new_code: str | None, compute_progr
     for user_id, rows in by_user.items():
         counters = await compute_progress(user_id)
         earned_at = min(str(row.get("earned_at") or "") for row in rows) or now_utc().isoformat()
-        reached = [t for t in new_tiers if t.get("condition_key") and t.get("progress_target") and counters.get(t["condition_key"], 0) >= int(t["progress_target"])]
+        reached = _carry_over(new_tiers, counters, rows)
         plan["moves"].append({"user_id": user_id, "old_tiers": [row["tier_code"] for row in rows], "new_tiers": [t["code"] for t in reached], "earned_at": earned_at})
     return plan
 

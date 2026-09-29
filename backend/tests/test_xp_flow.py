@@ -53,17 +53,17 @@ async def test_mitglieder_bekommen_zehn_prozent_mehr(flow):
 @pytest.mark.asyncio
 async def test_erfolg_bringt_punkte_mal_zehn_und_aufstieg_meldet_sich(flow):
     user = await flow.add_user(name="Sammler")
-    assert await badges.award_achievement(user["id"], "profile_completeness_s")  # 25 Punkte
+    assert await badges.award_achievement(user["id"], "profile_completeness_2")  # Silber: 35 Punkte (Katalog C)
     state = await xp.state(user["id"])
-    assert state["total"] == 250 and state["level"] == 2
+    assert state["total"] == 350 and state["level"] == 2
     note = await flow.db.notifications.find_one({"user_id": user["id"], "kind": "level"}, {"_id": 0})
     assert note and note["title"] == "Level 2 erreicht" and note["meta"]["previous"] == 1
-    assert await badges.award_achievement(user["id"], "profile_completeness_s") is False
+    assert await badges.award_achievement(user["id"], "profile_completeness_2") is False
     assert await flow.db.xp_events.count_documents({"user_id": user["id"], "source": "achievement"}) == 1
     # Negative Gruppen bringen nichts.
     neg = await flow.db.achievements.find_one({"group_code": {"$regex": "^neg_"}}, {"_id": 0, "code": 1})
     await badges.award_achievement(user["id"], neg["code"])
-    assert (await xp.state(user["id"]))["total"] == 250
+    assert (await xp.state(user["id"]))["total"] == 350
 
 
 @pytest.mark.asyncio

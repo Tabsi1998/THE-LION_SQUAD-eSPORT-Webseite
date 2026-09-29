@@ -160,8 +160,8 @@ class TestDiscordCounter:
         body = r.json()
         codes = {a.get("code") or a.get("tier_code") for a in body.get("awards", [])}
         # tier 'b' is the lowest threshold; if it's not awarded, at least the user got SOME discord_active tier
-        has_discord = any((c or "").startswith("discord_active") for c in codes)
-        assert has_discord, f"expected some discord_active_* tier; got {codes}"
+        has_discord = any((c or "").startswith("discord_messages") for c in codes)
+        assert has_discord, f"expected some discord_messages_* tier; got {codes}"
 
     def test_bump_unknown_user_404(self, admin_headers):
         r = requests.post(f"{API}/admin/discord/counter/__nope__",
