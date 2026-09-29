@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
 import { requestMotion } from "../motion";
+import { recordSignal } from "../signals";
 import { Ghost, MiniTombstone } from "./art";
 
 // Mini-Friedhof (#662): zwei bis vier winzige Grabsteine stehen auf dem Strich über der Impressum-Leiste. Ein
@@ -10,6 +11,8 @@ import { Ghost, MiniTombstone } from "./art";
 // Seitenkoordinaten, man kann ihm nachscrollen. Je Grab höchstens ein Geist je Minute.
 
 export const GHOST_COOLDOWN_MS = 60000;
+/** Jeder befreite Geist zählt für die Saison-Fundstücke (#678) - der Server deckelt je Tag. */
+export const FREED_SIGNAL = "halloween_ghosts_freed";
 
 /** Richtung und Weite eines Geistes: meist nach oben, ein wenig zur Seite. */
 export function ghostDrift(rng) {
@@ -62,6 +65,7 @@ export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COO
     const drift = ghostDrift(rngRef.current);
     requestMotion("ghost", { force: true });
     emitSound("ghost");
+    recordSignal(FREED_SIGNAL, { onceIf: false });
     nextId.current += 1;
     setGhosts((current) => [...current, { id: nextId.current, x: rect.left + rect.width / 2 + window.scrollX, y: rect.top + window.scrollY, until: now + ghostMs, ...drift }]);
   };

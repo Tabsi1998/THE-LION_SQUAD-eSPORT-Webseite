@@ -7,13 +7,15 @@ je Person liegt in ``user_achievement_stats`` - Profil und Katalog lesen ihn, st
 Nächtlich rechnet ``reconcile`` alle Aktiven komplett nach und protokolliert Abweichungen.
 
 Signale (``user_signals``) sind Ereignisse, die der Client meldet - Kürbis geklickt, Konami-Code,
-Schneeflocken - je Tag gezählt, vom Server auf Plausibilität geprüft (Saison, Deckel).
+Schneeflocken, verscheuchte Fledermäuse - je Tag gezählt, vom Server auf Plausibilität geprüft (Saison, Deckel).
+Wer ohne Anmeldung sammelt, meldet nach dem Login nach (#678): je Tag, höchstens eine Woche zurück, mit demselben
+Deckel und nur für Tage, an denen die Saison lief. Gespeichert wird nur Person, Signal, Tag und Anzahl.
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Awaitable, Callable
 from zoneinfo import ZoneInfo
 
@@ -664,11 +666,14 @@ async def _reports(ctx):
 
 # ------------------------------------------------------------------ Rechnen, Cache, Abgleich
 
-async def compute(user_id: str, keys: set[str] | None = None) -> dict[str, int]:
-    """Zähler rechnen - alle, oder nur ``keys``. Der alte Block läuft immer mit."""
+async def compute(user_id: str, keys: set[str] | None = None, legacy: bool = True) -> dict[str, int]:
+    """Zähler rechnen - alle, oder nur ``keys``. Der alte Block läuft mit, außer ``legacy`` ist aus (nur mit ``keys``):
+    dann werden wirklich nur diese Zähler gerechnet - für Signale, die nichts am alten Block ändern."""
     db = get_db()
-    from badges import compute_user_progress
-    values = dict(await compute_user_progress(user_id))
+    values: dict[str, int] = {}
+    if legacy or keys is None:
+        from badges import compute_user_progress
+        values = dict(await compute_user_progress(user_id))
     ctx = Context(db, user_id)
     for key, item in REGISTRY.items():
         if keys is not None and key not in keys:
@@ -680,11 +685,12 @@ async def compute(user_id: str, keys: set[str] | None = None) -> dict[str, int]:
     return values
 
 
-async def refresh(user_id: str, sources=None) -> dict[str, int]:
-    """Stand auffrischen: mit ``sources`` nur die betroffenen neuen Zähler, sonst alles."""
+async def refresh(user_id: str, sources=None, legacy: bool = True) -> dict[str, int]:
+    """Stand auffrischen: mit ``sources`` nur die betroffenen neuen Zähler, sonst alles. ``legacy`` aus (nur mit
+    ``sources``) lässt den alten Block weg."""
     db = get_db()
     keys = None if not sources else keys_for_sources(sources)
-    fresh = await compute(user_id, keys)
+    fresh = await compute(user_id, keys, legacy=legacy)
     current = await db[STATS].find_one({"user_id": user_id}, {"_id": 0}) or {}
     values = {**(current.get("values") or {}), **fresh}
     stamp = now_utc().isoformat()
@@ -729,25 +735,48 @@ async def reconcile(days: int = 7, limit: int = 5000) -> dict:
 # ------------------------------------------------------------------ Signale
 
 # Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
+# ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
 SIGNAL_RULES: dict[str, dict] = {
     "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
+    "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
+    "halloween_ghosts_freed": {"per_day": 20, "season": "halloween"},
+    "halloween_cat_petted": {"per_day": 10, "season": "halloween"},
     "snowflakes_clicked": {"per_day": 200, "season": "snow"},
-    "online_at_new_year": {"per_day": 1, "season": "new_year", "phases": {"pre_countdown", "countdown", "show", "fade"}},
+    "online_at_new_year": {"per_day": 1, "season": "new_year", "phases": {"pre_countdown", "countdown", "show", "fade"}, "live": True},
     "konami": {"per_day": 1},
     "lost_404": {"per_day": 1},
     "logo_clicks": {"per_day": 100},
     "explorer_done": {"per_day": 1},
     "calendar_used": {"per_day": 1},
     "member_card_added": {"per_day": 1},
-    "app_open": {"per_day": 1},
+    "app_open": {"per_day": 1, "live": True},
     "tutorial_done": {"per_day": 1},
     "advent_door": {"per_day": 24, "season": "advent_calendar"},
     "easter_egg": {"per_day": 50, "season": "easter_hunt"},
 }
+# So viele Tage zurück lässt sich nachmelden (#678): wer ohne Anmeldung gesammelt hat, verliert die Woche nicht.
+REPLAY_DAYS = 7
 
 
-async def season_allows(name: str) -> bool:
-    """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit."""
+def signal_day(value, today: date) -> tuple[date | None, str | None]:
+    """Der Tag einer Meldung: ohne Angabe heute; sonst ein Datum von heute bis ``REPLAY_DAYS`` zurück. Liefert
+    (Tag, None) oder (None, Grund) - ``day`` für ein kaputtes oder künftiges Datum, ``old`` für ein zu altes."""
+    if value in (None, ""):
+        return today, None
+    try:
+        day = date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None, "day"
+    if day > today:
+        return None, "day"
+    if (today - day).days > REPLAY_DAYS:
+        return None, "old"
+    return day, None
+
+
+async def season_allows(name: str, day: date | None = None) -> bool:
+    """Saisongebundene Signale zählen nur, während die Saison (und die Phase) wirklich läuft - Serverzeit. Für einen
+    nachgemeldeten Tag zählt, ob die Saison an diesem Tag zu Mittag lief (die Fenster der Sammel-Saisonen sind ganze Tage)."""
     rule = SIGNAL_RULES.get(name) or {}
     if not rule.get("season"):
         return True
@@ -755,31 +784,41 @@ async def season_allows(name: str) -> bool:
     from services import seasons
     db = get_db()
     stored, founded = await load_context(db)
-    active = {s["key"]: s for s in seasons.active(None, stored, founded)["seasons"]}
+    moment = datetime.combine(day, time(12, 0), tzinfo=VIENNA) if day else None
+    active = {s["key"]: s for s in seasons.active(moment, stored, founded)["seasons"]}
     state = active.get(rule["season"])
     if not state:
         return False
     return not rule.get("phases") or state.get("phase") in rule["phases"]
 
 
-async def record_signal(user_id: str, name: str, count: int = 1) -> dict:
-    """Ein Signal zählen. Liefert {accepted, count, day_count} - abgelehnt bei Deckel oder falscher Saison."""
+async def record_signal(user_id: str, name: str, count: int = 1, day: str | None = None) -> dict:
+    """Ein Signal zählen. Liefert {accepted, count, day_count, day} - abgelehnt bei Deckel (``cap``), falscher Saison
+    (``season``), kaputtem oder künftigem Tag (``day``), zu altem Tag (``old``) oder einem Signal, das nur im
+    Augenblick zählt (``live``)."""
     if name not in SIGNAL_RULES or not user_id:
         return {"accepted": False, "reason": "unknown"}
-    if not await season_allows(name):
+    rule = SIGNAL_RULES[name]
+    today = now_utc().astimezone(VIENNA).date()
+    when, problem = signal_day(day, today)
+    if problem:
+        return {"accepted": False, "reason": problem}
+    replay = when != today
+    if replay and rule.get("live"):
+        return {"accepted": False, "reason": "live"}
+    if not await season_allows(name, when if replay else None):
         return {"accepted": False, "reason": "season"}
     db = get_db()
-    rule = SIGNAL_RULES[name]
-    day = now_utc().astimezone(VIENNA).date().isoformat()
+    day = when.isoformat()
     doc = await db[SIGNALS].find_one({"user_id": user_id, "name": name}, {"_id": 0}) or {}
-    today = int((doc.get("days") or {}).get(day) or 0)
-    room = max(0, int(rule["per_day"]) - today)
+    counted = int((doc.get("days") or {}).get(day) or 0)
+    room = max(0, int(rule["per_day"]) - counted)
     add = min(max(1, int(count)), room)
     if add <= 0:
-        return {"accepted": False, "reason": "cap", "count": int(doc.get("count") or 0), "day_count": today}
+        return {"accepted": False, "reason": "cap", "count": int(doc.get("count") or 0), "day_count": counted, "day": day}
     stamp = now_utc().isoformat()
     await db[SIGNALS].update_one({"user_id": user_id, "name": name}, {"$inc": {"count": add, f"days.{day}": add}, "$set": {"last_at": stamp}, "$setOnInsert": {"user_id": user_id, "name": name, "first_at": stamp}}, upsert=True)
-    return {"accepted": True, "count": int(doc.get("count") or 0) + add, "day_count": today + add}
+    return {"accepted": True, "count": int(doc.get("count") or 0) + add, "day_count": counted + add, "day": day}
 
 
 # ------------------------------------------------------------------ Katalog A (#612): Serien, Karten, Pünktlichkeit, Dispute, Turnierläufe

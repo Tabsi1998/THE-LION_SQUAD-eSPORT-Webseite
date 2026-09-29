@@ -34,6 +34,8 @@ import "./halloween.css";
 
 export const ACCENT = "rgba(170, 225, 240, 0.35)";
 export const SIGNAL_KEY = "halloween_pumpkin";
+/** Die Katze anstupsen zählt für die Saison-Fundstücke (#678) - der Server deckelt je Tag. */
+export const CAT_SIGNAL = "halloween_cat_petted";
 export const FACES = ["grin", "calm", "wicked"];
 /** Jahres-Salz (C4, #724): die Anordnung bleibt das ganze Saisonjahr gleich und würfelt sich im nächsten Jahr neu. */
 export let YEAR_SALT = String(seasonYear("halloween"));
@@ -471,6 +473,7 @@ function CatOnEdge({ size, startX = 40, moving }) {
     const seconds = Math.abs(target - x) / CAT_WALK_SPEED;
     // Sie miaut und läuft dann los (Rückmeldung 29.09.) - nur mit eingeschaltetem Ton.
     emitSound("cat_meow");
+    recordSignal(CAT_SIGNAL, { onceIf: false });
     setWalk({ to: target, facing: target < x ? 1 : -1, seconds });
     setX(target);
     window.clearTimeout(timer.current);

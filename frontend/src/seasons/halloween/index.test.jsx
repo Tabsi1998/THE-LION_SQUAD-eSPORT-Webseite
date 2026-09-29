@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
-const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, YEAR_SALT, setYearSalt, catTarget } = await import("./index.jsx");
+const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, YEAR_SALT, setYearSalt, catTarget, CAT_SIGNAL } = await import("./index.jsx");
 import { createMotionScheduler, resetMotionScheduler } from "../motion";
 
 // Der Salt je Seitenaufruf ist im Browser zufällig; hier fest, damit die Erwartungen (Krabbler, zweites Netz,
@@ -299,6 +299,12 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   expect(footer.container.querySelectorAll(".tls-cat-walking__paw").length).toBe(4);
   expect(footer.container.querySelectorAll(".tls-cat-walking__leg--b").length).toBe(2);
   expect(cat.style.left).not.toBe(`${layout.cat.x}px`);
+  // Die Katze anstupsen zählt als Fundstück (#678) - jedes Mal, aber nicht, während sie schon läuft.
+  expect(signals.recordSignal).toHaveBeenCalledTimes(1);
+  expect(signals.recordSignal).toHaveBeenCalledWith(CAT_SIGNAL, { onceIf: false });
+  expect(CAT_SIGNAL).toBe("halloween_cat_petted");
+  fireEvent.click(cat);
+  expect(signals.recordSignal).toHaveBeenCalledTimes(1);
   expect(Math.abs(parseInt(cat.style.left, 10) - layout.cat.x)).toBeGreaterThanOrEqual(120);
   expect(screen.getAllByTestId("halloween-grave").length).toBe(layout.graves.length);
   footer.unmount();

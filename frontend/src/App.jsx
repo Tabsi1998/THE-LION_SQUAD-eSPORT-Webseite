@@ -2,6 +2,7 @@ import "@/App.css";
 import { lazy, Suspense } from "react";
 import { SeasonProvider } from "@/seasons/SeasonContext";
 import { SeasonStage } from "@/seasons/SeasonStage";
+import { SignalSync } from "@/seasons/SignalSync";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -193,6 +194,8 @@ function App() {
             <ApiInvalidationBridge />
             <ScrollManager />
             <AchievementCatchUp />
+            {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
+            <SignalSync />
             <CeremonyHost />
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
             <SeasonStage />

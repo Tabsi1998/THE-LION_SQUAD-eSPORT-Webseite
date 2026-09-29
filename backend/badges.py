@@ -560,17 +560,22 @@ async def list_user_awards(user_id: str, viewer: dict | None) -> list[dict]:
 
 
 # ---------------- Auto-eval ----------------
-async def evaluate_user_progress(user_id: str, sources=None) -> int:
+async def evaluate_user_progress(user_id: str, sources=None, legacy: bool = True) -> int:
     """Stufen prüfen und vergeben. Mit ``sources`` (#616) werden nur die betroffenen Zähler neu gerechnet
-    und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles."""
+    und nur Stufen mit diesen Schlüsseln angesehen; ohne Quelle alles. ``legacy`` aus (#678, nur mit ``sources``):
+    der alte Block bleibt liegen und nur die Stufen dieser Zähler werden geladen - leicht genug für jede Meldung."""
     db = get_db()
     from services import achievement_counters
-    counters = await achievement_counters.refresh(user_id, sources)
-    only_keys = None if not sources else (achievement_counters.keys_for_sources(sources) | achievement_counters.LEGACY_KEYS)
+    light = bool(sources) and not legacy
+    counters = await achievement_counters.refresh(user_id, sources, legacy=not light)
+    only_keys = None if not sources else (achievement_counters.keys_for_sources(sources) | (frozenset() if light else achievement_counters.LEGACY_KEYS))
     active_member = is_active_member(await get_membership(user_id))
     earned_codes = {a["tier_code"] async for a in db.user_achievements.find({"user_id": user_id})}
     new_count = 0
-    tiers = await db.achievements.find({"manual_only": {"$ne": True}}, {"_id": 0}).to_list(2000)
+    query = {"manual_only": {"$ne": True}}
+    if light:
+        query["condition_key"] = {"$in": sorted(only_keys)}
+    tiers = await db.achievements.find(query, {"_id": 0}).to_list(2000)
     for t in tiers:
         if t["code"] in earned_codes:
             continue

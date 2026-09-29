@@ -4,6 +4,8 @@ wer was getan hat - die Zähler sind das Einzige, was nach außen geht.
 """
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
@@ -14,11 +16,18 @@ from services import achievement_counters as counters
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(tags=["achievement-signals"])
+logger = logging.getLogger("tls.achievements.signals")
 
 
 class SignalBody(BaseModel):
     name: str = Field(min_length=2, max_length=40)
     count: int = Field(1, ge=1, le=200)
+    # Nachmelden (#678): der Tag, an dem gesammelt wurde - ohne Angabe heute.
+    day: str | None = Field(None, max_length=10)
+
+
+class SignalBatch(BaseModel):
+    items: list[SignalBody] = Field(min_length=1, max_length=40)
 
 
 @router.post("/api/achievements/signal")
@@ -28,11 +37,35 @@ async def post_signal(body: SignalBody, request: Request, me: dict = Depends(get
     await enforce_rate_limit(request, "achievement_signal", 30, 60, subject=me["id"])
     if body.name not in counters.SIGNAL_RULES:
         raise HTTPException(400, "Dieses Signal gibt es nicht.")
-    result = await counters.record_signal(me["id"], body.name, body.count)
+    result = await counters.record_signal(me["id"], body.name, body.count, body.day)
     if result.get("accepted"):
         from services.achievement_queue import request_evaluation
         await request_evaluation([me["id"]], f"signal:{body.name}", sources={"signal"})
     return result
+
+
+@router.post("/api/achievements/signals")
+async def post_signals(body: SignalBatch, request: Request, me: dict = Depends(get_current_user)):
+    """Mehrere Signale auf einmal (#678): was der Client gesammelt hat, seit er zuletzt melden konnte - auch von den
+    Tagen davor. Jede Zeile bekommt ihre eigene Antwort; eine unbekannte oder abgelehnte Zeile hält die anderen nicht
+    auf. Danach wird sofort ausgewertet - nur die Zähler aus Signalen, damit die neue Stufe gleich gefeiert werden
+    kann (``newly_awarded``). Geht das schief, holt es die Warteschlange nach."""
+    await enforce_rate_limit(request, "achievement_signal_batch", 12, 60, subject=me["id"])
+    results = []
+    for item in body.items:
+        outcome = await counters.record_signal(me["id"], item.name, item.count, item.day)
+        results.append({"name": item.name, "day": outcome.get("day") or item.day, **{k: v for k, v in outcome.items() if k != "day"}})
+    accepted = sorted({row["name"] for row in results if row.get("accepted")})
+    newly = 0
+    if accepted:
+        try:
+            from badges import evaluate_user_progress
+            newly = int(await evaluate_user_progress(me["id"], {"signal"}, legacy=False) or 0)
+        except Exception:  # noqa: BLE001 - die Zählung steht; ausgewertet wird dann über die Warteschlange
+            logger.warning("[achievements] signal evaluation failed for %s", me["id"], exc_info=True)
+            from services.achievement_queue import request_evaluation
+            await request_evaluation([me["id"]], f"signals:{','.join(accepted)}"[:120], sources={"signal"})
+    return {"results": results, "accepted": sum(1 for row in results if row.get("accepted")), "newly_awarded": newly}
 
 
 # ------------------------------------------------------------------ GG-Lob
