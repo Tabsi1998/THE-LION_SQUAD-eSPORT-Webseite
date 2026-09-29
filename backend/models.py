@@ -124,6 +124,8 @@ class UserUpdate(BaseModel):
     battlenet_id: Optional[str] = None
     # Privacy
     privacy_public_profile: Optional[bool] = None
+    # Erfolge II (#619): „Erfolge öffentlich“ - Standard an; aus heißt: fremde sehen keine Erfolge.
+    privacy_achievements_public: Optional[bool] = None
     profile_visibility: Optional[Dict[str, VisibilityLevel]] = None  # field_name -> level
     dm_privacy: Optional[DirectMessagePrivacy] = None
     newsletter_consent: Optional[bool] = None

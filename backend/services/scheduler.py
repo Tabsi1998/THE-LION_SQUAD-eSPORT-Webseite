@@ -157,6 +157,18 @@ async def _safe_season_rank_snapshots():
         _log_task_failure("season_rank_snapshots", exc)
 
 
+async def _safe_achievement_of_week():
+    """Erfolge II (#619): montags 08:00 die Freischaltung der Woche festlegen, die am wenigsten Leute haben."""
+    try:
+        from database import get_db
+        from services.achievement_visibility import achievement_of_week
+        doc = await achievement_of_week(get_db(), force=True)
+        award = doc.get("award") or {}
+        logger.info(f"[scheduler] achievement_of_week week={doc.get('week_key')} tier={award.get('tier_code')}")
+    except Exception as exc:
+        _log_task_failure("achievement_of_week", exc)
+
+
 async def _safe_prize_expiry():
     try:
         from services.prize_service import expire_overdue
@@ -673,6 +685,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="achievements_reconcile", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("season_rank_snapshots", _safe_season_rank_snapshots), CronTrigger(hour=3, minute=35, timezone="Europe/Vienna"),
                   id="season_rank_snapshots", max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("achievement_of_week", _safe_achievement_of_week), CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="Europe/Vienna"),
+                  id="achievement_of_week", replace_existing=True)
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",

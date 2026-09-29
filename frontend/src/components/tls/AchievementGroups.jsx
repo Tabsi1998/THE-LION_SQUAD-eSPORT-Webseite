@@ -1,5 +1,5 @@
 /**
- * Achievement Groups View — Phase B v4.
+ * Achievement Groups View — Phase B v4, Erfolge II (#619).
  *
  * Renders achievement groups returned from /api/achievements/{me|user/:id}.
  * In profile-edit views it can show earned + locked tiers. Public profile views
@@ -7,10 +7,14 @@
  *
  * Secret negative/fun groups appear only after a user has earned at least one
  * tier. Locked negative tiers are never sent by the API.
+ *
+ * Seit #619: Seltenheit je Gruppe und Stufe („4,2 % haben Diamant“), Sortierung nach Seltenheit,
+ * die „?“-Karte mit dem Zähler für geheime Gruppen und die Vitrine „Für Vereinsmitglieder“.
  */
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Lock } from "lucide-react";
+import { ChevronDown, CircleHelp, Lock } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 
 const LEVEL_META = {
@@ -21,23 +25,30 @@ const LEVEL_META = {
   5: { name: "Legendär", color: "#FF3B30" },
 };
 
-const CATEGORY_META = {
-  match:      { label: "Match",     icon: "swords",        accent: "#29B6E8", order: 1 },
+export const CATEGORY_META = {
+  match:      { label: "Spielen",   icon: "swords",        accent: "#29B6E8", order: 1 },
   tournament: { label: "Turnier",   icon: "trophy",        accent: "#FFD700", order: 2 },
   fastlap:    { label: "Fast Lap",  icon: "flag",          accent: "#A855F7", order: 3 },
+  season:     { label: "Saison",    icon: "calendar-check", accent: "#29B6E8", order: 3.5 },
   team:       { label: "Team",      icon: "users",         accent: "#00FF88", order: 4 },
   community:  { label: "Community", icon: "messages-square", accent: "#29B6E8", order: 5 },
-  season:     { label: "Saison",    icon: "calendar-days", accent: "#29B6E8", order: 3.5 },
   // Erfolge II (#611): Streaming & Content heißt jetzt Streaming & Creator, Fortschritt Profil & Konto.
   content:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
   creator:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
-  progression:{ label: "Profil & Konto", icon: "user-round",  accent: "#00FF88", order: 7 },
-  profile:    { label: "Profil & Konto", icon: "user-round",  accent: "#00FF88", order: 7 },
+  progression:{ label: "Profil & Konto", icon: "user-check",  accent: "#00FF88", order: 7 },
+  profile:    { label: "Profil & Konto", icon: "user-check",  accent: "#00FF88", order: 7 },
   club:       { label: "Verein",    icon: "crown",         accent: "#FFD700", order: 8 },
   special:    { label: "Besonders", icon: "sparkles",  accent: "#FF3B30", order: 9 },
-  hidden:     { label: "Geheim",    icon: "eye-off",   accent: "#A855F7", order: 9.5 },
+  hidden:     { label: "Geheim",    icon: "ghost",   accent: "#A855F7", order: 9.5 },
   negative:   { label: "Geheim / Fun", icon: "alert-triangle", accent: "#FF3B30", order: 10 },
 };
+
+// „4,2 %“ - deutsche Schreibweise, höchstens eine Nachkommastelle, kleine Werte bleiben lesbar.
+export function formatPercent(value) {
+  const n = Number(value || 0);
+  if (n > 0 && n < 0.1) return "< 0,1 %";
+  return `${n.toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`;
+}
 
 // Escalating, animated medal per tier level. Every rarity has its own signature:
 // Bronze ember, Silver sheen, Gold spark orbit, Platinum float+ring, Legendary flames.
@@ -105,9 +116,39 @@ function levelLabel(level, group, tier) {
   return LEVEL_META[level]?.name || "?";
 }
 
-export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Achievements freigeschaltet.", earnedOnly = false }) {
+function groupRarity(rarity, group) {
+  return rarity?.groups?.[group.code] || null;
+}
+
+// Nach Seltenheit: erst die Gruppen, deren höchste Stufe die wenigsten Leute haben - bei Gleichstand
+// die mit weniger Leuten insgesamt, dann nach Name. Ohne Seltenheitsdaten bleibt die Katalogreihenfolge.
+export function sortGroupsByRarity(groups, rarity) {
+  return [...groups].sort((a, b) => {
+    const ra = groupRarity(rarity, a);
+    const rb = groupRarity(rarity, b);
+    const pa = ra ? Number(ra.top?.percent ?? 0) : 101;
+    const pb = rb ? Number(rb.top?.percent ?? 0) : 101;
+    if (pa !== pb) return pa - pb;
+    const ha = ra ? Number(ra.holders || 0) : Infinity;
+    const hb = rb ? Number(rb.holders || 0) : Infinity;
+    if (ha !== hb) return ha - hb;
+    return String(a.name || "").localeCompare(String(b.name || ""), "de");
+  });
+}
+
+export function AchievementGroupsView({
+  groups = [],
+  emptyText = "Noch keine Achievements freigeschaltet.",
+  earnedOnly = false,
+  rarity = null,
+  sortBy = "category",
+  hidden = null,
+  clubTeaser = false,
+  categoryFilter = null,
+}) {
+  const filtered = categoryFilter ? groups.filter((group) => group.category === categoryFilter) : groups;
   const visibleGroups = earnedOnly
-    ? groups
+    ? filtered
         .map((group) => ({
           ...group,
           tiers: (group.tiers || []).filter((tier) => tier.earned),
@@ -115,15 +156,10 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
           earned_count: (group.tiers || []).filter((tier) => tier.earned).length,
         }))
         .filter((group) => group.tiers.length > 0)
-    : groups;
-  // Group by category, ordered by CATEGORY_META.order
-  const byCat = {};
-  for (const g of visibleGroups) (byCat[g.category] ||= []).push(g);
-  const order = Object.keys(byCat).sort(
-    (a, b) => (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99)
-  );
+    : filtered;
+  const showHiddenCard = Boolean(hidden && Number(hidden.total || 0) > 0 && !earnedOnly && (!categoryFilter || categoryFilter === "hidden"));
 
-  if (!visibleGroups.length) {
+  if (!visibleGroups.length && !showHiddenCard) {
     return (
       <div className="border border-dashed border-white/10 rounded-sm p-12 text-center text-white/50" data-testid="achievements-empty">
         {emptyText}
@@ -131,21 +167,64 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
     );
   }
 
+  if (sortBy === "rarity") {
+    const ordered = sortGroupsByRarity(visibleGroups, rarity);
+    return (
+      <div className="space-y-4" data-testid="achievement-groups" data-sort="rarity">
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-heading text-xl md:text-2xl font-bold uppercase">Die seltensten zuerst</h2>
+          <span className="text-[10px] uppercase tracking-widest text-white/40">{ordered.length} Gruppen</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} />)}
+          {showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
+        </div>
+      </div>
+    );
+  }
+
+  // Group by category, ordered by CATEGORY_META.order
+  const byCat = {};
+  for (const g of visibleGroups) (byCat[g.category] ||= []).push(g);
+  if (showHiddenCard) byCat.hidden ||= [];
+  const order = Object.keys(byCat).sort(
+    (a, b) => (CATEGORY_META[a]?.order ?? 99) - (CATEGORY_META[b]?.order ?? 99)
+  );
+
   return (
-    <div className="space-y-10" data-testid="achievement-groups">
-      {order.filter(c => byCat[c]?.length).map((cat) => {
+    <div className="space-y-10" data-testid="achievement-groups" data-sort="category">
+      {order.filter(c => byCat[c]?.length || (c === "hidden" && showHiddenCard)).map((cat) => {
         const meta = CATEGORY_META[cat] || CATEGORY_META.special;
+        const isClub = cat === "club";
         return (
-          <section key={cat}>
-            <div className="flex items-baseline justify-between mb-4">
-              <div className="flex items-center gap-2">
+          <section key={cat} data-testid={`achievement-category-${cat}`}>
+            <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <AchievementIcon name={meta.icon} fallback="trophy" className="w-4 h-4" style={{ color: meta.accent }} />
                 <h2 className="font-heading text-xl md:text-2xl font-bold uppercase">{meta.label}</h2>
+                {isClub && clubTeaser && (
+                  <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/40 text-[#FFD700]/90" data-testid="club-showcase-badge">
+                    Für Vereinsmitglieder
+                  </span>
+                )}
               </div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">{byCat[cat].length} Gruppen</span>
+              <span className="text-[10px] uppercase tracking-widest text-white/40">
+                {byCat[cat].length} Gruppen{cat === "hidden" && hidden ? ` · ${hidden.earned} von ${hidden.total} gefunden` : ""}
+              </span>
             </div>
+            {isClub && clubTeaser && (
+              <div className="mb-4 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm text-white/70 flex items-center gap-3 flex-wrap" data-testid="club-showcase-note">
+                <span className="flex-1 min-w-[16rem]">
+                  Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
+                </span>
+                <Link to="/membership/join" className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">
+                  Mitglied werden
+                </Link>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} />)}
+              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} />)}
+              {cat === "hidden" && showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
             </div>
           </section>
         );
@@ -154,7 +233,41 @@ export function AchievementGroupsView({ groups = [], emptyText = "Noch keine Ach
   );
 }
 
-function GroupCard({ group, earnedOnly = false }) {
+// Die „?“-Karte (#619): geheime Gruppen zeigen ihren Namen erst nach der Freischaltung - hier steht nur,
+// wie viele es gibt und wie viele die Person schon gefunden hat.
+function HiddenSummaryCard({ hidden }) {
+  const total = Number(hidden?.total || 0);
+  const earned = Number(hidden?.earned || 0);
+  const remaining = Math.max(total - earned, 0);
+  return (
+    <motion.div
+      data-testid="achievement-hidden-summary"
+      className="border border-dashed border-[#A855F7]/40 rounded-sm bg-[#0F0A16] p-4 flex items-center gap-4"
+      whileHover={{ y: -3 }}
+      animate={{ borderColor: ["rgba(168,85,247,0.25)", "rgba(168,85,247,0.6)", "rgba(168,85,247,0.25)"] }}
+      transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <div className="w-12 h-12 rounded-sm flex items-center justify-center border border-[#A855F7]/40 bg-[#A855F7]/10 shrink-0">
+        <CircleHelp className="w-6 h-6 text-[#c084fc]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="font-heading text-base md:text-lg font-bold uppercase">Geheim</div>
+          <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#A855F7]/50 text-[#c084fc]" data-testid="achievement-hidden-count">
+            {earned} von {total} gefunden
+          </span>
+        </div>
+        <div className="mt-1 text-xs text-white/55">
+          {remaining === 0
+            ? "Alle gefunden. Du kennst jede Ecke dieser Seite."
+            : `${remaining === total ? "Sie zeigen sich erst, wenn du sie gefunden hast" : `${remaining} warten noch`} – zu ungewöhnlichen Zeiten, an ungewöhnlichen Orten, mit ungewöhnlichen Zahlen.`}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function GroupCard({ group, earnedOnly = false, rarity = null }) {
   const [open, setOpen] = useState(false);
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
   const lockedTiers = group.tiers.filter(t => !t.earned).sort((a, b) => a.level - b.level);
@@ -166,6 +279,7 @@ function GroupCard({ group, earnedOnly = false }) {
   const prestige = hasAny && !isNegative && highest?.level >= 4;
   const lockedPulse = !earnedOnly && !hasAny && !isNegative && Number(nextLocked?.percent || 0) >= 80;
   const highestLabel = highest ? levelLabel(highest.level, group, highest) : "";
+  const rare = !isNegative ? groupRarity(rarity, group) : null;
 
   return (
     <motion.div
@@ -214,8 +328,19 @@ function GroupCard({ group, earnedOnly = false }) {
                 Locked
               </span>
             )}
+            {group.member_only && !isNegative && (
+              <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+                Verein
+              </span>
+            )}
           </div>
           <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
+          {rare?.top && (
+            <div className="mt-1 text-[10px] uppercase tracking-widest text-white/40 tabular-nums" data-testid={`achievement-rarity-${group.code}`}>
+              <span style={{ color: accent }}>{formatPercent(rare.top.percent)}</span> haben {rare.top.material_name || "die höchste Stufe"}
+              {Number(rare.holders || 0) > 0 && <span className="text-white/30"> · {rare.holders} mit mindestens einer Stufe</span>}
+            </div>
+          )}
           {/* Compact progress hint when nothing earned yet */}
           {!earnedOnly && !isNegative && !hasAny && nextLocked && nextLocked.target > 0 && nextLocked.condition_status !== "planned" && (
             <div className="mt-2 flex items-center gap-2">
@@ -248,7 +373,7 @@ function GroupCard({ group, earnedOnly = false }) {
             className="overflow-hidden"
           >
             <div className="border-t border-white/5 px-4 py-3 space-y-2" data-testid={`achievement-group-${group.code}-tiers`}>
-              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} />)}
+              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} rarityPercent={!isNegative ? rarity?.tiers?.[t.code] : undefined} />)}
             </div>
           </motion.div>
         )}
@@ -257,10 +382,11 @@ function GroupCard({ group, earnedOnly = false }) {
   );
 }
 
-function TierRow({ tier, group, accent, isNegative = false }) {
+function TierRow({ tier, group, accent, isNegative = false, rarityPercent }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
   const label = levelLabel(tier.level, group, tier);
   const rowGlow = tier.earned && tier.level >= 4 && !isNegative ? `tls-tierrow--${tier.level}` : "";
+  const hasRarity = rarityPercent !== undefined && rarityPercent !== null;
   return (
     <motion.div
       data-testid={`achievement-tier-${tier.code}`}
@@ -318,6 +444,11 @@ function TierRow({ tier, group, accent, isNegative = false }) {
           </div>
         ) : (
           <div className="text-[10px] uppercase tracking-widest text-white/50">+{tier.points}</div>
+        )}
+        {hasRarity && (
+          <div className="mt-0.5 text-[10px] tracking-widest text-white/35 tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
+            {formatPercent(rarityPercent)} haben das
+          </div>
         )}
       </div>
     </motion.div>
