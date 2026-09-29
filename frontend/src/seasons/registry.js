@@ -5,6 +5,7 @@
 
 export const SEASON_MODULES = {
   halloween: () => import("./halloween/index.jsx"),
+  advent: () => import("./advent/index.jsx"),
 };
 
 export function hasModule(key) {
