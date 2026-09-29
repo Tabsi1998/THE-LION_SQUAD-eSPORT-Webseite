@@ -14,7 +14,9 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
-const { HalloweenWidget, HalloweenCorners, HalloweenBats, OrbWeb, RappelSpider, pumpkinCounts, screenLayout, GHOST_COOLDOWN_MS } = require("./halloween");
+const { HalloweenWidget, HalloweenCorners, HalloweenBats, OrbWeb, RappelSpider, pumpkinCounts, screenLayout, setYearSalt, GHOST_COOLDOWN_MS } = require("./halloween");
+// Festes Jahres-Salz (C4): die Anordnung je Screen hängt sonst vom Kalenderjahr ab.
+setYearSalt("abnahme");
 const { buildPlan, stepDurationMs, webRadius } = require("./webPlan");
 const { createMotionScheduler, resetMotionScheduler } = require("./motion");
 const { resetPerches } = require("./perches");
@@ -127,8 +129,9 @@ test("Netzbau: Schritt für Schritt nach der Uhr, am Ende fertig; ohne Bau oder 
 test("Ecken: Netz immer, Spinne am Faden und Gräber nur mit Bewegung; dezent zeigt das fertige Netz", async () => {
   const name = SCREENS.find((candidate) => {
     const layout = screenLayout(candidate, "normal");
-    return layout.graves.length > 0 && layout.hangingBats.length > 0 && layout.crawler;
+    return layout.graves.length > 0 && layout.hangingBats.length > 0;
   }) as string;
+  expect(name).toBeTruthy();
   const layout = screenLayout(name, "normal");
   await render(<HalloweenCorners season={season({ effective: "subtle" })} screen={name} />);
   expect(screen.getByTestId("halloween-corners")).toBeTruthy();
@@ -146,9 +149,11 @@ test("Ecken: Netz immer, Spinne am Faden und Gräber nur mit Bewegung; dezent ze
 
 test("Krabbler kommt nach der Wartezeit", async () => {
   jest.useFakeTimers();
-  const name = SCREENS.find((candidate) => screenLayout(candidate, "normal").crawler) as string;
-  const layout = screenLayout(name, "normal");
-  await render(<HalloweenCorners season={season({ effective: "normal" })} screen={name} />);
+  // Auf dem Höhepunkt (full) hat jeder lebendige Screen einen Krabbler - unabhängig vom Jahres-Salz (C4).
+  const name = SCREENS.find((candidate) => screenLayout(candidate, "full").crawler) as string;
+  const layout = screenLayout(name, "full");
+  expect(layout.crawler).toBeTruthy();
+  await render(<HalloweenCorners season={season({ effective: "full" })} screen={name} />);
   expect(screen.queryByTestId("halloween-crawler")).toBeNull();
   await act(async () => {
     jest.advanceTimersByTime(layout.crawler.firstMs + 50);
