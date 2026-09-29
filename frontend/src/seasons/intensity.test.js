@@ -14,6 +14,10 @@ test("ordnet Seiten ihren Klassen zu", () => {
   expect(pageClass("/u/anna")).toBe("medium");
   expect(pageClass("/tournaments")).toBe("medium");
   expect(pageClass("/tournaments/cup/bracket")).toBe("calm");
+  // Der Adventkalender (#641) ist selbst das Bild - die Deko rundherum hält sich zurück.
+  expect(pageClass("/advent")).toBe("calm");
+  expect(pageClass("/advent/")).toBe("calm");
+  expect(pageClass("/adventure")).toBe("medium");
   expect(pageClass("/tournaments/cup/standings")).toBe("calm");
   expect(pageClass("/fastlap/spielberg")).toBe("calm");
   expect(pageClass("/login")).toBe("calm");

@@ -4,6 +4,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { missingLabels } from "@/lib/profileCompleteness";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { AdventHint } from "@/advent/AdventHint";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { NotificationRow } from "@/components/tls/NotificationRow";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
@@ -168,6 +169,8 @@ export default function DashboardPage() {
             <Settings className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Profil bearbeiten</span>
           </Link>
         </div>
+
+        <AdventHint />
 
         {completeness && completeness.score < 100 && (
           <div className="mb-8 border border-[#A855F7]/30 bg-gradient-to-r from-[#A855F7]/10 via-transparent to-transparent rounded-sm p-5 flex items-center gap-4" data-testid="profile-completeness-banner">

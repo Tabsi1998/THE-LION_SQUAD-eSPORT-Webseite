@@ -56,7 +56,7 @@ export default function MyPrizesPage() {
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spieler</span>
         <h1 className="font-heading text-3xl md:text-5xl font-black uppercase mt-1 mb-4">Meine Gewinne</h1>
         <p className="text-white/60 max-w-2xl mb-8">
-          Hier siehst du deine Preise aus TLS-Turnieren und Fast-Lap-Challenges, deine Urkunden und ob Gewinne schon zur Abholung bereit sind.
+          Hier siehst du deine Preise aus TLS-Turnieren, Fast-Lap-Challenges und Verlosungen, deine Urkunden und ob Gewinne schon zur Abholung bereit sind.
         </p>
 
         {!loading && (items.length > 0 || certificates.length > 0) && (
@@ -159,7 +159,8 @@ function PrizeCard({ p, highlight }) {
       <div className="flex items-start justify-between mb-3">
         <div className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] flex items-center gap-2">
-            <Trophy className="w-3.5 h-3.5" /> Platz #{p.place}
+            {/* Verlosung (#641): ein Gewinn aus dem Adventkalender hat keinen Platz. */}
+            {p.source_type === "season" ? <><Gift className="w-3.5 h-3.5" /> {p.place_label || "Verlosung"}</> : <><Trophy className="w-3.5 h-3.5" /> Platz #{p.place}</>}
           </div>
           <div className="font-heading font-bold text-lg uppercase mt-1">{p.prize_label}</div>
           {p.recipient_type === "team" && (
@@ -174,7 +175,7 @@ function PrizeCard({ p, highlight }) {
       </div>
       {(p.source_url || p.tournament_slug) && (
         <Link to={p.source_url || `/tournaments/${p.tournament_slug}`} className="text-sm text-white/70 hover:text-[#29B6E8] block mb-2">
-          {p.fastlap_challenge_title || p.tournament_title}
+          {p.fastlap_challenge_title || p.tournament_title}{p.source_type === "season" && p.season_source_label ? ` · ${p.season_source_label}` : ""}
         </Link>
       )}
       {p.fastlap_source_label && <div className="text-xs text-[#29B6E8] mb-2">{p.fastlap_source_label}</div>}

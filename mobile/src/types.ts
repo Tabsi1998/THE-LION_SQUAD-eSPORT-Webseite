@@ -450,6 +450,8 @@ export type PrizePickup = {
   fastlap_challenge_slug?: string | null;
   fastlap_source_label?: string | null;
   fastlap_track_name?: string | null;
+  // Verlosung (#641): ein Gewinn aus dem Adventkalender - „Türchen 12“ statt einem Platz.
+  season_source_label?: string | null;
   recipient_type?: "user" | "team" | string | null;
   recipient_label?: string | null;
 };
