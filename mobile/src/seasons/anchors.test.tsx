@@ -88,3 +88,28 @@ test("ohne perch bleibt die Karte, wie sie war", async () => {
   expect(screen.queryByTestId(/season-perch/)).toBeNull();
   expect(SeasonPerch).toBeDefined();
 });
+
+test("Ecknetz (A4): eine Karte ohne Fledermaus bekommt ein kleines, nicht klickbares Netz - links oder rechts oben; ein Dialog blendet es aus", async () => {
+  await render(<Card perch="web-1"><Text>Karte</Text></Card>);
+  expect(screen.queryByTestId("halloween-corner-web")).toBeNull();
+  await act(async () => {
+    perches.assignWebs([{ perchId: "web-1", side: "tr", seed: 0.42, radius: 26 }]);
+  });
+  const web = screen.getByTestId("halloween-corner-web");
+  expect(web.props["data-side"]).toBe("tr");
+  expect(web.props.pointerEvents).toBe("none");
+  expect(web.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ right: 0 })]));
+  await act(async () => {
+    quiet.setOverlay("dialog", true);
+  });
+  expect(screen.queryByTestId("halloween-corner-web")).toBeNull();
+  await act(async () => {
+    quiet.setOverlay("dialog", false);
+  });
+  expect(screen.getByTestId("halloween-corner-web")).toBeTruthy();
+  const chosen = perches.chooseWebPerches(perches.perchesFor("NewsList"), 2, () => 0.3, []);
+  expect(chosen.length).toBe(1);
+  expect(chosen[0].perchId).toBe("web-1");
+  expect(perches.chooseWebPerches(perches.perchesFor("NewsList"), 2, () => 0.3, ["web-1"])).toEqual([]);
+});
+

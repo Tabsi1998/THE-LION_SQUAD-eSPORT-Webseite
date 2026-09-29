@@ -15,13 +15,15 @@ export type Perch = {
   measure: () => Promise<PerchRect | null>;
 };
 export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string; /** nach einem Flug gelandet (Einfedern mit Haptik) */ landed?: boolean };
-export type PerchState = { perches: Perch[]; assignments: Record<string, PerchAssignment> };
+/** Ein kleines Netz in einer oberen Innenecke einer Karte (A4): Seite und Seed je Karte. */
+export type WebAssignment = { perchId: string; side: "tl" | "tr"; seed: number; radius: number };
+export type PerchState = { perches: Perch[]; assignments: Record<string, PerchAssignment>; webs: Record<string, WebAssignment> };
 type Listener = (state: PerchState) => void;
 
 /** Wie oft welche Art drankommt. Der Held (Dashboard-Kopf) etwas seltener, damit er nicht immer besetzt ist. */
 export const KIND_WEIGHTS: Record<PerchKind, number> = { card: 0.4, tile: 0.3, banner: 0.2, hero: 0.1 };
 
-const state: PerchState = { perches: [], assignments: {} };
+const state: PerchState = { perches: [], assignments: {}, webs: {} };
 const listeners = new Set<Listener>();
 
 function emit() {
@@ -31,7 +33,7 @@ function emit() {
 }
 
 export function perchSnapshot(): PerchState {
-  return { perches: [...state.perches], assignments: { ...state.assignments } };
+  return { perches: [...state.perches], assignments: { ...state.assignments }, webs: { ...state.webs } };
 }
 
 export function registerPerch(perch: Perch) {
@@ -43,7 +45,38 @@ export function unregisterPerch(id: string) {
   const before = state.perches.length;
   state.perches = state.perches.filter((entry) => entry.id !== id);
   if (state.assignments[id]) delete state.assignments[id];
+  if (state.webs[id]) delete state.webs[id];
   if (state.perches.length !== before) emit();
+}
+
+/** Netze je Screen: ersetzt alle - Karten anderer Screens verlieren ihres. */
+export function assignWebs(webs: WebAssignment[]) {
+  const next: Record<string, WebAssignment> = {};
+  webs.forEach((entry) => {
+    next[entry.perchId] = entry;
+  });
+  const same = Object.keys(next).length === Object.keys(state.webs).length && Object.keys(next).every((key) => state.webs[key] && state.webs[key].seed === next[key].seed && state.webs[key].side === next[key].side);
+  if (same) return;
+  state.webs = next;
+  emit();
+}
+
+export function websFor(screen: string): WebAssignment[] {
+  return Object.values(state.webs).filter((entry) => state.perches.some((perch) => perch.id === entry.perchId && perch.screen === screen));
+}
+
+/** Auswahl der Netz-Karten je Screen: gesät aus Screen und Kartenliste, nie eine Karte mit einer Fledermaus, nie zwei Netze an derselben Karte. */
+export function chooseWebPerches(candidates: Perch[], count: number, rng: () => number, taken: string[] = []): WebAssignment[] {
+  const used = new Set(taken);
+  const out: WebAssignment[] = [];
+  for (let n = 0; n < count; n += 1) {
+    const options = candidates.filter((perch) => !used.has(perch.id) && perch.kind !== "banner");
+    if (!options.length) break;
+    const pick = options[Math.min(options.length - 1, Math.floor(rng() * options.length))];
+    used.add(pick.id);
+    out.push({ perchId: pick.id, side: rng() < 0.5 ? "tl" : "tr", seed: rng(), radius: Math.round(22 + rng() * 8) });
+  }
+  return out;
 }
 
 export function perchesFor(screen: string): Perch[] {
@@ -80,6 +113,7 @@ export function subscribePerches(listener: Listener): () => void {
 export function resetPerches() {
   state.perches = [];
   state.assignments = {};
+  state.webs = {};
   emit();
 }
 
