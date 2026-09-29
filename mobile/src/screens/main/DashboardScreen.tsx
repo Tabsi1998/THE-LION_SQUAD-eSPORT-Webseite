@@ -188,7 +188,7 @@ export function DashboardScreen({ navigation }: Props) {
           </Card>
         ) : null}
         {/* Eine Zeile Begrüßung mit den Pills daneben; der Erklärsatz ist weg (#248). */}
-        <Card style={styles.heroCard}>
+        <Card style={styles.heroCard} perch="dashboard-hero" perchKind="hero">
           <View style={styles.heroTop}>
             <View style={styles.heroMark}>
               <Ionicons name={isGuest ? "radio-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
@@ -343,7 +343,7 @@ function StreamCard({ stream }: { stream: LiveStream }) {
   const url = stream.stream_url || (stream.twitch_login ? `https://www.twitch.tv/${stream.twitch_login}` : "");
   return (
     <Pressable onPress={() => url ? Linking.openURL(url).catch(() => {}) : undefined} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.streamCard}>
+      <Card style={styles.streamCard} perch="dashboard-stream" perchKind="banner">
         <View style={styles.streamIcon}>
           <Ionicons name="radio-outline" color={colors.live} size={20} />
         </View>

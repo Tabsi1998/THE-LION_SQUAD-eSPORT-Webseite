@@ -16,6 +16,17 @@ jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
 const { HalloweenWidget, HalloweenCorners, HalloweenBats, OrbWeb, RappelSpider, pumpkinCounts, screenLayout, GHOST_COOLDOWN_MS } = require("./halloween");
 const { buildPlan, stepDurationMs, webRadius } = require("./webPlan");
+const { createMotionScheduler, resetMotionScheduler } = require("./motion");
+const { resetPerches } = require("./perches");
+const { resetFlights } = require("./flights");
+
+// Bewegungsbudget (A3): in diesen Tests darf alles sofort - der Planer hat seine eigenen Tests.
+beforeEach(() => {
+  resetMotionScheduler(createMotionScheduler({ unlimited: true, appState: null }));
+  resetPerches();
+  resetFlights();
+});
+afterAll(() => resetMotionScheduler(null));
 
 const SCREENS = ["Dashboard", "Tournaments", "Events", "News", "Teams", "More", "Profile", "Calendar", "Achievements", "Settings", "Chat", "Members", "Gallery", "Servers"];
 
@@ -153,13 +164,13 @@ test("Fledermaus antippen: Haptik, sie fliegt davon und ist danach weg", async (
   expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(count);
   await fireEvent.press(screen.getAllByTestId("halloween-bat-hanging")[0]);
   expect(Haptics.impactAsync).toHaveBeenCalled();
-  expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(count - 1);
+  expect(screen.queryAllByTestId("halloween-bat-hanging").length).toBe(count - 1);
   expect(screen.getByTestId("halloween-bat-flying")).toBeTruthy();
   await act(async () => {
     jest.advanceTimersByTime(2900);
   });
   expect(screen.queryByTestId("halloween-bat-flying")).toBeNull();
-  expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(count - 1);
+  expect(screen.queryAllByTestId("halloween-bat-hanging").length).toBe(count - 1);
 });
 
 test("Grab antippen: ein Geist steigt auf, das zweite Mal erst nach der Sperre, der Geist verschwindet wieder", async () => {

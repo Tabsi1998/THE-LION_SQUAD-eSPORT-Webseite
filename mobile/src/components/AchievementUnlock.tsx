@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { colors, radius } from "../theme";
 import { useReduceMotion } from "./FadeIn";
+import { useSeasonOverlay } from "../seasons/anchors";
 
 export type UnlockTier = {
   code?: string;
@@ -93,6 +94,7 @@ export function AchievementUnlockModal({
   sub?: string;
 }) {
   const open = Array.isArray(tiers) && tiers.length > 0;
+  useSeasonOverlay("achievement-unlock", open);
   const maxLevel = useMemo(
     () => (open ? Math.min(5, Math.max(1, tiers.reduce((m, t) => Math.max(m, Number(t.level) || 1), 1))) : 1),
     [tiers, open],

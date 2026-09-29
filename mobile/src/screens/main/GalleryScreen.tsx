@@ -12,6 +12,7 @@ import { albumCountLabel, sizedUpload, type GalleryAlbum } from "../../lib/galle
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
+import { SeasonPerch } from "../../seasons/anchors";
 
 // Galerie (#236): Alben wie im Web - öffentliche für alle, Mitglieder-Alben nur angemeldet
 // (das entscheidet der Server, die App zeigt, was er liefert).
@@ -71,6 +72,7 @@ export function GalleryScreen({ navigation }: Props) {
               <Muted>{[formatDate(album.taken_at), albumCountLabel(album)].filter(Boolean).join(" · ")}</Muted>
               {album.visibility && album.visibility !== "public" ? <Muted style={styles.internal}>Nur für Mitglieder</Muted> : null}
             </View>
+            <SeasonPerch id={`album-${album.id}`} kind="tile" />
           </Pressable>
         )) : (
           <EmptyState icon="images-outline" title="Noch keine Alben" detail="Sobald Bilder hochgeladen sind, stehen sie hier." />

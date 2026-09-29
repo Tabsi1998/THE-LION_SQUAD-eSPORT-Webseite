@@ -8,8 +8,9 @@ export type Size = { width: number; height: number };
 export const FLIGHT_MS: [number, number] = [6500, 9500];
 export const KEYFRAMES = 24;
 
-export function batCount(intensity: string, rng: () => number = Math.random): number {
-  const [min, max] = intensity === "full" ? [4, 6] : [3, 5];
+export function batCount(intensity: string, rng: () => number = Math.random, range?: [number, number]): number {
+  const [min, max] = range || (intensity === "full" ? [4, 6] : [3, 5]);
+  if (max <= 0) return 0;
   return min + Math.floor(rng() * (max - min + 1));
 }
 
@@ -69,8 +70,8 @@ export function formationOffset(index: number, formation: "v" | "loose", rng: ()
   return { x: (rng() - 0.5) * 140, y: (rng() - 0.5) * 100, delayMs: rng() * 700 };
 }
 
-export function planFlock(intensity: string, rng: () => number = Math.random): BatPlan[] {
-  const count = batCount(intensity, rng);
+export function planFlock(intensity: string, rng: () => number = Math.random, range?: [number, number]): BatPlan[] {
+  const count = batCount(intensity, rng, range);
   const durationMs = FLIGHT_MS[0] + rng() * (FLIGHT_MS[1] - FLIGHT_MS[0]);
   const formation: "v" | "loose" = rng() < 0.55 ? "v" : "loose";
   return Array.from({ length: count }, (_, index) => {

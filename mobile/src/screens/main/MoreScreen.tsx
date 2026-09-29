@@ -184,7 +184,7 @@ export function MoreScreen({ navigation }: Props) {
           return (
             <View key={group.title} style={styles.group}>
               <Heading>{group.title}</Heading>
-              <Card style={styles.list}>
+              <Card style={styles.list} perch={`more-${group.title}`}>
                 {group.entries.map((entry, index) => (
                   <Pressable
                     key={entry.title}

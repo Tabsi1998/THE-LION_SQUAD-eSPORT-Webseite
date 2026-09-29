@@ -5,6 +5,7 @@ import { REPORT_CATEGORIES, detailsValid, sendReport, type ReportDraft } from ".
 import { colors } from "../theme";
 import { Button } from "./Button";
 import { Heading, Muted } from "./Text";
+import { useSeasonOverlay } from "../seasons/anchors";
 
 // Meldung an die Moderation (#414): Grund wählen, kurz beschreiben, senden. Wer gemeldet wurde,
 // erfährt nichts davon; die Moderation sieht die Meldung unter Admin → Moderation.
@@ -18,6 +19,7 @@ export function ReportSheet({ draft, onClose, onSent }: {
   const [category, setCategory] = useState("harassment");
   const [details, setDetails] = useState("");
   const [busy, setBusy] = useState(false);
+  useSeasonOverlay("report-sheet", draft !== null);
   const [error, setError] = useState("");
   const visible = Boolean(draft);
 

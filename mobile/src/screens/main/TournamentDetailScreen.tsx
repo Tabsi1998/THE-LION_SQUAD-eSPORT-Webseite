@@ -20,6 +20,7 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Team, Tournament, User } from "../../types";
+import { useSeasonOverlay } from "../../seasons/anchors";
 
 const TOURNAMENT_LIVE_RESOURCES = ["tournaments", "matches", "matches-v2", "teams"];
 
@@ -476,6 +477,7 @@ function RegistrationModal({
   onClose: () => void;
   onSubmit: (payload: RegistrationPayload) => void;
 }) {
+  useSeasonOverlay("registration-modal", visible);
   const isTeamTournament = (tournament.team_mode || "solo") !== "solo";
   const sourceSlug = tournament.game?.identity_game_slug || tournament.game?.slug || "";
   const gameSlug = tournament.game?.slug || "";

@@ -1,10 +1,15 @@
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
+import { Animated, AppState, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Ellipse, Line, Path } from "react-native-svg";
 import { colors } from "../theme";
+import { FlyingBatShape, HangingBatShape as HangingBatArt } from "./batArt";
 import { flightPath, keyframes, nextFlightDelaySeconds, planFlock, type FlightPath } from "./bats";
+import { endFlight, fleePath, startFlight, subscribeFlights, type Flight as PerchFlightData } from "./flights";
+import { capabilities, scaleForScreen, type Capabilities } from "./intensity";
+import { getMotionScheduler, releaseMotion, requestMotion, type MotionToken } from "./motion";
+import { assign, assignmentsFor, choosePerches, perchesFor, placementFor, subscribePerches } from "./perches";
 import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelState } from "./rappel";
 import { between, pick, screenRng } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
@@ -19,6 +24,9 @@ import { EXTENT, buildPlan, planLines, stepDurationMs, toPixels, webRadius, type
 // Antippen Geister frei; eine Spinne seilt sich vom oberen Rand ab, lässt unten los und läuft weg, der Faden
 // schwingt und reißt ab. Dazu der Schwarm, der Kürbis im Dashboard-Kopf und als Tab-Symbol. Jeder Screen
 // bekommt aus seinem Namen seine Anordnung; Fledermäuse und Gräber sind die einzigen Dinge, die Berührungen nehmen.
+// Halloween IV App (A1/A3, #715/#717): Screen-Klassen kappen die Anordnung (intensity.ts), ein Bewegungsbudget
+// begrenzt große Bewegungen (motion.ts), Karten bieten Plätze an (perches.ts, anchors.tsx), die Bühne teilt sie
+// gesät zu und zeichnet die Flüge (flights.ts); im App-Hintergrund ruht alles, offene Dialoge sperren.
 
 export const SIGNAL_KEY = "halloween_pumpkin";
 export const FACES = ["grin", "scared", "wicked"] as const;
@@ -45,12 +53,38 @@ export type ScreenLayout = {
   crawler: { firstMs: number; everyMs: number; size: number; durationMs: number } | null;
   rappel: RappelSpec | null;
   hangingBats: Array<{ x: number; size: number; delayMs: number }>;
+  /** So viele Fledermäuse sitzen auf Karten-Plätzen (perches.ts) statt unter der Kopfzeile. */
+  perchBats: number;
   graves: Array<{ x: number; size: number; tilt: number }>;
   lanternFace: Face;
+  caps: Capabilities | null;
 };
 
-/** Was dieser Screen bekommt - aus dem Namen berechnet; alle Zufallszahlen immer gezogen, die Stärke schaltet nur ab. */
-export function screenLayout(screen: string, intensity: string): ScreenLayout {
+/**
+ * Was dieser Screen bekommt - aus dem Namen berechnet; alle Zufallszahlen immer gezogen, die Stärke schaltet nur ab,
+ * danach kappen die Fähigkeiten der Screen-Klasse (`caps`, A3) - gleiche Anordnung, nur weniger davon.
+ */
+export function screenLayout(screen: string, intensity: string, caps: Capabilities = capabilities(screen, intensity)): ScreenLayout {
+  const drawn = drawLayout(screen, intensity);
+  return applyCapabilities(drawn, caps);
+}
+
+export function applyCapabilities(layout: ScreenLayout, caps: Capabilities): ScreenLayout {
+  return {
+    ...layout,
+    caps,
+    secondWeb: caps.webs >= 2 ? layout.secondWeb : null,
+    web: caps.webs >= 1 ? layout.web : { ...layout.web, factor: 0 },
+    spider: caps.dropSpider ? layout.spider : null,
+    crawler: caps.crawler ? layout.crawler : null,
+    rappel: caps.rappel ? layout.rappel : null,
+    hangingBats: layout.hangingBats.slice(0, Math.min(1, caps.hangingBats)),
+    perchBats: Math.max(0, caps.hangingBats - Math.min(1, caps.hangingBats, layout.hangingBats.length)),
+    graves: caps.graves ? layout.graves : [],
+  };
+}
+
+function drawLayout(screen: string, intensity: string): ScreenLayout {
   const rng = screenRng(screen, "halloween");
   const full = intensity === "full";
   const subtle = intensity === "subtle";
@@ -73,7 +107,7 @@ export function screenLayout(screen: string, intensity: string): ScreenLayout {
   const graveRoll = rng();
   const graveSpecs = Array.from({ length: 2 + Math.floor(rng() * 2) }, (_, index) => ({ x: 0.1 + index * 0.22 + rng() * 0.1, size: Math.round(between(rng, 16, 22)), tilt: between(rng, -7, 7) }));
   const graves = !subtle && graveRoll < 0.6 ? graveSpecs : [];
-  return { web, secondWeb, spider, crawler, rappel, hangingBats, graves, lanternFace: pick(rng, [...FACES]) };
+  return { web, secondWeb, spider, crawler, rappel, hangingBats, perchBats: 0, graves, lanternFace: pick(rng, [...FACES]), caps: null };
 }
 
 // ------------------------------------------------------------------ Kunst
@@ -141,22 +175,9 @@ export function Bat({ size = 26 }: { size?: number }) {
   );
 }
 
-/** Eine Fledermaus, die kopfüber hängt: Füße oben, Flügel angelegt, Kopf unten mit Ohren und Augen. */
+/** Eine Fledermaus, die kopfüber hängt - die Figur liegt in batArt.tsx (mit Mondlicht-Saum), hier der alte Name. */
 export function HangingBatShape({ size = 26 }: { size?: number }) {
-  return (
-    <Svg width={size} height={size * 1.55} viewBox="0 0 40 62">
-      <Path d="M18 0 l2 6 l2 -6" stroke={INK} strokeWidth={1.6} fill="none" strokeLinecap="round" />
-      <Path d="M13 12 q-9 12 -3 28 q3 -7 7 -3 z" fill={RIM} transform="translate(-0.6 0)" />
-      <Path d="M27 12 q9 12 3 28 q-3 -7 -7 -3 z" fill={RIM} transform="translate(0.6 0)" />
-      <Path d="M13 12 q-9 12 -3 28 q3 -7 7 -3 z" fill={INK} />
-      <Path d="M27 12 q9 12 3 28 q-3 -7 -7 -3 z" fill={INK} />
-      <Ellipse cx={20} cy={24} rx={6.5} ry={12} fill={INK} />
-      <Circle cx={20} cy={40} r={5.6} fill={INK} />
-      <Path d="M15 43 l-2.5 8 l6.5 -3.5 z M25 43 l2.5 8 l-6.5 -3.5 z" fill={INK} />
-      <Circle cx={17.8} cy={40.5} r={0.9} fill={EYES} />
-      <Circle cx={22.2} cy={40.5} r={0.9} fill={EYES} />
-    </Svg>
-  );
+  return <HangingBatArt size={size} />;
 }
 
 /** Ein winziger Grabstein, hell genug für Schwarz auf Schwarz. */
@@ -188,6 +209,11 @@ export function Ghost({ size = 36 }: { size?: number }) {
 /** Das runde Netz in einer oberen Ecke: fertig auf einmal, oder Faden für Faden mit laufender Spinne. */
 export function OrbWeb({ web, width, reduced }: { web: WebSpec; width: number; reduced: boolean }) {
   const plan = useMemo(() => buildPlan(web.seed), [web.seed]);
+  if (web.factor <= 0) return null;
+  return <OrbWebInner web={web} width={width} reduced={reduced} plan={plan} />;
+}
+
+function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: number; reduced: boolean; plan: WebPlan }) {
   const radius = webRadius(width, web.factor);
   const mirror = web.corner === "tr";
   const lines = useMemo(() => planLines(plan, radius, mirror), [plan, radius, mirror]);
@@ -277,20 +303,43 @@ function DropSpider({ spec, width, reduced }: { spec: NonNullable<ScreenLayout["
   const sway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduced) return undefined;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.delay(spec.delayMs),
-      Animated.timing(drop, { toValue: 1, duration: 3600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.sequence([
-        Animated.timing(sway, { toValue: -1, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(sway, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(sway, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-      Animated.delay(2500),
-      Animated.timing(drop, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.delay(Math.max(1000, spec.periodMs - spec.delayMs - 10400)),
-    ]));
-    loop.start();
-    return () => loop.stop();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let stopped = false;
+    let token: MotionToken | null = null;
+    let running: Animated.CompositeAnimation | null = null;
+    // Bewegungsbudget (A3): jeder Abstieg holt sich einen Platz; ohne Platz in 15 s noch einmal fragen.
+    const descend = () => {
+      if (stopped) return;
+      token = requestMotion("drop_spider");
+      if (!token) {
+        timer = setTimeout(descend, 15000);
+        return;
+      }
+      running = Animated.sequence([
+        Animated.timing(drop, { toValue: 1, duration: 3600, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.sequence([
+          Animated.timing(sway, { toValue: -1, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(sway, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+          Animated.timing(sway, { toValue: 0, duration: 700, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        ]),
+        Animated.delay(2500),
+        Animated.timing(drop, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ]);
+      running.start();
+      timer = setTimeout(() => {
+        releaseMotion(token);
+        token = null;
+        timer = setTimeout(descend, Math.max(1000, spec.periodMs - spec.delayMs - 10400));
+      }, 11400);
+    };
+    timer = setTimeout(descend, spec.delayMs);
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+      running?.stop();
+      drop.setValue(0);
+      if (token) releaseMotion(token);
+    };
   }, [drop, sway, spec, reduced]);
   if (reduced) return null;
   const translateY = drop.interpolate({ inputRange: [0, 1], outputRange: [-spec.drop - spec.size * 4, 0] });
@@ -312,8 +361,15 @@ function Crawler({ spec, width, bottom, reduced }: { spec: NonNullable<ScreenLay
     if (reduced) return undefined;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
+    let token: MotionToken | null = null;
     const run = () => {
       if (stopped) return;
+      // Bewegungsbudget (A3): ohne freien Platz in 20 s noch einmal.
+      token = requestMotion("crawler");
+      if (!token) {
+        timer = setTimeout(run, 20000);
+        return;
+      }
       setRunning(true);
       progress.setValue(0);
       const legs = Animated.loop(Animated.sequence([
@@ -325,6 +381,8 @@ function Crawler({ spec, width, bottom, reduced }: { spec: NonNullable<ScreenLay
       timer = setTimeout(() => {
         legs.stop();
         setRunning(false);
+        releaseMotion(token);
+        token = null;
         timer = setTimeout(run, spec.everyMs);
       }, spec.durationMs);
     };
@@ -332,6 +390,7 @@ function Crawler({ spec, width, bottom, reduced }: { spec: NonNullable<ScreenLay
     return () => {
       stopped = true;
       if (timer) clearTimeout(timer);
+      if (token) releaseMotion(token);
     };
   }, [progress, wiggle, spec, reduced]);
   if (!running || reduced) return null;
@@ -352,12 +411,26 @@ export function RappelSpider({ spec, width, floorY, reduced }: { spec: RappelSpe
   useEffect(() => {
     if (reduced) return undefined;
     let current = createRappel(spec);
+    let token: MotionToken | null = null;
     setState(current);
     const handle = setInterval(() => {
-      current = advanceRappel(current, 0.05, { floorY, width });
+      // Bewegungsbudget (A3): kurz vor dem Abseilen einen Platz holen - sonst noch acht Sekunden warten.
+      if (current.phase === "wait" && current.timer - 0.05 <= 0 && !token) {
+        token = requestMotion("rappel");
+        if (!token) current = { ...current, timer: 8 };
+      }
+      const next = advanceRappel(current, 0.05, { floorY, width });
+      if (token && next.phase === "wait" && current.phase !== "wait") {
+        releaseMotion(token);
+        token = null;
+      }
+      current = next;
       setState(current);
     }, 50);
-    return () => clearInterval(handle);
+    return () => {
+      clearInterval(handle);
+      if (token) releaseMotion(token);
+    };
   }, [spec, floorY, width, reduced]);
   const view = rappelView(state);
   useEffect(() => {
@@ -443,11 +516,9 @@ function HangingBat({ spec, width, height, reduced, onScared }: { spec: ScreenLa
   }
   const scare = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    const rng = Math.random;
-    const dir: 1 | -1 = rng() < 0.5 ? -1 : 1;
-    const endX = dir > 0 ? width + 80 : -80;
-    const endY = rng() < 0.6 ? Math.min(height - TAB_BAR - 40, start.y + 220 + rng() * 260) : Math.max(-60, start.y - 120 - rng() * 120);
-    setFlight({ p0: start, p1: { x: start.x + (endX - start.x) * 0.25, y: start.y - 90 }, p2: { x: start.x + (endX - start.x) * 0.75, y: endY - 60 }, p3: { x: endX, y: endY }, facing: dir });
+    const token = requestMotion("bat_scare", { force: true });
+    if (token) setTimeout(() => releaseMotion(token), 3600);
+    setFlight(fleePath(start, { width, height: height - TAB_BAR }, Math.random));
   };
   const rotate = swing.interpolate({ inputRange: [0, 1], outputRange: ["-3deg", "3deg"] });
   return (
@@ -469,6 +540,8 @@ function Graveyard({ graves, width, bottom, reduced }: { graves: ScreenLayout["g
     if (reduced || now - (lastRef.current[index] || 0) < GHOST_COOLDOWN_MS) return;
     lastRef.current[index] = now;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    const token = requestMotion("ghost", { force: true });
+    if (token) setTimeout(() => releaseMotion(token), 6500);
     nextId.current += 1;
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
     const distance = 220 + Math.random() * 260;
@@ -510,19 +583,116 @@ function RisingGhost({ ghost, onDone }: { ghost: { id: number; x: number; dx: nu
 
 // ------------------------------------------------------------------ Ebenen
 
+/** Ist die App gerade im Vordergrund? Im Hintergrund ruht die Bühne (A3), nach der Rückkehr holt sie nichts nach. */
+export function useAppActive(): boolean {
+  // Nur „background“ und „inactive“ zählen als weg - „unknown“ (Start, Tests) gilt als vorne.
+  const inactive = (status: string | null | undefined) => status === "background" || status === "inactive";
+  const [active, setActive] = useState(() => !inactive(AppState.currentState));
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (status) => setActive(!inactive(status)));
+    return () => subscription?.remove?.();
+  }, []);
+  return active;
+}
+
+/**
+ * Plätze auf Karten (A1): so viele Fledermäuse, wie die Klasse erlaubt und nicht unter der Kopfzeile hängen, sitzen
+ * gesät auf angemeldeten Karten dieses Screens. Verlässt eine Karte den Screen oder fliegt eine Fledermaus davon,
+ * bleibt ihr Platz eine Weile frei, dann wird ein anderer besetzt.
+ */
+export function usePerchAssignments(screen: string, wanted: number, active: boolean) {
+  const vacatedRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (!active || wanted <= 0) {
+      assign([]);
+      return undefined;
+    }
+    const recompute = () => {
+      const perches = perchesFor(screen);
+      const now = Date.now();
+      const vacated = Object.entries(vacatedRef.current).filter(([, until]) => until > now).map(([id]) => id);
+      const current = assignmentsFor(screen).filter((entry) => perches.some((perch) => perch.id === entry.perchId));
+      const missing = wanted - current.length;
+      if (missing <= 0) return;
+      const pickRng = screenRng(`${screen}|${perches.map((perch) => perch.id).join(",")}`, "perch-pick");
+      const chosen = choosePerches(perches, missing, pickRng, [...current.map((entry) => entry.perchId), ...vacated]);
+      if (!chosen.length) return;
+      assign([
+        ...current,
+        ...chosen.map((perch) => {
+          const rng = screenRng(perch.id, "placement");
+          return { perchId: perch.id, ...placementFor(perch, rng), temperament: pick(rng, ["sleepy", "skittish", "roamer", "curious"]) };
+        }),
+      ]);
+    };
+    recompute();
+    const stopPerches = subscribePerches(recompute);
+    // Eine verscheuchte Fledermaus lässt ihren Platz 25–60 s frei; danach darf ein anderer besetzt werden.
+    const stopFlights = subscribeFlights((flights) => {
+      flights.forEach((flight) => {
+        if (flight.perchId && !vacatedRef.current[flight.perchId]) vacatedRef.current[flight.perchId] = Date.now() + 25000 + Math.round(Math.random() * 35000);
+      });
+    });
+    const timer = setInterval(recompute, 5000);
+    return () => {
+      stopPerches();
+      stopFlights();
+      clearInterval(timer);
+      assign([]);
+    };
+  }, [screen, wanted, active]);
+}
+
+/** Die Flüge verscheuchter Fledermäuse (flights.ts), in Fensterkoordinaten über allem gezeichnet. */
+function FlightLayer({ top }: { top: number }) {
+  const [flights, setFlights] = useState<PerchFlightData[]>([]);
+  useEffect(() => subscribeFlights(setFlights), []);
+  if (!flights.length) return null;
+  return (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { top: -top }]} testID="halloween-flights">
+      {flights.map((flight) => <PerchFlight key={flight.id} flight={flight} />)}
+    </View>
+  );
+}
+
+function PerchFlight({ flight }: { flight: PerchFlightData }) {
+  const progress = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(progress, { toValue: 1, duration: flight.durationMs, easing: Easing.inOut(Easing.quad), useNativeDriver: true }).start();
+    const handle = setTimeout(() => endFlight(flight.id), flight.durationMs);
+    return () => clearTimeout(handle);
+  }, [flight, progress]);
+  const frames = keyframes(flight.path, { x: 0, y: 0 });
+  const size = flight.size * 1.7;
+  const translateX = progress.interpolate({ inputRange: frames.input, outputRange: frames.xs.map((x) => x - size / 2) });
+  const translateY = progress.interpolate({ inputRange: frames.input, outputRange: frames.ys.map((y) => y - size * 0.275) });
+  const flap = progress.interpolate({ inputRange: Array.from({ length: 33 }, (_, i) => i / 32), outputRange: Array.from({ length: 33 }, (_, i) => (i % 2 ? 0.5 : 1)) });
+  return (
+    <Animated.View pointerEvents="none" style={[styles.bat, { transform: [{ translateX }, { translateY }, { scaleX: flight.path.facing }, { scaleY: flap }] }]} testID="halloween-bat-flying">
+      <FlyingBatShape size={size} />
+    </Animated.View>
+  );
+}
+
 export function HalloweenCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { reducedMotion } = useSeason();
-  const layout = useMemo(() => screenLayout(screen, season.effective), [screen, season.effective]);
-  const moving = !reducedMotion && season.effective !== "subtle";
+  const appActive = useAppActive();
+  const caps = useMemo(() => scaleForScreen(capabilities(screen, season.effective), width, height), [screen, season.effective, width, height]);
+  const layout = useMemo(() => screenLayout(screen, season.effective, caps), [screen, season.effective, caps]);
+  const moving = !reducedMotion && season.effective !== "subtle" && appActive;
   const bottom = TAB_BAR + insets.bottom + 4;
   const floorY = Math.max(240, height - insets.top - bottom - 10);
   const [salt, setSalt] = useState(0);
   const onScared = useCallback(() => setSalt((value) => value + 1), []);
   void salt;
+  usePerchAssignments(screen, moving ? layout.perchBats : 0, moving);
+  useEffect(() => {
+    getMotionScheduler().setHidden(!appActive);
+  }, [appActive]);
   return (
-    <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="halloween-corners">
+    <View pointerEvents="box-none" style={StyleSheet.absoluteFill} testID="halloween-corners" data-class={caps.cls}>
       <OrbWeb web={layout.web} width={width} reduced={!moving} />
       {layout.secondWeb ? <OrbWeb web={layout.secondWeb} width={width} reduced={!moving} /> : null}
       {layout.spider ? <DropSpider spec={layout.spider} width={width} reduced={!moving} /> : null}
@@ -530,6 +700,7 @@ export function HalloweenCorners({ season, screen }: { season: ActiveSeason; scr
       {layout.rappel && moving ? <RappelSpider spec={layout.rappel} width={width} floorY={floorY} reduced={!moving} /> : null}
       {moving ? layout.hangingBats.map((bat, index) => <HangingBat key={`${screen}-${index}`} spec={bat} width={width} height={height} reduced={!moving} onScared={onScared} />) : null}
       {moving ? <Graveyard graves={layout.graves} width={width} bottom={bottom} reduced={!moving} /> : null}
+      {moving ? <FlightLayer top={insets.top} /> : null}
     </View>
   );
 }
@@ -600,22 +771,40 @@ export function HalloweenBats({ season, screen, reducedMotion }: { season: Activ
     rngRef.current = screenRng(screen, "bats");
   }, [screen]);
 
+  const caps = useMemo(() => scaleForScreen(capabilities(screen, season.effective), width, height), [screen, season.effective, width, height]);
+  const tokenRef = useRef<MotionToken | null>(null);
+  const [retry, setRetry] = useState(0);
+
   useEffect(() => {
-    if (!active || flight) return undefined;
-    const delay = remaining === 0 && !night ? 3000 : nextFlightDelaySeconds(night, rngRef.current) * 1000;
+    if (!active || flight || !caps.flock) return undefined;
+    const delay = remaining === 0 && !night && retry === 0 ? 3000 : nextFlightDelaySeconds(night, rngRef.current) * 1000;
     const handle = setTimeout(() => {
-      const plan = planFlock(season.effective, rngRef.current);
+      // Bewegungsbudget (A3): der Schwarm ist eine große Bewegung - ohne Platz in 5–15 s noch einmal.
+      const token = requestMotion("flock");
+      if (!token) {
+        setTimeout(() => setRetry((value) => value + 1), 5000 + Math.round(rngRef.current() * 10000));
+        return;
+      }
+      tokenRef.current = token;
+      const plan = planFlock(season.effective, rngRef.current, caps.flockRange);
       setRemaining(plan.length);
       setFlight({ id: Date.now(), plan, path: flightPath({ width, height }, rngRef.current) });
     }, delay);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, flight, night, season.effective]);
+  }, [active, flight, night, season.effective, caps.flock, retry]);
+  useEffect(() => () => {
+    if (tokenRef.current) releaseMotion(tokenRef.current);
+  }, []);
 
   const onDone = useMemo(() => () => {
     setRemaining((count) => {
       const next = count - 1;
-      if (next <= 0) setFlight(null);
+      if (next <= 0) {
+        setFlight(null);
+        releaseMotion(tokenRef.current);
+        tokenRef.current = null;
+      }
       return next;
     });
   }, []);

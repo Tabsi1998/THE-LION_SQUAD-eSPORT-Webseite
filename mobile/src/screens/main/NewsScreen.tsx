@@ -204,7 +204,7 @@ export function NewsScreen({ navigation }: Props) {
 function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.featuredCard}>
+      <Card style={styles.featuredCard} perch={`news-featured-${post.id}`}>
         <MediaImage
           uri={post.banner_url}
           style={styles.featuredImage}
@@ -232,7 +232,7 @@ function FeaturedNewsCard({ post, onPress }: { post: NewsPost; onPress: () => vo
 function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.card}>
+      <Card style={styles.card} perch={`news-${post.id}`}>
         <MediaImage
           uri={post.banner_url}
           style={styles.image}

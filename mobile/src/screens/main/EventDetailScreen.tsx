@@ -238,7 +238,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
         ) : null}
 
         {(event.locations?.length || 0) > 1 ? (
-          <Card style={styles.card} testID="event-locations">
+          <Card style={styles.card} testID="event-locations" perch="event-locations">
             <Heading>Standorte</Heading>
             {event.locations!.map((place, index) => (
               <Pressable key={place.key || index} onPress={() => openMap(place.map_query)} disabled={!place.map_query} accessibilityRole="button" style={styles.place}>

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme";
 import { whatsNewTitle, type WhatsNew } from "../lib/whatsnew";
 import { Body, Muted, Title } from "./Text";
+import { useSeasonOverlay } from "../seasons/anchors";
 
 // „Was ist neu“ (#249): eine Karte mit den Punkten der Version, einmal nach
 // dem Update und jederzeit unter Mehr.
@@ -12,6 +13,7 @@ type Props = { entry: WhatsNew; visible: boolean; onClose: () => void };
 
 export function WhatsNewCard({ entry, visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  useSeasonOverlay("whats-new", visible);
   return (
     <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
       <View style={styles.backdrop}>
