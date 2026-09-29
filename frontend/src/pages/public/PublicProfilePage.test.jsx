@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Profilseite (Umbau 24.09.): Banner mit Avatar, Pillen und verknüpften Konten im Kopf, fünf Reiter,
@@ -132,4 +132,46 @@ test("läuft der Stream, steht der Player oben in der Übersicht (ohne Zustimmun
 test("podiumHighlights: nur Rang 1 bis 3, nach Rang und dann nach Datum", () => {
   const items = [{ id: "a", rank: 3, date: "2026-01-01" }, { id: "b", rank: 1, date: "2026-01-01" }, { id: "c", rank: 9 }, { id: "d", rank: 1, date: "2026-05-01" }];
   expect(podiumHighlights(items).map((i) => i.id)).toEqual(["d", "b", "a"]);
+});
+
+// Erfolge II (#619): Angeheftete zuerst in der Uebersicht, Kategorie-Balken und geheime Funde im Reiter,
+// private Erfolge als Hinweis statt Liste.
+function mockApiWithAchievements(achievements) {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: PROFILE };
+    if (url === "/streams/live") return { data: [] };
+    if (url === "/achievements/user/u1") return { data: achievements };
+    return { data: [] };
+  });
+}
+
+test("Angeheftete stehen zuerst in der Uebersicht, der Reiter zeigt Kategorie-Balken und geheime Funde", async () => {
+  const groups = [
+    { code: "matches_played", name: "Spielmacher", category: "match", icon: "swords", accent_color: "#29B6E8", description: "", tier_count: 2, earned_count: 1,
+      tiers: [
+        { code: "matches_played_1", rank: 1, level: 1, name: "Spielmacher I", description: "", points: 5, material: "wood", material_name: "Holz", material_color: "#A0703C", earned: true, earned_at: "2026-09-20T10:00:00Z" },
+        { code: "matches_played_2", rank: 2, level: 1, name: "Spielmacher II", description: "", points: 10, material: "iron", material_name: "Eisen", material_color: "#9AA0A6", earned: false, current: 3, target: 25, percent: 12 },
+      ] },
+  ];
+  const award = { code: "matches_played_1", award_id: "aw1", name: "Spielmacher I", group_name: "Spielmacher", group_category: "match", material_name: "Holz", material_color: "#A0703C", level_name: "Holz", level_color: "#A0703C", points: 5, icon: "swords" };
+  mockApiWithAchievements({ groups, awards: [award], pinned: [award], hidden: { total: 13, earned: 2 }, achievements_hidden: false });
+  renderPage();
+  const pinned = await screen.findByTestId("profile-pinned-awards");
+  expect(within(pinned).getByTestId("profile-pinned-matches_played_1")).toHaveTextContent("Spielmacher I");
+  expect(within(pinned).getByTestId("profile-pinned-matches_played_1")).toHaveTextContent("Holz");
+  fireEvent.click(screen.getByTestId("profile-tab-badges"));
+  expect(await screen.findByTestId("profile-category-bar-match")).toHaveTextContent("1 von 2");
+  expect(screen.getByTestId("profile-hidden-found")).toHaveTextContent("2 geheime Erfolge gefunden");
+  expect(screen.getByTestId("achievement-groups")).toBeInTheDocument();
+  expect(screen.queryByTestId("profile-achievements-private")).toBeNull();
+});
+
+test("private Erfolge: Hinweis statt Liste, keine Angehefteten", async () => {
+  mockApiWithAchievements({ groups: [], awards: [], pinned: [], hidden: { total: 0, earned: 0 }, achievements_hidden: true });
+  renderPage();
+  expect(await screen.findByTestId("profile-achievements-private")).toHaveTextContent("Paula B. zeigt Erfolge nicht öffentlich.");
+  expect(screen.queryByTestId("profile-pinned-awards")).toBeNull();
+  fireEvent.click(screen.getByTestId("profile-tab-badges"));
+  expect(await screen.findByText("Erfolge sind privat")).toBeInTheDocument();
+  expect(screen.queryByTestId("achievement-groups")).toBeNull();
 });

@@ -9,12 +9,13 @@
  * tier. Locked negative tiers are never sent by the API.
  *
  * Seit #619: Seltenheit je Gruppe und Stufe („4,2 % haben Diamant“), Sortierung nach Seltenheit,
- * die „?“-Karte mit dem Zähler für geheime Gruppen und die Vitrine „Für Vereinsmitglieder“.
+ * die „?“-Karte mit dem Zähler für geheime Gruppen und die Vitrine „Für Vereinsmitglieder“;
+ * im eigenen Profil Filter (Material, Status) und das Anheften einzelner Stufen.
  */
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, CircleHelp, Lock } from "lucide-react";
+import { ChevronDown, CircleHelp, Lock, Pin, PinOff } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 
 const LEVEL_META = {
@@ -52,7 +53,7 @@ export function formatPercent(value) {
 
 // Escalating, animated medal per tier level. Every rarity has its own signature:
 // Bronze ember, Silver sheen, Gold spark orbit, Platinum float+ring, Legendary flames.
-function TierMedal({ level, icon, earned = true, size = "md" }) {
+export function TierMedal({ level, icon, earned = true, size = "md" }) {
   const lvl = LEVEL_META[level] || LEVEL_META[1];
   const dim = size === "lg" ? "w-12 h-12" : size === "sm" ? "w-8 h-8" : "w-9 h-9";
   const iconDim = size === "lg" ? "w-5 h-5" : "w-4 h-4";
@@ -136,6 +137,37 @@ export function sortGroupsByRarity(groups, rarity) {
   });
 }
 
+export const STATUS_FILTERS = [
+  ["all", "Alle"],
+  ["earned", "Erreicht"],
+  ["progress", "In Arbeit"],
+  ["locked", "Gesperrt"],
+  ["secret", "Geheim"],
+];
+
+// Status einer Stufe für den Filter im Profil: erreicht, in Arbeit (messbar und schon angefangen),
+// gesperrt (noch nichts, von Hand oder geplant) - geheime Gruppen zählen als „geheim“.
+export function tierStatus(tier, group) {
+  if (group?.hidden) return "secret";
+  if (tier.earned) return "earned";
+  const measurable = !tier.manual_only && tier.condition_status !== "planned" && Number(tier.target || 0) > 0;
+  if (measurable && Number(tier.current || 0) > 0) return "progress";
+  return "locked";
+}
+
+export function applyTierFilters(groups, filters) {
+  if (!filters) return groups;
+  const material = filters.material || "";
+  const status = filters.status && filters.status !== "all" ? filters.status : "";
+  if (!material && !status) return groups;
+  return groups
+    .map((group) => ({
+      ...group,
+      tiers: (group.tiers || []).filter((tier) => (!material || tier.material === material) && (!status || tierStatus(tier, group) === status)),
+    }))
+    .filter((group) => group.tiers.length > 0);
+}
+
 export function AchievementGroupsView({
   groups = [],
   emptyText = "Noch keine Achievements freigeschaltet.",
@@ -145,8 +177,11 @@ export function AchievementGroupsView({
   hidden = null,
   clubTeaser = false,
   categoryFilter = null,
+  filters = null,
+  pins = null,
 }) {
-  const filtered = categoryFilter ? groups.filter((group) => group.category === categoryFilter) : groups;
+  const byCategory = categoryFilter ? groups.filter((group) => group.category === categoryFilter) : groups;
+  const filtered = applyTierFilters(byCategory, filters);
   const visibleGroups = earnedOnly
     ? filtered
         .map((group) => ({
@@ -157,7 +192,8 @@ export function AchievementGroupsView({
         }))
         .filter((group) => group.tiers.length > 0)
     : filtered;
-  const showHiddenCard = Boolean(hidden && Number(hidden.total || 0) > 0 && !earnedOnly && (!categoryFilter || categoryFilter === "hidden"));
+  const filtering = Boolean(filters && ((filters.material) || (filters.status && filters.status !== "all")));
+  const showHiddenCard = Boolean(hidden && Number(hidden.total || 0) > 0 && !earnedOnly && (!categoryFilter || categoryFilter === "hidden") && (!filtering || filters.status === "secret"));
 
   if (!visibleGroups.length && !showHiddenCard) {
     return (
@@ -176,7 +212,7 @@ export function AchievementGroupsView({
           <span className="text-[10px] uppercase tracking-widest text-white/40">{ordered.length} Gruppen</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} />)}
+          {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} />)}
           {showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
         </div>
       </div>
@@ -223,7 +259,7 @@ export function AchievementGroupsView({
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} />)}
+              {byCat[cat].map(g => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} />)}
               {cat === "hidden" && showHiddenCard && <HiddenSummaryCard hidden={hidden} />}
             </div>
           </section>
@@ -267,7 +303,7 @@ function HiddenSummaryCard({ hidden }) {
   );
 }
 
-function GroupCard({ group, earnedOnly = false, rarity = null }) {
+function GroupCard({ group, earnedOnly = false, rarity = null, pins = null }) {
   const [open, setOpen] = useState(false);
   const earnedTiers = group.tiers.filter(t => t.earned).sort((a, b) => b.level - a.level);
   const lockedTiers = group.tiers.filter(t => !t.earned).sort((a, b) => a.level - b.level);
@@ -373,7 +409,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null }) {
             className="overflow-hidden"
           >
             <div className="border-t border-white/5 px-4 py-3 space-y-2" data-testid={`achievement-group-${group.code}-tiers`}>
-              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} rarityPercent={!isNegative ? rarity?.tiers?.[t.code] : undefined} />)}
+              {group.tiers.map(t => <TierRow key={t.code} tier={t} group={group} accent={accent} isNegative={isNegative} rarityPercent={!isNegative ? rarity?.tiers?.[t.code] : undefined} pins={!isNegative ? pins : null} />)}
             </div>
           </motion.div>
         )}
@@ -382,11 +418,14 @@ function GroupCard({ group, earnedOnly = false, rarity = null }) {
   );
 }
 
-function TierRow({ tier, group, accent, isNegative = false, rarityPercent }) {
+function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins = null }) {
   const lvl = LEVEL_META[tier.level] || LEVEL_META[1];
   const label = levelLabel(tier.level, group, tier);
   const rowGlow = tier.earned && tier.level >= 4 && !isNegative ? `tls-tierrow--${tier.level}` : "";
   const hasRarity = rarityPercent !== undefined && rarityPercent !== null;
+  const pinned = Boolean(pins && (pins.codes || []).includes(tier.code));
+  const pinFull = Boolean(pins && !pinned && (pins.codes || []).length >= (pins.max || 6));
+  const canPin = Boolean(pins && tier.earned);
   return (
     <motion.div
       data-testid={`achievement-tier-${tier.code}`}
@@ -449,6 +488,21 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent }) {
           <div className="mt-0.5 text-[10px] tracking-widest text-white/35 tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
             {formatPercent(rarityPercent)} haben das
           </div>
+        )}
+        {canPin && (
+          <button
+            type="button"
+            onClick={() => pins.onToggle(tier.code)}
+            disabled={pinFull}
+            aria-pressed={pinned}
+            aria-label={pinned ? `${tier.name} lösen` : `${tier.name} anheften`}
+            title={pinned ? "Vom Profil lösen" : pinFull ? `Höchstens ${pins.max || 6} angeheftet` : "Im Profil anheften"}
+            data-testid={`achievement-pin-${tier.code}`}
+            className={`mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm border transition ${pinned ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/50 hover:text-white hover:border-white/40"} disabled:opacity-35 disabled:cursor-not-allowed`}
+          >
+            {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+            {pinned ? "Angeheftet" : "Anheften"}
+          </button>
         )}
       </div>
     </motion.div>

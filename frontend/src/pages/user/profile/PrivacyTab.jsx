@@ -27,6 +27,15 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         testId="profile-privacy"
       />
 
+      <SwitchRow
+        label="Erfolge öffentlich"
+        description="Wenn aktiv, zeigt dein Profil die angehefteten und erreichten Erfolge, und du stehst in den Ranglisten, im Erfolg der Woche und im Laufband. Die Verein-Kategorie sehen dabei nur Mitglieder. Wenn aus, sieht niemand deine Erfolge."
+        hint={publicProfile ? null : "Wirkt erst, sobald das Profil öffentlich ist."}
+        checked={form.privacy_achievements_public !== false}
+        onCheckedChange={(checked) => set("privacy_achievements_public", checked)}
+        testId="profile-privacy-achievements"
+      />
+
       <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
         <div className="flex items-start gap-3 mb-4">
           <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />

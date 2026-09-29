@@ -7,6 +7,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { NotificationRow } from "@/components/tls/NotificationRow";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
+import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { bundleNotifications } from "@/lib/notifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -292,6 +293,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="mt-8 grid sm:grid-cols-2 md:grid-cols-3 gap-4" data-testid="dashboard-tiles">
+          <AchievementsTile />
           {isClubMember && (
             <Link to="/members/benefits" data-testid="dashboard-benefits" className="border border-[#FFD700]/30 hover:border-[#FFD700]/60 rounded-sm p-5 bg-[#121212] transition">
               <div className="flex items-center justify-between">

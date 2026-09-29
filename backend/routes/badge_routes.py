@@ -6,6 +6,7 @@ Public/User endpoints (prefix /api/achievements):
   GET  /api/achievements/user/{user_id}    — public profile achievements
   POST /api/achievements/evaluate          — re-evaluate (auto-award) for self
   PUT  /api/achievements/me/pins           — bis zu sechs eigene Erfolge anheften (#619)
+  GET  /api/achievements/me/summary        — Dashboard-Kachel: Level, Als Nächstes, letzte Freischaltung
   GET  /api/achievements/overview          — Kategorien, Seltenheit, Geheim-Zähler, Woche, Laufband (#619)
   GET  /api/achievements/leaderboard       — Punkte (je Kategorie/Zeitraum) oder Level
   GET  /api/achievements/week, /recent     — Erfolg der Woche, neueste Freischaltungen
@@ -71,6 +72,14 @@ async def my_achievements(user: dict = Depends(get_current_user)):
         "privacy_achievements_public": visibility.achievements_public(stored),
         "level": await xp.view(user["id"]),
     }
+
+
+@router.get("/me/summary")
+async def my_summary(user: dict = Depends(get_current_user)):
+    """Die Dashboard-Kachel „Deine Erfolge“ (#619): Level, „Als Nächstes“, letzte Freischaltung, Zähler."""
+    groups = await list_groups_for_user(user["id"], user)
+    awards = await list_user_awards(user["id"], user)
+    return await visibility.my_summary(get_db(), user["id"], groups, awards)
 
 
 class PinsBody(BaseModel):

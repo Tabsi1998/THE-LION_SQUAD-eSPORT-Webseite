@@ -401,6 +401,26 @@ async def recent_unlocks(db, limit: int = 20) -> list[dict]:
     return out
 
 
+# ------------------------------------------------------------------ Dashboard-Kachel
+
+async def my_summary(db, user_id: str, groups: list[dict], awards: list[dict]) -> dict:
+    """Die Kachel „Deine Erfolge“ (#619): Level-Stand, was als Nächstes dran ist, die letzte Freischaltung,
+    Anzahl und Punkte - ohne den ganzen Katalog zu schicken."""
+    from services import xp
+    earned = [a for a in awards if not a.get("is_negative")]
+    earned.sort(key=lambda a: str(a.get("earned_at") or ""), reverse=True)
+    last = earned[0] if earned else None
+    nxt = next_up(groups, 1)
+    return {
+        "level": await xp.view(user_id),
+        "next_up": nxt[0] if nxt else None,
+        "last_award": {k: last.get(k) for k in ("award_id", "code", "name", "group_name", "material", "material_name", "material_color", "icon", "points", "earned_at")} if last else None,
+        "count": len(earned),
+        "points": sum(int(a.get("points") or 0) for a in earned),
+        "hidden": await hidden_summary(db, user_id),
+    }
+
+
 # ------------------------------------------------------------------ Angeheftet
 
 async def set_pins(db, user_id: str, tier_codes: list[str]) -> list[str]:

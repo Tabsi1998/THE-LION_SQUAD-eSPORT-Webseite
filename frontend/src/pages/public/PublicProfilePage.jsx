@@ -8,6 +8,8 @@ import { PlatformIcon as SocialIcon, platformMeta as socialMeta } from "@/lib/pl
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
+import { AchievementIcon } from "@/components/tls/AchievementIcon";
+import { categoryProgress } from "@/pages/user/profile/AchievementPanels";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
@@ -367,6 +369,11 @@ export default function PublicProfilePage() {
   const referenceTargets = new Set(referenceItems.map((item) => item.target_id).filter(Boolean));
   const awards = Array.isArray(profile.awards) ? profile.awards : [];
   const badges = Array.isArray(achievementsData?.awards) ? achievementsData.awards : [];
+  // Erfolge II (#619): Angeheftete zuerst, der Schalter „Erfolge öffentlich“ und die geheimen Funde.
+  const pinned = Array.isArray(achievementsData?.pinned) ? achievementsData.pinned : [];
+  const achievementsHidden = achievementsData?.achievements_hidden === true;
+  const hiddenFound = Number(achievementsData?.hidden?.earned || 0);
+  const categoryBars = categoryProgress(achievementsData?.groups || []).filter((row) => row.earned > 0);
   const teams = Array.isArray(profile.teams) ? profile.teams : [];
   const tournaments = Array.isArray(profile.tournaments) ? profile.tournaments : [];
   const fastLaps = Array.isArray(profile.f1_bests) ? profile.f1_bests : [];
@@ -380,7 +387,7 @@ export default function PublicProfilePage() {
   const filteredReferences = referenceFilter === "all" ? referenceItems : referenceItems.filter((item) => (item.kind || "tournament") === referenceFilter);
   const showTwitchLive = Boolean(profile.show_twitch_embed && twitchChannel && liveStream);
   const showTwitchChannel = Boolean(profile.show_twitch_embed && twitchChannel && !liveStream);
-  const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || referenceItems.length > 0 || showTwitchLive;
+  const hasOverviewContent = highlights.length > 0 || awards.length > 0 || badges.length > 0 || pinned.length > 0 || referenceItems.length > 0 || showTwitchLive;
 
   // Auszeichnung als Profilbanner (#230): nur eigene; der Server prüft das und die Seite lädt neu.
   const featureAward = async (awardId) => {
@@ -639,6 +646,21 @@ export default function PublicProfilePage() {
                 </section>
               )}
 
+              {pinned.length > 0 && (
+                <section data-testid="profile-pinned-awards">
+                  <SectionTitle icon={Medal} color="#FFD700" kicker="Angeheftet" title="Lieblingserfolge" action={{ label: "Alle ansehen", onClick: () => setTab("badges") }} />
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {pinned.map((a) => <PinnedAwardCard key={a.code} award={a} />)}
+                  </div>
+                </section>
+              )}
+
+              {achievementsHidden && (
+                <div className="border border-dashed border-white/15 rounded-sm px-4 py-3 text-sm text-white/50 flex items-center gap-2" data-testid="profile-achievements-private">
+                  <Lock className="w-3.5 h-3.5 shrink-0" /> {displayName} zeigt Erfolge nicht öffentlich.
+                </div>
+              )}
+
               {badges.length > 0 && (
                 <section>
                   <SectionTitle icon={Medal} color="#29B6E8" kicker="Zuletzt" title="Achievements" action={badges.length > 6 ? { label: "Alle ansehen", onClick: () => setTab("badges") } : null} />
@@ -688,8 +710,39 @@ export default function PublicProfilePage() {
         )}
 
         {tab === "badges" && (
-          <div>
-            <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
+          <div className="space-y-6">
+            {achievementsHidden ? (
+              <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-achievements-private">
+                <Lock className="w-8 h-8 mx-auto mb-3 text-white/25" />
+                <div className="font-heading text-xl font-bold uppercase text-white/70">Erfolge sind privat</div>
+                <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">{displayName} zeigt Erfolge nicht öffentlich.</p>
+              </div>
+            ) : (
+              <>
+                {(categoryBars.length > 0 || hiddenFound > 0) && (
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2" data-testid="profile-category-bars">
+                    {categoryBars.map((row) => (
+                      <div key={row.key} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-2.5" data-testid={`profile-category-bar-${row.key}`}>
+                        <div className="flex items-center gap-2">
+                          <AchievementIcon name={row.icon} fallback="trophy" className="w-3.5 h-3.5 shrink-0" style={{ color: row.accent }} />
+                          <span className="font-heading font-bold uppercase text-sm truncate">{row.label}</span>
+                          <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50 tabular-nums shrink-0">{row.earned} von {row.total}</span>
+                        </div>
+                        <div className="mt-2 h-1 bg-white/5 rounded-sm overflow-hidden">
+                          <div className="h-full" style={{ width: `${row.total ? Math.round((row.earned / row.total) * 100) : 0}%`, backgroundColor: row.accent }} />
+                        </div>
+                      </div>
+                    ))}
+                    {hiddenFound > 0 && (
+                      <div className="border border-[#A855F7]/30 rounded-sm bg-[#0F0A16] px-3 py-2.5 text-sm text-[#c084fc]" data-testid="profile-hidden-found">
+                        {hiddenFound === 1 ? "Ein geheimer Erfolg gefunden" : `${hiddenFound} geheime Erfolge gefunden`}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
+              </>
+            )}
           </div>
         )}
 
@@ -803,6 +856,23 @@ export default function PublicProfilePage() {
         )}
       </div>
     </PublicLayout>
+  );
+}
+
+// Angeheftete Erfolge (#619): die bis zu sechs Lieblingsstufen, in der Reihenfolge der Person.
+function PinnedAwardCard({ award }) {
+  const color = award.material_color || award.level_color || "#FFD700";
+  return (
+    <div className="flex items-center gap-3 p-3 border rounded-sm bg-[#121212]" style={{ borderColor: `${color}55`, boxShadow: `inset 0 0 0 1px ${color}14` }} data-testid={`profile-pinned-${award.code}`}>
+      <div className="w-10 h-10 rounded-sm flex items-center justify-center border shrink-0" style={{ borderColor: `${color}66`, backgroundColor: `${color}14` }}>
+        <AchievementIcon name={award.icon || award.group_icon} fallback="trophy" className="w-5 h-5" style={{ color, filter: `drop-shadow(0 0 4px ${color}66)` }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-[10px] font-bold uppercase tracking-widest truncate" style={{ color }}>{award.material_name || award.level_name}</div>
+        <div className="font-semibold truncate text-sm">{award.name}</div>
+        <div className="text-[10px] text-white/40 truncate">{award.group_name}</div>
+      </div>
+    </div>
   );
 }
 
