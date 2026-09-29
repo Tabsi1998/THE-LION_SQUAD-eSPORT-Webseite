@@ -342,6 +342,7 @@ async def test_dashboard_kachel_liefert_level_naechstes_und_letzte_freischaltung
     summary = (await flow.get("/api/achievements/me/summary")).json()
     assert summary["count"] == 2 and summary["points"] == catalog.MATERIALS["wood"]["points"] + catalog.MATERIALS["iron"]["points"]
     assert summary["last_award"]["code"] == "matches_played_2" and summary["last_award"]["material"] == "iron" and summary["last_award"]["award_id"]
-    assert summary["hidden"] == {"total": 0, "earned": 0}
+    hidden_total = await flow.db.achievement_groups.count_documents({"hidden": True, "is_negative": {"$ne": True}})
+    assert summary["hidden"] == {"total": hidden_total, "earned": 0}
     mine = (await flow.get("/api/achievements/me")).json()
     assert all(a.get("award_id") for a in mine["awards"]), "jede Vergabe trägt ihre Kennung"
