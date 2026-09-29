@@ -721,7 +721,9 @@ async def reconcile(days: int = 7, limit: int = 5000) -> dict:
             logger.info("[achievements] reconcile %s: %s", user_id, changed)
         awarded += await evaluate_user_progress(user_id)
         checked += 1
-    return {"checked": checked, "drift": drift, "awarded": awarded}
+    result = {"checked": checked, "drift": drift, "awarded": awarded}
+    await db.settings.update_one({"id": "achievements_reconcile_last"}, {"$set": {"id": "achievements_reconcile_last", "at": now_utc().isoformat(), **result}}, upsert=True)
+    return result
 
 
 # ------------------------------------------------------------------ Signale

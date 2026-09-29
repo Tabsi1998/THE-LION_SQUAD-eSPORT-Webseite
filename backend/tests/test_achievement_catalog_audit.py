@@ -266,3 +266,13 @@ def test_katalog_d_ziele_material_texte_und_schluessel():
     assert all(CONDITION_KEY_STATUS.get(key) == "live" for key in keys), sorted(key for key in keys if CONDITION_KEY_STATUS.get(key) != "live")
     known = set(counters.REGISTRY) | set(counters.LEGACY_KEYS)
     assert keys <= known, sorted(keys - known)
+
+
+def test_die_katalog_pruefung_des_admins_findet_im_code_katalog_keinen_fehler():
+    """E10 (#620): dieselben Regeln im Test und im Admin - der ausgelieferte Katalog ist fehlerfrei."""
+    from achievement_catalog import apply_category_overrides
+    from achievement_catalog.validate import validate_catalog
+    groups = [apply_category_overrides(g) for g in ACHIEVEMENT_GROUPS]
+    report = validate_catalog(groups, ACHIEVEMENT_TIERS, CONDITION_KEY_STATUS)
+    assert report["errors"] == [], report["errors"][:10]
+    assert report["counts"]["groups"] == len(groups) and report["counts"]["tiers"] == len(ACHIEVEMENT_TIERS)
