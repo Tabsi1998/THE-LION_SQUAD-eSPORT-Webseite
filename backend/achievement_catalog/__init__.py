@@ -18,6 +18,8 @@ from .catalog_b import CONDITION_KEYS_B, GROUPS_B, TIERS_B  # noqa: F401
 from .catalog_b import REDEFINED as REDEFINED_B, REPLACED as REPLACED_B  # noqa: F401
 from .catalog_c import CONDITION_KEYS_C, GROUPS_C, TIERS_C  # noqa: F401
 from .catalog_c import REDEFINED as REDEFINED_C, REPLACED as REPLACED_C  # noqa: F401
+from .catalog_d import CONDITION_KEYS_D, GROUPS_D, TIERS_D  # noqa: F401
+from .catalog_d import REDEFINED as REDEFINED_D, REPLACED as REPLACED_D  # noqa: F401
 
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (
@@ -42,24 +44,30 @@ COUNTER_KEYS_V2 = (
     # Katalog C (#614): Community, Creator, Profil
     "discord_messages", "community_messages_sent", "gallery_uploads_approved", "stickers_collected", "app_user_stage",
     "own_tournament_streams", "clips_synced",
+    # Katalog D (#615): Verein, Besonders, Geheim
+    "member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
+    "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",
+    "leap_day_logins",
 )
 CONDITION_KEY_STATUS.update({key: "live" for key in COUNTER_KEYS_V2})
 
-# Katalog A (#612), B (#613) und C (#614) ersetzen alte Gruppen: die abgelösten (REPLACED) und die neu definierten
-# (REDEFINED) weichen aus dem Katalog, ihre Vergaben wandern beim Start über die Abbildung (services/achievement_migration.py).
-_RETIRED = set(REPLACED) | set(REDEFINED) | set(REPLACED_B) | set(REDEFINED_B) | set(REPLACED_C) | set(REDEFINED_C)
+# Katalog A (#612), B (#613), C (#614) und D (#615) ersetzen alte Gruppen: die abgelösten (REPLACED) und die neu
+# definierten (REDEFINED) weichen aus dem Katalog, ihre Vergaben wandern beim Start über die Abbildung
+# (services/achievement_migration.py).
+_RETIRED = set(REPLACED) | set(REDEFINED) | set(REPLACED_B) | set(REDEFINED_B) | set(REPLACED_C) | set(REDEFINED_C) | set(REPLACED_D) | set(REDEFINED_D)
 # Gleicher Code, neue Leiter: die alten Stufen-Codes dieser Gruppen (noch aus der alten Liste gelesen) - die Migration
 # hebt Vergaben darauf auf die neuen Stufen und nimmt die alten Stufen aus der Datenbank (services/achievement_migration.py).
-_REDEFINED_CODES = set(REDEFINED) | set(REDEFINED_B) | set(REDEFINED_C)
+_REDEFINED_CODES = set(REDEFINED) | set(REDEFINED_B) | set(REDEFINED_C) | set(REDEFINED_D)
 REDEFINED_OLD_TIERS: dict[str, list[str]] = {}
 for _old in ACHIEVEMENT_TIERS:
     if _old["group_code"] in _REDEFINED_CODES:
         REDEFINED_OLD_TIERS.setdefault(_old["group_code"], []).append(_old["code"])
-ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C
-ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C
+ACHIEVEMENT_GROUPS[:] = [g for g in ACHIEVEMENT_GROUPS if g["code"] not in _RETIRED] + GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D
+ACHIEVEMENT_TIERS[:] = [t for t in ACHIEVEMENT_TIERS if t["group_code"] not in _RETIRED] + TIERS_A + TIERS_B + TIERS_C + TIERS_D
 GROUP_MAPPING.update(REPLACED)
 GROUP_MAPPING.update(REPLACED_B)
 GROUP_MAPPING.update(REPLACED_C)
+GROUP_MAPPING.update(REPLACED_D)
 
 # Alte Kategorienamen in den Überschreibungen → neue (Streaming & Content → Creator, Fortschritt → Profil).
 for _code, _category in list(CATEGORY_OVERRIDES.items()):

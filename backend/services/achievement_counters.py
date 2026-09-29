@@ -1233,3 +1233,157 @@ async def _clips(ctx):
     from services.twitch_clips import STATE_ID
     doc = await ctx.db.settings.find_one({"id": STATE_ID}, {"_id": 0, "clips": 1}) or {}
     return sum(1 for clip in doc.get("clips") or [] if str(clip.get("creator_name") or "").strip().lstrip("@").lower() == handle)
+
+
+# ------------------------------------------------------------------ Katalog D (#615): Verein, Besonders, Geheim
+
+# Mondphase wie im Web (seasons/halloween/moon.js): mittlere Rechnung ab dem Neumond vom 6.1.2000, 18:14 UTC.
+SYNODIC_DAYS = 29.530588853
+REFERENCE_NEW_MOON = datetime(2000, 1, 6, 18, 14, tzinfo=timezone.utc)
+FULL_MOON_WINDOW = 0.017  # rund ein halber Tag zu jeder Seite
+
+
+def moon_phase(at: datetime) -> float:
+    """0 = Neumond, 0,5 = Vollmond."""
+    days = (at - REFERENCE_NEW_MOON).total_seconds() / 86400
+    return (days / SYNODIC_DAYS) % 1
+
+
+@counter("member_since_founding_year", "club")
+async def _founding_member(ctx):
+    """Aktives Mitglied seit dem Gründungsjahr des Vereins (Verein → Über uns)."""
+    membership = await ctx.db.memberships.find_one({"user_id": ctx.user_id}, {"_id": 0, "member_since": 1, "member_status": 1})
+    if not membership or membership.get("member_status") not in ("active", "honorary"):
+        return 0
+    about = await ctx.db.settings.find_one({"id": "about_page"}, {"_id": 0, "founded_on": 1}) or {}
+    founded = _parse(about.get("founded_on"))
+    since = _parse(membership.get("member_since"))
+    return 1 if founded and since and since.year == founded.year else 0
+
+
+@counter("pioneer_account", "profile")
+async def _pioneer(ctx):
+    """Eines der ersten hundert Konten der Plattform."""
+    created = (await ctx.user()).get("created_at")
+    if not created:
+        return 0
+    return 1 if await ctx.db.users.count_documents({"created_at": {"$lt": created}}) < 100 else 0
+
+
+@counter("distinct_game_wins_one_season", "tournament")
+async def _grand_slam(ctx):
+    """Turniersiege in verschiedenen Spielen innerhalb einer Saison - das Maximum über die Saisons."""
+    tournaments = await ctx.tournaments()
+    per_season: dict[str, set[str]] = {}
+    for award in await ctx.awards_places():
+        if award.get("place") != 1:
+            continue
+        tournament = tournaments.get(award.get("tournament_id")) or {}
+        if tournament.get("season_id") and tournament.get("game_id"):
+            per_season.setdefault(tournament["season_id"], set()).add(tournament["game_id"])
+    return max((len(games) for games in per_season.values()), default=0)
+
+
+@counter("all_visible_achievements", "achievement")
+async def _completionist(ctx):
+    """Jede messbare Stufe, die diese Person sehen kann, ist erreicht (ohne Geheimes, Negatives, Hand-Stufen und sich selbst)."""
+    user = await ctx.user()
+    groups = [g async for g in ctx.db.achievement_groups.find({"public": True, "is_negative": {"$ne": True}, "hidden": {"$ne": True}, "code": {"$ne": "completionist"}}, {"_id": 0, "code": 1, "category": 1})]
+    if not user.get("is_club_member"):
+        groups = [g for g in groups if g.get("category") != "club"]
+    codes = [g["code"] for g in groups]
+    if not codes:
+        return 0
+    tiers = {t["code"] async for t in ctx.db.achievements.find({"group_code": {"$in": codes}, "manual_only": {"$ne": True}}, {"_id": 0, "code": 1})}
+    earned = {award.get("tier_code") for award in await ctx.awards()}
+    return 1 if tiers and tiers <= earned else 0
+
+
+@counter("witching_hour_matches", "match")
+async def _witching_hour(ctx):
+    """Matches, die zwischen 00:00 und 00:15 (Wien) endeten."""
+    count = 0
+    for _match, _won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
+        local = when.astimezone(VIENNA) if when else None
+        if local and local.hour == 0 and local.minute < 15:
+            count += 1
+    return count
+
+
+@counter("lucky_seven_days", "match")
+async def _lucky_seven(ctx):
+    """Tage, die ein Siebter waren und sieben Siege brachten."""
+    wins: dict = {}
+    for _match, won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
+        if not won or not when:
+            continue
+        local = when.astimezone(VIENNA)
+        if local.day == 7:
+            wins[local.date()] = wins.get(local.date(), 0) + 1
+    return sum(1 for n in wins.values() if n >= 7)
+
+
+@counter("palindrome_laps", "fastlap")
+async def _palindrome(ctx):
+    """Gültige Rundenzeiten, deren Ziffern sich von hinten wie von vorn lesen (1:23.321)."""
+    from services.fastlap_standings import effective_ms
+    count = 0
+    for row in await ctx.lap_times():
+        ms = effective_ms(row)
+        digits = f"{ms // 60000}{(ms % 60000) // 1000:02d}{ms % 1000:03d}"
+        if len(digits) >= 5 and digits == digits[::-1]:
+            count += 1
+    return count
+
+
+@counter("echo_results", "match")
+async def _echo(ctx):
+    """Dreimal hintereinander derselbe Kartenstand (in Spielreihenfolge)."""
+    mine = await ctx.registration_ids()
+    rows = sorted((entry for entry in _completed_matches(await ctx.matches(), mine) if entry[2]), key=lambda entry: entry[2])
+    count = 0
+    streak = 0
+    last = None
+    for match, _won, _when, _others in rows:
+        pair = _score_pair(match, mine)
+        if pair is None:
+            streak = 0
+            last = None
+            continue
+        streak = streak + 1 if pair == last else 1
+        last = pair
+        if streak == 3:
+            count += 1
+            streak = 0
+            last = None
+    return count
+
+
+@counter("night_shift_nights", "match")
+async def _night_shift(ctx):
+    """Nächte (22 Uhr bis 6 Uhr, Wien) mit mindestens fünf abgeschlossenen Matches."""
+    nights: dict = {}
+    for _match, _won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()):
+        if not when:
+            continue
+        local = when.astimezone(VIENNA)
+        if local.hour >= 22:
+            key = local.date()
+        elif local.hour < 6:
+            key = (local - timedelta(days=1)).date()
+        else:
+            continue
+        nights[key] = nights.get(key, 0) + 1
+    return sum(1 for n in nights.values() if n >= 5)
+
+
+@counter("full_moon_wins", "match")
+async def _full_moon(ctx):
+    """Siege, während der Mond voll war (rund ein halber Tag zu jeder Seite)."""
+    return sum(1 for _match, won, when, _others in _completed_matches(await ctx.matches(), await ctx.registration_ids()) if won and when and abs(moon_phase(when) - 0.5) <= FULL_MOON_WINDOW)
+
+
+@counter("leap_day_logins", "profile", "xp")
+async def _leap_day(ctx):
+    """Tages-Logins an einem 29. Februar."""
+    return await ctx.db.xp_events.count_documents({"user_id": ctx.user_id, "source": "daily_login", "day": {"$regex": "-02-29$"}})

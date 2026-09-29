@@ -175,12 +175,12 @@ class TestAdminTiers:
 # ---------------- Manual award / revoke ----------------
 class TestAdminAwardManual:
     def test_award_revoke_flow(self, admin_headers, admin_id):
-        # award: gamers_heaven_p (Special-tier in Plattformen group)
+        # award: gamers_heaven_1 (Special-tier in Plattformen group)
         # revoke if pre-existed
         requests.delete(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
-                        json={"user_id": admin_id, "tier_code": "gamers_heaven_p"}, timeout=15)
+                        json={"user_id": admin_id, "tier_code": "gamers_heaven_1"}, timeout=15)
         r = requests.post(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
-                          json={"user_id": admin_id, "tier_code": "gamers_heaven_p", "note": "TEST"},
+                          json={"user_id": admin_id, "tier_code": "gamers_heaven_1", "note": "TEST"},
                           timeout=15)
         assert r.status_code == 200, r.text
         body = r.json()
@@ -188,19 +188,19 @@ class TestAdminAwardManual:
         # verify in /me
         r2 = requests.get(f"{BASE_URL}/api/achievements/me", headers=admin_headers, timeout=15)
         codes = {a["code"] for a in r2.json()["awards"]}
-        assert "gamers_heaven_p" in codes
+        assert "gamers_heaven_1" in codes
         # revoke
         r3 = requests.delete(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
-                             json={"user_id": admin_id, "tier_code": "gamers_heaven_p"}, timeout=15)
+                             json={"user_id": admin_id, "tier_code": "gamers_heaven_1"}, timeout=15)
         assert r3.status_code == 200
         # verify gone
         r4 = requests.get(f"{BASE_URL}/api/achievements/me", headers=admin_headers, timeout=15)
         codes = {a["code"] for a in r4.json()["awards"]}
-        assert "gamers_heaven_p" not in codes
+        assert "gamers_heaven_1" not in codes
 
     def test_award_unknown_user(self, admin_headers):
         r = requests.post(f"{BASE_URL}/api/admin/achievements/award", headers=admin_headers,
-                          json={"user_id": "nope-id", "tier_code": "gamers_heaven_p"}, timeout=15)
+                          json={"user_id": "nope-id", "tier_code": "gamers_heaven_1"}, timeout=15)
         assert r.status_code == 404
 
     def test_award_unknown_tier(self, admin_headers, admin_id):
