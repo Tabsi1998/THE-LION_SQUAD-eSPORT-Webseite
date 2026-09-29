@@ -122,6 +122,7 @@ const AdminDocumentsPage = lazy(() => import("@/pages/admin/AdminDocumentsPage")
 const SeasonPage = lazy(() => import("@/pages/public/SeasonPage"));
 const PublicProfilePage = lazy(() => import("@/pages/public/PublicProfilePage"));
 const AdminAchievementsPage = lazy(() => import("@/pages/admin/AdminAchievementsPage"));
+const AdminAchievementPreviewPage = lazy(() => import("@/pages/admin/AdminAchievementPreviewPage"));
 const AdminMembershipApplicationsPage = lazy(() => import("@/pages/admin/AdminMembershipApplicationsPage"));
 const AdminEmailTemplatesPage = lazy(() => import("@/pages/admin/AdminEmailTemplatesPage"));
 const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
@@ -336,6 +337,7 @@ function App() {
           <Route path="/admin/about" element={<ProtectedRoute requireArea="content"><AdminAboutPage /></ProtectedRoute>} />
           <Route path="/admin/game-servers" element={<ProtectedRoute requireArea="system"><AdminGameServersPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
+          <Route path="/admin/achievements/preview" element={<ProtectedRoute requireArea="content"><AdminAchievementPreviewPage /></ProtectedRoute>} />
           <Route path="/admin/stickers" element={<ProtectedRoute requireArea="content"><AdminStickersPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireArea="club"><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/email-templates" element={<ProtectedRoute requireArea="system"><AdminEmailTemplatesPage /></ProtectedRoute>} />

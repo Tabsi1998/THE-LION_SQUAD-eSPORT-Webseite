@@ -5,6 +5,7 @@
  *   Groups · Tiers · Manuell vergeben · Negative Vorfälle
  */
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
@@ -60,6 +61,9 @@ export default function AdminAchievementsPage() {
         Verwalte alle Achievement-Gruppen, Stufen, Sonderauszeichnungen und Negative-Vorfälle.
         Negative/Fun-Awards bleiben bis zur Freischaltung geheim und erscheinen danach im Profil.
       </p>
+      <Link to="/admin/achievements/preview" data-testid="ach-preview-link" className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-widest rounded-sm hover:bg-[#29B6E8]/10">
+        <Eye className="w-3.5 h-3.5" /> Vorschau der Abzeichen-Kunst
+      </Link>
       <EvaluationPanel />
 
       <div className="mt-6 flex gap-1 border-b border-white/10 overflow-x-auto">
