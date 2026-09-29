@@ -10,8 +10,12 @@ import userEvent from "@testing-library/user-event";
 const signals = { recordSignal: vi.fn(() => true) };
 vi.mock("../signals", () => signals);
 
-const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT, catTarget } = await import("./index.jsx");
+const { Widget, Backdrop, Corners, Footer, StaticWeb, RappelSpider, eyeOffset, pumpkinCounts, pageLayout, skyLayers, season, LOAD_SALT, setLoadSalt, catTarget } = await import("./index.jsx");
 import { createMotionScheduler, resetMotionScheduler } from "../motion";
+
+// Der Salt je Seitenaufruf ist im Browser zufällig; hier fest, damit die Erwartungen (Krabbler, zweites Netz,
+// Katze, leere Friedhöfe) nicht vom Zufall des Laufs abhängen.
+setLoadSalt(process.env.TLS_SEASON_SALT || "feinschliff");
 
 // Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
 beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));

@@ -32,7 +32,12 @@ export const ACCENT = "rgba(170, 225, 240, 0.35)";
 export const SIGNAL_KEY = "halloween_pumpkin";
 export const FACES = ["grin", "calm", "wicked"];
 /** Salz je Ladung: die ganze Anordnung würfelt sich bei jedem Laden neu - innerhalb einer Sitzung bleibt sie je Seite. */
-export const LOAD_SALT = Math.random().toString(36).slice(2, 8);
+export let LOAD_SALT = Math.random().toString(36).slice(2, 8);
+
+/** Nur für Tests: ein fester Salt, damit die Anordnung je Seite reproduzierbar ist. */
+export function setLoadSalt(value) {
+  LOAD_SALT = String(value);
+}
 
 /** Zählt der Klick? Nur am 31. Oktober ab 18:00 (Ortszeit des Geräts, der Server prüft später selbst). */
 export function pumpkinCounts(now = new Date()) {
