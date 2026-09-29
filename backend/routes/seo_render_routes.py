@@ -246,6 +246,8 @@ async def resolve_meta(raw_path: str, request: Request) -> dict:
         return await user_profile_meta(db, slug, meta, origin)
     if first == "references" and slug:
         return await reference_meta(db, slug, meta, origin)
+    if first == "achievements" and slug == "a" and len(parts) > 2:
+        return await achievement_share_meta(db, unquote(parts[2]), meta, origin)
 
     static = static_page_meta(first, meta)
     if static:
@@ -614,6 +616,32 @@ async def user_profile_meta(db, username: str, base: dict, origin: str) -> dict:
     meta["robots"] = "noindex, follow"
     meta["json_ld"] = webpage_json_ld(meta)
     return add_breadcrumbs(meta, origin, [("Community-Spieler", "/players")], label)
+
+
+async def achievement_share_meta(db, award_id: str, base: dict, origin: str) -> dict:
+    """Erfolge II (#619): die Teilen-Seite einer Vergabe - Discord und Co. bekommen die gezeichnete Karte."""
+    from services.achievement_share import share_payload
+    payload = await share_payload(db, award_id)
+    if not payload:
+        raise HTTPException(404, "SEO-Vorschau nicht gefunden.")
+    person = payload["user"]["display_name"]
+    canonical = f"{origin}{payload['path']}"
+    meta = {
+        **base,
+        "title": f"{payload['name']} · {payload['material_name']} · {person} · {base['site_name']}",
+        "description": seo_description(
+            payload.get("description") or f"{person} hat {payload['name']} freigeschaltet.",
+            prefix=f"{person} hat {payload['name']} ({payload['material_name']}) freigeschaltet",
+            details=[payload.get("group_name"), f"+{payload.get('points')} Punkte"],
+        ),
+        "image": f"{origin}{payload['image_path']}",
+        "type": "article",
+    }
+    meta["url"] = canonical
+    meta["canonical"] = canonical
+    meta["robots"] = "noindex, follow"
+    meta["json_ld"] = webpage_json_ld(meta)
+    return add_breadcrumbs(meta, origin, [("Achievements", "/achievements")], payload["name"])
 
 
 async def reference_meta(db, rid: str, base: dict, origin: str) -> dict:

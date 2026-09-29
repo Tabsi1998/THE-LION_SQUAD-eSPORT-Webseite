@@ -10,6 +10,8 @@ Public/User endpoints (prefix /api/achievements):
   GET  /api/achievements/overview          — Kategorien, Seltenheit, Geheim-Zähler, Woche, Laufband (#619)
   GET  /api/achievements/leaderboard       — Punkte (je Kategorie/Zeitraum) oder Level
   GET  /api/achievements/week, /recent     — Erfolg der Woche, neueste Freischaltungen
+  GET  /api/achievements/award/{id}        — Daten einer öffentlichen Vergabe für die Teilen-Seite
+  GET  /api/achievements/share/{id}.png    — Teilen-Karte 1200×630 (Pillow)
 
 Admin endpoints (prefix /api/admin/achievements):
   GET    /groups                          — all groups (incl. negative)
@@ -138,6 +140,28 @@ async def achievements_overview(viewer: dict | None = Depends(get_optional_user)
         "week": await visibility.achievement_of_week(db),
         "recent": await visibility.recent_unlocks(db, 20),
     }
+
+
+@router.get("/award/{award_id}")
+async def shared_award(award_id: str):
+    """Die Teilen-Seite (#619): die Daten einer öffentlichen Vergabe - 404, wenn sie nicht geteilt werden darf."""
+    from services.achievement_share import share_payload
+    payload = await share_payload(get_db(), award_id)
+    if not payload:
+        raise HTTPException(404, "Dieser Erfolg ist nicht öffentlich.")
+    return payload
+
+
+@router.get("/share/{award_id}.png")
+async def shared_award_card(award_id: str):
+    """Die Teilen-Karte (#619): 1200×630 als PNG, serverseitig gezeichnet (Pillow, ohne Browser)."""
+    from fastapi.responses import Response
+    from services.achievement_share import render_card, share_payload
+    payload = await share_payload(get_db(), award_id)
+    if not payload:
+        raise HTTPException(404, "Dieser Erfolg ist nicht öffentlich.")
+    return Response(content=render_card(payload), media_type="image/png",
+                    headers={"Content-Disposition": f'inline; filename="achievement-{award_id}.png"'})
 
 
 @router.get("/week")

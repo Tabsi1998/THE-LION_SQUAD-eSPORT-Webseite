@@ -140,6 +140,7 @@ const ReferencesPage = lazy(() => import("@/pages/public/ReferencesPage"));
 const ReferenceDetailPage = lazy(() => import("@/pages/public/ReferencesPage").then((m) => ({ default: m.ReferenceDetailPage })));
 const PlayersPage = lazy(() => import("@/pages/public/PlayersPage"));
 const AchievementsShowcasePage = lazy(() => import("@/pages/public/AchievementsShowcasePage"));
+const AchievementSharePage = lazy(() => import("@/pages/public/AchievementSharePage"));
 const CommunityPage = lazy(() => import("@/pages/public/CommunityPage"));
 const ServersPage = lazy(() => import("@/pages/public/ServersPage"));
 const MembersDirectoryPage = lazy(() => import("@/pages/public/MembersDirectoryPage"));
@@ -213,6 +214,7 @@ function App() {
           <Route path="/servers" element={<ServersPage />} />
           <Route path="/players" element={<PlayersPage />} />
           <Route path="/achievements" element={<AchievementsShowcasePage />} />
+          <Route path="/achievements/a/:awardId" element={<AchievementSharePage />} />
           <Route path="/members" element={<MembersDirectoryPage />} />
           <Route path="/members/:slug" element={<MemberProfilePage />} />
           <Route path="/membership/join" element={<JoinMembershipPage />} />
