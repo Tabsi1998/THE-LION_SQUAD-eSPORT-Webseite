@@ -469,7 +469,8 @@ function CatOnEdge({ size, startX = 40, moving }) {
     const width = ref.current?.parentElement?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1280);
     const target = catTarget(x, width);
     const seconds = Math.abs(target - x) / CAT_WALK_SPEED;
-    emitSound("cat_walk");
+    // Sie miaut und läuft dann los (Rückmeldung 29.09.) - nur mit eingeschaltetem Ton.
+    emitSound("cat_meow");
     setWalk({ to: target, facing: target < x ? 1 : -1, seconds });
     setX(target);
     window.clearTimeout(timer.current);

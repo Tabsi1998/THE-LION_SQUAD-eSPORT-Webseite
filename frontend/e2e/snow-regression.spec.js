@@ -89,3 +89,59 @@ test.describe("Schnee: Bildbudget und Lebenszyklus", () => {
     expect(await page.evaluate(() => window.localStorage.getItem("tls_snow_clicks"))).toBe("2");
   });
 });
+
+test.describe("Schnee: die Flocken gehören zur Seite", () => {
+  test("beim Scrollen wandern die Flocken mit dem Inhalt - sie kleben nicht am Fenster", async ({ page, isMobile }, testInfo) => {
+    test.skip(Boolean(isMobile), "PC-Messung");
+    await mockSeason(page, activePayload({ season: snow(), now: NOW }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await expect.poll(() => page.evaluate(() => document.querySelectorAll("[data-testid='season-sky']").length), { timeout: 15000 }).toBe(1);
+    await page.waitForTimeout(2500);
+    // Helle Punkte der Zeichenfläche vor und nach einem Scrollschritt vergleichen: bei welcher Verschiebung nach
+    // oben decken sie sich am besten? Klebten die Flocken am Fenster, wäre es 0; in der Seite ist es der Scrollweg
+    // (vorne ganz, in der Mitte 0,8, hinten 0,55).
+    const result = await page.evaluate(async (delta) => {
+      const canvas = document.querySelector("[data-testid='season-sky']");
+      const ctx = canvas.getContext("2d");
+      const ratio = canvas.width / canvas.clientWidth;
+      const cell = 6;
+      const grab = () => {
+        const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const points = [];
+        for (let y = 0; y < height; y += 2) {
+          for (let x = 0; x < width; x += 2) {
+            if (data[(y * width + x) * 4 + 3] > 150) points.push([x / ratio, y / ratio]);
+          }
+        }
+        return points;
+      };
+      const frames = (count) => new Promise((resolve) => {
+        const step = (left) => (left <= 0 ? resolve() : requestAnimationFrame(() => step(left - 1)));
+        step(count);
+      });
+      await frames(2);
+      const before = grab();
+      window.scrollTo(0, window.scrollY + delta);
+      await frames(2);
+      const after = grab();
+      const cells = new Set(after.map(([x, y]) => `${Math.round(x / cell)}:${Math.round(y / cell)}`));
+      const score = (shift) => before.filter(([x, y]) => {
+        const cx = Math.round(x / cell);
+        const cy = Math.round((y - shift) / cell);
+        return cells.has(`${cx}:${cy}`) || cells.has(`${cx + 1}:${cy}`) || cells.has(`${cx - 1}:${cy}`);
+      }).length;
+      const scores = [];
+      for (let shift = 0; shift <= delta + 30; shift += 3) scores.push({ shift, hits: score(shift) });
+      const best = scores.reduce((a, b) => (b.hits > a.hits ? b : a), scores[0]);
+      return { before: before.length, after: after.length, zero: scores[0].hits, best, scrollY: window.scrollY, scores };
+    }, 120);
+    await testInfo.attach("schnee-scrollen.json", { body: JSON.stringify(result), contentType: "application/json" });
+    expect(result.scrollY, "die Seite hat gescrollt").toBe(120);
+    expect(result.before, "helle Punkte vor dem Scrollen").toBeGreaterThan(40);
+    expect(result.best.shift, `beste Deckung bei ${result.best.shift} px (Treffer ${result.best.hits}, ohne Verschiebung ${result.zero})`).toBeGreaterThanOrEqual(60);
+    expect(result.best.shift).toBeLessThanOrEqual(129);
+    expect(result.best.hits).toBeGreaterThan(result.zero * 1.4);
+  });
+});

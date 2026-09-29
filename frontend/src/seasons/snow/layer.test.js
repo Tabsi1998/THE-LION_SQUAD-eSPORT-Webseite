@@ -86,3 +86,27 @@ test("Flocken nach Budget und Wetter: es schneit → volle Zahl; Wind vom Wetter
   bare.dispose();
   expect(bare.state().counts.total).toBe(6);
 });
+
+test("Scrollen schiebt die Flocken: vorne so weit wie die Seite, hinten weniger - ohne Scrollen bleiben sie stehen", () => {
+  const win = { ...fakeWindow(), scrollY: 0 };
+  const layer = createSnowLayer({ budget: 40, share: 1, seed: "scroll", weather: { snow_cm: 1 }, win, doc: null, now: () => 0 });
+  const ctx = fakeContext([]);
+  layer.draw(ctx, 0, SIZE);
+  const before = layer.state().positions;
+  layer.draw(ctx, 0, SIZE);
+  expect(layer.state().positions).toEqual(before);
+  win.scrollY = 60;
+  layer.draw(ctx, 0, SIZE);
+  const after = layer.state().positions;
+  const moved = (depth) => before[depth].map((flake, index) => flake.y - after[depth][index].y).filter((delta) => Math.abs(delta) < 200);
+  expect(moved("front").length).toBeGreaterThan(0);
+  moved("front").forEach((delta) => expect(delta).toBeCloseTo(60, 5));
+  moved("back").forEach((delta) => expect(delta).toBeCloseTo(33, 5));
+  // Zurück nach oben: sie kommen wieder herunter.
+  win.scrollY = 0;
+  layer.draw(ctx, 0, SIZE);
+  const back = layer.state().positions;
+  const returned = after.front.map((flake, index) => back.front[index].y - flake.y).filter((delta) => Math.abs(delta) < 200);
+  returned.forEach((delta) => expect(delta).toBeCloseTo(60, 5));
+  layer.dispose();
+});
