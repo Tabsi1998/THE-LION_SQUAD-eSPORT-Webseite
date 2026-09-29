@@ -10,9 +10,11 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, ballot_right, member  # noqa: E402
+from datetime import date, datetime, timezone  # noqa: E402
+
+from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, ballot_right, member, pin_club_clock  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
-from services import dolibarr_client, dolibarr_identity  # noqa: E402
+from services import dolibarr_client, dolibarr_identity, dolibarr_meetings  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -31,6 +33,8 @@ def fake(monkeypatch):
     monkeypatch.setattr(dolibarr_client, "_transport", instance.transport())
     monkeypatch.setattr(dolibarr_client, "RETRY_PAUSES", (0, 0))
     dolibarr_identity.reset_cache()
+    # Die Termine der Testdaten sind fest - also steht auch die Uhr des Vereins fest (25.09.2026).
+    pin_club_clock(monkeypatch)
     return instance
 
 
@@ -200,3 +204,23 @@ async def test_an_uninvited_or_non_voting_member_gets_the_reason_not_a_form(flow
     await connect(flow, mode="preview")
     view = (await flow.get("/api/membership/me/meetings")).json()
     assert view["available"] is False and view["reason"] == "not_connected"
+
+
+def test_frist_und_termin_gelten_nach_dem_tag_in_wien_nicht_nach_dem_des_servers(monkeypatch):
+    """Der Server läuft in UTC: um 00:30 in Wien meldet er noch „gestern“. Die Antragsfrist vom 21.10. ist dann aber
+    vorbei und die Sitzung vom 21.10. auch - gerechnet wird mit dem Tag am Ort des Vereins."""
+    row = {"id": 7, "kind": "general", "status": "invited", "day": "2026-10-21", "motion_deadline": "2026-10-21"}
+    pin_club_clock(monkeypatch, datetime(2026, 10, 21, 21, 30, tzinfo=timezone.utc))  # 23:30 in Wien, noch der 21.
+    view = dolibarr_meetings.meeting_view(row)
+    assert view["upcoming"] is True and view["can_motion"] is True and view["motion_late"] is False
+    pin_club_clock(monkeypatch, datetime(2026, 10, 21, 22, 30, tzinfo=timezone.utc))  # 00:30 in Wien, schon der 22.
+    view = dolibarr_meetings.meeting_view(row)
+    assert view["upcoming"] is False and view["can_respond"] is False and view["can_motion"] is False and view["motion_late"] is True
+    # Im Winter ist Wien nur eine Stunde voraus: 23:30 UTC am 14.01. ist 00:30 am 15.01.
+    winter = {**row, "day": "2027-01-14", "motion_deadline": "2027-01-14"}
+    pin_club_clock(monkeypatch, datetime(2027, 1, 14, 22, 30, tzinfo=timezone.utc))
+    assert dolibarr_meetings.meeting_view(winter)["upcoming"] is True
+    pin_club_clock(monkeypatch, datetime(2027, 1, 14, 23, 30, tzinfo=timezone.utc))
+    assert dolibarr_meetings.meeting_view(winter)["motion_late"] is True
+    # Ein mitgegebener Tag gilt wie bisher.
+    assert dolibarr_meetings.meeting_view(row, date(2026, 10, 1))["upcoming"] is True

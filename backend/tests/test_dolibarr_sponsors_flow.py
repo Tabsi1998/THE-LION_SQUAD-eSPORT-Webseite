@@ -17,6 +17,10 @@ from flow_harness import make_flow  # noqa: E402
 from services import daily_center, dolibarr_client, dolibarr_sponsors  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
+# Der Vertrag von Alpha läuft noch - bis Ende des übernächsten Jahres. Ein festes Datum würde eines Tages vom
+# Kalender überholt, und Alpha stünde bei den Ehemaligen.
+RUNNING_UNTIL = f"{datetime.now(timezone.utc).year + 2}-12-31"
+
 
 @pytest_asyncio.fixture
 async def flow():
@@ -83,7 +87,7 @@ def test_plan_maps_tiers_kinds_dates_and_closed_companies():
 async def test_switch_reads_dolibarr_into_the_lists_locks_its_fields_and_keeps_website_fields(flow, fake):
     await connect(flow)
     ids = seed_categories(fake)
-    alpha = fake.add_thirdparty("Alpha Energy", "office@alpha.test", url="https://alpha.test", array_options={"options_sponsor_start": "2024-01-01", "options_sponsor_end": "2026-12-31"})
+    alpha = fake.add_thirdparty("Alpha Energy", "office@alpha.test", url="https://alpha.test", array_options={"options_sponsor_start": "2024-01-01", "options_sponsor_end": RUNNING_UNTIL})
     beta = fake.add_thirdparty("Beta GmbH")
     delta = fake.add_thirdparty("Delta Bank", array_options={"options_sponsor_end": "2025-06-30"})
     gamma = fake.add_thirdparty("Gamma Verein", url="https://gamma.test")
@@ -112,7 +116,7 @@ async def test_switch_reads_dolibarr_into_the_lists_locks_its_fields_and_keeps_w
     assert set(sponsors) == {"Alpha Energy", "Beta GmbH", "Delta Bank"}, "kein Duplikat für den Handeintrag"
     assert sponsors["Alpha Energy"]["id"] == "s-alpha" and sponsors["Alpha Energy"]["logo_url"] == "/uploads/alpha.png" and sponsors["Alpha Energy"]["description"] == "Handtext"
     assert sponsors["Alpha Energy"]["tier"] == "gold" and sponsors["Alpha Energy"]["source"] == "dolibarr" and sponsors["Alpha Energy"]["link"] == "https://alpha.test"
-    assert sponsors["Alpha Energy"]["contract_start"] == "2024-01-01" and sponsors["Alpha Energy"]["contract_end"] == "2026-12-31" and sponsors["Alpha Energy"]["contact_email"] == "office@alpha.test"
+    assert sponsors["Alpha Energy"]["contract_start"] == "2024-01-01" and sponsors["Alpha Energy"]["contract_end"] == RUNNING_UNTIL and sponsors["Alpha Energy"]["contact_email"] == "office@alpha.test"
     assert sponsors["Beta GmbH"]["tier"] == "bronze" and sponsors["Beta GmbH"]["show_on_footer"] is False
     assert sponsors["Delta Bank"]["effective_status"] == "expired"
     partners = (await flow.get("/api/partners/admin")).json()
@@ -129,7 +133,7 @@ async def test_switch_reads_dolibarr_into_the_lists_locks_its_fields_and_keeps_w
 
     # Gesperrt, solange der Schalter an ist: Name, Stufe, Laufzeit, Kontakt - Beschreibung und Platzierung bleiben Handpflege.
     saved = await flow.patch("/api/sponsors/s-alpha", json={"name": "Umbenannt", "tier": "main", "contract_end": "2030-01-01", "description": "Neu", "show_on_home": True})
-    assert saved.status_code == 200 and saved.json()["name"] == "Alpha Energy" and saved.json()["tier"] == "gold" and saved.json()["contract_end"] == "2026-12-31"
+    assert saved.status_code == 200 and saved.json()["name"] == "Alpha Energy" and saved.json()["tier"] == "gold" and saved.json()["contract_end"] == RUNNING_UNTIL
     assert saved.json()["description"] == "Neu" and saved.json()["show_on_home"] is True
     partner_id = partners[0]["id"]
     saved = await flow.patch(f"/api/partners/{partner_id}", json={"name": "Anders", "kind": "Messe", "description": "Freunde"})

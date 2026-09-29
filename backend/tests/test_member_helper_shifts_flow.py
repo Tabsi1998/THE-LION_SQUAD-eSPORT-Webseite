@@ -9,9 +9,11 @@ import pytest_asyncio
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, member  # noqa: E402
+from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr, member, pin_club_clock  # noqa: E402
+from datetime import date, datetime, timezone  # noqa: E402
+
 from flow_harness import make_flow  # noqa: E402
-from services import dolibarr_client, dolibarr_identity  # noqa: E402
+from services import dolibarr_client, dolibarr_helper_shifts, dolibarr_identity  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
 
@@ -30,6 +32,8 @@ def fake(monkeypatch):
     monkeypatch.setattr(dolibarr_client, "_transport", instance.transport())
     monkeypatch.setattr(dolibarr_client, "RETRY_PAUSES", (0, 0))
     dolibarr_identity.reset_cache()
+    # Die Termine der Testdaten sind fest - also steht auch die Uhr des Vereins fest (25.09.2026).
+    pin_club_clock(monkeypatch)
     return instance
 
 
@@ -138,3 +142,16 @@ async def test_without_live_connection_there_is_only_the_reason(flow, fake):
     view = (await flow.get("/api/membership/me/helper-shifts")).json()
     assert view["available"] is False and view["reason"] == "not_connected" and view["events"] == []
     assert (await flow.put("/api/membership/me/events/5/shifts/51")).status_code == 403
+
+
+def test_ein_helferdienst_ist_vorbei_wenn_der_tag_in_wien_vorbei_ist(monkeypatch):
+    """Der Server läuft in UTC: um 00:30 in Wien meldet er noch „gestern“. Das Fest vom 10.10. ist dann aber vorbei -
+    gerechnet wird mit dem Tag am Ort des Vereins."""
+    row = {"id": 5, "label": "Sommerfest", "status": "planned", "day": "2026-10-10",
+           "shifts": [{"id": 51, "label": "Aufbau", "day": "2026-10-10", "start": "14:00", "end": "16:00", "capacity": 2}]}
+    pin_club_clock(monkeypatch, datetime(2026, 10, 10, 21, 30, tzinfo=timezone.utc))  # 23:30 in Wien, noch der 10.
+    assert dolibarr_helper_shifts.event_view(row)["upcoming"] is True
+    pin_club_clock(monkeypatch, datetime(2026, 10, 10, 22, 30, tzinfo=timezone.utc))  # 00:30 in Wien, schon der 11.
+    assert dolibarr_helper_shifts.event_view(row)["upcoming"] is False
+    # Ein mitgegebener Tag gilt wie bisher.
+    assert dolibarr_helper_shifts.event_view(row, date(2026, 10, 1))["upcoming"] is True

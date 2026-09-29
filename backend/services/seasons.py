@@ -509,6 +509,7 @@ def adult_from_birth_date(value, today: date | None = None) -> bool:
         born = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
     except (TypeError, ValueError):
         return False
-    today = today or date.today()
+    # Der Geburtstag beginnt um Mitternacht in Wien, nicht erst, wenn auch der Server (UTC) den neuen Tag hat.
+    today = today or to_vienna(None).date()
     age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
     return age >= 18

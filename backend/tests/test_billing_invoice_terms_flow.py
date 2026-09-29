@@ -3,6 +3,7 @@ kommen aus den Einstellungen an jeden Beleg; ohne die drei wird nichts automatis
 Jede Zeile nennt den Vorgang, die Finanzverwaltung kann vor dem Beleg einen Zusatztext ergänzen."""
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -11,6 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from services import billing_orders, dolibarr_billing, dolibarr_client  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
@@ -56,9 +58,14 @@ async def paid_event(flow, admin, **extra):
     flow.act_as(admin)
     response = await flow.post("/api/events", json={"name": "Weihnachtsfeier", "status": "registration_open", "visibility": "public", "has_registration": True,
                                                     "allow_companions": True, "max_companions_per_registration": 3,
-                                                    "start_date": "2026-12-12T18:00:00+00:00", "billing": {**OFFER, **extra}})
+                                                    "start_date": (now_utc() + timedelta(days=30)).isoformat(), "billing": {**OFFER, **extra}})
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def event_day(event: dict) -> str:
+    """Der Tag der Feier, wie er auf dem Beleg steht - der Termin liegt dreißig Tage nach dem Lauf des Tests."""
+    return dolibarr_billing._club_date(event["start_date"])
 
 
 async def book(flow, user, event, companions=0):
@@ -99,7 +106,8 @@ async def test_invoice_carries_terms_and_a_readable_text_with_the_extra_line(flo
     flow.act_as(kassier)
     overview = (await flow.get("/api/admin/finance/overview")).json()
     row = next(r for r in overview["open"] if r["id"] == order["id"])
-    assert row["invoice_text"] == ["Kostenbeitrag – Essen und Getränke\nWeihnachtsfeier am 12.12.2026 – 2 Personen (Paula Beispiel + 1 Begleitperson)"]
+    assert len(event_day(event)) == 10 and event_day(event)[2] == "." and event_day(event)[5] == "."
+    assert row["invoice_text"] == [f"Kostenbeitrag – Essen und Getränke\nWeihnachtsfeier am {event_day(event)} – 2 Personen (Paula Beispiel + 1 Begleitperson)"]
     assert overview["dolibarr"]["terms_complete"] is True
     saved = await flow.put(f"/api/admin/finance/orders/{order['id']}/text", json={"extra_text": "  Tischreservierung Nr. 4 \n\n Menü vegetarisch  "})
     assert saved.status_code == 200, saved.text
@@ -110,7 +118,7 @@ async def test_invoice_carries_terms_and_a_readable_text_with_the_extra_line(flo
     invoice = fake.core_invoices[order["invoice_id"]]
     assert (invoice["cond_reglement_id"], invoice["mode_reglement_id"], invoice["fk_account"]) == (2, 2, 1)
     assert invoice["statut"] == 1, "mit vollständigen Konditionen wird freigegeben"
-    assert invoice["lines"][0]["desc"] == "Kostenbeitrag – Essen und Getränke\nWeihnachtsfeier am 12.12.2026 – 2 Personen (Paula Beispiel + 1 Begleitperson)\nTischreservierung Nr. 4\nMenü vegetarisch"
+    assert invoice["lines"][0]["desc"] == f"Kostenbeitrag – Essen und Getränke\nWeihnachtsfeier am {event_day(event)} – 2 Personen (Paula Beispiel + 1 Begleitperson)\nTischreservierung Nr. 4\nMenü vegetarisch"
     assert invoice["note_public"] == "Anmeldung: Weihnachtsfeier – Paula Beispiel\nTischreservierung Nr. 4\nMenü vegetarisch"
 
     # Nach dem Beleg ist der Text in Dolibarr zu Hause.

@@ -5,6 +5,7 @@ Aufnahme genau das Konto und lässt die Website nicht mehr selbst entscheiden. O
 alles wie bisher."""
 import pathlib
 import sys
+from datetime import timedelta
 
 import pytest
 import pytest_asyncio
@@ -13,6 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from dolibarr_fake import API_KEY, BASE_URL, FakeDolibarr  # noqa: E402
 from flow_harness import make_flow  # noqa: E402
+from models import now_utc  # noqa: E402
 from services import dolibarr_applications, dolibarr_client, dolibarr_sync  # noqa: E402
 from services.secret_store import encrypt_secret  # noqa: E402
 
@@ -178,7 +180,8 @@ async def test_outage_keeps_the_application_in_transit_and_the_job_sends_it_late
     await flow.db.membership_applications.insert_one({
         "id": doc_id, "user_id": amelie["id"], "external_id": "web-app-alt", "source": "dolibarr", "type_id": 2, "status": "submitting",
         "person": {"firstname": "Amelie", "lastname": "Beispiel", "email": "amelie@example.test", "address": "Hauptplatz 1", "zip": "6020", "town": "Innsbruck", "country_code": "AT"},
-        "consents": [{"code": "fotos", "version": 2}], "created_at": "2027-01-01T00:00:00+00:00", "dolibarr": {"attempts": 0, "next_try_at": "2026-01-01T00:00:00+00:00"},
+        # Der jüngste Antrag der Person: morgen - ein festes Datum würde eines Tages vom Kalender überholt.
+        "consents": [{"code": "fotos", "version": 2}], "created_at": (now_utc() + timedelta(days=1)).isoformat(), "dolibarr": {"attempts": 0, "next_try_at": "2026-01-01T00:00:00+00:00"},
     })
     await dolibarr_applications.refresh_due(flow.db)
     stale = await flow.db.membership_applications.find_one({"id": doc_id}, {"_id": 0})

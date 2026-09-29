@@ -254,6 +254,9 @@ test("Krabbler kommt nach der Wartezeit quer über den Bildschirm und geht wiede
 });
 
 test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, Friedhof auf dem Strich und je nach Seite Katze", () => {
+  // Die Uhr steht auf einem Tag vor dem 31.10.: am Halloween-Abend zählte der Klick auf den Kürbis, und der Test
+  // hinge am Datum des Laufs. Nur das Datum steht, Timer laufen echt weiter.
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 9, 27, 12, 0), shouldAdvanceTime: true });
   const path = PATHS.find((candidate) => pageLayout(candidate, "normal").moon);
   const subtle = mount(<Backdrop season={halloween({ effective: "subtle" })} />, path);
   expect(subtle.container.querySelector(".tls-moon")).toBeNull();
@@ -280,7 +283,7 @@ test("Hintergrund: Mond mit echter Phase nur ab normal; Footer mit Kürbissen, F
   const pumpkins = footer.container.querySelectorAll(".tls-footer-pumpkins .tls-pumpkin");
   expect(pumpkins.length).toBeGreaterThanOrEqual(1);
   expect(Number(pumpkins[0].getAttribute("width"))).toBeGreaterThanOrEqual(46);
-  // Jeder Kürbis grüßt beim Klick wie die Laterne; heute (nicht der 31.10.) zählt der Klick nicht.
+  // Jeder Kürbis grüßt beim Klick wie die Laterne; am 27.10. zählt der Klick nicht.
   const pumpkinButtons = screen.getAllByTestId("halloween-footer-pumpkin");
   expect(pumpkinButtons.length).toBe(layout.footerPumpkins.length);
   fireEvent.click(pumpkinButtons[pumpkinButtons.length - 1]);

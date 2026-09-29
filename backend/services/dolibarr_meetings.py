@@ -19,7 +19,7 @@ import hashlib
 import json
 from datetime import date
 
-from services import dolibarr_identity
+from services import dolibarr_identity, dolibarr_policy
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
 
 KIND_LABELS = {"board": "Vorstandssitzung", "general": "Generalversammlung", "extraordinary": "Außerordentliche Generalversammlung"}
@@ -105,7 +105,9 @@ def _external_id(prefix: str, user_id: str, *parts) -> str:
 
 
 def _iso(today: date | None) -> str:
-    return (today or date.today()).isoformat()
+    """Der Tag als Text. Ohne Vorgabe der Tag am Ort des Vereins - nicht der des Servers, der in UTC läuft und nach
+    Mitternacht bis zu zwei Stunden lang noch „gestern“ meldet (Frist vorbei, Termin vorbei)."""
+    return today.isoformat() if today else dolibarr_policy.club_today()
 
 
 # ---------------------------------------------------------------- Ansichten (reine Rechnung)
