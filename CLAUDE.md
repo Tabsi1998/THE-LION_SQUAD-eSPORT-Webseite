@@ -2628,13 +2628,11 @@ Seit dem 15. September gilt:
   über schrumpfende Ruhelängen, frei = Wind + Auftrieb + Verblassen, danach
   Neubau mit neuem Plan; Klasse `tls-web-grabbing` gegen Textmarkieren;
   `createWebLayer` für den Canvas, `staticLines` für das SVG bei „dezent“/
-  „Bewegung reduzieren“), `HangingBats.jsx` (still, keine eigene Bewegung;
-  Anker: Menüpunkte `header nav a` in einem `fixed`-Halter, Buchstaben der
-  Überschriften `main h1, h2` an der Tintenkante – Range je Zeichen plus
-  `measureText` `fontBoundingBoxAscent`/`actualBoundingBoxAscent` –, Karten
-  `[data-season-anchor="card"]` an der Oberkante, Löwe; gewichtete Auswahl,
-  Nachbesetzen per `ResizeObserver`; Klick → eigener Flug je Fledermaus,
-  Startzeit in Refs), `graveyard.jsx` (Gräber auf `footer [data-season-line]`,
+  „Bewegung reduzieren“), `HangingBats.jsx` (seit Halloween IV H7–H9 nur noch
+  DOM, Zeit und Anzeige – Plätze und Leben siehe den Eintrag Halloween IV
+  unten; Menü-Fledermäuse hängen am Fenster, alle anderen scrollen mit ihrem
+  Platz; Klick scheucht; Testschalter `timeScale`, `temperament`,
+  `reactionRng`), `graveyard.jsx` (Gräber auf `footer [data-season-line]`,
   Geister per Klick, Sperre je Grab 60 s), `rappel.js` (Zustandsfolge der
   Abseil-Spinne; die Läuferin steht in `.tls-rappel-runner` neben dem
   schwingenden Faden), `wisps.js`, `bats.js` (Bahnen in Seitenkoordinaten:
@@ -2654,6 +2652,114 @@ Seit dem 15. September gilt:
   SVG-Gruppen; Saison-SVGs in nullbreiten Haltern brauchen `max-width: none`
   (Tailwind-Vorgabe `svg { max-width: 100% }` – Geister, Fledermäuse, Mond
   waren sonst 0 px breit).
+- Erfolge II, E5 Katalog D (#615, PR #688): `achievement_catalog/catalog_d.py`
+  – 33 Gruppen Verein, Besonders und Geheim (Katalog gesamt 148 Gruppen,
+  615 Stufen), elf neue Zähler in `achievement_counters.py`, negative Stufen
+  (`neg_dispute`, `silent` an Stufen und Vergaben, `award_id` an Vergaben),
+  `validate.py` (`validate_catalog(groups, tiers, condition_status)` →
+  ok/errors/warnings/counts). Zählerfalle: Tests dürfen Gruppenzahlen nicht als
+  Zahl hinschreiben – aus der Datenbank lesen.
+- Erfolge II, E9 Sichtbarkeit und Teilen (#619, PRs #689–#691):
+  `services/achievement_visibility.py` (Seltenheit mit Mitgliedern als
+  Grundmenge, `category_overview`, `hidden_summary`, `next_up` mit
+  `CATEGORY_LINKS`, `leaderboard(category, period)`, Erfolg der Woche
+  (`week_window`, Einstellung `achievement_of_week`), `recent_unlocks`,
+  Anheften `set_pins`/`pinned_awards`, `viewer_sees_club`,
+  `achievements_public(user)` – `None` → privat, `{}` → öffentlich –,
+  `my_summary`), Routen in `badge_routes.py` `GET /api/achievements/me`
+  (next_up, hidden, pinned, level), `PUT …/me/pins`, `…/me/summary`,
+  `…/user/{id}` (`achievements_hidden`, Vereinsfilter), `…/overview`, `…/week`,
+  `…/recent`, `…/award/{id}`, `…/share/{id}.png`, `…/leaderboard?category=
+  &period=`; `services/achievement_share.py` (Pillow-Karte `render_card` mit
+  `_blend`, `_wrap`, Polygon-Stern statt ★, Schriftkandidaten – Dockerfile
+  `fonts-dejavu-core`; `share_payload`, `shareable`); Modell
+  `UserUpdate.privacy_achievements_public`. Web: `components/tls/
+  AchievementGroups.jsx` (Seltenheit, Sortierung, Geheim-Karte, Vereins-
+  Teaser, Filter, Anheften, Teilen, `ListBadge`), `pages/public/
+  AchievementsShowcasePage.jsx` und `AchievementSharePage.jsx` (Open-Graph),
+  Profil `pages/user/profile/{AchievementPanels,AchievementsTab,PrivacyTab}.jsx`,
+  `components/tls/AchievementsTile.jsx`, `lib/shareAchievement.js`. Der
+  Server-Middleware-Header `Cache-Control: no-store` überschreibt Routen-
+  Header – nicht dagegen testen.
+- Erfolge II, E8 Abzeichen und Zeremonien (#618, PRs #692–#694):
+  `components/achievements/` (`materials.js` neun Material-Looks, `Badge.jsx`
+  + `badge.css`, `badgeArt.jsx` mit Relief, `motifs/{club,people,play,
+  racing}.jsx` 142 Motive; Test `test_badge_art_keys.py` hält Motive und
+  Katalog deckungsgleich), `components/achievements/ceremony/` (`select.js`
+  Auswahl je Paket, `queue.js` Warteschlange, `sounds.js`, `particles.js`,
+  `motions.jsx` elf Bewegungen, `Ceremony.jsx`, `CeremonyHost.jsx` mit
+  `quietPrefixes`, `ceremony.css`); `AchievementCatchUp`, `AchievementUnlock
+  Overlay`, `LevelUpCelebration` reihen nur noch ein; `lib/unlockSounds.js`;
+  Vorschau `pages/admin/AdminAchievementPreviewPage.jsx` (`sampleCeremony`,
+  e2e `achievement-preview.spec.js`); Einstellungen `ceremony_sound`,
+  `ceremony_volume` 0–100, `ceremony_mode` full/subtle (`UserUpdate`,
+  Profil-Reiter Benachrichtigungen). Das Abzeichen steht in allen Listen
+  (Katalog, Profil, öffentliches Profil, Schaukasten, Dashboard, Teilen).
+  Testfallen: jsdom kennt keinen `IntersectionObserver` (Attrappe vor dem
+  Import von Seiten mit `whileInView`), `AnimatePresence` hält Ausgehende im
+  DOM (`waitFor(... toBeNull())`).
+- Erfolge II, E10 Admin-Backend (#620 Teil 1, PR #709; Teil 2 – acht Reiter im
+  Web – offen): `services/achievement_admin.py`, Admin-Routen in
+  `badge_routes.py` `POST /api/admin/achievements/award` (`earned_at`,
+  `silent`), `DELETE …/award` mit Notiz, `…/award/bulk`, `…/events`
+  (Sammlung `achievement_events`), `…/overview`, `…/catalog/check|export|
+  import`, `…/season/{id}/preview`, `…/xp/caps`, `…/xp/prestige-reset`,
+  `…/stats` und `…/stats.csv`; `_require_board` (Superadmin oder aktive
+  Vorstandsposition), `achievement_counters.reconcile` merkt
+  `achievements_reconcile_last`. Testfalle: `add_staff()` ist Superadmin –
+  für „Staff ohne Vorstand“ `club_admin` nehmen; `award_achievement` legt
+  `user_xp` an (Upsert in Tests).
+- Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
+  in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
+  Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
+  `pointInQuiet`, `rectInQuiet`, `watchOverlays`; Bracket trägt
+  `data-season-quiet="bracket"`), `seasons/motion.js` (Bewegungsbudget
+  `EFFECTS` mit Plätzen, Abklingzeiten, Prioritäten; `createMotionScheduler`
+  – `request(kind)` → Token oder null mit `lastReason`, `release`,
+  `snapshot`, `subscribe`, versteckter Tab pausiert; Testschalter
+  `unlimited`; nie gestartete Klassen haben keine Abklingzeit),
+  `seasons/intensity.js` (`pageClass` lebendig/mittel/ruhig/still, `MATRIX`
+  je Klasse und Stärke – Fledermäuse, Schwarm, Netze, `cornerWebs`,
+  Abseil-Spinne, Krabbler, Schwaden, Augen, seltene Ereignisse, Nebel,
+  Jumpscares, Plätze, `footerScene` –, `scaleForViewport` für Tablet/Handy),
+  `SeasonStage` setzt `data-season-page` am `<html>`, `pageLayout` würfelt
+  wie bisher und kappt danach (`applyCapabilities`; Testschalter
+  `setLoadSalt`, die Tests setzen „feinschliff“). Fledermäuse:
+  `halloween/perches.js` (Plätze an echten Kanten – Menüpunkte, Kopfzeile,
+  Karten-Ecken sitzend und -Unterkante hängend, Rahmen `data-season-perch=
+  "frame"`, freistehende Bilder, Löwe hängend, Fußzeilen-Strich; Sonde
+  `elementFromPoint` plus Geometrie der Nachbarkarten, Schlüssel je Element,
+  `choosePerches`, `nearestFreePerch`), `halloween/batLife.js` (Zustände
+  perched → alert → takeoff → flying/approaching → landing → settle, „gone“
+  bis ein sichtbarer Platz frei ist; Temperamente sleepy/skittish/roamer/
+  curious; Bézier-Bahnen mit Welle und Drehung; `advanceBat(bat, dt, env)`,
+  `reactToPointer` mit Pause je Fledermaus, `reactToScroll` mit Fenster;
+  höchstens zwei Flüge, Budget `bat_flight`/`bat_scare`), Figur
+  `SittingBatShape` und Mondlicht-Saum `RIM_EDGE` in `art.jsx`, Event-Kacheln
+  `data-season-perch="card"`. Netze und Karten: `halloween/webCorners.js`
+  (obere Innenecken von Karten und Fußzeile im Fenster, je Fensterhöhe
+  `cornerWebs`, Sonde mit sechs Punkten, `chooseWebCorners`) und
+  `CornerWebs.jsx` (SVG-Netze aus `buildPlan`/`staticLines`, winzige Spinne
+  über Budget `web_spider`, Rückzug vor dem Zeiger, Ausweichen unter
+  Dialogen; Dateiname bewusst anders als das Modul – Vite verwechselt auf
+  Windows Namen, die sich nur in der Schreibung unterscheiden), Karten-Hover
+  nur als `box-shadow` über `:root[data-season~="halloween"]` und
+  `data-season-page`. Fußzeile als Szene (`Footer`, `useSceneBusy` über den
+  Planer, Kürbisse auf dem Strich, erster Kürbis schaut dem Zeiger nach,
+  `footerScene` voll/klein/keine). Atmosphäre: `halloween/atmosphere.js`
+  (`fogStrength`, `spotFree`/`freeSpots`/`chooseSpot` als Raster mit Sonde,
+  `edgeFree`), `Fog.jsx` (zwei Ebenen als `mix-blend-mode: screen`,
+  `--fog-strength`, Drift mit `--season-wind`), `Watchers.jsx` (`Eyes`,
+  `RareEdge`; Budget `eyes`/`rare_edge`; Testschalter `firstDelayMs`,
+  `pauseMs`, `showMs`, `probe`). Schrift misst `seasons/glyphs.js` nur mit
+  ihren Zeichenkästen (`blocksPoint`) – ein Textbehälter ist oft kartenbreit.
+  Leistung: Fledermaus-Schleife tickt in Ruhe viermal je Sekunde
+  (`IDLE_TICK_MS`), Abseil-Spinne wartet grob, Netz-Takt ruht im versteckten
+  Tab. Abnahme `e2e/halloween-regression.spec.js` (neun Seiten × 1366/1440/
+  1920 und 375/768, Dropdown, Reduced Motion, Saison aus). Probe-Skripte
+  im Scratchpad (`probe_hw4b/c/d.cjs`) gegen `vite preview` mit gemockter
+  Saison – jede Runde endet mit Screenshots. Effekt-Deps: nie eine je Render
+  neue Liste als Effekt-Abhängigkeit (endloser Neustart, OOM in Vitest).
 - Saisonneutrale Bausteine (#679–#681): `seasons/audio.js`
   (`createSoundEngine` – AudioContext erst nach der ersten Geste, Regler
   Töne/Musik, `play` mit 150 ms je Quelle, Bus `tls:season-sound` über
@@ -2945,7 +3051,7 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (28. September 2026)
+## 9. Aktueller Stand (29. September 2026)
 
 ### Gemergt zuletzt (16.–22. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
@@ -3043,6 +3149,17 @@ die Neuberechnung an), #659 (Halloween-Feinschliff Web + App 1.0.2 –
 Build 81; Nebel, Geister, Lichterketten, Friedhof raus, Netzbau, Abseil-
 Spinne, echter Mond). Alle vom Betreiber gemergt; `update.sh` danach.
 
+### Gemergt 29. September (Vormittag)
+#686 (Jumpscares ab 18), #687 (Doku-Stand), #688 (E5 Katalog D), #689–#691
+(E9 Sichtbarkeit: Schaukasten, Profil-Reiter, Teilen-Karte), #692–#694 (E8
+Abzeichen-Kunst, Zeremonien, Abzeichen in allen Listen), #709 (E10 Teil 1
+Admin-Backend), #710–#713 (Halloween IV Pakete 1–4: Fundament, Fledermäuse,
+Netze/Karten/Fußzeile, Nebel/Augen). Der Betreiber hat den Meilenstein 43
+„Halloween Event 2026 – Feinschliff IV“ (#695–#708) angelegt und merged jeden
+PR, sobald er ready ist. GitHub-Falle: „Closes #a, #b, #c“ schließt nur die
+erste Nummer – jede Nummer braucht ihr eigenes `closes`; sieben Issues wurden
+von Hand geschlossen.
+
 ### Gemergt 28.–29. September
 #668 (Halloween III), #669 (Doku-Stand), #670 (Physik-Fix: kein Knäuel beim
 Scrollen, Gräber sichtbar, Katze auf dem Strich), #671 (#666 echtes Wetter
@@ -3056,11 +3173,12 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (29.09. früh): #686 Jumpscares ab 18 (auf `main` umgesetzt, ready
-  nach dem Check). Danach: Doku-Stand, Erfolge II Rest (E5 Katalog D #615 –
-  dort auch die vier zurückgestellten Gruppen aus #614 und die
-  Saison-Fundstücke #678 –, E8 #618, E9 #619, E10 #620, E12 #622, E13
-  #623), Halloween VII aus dem nächsten Live-Blick (#677: alles wird
+- Offen (29.09. mittags): #714 Halloween IV Paket 5 (Handy/Reduced Motion,
+  Leistung, Abnahme-Test; nach dem Merge von #713 auf `main` umgesetzt, ready
+  nach den Checks). Danach: Doku-Stand, Erfolge II Rest (E10 Teil 2 – acht
+  Admin-Reiter im Web –, E12 #622, E13 #623; die vier zurückgestellten
+  Gruppen aus #614 und die Saison-Fundstücke #678 warten auf Datenquellen),
+  Halloween VII aus dem nächsten Live-Blick (#677: alles wird
   überarbeitet), App-Fassung von Klang, Mond und Jumpscares (#667),
   Jahreszeiten II (#637–#642 bis 27.11.) von Anfang an nach dem Standard,
   der als Kommentar auf #637–#647 und #658 steht (Bild, Klang und Musik,
