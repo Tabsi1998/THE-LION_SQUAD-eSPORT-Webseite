@@ -247,6 +247,12 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "sind nicht öffentlich – sichtbar wird erst der freigeschaltete Erfolg. Sie stehen in deinem Datenexport und werden "
                   "gelöscht, wenn du dein Konto löschst. Grundlage ist die Nutzung der Plattform, zu der die Erfolge gehören "
                   "(Art. 6 Abs. 1 lit. b DSGVO).", "privacy-achievement-counters"),
+                # Verlosungen (#641): nur wer selbst auf „Mitmachen“ klickt, nimmt teil.
+                p("Bei Verlosungen – etwa im Adventkalender – nimmst du nur teil, wenn du selbst auf „Mitmachen“ klickst. Gespeichert wird "
+                  "dann, dass und wann du mitmachst; bis zum Teilnahmeschluss kannst du das zurückziehen. Gezogen wird per Zufall. Wer "
+                  "gewinnt, bekommt eine Nachricht auf der Plattform; Namen werden nicht veröffentlicht. Die Ziehung steht mit Zeitpunkt "
+                  "und Gewinnern in einem Protokoll, das nur die Vereinsleitung sieht. Grundlage ist deine Teilnahme "
+                  "(Art. 6 Abs. 1 lit. b DSGVO).", "privacy-raffles"),
                 p("Öffentliche Community-Profile registrierter Benutzer werden nicht in die Sitemap aufgenommen und mit einem technischen "
                   "Noindex-Hinweis für Suchmaschinen versehen. Sichtbar bleiben sie nur, wenn die Profilfreigabe aktiv ist. Offizielle "
                   "Vereinsmitglieder-Profile werden separat gepflegt und können als Teil der Vereinsdarstellung öffentlich auffindbar sein.")),

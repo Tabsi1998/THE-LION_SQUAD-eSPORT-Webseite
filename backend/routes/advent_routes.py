@@ -11,7 +11,7 @@ from datetime import date, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
-from auth import get_optional_user, require_area
+from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from models import new_id, now_utc
 from services import advent_calendar as advent
@@ -21,6 +21,8 @@ from services.rate_limit import enforce_rate_limit
 router = APIRouter(prefix="/api/seasonal/advent", tags=["seasonal"])
 # Türchen sind Inhalte wie News - die Redaktion pflegt sie, die Vereinsleitung auch.
 require_editor = require_area("content", "club")
+# Eine Ziehung vergibt einen Gewinn - das macht die Vereinsleitung.
+require_drawer = require_area("club")
 
 
 def _private(response: Response) -> None:
@@ -38,6 +40,23 @@ class QuizPayload(BaseModel):
     explanation: str = Field("", max_length=800)
 
 
+class PrizePayload(BaseModel):
+    label: str = Field("", max_length=300)
+    value: str = Field("", max_length=300)
+    winners: int = Field(1, ge=1, le=100)
+    audience: str = Field("all", max_length=20)
+    closes_at: str | None = Field(None, max_length=40)
+    staff_may_enter: bool = False
+
+
+class DrawPayload(BaseModel):
+    close_early: bool = False
+
+
+class RedrawPayload(BaseModel):
+    pickup_id: str = Field(min_length=4, max_length=80)
+
+
 class DoorPayload(BaseModel):
     kind: str = Field(min_length=2, max_length=40)
     title: str = Field("", max_length=200)
@@ -49,6 +68,7 @@ class DoorPayload(BaseModel):
     consent_confirmed: bool = False
     sticker_id: str | None = Field(None, max_length=120)
     quiz: QuizPayload | None = None
+    prize: PrizePayload | None = None
     link_url: str | None = Field(None, max_length=400)
     link_label: str | None = Field(None, max_length=80)
 
@@ -81,6 +101,21 @@ async def answer_quiz(day: int, body: QuizAnswer, request: Request, response: Re
     viewer = user if user and user.get("id") else None
     await enforce_rate_limit(request, "advent_quiz", 30, 60, subject=(viewer or {}).get("id"))
     return await advent.answer_quiz(get_db(), viewer, day, body.answer)
+
+
+@router.post("/{day}/enter")
+async def enter_raffle(day: int, request: Request, response: Response, me: dict = Depends(get_current_user)):
+    """Bei der Verlosung im Türchen mitmachen - ein eigener Klick, nie automatisch."""
+    _private(response)
+    await enforce_rate_limit(request, "advent_enter", 20, 60, subject=me["id"])
+    return await advent.enter_raffle(get_db(), me, day)
+
+
+@router.delete("/{day}/enter")
+async def withdraw_raffle(day: int, request: Request, response: Response, me: dict = Depends(get_current_user)):
+    _private(response)
+    await enforce_rate_limit(request, "advent_enter", 20, 60, subject=me["id"])
+    return await advent.withdraw_raffle(get_db(), me, day)
 
 
 # ------------------------------------------------------------------ Verwaltung
@@ -139,3 +174,25 @@ async def admin_copy_year(year: int, body: CopyPayload, response: Response, me: 
     result = await advent.copy_year(db, body.source_year, year, me)
     await _audit(db, me, "advent.copy", year, {"source": body.source_year, "copied": len(result["copied"]), "skipped": len(result["skipped"])})
     return result
+
+
+@router.post("/admin/{year}/{day}/draw")
+async def admin_draw(year: int, day: int, body: DrawPayload, response: Response, me: dict = Depends(require_drawer)):
+    """Die Ziehung: per Zufall, mit Protokoll. Wer gewinnt, wird privat benachrichtigt."""
+    _private(response)
+    db = get_db()
+    state = await advent.draw_raffle(db, year, day, me, body.close_early)
+    record = state["protocol"][-1]
+    await _audit(db, me, "advent.raffle.draw", year, {"day": day, "entries": record["entries"], "eligible": record["eligible"], "winners": len(record["winners"]), "closed_early": record["closed_early"]})
+    return state
+
+
+@router.post("/admin/{year}/{day}/redraw")
+async def admin_redraw(year: int, day: int, body: RedrawPayload, response: Response, me: dict = Depends(require_drawer)):
+    """Nachziehen für einen verfallenen Gewinn - unter allen, die noch nicht gewonnen haben."""
+    _private(response)
+    db = get_db()
+    state = await advent.redraw_raffle(db, year, day, body.pickup_id, me)
+    record = state["protocol"][-1]
+    await _audit(db, me, "advent.raffle.redraw", year, {"day": day, "replaces": body.pickup_id, "eligible": record["eligible"]})
+    return state

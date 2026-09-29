@@ -20,6 +20,7 @@ from datetime import date, datetime
 from fastapi import HTTPException
 
 from models import new_id, now_utc
+from services import season_raffles as raffles
 from services import seasons
 
 SEASON = "advent_calendar"
@@ -40,6 +41,7 @@ KIND_LABELS = {
     "member_spotlight": "Mitglied der Woche",
     "sticker": "Sticker",
     "quiz": "Quiz",
+    "prize": "Gewinn",
 }
 KINDS = tuple(KIND_LABELS)
 QUIZ_ANSWERS = 3
@@ -67,6 +69,10 @@ def door_seed(year: int, day: int) -> int:
     """Eine feste Zahl je Jahr und Türchen (#732): daraus leiten Web und App Scharnier, Licht und Neigung ab -
     jedes Türchen anders, aber nach dem Neuladen dasselbe."""
     return int(hashlib.sha256(f"advent:{year}:{day}".encode("utf-8")).hexdigest()[:8], 16)
+
+
+def raffle_key(year: int, day: int) -> str:
+    return f"advent:{year}:{day}"
 
 
 def door_order(year: int) -> list[int]:
@@ -151,7 +157,7 @@ def _quiz(value) -> dict:
     return {"question": question, "answers": answers, "correct": correct, "explanation": _text(data.get("explanation"), 400)}
 
 
-async def clean_door(db, payload: dict) -> dict:
+async def clean_door(db, payload: dict, year: int, day: int) -> dict:
     """Was gespeichert wird - geprüft je Art. Wirft 400 mit einem Satz, der sagt, was fehlt."""
     kind = str(payload.get("kind") or "").strip()
     if kind not in KINDS:
@@ -162,7 +168,7 @@ async def clean_door(db, payload: dict) -> dict:
     door = {
         "kind": kind, "title": title, "body": _text(payload.get("body"), BODY_MAX),
         "media_url": None, "video_url": None, "video_id": None, "clip_url": None, "clip_id": None,
-        "ref_id": None, "consent_confirmed": False, "sticker": None, "quiz": None,
+        "ref_id": None, "consent_confirmed": False, "sticker": None, "quiz": None, "prize": None,
         "link_url": None, "link_label": None,
     }
     media = str(payload.get("media_url") or "").strip()
@@ -212,6 +218,8 @@ async def clean_door(db, payload: dict) -> dict:
         door["sticker"] = sticker
     if kind == "quiz":
         door["quiz"] = _quiz(payload.get("quiz"))
+    if kind == "prize":
+        door["prize"] = raffles.clean_prize(payload.get("prize"), opens_at(year, day), seasons.windows_for(SEASON, year)[0]["end"])
     return door
 
 
@@ -252,8 +260,8 @@ def default_content(day: int) -> dict:
     return {"kind": "text", "title": f"Türchen {day}", "body": DEFAULT_BODY, "media_url": None, "link": None, "fallback": True}
 
 
-async def content_for(db, door: dict | None, day: int, viewer: dict | None = None) -> dict:
-    """Der Inhalt, wie ihn diese Person sieht - nie mit der richtigen Quiz-Antwort."""
+async def content_for(db, door: dict | None, day: int, viewer: dict | None = None, now: datetime | None = None) -> dict:
+    """Der Inhalt, wie ihn diese Person sieht - nie mit der richtigen Quiz-Antwort, nie mit fremden Namen."""
     if not door:
         return default_content(day)
     kind = door.get("kind") if door.get("kind") in KINDS else "text"
@@ -267,6 +275,14 @@ async def content_for(db, door: dict | None, day: int, viewer: dict | None = Non
     elif kind == "quiz":
         quiz = door.get("quiz") or {}
         content["quiz"] = {"question": quiz.get("question"), "answers": list(quiz.get("answers") or [])}
+    elif kind == "prize":
+        raffle = await db[raffles.RAFFLES].find_one({"id": door.get("raffle_id")}, {"_id": 0}) if door.get("raffle_id") else None
+        if raffle:
+            content["prize"] = await raffles.public_state(db, raffle, viewer, now)
+        else:
+            # Kopiert und für dieses Jahr noch nicht bestätigt: kein Gewinn, nur der Text.
+            content["kind"] = "text"
+            content["body"] = content["body"] or DEFAULT_BODY
     elif kind in ("news", "event", "member_spotlight"):
         if kind == "news":
             card = await _news_card(db, door.get("ref_id"), viewer)
@@ -332,7 +348,7 @@ async def calendar_view(db, viewer: dict | None, now: datetime | None = None, gu
         item = {"day": day, "opens_at": opens_at(year, day).isoformat(), "seed": door_seed(year, day),
                 "state": "locked" if not available else ("opened" if day in shown else "available")}
         if item["state"] == "opened":
-            item["content"] = await content_for(db, doors.get(day), day, viewer)
+            item["content"] = await content_for(db, doors.get(day), day, viewer, now)
             if item["content"].get("quiz") is not None:
                 item["content"]["quiz"]["done"] = bool((opened.get(day) or {}).get("quiz_done"))
             if day in opened:
@@ -382,7 +398,7 @@ async def open_door(db, viewer: dict | None, day: int, now: datetime | None = No
         if first:
             newly = await _count_for_achievements(user_id)
     await db[VIEWS].update_one({"year": year, "day": day}, {"$inc": {"count": 1}, "$setOnInsert": {"year": year, "day": day}}, upsert=True)
-    content = await content_for(db, doors.get(day), day, viewer)
+    content = await content_for(db, doors.get(day), day, viewer, state["now"])
     opening = (await db[OPENINGS].find_one({"user_id": user_id, "year": year, "day": day}, {"_id": 0}) if user_id else None) or {}
     if content.get("quiz") is not None:
         content["quiz"]["done"] = bool(opening.get("quiz_done"))
@@ -434,6 +450,30 @@ async def answer_quiz(db, viewer: dict | None, day: int, answer: int, now: datet
     return {"day": day, "correct": answer == quiz["correct"], "correct_index": quiz["correct"], "correct_answer": quiz["answers"][quiz["correct"]], "explanation": quiz.get("explanation") or "", "done": True}
 
 
+async def _raffle_for_entry(db, viewer: dict | None, day: int, now: datetime | None) -> tuple[dict, dict]:
+    """Die Verlosung hinter einem offenen Türchen - mitmachen kann nur, wer angemeldet ist und es geöffnet hat."""
+    if not viewer or not viewer.get("id"):
+        raise HTTPException(status_code=401, detail="Melde dich an, um mitzumachen.")
+    state, doors = await _require_open_door(db, day, now)
+    door = doors.get(day) or {}
+    raffle = await db[raffles.RAFFLES].find_one({"id": door.get("raffle_id")}, {"_id": 0}) if door.get("kind") == "prize" and door.get("raffle_id") else None
+    if not raffle:
+        raise HTTPException(status_code=404, detail="In diesem Türchen steckt keine Verlosung.")
+    if not await db[OPENINGS].find_one({"user_id": viewer["id"], "year": state["year"], "day": day}, {"_id": 0, "id": 1}):
+        raise HTTPException(status_code=409, detail="Öffne zuerst das Türchen.")
+    return state, raffle
+
+
+async def enter_raffle(db, viewer: dict | None, day: int, now: datetime | None = None) -> dict:
+    state, raffle = await _raffle_for_entry(db, viewer, day, now)
+    return {"day": day, "prize": await raffles.enter(db, raffle, viewer, state["now"])}
+
+
+async def withdraw_raffle(db, viewer: dict | None, day: int, now: datetime | None = None) -> dict:
+    state, raffle = await _raffle_for_entry(db, viewer, day, now)
+    return {"day": day, "prize": await raffles.withdraw(db, raffle, viewer, state["now"])}
+
+
 # ------------------------------------------------------------------ Verwaltung
 
 def check_year(year: int) -> int:
@@ -444,7 +484,7 @@ def check_year(year: int) -> int:
 
 def _admin_door(door: dict) -> dict:
     return {key: door.get(key) for key in ("id", "year", "day", "kind", "title", "body", "media_url", "video_url", "video_id", "clip_url", "clip_id", "ref_id",
-                                           "consent_confirmed", "sticker", "quiz", "link_url", "link_label", "created_at", "updated_at", "updated_by", "copied_from")}
+                                           "consent_confirmed", "sticker", "quiz", "prize", "raffle_id", "link_url", "link_label", "created_at", "updated_at", "updated_by", "copied_from")}
 
 
 def door_problem(door: dict | None) -> str | None:
@@ -453,6 +493,8 @@ def door_problem(door: dict | None) -> str | None:
         return "Noch nichts eingetragen – an diesem Tag grüßt nur der Löwe."
     if door.get("kind") == "member_spotlight" and door.get("consent_confirmed") is not True:
         return "Die Einwilligung des Mitglieds ist für dieses Jahr noch nicht bestätigt."
+    if door.get("kind") == "prize" and not door.get("raffle_id"):
+        return "Der Gewinn ist für dieses Jahr noch nicht bestätigt – bitte Teilnahmeschluss prüfen und speichern."
     return None
 
 
@@ -473,6 +515,7 @@ async def admin_view(db, year: int, now: datetime | None = None) -> dict:
             continue
         same_day[day] += 1 if when == date(year, 12, day) else 0
     window = seasons.windows_for(SEASON, year)[0]
+    drawings = {row["id"]: row for row in await db[raffles.RAFFLES].find({"season": SEASON, "year": year}, {"_id": 0}).to_list(DOORS * 2)}
     items = []
     for day in DOOR_DAYS:
         door = doors.get(day)
@@ -480,6 +523,7 @@ async def admin_view(db, year: int, now: datetime | None = None) -> dict:
             "day": day, "opens_at": opens_at(year, day).isoformat(), "is_open": is_open(year, day, now), "seed": door_seed(year, day),
             "door": _admin_door(door) if door else None, "problem": door_problem(door),
             "stats": {"opened": opened[day], "same_day": same_day[day], "later": opened[day] - same_day[day], "views": views.get(day, 0), "quiz_done": quizzed[day]},
+            "raffle": await raffles.admin_state(db, drawings.get((door or {}).get("raffle_id")), now) if (door or {}).get("kind") == "prize" else None,
         })
     years = sorted({int(value) for value in await db[DOOR_COLLECTION].distinct("year") if value}, reverse=True)
     return {
@@ -495,7 +539,17 @@ async def save_door(db, year: int, day: int, payload: dict, actor: dict) -> dict
     year = check_year(year)
     if day not in DOOR_DAYS:
         raise HTTPException(status_code=404, detail="Dieses Türchen gibt es nicht.")
-    door = await clean_door(db, payload)
+    door = await clean_door(db, payload, year, day)
+    if door["kind"] == "prize":
+        raffle = await raffles.save(
+            db, season=SEASON, year=year, source_key=raffle_key(year, day), source_label=f"Türchen {day}", title=f"Adventkalender {year}",
+            source_url="/advent", prize=door["prize"], actor=actor,
+        )
+        door["raffle_id"] = raffle["id"]
+    else:
+        # Aus einem Gewinn wird etwas anderes: nur, solange niemand mitmacht und nichts gezogen ist.
+        await raffles.release(db, raffle_key(year, day))
+        door["raffle_id"] = None
     stamp = now_utc().isoformat()
     await db[DOOR_COLLECTION].update_one(
         {"year": year, "day": day},
@@ -507,8 +561,31 @@ async def save_door(db, year: int, day: int, payload: dict, actor: dict) -> dict
 
 
 async def delete_door(db, year: int, day: int) -> bool:
-    result = await db[DOOR_COLLECTION].delete_one({"year": check_year(year), "day": day})
+    year = check_year(year)
+    await raffles.release(db, raffle_key(year, day))
+    result = await db[DOOR_COLLECTION].delete_one({"year": year, "day": day})
     return bool(result.deleted_count)
+
+
+async def _door_raffle(db, year: int, day: int) -> dict:
+    door = await db[DOOR_COLLECTION].find_one({"year": check_year(year), "day": day}, {"_id": 0, "kind": 1, "raffle_id": 1}) or {}
+    raffle = await db[raffles.RAFFLES].find_one({"id": door.get("raffle_id")}, {"_id": 0}) if door.get("kind") == "prize" and door.get("raffle_id") else None
+    if not raffle:
+        raise HTTPException(status_code=404, detail="Zu diesem Türchen gibt es keine Verlosung.")
+    return raffle
+
+
+async def draw_raffle(db, year: int, day: int, actor: dict, close_early: bool = False, now: datetime | None = None) -> dict:
+    now = seasons.to_vienna(now)
+    if not is_open(check_year(year), day, now):
+        raise HTTPException(status_code=409, detail="Gezogen wird erst, wenn das Türchen offen war.")
+    raffle = await raffles.draw(db, await _door_raffle(db, year, day), actor, now, close_early)
+    return await raffles.admin_state(db, raffle, now)
+
+
+async def redraw_raffle(db, year: int, day: int, pickup_id: str, actor: dict, now: datetime | None = None) -> dict:
+    raffle = await raffles.redraw(db, await _door_raffle(db, year, day), pickup_id, actor)
+    return await raffles.admin_state(db, raffle, now)
 
 
 async def copy_year(db, source: int, target: int, actor: dict) -> dict:
@@ -532,7 +609,10 @@ async def copy_year(db, source: int, target: int, actor: dict) -> dict:
             continue
         door = {key: row.get(key) for key in ("kind", "title", "body", "media_url", "video_url", "video_id", "clip_url", "clip_id", "ref_id", "sticker", "quiz", "link_url", "link_label")}
         door["consent_confirmed"] = False
-        if door["kind"] == "member_spotlight":
+        # Der Gewinn wandert als Vorschlag mit - ohne Verlosung und ohne den Teilnahmeschluss vom Vorjahr.
+        door["prize"] = {key: value for key, value in (row.get("prize") or {}).items() if key != "closes_at"} or None
+        door["raffle_id"] = None
+        if door["kind"] in ("member_spotlight", "prize"):
             reconfirm.append(day)
         await db[DOOR_COLLECTION].insert_one({**door, "id": new_id(), "year": target, "day": day, "created_at": stamp, "updated_at": stamp, "updated_by": actor.get("id"), "copied_from": source})
         copied.append(day)

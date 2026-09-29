@@ -65,7 +65,7 @@ class FakeDb:
             "team_invites", "user_achievements", "season_points", "prize_pickups", "notifications",
             "direct_messages", "friendships", "user_blocks", "user_reports", "mobile_push_tokens",
             "mobile_client_logs", "audit_logs", "platform_links", "user_signals", "news_reads", "stream_watches",
-            "user_achievement_stats", "match_commendations", "advent_openings",
+            "user_achievement_stats", "match_commendations", "advent_openings", "season_raffle_entries",
         ):
             setattr(self, name, FakeCollection())
 
