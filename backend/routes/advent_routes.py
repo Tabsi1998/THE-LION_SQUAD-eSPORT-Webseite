@@ -124,6 +124,13 @@ async def _audit(db, actor: dict, action: str, year: int, details: dict) -> None
     await db.audit_logs.insert_one({"id": new_id(), "actor_id": actor["id"], "action": action, "entity_id": f"advent:{year}", "details": details, "created_at": now_utc().isoformat()})
 
 
+@router.get("/admin/options")
+async def admin_options(response: Response, me: dict = Depends(require_editor)):
+    """Auswahllisten für die Pflege: News, Events, Mitglieder, Sticker."""
+    _private(response)
+    return await advent.editor_options(get_db())
+
+
 @router.get("/admin/{year}")
 async def admin_calendar(year: int, response: Response, me: dict = Depends(require_editor)):
     _private(response)

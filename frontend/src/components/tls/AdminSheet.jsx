@@ -14,7 +14,7 @@ const WIDTHS = {
   xl: "sm:max-w-[56rem]",
 };
 
-export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", onClose, onSubmit, saving = false, submitLabel = "Speichern", savingLabel = "Speichere …", submitTestId, cancelLabel = "Abbrechen", footer, testId = "admin-sheet", children }) {
+export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", onClose, onSubmit, saving = false, submitLabel = "Speichern", savingLabel = "Speichere …", submitTestId, cancelLabel = "Abbrechen", footer, testId = "admin-sheet", noValidate = false, children }) {
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -46,6 +46,8 @@ export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", on
         aria-modal="true"
         aria-label={title}
         onSubmit={onSubmit}
+        // Mit `noValidate` prüft das Formular selbst und sagt in eigenen Worten, was fehlt.
+        noValidate={onSubmit && noValidate ? true : undefined}
         data-testid={testId}
         className={`flex h-full w-full ${WIDTHS[size] || WIDTHS.md} flex-col bg-[#0F0F10] border-l border-white/10 shadow-2xl shadow-black/60 outline-none`}
       >

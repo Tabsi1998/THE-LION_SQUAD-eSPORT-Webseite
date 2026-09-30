@@ -134,6 +134,7 @@ const MembershipApplyPage = lazy(() => import("@/pages/public/MembershipApplyPag
 const AdminSponsorsPage = lazy(() => import("@/pages/admin/AdminSponsorsPage"));
 const AdminPartnersPage = lazy(() => import("@/pages/admin/AdminPartnersPage"));
 const AdminStickersPage = lazy(() => import("@/pages/admin/AdminStickersPage"));
+const AdminAdventPage = lazy(() => import("@/pages/admin/AdminAdventPage"));
 
 const AboutPage = lazy(() => import("@/pages/public/AboutPage"));
 const ContactPage = lazy(() => import("@/pages/public/ContactPage"));
@@ -346,6 +347,7 @@ function App() {
           <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
           <Route path="/admin/achievements/preview" element={<ProtectedRoute requireArea="content"><AdminAchievementPreviewPage /></ProtectedRoute>} />
           <Route path="/admin/stickers" element={<ProtectedRoute requireArea="content"><AdminStickersPage /></ProtectedRoute>} />
+          <Route path="/admin/advent" element={<ProtectedRoute requireArea={["content", "club"]}><AdminAdventPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireArea="club"><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/email-templates" element={<ProtectedRoute requireArea="system"><AdminEmailTemplatesPage /></ProtectedRoute>} />
           {/* Das Web-CMS ist weg (#437 A): alte Lesezeichen landen bei den E-Mail-Vorlagen, seiner einen verbliebenen Aufgabe. */}

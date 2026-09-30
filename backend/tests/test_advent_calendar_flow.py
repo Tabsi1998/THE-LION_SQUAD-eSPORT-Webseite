@@ -429,6 +429,41 @@ async def test_verwaltung_prueft_jede_art_und_nur_die_redaktion_darf(flow):
 
 
 @pytest.mark.asyncio
+async def test_auswahllisten_fuer_die_pflege(flow):
+    staff = await flow.add_staff("Redaktion")
+    user = await flow.add_user(name="Paula")
+    flow.act_as(staff)
+    shown = (await flow.post("/api/news", json={"title": "Wintercup", "content": "Text", "published_at": "2026-12-04T10:00:00+01:00"})).json()
+    draft = (await flow.post("/api/news", json={"title": "Noch geheim", "content": "Text", "published": False, "visibility": "members"})).json()
+    await flow.db.events.insert_many([
+        {"id": "e1", "name": "Weihnachtsfeier", "status": "published", "visibility": "members", "start_date": "2026-12-19T18:00:00+01:00"},
+        {"id": "e2", "name": "Sommerfest", "status": "draft", "visibility": "public", "start_date": "2027-07-01T18:00:00+02:00"},
+        {"id": "e3", "name": "Abgesagt", "status": "cancelled", "visibility": "public", "start_date": "2026-11-01T18:00:00+01:00"},
+    ])
+    await flow.db.club_member_profiles.insert_many([
+        {"id": "p1", "slug": "paula", "display_name": "Paula P.", "gamertag": "Pauli", "role_title": "Kapitänin", "order_index": 2},
+        {"id": "p2", "slug": "kai", "display_name": "Kai K.", "order_index": 1},
+        {"id": "p3", "slug": "weg", "display_name": "Nicht mehr dabei", "is_active": False},
+    ])
+    for who, status in ((None, 401), (user, 403)):
+        flow.act_as(who)
+        assert (await flow.get("/api/seasonal/advent/admin/options")).status_code == status
+    flow.act_as(staff)
+    res = await flow.get("/api/seasonal/advent/admin/options")
+    assert res.status_code == 200 and res.headers["cache-control"] == "private, no-store"
+    options = res.json()
+    assert {"id": shown["id"], "label": "Wintercup", "hint": "4.12.2026"} in options["news"]
+    assert next(row for row in options["news"] if row["id"] == draft["id"])["hint"].endswith("Entwurf · nur Mitglieder")
+    assert options["events"] == [
+        {"id": "e2", "label": "Sommerfest", "hint": "1.7.2027 · Entwurf"},
+        {"id": "e1", "label": "Weihnachtsfeier", "hint": "19.12.2026 · nur Mitglieder"},
+    ]
+    assert options["members"] == [{"id": "p2", "label": "Kai K.", "hint": "Mitglied"}, {"id": "p1", "label": "Pauli", "hint": "Kapitänin"}]
+    assert options["stickers"] and all(set(sticker) == {"id", "name", "url"} for pack in options["stickers"] for sticker in pack["stickers"])
+    assert options["audiences"] == [{"key": "all", "label": "alle mit Konto"}, {"key": "members", "label": "nur Vereinsmitglieder"}] and options["max_winners"] == 20
+
+
+@pytest.mark.asyncio
 async def test_kopieren_zahlen_und_vorschau(flow, monkeypatch):
     staff = await flow.add_staff("Redaktion")
     paula = await flow.add_user(name="Paula")

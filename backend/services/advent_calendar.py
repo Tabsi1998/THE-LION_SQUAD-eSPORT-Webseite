@@ -619,6 +619,38 @@ async def copy_year(db, source: int, target: int, actor: dict) -> dict:
     return {"source": source, "target": target, "copied": copied, "skipped": skipped, "reconfirm": reconfirm}
 
 
+def _day_text(value) -> str:
+    try:
+        moment = seasons.to_vienna(datetime.fromisoformat(str(value).replace("Z", "+00:00")))
+    except ValueError:
+        return ""
+    return f"{moment.day}.{moment.month}.{moment.year}"
+
+
+async def editor_options(db) -> dict:
+    """Was sich in ein Türchen legen lässt: News, Events, Mitglieder und Sticker - mit einem Hinweis, wenn etwas
+    (noch) nicht für alle sichtbar ist. So braucht die Pflege keine weiteren Rechte als die für den Kalender."""
+    from services.stickers import list_sticker_packs
+
+    visibility = {"members": "nur Mitglieder", "community": "nur angemeldet", "internal": "nur intern"}
+    news = []
+    for row in await db.news_posts.find({}, {"_id": 0, "id": 1, "title": 1, "published": 1, "published_at": 1, "visibility": 1}).sort([("published_at", -1), ("created_at", -1)]).to_list(120):
+        hints = [_day_text(row.get("published_at")), "Entwurf" if row.get("published") is False else "", visibility.get(row.get("visibility") or "public", "")]
+        news.append({"id": row["id"], "label": row.get("title") or "Ohne Titel", "hint": " · ".join(hint for hint in hints if hint)})
+    events = []
+    for row in await db.events.find({"status": {"$nin": ["archived", "cancelled"]}}, {"_id": 0, "id": 1, "name": 1, "status": 1, "start_date": 1, "visibility": 1}).sort("start_date", -1).to_list(120):
+        hints = [_day_text(row.get("start_date")), "Entwurf" if row.get("status") == "draft" else "", visibility.get(row.get("visibility") or "public", "")]
+        events.append({"id": row["id"], "label": row.get("name") or "Ohne Titel", "hint": " · ".join(hint for hint in hints if hint)})
+    members = []
+    for row in await db.club_member_profiles.find({"is_active": {"$ne": False}}, {"_id": 0, "id": 1, "display_name": 1, "gamertag": 1, "role_title": 1}).sort([("order_index", 1), ("display_name", 1)]).to_list(400):
+        members.append({"id": row["id"], "label": row.get("gamertag") or row.get("display_name") or "Ohne Namen", "hint": row.get("role_title") or "Mitglied"})
+    stickers = [
+        {"id": pack["id"], "name": pack["name"], "stickers": [{"id": sticker["id"], "name": sticker.get("name") or "Sticker", "url": sticker["url"]} for sticker in pack["stickers"]]}
+        for pack in await list_sticker_packs(db)
+    ]
+    return {"news": news, "events": events, "members": members, "stickers": stickers, "audiences": [{"key": key, "label": label} for key, label in raffles.AUDIENCES.items()], "max_winners": raffles.MAX_WINNERS}
+
+
 # ------------------------------------------------------------------ Für die Erfolge und den Datenschutz
 
 async def doors_in_best_year(db, user_id: str) -> int:
