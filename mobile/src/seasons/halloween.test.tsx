@@ -169,6 +169,9 @@ test("Fledermaus antippen: Haptik, sie fliegt davon und ist danach weg", async (
   expect(screen.getAllByTestId("halloween-bat-hanging").length).toBe(count);
   await fireEvent.press(screen.getAllByTestId("halloween-bat-hanging")[0]);
   expect(Haptics.impactAsync).toHaveBeenCalled();
+  // Jede verscheuchte Fledermaus zählt als Fundstück (#678) - jedes Mal, nicht nur einmal am Tag.
+  expect(mockSignals.recordSignal).toHaveBeenCalledTimes(1);
+  expect(mockSignals.recordSignal).toHaveBeenCalledWith("halloween_bats_scared", { onceIf: false });
   expect(screen.queryAllByTestId("halloween-bat-hanging").length).toBe(count - 1);
   expect(screen.getByTestId("halloween-bat-flying")).toBeTruthy();
   await act(async () => {
@@ -189,6 +192,9 @@ test("Grab antippen: ein Geist steigt auf, das zweite Mal erst nach der Sperre, 
   expect(screen.getAllByTestId("halloween-ghost").length).toBe(1);
   await fireEvent.press(graves[1]);
   expect(screen.getAllByTestId("halloween-ghost").length).toBe(2);
+  // Jeder befreite Geist zählt als Fundstück (#678) - das Antippen in der Sperrzeit nicht.
+  expect(mockSignals.recordSignal).toHaveBeenCalledTimes(2);
+  expect(mockSignals.recordSignal).toHaveBeenLastCalledWith("halloween_ghosts_freed", { onceIf: false });
   await act(async () => {
     jest.advanceTimersByTime(6100);
   });
