@@ -2650,6 +2650,19 @@ der Erfolge - und vier neue Regeln, die für alles gelten.
   Karte des Vereins. Lehre: ein globales `max-width: 100%` für SVGs lässt absolut positionierte
   Grafiken in leeren Behältern verschwinden – Breite immer auch als Stil setzen.
 
+- **Wetter das ganze Jahr** ([#673](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/673),
+  PR #770; davor #768 aus der Rückmeldung des Betreibers): Regnet es am Vereinsort, regnet es auf
+  der Seite; schneit es, fällt leichter Schnee; bei Gewitter leuchtet es leise. Vom 1. Advent bis
+  Dreikönig schneit es immer – Regen wird zu Schnee, und je mehr draußen fällt, desto dichter. Das
+  Wetter ist eine eigene Saison, die das ganze Jahr läuft und im Admin in der Karte „Wetter am
+  Vereinsort“ geschaltet wird (an, aus, Stärke, Vorschau mit Gewitterregen). Ein trockener Tag
+  kostet nichts: der Zeichen-Loop schläft ohne ein einziges Bild und gibt den Speicher frei.
+  Schneeflocken und Tropfen gehören zur Seite – beim Scrollen fährt man an ihnen vorbei. Lehren:
+  eine Saison ohne Termin berührt mehr als gedacht (Kalender, Kanäle, Vorschau, Stärke am
+  `<html>`), und ein Test, der den hellsten Punkt misst, hängt am Zufall, sobald sich zwei
+  durchscheinende Striche kreuzen. Die App folgt mit #771; die Übersicht, was der App gegenüber
+  dem Web noch fehlt, steht in #772.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen

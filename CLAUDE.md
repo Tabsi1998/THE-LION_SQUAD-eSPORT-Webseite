@@ -2710,7 +2710,7 @@ Seit dem 15. September gilt:
   für „Staff ohne Vorstand“ `club_admin` nehmen; `award_achievement` legt
   `user_xp` an (Upsert in Tests).
 - Seasonal Core (C1–C6, #721–#726; PRs #763 Web, #764 App) und die ersten
-  Winter-Saisons (#765 Adventkranz, #766 Schnee; #767 Weihnachten offen):
+  Winter-Saisons (#765 Adventkranz, #766 Schnee, #767 Weihnachten):
   Kern der Jahreszeiten in `frontend/src/seasons/` – `anchors.js` (echte
   Kanten und Ecken: `measureAnchors` je Art nav/header/card/frame/image/hero/
   footer/footerLine mit stabilen Schlüsseln, `edgeSlot`/`pointSlot`/
@@ -2722,8 +2722,8 @@ Seit dem 15. September gilt:
   Halloween würfelt je Saisonjahr über `YEAR_SALT`/`setYearSalt` statt je
   Ladung), `intensity.js` (`effectClasses` perch/corner/ambient/watch/motion/
   slots/crawl/rare/scene/interact je Seitenklasse, `allows`,
-  `SEASON_CAPABILITIES` übersetzt je Saison – halloween, snow; christmas und
-  `motion.js` `setSlots` kommen mit #767), `e2e/seasonQa.js` (`defineSeasonQa` – PC 1366/
+  `SEASON_CAPABILITIES` übersetzt je Saison – halloween, snow, christmas;
+  `motion.js` `setSlots(n)` für ruhige Tage), `e2e/seasonQa.js` (`defineSeasonQa` – PC 1366/
   1440/1920, Handy 375, Tablet 768, Reduced Motion, Saison aus; jede Saison
   hat ihre `<saison>-regression.spec.js`), `docs/SEASONS.md` (Semantik,
   Checkliste, neue Saison anlegen). App: `mobile/src/seasons/rng.ts`
@@ -2734,13 +2734,50 @@ Seit dem 15. September gilt:
   dem Logo), `snow/` (`flakes.js` drei Tiefen und Böen aus dem Wetter,
   `layer.js` für den Canvas-Loop, `caps.js`/`SnowCaps.jsx` Hauben auf Kanten
   mit Stufe und Tauwetter, Schneeflocke mit Signal `snowflakes_clicked`),
-  `christmas/` (offen in #767: `lights.js`/`LightChain.jsx` Kette mit Draht
-  in den untersten 16 px der Kopfzeile und oben in der Fußzeile, Lücken für
-  Logo/Knöpfe/Schrift; `Toast` einmal je Tag; Feiertage ein Platz im
-  Budget). Falle: das globale `img,
+  `christmas/` (#767: `lights.js`/`LightChain.jsx` Kette mit Draht
+  in den untersten 16 px der Kopfzeile und oben in der Fußzeile – dort nur
+  mit mindestens 30 px freiem Raum –, Lücken für Logo, Knöpfe und jede
+  Schrift, Schein höchstens 7 px; `Toast` einmal je Tag, schließen über
+  Knopf oder Escape; Feiertage ein Platz im Budget). Seit #768 gehören die
+  Schneeflocken zur Seite statt zum Fenster (`scrollFlake`, Tiefen 1/0,8/
+  0,55) und die Halloween-Katze miaut (`cat_meow` in `halloween/sounds.js`,
+  nur mit eingeschaltetem Ton). Falle: das globale `img,
   video, canvas, svg { max-width: 100% }` in `index.css` lässt absolut
   positionierte SVGs in 0 px breiten Behältern kollabieren – `max-width:
   none` plus Breite als Stil.
+- Wetter das ganze Jahr (#673, PR #770): eigene Saison `weather` in
+  `services/seasons.py` – ein Fenster vom 1.1. bis zum ersten Augenblick des
+  nächsten Jahres (keine Lücke zu Silvester), `always` (kein Termin im
+  Kalender) und `channels: ("web",)`. `supported_channels(key)` /
+  `runs_all_year(key)`; `merge_settings` und `PUT /api/settings/seasons`
+  nehmen nur Kanäle an, die eine Saison bedienen kann – die App bekommt das
+  Wetter erst mit #771. `admin_view` liefert je Saison `always` und
+  `supported_channels`. Vorschau: `weather.demo()` (Gewitterregen 2,5 mm,
+  Code 95) nur mit dem Vorschau-Token der Saison `weather`, gespeichert wird
+  nichts. Web `frontend/src/seasons/weather/`: `rain.js` (reine Rechnung –
+  `rainFactor` 0/0,35/0,65/1/1,2 aus `rain_mm`, drei Tiefen, `MAX_ALPHA`
+  0,35, `dropCounts` mit `area`, `scrollDrop`, Spritzer), `storm.js`
+  (`isThunderstorm` Code 95–99, Blitzabstand 8–25 s, Schein 0,14), `layer.js`
+  (`createRainLayer`, `createWeatherLayer` entscheidet je Bild: Schnee-Saison
+  → nichts, sonst Schnee oder Regen; Schnee außerhalb der Saison über
+  `createSnowLayer({ baseFactor: 0 })`), `module.js` (`skyOnly: true`, in der
+  Vorschau volle Menge auch im Admin), `index.js` (`weatherPlan`,
+  `describeWeather` für den Admin). Schnee-Saison: `snowfallFactor` 0,55/0,8/
+  1/1,25 aus `snow_cm + rain_mm` – Regen wird zu Schnee. `sky.js`: Vertrag der
+  Ebenen `draw`, optional `idle()`, `slept(sekunden)`, `dispose()`; ruhen alle,
+  schläft der Loop **ohne ein Bild**, parkt die Zeichenfläche auf 1×1
+  (`parked`) und schaut alle 2 s nach; `areaFactor(size)` hebt die Teilchenzahl
+  auf großen Fenstern (höchstens ×2). `SeasonStage`: `useLayerDisposal` räumt
+  Ebenen verzögert ab (StrictMode ruft Effekte doppelt), gibt `preview` an
+  `skyLayers` weiter und schreibt die Stärke von `skyOnly`-Saisonen nicht in
+  `data-season-intensity`. Admin: die Schalter des Wetters stehen in
+  `SeasonsWeatherCard.jsx` (keine eigene Saison-Karte, ohne „dezent“).
+  Fallen: (1) eine Ganzjahres-Saison steht sonst als „1.1.–31.12.“ im
+  Kalender und macht den Deko-Schalter im Footer ganzjährig sichtbar (gewollt);
+  (2) wo sich zwei Striche kreuzen, addiert sich die Deckkraft – Tests prüfen
+  den **Anteil** der Punkte über der Grenze, nicht den hellsten Punkt; mehrere
+  Formen derselben Figur (Spritzer) in **einem** Pfad zeichnen; (3) Arbeitsbäume
+  haben unter Windows CRLF – Patch-Skripte müssen Zeilenenden erhalten.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3185,7 +3222,10 @@ Spinne, echter Mond). Alle vom Betreiber gemergt; `update.sh` danach.
 #714 (Halloween IV Paket 5), #720 (Doku-Stand), #760–#762 (Halloween IV App
 1–3: Plätze, Fledermausleben, Spinnen/Netz/Friedhof/Katze/Nebel, Abnahme –
 Meilenstein 43 leer), #763 (Seasonal Core Web), #764 (Seasonal Core App –
-schließt #721–#726), #765 (Adventkranz Web), #766 (Schnee Web). #762 war rot
+schließt #721–#726), #765 (Adventkranz Web), #766 (Schnee Web), #767
+(Weihnachten Web: Lichterkette, Gruß), #768 (Rückmeldung: Flocken gehören zur
+Seite, Katze miaut), #769 (Doku-Stand), #770 (Wetter das ganze Jahr, schließt
+#673). #762 war rot
 wegen einer Expo-Drift (`expo install --check` verlangt expo ~57.0.26,
 expo-constants ~57.0.20) – nur package.json und Lockfile angehoben. Die
 Sichtproben laufen gegen einen Vite-Dev-Server je Worktree (`probe_*.cjs`
@@ -3215,10 +3255,16 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (29.09. abends): #767 Weihnachten Web (S8 #639 mit X1/X2/X4, auf
-  `main`), #768 Rückmeldung des Betreibers (Schneeflocken gehören zur Seite
-  statt zum Fenster – `scrollFlake` mit Tiefen 1/0,8/0,55; die
-  Halloween-Katze miaut – `cat_meow` in `halloween/sounds.js`).
+- Offen (30.09. früh): #773 Saison-Fundstücke I (Signale kommen am Server an:
+  `POST /api/achievements/signals`, Nachmelden je Tag, sofortige leichte
+  Auswertung; Web `signals.js` mit Ausgang, `SignalSync`), #774 Tests hängen
+  nicht mehr am Kalender (Saison-Uhr im Test, relative Termine; Fristen,
+  Termine und Alter nach dem Tag in Wien), #776 Entwurf Saison-Fundstücke II
+  (Katalog E, Karte im Profil – baut auf #773), #777 Entwurf Signale in der App.
+  Neue Issues: #771 Wetter in der App, #772 Klammer App-Parität (Wunsch des
+  Betreibers vom 29.09.: Wetter und Jahreszeiten sollen in der App gleich gut
+  funktionieren – jeder Web-PR einer Jahreszeit nennt sein App-Gegenstück),
+  #775 Frühwarnung mit verstellter Uhr (Entscheidung A/B/C offen).
   Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, Silvester S9 #640 mit
   N1–N5 (#739–#743), Adventkalender S10 #641 mit W6 #732 (braucht Server:
   Sammlung `advent_doors`, Öffnen, Ziehung), Nikolausstiefel X3 #736 (braucht

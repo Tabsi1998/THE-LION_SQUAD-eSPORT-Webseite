@@ -1,6 +1,6 @@
 # Jahreszeiten: der gemeinsame Kern (Seasonal Core)
 
-Stand: 29. September 2026 abends (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766; Weihnachten #767 offen). Gilt für Web (`frontend/src/seasons/`) und App
+Stand: 30. September 2026 (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766, Weihnachten #767, Wetter #770). Gilt für Web (`frontend/src/seasons/`) und App
 (`mobile/src/seasons/`). Halloween ist die erste Saison auf diesem Kern; Winter, Weihnachten, Silvester, Fasching,
 Ostern und Geburtstage bringen nur noch ihre Figuren und ihren Plan mit, nicht ihre eigenen Regeln.
 
@@ -13,12 +13,13 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, advent, snow; christmas mit #767) | `halloween.tsx` über `SEASON_MODULES` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: weather, halloween, advent, snow, christmas) | `halloween.tsx` über `SEASON_MODULES` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
 dem Inhalt, nie klickbar), `Corners` (Ecken und Anker), `Widget` (klickbar im Kopfbereich), `Footer`, `Toast`,
-`sounds`, `ScareToggle`, `accent`. Ein App-Modul liefert `Corners`, `Widget`, `Bats` (Flugebene) und Farben.
+`sounds`, `ScareToggle`, `accent`, `skyOnly` (die Saison ist nur Himmel, Abschnitt 9). Ein App-Modul liefert
+`Corners`, `Widget`, `Bats` (Flugebene) und Farben.
 
 ## 2. Anker: echte Kanten statt zufälliger Positionen (C1)
 
@@ -129,8 +130,8 @@ Ankern), `corner` (Ecken), `ambient` (none/far/near), `watch` (Beobachter), `mot
   Beobachter), `scaleForScreen` (App).
 - **Saison-Übersetzung**: `SEASON_CAPABILITIES[saison]` übersetzt die Klassen in eigene Schlüssel (Halloween:
   `hangingBats`, `cornerWebs`, `fog`, `eyes`, `flock`, `rappel`, `crawler`, `scares`, `footerScene`; Schnee: `flakes`,
-  `caps`, `capsMax`, `tint`; Weihnachten mit #767: `chain`, `footerChain`, `glow`). Eine neue Saison trägt sich dort ein;
-  Komponenten fragen nur ihre Schlüssel. Mit #767 kommt `setSlots(n)` in `motion.js` für ruhige Tage (Feiertage ein Platz).
+  `caps`, `capsMax`, `tint`; Weihnachten: `chain`, `footerChain`, `glow`). Eine neue Saison trägt sich dort ein;
+  Komponenten fragen nur ihre Schlüssel. `setSlots(n)` in `motion.js` senkt das Budget für ruhige Tage (Feiertage ein Platz).
 
 ## 7. Abnahme: „nichts wird schlechter“ (C6)
 
@@ -174,3 +175,41 @@ Verbindlich für jede Saison, Web und App:
 6. Effektklassen übersetzen: Eintrag in `SEASON_CAPABILITIES` (Web) und `intensity.ts` (App).
 7. Abnahme: `defineSeasonQa` im Web, `acceptance.test.tsx` in der App; Screenshots an den PR.
 8. Doku: dieser Stand wird im Doku-PR nach dem Merge fortgeschrieben (CLAUDE.md §5/§9).
+9. App-Gegenstück: jeder Web-PR einer Jahreszeit nennt das Issue, in dem die App nachzieht (#772). Reine Rechnung
+   (Mengen, Wege, Zeiten, Zufall) ohne Browser schreiben, damit die App sie übernehmen kann.
+
+## 9. Himmel-Ebenen und das Wetter (#673, #770)
+
+**Vertrag einer Ebene** (`skyLayers({ season, budget, reducedMotion, weather, preview })` liefert eine Liste):
+
+| Teil | Pflicht | Bedeutung |
+|---|---|---|
+| `key` | ja | Name für Tests und Fehlersuche |
+| `draw(ctx, dt, size, now)` | ja | ein Bild zeichnen; `dt` in Sekunden, höchstens 0,1 |
+| `idle()` | nein | `true`, wenn es nichts zu zeichnen gibt – ruhen **alle** Ebenen, schläft der Loop |
+| `slept(sekunden)` | nein | die Uhr der Ebene nachstellen, wenn der Loop geschlafen hat |
+| `dispose()` | nein | Hörer am Fenster abbauen; die Bühne ruft es verzögert (StrictMode) |
+
+Der Loop (`sky.js`) zeichnet im Schlaf **kein Bild**, parkt die Zeichenfläche auf 1×1 (kein Speicher in
+Fenstergröße) und fragt alle zwei Sekunden `idle()` – das kostet nichts. `areaFactor(size)` hebt die Teilchenzahl auf
+großen Fenstern (Fläche gegen 1440 × 900, höchstens das Doppelte).
+
+**Das Wetter** ist eine Saison wie jede andere (`weather`), nur ohne Termin:
+
+| Wann | Was die Seite zeigt |
+|---|---|
+| Schnee-Saison läuft (1. Advent bis Dreikönig) | die Wetter-Ebene ruht; die Schnee-Ebene schneit immer und wird mit Schnee **oder Regen** draußen dichter (55/80/100/125 %) |
+| sonst, `snow_cm` > 0 | leichter Schnee (60 % des Budgets, ohne Hauben) |
+| sonst, `rain_mm` > 0 | Regen: 35/65/100/120 % der Tropfen |
+| Wettercode 95–99 | Wetterleuchten im Bewegungsbudget (`lightning`), nie in der Schnee-Saison |
+| trocken oder Stand älter als drei Stunden | nichts |
+
+- Server: `always` (kein Eintrag im Kalender), `channels` (was die Saison bedienen kann – das Wetter vorerst nur
+  `web`, die App mit #771). Die Vorschau der Saison `weather` liefert einen Gewitterregen (`weather.demo()`).
+- `skyOnly`: die Saison hat keine Ecken, kein Widget, keinen Farbschein; ihre Stärke steht nicht in
+  `data-season-intensity`, damit „Wetter: dezent“ keine andere Saison anhält.
+- „Bewegung reduzieren“ und „dezent“: kein Wetter. Lebendige Seiten bekommen alles, mittlere und ruhige 60 %,
+  stille nichts (`weatherShare` aus der Effektklasse `ambient`).
+- Deckkraft: kein Strich über 0,35. Wo sich durchscheinende Formen überlagern, addiert sich die Deckkraft –
+  mehrere Formen derselben Figur in einem Pfad zeichnen, und in Tests den Anteil der Punkte über der Grenze
+  prüfen, nicht den hellsten Punkt.
