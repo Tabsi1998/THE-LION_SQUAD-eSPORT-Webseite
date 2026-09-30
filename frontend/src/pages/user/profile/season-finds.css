@@ -1,0 +1,48 @@
+/* Saison-Fundstücke im Profil (#678): ruhige Karten, kleine Figuren auf einer Scheibe aus Mondlicht, eine Bewegung
+   nur beim Überfahren. Die Figuren sind dunkle Silhouetten - ohne die Scheibe verschwänden sie im dunklen Grund. */
+
+.tls-find { position: relative; display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 2px; transition: background-color 0.2s ease; }
+.tls-find:hover, .tls-find:focus-within { background: rgba(255, 255, 255, 0.03); }
+.tls-find--empty .tls-find__figure { opacity: 0.38; filter: grayscale(0.85); }
+.tls-find--empty .tls-find__count { color: rgba(255, 255, 255, 0.3); }
+
+.tls-find__figure { flex: none; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; line-height: 0; border-radius: 50%; background: radial-gradient(circle at 50% 36%, rgba(170, 225, 240, 0.26), rgba(120, 190, 215, 0.1) 58%, rgba(120, 190, 215, 0.03) 100%); box-shadow: inset 0 0 0 1px rgba(170, 225, 240, 0.12), inset 0 -6px 10px rgba(0, 0, 0, 0.28); }
+.tls-find__figure svg { max-width: none; overflow: visible; }
+.tls-find__figure--ghost svg { filter: drop-shadow(0 0 3px rgba(200, 240, 250, 0.55)); }
+.tls-find__figure--snowflake svg { filter: drop-shadow(0 0 3px rgba(200, 240, 250, 0.4)); }
+.tls-find__count { min-width: 2.6ch; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* Der Balken für heute: wie viel vom Tagesdeckel schon gesammelt ist. */
+.tls-find__today { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+.tls-find__today > span { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, rgba(41, 182, 232, 0.55), rgba(155, 231, 255, 0.95)); transition: width 0.4s ease; }
+.tls-find__today--full > span { background: linear-gradient(90deg, rgba(0, 255, 136, 0.5), rgba(0, 255, 136, 0.9)); }
+
+/* Eine Saison, die gerade läuft, trägt einen leisen Schein am Rand. */
+.tls-finds__season--active { border-color: rgba(41, 182, 232, 0.35); box-shadow: inset 0 0 0 1px rgba(41, 182, 232, 0.08), 0 0 24px rgba(41, 182, 232, 0.06); }
+
+.tls-find__figure .tls-hbat__wing { transform-origin: 20px 22px; transition: transform 0.25s ease-out; }
+.tls-find__figure .tls-cat__tail { transform-origin: 60px 76px; }
+.tls-find__figure .tls-find__door-leaf { transform-origin: 6px 16px; transition: transform 0.35s ease-out; }
+.tls-find__figure .tls-find__rocket-body, .tls-find__figure .tls-find__rocket-flame { transition: transform 0.3s ease-out, opacity 0.3s ease-out; }
+.tls-find__figure .tls-find__rocket-flame { transform-origin: 16px 21px; }
+.tls-find__figure .tls-find__flake { transition: transform 0.6s ease-out; }
+.tls-find__figure .tls-ghost__shape { transition: transform 0.4s ease-out, opacity 0.4s ease-out; }
+.tls-find__figure .tls-find__egg { transform-origin: 16px 29px; }
+.tls-find__figure .tls-pumpkin { animation: none; filter: drop-shadow(0 0 4px rgba(255, 150, 40, 0.35)); transition: filter 0.3s ease-out; }
+.tls-find__figure .tls-pumpkin__face { animation: none; }
+
+@keyframes tls-find-wobble { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-9deg); } 60% { transform: rotate(7deg); } 85% { transform: rotate(-3deg); } }
+@keyframes tls-find-tail { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-9deg); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tls-find:not(.tls-find--empty):hover .tls-hbat__wing--l { transform: rotate(-16deg); }
+  .tls-find:not(.tls-find--empty):hover .tls-hbat__wing--r { transform: rotate(16deg); }
+  .tls-find:not(.tls-find--empty):hover .tls-ghost__shape { transform: translateY(-4px); opacity: 0.8; }
+  .tls-find:not(.tls-find--empty):hover .tls-cat__tail { animation: tls-find-tail 0.9s ease-in-out infinite; }
+  .tls-find:not(.tls-find--empty):hover .tls-pumpkin { filter: drop-shadow(0 0 9px rgba(255, 180, 70, 0.75)); }
+  .tls-find:not(.tls-find--empty):hover .tls-find__flake { transform: rotate(60deg); }
+  .tls-find:not(.tls-find--empty):hover .tls-find__door-leaf { transform: perspective(60px) rotateY(-34deg); }
+  .tls-find:not(.tls-find--empty):hover .tls-find__rocket-body { transform: translateY(-3px); }
+  .tls-find:not(.tls-find--empty):hover .tls-find__rocket-flame { transform: translateY(-3px) scaleY(1.35); opacity: 1; }
+  .tls-find:not(.tls-find--empty):hover .tls-find__egg { animation: tls-find-wobble 0.7s ease-in-out 1; }
+}

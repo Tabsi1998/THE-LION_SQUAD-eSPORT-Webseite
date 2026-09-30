@@ -298,7 +298,10 @@ async def test_nachmelden_je_tag_und_mehrere_auf_einmal(flow, monkeypatch):
     res = await flow.post("/api/achievements/signals", json={"items": items})
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["accepted"] == 3 and body["newly_awarded"] == 0
+    # 37 Fledermäuse und 3 Geister: Fledermausflüsterer I und II, dazu der erste Jahreszeiten-Sammler (40 Fundstücke).
+    assert body["accepted"] == 3 and body["newly_awarded"] == 3
+    awards = await flow.db.user_achievements.find({"user_id": user["id"]}, {"_id": 0, "tier_code": 1}).to_list(10)
+    assert sorted(a["tier_code"] for a in awards) == ["bat_whisperer_1", "bat_whisperer_2", "season_collector_1"]
     assert body["results"] == [
         {"name": "halloween_bats_scared", "day": "2026-10-27", "accepted": True, "count": 30, "day_count": 30},
         {"name": "halloween_ghosts_freed", "day": "2026-10-29", "accepted": True, "count": 3, "day_count": 3},
@@ -316,8 +319,10 @@ async def test_nachmelden_je_tag_und_mehrere_auf_einmal(flow, monkeypatch):
     assert again.json() == {"accepted": 0, "newly_awarded": 0, "results": [{"name": "halloween_bats_scared", "day": "2026-10-27", "accepted": False, "reason": "cap", "count": 37, "day_count": 30}]}
     doc = await flow.db[counters.SIGNALS].find_one({"user_id": user["id"], "name": "halloween_bats_scared"}, {"_id": 0})
     assert doc["days"] == {"2026-10-27": 30, "2026-10-30": 7} and doc["count"] == 37
-    # Ausgewertet wurde sofort - die Warteschlange bleibt leer.
-    assert await flow.db.achievement_eval_queue.count_documents({"user_id": user["id"]}) == 0
+    # Ausgewertet wurde sofort: für die Signale steht nichts in der Warteschlange - nur die neuen Stufen selbst
+    # merken vor, dass die Zähler über Erfolge (Anzahl, Punkte) nachgerechnet werden.
+    queued = await flow.db.achievement_eval_queue.find({"user_id": user["id"]}, {"_id": 0}).to_list(10)
+    assert all("signal" not in (entry.get("sources") or []) and not entry.get("full") for entry in queued), queued
     # Nach der Saison lässt sich die letzte Woche noch nachmelden - der Tag zählt, nicht der Augenblick der Meldung.
     set_clock(monkeypatch, datetime(2026, 11, 3, 9, 0, tzinfo=counters.VIENNA))
     late = await flow.post("/api/achievements/signals", json={"items": [
@@ -352,10 +357,13 @@ async def test_meldung_wertet_sofort_aus_und_nur_die_signal_zaehler(flow, monkey
     assert [a["tier_code"] for a in awards] == ["halloween_1"], "Gruselnacht"
     stats = await flow.db[counters.STATS].find_one({"user_id": user["id"]}, {"_id": 0})
     assert stats["values"]["halloween_pumpkin"] == 1 and "full_at" not in stats
-    # Noch einmal melden: nichts Neues, nichts doppelt.
+    # Zwei Fledermäuse dazu machen fünf: Fledermausflüsterer I. Noch einmal melden: nichts Neues, nichts doppelt.
     res = await flow.post("/api/achievements/signals", json={"items": [{"name": "halloween_bats_scared", "count": 2}]})
+    assert res.json()["accepted"] == 1 and res.json()["newly_awarded"] == 1
+    res = await flow.post("/api/achievements/signals", json={"items": [{"name": "halloween_bats_scared", "count": 1}]})
     assert res.json()["accepted"] == 1 and res.json()["newly_awarded"] == 0
-    assert await flow.db.user_achievements.count_documents({"user_id": user["id"]}) == 1
+    awards = await flow.db.user_achievements.find({"user_id": user["id"]}, {"_id": 0, "tier_code": 1}).to_list(10)
+    assert sorted(a["tier_code"] for a in awards) == ["bat_whisperer_1", "halloween_1"]
     # Die volle Auswertung rechnet weiterhin alles - auch den alten Block.
     assert await badges.evaluate_user_progress(user["id"], {"signal"}) == 0
     assert legacy_runs == [user["id"]]
@@ -397,3 +405,67 @@ async def test_auskunft_nennt_die_signale_und_konto_loeschen_nimmt_sie_mit(flow,
     for collection in (counters.SIGNALS, "news_reads", "stream_watches", counters.STATS):
         assert await flow.db[collection].count_documents({"user_id": user["id"]}) == 0, collection
         assert await flow.db[collection].count_documents({"user_id": other["id"]}) == (2 if collection == counters.SIGNALS else 1), collection
+
+
+@pytest.mark.asyncio
+async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, monkeypatch):
+    """Saison-Fundstücke (#678): die Zähler für die Erfolge und die Übersicht im Profil - je Saison, was gesammelt
+    wurde: insgesamt, in dieser Saison, heute, mit Tagesdeckel und nächstem Termin. Nur für die Person selbst."""
+    from services import collectibles
+
+    assert collectibles.SEASON_ORDER == ("halloween", "snow", "advent_calendar", "new_year", "easter_hunt")
+    assert set(collectibles.COLLECTIBLE_SIGNALS) <= set(counters.SIGNAL_RULES)
+    assert {item["icon"] for item in collectibles.COLLECTIBLES} == {"bat", "ghost", "cat", "pumpkin", "snowflake", "door", "rocket", "egg"}
+    assert collectibles.total_of({"halloween_bats_scared": {"count": 4}, "logo_clicks": {"count": 90}, "easter_egg": {"count": 2}}) == 6
+    assert collectibles.total_of({}) == 0
+
+    set_clock(monkeypatch, HALLOWEEN_EVE)
+    user = await flow.add_user(name="Sammlerin")
+    other = await flow.add_user(name="Andere")
+    flow.act_as(None)
+    assert (await flow.get("/api/achievements/collectibles")).status_code == 401
+    flow.act_as(user)
+    empty = (await flow.get("/api/achievements/collectibles")).json()
+    assert empty["total"] == 0 and [season["key"] for season in empty["seasons"]] == list(collectibles.SEASON_ORDER)
+    halloween = empty["seasons"][0]
+    assert halloween["active"] is True and halloween["label"] == "Halloween" and halloween["ends_at"].startswith("2026-11-01T23:59:59") and halloween["next_start"] is None
+    assert [item["signal"] for item in halloween["items"]] == ["halloween_bats_scared", "halloween_ghosts_freed", "halloween_cat_petted", "halloween_pumpkin"]
+    assert halloween["items"][0] == {"signal": "halloween_bats_scared", "label": "Fledermäuse verscheucht", "icon": "bat", "count": 0, "season_count": 0, "today": 0,
+                                     "per_day": 30, "first_at": None, "last_at": None}
+    winter = empty["seasons"][1]
+    assert winter["active"] is False and winter["label"] == "Winter" and winter["next_start"].startswith("2026-11-29T00:00:00") and winter["ends_at"] is None
+
+    # Gesammelt: letztes Jahr (in den Daten), vorgestern (nachgemeldet) und heute.
+    await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "halloween_bats_scared", "count": 20, "days": {"2025-10-31": 20}, "first_at": "2025-10-31T19:00:00+00:00", "last_at": "2025-10-31T19:30:00+00:00"})
+    await flow.db[counters.SIGNALS].insert_one({"user_id": user["id"], "name": "snowflakes_clicked", "count": 60, "days": {"2025-12-24": 60}})
+    await flow.db[counters.SIGNALS].insert_one({"user_id": other["id"], "name": "halloween_bats_scared", "count": 99, "days": {"2026-10-30": 99}})
+    res = await flow.post("/api/achievements/signals", json={"items": [
+        {"name": "halloween_bats_scared", "count": 8, "day": "2026-10-28"}, {"name": "halloween_bats_scared", "count": 4},
+        {"name": "halloween_ghosts_freed", "count": 2}, {"name": "halloween_pumpkin"},
+    ]})
+    assert res.json()["accepted"] == 4
+    view = (await flow.get("/api/achievements/collectibles")).json()
+    assert view["total"] == 20 + 8 + 4 + 2 + 1 + 60
+    by_signal = {item["signal"]: item for season in view["seasons"] for item in season["items"]}
+    bats = by_signal["halloween_bats_scared"]
+    assert (bats["count"], bats["season_count"], bats["today"], bats["per_day"]) == (32, 12, 4, 30)
+    assert by_signal["halloween_ghosts_freed"]["count"] == 2 and by_signal["halloween_pumpkin"]["today"] == 1
+    flakes = by_signal["snowflakes_clicked"]
+    assert (flakes["count"], flakes["season_count"], flakes["today"]) == (60, 60, 0), "die letzte Schnee-Saison zählt als „zuletzt“"
+    assert view["seasons"][0]["count"] == 35 and view["seasons"][1]["count"] == 60
+    # Die Zähler für die Erfolge: Fledermäuse, Flocken, alles zusammen - und die Stufen dazu.
+    values = await counters.refresh(user["id"], {"signal"})
+    assert values["halloween_bats_scared"] == 32 and values["snowflakes_clicked"] == 60 and values["season_collectibles_total"] == 95
+    awards = {a["tier_code"] async for a in flow.db.user_achievements.find({"user_id": user["id"]}, {"_id": 0, "tier_code": 1})}
+    assert {"bat_whisperer_1", "bat_whisperer_2", "snow_catcher_1", "snow_catcher_2", "season_collector_1", "snow_king_1", "halloween_1"} <= awards
+    assert "bat_whisperer_3" not in awards and "season_collector_2" not in awards
+    # Die andere Person sieht ihre eigenen Zahlen, nicht diese.
+    flow.act_as(other)
+    assert (await flow.get("/api/achievements/collectibles")).json()["total"] == 99
+    # Nach der Saison: Halloween ist vorbei, der Stand bleibt, der nächste Termin steht da.
+    set_clock(monkeypatch, datetime(2026, 11, 10, 12, 0, tzinfo=counters.VIENNA))
+    flow.act_as(user)
+    later = (await flow.get("/api/achievements/collectibles")).json()
+    halloween = later["seasons"][0]
+    assert halloween["active"] is False and halloween["next_start"].startswith("2027-10-25") and halloween["ends_at"] is None
+    assert {item["signal"]: (item["count"], item["season_count"], item["today"]) for item in halloween["items"]}["halloween_bats_scared"] == (32, 12, 0)
