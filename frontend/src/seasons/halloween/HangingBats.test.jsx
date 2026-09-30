@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { HangingBats, KIND_WEIGHTS, MIN_DISTANCE, chooseAnchors, flightPath, measureAnchors, pointOn } from "./HangingBats";
+import { HangingBats, KIND_WEIGHTS, MIN_DISTANCE, SCARED_SIGNAL, chooseAnchors, flightPath, measureAnchors, pointOn } from "./HangingBats";
 import { createMotionScheduler, resetMotionScheduler } from "../motion";
+import { outboxSize, signalCount } from "../signals";
 
 // Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
 beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
@@ -338,3 +339,33 @@ test("Leistung (H19): ruhen alle Fledermäuse, tickt die Schleife grob (250 ms) 
   rafSpy.mockRestore();
 });
 
+test("Fundstücke (#678): nur die von Hand verscheuchte Fledermaus zählt - der Zeiger scheucht auch, zählt aber nicht; eine, die schon startet, zählt nicht doppelt", async () => {
+  vi.useFakeTimers();
+  localStorage.clear();
+  mountNav(["n1", "n2", "n3"]);
+  render(<MemoryRouter initialEntries={["/"]}><HangingBats count={2} seed={0.3} salt="x" temperament="curious" reactionRng={() => 0} /></MemoryRouter>);
+  await act(async () => {
+    vi.advanceTimersByTime(450);
+  });
+  const bats = screen.getAllByTestId("halloween-bat-hanging");
+  expect(bats.length).toBe(2);
+  expect(outboxSize()).toBe(0);
+  // Der Zeiger direkt neben der ersten: sie fliegt von selbst - kein Fundstück.
+  const match = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(bats[0].style.transform);
+  fireEvent.mouseMove(window, { clientX: Number(match[1]) + 14, clientY: Number(match[2]) + 16 });
+  await act(async () => {
+    vi.advanceTimersByTime(200);
+  });
+  expect(states()).toContain("takeoff");
+  expect(outboxSize()).toBe(0);
+  // Ein Klick auf die andere: das zählt.
+  const other = screen.getAllByTestId("halloween-bat-hanging").find((bat) => bat.getAttribute("data-state") !== "takeoff");
+  fireEvent.click(other);
+  expect(outboxSize()).toBe(1);
+  expect(signalCount(SCARED_SIGNAL)).toBe(1);
+  expect(SCARED_SIGNAL).toBe("halloween_bats_scared");
+  // Noch ein Klick auf dieselbe, während sie startet: nichts mehr.
+  screen.queryAllByTestId("halloween-bat-hanging").forEach((bat) => fireEvent.click(bat));
+  expect(outboxSize()).toBe(1);
+  localStorage.clear();
+});

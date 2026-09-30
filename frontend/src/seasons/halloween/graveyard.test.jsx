@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { Graveyard, ghostDrift } from "./graveyard";
+import { FREED_SIGNAL, Graveyard, ghostDrift } from "./graveyard";
 import { createMotionScheduler, resetMotionScheduler } from "../motion";
+import { outboxSize, signalCount } from "../signals";
 
 // Bewegungsbudget (H11): in diesen Tests darf alles sofort - der Planer selbst hat seine eigenen Tests.
 beforeEach(() => resetMotionScheduler(createMotionScheduler({ unlimited: true })));
@@ -62,4 +63,19 @@ test("Geister treiben meist nach oben, ein wenig zur Seite", () => {
   const aside = ghostDrift(() => 0.9);
   expect(aside.dx).toBeGreaterThan(50);
   expect(aside.dy).toBeLessThan(0);
+});
+
+test("Fundstücke (#678): jeder befreite Geist zählt - ein Klick in der Sperrzeit nicht", () => {
+  localStorage.clear();
+  footerWithLine(300);
+  render(<Graveyard graves={[{ x: 0.1, size: 20, tilt: 3 }, { x: 0.3, size: 18, tilt: -2 }]} salt="s" ghostMs={60} cooldownMs={1000} />);
+  const stones = screen.getAllByTestId("halloween-grave");
+  fireEvent.click(stones[0]);
+  fireEvent.click(stones[0]);
+  expect(signalCount(FREED_SIGNAL)).toBe(1);
+  fireEvent.click(stones[1]);
+  expect(signalCount(FREED_SIGNAL)).toBe(2);
+  expect(outboxSize()).toBe(2);
+  expect(FREED_SIGNAL).toBe("halloween_ghosts_freed");
+  localStorage.clear();
 });

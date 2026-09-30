@@ -49,6 +49,10 @@ async def test_without_services_the_privacy_page_says_so_and_the_imprint_shows_t
     assert "keinen Statistik- oder Tracking-Dienst" in block(privacy, "privacy-analytics")["text"]
     assert "kein E-Mail-Versand" in block(privacy, "privacy-email")["text"]
     assert "Crashlytics" in block(privacy, "privacy-app")["text"]
+    # Zähler hinter den Erfolgen (#678): was gezählt wird, dass es nicht öffentlich ist und mit dem Konto verschwindet.
+    counted = block(privacy, "privacy-achievement-counters")["text"]
+    assert "Fundstücke der Jahreszeiten" in counted and "nicht öffentlich" in counted and "Datenexport" in counted and "gelöscht" in counted
+    assert "Zählerstände hinter den Erfolgen" in blocks(privacy, "account-deletion")[1]["text"]
     assert any("eigener Infrastruktur des Vereins" in item for item in block(privacy, "privacy-recipients")["items"])
     # Steam braucht keine App - es ist die einzige Plattform, die ohne Einrichtung verknüpfbar ist.
     # Steam, Lichess, Mastodon und Bluesky brauchen keine App - die vier sind ohne Einrichtung verknüpfbar.

@@ -5,6 +5,7 @@ import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
 import { measureQuietZones, overlayZones, rectInQuiet, watchOverlays } from "../quiet";
 import { releaseMotion, requestMotion } from "../motion";
+import { recordSignal } from "../signals";
 import { FlyingBatShape, HangingBatShape, SittingBatShape } from "./art";
 import { KIND_WEIGHTS, MIN_DISTANCE, POSE, SHAPE_HEIGHT, choosePerches, measurePerches, nearestFreePerch } from "./perches";
 import { MAX_ACTIVE_FLIGHTS, SCROLL_STARTLE_SPEED, activeFlights, advanceBat, alert, createBat, fleePath, pointOn, reactToPointer, reactToScroll, startle } from "./batLife";
@@ -16,6 +17,8 @@ import { MAX_ACTIVE_FLIGHTS, SCROLL_STARTLE_SPEED, activeFlights, advanceBat, al
 // noch DOM, Zeit und Anzeige.
 
 export { KIND_WEIGHTS, MIN_DISTANCE, pointOn };
+/** Jede von Hand verscheuchte Fledermaus zählt für die Saison-Fundstücke (#678) - der Server deckelt je Tag. */
+export const SCARED_SIGNAL = "halloween_bats_scared";
 export const flightPath = fleePath;
 export const chooseAnchors = choosePerches;
 
@@ -309,6 +312,7 @@ export function HangingBats({ count, seed, salt, timeScale = 1, temperament = nu
     const token = requestMotion("bat_scare", { force: true });
     if (token) tokensRef.current.set(id, token);
     emitSound("bat_scare");
+    recordSignal(SCARED_SIGNAL, { onceIf: false });
     const now = performance.now();
     batsRef.current = batsRef.current.map((candidate) => (candidate.id === id ? startle(candidate, rngRef.current, viewFor(candidate.fixed, window), now) : candidate));
     setBats(batsRef.current);
