@@ -1,5 +1,7 @@
 """Shared pytest fixtures for TLS Arena backend tests."""
 import os
+from datetime import datetime
+
 import pytest
 import requests
 
@@ -47,6 +49,30 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.live)
             if not live_enabled:
                 item.add_marker(skip_live)
+
+
+# Ein ruhiger Tag ohne Saison: Dienstag, 15. September 2026, zu Mittag (Wien).
+SEASON_TEST_NOW = "2026-09-15T12:00:00"
+
+
+@pytest.fixture(autouse=True)
+def season_clock(monkeypatch):
+    """Die Saison-Uhr steht in jedem Test auf einem ruhigen Tag.
+
+    „Was läuft gerade“ fragt ohne Zeitangabe die echte Uhr (``seasons.to_vienna``). Tests, die das über die Routen
+    tun, hingen damit am Datum des Laufs: in der Halloween-Woche läuft Halloween von selbst, und wer prüft, dass es
+    nicht läuft oder dass es „erzwungen“ ist, wird rot. Wer eine bestimmte Zeit braucht, gibt sie wie bisher mit oder
+    stellt die Uhr im Test um (``monkeypatch.setattr(seasons, "to_vienna", ...)``).
+    """
+    try:
+        from services import seasons
+    except ImportError:  # Live-Tests gegen einen laufenden Server laden die Dienste nicht
+        yield None
+        return
+    real = seasons.to_vienna
+    fixed = real(datetime.fromisoformat(SEASON_TEST_NOW))
+    monkeypatch.setattr(seasons, "to_vienna", lambda now=None: real(now if now is not None else fixed))
+    yield fixed
 
 
 @pytest.fixture(scope="session")

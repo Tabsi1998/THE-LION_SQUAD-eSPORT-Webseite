@@ -13,6 +13,7 @@ import pytest
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 
+import pdf_service
 from pdf_service import (
     REGISTRATION_STATUS_LABELS,
     _registration_status_label,
@@ -320,3 +321,15 @@ def test_the_qr_badge_is_never_empty():
     logo, silhouette = qr_badge_sources({})
 
     assert (logo or silhouette) is not None
+
+
+def test_auf_dem_papier_steht_die_zeit_in_wien_nicht_die_des_servers():
+    """Der Server läuft in UTC; „Generated …“ und das Datum der Urkunde zeigen die Zeit am Ort des Vereins."""
+    from datetime import datetime, timedelta, timezone
+
+    now = pdf_service.club_now()
+    assert now.tzinfo is not None and str(now.tzinfo) == "Europe/Vienna"
+    assert now.utcoffset() in (timedelta(hours=1), timedelta(hours=2))
+    assert abs(now - datetime.now(timezone.utc)) < timedelta(seconds=5)
+    summer = datetime(2026, 7, 14, 22, 30, tzinfo=timezone.utc).astimezone(pdf_service.CLUB_TZ)
+    assert summer.strftime("%d.%m.%Y %H:%M") == "15.07.2026 00:30"

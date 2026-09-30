@@ -20,7 +20,7 @@ from services.notification_preferences import send_user_template
 from typing import Literal
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings as load_dolibarr_settings
 from services.dolibarr_links import link_for_user, public_link, verified_link
-from services.dolibarr_policy import MAX_STATE_AGE_HOURS
+from services.dolibarr_policy import MAX_STATE_AGE_HOURS, club_today
 from services.dolibarr_sync import try_auto_link
 from services import dolibarr_helper_shifts, dolibarr_identity, dolibarr_meetings, dolibarr_self_service
 from services.rate_limit import enforce_rate_limit
@@ -119,7 +119,7 @@ def _age_from_birth_date(value: str | date | None) -> int | None:
         born = value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
     except ValueError:
         return None
-    today = date.today()
+    today = date.fromisoformat(club_today())  # der Tag in Wien, nicht der des Servers (UTC)
     return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
 
 

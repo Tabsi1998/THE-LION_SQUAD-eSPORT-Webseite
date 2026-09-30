@@ -238,7 +238,7 @@ async def test_overdue_shows_up_and_the_daily_reconcile_rereads_settled_invoices
     fake.core_invoices[order["invoice_id"]]["date_lim_reglement"] = int(time.time()) - 40 * 86400
     await billing_orders.sync_due()
     order = await order_of(flow, booked)
-    assert order["payment_state"] == "overdue" and order["due_on"] < "2026-09-23"
+    assert order["payment_state"] == "overdue" and order["due_on"] < time.strftime("%Y-%m-%d", time.gmtime(time.time() - 38 * 86400))
     flow.act_as(kassier)
     row = (await flow.get("/api/admin/finance/overview")).json()["invoiced"][0]
     assert row["payment_label"] == "überfällig" and row["synced_at"]

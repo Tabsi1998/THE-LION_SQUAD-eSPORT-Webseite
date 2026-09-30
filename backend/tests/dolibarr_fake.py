@@ -13,6 +13,7 @@ import hashlib
 import json
 import pathlib
 import re
+from datetime import datetime, timezone
 
 import httpx
 
@@ -23,6 +24,19 @@ API_KEY = "test-key-nur-im-test"
 BASE_URL = "https://erp.example.test"
 
 TYPES = {"object": dict, "array": list, "string": str, "boolean": bool}
+
+# Der Tag, an dem die Testdaten spielen (wie ``FakeDolibarr.today``): das Sommerfest am 10.10. und die
+# Generalversammlung am 24.10.2026 liegen davor noch in der Zukunft. Tests, die über die Website fragen, was „heute“
+# noch geht, stellen die Uhr des Vereins darauf - sonst werden sie rot, sobald der echte Kalender die Termine überholt.
+CLUB_NOW = datetime(2026, 9, 25, 10, 0, tzinfo=timezone.utc)
+
+
+def pin_club_clock(monkeypatch, moment: datetime = CLUB_NOW) -> datetime:
+    """Die Uhr des Vereins (``dolibarr_policy.club_today``) auf einen festen Augenblick stellen."""
+    from services import dolibarr_policy
+
+    monkeypatch.setattr(dolibarr_policy, "now_utc", lambda: moment)
+    return moment
 
 
 class ContractViolation(AssertionError):

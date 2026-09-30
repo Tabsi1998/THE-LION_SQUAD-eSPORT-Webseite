@@ -54,6 +54,22 @@ def test_kerzen_je_adventsonntag():
     assert seasons.candles_lit(date(2026, 12, 26)) == 4
 
 
+# ------------------------------------------------------------------ Die Uhr im Test
+
+def test_saison_uhr_steht_im_test_auf_einem_ruhigen_tag(season_clock):
+    """Ohne Zeitangabe gilt im Test ein fester, ruhiger Tag (conftest.py) - die Suite hängt nicht am Datum des Laufs.
+    Eine mitgegebene Zeit gilt wie immer."""
+    assert season_clock == at(2026, 9, 15, 12)
+    assert seasons.to_vienna(None) == season_clock and seasons.to_vienna() == season_clock
+    assert seasons.active(None, {})["now"] == "2026-09-15T12:00:00+02:00"
+    running = [s["key"] for s in seasons.active(None, {})["seasons"]]
+    assert all(seasons.runs_all_year(key) for key in running), f"ein Tag ohne Saison mit Termin - nur was das ganze Jahr läuft: {running}"
+    assert running == ["weather"]
+    assert seasons.to_vienna(datetime(2026, 10, 31, 20, 0)) == at(2026, 10, 31, 20)
+    assert seasons.to_vienna(datetime(2026, 12, 31, 23, 0, tzinfo=timezone.utc)) == at(2027, 1, 1, 0)
+    assert "halloween" in {s["key"] for s in seasons.active(at(2026, 10, 31, 20), {})["seasons"]}
+
+
 # ------------------------------------------------------------------ Phasen an den Rändern
 
 def keys(payload):
@@ -279,6 +295,23 @@ async def test_persoenlicher_schalter_am_konto(flow):
     assert (await flow.patch("/api/users/me", json={"seasonal_decorations": "laut"})).status_code == 422
     stored = await flow.db.users.find_one({"id": user["id"]})
     assert stored["seasonal_decorations"] == "subtle"
+
+
+def test_der_18_geburtstag_beginnt_um_mitternacht_in_wien(monkeypatch):
+    """Der Server läuft in UTC: um 00:30 in Wien ist dort noch der Vortag. Wer heute 18 wird, ist es trotzdem schon -
+    die Altersprüfung rechnet mit der Saison-Uhr (Wien), nicht mit dem Tag des Servers. (Ende Oktober gilt schon die
+    Winterzeit: Mitternacht in Wien ist 23 Uhr UTC.)"""
+    real = seasons.to_vienna
+    half_past_midnight = datetime(2026, 10, 30, 23, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(seasons, "to_vienna", lambda now=None: real(now if now is not None else half_past_midnight))
+    assert seasons.to_vienna(None).date() == date(2026, 10, 31) and half_past_midnight.date() == date(2026, 10, 30)
+    assert seasons.adult_from_birth_date("2008-10-31") is True
+    assert seasons.adult_from_birth_date("2008-11-01") is False
+    an_hour_earlier = datetime(2026, 10, 30, 22, 30, tzinfo=timezone.utc)
+    monkeypatch.setattr(seasons, "to_vienna", lambda now=None: real(now if now is not None else an_hour_earlier))
+    assert seasons.adult_from_birth_date("2008-10-31") is False
+    # Ein mitgegebener Tag gilt wie bisher.
+    assert seasons.adult_from_birth_date("2008-10-31", date(2026, 10, 31)) is True
 
 
 @pytest.mark.asyncio

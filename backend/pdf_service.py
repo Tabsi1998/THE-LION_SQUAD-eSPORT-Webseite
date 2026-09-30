@@ -22,6 +22,14 @@ from reportlab.platypus import (
 )
 from PIL import Image
 
+CLUB_TZ = ZoneInfo("Europe/Vienna")
+
+
+def club_now() -> datetime:
+    """Jetzt am Ort des Vereins - der Server läuft in UTC, auf dem Papier soll die Zeit stehen, die an der Wand hängt."""
+    return datetime.now(CLUB_TZ)
+
+
 # Bildschirmfarben der Plattform. Sie bleiben als schmale Linien und Akzente,
 # tragen aber keinen Text auf hellem Grund.
 CYAN = colors.HexColor("#29B6E8")
@@ -169,7 +177,7 @@ def _page_bg(canvas, doc):
     # Footer
     canvas.setFillColor(INK_FAINT)
     canvas.setFont("Helvetica", 7)
-    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + club_now().strftime("%Y-%m-%d %H:%M"))
     canvas.drawRightString(doc.pagesize[0] - 2 * cm, 0.72 * cm, f"Page {doc.page}")
     canvas.restoreState()
 
@@ -1002,7 +1010,7 @@ def pdf_station_signs(
         _draw_sponsor_footer(c, doc, sponsors)
         c.setFillColor(INK_FAINT)
         c.setFont("Helvetica", 7)
-        c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+        c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + club_now().strftime("%Y-%m-%d %H:%M"))
         c.drawRightString(page_w - 2 * cm, 0.72 * cm, f"Station {page}/{len(rows)}")
         c.showPage()
 
@@ -1164,7 +1172,7 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
                 x + slot_w / 2, metric_y + 0.30 * cm,
                 _truncate_to_width(value, slot_w - 0.30 * cm, "Helvetica-Bold", value_size))
 
-    issued = _normalize_pdf_text(certificate.get("issued_label") or datetime.now().strftime("%d.%m.%Y"))
+    issued = _normalize_pdf_text(certificate.get("issued_label") or club_now().strftime("%d.%m.%Y"))
     canvas.setStrokeColor(INK_FAINT)
     canvas.setLineWidth(0.6)
     canvas.line(3.0 * cm, 5.05 * cm, 8.05 * cm, 5.05 * cm)
@@ -1180,7 +1188,7 @@ def _certificate_page(canvas, doc, certificate: dict, branding: dict | None, spo
     _draw_sponsor_footer(canvas, doc, sponsors or [])
     canvas.setFillColor(INK_FAINT)
     canvas.setFont("Helvetica", 7)
-    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    canvas.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + club_now().strftime("%Y-%m-%d %H:%M"))
     canvas.drawRightString(page_w - 2 * cm, 0.72 * cm, "Urkunde")
 
 
@@ -1355,7 +1363,7 @@ def pdf_qr_sign(
     _draw_sponsor_footer(c, doc, pdf_sponsors or [])
     c.setFillColor(INK_FAINT)
     c.setFont("Helvetica", 7)
-    c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    c.drawString(2 * cm, 0.72 * cm, "THE LION SQUAD eSports - Generated " + club_now().strftime("%Y-%m-%d %H:%M"))
     c.drawRightString(page_w - 2 * cm, 0.72 * cm, "QR-Schild")
     c.showPage()
     c.save()

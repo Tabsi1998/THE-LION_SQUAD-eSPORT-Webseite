@@ -580,6 +580,21 @@ def test_a_function_starts_on_the_clubs_day_not_the_servers(monkeypatch):
     assert dolibarr_policy.areas_from_functions(starts_tomorrow, {"kassier": ["club"]}) == []
 
 
+def test_das_alter_zaehlt_nach_dem_tag_in_wien(monkeypatch):
+    """Dasselbe für das Alter in der Mitgliederliste: der Geburtstag beginnt um Mitternacht in Wien (Ende Oktober
+    ist das 23 Uhr UTC - es gilt schon die Winterzeit)."""
+    from datetime import datetime, timezone
+
+    from routes import membership_routes
+
+    monkeypatch.setattr(dolibarr_policy, "now_utc", lambda: datetime(2026, 10, 30, 23, 30, tzinfo=timezone.utc))
+    assert membership_routes._age_from_birth_date("2008-10-31") == 18
+    assert membership_routes._age_from_birth_date("2008-11-01") == 17
+    monkeypatch.setattr(dolibarr_policy, "now_utc", lambda: datetime(2026, 10, 30, 22, 30, tzinfo=timezone.utc))
+    assert membership_routes._age_from_birth_date("2008-10-31") == 17
+    assert membership_routes._age_from_birth_date(None) is None and membership_routes._age_from_birth_date("kaputt") is None
+
+
 # ---------------------------------------------------------------- Alle Schalter an einem Ort (#510)
 
 @pytest.mark.asyncio
