@@ -15,25 +15,37 @@ export function navigateToNotification(item: UserNotification) {
     navigationRef.navigate("More", { screen: "Notifications" });
     return false;
   }
+  openTarget(target);
+  return true;
+}
 
+/** Eine Adresse der Website im passenden Screen öffnen - false, wenn die App dafür keinen Screen hat. */
+export function navigateToUrl(url?: string | null): boolean {
+  if (!navigationRef.isReady()) return false;
+  const target = targetFromUrl(url);
+  if (!target) return false;
+  openTarget(target);
+  return true;
+}
+
+function openTarget(target: NotificationTarget) {
   if (target.area === "dashboard") {
     navigationRef.navigate("Dashboard");
-    return true;
+    return;
   }
   if (target.area === "profile") {
     navigationRef.navigate("Profile", target.params);
-    return true;
+    return;
   }
   if (target.area === "teams") {
     navigationRef.navigate("Teams", { screen: target.screen, params: target.params } as never);
-    return true;
+    return;
   }
   if (target.area === "tournaments") {
     navigationRef.navigate("Tournaments", { screen: target.screen, params: target.params } as never);
-    return true;
+    return;
   }
   navigationRef.navigate("More", { screen: target.screen, params: target.params } as never);
-  return true;
 }
 
 export function flushPendingNotification() {
@@ -48,8 +60,9 @@ type NotificationTarget =
   | { area: "profile"; params?: { tab?: "overview" | "references" | "prizes" | "edit" | "achievements" | "privacy" | "notifications" } }
   | { area: "teams"; screen: "TeamList"; params?: undefined }
   | { area: "teams"; screen: "TeamDetail" | "TeamChat"; params: { id: string; title?: string } }
+  | { area: "tournaments"; screen: "TournamentList"; params?: undefined }
   | { area: "tournaments"; screen: "TournamentDetail" | "EventDetail" | "FastLapDetail" | "MatchDetail" | "TournamentChat"; params: { id: string; title?: string } }
-  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter"; params?: Record<string, unknown> };
+  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar"; params?: Record<string, unknown> };
 
 function targetFromNotification(item: UserNotification): NotificationTarget | null {
   const meta = (item.meta || {}) as Record<string, unknown>;
@@ -126,6 +139,14 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "profile" && parsed.query.includes("tab=achievements")) return { area: "profile", params: { tab: "achievements" } };
   if (first === "profile") return { area: "profile" };
   if (first === "me" && second === "prizes") return { area: "profile", params: { tab: "prizes" } };
+  // Adressen ohne Kennung (aus Inhalten wie dem Adventkalender, #641): die passende Liste der App.
+  if (!second) {
+    if (first === "events" || first === "tournaments") return { area: "tournaments", screen: "TournamentList" };
+    if (first === "news") return { area: "more", screen: "NewsList" };
+    if (first === "gallery" || first === "galerie") return { area: "more", screen: "Gallery" };
+    if (first === "fastlap" || first === "fastlaps" || first === "f1") return { area: "more", screen: "FastLapList" };
+    if (first === "advent") return { area: "more", screen: "AdventCalendar" };
+  }
   return null;
 }
 

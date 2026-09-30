@@ -58,6 +58,8 @@ const CALM = new Set([
   "TournamentList", "Tournaments", "TournamentDetail", "TournamentChat", "MatchDetail", "FastLapList", "FastLapDetail",
   "TeamChat", "DirectMessages", "DirectThread", "Notifications", "Profile", "MemberArea", "MyMembership", "MyInvoices",
   "MemberCard", "MemberDocuments", "MemberHelperShifts", "MemberMeetings", "Login", "Register", "GalleryViewer",
+  // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
+  "AdventCalendar",
 ]);
 const QUIET = new Set(["Consent", "Lock", "Boot", "Settings", "Admin"]);
 

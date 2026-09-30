@@ -15,6 +15,7 @@ import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import { useAppUpdate } from "../../update/AppUpdateProvider";
 import { DecoSetting } from "../../seasons/DecoSetting";
+import { useAdventEntry } from "../../advent/entry";
 
 // "Mehr" ist das Verzeichnis: eine Zeile je Ziel, keine Beschreibungstexte.
 // Vorher war jedes Ziel eine große Karte mit Badge und zwei Zeilen Text, und
@@ -27,7 +28,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices" | "MyMembership";
+  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices" | "MyMembership" | "AdventCalendar";
   ownPublicProfile?: boolean;
 };
 
@@ -71,6 +72,14 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
   },
 ];
 
+// Der Adventkalender (#641) steht nur im Verzeichnis, solange er läuft und Türchen angelegt sind.
+const ADVENT_ENTRY: Entry = { title: "Adventkalender", icon: "calendar-outline", screen: "AdventCalendar" };
+
+export function moreGroups(advent: boolean): Array<{ title: string; entries: Entry[] }> {
+  if (!advent) return GROUPS;
+  return GROUPS.map((group) => (group.title === "Verein" ? { ...group, entries: [ADVENT_ENTRY, ...group.entries] } : group));
+}
+
 // Dieselben Plattform-Schlüssel wie im Web (frontend/src/lib/socialIcons.js).
 const SOCIAL_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   discord: "logo-discord",
@@ -107,6 +116,7 @@ export function MoreScreen({ navigation }: Props) {
   const { user } = useAuth();
   const { clubName } = useBranding();
   const { openWhatsNew } = useAppUpdate();
+  const advent = Boolean(useAdventEntry());
   const [socials, setSocials] = useState<SocialLink[]>([]);
   const appVersion = Constants.expoConfig?.version ?? "?";
   const build = Constants.expoConfig?.android?.versionCode;
@@ -180,7 +190,7 @@ export function MoreScreen({ navigation }: Props) {
           )
         ) : null}
 
-        {[{ title: "Konto", entries: kontoEntries(Boolean(user && !isGuestUser(user) && user.is_club_member)) }, ...GROUPS].map((group) => {
+        {[{ title: "Konto", entries: kontoEntries(Boolean(user && !isGuestUser(user) && user.is_club_member)) }, ...moreGroups(advent)].map((group) => {
           return (
             <View key={group.title} style={styles.group}>
               <Heading>{group.title}</Heading>
@@ -190,6 +200,7 @@ export function MoreScreen({ navigation }: Props) {
                     key={entry.title}
                     onPress={() => open(entry)}
                     accessibilityRole="button"
+                    testID={entry.screen === "AdventCalendar" ? "more-advent" : undefined}
                     style={({ pressed }) => [styles.row, index > 0 && styles.rowBorder, pressed && styles.pressed]}
                   >
                     <Ionicons name={entry.icon} color={colors.cyan} size={20} />

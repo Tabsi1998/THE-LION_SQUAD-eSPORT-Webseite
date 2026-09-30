@@ -1,5 +1,6 @@
-import { hashString, mulberry32 } from "@/seasons/rng";
+import { hashString, mulberry32 } from "../seasons/rng";
 
+// Dieselbe Rechnung wie im Web (frontend/src/advent/scene.js) - ein Test hält beide mit festen Werten zusammen.
 // Das Bild des Adventkalenders (#641, #732): eine Winternacht über einem Tiroler Dorf - Sterne, das Sternbild
 // Löwe, Nordlicht, Mond, zwei Bergketten, Tannen, Häuser mit warmen Fenstern, Schnee und die Spur einer großen
 // Tatze, die zum Dorf führt. Das Bild ist hoch gebaut und am Boden verankert: am PC (6 × 4) sieht man Dorf und
@@ -8,15 +9,18 @@ import { hashString, mulberry32 } from "@/seasons/rng";
 
 export const SCENE = { width: 1200, height: 3200, ground: 3030 };
 
-const f = (value) => (Math.round(value * 10) / 10).toString();
+type Rng = () => number;
+type Point = { x: number; y: number; peak: boolean };
 
-function between(rng, min, max) {
+const f = (value: number): string => (Math.round(value * 10) / 10).toString();
+
+function between(rng: Rng, min: number, max: number): number {
   return min + rng() * (max - min);
 }
 
 /** Ein Bergkamm als Punkte: grobe Gipfel, dazwischen kleine Zacken. */
-export function ridgePoints(rng, { base, height, peaks, jag = 0.22 }) {
-  const points = [];
+export function ridgePoints(rng: Rng, { base, height, peaks, jag = 0.22 }: { base: number; height: number; peaks: number; jag?: number }): Point[] {
+  const points: Point[] = [];
   const step = SCENE.width / (peaks * 2);
   for (let i = 0; i <= peaks * 2; i += 1) {
     const peak = i % 2 === 1;
@@ -31,11 +35,11 @@ export function ridgePoints(rng, { base, height, peaks, jag = 0.22 }) {
   return points.sort((a, b) => a.x - b.x);
 }
 
-function ridgePath(points) {
+function ridgePath(points: Point[]): string {
   return `M0 ${SCENE.height} L${points.map((point) => `${f(point.x)} ${f(point.y)}`).join(" L")} L${SCENE.width} ${SCENE.height} Z`;
 }
 
-function snowCaps(points, height) {
+function snowCaps(points: Point[], height: number): string {
   return points.filter((point) => point.peak).map((point) => {
     const w = height * 0.2;
     const d = height * 0.26;
@@ -43,7 +47,7 @@ function snowCaps(points, height) {
   }).join("");
 }
 
-function stars(rng, count) {
+function stars(rng: Rng, count: number): string {
   let out = "";
   for (let i = 0; i < count; i += 1) {
     const y = between(rng, 0, 2860);
@@ -56,7 +60,7 @@ function stars(rng, count) {
   return out;
 }
 
-function sparkles(rng, count) {
+function sparkles(rng: Rng, count: number): string {
   let out = "";
   for (let i = 0; i < count; i += 1) {
     const x = between(rng, 40, SCENE.width - 40);
@@ -68,13 +72,13 @@ function sparkles(rng, count) {
 }
 
 // Das Sternbild Löwe: die Sichel (Kopf und Mähne) und das Dreieck (Rumpf) - als Gruß an den Verein.
-const LEO = {
+const LEO: { stars: Record<string, [number, number, number]>; lines: Array<[string, string]> } = {
   stars: { regulus: [300, 1800, 3.6], eta: [332, 1706, 2.2], algieba: [404, 1642, 3], zeta: [436, 1560, 2.2], mu: [382, 1498, 2], epsilon: [318, 1522, 2.4], zosma: [612, 1676, 2.6], chertan: [604, 1762, 2.4], denebola: [716, 1756, 3.2] },
   lines: [["regulus", "eta"], ["eta", "algieba"], ["algieba", "zeta"], ["zeta", "mu"], ["mu", "epsilon"], ["algieba", "zosma"], ["zosma", "denebola"], ["denebola", "chertan"], ["chertan", "regulus"], ["zosma", "chertan"]],
 };
 
-function leo(dx, dy, scale) {
-  const at = ([x, y]) => [300 + (x - 300) * scale + dx, 1800 + (y - 1800) * scale + dy];
+function leo(dx: number, dy: number, scale: number): string {
+  const at = ([x, y]: [number, number, number]): [number, number] => [300 + (x - 300) * scale + dx, 1800 + (y - 1800) * scale + dy];
   const lines = LEO.lines.map(([a, b]) => {
     const [x1, y1] = at(LEO.stars[a]);
     const [x2, y2] = at(LEO.stars[b]);
@@ -87,7 +91,7 @@ function leo(dx, dy, scale) {
   return `<g data-part="leo"><g stroke="#cfe0ff" stroke-width="0.9" stroke-linecap="round" opacity="0.38">${lines}</g>${points}</g>`;
 }
 
-function aurora(rng, filters) {
+function aurora(rng: Rng, filters: boolean): string {
   let out = "";
   for (let i = 0; i < 3; i += 1) {
     const y = 760 + i * 300 + between(rng, -60, 60);
@@ -98,7 +102,7 @@ function aurora(rng, filters) {
   return `<g data-part="aurora">${out}</g>`;
 }
 
-function moon(rng) {
+function moon(rng: Rng): string {
   const x = between(rng, 820, 1010);
   const y = between(rng, 2400, 2500);
   const r = 56;
@@ -107,7 +111,7 @@ function moon(rng) {
     + `<circle cx="${f(x)}" cy="${f(y)}" r="${r}" fill="#9fb4e6" opacity="0.07"/></g>`;
 }
 
-function fir(x, base, height, rng) {
+function fir(x: number, base: number, height: number, rng: Rng): string {
   const w = height * between(rng, 0.34, 0.42);
   let out = `<rect x="${f(x - height * 0.03)}" y="${f(base - height * 0.12)}" width="${f(height * 0.06)}" height="${f(height * 0.14)}" fill="#0a1020"/>`;
   let snow = "";
@@ -121,7 +125,7 @@ function fir(x, base, height, rng) {
   return out + snow;
 }
 
-function forest(rng, line) {
+function forest(rng: Rng, line: (x: number) => number): string {
   let out = "";
   let x = between(rng, -10, 20);
   while (x < SCENE.width + 20) {
@@ -133,7 +137,7 @@ function forest(rng, line) {
   return `<g data-part="forest">${out}</g>`;
 }
 
-function house(x, ground, rng, lit) {
+function house(x: number, ground: number, rng: Rng, lit: () => boolean): { body: string; glow: string; chimney: [number, number] } {
   const w = between(rng, 48, 72);
   const h = between(rng, 32, 46);
   const roof = between(rng, 22, 32);
@@ -155,10 +159,10 @@ function house(x, ground, rng, lit) {
       glow += `<circle cx="${f(wx + 4)}" cy="${f(wy + 5)}" r="22" fill="url(#a-window)"/>`;
     }
   }
-  return { body: out, glow, chimney: [chimney + 3.5, ground - h - roof * 0.78 - 3] };
+  return { body: out, glow, chimney: [chimney + 3.5, ground - h - roof * 0.78 - 3] as [number, number] };
 }
 
-function church(x, ground, rng) {
+function church(x: number, ground: number, rng: Rng): { body: string; glow: string } {
   const out = [
     `<rect x="${f(x)}" y="${f(ground - 58)}" width="58" height="58" fill="#1f294a"/>`,
     `<path d="M${f(x - 5)} ${f(ground - 58)} L${f(x + 29)} ${f(ground - 84)} L${f(x + 63)} ${f(ground - 58)} Z" fill="#141c36"/>`,
@@ -176,12 +180,12 @@ function church(x, ground, rng) {
   return { body: out, glow };
 }
 
-function smoke(x, y, rng, filters) {
+function smoke(x: number, y: number, rng: Rng, filters: boolean): string {
   const sway = between(rng, 14, 30) * (rng() < 0.5 ? -1 : 1);
   return `<path d="M${f(x)} ${f(y)} c ${f(sway)} -22, ${f(-sway)} -44, ${f(sway * 0.6)} -70 s ${f(-sway * 1.4)} -40, ${f(sway * 0.4)} -78" fill="none" stroke="#d6e0f8" stroke-width="${f(between(rng, 6, 9))}" stroke-linecap="round" opacity="0.16"${filters ? ' filter="url(#a-blur-s)"' : ""}/>`;
 }
 
-function village(rng, filters) {
+function village(rng: Rng, filters: boolean): string {
   const ground = SCENE.ground;
   const lit = () => rng() < 0.72;
   const spots = [600, 668, 742, 902, 962].map((x) => x + between(rng, -8, 8));
@@ -199,12 +203,12 @@ function village(rng, filters) {
 }
 
 /** Eine Tatze im Schnee: Ballen und vier Zehen, in Laufrichtung gedreht. */
-export function pawPrint(x, y, size, angle) {
+export function pawPrint(x: number, y: number, size: number, angle: number): string {
   const toes = [[-7.4, -7.2, 2.7], [-2.7, -11.2, 2.9], [2.7, -11.2, 2.9], [7.4, -7.2, 2.7]].map(([tx, ty, tr]) => `<ellipse cx="${tx}" cy="${ty}" rx="${tr}" ry="${f(tr * 1.18)}"/>`).join("");
   return `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(angle)}) scale(${f(size)})"><path d="M0 -4.6 C 4.6 -4.6 8.2 -0.8 8 3.4 C 7.8 6.6 4.2 7.4 0 7.4 C -4.2 7.4 -7.8 6.6 -8 3.4 C -8.2 -0.8 -4.6 -4.6 0 -4.6 Z"/>${toes}</g>`;
 }
 
-function pawTrail() {
+function pawTrail(): string {
   // Von vorne links ins Dorf: die Spur wird mit der Entfernung kleiner und enger.
   let out = "";
   const steps = 12;
@@ -223,7 +227,7 @@ function pawTrail() {
   return `<g data-part="paws" fill="#6f86b8" opacity="0.5">${out}</g>`;
 }
 
-function snowfall(rng, count) {
+function snowfall(rng: Rng, count: number): string {
   let out = "";
   for (let i = 0; i < count; i += 1) {
     out += `<circle cx="${f(between(rng, 0, SCENE.width))}" cy="${f(between(rng, 2100, 3170))}" r="${f(between(rng, 0.9, 2.4))}" fill="#fff" opacity="${f(between(rng, 0.18, 0.6))}"/>`;
@@ -231,13 +235,13 @@ function snowfall(rng, count) {
   return `<g data-part="snowfall">${out}</g>`;
 }
 
-function hillLine(rng, base, swell) {
+function hillLine(rng: Rng, base: number, swell: number): (x: number) => number {
   const a = between(rng, 0.6, 1.4);
   const b = between(rng, 0, Math.PI * 2);
-  return (x) => base - Math.sin((x / SCENE.width) * Math.PI * a + b) * swell - Math.sin((x / SCENE.width) * Math.PI * 3.1 + b * 2) * swell * 0.25;
+  return (x: number) => base - Math.sin((x / SCENE.width) * Math.PI * a + b) * swell - Math.sin((x / SCENE.width) * Math.PI * 3.1 + b * 2) * swell * 0.25;
 }
 
-function hillPath(line) {
+function hillPath(line: (x: number) => number): string {
   let d = `M0 ${SCENE.height} L0 ${f(line(0))}`;
   for (let x = 40; x <= SCENE.width; x += 40) d += ` L${x} ${f(line(x))}`;
   return `${d} L${SCENE.width} ${SCENE.height} Z`;
@@ -247,7 +251,7 @@ function hillPath(line) {
  * Das ganze Bild als SVG-Text - dieselbe Saat, dasselbe Bild. Ohne `filters` kommt es ohne Weichzeichner aus
  * (Nordlicht und Rauch bleiben über ihre Durchsicht weich): so zeichnet es die App, die keine Filter kennt.
  */
-export function sceneSvg(year, { filters = true } = {}) {
+export function sceneSvg(year: number, { filters = true }: { filters?: boolean } = {}): string {
   const rng = mulberry32(hashString(`advent-scene:${year}`));
   const far = ridgePoints(rng, { base: 2860, height: 250, peaks: 5 });
   const mid = ridgePoints(rng, { base: 2950, height: 170, peaks: 6, jag: 0.16 });
@@ -287,9 +291,4 @@ export function sceneSvg(year, { filters = true } = {}) {
     `<rect width="${SCENE.width}" height="${SCENE.height}" fill="url(#a-vignette)"/>`,
     "</svg>",
   ].join("");
-}
-
-/** Das Bild als Adresse für CSS (`background-image`). */
-export function sceneUrl(year) {
-  return `url("data:image/svg+xml,${encodeURIComponent(sceneSvg(year))}")`;
 }
