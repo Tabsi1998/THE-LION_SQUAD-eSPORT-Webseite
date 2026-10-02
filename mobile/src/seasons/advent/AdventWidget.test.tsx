@@ -160,7 +160,7 @@ test("in einem anderen Tab ruht die Bewegung - die Flammen brennen weiter", asyn
   loop.mockRestore();
 });
 
-test("die Flamme sitzt am Docht: Maßstab der Zeichenfläche, Neigung der Kerze, Drehpunkt im Kasten", async () => {
+test("die Flamme sitzt am Docht: Maßstab der Zeichenfläche, Neigung der Kerze, Kasten mittig auf dem Docht", async () => {
   expect(viewFit(72, 42)).toEqual({ k: 72 / 76, ox: 0, oy: (42 - 44 * (72 / 76)) / 2 });
   expect(viewFit(76, 60)).toEqual({ k: 1, ox: 0, oy: 8 });
   // Eine gerade Kerze: der Punkt liegt senkrecht über dem Fuß; geneigt wandert er zur Seite.
@@ -174,13 +174,17 @@ test("die Flamme sitzt am Docht: Maßstab der Zeichenfläche, Neigung der Kerze,
   const candle = wreathLayout(2026).candles[0];
   const { k, ox, oy } = viewFit(72, 42);
   const style = StyleSheet.flatten(screen.getByTestId("advent-flame-body-1").props.style) as Record<string, number | string>;
-  // Der Kasten beginnt so weit links und oben vom Docht, wie FLAME_BOX sagt - und dreht sich um den Docht.
+  // Der Kasten liegt mittig auf dem Docht - Android dreht und skaliert um die Mitte, ein transformOrigin entfällt.
+  expect(FLAME_BOX.top).toBe(FLAME_BOX.bottom);
+  expect(FLAME_BOX.left).toBe(FLAME_BOX.right);
   const days = 8;
   const height = candle.height - Math.round((days / 28) * 2.6 * 100) / 100;
   const wick = abovePoint(candle, height, 1.4);
   expect(style.left).toBeCloseTo(ox + (wick.x - FLAME_BOX.left) * k, 6);
   expect(style.top).toBeCloseTo(oy + (wick.y - FLAME_BOX.top) * k, 6);
-  expect(style.transformOrigin).toBe(`50% ${Math.round((FLAME_BOX.top / (FLAME_BOX.top + FLAME_BOX.bottom)) * 100 * 1000) / 1000}%`);
+  expect(Number(style.left) + Number(style.width) / 2).toBeCloseTo(ox + wick.x * k, 6);
+  expect(Number(style.top) + Number(style.height) / 2).toBeCloseTo(oy + wick.y * k, 6);
+  expect(style.transformOrigin).toBeUndefined();
 });
 
 test("die Bilder der Bewegung: Flackern je Stärke und Wind, Fangen und Streichholz", () => {

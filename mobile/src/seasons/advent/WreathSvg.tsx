@@ -10,7 +10,9 @@ import { BERRY_TRIAD, CANDLE_WIDTH, RING, VIEW, candleBurn, dripPath, ringPoint,
 // Flammen mit Schein.
 //
 // Die Flammen liegen als eigene kleine Ebenen über dem Kranz und bewegen sich mit dem nativen Animationstreiber
-// (Drehpunkt am Docht, kein JavaScript je Bild). Bewegte Drehung und Skalierung direkt an SVG-Gruppen gehen auf
+// (kein JavaScript je Bild). Der Kasten jeder Flamme sitzt mittig auf dem Docht, denn Android dreht und skaliert eine
+// Ansicht um ihre Mitte - ein `transformOrigin` in Prozent war bei der Halloween-Katze in der Sichtprobe nicht
+// verlässlich (ein gedrehter Schwanz verschwand ganz). Bewegte Drehung und Skalierung direkt an SVG-Gruppen gehen auf
 // Android nicht: react-native-svg setzt sie dort über die Matrix der Android-Ansicht (VirtualViewManager,
 // setTransformProperty), deren Drehpunkt bei diesen Teil-Ansichten die Ecke der Zeichenfläche ist - ein `origin`
 // und auch eine feste Verschiebung als Drehpunkt helfen nicht. In der Sichtprobe flog die Flamme beim Anzünden von
@@ -71,8 +73,9 @@ export function abovePoint(candle: Pick<CandleSpec, "x" | "y" | "lean">, height:
   return { x: candle.x + Math.sin(theta) * length, y: candle.y - Math.cos(theta) * length };
 }
 
-/** Der Kasten der Flamme um den Docht (Einheiten): so groß, dass die äußere Ellipse ganz hineinpasst. */
-export const FLAME_BOX = { left: 2.1, right: 2.1, top: 8.4, bottom: 1.2 };
+/** Der Kasten der Flamme um den Docht (Einheiten): oben so hoch, dass die äußere Ellipse hineinpasst, unten gleich tief
+ * - so liegt seine Mitte genau auf dem Docht, und um die Mitte dreht und skaliert Android die Ansicht. */
+export const FLAME_BOX = { left: 2.1, right: 2.1, top: 8.4, bottom: 8.4 };
 const GLOW_R = 8.5;
 const MATCH_R = 6;
 
@@ -213,8 +216,6 @@ function Fire({ candle, height, lighting, calm, still, wind, fit }: FireProps) {
             top: oy + (wick.y - box.top) * k,
             width: boxWidth * k,
             height: boxHeight * k,
-            // Der Drehpunkt sitzt am Docht: waagrecht in der Mitte, senkrecht `top` von oben.
-            transformOrigin: `50% ${tidy((box.top / boxHeight) * 100)}%`,
             opacity: flame.opacity,
             transform: [{ rotate: flame.rotate }, { scaleX: flame.scaleX }, { scaleY: flame.scaleY }],
           },
