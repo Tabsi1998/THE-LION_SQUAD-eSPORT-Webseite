@@ -13,13 +13,15 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
-| Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather, christmas), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
+| Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | `SeasonWidgetSlot` (Dashboard-Kopf), `SeasonEdgeSlot` (Unterkante der Begrüßungskarte), `SeasonBackdropSlot` (in `Screen`, hinter dem Inhalt); Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
 dem Inhalt, nie klickbar), `Corners` (Ecken und Anker), `Widget` (klickbar im Kopfbereich), `Footer`, `Toast`,
 `sounds`, `ScareToggle`, `accent`, `skyOnly` (die Saison ist nur Himmel, Abschnitt 9). Ein App-Modul liefert
-`Corners`, `Widget`, `Bats` (Flugebene) und Farben.
+`Sky` (Ebene über allen Tabs), `Corners`, `Widget` (Dashboard-Kopf; `widgetOnTop` stellt es bei mehreren oben hin),
+`Edge` (Unterkante der Begrüßungskarte), `Greeting` (Karte über der Tab-Leiste), `Backdrop` (hinter dem Inhalt eines
+Screens), `TabIcon` (Symbol des Tabs „Mehr“) und `skyOnly`.
 
 ## 2. Anker: echte Kanten statt zufälliger Positionen (C1)
 
@@ -301,3 +303,15 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
   Muster von `SnowField` (Plätze, `step…` ohne Reanimated testbar), Paritätstest mit dem Web.
 - Tests: `jest.setup.js` bildet Reanimated nach; `__frameCallbacks` schaltet Bilder weiter. Zeitpunkte aus dem festen
   Seed vorher ausrechnen statt in kleinen Schritten vorzuspulen.
+
+## 15. Weihnachten in der App (#797)
+
+| Teil | Slot | Was |
+|---|---|---|
+| Lichterkette | `Edge` – Unterkante der Begrüßungskarte im Dashboard | `chainLayout` wie im Web (`christmas/lights.ts`), das Band beginnt 16 Punkte über der Unterkante; je Lämpchen Schein und Kolben mit einem nativen Takt, der Wind lässt die Kette schwingen |
+| Gruß | `Greeting` – Karte über der Tab-Leiste | einmal je Tag und Phase nach der Uhr am Gerät; nicht auf stillen Screens, nicht über einem Dialog; kommt die App an einem neuen Tag zurück, gilt der neue Tag |
+| Lichtinseln | `Backdrop` – in `Screen` hinter dem Inhalt | drei warme Verläufe wie im Web, nur an den Feiertagen, nicht bei „dezent“ |
+
+- Gleich wie im Web: Fingerabdruck der Kette `2814731317`, der Sterne `2991777711` – in den Tests beider Seiten.
+- „dezent“ und „Bewegung reduzieren“: Kette ruhig und leicht gedämpft (0,9), Karte ohne Hereingleiten, Lichter und
+  Sterne still. Ist das Dashboard nicht im Blick, leuchtet die Kette ruhig, ohne Takt.
