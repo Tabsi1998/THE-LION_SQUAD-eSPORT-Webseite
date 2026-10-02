@@ -72,7 +72,7 @@ test("Effektklassen je Screen-Klasse: nicht nur wie viel, sondern welche Art - S
 });
 
 test("Saison-Übersetzung: Halloween leitet seine Schlüssel aus den Effektklassen ab, eine Saison ohne Übersetzung bekommt nur die Klassen", () => {
-  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween", "snow"]);
+  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween", "snow", "christmas"]);
   (["lively", "medium", "calm", "quiet"] as const).forEach((cls) => {
     ["normal", "subtle", "full"].forEach((intensity) => {
       const caps = capabilitiesFor(cls, intensity);
@@ -93,4 +93,11 @@ test("Saison-Übersetzung: Halloween leitet seine Schlüssel aus den Effektklass
   expect(plain).toMatchObject({ cls: "lively", season: "winter", perch: 2, motion: true });
   expect(plain.hangingBats).toBeUndefined();
   expect(seasonCapabilities("halloween", "Dashboard", "normal")).toMatchObject({ hangingBats: 2, cat: true, season: "halloween" });
+});
+
+test("Weihnachten wie im Web: Kette außer auf stillen Screens, Lichtinseln mit der Atmosphäre - auch bei „dezent“ ferne", () => {
+  expect(seasonCapabilities("christmas", "Dashboard", "normal")).toMatchObject({ chain: true, glow: true, season: "christmas" });
+  expect(seasonCapabilities("christmas", "Profile", "normal")).toMatchObject({ chain: true, glow: true });
+  expect(seasonCapabilities("christmas", "Settings", "normal")).toMatchObject({ chain: false, glow: false });
+  expect(seasonCapabilities("christmas", "Dashboard", "subtle")).toMatchObject({ chain: true, glow: true });
 });

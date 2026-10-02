@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, View, type ViewStyle } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { SeasonBackdropSlot } from "../seasons/SeasonStage";
 import { colors } from "../theme";
 
 export function Screen({
@@ -16,7 +17,11 @@ export function Screen({
 }) {
   return (
     <SafeAreaView style={styles.safe} edges={bottomSafe ? ["top", "left", "right", "bottom"] : ["top", "left", "right"]}>
-      <View style={[styles.container, padded && styles.padded, style]}>{children}</View>
+      <View style={[styles.container, padded && styles.padded, style]}>
+        {/* Jahreszeiten (#642): was hinter dem Inhalt liegt (Weihnachten: warme Lichtinseln) - unter allem, nie klickbar. */}
+        <SeasonBackdropSlot />
+        {children}
+      </View>
     </SafeAreaView>
   );
 }

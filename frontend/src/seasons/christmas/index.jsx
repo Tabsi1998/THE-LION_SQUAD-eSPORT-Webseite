@@ -21,6 +21,8 @@ export const HOLIDAY_SLOTS = 1;
 export const TOAST_DELAY_MS = 1500;
 export const TOAST_MS = 14000;
 export const DAY_LABELS = { 24: "Heiligabend", 25: "Erster Weihnachtstag", 26: "Zweiter Weihnachtstag" };
+/** Der Abschied am 6. Jänner trägt den Namen des Tages - der Text sagt schon „Danke fürs Mitfeiern“. */
+export const FAREWELL_LABEL = "Heilige Drei Könige";
 
 let yearSaltOverride = null;
 
@@ -43,7 +45,7 @@ export function christmasLayout(pathname = "/", effective = "normal", width = ty
 /** Der Text des Grußes: je Tag ein eigener aus dem Admin (`greeting_25`, `greeting_26`), sonst der eine Gruß. */
 export function greetingFor(season, now = new Date()) {
   const texts = season?.texts || {};
-  if (season?.phase === "abschied") return { title: "Danke fürs Mitfeiern", text: texts.farewell || "Danke fürs Mitfeiern – bis zum nächsten Jahr!", link: texts.farewell_link || "", day: 6 };
+  if (season?.phase === "abschied") return { title: FAREWELL_LABEL, text: texts.farewell || "Danke fürs Mitfeiern – bis zum nächsten Jahr!", link: texts.farewell_link || "", day: 6 };
   const day = now.getMonth() === 11 && DAY_LABELS[now.getDate()] ? now.getDate() : 24;
   return { title: DAY_LABELS[day], text: texts[`greeting_${day}`] || texts.greeting || "Frohe Weihnachten wünscht THE LION SQUAD", link: "", day };
 }

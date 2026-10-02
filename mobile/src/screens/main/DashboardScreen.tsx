@@ -8,7 +8,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
-import { SeasonWidgetSlot } from "../../seasons/SeasonStage";
+import { SeasonEdgeSlot, SeasonWidgetSlot } from "../../seasons/SeasonStage";
 import { AdventHint } from "../../advent/entry";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -207,6 +207,8 @@ export function DashboardScreen({ navigation }: Props) {
             <SeasonWidgetSlot />
           </View>
           {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News aus der Website.</Body> : null}
+          {/* Weihnachten (#642): die Lichterkette hängt an der Unterkante der Karte - dem Kopf der App. */}
+          <SeasonEdgeSlot />
         </Card>
 
         {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft. */}

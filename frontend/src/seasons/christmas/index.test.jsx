@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { hashString } from "../rng";
 
 // Weihnachten (S8, X1, X2, X4): Klassen und Breite, Lichtinseln nur an den Feiertagen, Kette mit ruhigerem
 // Bewegungsbudget, der Gruß einmal je Tag mit Text des Tages, Escape und Klick, Abschied mit Link, Jahres-Salz.
@@ -35,6 +36,14 @@ afterEach(() => {
 
 afterAll(() => resetMotionScheduler(null));
 
+// Die App zeigt dieselbe Grußkarte (mobile/src/seasons/christmas/greeting.ts, #642) - derselbe Fingerabdruck der Sterne
+// steht dort im Test: weicht eine Seite ab, wird die andere rot.
+const STARS_PARITY = 2991777711;
+
+test("Parität mit der App: dieselben Sterne aus demselben Seed", () => {
+  expect(hashString(JSON.stringify([starField(2026), starField("2027", 5)]))).toBe(STARS_PARITY);
+});
+
 test("Klassen und Breite: Kette überall außer still und unter 768 px, Fußzeile mit der Szene, Lichtinseln mit der Atmosphäre", () => {
   expect(christmasLayout("/", "normal", 1440)).toEqual({ cls: "lively", chain: true, footerChain: true, glow: true });
   expect(christmasLayout("/login", "normal", 1440)).toEqual({ cls: "calm", chain: true, footerChain: true, glow: true });
@@ -47,7 +56,7 @@ test("Text des Tages: Heiligabend, eigener Text am 25., der eine Gruß am 26., A
   expect(greetingFor(xmas(), new Date(2026, 11, 24, 18))).toEqual({ title: "Heiligabend", text: "Frohe Weihnachten wünscht THE LION SQUAD", link: "", day: 24 });
   expect(greetingFor(xmas(), new Date(2026, 11, 25, 9))).toMatchObject({ title: DAY_LABELS[25], text: "Schöne Feiertage vom Rudel!", day: 25 });
   expect(greetingFor(xmas(), new Date(2026, 11, 26, 9))).toMatchObject({ title: DAY_LABELS[26], text: "Frohe Weihnachten wünscht THE LION SQUAD", day: 26 });
-  expect(greetingFor(xmas({ phase: "abschied" }), new Date(2027, 0, 6, 9))).toEqual({ title: "Danke fürs Mitfeiern", text: "Danke fürs Mitfeiern", link: "/news/rueckblick", day: 6 });
+  expect(greetingFor(xmas({ phase: "abschied" }), new Date(2027, 0, 6, 9))).toEqual({ title: "Heilige Drei Könige", text: "Danke fürs Mitfeiern", link: "/news/rueckblick", day: 6 });
   expect(greetingFor(xmas({ texts: {} }), new Date(2026, 11, 20))).toMatchObject({ day: 24, text: "Frohe Weihnachten wünscht THE LION SQUAD" });
   expect(greetingFor(xmas({ phase: "abschied", texts: {} }))).toMatchObject({ link: "", text: expect.stringContaining("Danke") });
 });
