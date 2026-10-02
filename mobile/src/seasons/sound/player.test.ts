@@ -4,7 +4,7 @@ import * as SecureStore from "expo-secure-store";
 // Cache abgelegt, leise und ohne fremde Musik zu unterbrechen gespielt, danach freigegeben. Schnelles Tippen
 // knattert nicht, und ohne Speicher oder Audio bleibt es still statt zu stören.
 
-const mockPlayer = { play: jest.fn(), remove: jest.fn() };
+const mockPlayer = { play: jest.fn(), remove: jest.fn(), release: jest.fn() };
 const mockAudio = { createAudioPlayer: jest.fn((_source: unknown) => mockPlayer), setAudioModeAsync: jest.fn(async (_mode: unknown) => {}) };
 jest.mock("expo-audio", () => mockAudio);
 const mockFiles = new Map<string, string>();
@@ -55,6 +55,8 @@ test("die Katze miaut: einmal gerechnet und in den Cache geschrieben, still bei 
   expect(mockPlayer.play).toHaveBeenCalledTimes(1);
   jest.advanceTimersByTime(2000);
   expect(mockPlayer.remove).toHaveBeenCalledTimes(1);
+  // Sofort frei samt Media-Session - nicht erst bei der nächsten Speicherbereinigung.
+  expect(mockPlayer.release).toHaveBeenCalledTimes(1);
   // Beim nächsten Mal liegt die Datei schon da.
   expect(await playSeasonSound("cat_meow", { rng: () => 0.5, now: 5000 })).toBe(true);
   expect(mockFs.writeAsStringAsync).toHaveBeenCalledTimes(1);

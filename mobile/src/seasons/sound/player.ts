@@ -132,10 +132,13 @@ export async function playSeasonSound(name: SeasonSound, { rng = Math.random, no
     await audioReady;
     const player = audio.createAudioPlayer({ uri });
     player.play();
-    // Der Spieler gibt sich nicht selbst frei - nach dem Laut aufräumen.
+    // Der Spieler gibt sich nicht selbst frei - nach dem Laut aufräumen. `remove()` nimmt ihn nur aus der Liste des
+    // Moduls; erst `release()` gibt ihn samt seiner Media-Session sofort frei (sonst lebt sie bis zur nächsten
+    // Speicherbereinigung, und die Tasten am Kopfhörer landen so lange bei der App statt bei der Musik).
     setTimeout(() => {
       try {
         player.remove();
+        player.release();
       } catch {
         // schon weg
       }
