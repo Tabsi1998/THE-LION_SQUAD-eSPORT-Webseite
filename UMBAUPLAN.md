@@ -2727,6 +2727,13 @@ der Verwaltung.
   einer Saison dazukommt, muss bei alten Speicherständen an sein (sonst bleibt die App unbemerkt
   draußen); und ein Test, der knapp unter dem Zeitlimit lag, reißt, sobald andere schwere Tests
   parallel laufen.
+- **Weihnachten in der App** (PR #797): Vom 24. bis 26. Dezember hängt in der App eine Lichterkette
+  an der Unterkante der Begrüßungskarte im Dashboard – dieselbe Kette wie auf der Website, jedes
+  Lämpchen glimmt im eigenen Takt. Einmal am Tag kommt der Gruß als Karte des Vereins über der
+  Tab-Leiste, am 6. Jänner der Abschied, und hinter dem Inhalt liegen warme Lichtinseln. Lehren aus
+  der Sichtprobe: das „×“ der Karte lag auf dem letzten Licht (jetzt im Textteil wie im Web); bleibt
+  die App über Nacht offen, gilt morgens der neue Tag; und der Abschied hatte im Web wie in der App
+  zweimal „Danke fürs Mitfeiern“ – der Titel ist jetzt der Name des Tages.
 - **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.

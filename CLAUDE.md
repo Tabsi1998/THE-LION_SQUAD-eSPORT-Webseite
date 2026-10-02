@@ -2963,6 +2963,25 @@ Seit dem 15. September gilt:
   `jest.setup.js` bildet Reanimated selbst nach (die mitgelieferte Attrappe
   lädt die Worklet-Laufzeit und kennt `useFrameCallback` nicht);
   `__frameCallbacks` lässt Tests Bilder weiterschalten.
+- Weihnachten in der App (#642; PR #797): die Lichterkette rechnet wie im Web
+  (`mobile/src/seasons/christmas/lights.ts` – `chainLayout`, `wireY`,
+  `wirePath`, `inGap`, `glowRadius`; Saat `christmas:<Jahr>:lights:<Anker>`,
+  im Web heißt der dritte Teil `route`, in der App `screen`), der Gruß in
+  `christmas/greeting.ts` (`greetingFor`, `starField`, `yearSaltFor`,
+  `greetingShownToday`/`markGreetingShown` – einmal je Tag nach der Uhr am
+  Gerät, SecureStore `season_greeting_<Schlüssel>`). Parität: Kette
+  `2814731317` in `christmas/lights.test.ts` und `lights.test.js`, Sterne der
+  Karte `2991777711` in `greeting.test.ts` und `christmas/index.test.jsx`.
+  `LightChain.tsx`: Draht, Nägel und Fassungen als stilles Bild, je Lämpchen
+  Schein (unter dem Draht) und Kolben (darüber) als `Animated.View` mit einem
+  gemeinsamen nativen Takt (`pulseCurve` als Kosinus-Runde, `flickerCurve`,
+  `bulbStartDelay`), der Wind aus `weather.wind_factor` (`chainWind`). Neue
+  Slots in `SeasonStage.tsx`: `Edge` (`SeasonEdgeSlot` an der Unterkante der
+  Begrüßungskarte im Dashboard), `Greeting` (Karte über der Tab-Leiste, je
+  Phase ein eigener Schlüssel) und `Backdrop` (`SeasonBackdropSlot` in
+  `components/Screen.tsx`, hinter dem Inhalt jedes Screens); `christmasKeys`
+  in `intensity.ts`. Der Abschied am 6. Jänner trägt in Web und App den
+  Titel „Heilige Drei Könige“ (vorher stand „Danke fürs Mitfeiern“ doppelt).
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3258,6 +3277,21 @@ npx expo install --check
   sie bekommt eine Kopie (Wert außerhalb rechnen, wie `windX` im
   `RainField`). Funktionen, die je Bild laufen, tragen `"worklet"`; was sie
   aufrufen, auch.
+- **Metro im CI-Modus** (`CI=1` in den Probe-Skripten) beobachtet keine
+  Dateien: nach jeder Änderung während einer Sichtprobe Metro über den Port
+  neu starten, sonst lädt die App den alten Stand. Ein eigener Abruf des
+  Bundles mit anderen Parametern baut neu und täuscht frischen Code vor
+  (#797).
+- **Uhr im Emulator zurückstellen:** Android hält API-Antworten nach
+  `Cache-Control` (Saisons 60 s) in `cache/http-cache`. Steht die Uhr danach
+  vor dem `Date` der Antwort, gilt sie als frisch – die App zeigt die
+  Saisonen eines anderen Tages. Vor dem Neustart `adb shell run-as
+  at.lionsquad.app rm -rf cache/http-cache`. Kein Fehler der App.
+- **Versteckte Elemente in App-Tests:** was unter
+  `accessibilityElementsHidden`/`importantForAccessibility="no-hide-descendants"`
+  liegt (Lämpchen, Lichterfolge), findet `getByTestId` nur mit
+  `{ includeHiddenElements: true }`; `toHaveTextContent("…")` vergleicht den
+  ganzen Text – für Teile einen regulären Ausdruck nehmen.
 - **Zeitlimit in App-Tests auf GitHub:** der 2-Kern-Rechner ist langsam; der
   Netzbau-Test brauchte bis über 15 s, sobald mehr Testdateien parallel
   liefen (#795) – er hat jetzt 60 s. Tests nie in vielen kleinen
@@ -3391,6 +3425,12 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 2. Oktober (Abend)
+#796 (Doku-Stand nach #795), #797 (Weihnachten in der App: Lichterkette an
+der Begrüßungskarte, Gruß einmal am Tag über der Tab-Leiste, warme
+Lichtinseln; Abschied im Web jetzt mit Titel „Heilige Drei Könige“ – dafür
+braucht die Website `update.sh`, eilt nicht).
 
 ### Gemergt 2. Oktober (Nachmittag)
 #793 (Release-APK nur für ARM-Handys, 59 statt 105 MB – Cloudflare nimmt
@@ -3553,10 +3593,11 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (2.10. abends): keine PRs. Reihenfolge: Weihnachten in der App
-  (Lichterkette, Gruß; #642), Nikolaus #736 in Web und App, Build 84 (1.0.5)
-  vor dem 1. Advent, danach Silvester (#640, #739–#744 – gibt es weder im Web
-  noch in der App) mit eigenem Build bis Mitte Dezember. Offene Issues: #772
+- Offen (2.10. nachts): #798 Nikolaus in Web und App (schließt #736; neuer
+  Sticker je Person und Jahr aus dem Saison-Paket „Vom Nikolaus“; braucht
+  nach dem Merge `update.sh`). Reihenfolge danach: Build 84 (1.0.5) vor dem
+  1. Advent, Silvester (#640, #739–#744 – gibt es weder im Web noch in der
+  App) mit eigenem Build bis Mitte Dezember. Offene Issues: #772
   Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
   Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
   einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
