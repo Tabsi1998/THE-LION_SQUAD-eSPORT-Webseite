@@ -92,6 +92,9 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
   const [opened, setOpened] = useState(false);
   const [phase, setPhase] = useState<"idle" | "opening" | "card">("idle");
   const [card, setCard] = useState<BootCard | null>(null);
+  // Zwei getrennte Werte: das seltene Wippen räumt beim Phasenwechsel auf - mit einem gemeinsamen Wert brach das
+  // Aufräumen das Wackeln beim Öffnen ab (und mit ihm das Aufsteigen des Gutscheins).
+  const idle = useRef(new Animated.Value(0)).current;
   const wobble = useRef(new Animated.Value(0)).current;
   const rise = useRef(new Animated.Value(0)).current;
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
@@ -115,23 +118,26 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
     const loop = Animated.loop(
       Animated.sequence([
         Animated.delay(8000),
-        Animated.timing(wobble, { toValue: -0.5, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: 0.38, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(wobble, { toValue: 0, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(idle, { toValue: -0.5, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(idle, { toValue: 0.38, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(idle, { toValue: 0, duration: 260, easing: Easing.out(Easing.quad), useNativeDriver: true }),
       ]),
     );
     loop.start();
     return () => {
       loop.stop();
-      wobble.setValue(0);
+      idle.setValue(0);
     };
-  }, [still, opened, focused, phase, wobble]);
+  }, [still, opened, focused, phase, idle]);
 
   const close = () => {
     timers.current.forEach((handle) => clearTimeout(handle));
     timers.current = [];
     setCard(null);
     setPhase("idle");
+    // Erst jetzt zurück: geöffnet ist der Gutschein ohnehin weg; ohne Konto steckt er danach wieder im Stiefel. Beim
+    // Erscheinen der Karte zurückgesetzt, blitzte er sonst kurz im Stiefel auf, bevor der Stiefel als benutzt galt.
+    rise.setValue(0);
   };
 
   const open = async () => {
@@ -174,7 +180,6 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
       busy.current = false;
       setCard(next);
       setPhase("card");
-      rise.setValue(0);
       if (next.kind === "new") void Promise.resolve(Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)).catch(() => {});
     }, wait));
     timers.current.push(setTimeout(close, wait + CARD_MS));
@@ -184,7 +189,7 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
   const boxWidth = bootWidth(SHELF_HEIGHT);
   // Drehen um die Sohle: der Kasten ist doppelt so hoch und hat seine Mitte auf der Sohle (die Bauweise, die auf
   // Android sauber dreht - siehe Kranz und Katze).
-  const rotate = wobble.interpolate({ inputRange: [-1, 1], outputRange: ["-8deg", "8deg"] });
+  const rotate = Animated.add(idle, wobble).interpolate({ inputRange: [-1, 1], outputRange: ["-8deg", "8deg"], extrapolate: "clamp" });
   const voucherStyle = {
     opacity: rise.interpolate({ inputRange: [0, 0.55, 1], outputRange: [1, 1, 0] }),
     transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [0, -SHELF_HEIGHT * 0.4] }) }],
@@ -291,11 +296,12 @@ export function NikolausGreeting({ season, screen }: { season: ActiveSeason; scr
 }
 
 const styles = StyleSheet.create({
-  // Der Platz rechts im Kopf: die Sohle steht auf der Oberkante der ersten Karte (18 Punkte Abstand im Screen).
-  shelf: { position: "absolute", right: 6, bottom: -18, alignItems: "flex-end", zIndex: 3 },
+  // Der Platz rechts im Kopf: die Sohle steht auf der Oberkante der ersten Karte (18 Punkte Abstand im Screen), links
+  // neben der schwebenden Glocke (40 Punkte breit, 14 vom Rand - der Kopf beginnt 18 vom Rand).
+  shelf: { position: "absolute", right: 48, bottom: -18, alignItems: "flex-end", zIndex: 3 },
   pivot: { justifyContent: "flex-start", marginBottom: -SHELF_HEIGHT },
-  card: { position: "absolute", top: SHELF_HEIGHT + 10, right: -6, flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingLeft: 12, paddingRight: 14, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255, 200, 140, 0.35)", backgroundColor: "#170d0e", shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 12 },
-  cardTail: { position: "absolute", top: -7, right: 26, width: 12, height: 12, backgroundColor: "#170d0e", borderLeftWidth: 1, borderTopWidth: 1, borderColor: "rgba(255, 200, 140, 0.35)", transform: [{ rotate: "45deg" }] },
+  card: { position: "absolute", top: SHELF_HEIGHT + 10, right: -48, flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingLeft: 12, paddingRight: 14, borderRadius: 12, borderWidth: 1, borderColor: "rgba(255, 200, 140, 0.35)", backgroundColor: "#170d0e", shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 12 },
+  cardTail: { position: "absolute", top: -7, right: 66, width: 12, height: 12, backgroundColor: "#170d0e", borderLeftWidth: 1, borderTopWidth: 1, borderColor: "rgba(255, 200, 140, 0.35)", transform: [{ rotate: "45deg" }] },
   cardSticker: { width: 64, height: 64 },
   cardTexts: { flex: 1, minWidth: 0 },
   cardTitle: { color: "#ffc857", fontSize: 11, fontWeight: "800", letterSpacing: 2, textTransform: "uppercase" },
