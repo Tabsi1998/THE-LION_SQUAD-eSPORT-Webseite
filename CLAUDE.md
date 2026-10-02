@@ -2778,6 +2778,125 @@ Seit dem 15. September gilt:
   den **Anteil** der Punkte über der Grenze, nicht den hellsten Punkt; mehrere
   Formen derselben Figur (Spritzer) in **einem** Pfad zeichnen; (3) Arbeitsbäume
   haben unter Windows CRLF – Patch-Skripte müssen Zeilenenden erhalten.
+- Saison-Fundstücke (#678; PRs #773 Server und Web, #776 Katalog E, #777
+  App): `SIGNAL_RULES` in `achievement_counters.py` je Signal mit `per_day`,
+  `season`, optional `phases`, `live` (zählt nur im Augenblick) und `server`
+  (seit #785: nur der Server selbst meldet – `record_signal(...,
+  trusted=True)`; für Clients „unknown“). Halloween: `halloween_pumpkin` 1
+  (Web und App melden ihn nur am 31.10. ab 18 Uhr; der Server prüft die
+  Saison), `halloween_bats_scared` 30, `halloween_ghosts_freed`
+  20, `halloween_cat_petted` 10; Schnee `snowflakes_clicked` 200 je Tag.
+  `record_signal(user_id, name, count, day)`, `signal_day` (höchstens
+  `REPLAY_DAYS = 7` zurück, nur Tage, an denen die Saison lief), `POST
+  /api/achievements/signals` (bis zu 40 Zeilen) wertet sofort und leicht aus
+  (`evaluate_user_progress(..., legacy=False)` rechnet nur die Zähler der
+  Quelle) und liefert vergebene Stufen zurück. DSGVO: die Auskunft nennt
+  Zähler, Signale je Tag, gelesene News, geöffnete Streams und gegebenes GG;
+  „Konto löschen“ entfernt Signale, `news_reads`, `stream_watches` und
+  `user_achievement_stats` (GG bleibt beim Match); ein Absatz in der
+  Datenschutzerklärung (`site_texts.py`). Web: `seasons/signals.js` (Tag in
+  Wien, Ausgang im Browser mit Eigentümer – am geteilten Rechner bekommt
+  niemand fremde Funde –, Grenzen wie der Server), `seasons/SignalSync.jsx`
+  (bündeln, nach dem Login nachmelden, erneut versuchen),
+  `AchievementCatchUp` hört auf `tls:achievements-awarded`. Katalog E
+  (`achievement_catalog/catalog_e.py`, Community, Bronze bis Diamant):
+  Fledermausflüsterer 5/25/100/250/500, Flockenfänger 10/50/150/400/1000,
+  Jahreszeiten-Sammler 25/100/300/750/1500; Zähler `halloween_bats_scared`
+  und `season_collectibles_total`; `services/collectibles.py` und `GET
+  /api/achievements/collectibles` (nur für die Person selbst) speisen die
+  Karte „Saison-Fundstücke“ (`pages/user/profile/SeasonFindsPanel.jsx`,
+  `SeasonFindIcons.jsx`, `season-finds.css`; Motive in
+  `components/achievements/motifs/people.jsx`). App:
+  `mobile/src/seasons/signals.ts` (Tag in Wien nach der Regel der
+  EU-Sommerzeit ohne Zeitzonendaten, Ausgang im SecureStore mit höchstens 24
+  Zeilen – rund 2 kB je Eintrag –, Zugriffe nacheinander), `signalSync.ts`
+  (bündeln, erneut versuchen, melden beim Wechsel in den Hintergrund),
+  eingehängt in `SeasonProvider.tsx`; `halloween.tsx` und `atmosphere.tsx`
+  melden Fledermaus, Geist und Katze. Offen (#678, #772): Schalter
+  „Fundstücke im öffentlichen Profil“ (Vorgabe aus), die Karte in der App,
+  die Katze miaut in der App.
+- Gelesen und gesehen (#780, PR #781): `POST /api/news/{slug}/read` sucht in
+  `news_posts` über `find_by_slug_or_history` (auch alte Adressen) und zählt
+  nur, was die Person lesen darf (`published`, `published_at` erreicht,
+  sichtbar). Vorher suchte der Server in der falschen Sammlung, und der
+  Test legte seine News in dieselbe falsche – Tests legen News jetzt über
+  die echte Verwaltung an. `POST /api/streams/watch` prüft die Kennung
+  (`WATCH_KEY`, Twitch/YouTube/Kick), deckelt mit `WATCHES_PER_DAY = 12` und
+  bremst. Web `lib/streamWatch.js` (`streamKey`, `useStreamWatched`: eine
+  Minute im sichtbaren Tab, einmal je Stream und Tag in Wien), eingebaut in
+  `StreamEmbed` (`describeStream`), `LiveStreamSlider` und
+  `TournamentLiveStreams` – ohne Zustimmung zu externen Medien kein Player,
+  also kein Ping. App: `NewsDetailScreen` meldet nach dem Laden, nicht für
+  Gäste. Nicht rückwirkend.
+- Tag am Ort des Vereins (PR #774): der Server läuft in UTC und meldete nach
+  Mitternacht bis zu zwei Stunden „gestern“. Fristen und Termine
+  (`dolibarr_meetings`, `dolibarr_helper_shifts`, `membership_routes`)
+  rechnen mit `dolibarr_policy.club_today()`, das Alter (Jumpscares ab 18,
+  Mitgliederliste) mit `to_vienna(None).date()`, PDFs mit
+  `pdf_service.club_now()`. Tests: `conftest.py` stellt die Saison-Uhr
+  (`season_clock`, autouse) auf `SEASON_TEST_NOW` = 15.09.2026 12:00 Wien –
+  wer eine andere Zeit braucht, setzt `seasons.to_vienna` im Test; Termine
+  in Testdaten sind relativ zu heute. Die Gegenprobe mit verstellter Uhr
+  (freezegun, Rezept unter 6.4) fand Tests, die ab dem 11.10.2026 von selbst
+  rot geworden wären; als regelmäßige Frühwarnung vorgeschlagen in #775
+  (A/B/C offen).
+- Adventkalender (#641, #732; PR #785 – fasst #782–#784 und den App-Teil
+  zusammen): `services/advent_calendar.py` (Saison `advent_calendar`;
+  Sammlungen `advent_doors` – Jahr und Tag eindeutig –, `advent_openings` –
+  Person, Jahr und Tag eindeutig –, `advent_views` für Zahlen ohne Namen; ein
+  Türchen geht um `seasons.ADVENT_DOOR_HOUR = 6` Uhr in Wien auf
+  (`advent_door_opens_at`, `advent_doors_open`), vorher verrät die
+  Schnittstelle weder Titel noch Art; Nachholen bis 6. Jänner 23:59; Arten
+  `KINDS` Text, Bild, Video, Clip, News, Event, Mitglied der Woche (nur mit
+  Einwilligung), Sticker, Quiz (gespeichert wird nur die Teilnahme), Gewinn;
+  `content_for` zeigt News- und Event-Karten nur, wenn die Person sie sehen
+  darf; `calendar_view` holt Gäste-Türchen nach dem Login nach;
+  `doors_in_best_year` zählt „Alle Türchen“ als 24 von 24 im selben Advent,
+  vergeben beim 24. Türchen sofort; das Signal `advent_door` ist `server`).
+  Routen `routes/advent_routes.py` unter `/api/seasonal/advent`: `GET ""`,
+  `POST /{day}/open`, `POST /{day}/quiz`, `POST|DELETE /{day}/enter`; Admin
+  `GET /admin/options`, `GET /admin/{year}`, `GET /admin/{year}/preview`,
+  `PUT|DELETE /admin/{year}/{day}`, `POST /admin/{year}/copy` (nur in leere
+  Tage; Mitglied der Woche und Gewinn neu bestätigen), `POST
+  /admin/{year}/{day}/draw` und `…/redraw` – pflegen `require_area("content",
+  "club")`, ziehen nur `club`. `services/season_raffles.py` (gemeinsam für
+  Adventkalender und Eiersuche): `season_raffles` (eine je `source_key`),
+  `season_raffle_entries` (eine je Person), `AUDIENCES` all/members,
+  `MAX_WINNERS = 20`, Staff (`STAFF_AREAS`) nur mit Freigabe je Verlosung,
+  gesperrte und gelöschte Konten nie; Mitmachen ist ein eigener Klick, `draw`
+  schreibt ein Protokoll (Zeit, Person, Lose, Gewinner; ein zweiter Klick
+  zieht nicht noch einmal), `redraw` nur für verfallene Gewinne; der Gewinn
+  landet als Eintrag in `prize_pickups` („Verlosung“) mit privater
+  Nachricht, nach außen nie ein Name; `terms()` liefert die fünf Sätze der
+  Teilnahmebedingungen. `seasons_routes.with_calendar` setzt `data.ready`
+  (gibt es Türchen für das Jahr?) – ohne zeigen Web und App keinen
+  Einstieg. DSGVO: Auskunft und Löschen umfassen `advent_openings` und
+  `season_raffle_entries`. Web: `frontend/src/advent/` (`scene.js`
+  `sceneSvg(year, { filters })` – ein Bild der Winternacht über einem
+  Tiroler Dorf mit Sternbild Löwe und Tatzenspur, aus dem die Türchen
+  geschnitten sind; `doors.js` Form, Scharnier, Licht und Schmuck je Jahr;
+  `Door.jsx`, `AdventBoard.jsx` mit 6/4/3 Spalten, `DoorDialog.jsx`,
+  `AdventHint.jsx`, `storage.js` für Gäste-Türchen, `useAdventCalendar.js`,
+  `parity.test.js`), Seite `/advent` (`pages/public/AdventCalendarPage.jsx`,
+  Seitenklasse `calm`), kleines Türchen neben dem Logo
+  (`seasons/adventCalendar/`), der Kranz nennt das offene Türchen; Admin
+  `/admin/advent` (Content → Adventkalender; `AdminAdventPage.jsx`,
+  `advent/DoorEditor.jsx`, `CalendarPreview.jsx`, `RafflePanel.jsx`,
+  `form.js`; `AdminSheet` mit `noValidate`, damit das Formular selbst sagt,
+  was fehlt); Gewinne unter „Meine Gewinne“ (`MyPrizesPage.jsx`). App:
+  `mobile/src/advent/` (`doors.ts`, `scene.ts` – dieselbe Rechnung,
+  Paritätstest auf beiden Seiten –, `DoorTile.tsx` mit Vorder- und Rückseite
+  des Flügels als eigene Ebenen, `AdventBoard.tsx`, `DoorSheet.tsx`,
+  `entry.tsx` mit dem Hinweis im Dashboard, `links.ts`: eigene Pfade über
+  `navigateToUrl`, sonst Browser, nur http(s)),
+  `screens/main/AdventCalendarScreen.tsx` (Mehr → Verein, nur solange der
+  Kalender läuft; die Feier kommt nach dem Schließen des Fensters),
+  `navigation/rootNavigation.ts` (`navigateToUrl`, `openTarget`),
+  `lib/prizes.ts`, `seasons/SeasonStage.tsx` (`SCREEN_SEASONS`, `appCanShow`
+  – Mehr → Darstellung nennt nur Saisonen, die die App zeigt). Videos und
+  Clips bettet die App nicht ein. Offene Entscheidungen des Betreibers: 6 Uhr
+  oder Mitternacht, Staff in Verlosungen, wer zieht, Hauptgewinn unter allen
+  mit 24 Türchen.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3043,6 +3162,32 @@ npx expo install --check
   sondern `setSystemTime` und dann `runFor(61000)` für einen Minutentakt.
   Der Consent-Klick ist die erste Geste – vorher messen, was „vor der
   Geste“ gelten soll, und die Klang-Engine erst laden lassen.
+- **Sicherheitscheck der App** (`npm run audit:ci`, `mobile/scripts/audit-ci.cjs`):
+  sperrt ab „moderate“; Ausnahmen stehen mit Begründung und Frist in
+  `mobile/scripts/security-audit-allowlist.json` – nach Ablauf wird der
+  Check von selbst rot. Seit #786 hebt `overrides` `@grpc/grpc-js` auf
+  1.14.5 (kommt mit dem Firebase-JS-Paket, in der Android-App nie geladen)
+  und `brace-expansion` auf 5.0.12; einzige Ausnahme ist
+  `GHSA-86W9-CPQP-85RV` (node-forge, keine reparierte Version, nur im
+  Expo-Werkzeug zum Signieren von Over-the-air-Updates) bis **02.11.2026** –
+  dann neu prüfen.
+- **Schließwörter in Commit-Nachrichten:** ein „Fix“ direkt vor der Nummer
+  eines anderen PRs schließt ihn beim Merge – so wurde PR #781 am 30.09.
+  durch eine Commit-Nachricht von #773 geschlossen (wieder geöffnet, neu
+  aufgesetzt). Vor fremden Nummern nie fix/fixes/fixed, close/closes/closed
+  oder resolve/resolves/resolved schreiben; das deutsche „Schließt“ schließt
+  nichts, jede Nummer braucht ihr eigenes `closes`.
+- **Android-Emulator neben dem lokalen Check:** der Emulator (qemu mit
+  Software-GPU) belegt die Kerne. Am 02.10. riss der Netzbau-Test der App
+  (sonst knapp 4 s) so sein Zeitlimit von 15 s. Vor einem Check den
+  Emulator beenden (`adb emu kill`).
+- **Gegenprobe mit verstellter Uhr** (#774): Backend in einem Wegwerf-venv mit
+  `freezegun` und einem pytest-Plugin, das jede Prüfung bei
+  `freeze_time(zeitpunkt, tick=True, real_asyncio=True)` laufen lässt; die
+  Anwendung vorher über `flow_harness.load_application()` laden. Web: eigene
+  vitest-Konfiguration mit `vi.useFakeTimers({ now, toFake: ["Date"],
+  shouldAdvanceTime: true })`; App: jest mit `jest.useFakeTimers({ now,
+  advanceTimers: true })`. Ein Kanarien-Test beweist, dass die Uhr ankommt.
 
 ---
 
@@ -3120,7 +3265,20 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (29. September 2026)
+## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 30. September – 2. Oktober
+#773 (Saison-Fundstücke I: Signale kommen am Server an, Nachmelden nach dem
+Login, Datenschutz), #774 (Tests hängen nicht mehr am Kalender; Fristen,
+Termine und Alter nach dem Tag in Wien), #777 (Signale aus der App), #776
+(Katalog E und die Karte „Saison-Fundstücke“), #778 (Doku-Stand), #781
+(gelesen und gesehen zählt; schließt #780), #786 (App-Sicherheits-Update),
+#787 (Dependabot: brace-expansion im Web), #785 (Adventkalender komplett –
+fasst #782–#784 und den App-Teil zusammen, schließt #641 und #732; die vier
+waren gestapelte Entwürfe, der Betreiber wollte einen mergbaren PR). Die
+Server-Teile von #773, #774, #776, #781 und #785 brauchen `update.sh` (die
+neuen Indizes legt `init_indexes` beim Start an); die App-Teile von #777,
+#781 und #785 kommen mit dem nächsten Build.
 
 ### Gemergt zuletzt (16.–22. September)
 #285/#294/#298 (Mitgliederbereich und Kopfzeile), #286 (App 0.4.1-beta), #299
@@ -3255,23 +3413,28 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (30.09. früh): #773 Saison-Fundstücke I (Signale kommen am Server an:
-  `POST /api/achievements/signals`, Nachmelden je Tag, sofortige leichte
-  Auswertung; Web `signals.js` mit Ausgang, `SignalSync`), #774 Tests hängen
-  nicht mehr am Kalender (Saison-Uhr im Test, relative Termine; Fristen,
-  Termine und Alter nach dem Tag in Wien), #776 Entwurf Saison-Fundstücke II
-  (Katalog E, Karte im Profil – baut auf #773), #777 Entwurf Signale in der App.
-  Neue Issues: #771 Wetter in der App, #772 Klammer App-Parität (Wunsch des
-  Betreibers vom 29.09.: Wetter und Jahreszeiten sollen in der App gleich gut
-  funktionieren – jeder Web-PR einer Jahreszeit nennt sein App-Gegenstück),
-  #775 Frühwarnung mit verstellter Uhr (Entscheidung A/B/C offen).
-  Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, Silvester S9 #640 mit
-  N1–N5 (#739–#743), Adventkalender S10 #641 mit W6 #732 (braucht Server:
-  Sammlung `advent_doors`, Öffnen, Ziehung), Nikolausstiefel X3 #736 (braucht
-  einen Sticker-Grant in `services/stickers.py`), App S11 #642 (Kranz, Schnee,
-  Kette, Gruß nativ). Offen bleibt: Erfolge II Rest (E10 Teil 2 – acht
-  Admin-Reiter im Web –, E12 #622, E13 #623; die vier zurückgestellten
-  Gruppen aus #614 und die Saison-Fundstücke #678 warten auf Datenquellen),
+- Offen (2.10.): #788 Adventkranz in der App (schließt #637 und #727 – das
+  App-Gegenstück zu #765; die Flammen sind eigene Ebenen mit dem nativen
+  Animationstreiber, ihr Kasten sitzt mittig auf dem Docht) und #789
+  Halloween-Katze in der App (Schwanz und Blinzeln drehten sich in Build 82
+  auf Android um die Ecke der Zeichnung; jetzt eigene Ebenen mittig auf dem
+  Drehpunkt). Danach der Release-PR für den nächsten App-Build vor
+  Halloween: Adventkalender (#785), Kranz, Katze, Signale aus der App (#777)
+  und News-Lesen (#781) – ohne diesen Build zählt der Kürbis am 31.10. aus
+  der App nicht. Offene Issues dieser Runde: #771 Wetter in der App, #772
+  Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
+  Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
+  einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
+  verstellter Uhr (Entscheidung A/B/C offen), #678 Rest (Schalter
+  „Fundstücke im öffentlichen Profil“, die Karte in der App).
+  Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, W5 #731
+  Winter-Interaktionen, Silvester S9 #640 mit N1–N5 (#739–#743),
+  Nikolausstiefel X3 #736 (braucht einen Sticker-Grant in
+  `services/stickers.py`), App S11 #642 (Schnee, Kette, Gruß nativ),
+  Eiersuche S15 #646 (Verlosung über `season_raffles`). Offen bleibt:
+  Erfolge II Rest (E10 Teil 2 – acht Admin-Reiter im Web –, E12 #622, E13
+  #623; die vier zurückgestellten Gruppen aus #614 warten auf
+  Datenquellen),
   Halloween VII aus dem nächsten Live-Blick (#677: alles wird
   überarbeitet), App-Fassung von Klang, Mond und Jumpscares (#667),
   Jahreszeiten II (#637–#642 bis 27.11.) von Anfang an nach dem Standard,
@@ -3332,6 +3495,12 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
+- **Build 82** (`mobile-v1.0.3-build82`, Commit 6ff7141, 28.09.; #665
+  Halloween III in der App). Die Daten der Abschnitte 1.0.1–1.0.3 in
+  `mobile/CHANGELOG.md` (10. und 12.10.) stimmen nicht – gebaut wurde am
+  28.09.; der nächste Release-PR berichtigt sie. Der nächste Build (83)
+  bringt Adventkalender, Kranz, Katze, Signale und News-Lesen in die App –
+  über den Play Store ausgeliefert vor dem 25.10.
 - **Build 78** (`mobile-v0.18.0-beta-build78`, #585), **Build 79**
   (`mobile-v1.0.0-build79`, #594 – App 1.0.0 für den offenen Play-Test),
   **Build 80** (`mobile-v1.0.1-build80`, Commit 465a627, 28.09.; #650
@@ -3393,6 +3562,15 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   Dienstkonto `--play`).
 
 ### Erledigungen beim Betreiber
+- Nach #773–#787 (30.09.–2.10.): `update.sh` (neue Routen und Sammlungen für
+  Signale, Fundstücke, Adventkalender und Verlosungen). Rechtstexte einmal
+  lesen: Datenschutzerklärung (Absatz zu den Zählern aus #773, Satz zum
+  Adventkalender und Absatz zu Verlosungen aus #785) und die
+  Teilnahmebedingungen der Verlosung. Türchen anlegen unter Verwaltung →
+  Content → Adventkalender – ohne Türchen zeigt weder Website noch App einen
+  Kalender. Offene Entscheidungen: 6 Uhr oder Mitternacht, Vorstand und
+  Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24
+  Türchen; #775 A/B/C.
 - Nach #556–#563 (25.09. früh): `update.sh` und App-Build (Build 78: Plattformen Welle 2 und 3,
   Plattform-Haken, Beta/Release-Plakette mit Rückfrage beim Update). Danach: Verbindungen → Alle
   Verbindungen → „Plattformen für Mitglieder“ – abhaken, was der Verein nicht anbieten will („Alle
