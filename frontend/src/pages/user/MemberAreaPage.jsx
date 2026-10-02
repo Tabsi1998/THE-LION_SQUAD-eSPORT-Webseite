@@ -5,8 +5,10 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2 } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2, Cake } from "lucide-react";
 import { SteamPresence } from "@/components/tls/SteamPresence";
+import { useSeason } from "@/seasons/SeasonContext";
+import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -107,6 +109,8 @@ export default function MemberAreaPage() {
             </a>
           ) : null}
         </nav>
+
+        <BirthdayNote />
 
         {nothingYet ? (
           <div data-testid="member-area-empty" className="mt-10 border border-white/10 rounded-sm bg-[#121212] p-8 text-center">
@@ -249,6 +253,24 @@ function Section({ title, icon: Icon, more, testId, children }) {
         {more && <Link to={more.to} className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700] hover:underline">{more.label} →</Link>}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Am Vereinsgeburtstag (#644): der Hinweis mit dem Jahres-Sticker für Mitglieder - nur, solange die Saison läuft. */
+export function BirthdayNote() {
+  const { seasons } = useSeason();
+  const birthday = (seasons || []).find((season) => season.key === "club_birthday");
+  if (!birthday) return null;
+  const years = Number(birthday.data?.years);
+  return (
+    <div data-testid="member-area-birthday" className="mt-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <Cake className="w-7 h-7 text-[#FFD700] shrink-0" aria-hidden="true" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Vereinsgeburtstag</div>
+        <p className="mt-1 text-sm text-white/80">{years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} wurde der Verein gegründet.` : "Heute hat der Verein Geburtstag."} Als Mitglied bekommst du dazu einen Jahres-Sticker für den Chat – jedes Jahr einen anderen.</p>
+      </div>
+      <StickerClaim testId="member-area-birthday-sticker" />
     </div>
   );
 }

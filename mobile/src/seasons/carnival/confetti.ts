@@ -18,6 +18,8 @@ export const SHAPE_NAMES = Object.keys(SHAPES) as Shape[];
 export const SHAPE_WEIGHTS: Record<Shape, number> = { square: 4, strip: 3, dot: 2, scrap: 2 };
 /** Vorder- und Rückseite: Vereinsfarben zuerst, dann bunt. */
 export const COLORS: Array<[string, string]> = [["#29B6E8", "#1c86ab"], ["#FFD700", "#c9a800"], ["#ff4fa3", "#c23a7c"], ["#3ddc84", "#2aa863"], ["#ff8a3d", "#c9682b"], ["#a66bff", "#7f4fd1"], ["#ff4d4d", "#c43a3a"], ["#f5f5f5", "#bdbdbd"]];
+/** Nur Vereinsfarben (Vereinsgeburtstag #751): Blau, Gold, Weiß. */
+export const CLUB_PALETTE = [0, 1, 7];
 
 export type Piece = {
   shape: Shape;
@@ -59,11 +61,12 @@ function pickShape(rng: Rng): Shape {
   return SHAPE_NAMES[0];
 }
 
-function makePiece(rng: Rng, { x, y, vx, vy, at }: { x: number; y: number; vx: number; vy: number; at: number }): Piece {
+function makePiece(rng: Rng, { x, y, vx, vy, at }: { x: number; y: number; vx: number; vy: number; at: number }, palette: number[] | null = null): Piece {
   const shape = pickShape(rng);
   const spec = SHAPES[shape];
   const drag = round(spec.drag * (0.82 + rng() * 0.4), 3);
-  const color = Math.floor(rng() * (rng() < 0.45 ? 2 : COLORS.length));
+  // Ohne Auswahl fast die Hälfte in Vereinsfarben, sonst bunt; mit Auswahl (Vereinsgeburtstag) nur diese Farben.
+  const color = palette && palette.length ? palette[Math.floor(rng() * palette.length)] : Math.floor(rng() * (rng() < 0.45 ? 2 : COLORS.length));
   return {
     shape,
     x: round(x),
@@ -87,16 +90,16 @@ function makePiece(rng: Rng, { x, y, vx, vy, at }: { x: number; y: number; vx: n
 }
 
 /** Der Regen: über die ganze Breite (etwas darüber hinaus), oberhalb des Fensters, über `spreadMs` verteilt. */
-export function rainPieces(rng: Rng, { width, height }: { width: number; height: number }, count: number, spreadMs = 2500): Piece[] {
-  return Array.from({ length: count }, () => makePiece(rng, { x: -0.05 * width + rng() * width * 1.1, y: -20 - rng() * height * 0.25, vx: (rng() - 0.5) * 60, vy: 20 + rng() * 60, at: rng() * spreadMs }));
+export function rainPieces(rng: Rng, { width, height }: { width: number; height: number }, count: number, spreadMs = 2500, palette: number[] | null = null): Piece[] {
+  return Array.from({ length: count }, () => makePiece(rng, { x: -0.05 * width + rng() * width * 1.1, y: -20 - rng() * height * 0.25, vx: (rng() - 0.5) * 60, vy: 20 + rng() * 60, at: rng() * spreadMs }, palette));
 }
 
 /** Eine Explosion: aus einem Punkt nach oben und zur Seite, schnell, dann bremst die Luft und es fällt. */
-export function burstPieces(rng: Rng, { x, y }: { x: number; y: number }, count: number): Piece[] {
+export function burstPieces(rng: Rng, { x, y }: { x: number; y: number }, count: number, palette: number[] | null = null): Piece[] {
   return Array.from({ length: count }, () => {
     const angle = (-160 + rng() * 140) * (Math.PI / 180);
     const speed = 250 + rng() * 270;
-    return makePiece(rng, { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, at: rng() * 60 });
+    return makePiece(rng, { x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, at: rng() * 60 }, palette);
   });
 }
 

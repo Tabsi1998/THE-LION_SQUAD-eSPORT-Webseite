@@ -6,6 +6,7 @@ import { Body } from "../components/Text";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
+import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
@@ -58,6 +59,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Fasching (S12 #643, F1–F3 #745–#747, wie im Web): Konfetti beim ersten Start des Tages (Skia), der Partyhut im
   // Dashboard-Kopf und am Tab „Mehr“, Luftschlangen oben in den Rändern, der Gruß einmal am Tag.
   carnival: { Sky: ConfettiSky, Corners: CarnivalCorners, Widget: PartyHatWidget, TabIcon: PartyHatTabIcon, Greeting: CarnivalGreeting },
+  // Vereinsgeburtstag (S13 #644, B1–B3 wie im Web): die Karte mit der Torte, Konfetti in Vereinsfarben aus der Torte,
+  // die Wimpelkette an der Begrüßungskarte.
+  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

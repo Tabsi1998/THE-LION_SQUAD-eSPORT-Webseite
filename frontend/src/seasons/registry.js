@@ -8,6 +8,7 @@ export const SEASON_MODULES = {
   weather: () => import("./weather/module.js"),
   new_year: () => import("./newYear/index.jsx"),
   carnival: () => import("./carnival/index.jsx"),
+  club_birthday: () => import("./birthday/index.jsx"),
   advent: () => import("./advent/index.jsx"),
   snow: () => import("./snow/index.jsx"),
   christmas: () => import("./christmas/index.jsx"),

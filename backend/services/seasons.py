@@ -410,7 +410,7 @@ def phase_data(key: str, window: dict, now: datetime, founded: date | None, nigh
         rate = rocket_rate(window["phase"], now)
         return {"rate_per_hour": rate, "salvos": new_year_salvos(now), "seed": hourly_seed(now), "show_start": at(date(window["year"] + 1, 1, 1)).isoformat()}
     if key == "club_birthday" and founded:
-        return {"years": window["year"] - founded.year}
+        return {"years": window["year"] - founded.year, "founded_on": founded.isoformat()}
     if key == "easter":
         return {"quiet": day == good_friday(window["year"]), "sunday": easter_sunday(window["year"]).isoformat()}
     if key == "easter_hunt":

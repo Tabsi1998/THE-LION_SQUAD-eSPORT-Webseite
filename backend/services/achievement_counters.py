@@ -1315,10 +1315,12 @@ async def _founding_member(ctx):
     membership = await ctx.db.memberships.find_one({"user_id": ctx.user_id}, {"_id": 0, "member_since": 1, "member_status": 1})
     if not membership or membership.get("member_status") not in ("active", "honorary"):
         return 0
-    about = await ctx.db.settings.find_one({"id": "about_page"}, {"_id": 0, "founded_on": 1}) or {}
-    founded = _parse(about.get("founded_on"))
+    from services import founding
+
+    # Das Jahr reicht (Handfeld, Gründungsdatum oder Dolibarr) - früher zählte nur ein volles Datum.
+    year = (await founding.founding(ctx.db))["founded_year"]
     since = _parse(membership.get("member_since"))
-    return 1 if founded and since and since.year == founded.year else 0
+    return 1 if year and since and since.year == year else 0
 
 
 @counter("pioneer_account", "profile")

@@ -82,11 +82,12 @@ const monotonic = () => (typeof performance !== "undefined" && typeof performanc
 
 /**
  * Die Ebene. `rain` lässt beim Start einmal Konfetti regnen, `seed` macht es je Seite und Tag anders, `wind()` liefert
- * die Seitwärts-Geschwindigkeit, `edges()` die Kanten zum Liegenbleiben. `clock()` in ms - dieselbe Uhr für Start
+ * die Seitwärts-Geschwindigkeit, `edges()` die Kanten zum Liegenbleiben, `palette` beschränkt die Farben (Indizes in
+ * COLORS), `burst` ist die Größe einer Explosion. `clock()` in ms - dieselbe Uhr für Start
  * und Zeichnen; den Zeitstempel des Loops nimmt die Ebene nicht, damit eine Explosion zwischen zwei Bildern nicht
  * aus einer anderen Zeitrechnung kommt.
  */
-export function createConfettiLayer({ budget = 120, effective = "normal", seed = 1, rain = false, wind = () => 0, edges = landingEdges, clock = monotonic, win = typeof window === "undefined" ? null : window } = {}) {
+export function createConfettiLayer({ budget = 120, effective = "normal", seed = 1, rain = false, wind = () => 0, edges = landingEdges, clock = monotonic, win = typeof window === "undefined" ? null : window, palette = null, burst = BURST_COUNT } = {}) {
   const cap = confettiCap(budget, effective);
   const rng = mulberry32(seed);
   const state = { flying: [], resting: [], ledges: [] };
@@ -98,8 +99,8 @@ export function createConfettiLayer({ budget = 120, effective = "normal", seed =
     pieces.slice(0, room).forEach((piece) => state.flying.push({ piece, start: now, top: origin, rests: rng() < REST_SHARE, lastY: null }));
     state.ledges = edges();
   };
-  if (rain && cap > 0) add(rainPieces(rng, size(), cap), scroll());
-  const onBurst = (point) => add(burstPieces(rng, point, Math.min(BURST_COUNT, cap)), scroll());
+  if (rain && cap > 0) add(rainPieces(rng, size(), cap, 2500, palette), scroll());
+  const onBurst = (point) => add(burstPieces(rng, point, Math.min(burst, cap), palette), scroll());
   listeners.add(onBurst);
 
   const draw = (ctx, _dt, view) => {

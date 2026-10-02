@@ -11,12 +11,12 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatRequestError: (_err, fallback)
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { default: AdminAboutPage, textsToForm, formToPayload } = await import("./AdminAboutPage");
+const { default: AdminAboutPage, foundedLabel, textsToForm, formToPayload } = await import("./AdminAboutPage");
 
 const TEXTS = { hero_eyebrow: "Der Verein", hero_title: "Ein Rudel.", hero_text: "Text", values_title: "Werte", values_text: "V", pillars: ["Fairplay", "Spaß"], games_title: "Spiele", games_text: "G", offline_title: "Offline", offline_text: "O", offline_items: ["Grillen"], cta_title: "CTA", cta_text: "C", founded_year: 2019, purpose: "Zweck", nonprofit: true };
 
-function mockApi(organization) {
-  apiMock.get.mockResolvedValue({ data: { texts: TEXTS, defaults: {}, organization, numbers: { members: 3 }, games: 2, offline_events: 1 } });
+function mockApi(organization, texts = TEXTS) {
+  apiMock.get.mockResolvedValue({ data: { texts, defaults: {}, organization, numbers: { members: 3 }, games: 2, offline_events: 1 } });
   apiMock.put.mockReset();
   apiMock.put.mockResolvedValue({ data: { ok: true, texts: { ...TEXTS, hero_title: "Neu" } } });
 }
@@ -70,4 +70,22 @@ test("Formular-Umwandlung", () => {
   expect(form.founded_year).toBe("");
   expect(formToPayload({ ...form, founded_year: "19" }).founded_year).toBeNull();
   expect(formToPayload({ ...form, founded_year: "2019" }).founded_year).toBe(2019);
+});
+
+test("Gründungsdatum (#644): leer löscht, ein Tag geht mit, das Jahr folgt daraus und ist dann gesperrt", async () => {
+  const form = textsToForm({ founded_year: 2019, founded_on: null });
+  expect(form.founded_on).toBe("");
+  expect(formToPayload(form).founded_on).toBe("");
+  expect(formToPayload({ ...form, founded_on: "2019-03-01" }).founded_on).toBe("2019-03-01");
+  expect(formToPayload({ ...form, founded_on: "1.3.2019" }).founded_on).toBe("");
+  expect(foundedLabel("2019-03-01")).toBe("1. März 2019");
+  expect(foundedLabel("")).toBe("");
+
+  mockApi({ source: "manual" }, { ...TEXTS, founded_on: "2019-03-01" });
+  render(<MemoryRouter><AdminAboutPage /></MemoryRouter>);
+  expect(await screen.findByTestId("about-founded-on")).toHaveValue("2019-03-01");
+  expect(screen.getByTestId("about-founded-year")).toHaveValue("2019");
+  expect(screen.getByTestId("about-founded-year")).toBeDisabled();
+  fireEvent.change(screen.getByTestId("about-founded-on"), { target: { value: "" } });
+  expect(screen.getByTestId("about-founded-year")).not.toBeDisabled();
 });

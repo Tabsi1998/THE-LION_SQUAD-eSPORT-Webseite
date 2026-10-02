@@ -199,6 +199,21 @@ async def _safe_birthday_greetings():
         _log_task_failure("birthday_greetings", exc)
 
 
+async def _safe_club_birthday():
+    """Vereinsgeburtstag (#644): ab 10:00 am Gründungstag einmal im Jahr der Gruß auf Discord (Ereignis eingeschaltet)."""
+    try:
+        from datetime import datetime
+        from database import get_db
+        from routes.seasons_routes import running_season
+        from services import club_birthday, seasons
+        db = get_db()
+        res = await club_birthday.greet_on_discord(db, await running_season(db, club_birthday.SEASON), datetime.now(tz=seasons.VIENNA))
+        if res.get("sent"):
+            logger.info("[scheduler] club_birthday greeted on Discord")
+    except Exception as exc:
+        _log_task_failure("club_birthday", exc)
+
+
 async def _safe_discord_announcements():
     try:
         from services.discord_announcements import announce_due
@@ -690,6 +705,8 @@ def start_scheduler() -> AsyncIOScheduler:
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("club_birthday", _safe_club_birthday), IntervalTrigger(minutes=10), id="club_birthday",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
                   max_instances=1, coalesce=True)

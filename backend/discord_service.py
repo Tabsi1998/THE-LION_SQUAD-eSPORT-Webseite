@@ -44,6 +44,8 @@ EVENTS = {
     "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True},
     "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
     "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},
+    # Vereinsgeburtstag (#644): einmal im Jahr ab 10:00 am Gründungstag - öffentlich, ohne Personenbezug.
+    "club.birthday": {"target": "community", "label": "Vereinsgeburtstag", "default": False},
 }
 # Warum nichts ankam - in Worten mit Klickweg, für Versand-Log, Admin und Betrieb & Logs.
 REASON_TEXTS = {
