@@ -74,8 +74,9 @@ async def _custom_pack(db, pack_id: str) -> dict:
 
 
 @router.get("")
-async def list_stickers(_me: dict = Depends(get_current_user)):
-    return {"packs": await list_sticker_packs(get_db()), "source": builtin_source()}
+async def list_stickers(me: dict = Depends(get_current_user)):
+    # Geschenkte Saison-Sticker (#736) sieht nur, wer sie bekam - deshalb mit der Person.
+    return {"packs": await list_sticker_packs(get_db(), user_id=me["id"]), "source": builtin_source()}
 
 
 @router.get("/files/{pack}/{filename}")

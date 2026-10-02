@@ -400,7 +400,7 @@ async def post_team_chat(team_id: str, body: TeamChatCreate, me: dict = Depends(
     now = now_utc().isoformat()
     message_id = new_id()
     from services.stickers import sticker_for_message
-    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids, me["id"])
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "team", "team_id": team_id, "message_id": message_id,
     })

@@ -188,7 +188,7 @@ async def post_tournament_chat(tid: str, body: TournamentChatCreate, me: dict = 
     now = now_utc().isoformat()
     message_id = new_id()
     from services.stickers import sticker_for_message
-    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids, me["id"])
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "tournament", "tournament_id": tid, "message_id": message_id,
     })

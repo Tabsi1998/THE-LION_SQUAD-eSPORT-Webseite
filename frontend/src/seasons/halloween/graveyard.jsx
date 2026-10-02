@@ -4,6 +4,7 @@ import { hashString, mulberry32 } from "../rng";
 import { emitSound } from "../audio";
 import { requestMotion } from "../motion";
 import { recordSignal } from "../signals";
+import { useFooterLineTop } from "../footerLine";
 import { Ghost, MiniTombstone } from "./art";
 
 // Mini-Friedhof (#662): zwei bis vier winzige Grabsteine stehen auf dem Strich über der Impressum-Leiste. Ein
@@ -21,26 +22,8 @@ export function ghostDrift(rng) {
   return { dx: Math.cos(angle) * distance, dy: Math.sin(angle) * distance, spin: (rng() - 0.5) * 30 };
 }
 
-/** Wo der Strich über dem Impressum liegt (Abstand zur Oberkante des Footers) - null, wenn es keinen gibt. */
-export function useFooterLineTop(deps = []) {
-  const [top, setTop] = useState(null);
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    const measure = () => {
-      const line = document.querySelector("footer [data-season-line]");
-      setTop(line ? line.offsetTop : null);
-    };
-    measure();
-    const timer = window.setTimeout(measure, 1200);
-    window.addEventListener("resize", measure);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("resize", measure);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return top;
-}
+// Der Strich über dem Impressum ist eine gemeinsame Kante (auch für den Nikolausstiefel) - der Haken liegt in footerLine.js.
+export { useFooterLineTop };
 
 export function Graveyard({ graves, salt, ghostMs = 8000, cooldownMs = GHOST_COOLDOWN_MS }) {
   const top = useFooterLineTop([graves]);

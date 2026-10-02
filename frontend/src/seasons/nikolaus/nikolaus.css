@@ -1,0 +1,75 @@
+/* Nikolaus (S8, X3 #736): der Stiefel steht auf der Linie über dem Impressum (rechts, wo zu Halloween die Kürbisse
+   stehen), wackelt selten ein wenig, beim Öffnen deutlicher; der Gutschein steigt heraus, darüber die Karte mit dem
+   Sticker. „dezent“ und „Bewegung reduzieren“: nichts wackelt, die Karte steht gleich da. */
+.tls-nikolaus-scene { position: absolute; right: 2rem; bottom: 0; transform: translateY(-100%); display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; z-index: 3; }
+.tls-nikolaus-scene[data-line="1"] { bottom: auto; }
+.tls-nikolaus-art { display: block; max-width: none; overflow: visible; }
+
+.tls-nikolaus-boot { display: block; padding: 0; margin: 0; border: 0; background: none; line-height: 0; cursor: pointer; transform-origin: 60% 100%; animation: tls-nikolaus-idle 9s ease-in-out 3s infinite; }
+.tls-nikolaus-boot:hover { filter: drop-shadow(0 0 8px rgba(255, 200, 140, 0.35)); }
+.tls-nikolaus-boot:focus-visible { outline: 2px solid #ffc857; outline-offset: 4px; border-radius: 6px; }
+.tls-nikolaus-boot--opening { animation: tls-nikolaus-wobble 0.6s ease-in-out both; }
+.tls-nikolaus-boot--used, .tls-nikolaus-boot--still { animation: none; }
+/* Selten ein kleines Wippen - als ob jemand vorbeigegangen wäre. */
+@keyframes tls-nikolaus-idle {
+  0%, 88%, 100% { transform: rotate(0deg); }
+  90% { transform: rotate(-4deg); }
+  92.5% { transform: rotate(3deg); }
+  95% { transform: rotate(-1.5deg); }
+  97.5% { transform: rotate(0.6deg); }
+}
+@keyframes tls-nikolaus-wobble {
+  0% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  55% { transform: rotate(6deg); }
+  80% { transform: rotate(-3deg); }
+  100% { transform: rotate(0deg); }
+}
+/* Der Gutschein steigt aus dem Stiefel und verschwindet nach oben - dort erscheint gleich die Karte. */
+.tls-nikolaus-boot--opening .tls-nikolaus-voucher { animation: tls-nikolaus-rise 0.9s ease-in 0.15s both; }
+@keyframes tls-nikolaus-rise {
+  0% { transform: translateY(0); opacity: 1; }
+  55% { transform: translateY(-14px); opacity: 1; }
+  100% { transform: translateY(-28px); opacity: 0; }
+}
+
+.tls-nikolaus-card { position: relative; display: flex; align-items: center; gap: 0.75rem; width: min(19rem, calc(100vw - 2.5rem)); padding: 0.75rem 2.3rem 0.8rem 0.8rem; border-radius: 0.85rem; border: 1px solid rgba(255, 200, 140, 0.35); background: radial-gradient(ellipse at 20% 0%, #2a1416, #120b0c 72%); color: #fff4e6; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), 0 0 30px rgba(212, 40, 44, 0.12); transform-origin: 88% 100%; animation: tls-nikolaus-card-in 0.35s ease-out both; }
+/* Die Spitze zeigt auf den Stiefel. */
+.tls-nikolaus-card::after { content: ""; position: absolute; right: 1.6rem; bottom: -7px; width: 12px; height: 12px; background: #140c0d; border-right: 1px solid rgba(255, 200, 140, 0.35); border-bottom: 1px solid rgba(255, 200, 140, 0.35); transform: rotate(45deg); }
+@keyframes tls-nikolaus-card-in {
+  0% { opacity: 0; transform: translateY(10px) scale(0.92); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.tls-nikolaus-card__sticker { width: 4rem; height: 4rem; flex: none; object-fit: contain; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45)); animation: tls-nikolaus-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both; }
+@keyframes tls-nikolaus-pop {
+  0% { transform: scale(0.4) rotate(-12deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.tls-nikolaus-card__body { min-width: 0; }
+.tls-nikolaus-card__title { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-card__name { margin-top: 0.1rem; font-size: 1.05rem; font-weight: 700; }
+.tls-nikolaus-card__text { margin: 0.15rem 0 0; font-size: 0.85rem; line-height: 1.35; color: rgba(255, 244, 230, 0.85); }
+.tls-nikolaus-card__link { display: inline-block; margin-top: 0.35rem; font-size: 0.85rem; font-weight: 700; color: #29B6E8; text-decoration: underline; }
+.tls-nikolaus-card__close { position: absolute; top: 0.35rem; right: 0.4rem; width: 1.7rem; height: 1.7rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.05rem; line-height: 1; cursor: pointer; }
+.tls-nikolaus-card__close:hover { background: rgba(255, 255, 255, 0.14); }
+.tls-nikolaus-card__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
+
+/* Der Hinweis unten in der Mitte (Platz der Saison-Grüße): der Stiefel klein daneben, „Zum Stiefel“ führt hin. */
+.tls-nikolaus-hint { display: flex; align-items: center; gap: 0.8rem; width: min(92vw, 27rem); padding: 0.7rem 2.4rem 0.75rem 0.8rem; border-radius: 0.85rem; border: 1px solid rgba(255, 200, 140, 0.35); background: radial-gradient(ellipse at 20% 0%, #2a1416, #120b0c 72%); color: #fff4e6; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); animation: tls-nikolaus-hint-in 0.6s ease-out both; }
+.tls-nikolaus-hint .tls-nikolaus-art { width: 2.9rem; height: auto; flex: none; }
+@keyframes tls-nikolaus-hint-in {
+  0% { opacity: 0; transform: translate(-50%, 14px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.tls-nikolaus-hint__title { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-hint__text { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.35; }
+.tls-nikolaus-hint__actions { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.45rem; }
+.tls-nikolaus-hint__button { padding: 0.3rem 0.8rem; border: 0; border-radius: 999px; background: #d4282c; color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.tls-nikolaus-hint__button:hover { background: #e2363a; }
+.tls-nikolaus-hint__button:focus-visible, .tls-nikolaus-hint__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
+.tls-nikolaus-hint__link { font-size: 0.82rem; font-weight: 700; color: #29B6E8; text-decoration: underline; }
+.tls-nikolaus-hint__close { position: absolute; top: 0.35rem; right: 0.4rem; width: 1.7rem; height: 1.7rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.05rem; line-height: 1; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-nikolaus-boot, .tls-nikolaus-voucher, .tls-nikolaus-card, .tls-nikolaus-card__sticker, .tls-nikolaus-hint { animation: none !important; }
+}

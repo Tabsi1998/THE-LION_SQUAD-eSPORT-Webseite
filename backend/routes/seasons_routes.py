@@ -8,11 +8,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from auth import get_optional_user
+from auth import get_current_user, get_optional_user
 from database import get_db
-from services import seasons, weather
+from services import nikolaus, seasons, weather
 
 router = APIRouter(prefix="/api/seasonal", tags=["seasonal"])  # /api/seasons gehört den Wettkampf-Saisonen
 ABOUT_SETTINGS_ID = "about_page"
@@ -83,3 +83,28 @@ async def seasonal_me(response: Response, user: dict | None = Depends(get_option
     # Das Geburtsdatum frisch aus der Datenbank - der angemeldete Nutzer aus dem Token trägt es nicht immer mit.
     stored = await get_db().users.find_one({"id": user["id"]}, {"_id": 0, "birth_date": 1}) or {}
     return {"scares_allowed": seasons.adult_from_birth_date(stored.get("birth_date") or user.get("birth_date"))}
+
+
+async def nikolaus_season(db) -> dict | None:
+    """Läuft der Nikolaus gerade - nach derselben Rechnung wie die öffentliche Abfrage (Admin: an, aus, erzwungen)?"""
+    stored, founded = await load_context(db)
+    return next((season for season in seasons.active(None, stored, founded)["seasons"] if season["key"] == nikolaus.SEASON), None)
+
+
+@router.get("/nikolaus")
+async def nikolaus_boot(response: Response, user: dict = Depends(get_current_user)):
+    """Der Stiefel für diese Person (#736): da oder nicht, schon geöffnet, und welcher Sticker drin war."""
+    response.headers["Cache-Control"] = "private, no-store"
+    db = get_db()
+    return await nikolaus.boot_state(db, user, await nikolaus_season(db))
+
+
+@router.post("/nikolaus/open")
+async def nikolaus_open(response: Response, user: dict = Depends(get_current_user)):
+    """Den Stiefel öffnen: einmal je Person und Jahr ein Sticker aus „Vom Nikolaus“, danach derselbe noch einmal."""
+    response.headers["Cache-Control"] = "private, no-store"
+    db = get_db()
+    season = await nikolaus_season(db)
+    if not season:
+        raise HTTPException(status_code=409, detail="Der Nikolaus kommt am 6. Dezember.")
+    return await nikolaus.open_boot(db, user, season)

@@ -283,7 +283,7 @@ async def send_direct_message(user_id: str, body: DirectMessageCreate, request: 
         raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
     now = now_utc().isoformat()
     message_id = new_id()
-    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids, me["id"])
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "direct", "user_ids": [me["id"], recipient["id"]], "message_id": message_id,
     })

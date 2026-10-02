@@ -851,7 +851,7 @@ async def post_match_chat(match_id: str, body: MatchChatCreate, request: Request
     from services.chat_attachments import claim_attachments
     from services.stickers import sticker_for_message
     message_id = new_id()
-    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids)
+    sticker = await sticker_for_message(db, body.sticker_id, text, body.attachment_ids, me["id"])
     attachments = await claim_attachments(db, me["id"], body.attachment_ids, {
         "type": "match", "match_id": match_id, "message_id": message_id,
     })
