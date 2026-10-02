@@ -91,7 +91,8 @@
           "enableBackgroundPlayback": false,
           "enableBackgroundRecording": false
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "updates": {
       "enabled": false
