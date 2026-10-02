@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { ErrorState, SkeletonList } from "../../components/ListState";
@@ -12,12 +13,15 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
 import { formatDate, placeParts } from "../../lib/format";
+import { isGuestUser } from "../../live";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { NewsPost } from "../../types";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "NewsDetail">;
 export function NewsDetailScreen({ navigation, route }: Props) {
+  const { user } = useAuth();
+  const readerId = user?.id && !isGuestUser(user) ? user.id : null;
   const [post, setPost] = useState<NewsPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,12 +31,14 @@ export function NewsDetailScreen({ navigation, route }: Props) {
     try {
       const { data } = await api.get<NewsPost>(`/news/${route.params.id}`);
       setPost(data || null);
+      // Gelesen-Marker (#616): nur mit Anmeldung, nur die Zahl - still im Hintergrund.
+      if (data?.id && readerId) api.post(`/news/${data.id}/read`).catch(() => undefined);
     } catch (err) {
       setError(errorMessage(err, "News-Beitrag konnte nicht geladen werden."));
     } finally {
       setLoading(false);
     }
-  }, [route.params.id]);
+  }, [route.params.id, readerId]);
 
   useEffect(() => {
     load();

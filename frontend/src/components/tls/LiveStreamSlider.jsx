@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
+import { streamKey, useStreamWatched } from "@/lib/streamWatch";
 import { ExternalLink, MessageSquareText, Radio, Users } from "lucide-react";
 
 function twitchChannel(stream) {
@@ -69,6 +70,8 @@ export function LiveStreamSlider() {
     [activeChannel, streams],
   );
   const channel = twitchChannel(activeStream);
+  // Zuschauer-Ping (#616): der gewählte Stream zählt, sobald er eine Minute offen ist.
+  useStreamWatched(streamKey("twitch", channel), hasConsent("external_media"));
 
   if (!streams.length || !activeStream || !channel) return null;
 

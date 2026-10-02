@@ -87,7 +87,7 @@ CREATOR = [
        "music-2", "tiktok", "tiktok_linked", [1], "TikTok verbunden.", sort_order=716),
     _c("creator_spirit", "Kreativgeist", "creator", "Liefer Highlights und Clips für die Community.", "Wird von der Vereinsleitung vergeben, wenn deine Inhalte den Verein zeigen.",
        "sparkles", "spark", None, [1, 3, 7, 15, 30], "{n} Beiträge für die Community.", sort_order=717, manual=True),
-    _c("viewer", "Zuschauer", "creator", "Schau Streams auf der Seite.", "Ein geöffneter Stream zählt einmal je Stream und Tag.",
+    _c("viewer", "Zuschauer", "creator", "Schau Streams auf der Seite.", "Ein Stream, der eine Minute offen ist, zählt einmal je Stream und Tag.",
        "eye", "eye", "streams_watched", [5, 25, 75, 200, 500], "{n} Streams geschaut.", sort_order=718),
     _c("platform_links", "Plattform-Profil", "creator", "Trag deine Plattformen ein.", "Profil → Plattformen: jede eingetragene Plattform zählt einmal.",
        "gamepad-2", "platforms", "distinct_platforms", [1, 2, 3, 4, 5, 6, 8], "{n} Plattformen im Profil.", sort_order=719),
