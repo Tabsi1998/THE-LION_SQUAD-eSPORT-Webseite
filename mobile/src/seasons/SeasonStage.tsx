@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body } from "../components/Text";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
+import { AdventWidget } from "./advent/AdventWidget";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
 
@@ -21,6 +22,8 @@ type SeasonModule = {
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
   halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
+  // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
+  advent: { Widget: AdventWidget },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

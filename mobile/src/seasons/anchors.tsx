@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
-import { NavigationRouteContext } from "@react-navigation/native";
+import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
 import { HangingBatShape, SHAPE_HEIGHT, SittingBatShape } from "./batArt";
 import { ALERT_MS, TAKEOFF_MS, alertEveryMs, restMs, wantsToRoam, type Temperament } from "./batLife";
 import { fleePath, requestHop, startFlight } from "./flights";
@@ -22,6 +22,26 @@ import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quie
 export function useRouteNameSafe(): string {
   const route = useContext(NavigationRouteContext);
   return (route && route.name) || "Dashboard";
+}
+
+/**
+ * Ist der Screen, auf dem die Komponente liegt, gerade im Blick? Tabs bleiben geladen, wenn man woanders hinwechselt -
+ * eine Dauer-Bewegung (Flammen, Wiegen) ruht dann, statt unsichtbar Akku zu kosten. Ohne Navigation (Tests): ja.
+ */
+export function useScreenFocused(): boolean {
+  const navigation = useContext(NavigationContext);
+  const [focused, setFocused] = useState(() => (navigation ? navigation.isFocused() : true));
+  useEffect(() => {
+    if (!navigation) return undefined;
+    setFocused(navigation.isFocused());
+    const offFocus = navigation.addListener("focus", () => setFocused(true));
+    const offBlur = navigation.addListener("blur", () => setFocused(false));
+    return () => {
+      offFocus();
+      offBlur();
+    };
+  }, [navigation]);
+  return focused;
 }
 
 /** Ein Dialog oder Sheet meldet sich: solange es offen ist, ruhen große Bewegungen und Plätze darunter. */

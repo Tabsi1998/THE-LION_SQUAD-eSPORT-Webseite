@@ -6,7 +6,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 // Antippen startet einen Flug in Fensterkoordinaten und räumt den Platz; Dialoge verdecken und sperren.
 
 jest.mock("expo-haptics", () => ({ impactAsync: jest.fn(async () => {}), ImpactFeedbackStyle: { Light: "light", Medium: "medium" } }));
-jest.mock("@react-navigation/native", () => ({ NavigationRouteContext: require("react").createContext({ name: "NewsList" }) }));
+jest.mock("@react-navigation/native", () => ({ NavigationRouteContext: require("react").createContext({ name: "NewsList" }), NavigationContext: require("react").createContext(undefined) }));
 
 const { Card } = require("../components/Card");
 const { SeasonPerch, useSeasonOverlay } = require("./anchors");
@@ -113,3 +113,25 @@ test("Ecknetz (A4): eine Karte ohne Fledermaus bekommt ein kleines, nicht klickb
   expect(perches.chooseWebPerches(perches.perchesFor("NewsList"), 2, () => 0.3, ["web-1"])).toEqual([]);
 });
 
+
+test("Screen im Blick: ohne Navigation ja; mit Navigation folgt der Wert den Ereignissen focus und blur", async () => {
+  const { useScreenFocused } = require("./anchors");
+  const { NavigationContext } = require("@react-navigation/native");
+  function Probe() {
+    return <Text testID="focus-probe">{useScreenFocused() ? "im Blick" : "weg"}</Text>;
+  }
+  const first = await render(<Probe />);
+  expect(screen.getByTestId("focus-probe")).toHaveTextContent("im Blick");
+  await first.unmount();
+
+  const listeners: Record<string, () => void> = {};
+  const navigation = { isFocused: jest.fn(() => false), addListener: jest.fn((event: string, callback: () => void) => { listeners[event] = callback; return () => { delete listeners[event]; }; }) };
+  const view = await render(<NavigationContext.Provider value={navigation}><Probe /></NavigationContext.Provider>);
+  expect(screen.getByTestId("focus-probe")).toHaveTextContent("weg");
+  await act(async () => listeners.focus());
+  expect(screen.getByTestId("focus-probe")).toHaveTextContent("im Blick");
+  await act(async () => listeners.blur());
+  expect(screen.getByTestId("focus-probe")).toHaveTextContent("weg");
+  await view.unmount();
+  expect(Object.keys(listeners)).toEqual([]);
+});

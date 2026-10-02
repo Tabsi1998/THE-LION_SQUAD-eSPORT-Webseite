@@ -10,6 +10,7 @@ jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({
 const mockRoute = { name: "Dashboard" };
 jest.mock("@react-navigation/native", () => ({
   NavigationRouteContext: require("react").createContext(mockRoute),
+  NavigationContext: require("react").createContext(undefined),
   createNavigationContainerRef: () => ({ isReady: () => false, getCurrentRoute: () => undefined, addListener: () => () => {} }),
 }));
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
