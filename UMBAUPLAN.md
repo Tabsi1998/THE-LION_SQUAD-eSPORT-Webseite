@@ -2744,7 +2744,22 @@ der Verwaltung.
   Rampe des Servers, ab 23:59 der Countdown nach der Serveruhr, um 00:00 „Frohes neues Jahr“ und
   die Show mit drei großen Salven, danach der Ausklang und am 1. Jänner der Gruß. Sechs
   Feuerwerksarten mit eigener Physik, jedes Jahr eine eigene Choreografie, Ton nur nach
-  Einschalten. Gemessen: rund 1 ms je Bild bei voller Teilchenzahl. Die App folgt.
+  Einschalten. Gemessen: rund 1 ms je Bild bei voller Teilchenzahl.
+- **App 1.0.5 (Build 84)** ist veröffentlicht: Schnee mit Wind aus dem echten Wetter, Regen und
+  Wetterleuchten, die Lichterkette zu Weihnachten, der Nikolausstiefel. Die APK liegt am
+  Vereinsserver, das Bundle für die Play Console beim Betreiber.
+- **Silvester in der App** (PR #803): dasselbe Feuerwerk wie auf der Website – dieselben Raketen
+  zur selben Sekunde –, gezeichnet mit Skia; ab 23:00 der Hinweis im Dashboard, ab 23:59 der
+  Countdown, um 00:00 der Gruß mit einem Vibrieren, Ton nur nach Einschalten. Weil Skia ein
+  natives Modul ist, kommt das erst mit **Build 85** zu den Mitgliedern (bis Mitte Dezember).
+- **Winterhimmel** (PR #804, schließt #730): Auf der Website liegt im Winter eine ruhige Tiefe
+  hinter dem Inhalt, passend zur echten Tageszeit und zum Wetter am Vereinsort – nachts leiser
+  Blauschein, Sterne und der Mond, in der Dämmerung ein warmes Glühen auf der Seite der Sonne;
+  die Schneehauben nehmen dieses Licht an. Sterne und Mond weichen jedem Text aus. In der App
+  dasselbe Licht, ganz leise und ohne Mond.
+- **Lehre zu Zeitzonen:** GitHub prüft in UTC, der Verein lebt in Wien. Ein Test, der um
+  Mitternacht einen bestimmten Kalendertag erwartete, war hier grün und dort rot. Tests rechnen
+  den Tag jetzt mit derselben Hilfe wie die App.
 - **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.

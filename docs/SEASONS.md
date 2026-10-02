@@ -13,7 +13,7 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, new_year, advent, snow, christmas, nikolaus, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather, christmas, nikolaus), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, new_year, advent, snow, christmas, nikolaus, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather, christmas, nikolaus, new_year), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer – mit `footerAccessible` für bedienbare Szenen –, Sound- und Schreck-Schalter) | `SeasonWidgetSlot` (Dashboard-Kopf), `SeasonEdgeSlot` (Unterkante der Begrüßungskarte), `SeasonBackdropSlot` (in `Screen`, hinter dem Inhalt), `SeasonShelfSlot` (Kopf von „Mehr“); Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
@@ -340,4 +340,41 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
 
 - Eine Saison, die die Serverzeit braucht, liest `serverOffset` aus `useSeason()`; der Server cacht die Abfrage in den
   Phasen um Mitternacht nicht.
-- Die App übernimmt die Rechnung (Paritätstests auf beiden Seiten) und zeichnet nativ – #642.
+- Die App übernimmt die Rechnung (Paritätstests auf beiden Seiten) und zeichnet nativ – #803, Abschnitt 18.
+- Die Teilchen gehören zur Seite: `layer.js` schiebt Raketen, Funken und Rauch mit dem Scrollen (#803).
+
+## 18. Silvester in der App (#803)
+
+| Teil | Datei | Was |
+|---|---|---|
+| Rechnung | `newYear/fireworks.ts`, `choreography.ts`, `countdown.ts` | Worklet-Port der Web-Rechnung; Parität `2787607397` (Feuerwerk) und `681797588` (Choreografie) |
+| Ebene | `newYear/sky.ts` | `stepFire`/`drawFire` auf dem UI-Thread, Budget 200 „normal“ / 400 „kräftig“, Rauch als Ringe, Scrollen schiebt mit, schläft ohne Raketen |
+| Zeichnen | `newYear/index.tsx` (`FireworksSky`) | Skia: je Bild ein `Picture` über `useFrameCallback`; der JS-Thread weckt die Ebene 1,5 s vor der nächsten Rakete |
+| Kopf und Gruß | `newYear/index.tsx` (`NewYearWidget`, `NewYearGreeting`) | „noch / 42 Min.“ schmal mit Lautsprecher-Knopf; Countdown-Karte oben, Null mit Gruß und Erfolgs-Tippen, einmal am Tag der Gruß |
+| Klang | `newYear/sound.ts` | eigener Schalter `newyear_sounds`, Vorgabe aus, höchstens drei Stimmen, ferne Raketen leiser |
+
+- Die Bühne hängt `Greeting` bei jedem Phasenwechsel neu ein (Schlüssel mit der Phase). Was je Jahr nur einmal
+  geschehen darf (Signal, Tippen um 00:00, Merker), steht deshalb auf Modulebene (`seen`, `resetNewYearState`).
+- Widgets im Dashboard-Kopf bleiben schmal (zwei Zeilen, Symbol-Knöpfe) – ein breites drückt den Namen weg.
+- Skia ist nativ: die Fassung wirkt erst mit einem neuen Build. In Jest gibt es Attrappen für Skia und `runOnJS`.
+
+## 19. Winterhimmel (#730, #804)
+
+| Teil | Web | App |
+|---|---|---|
+| Licht | `skyLight.js` (`skyLight`, `snowLightAt`, `winterStars`) | `sky/light.ts` – gleiche Rechnung, Parität `2188173118` |
+| Himmel | `snow/WinterSky.jsx` im `Backdrop` der Schnee-Saison | `snow/WinterSky.tsx` im Backdrop-Slot (`WinterSkyBackdrop`) |
+| Mond | `MoonArt.jsx` + `moon.js` (Kern, gemeinsam mit Halloween), Stand aus `astronomy.js`/`MoonInSky.jsx` | keiner – die Screens haben keine freie Himmelsfläche |
+| Hauben | `SnowCaps.jsx` mit `light`/`moonX` | – (die App hat keine Hauben) |
+
+- Das Licht kommt aus Sonnenauf- und -untergang und dem Wettercode, die der Server im Wetter mitschickt: Nacht mit
+  45 min Dämmerung, Glühen um Auf- und Untergang auf der Seite der Sonne (abends rechts, morgens links), Wolken
+  dämpfen, bei Schnee, Regen und Nebel keine Sterne.
+- **Wirklich hinter dem Inhalt:** `.tls-season-backdrop` (z-index 0) liegt im Web über nicht positioniertem Inhalt;
+  der Winterhimmel hat z-index −1, und nur `<html>` malt das Schwarz (body, `#root` und das Seitengerüst sind
+  durchsichtig). Eine neue Saison, die wirklich dahinter liegen soll, nimmt denselben Weg.
+- **Freie Stellen:** `pointFree` sperrt den ganzen Kasten von Schrift, Bildern, Grafiken und Bedienelementen
+  (`SKY_BLOCKERS`). Sterne und Mond sehen nach Laden, Scrollen und Größenänderung neu nach; der Mond tritt zurück,
+  statt hinter Inhalt den Kontrast zu nehmen. Auf dem Handy kein Mond.
+- „dezent“ und „Bewegung reduzieren“: derselbe Himmel still, mit halb so vielen Sternen.
+- Paritäts-Seeds: im Web heißt der Ort `route`, in der App `screen` – beide mit demselben Wert füllen.
