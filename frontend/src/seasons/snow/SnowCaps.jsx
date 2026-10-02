@@ -2,13 +2,15 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { measureQuietZones, overlayZones, rectInQuiet, watchOverlays } from "../quiet";
+import { snowLightAt } from "../skyLight";
 import { OVERHANG, capLevel, capPath, capThickness, measureCaps } from "./caps";
 
 // Schneehauben (S7, #638; W3, #729): still auf den Oberkanten von Karten, Rahmen und der Fußzeile im Fenster - je
 // Kante eine eigene Kontur und ein eigenes Wachstum aus dem Jahres-Seed, nur auf freien Stücken (nie über Abzeichen,
 // Knöpfen, Schrift), mit der Stufe des Servers und dem Tauwetter des echten Wetters. Beim Scrollen kommen weitere
 // Kanten dazu; unter geöffneten Dialogen und Menüs weicht eine Haube aus. Ohne Bewegung bleiben die Hauben - sie
-// bewegen sich ohnehin nicht. Verschiebt kein Layout: liegt als eigene Ebene über der Kante.
+// bewegen sich ohnehin nicht. Verschiebt kein Layout: liegt als eigene Ebene über der Kante. Im Licht des
+// Winterhimmels (W4 #730): tags weiß, nachts kühl, im Glühen auf der Seite der Sonne warm, unter dem Mond heller.
 
 const REFRESH_DELAYS = [400, 1500, 3500];
 /** Wie hoch eine Haube mit Zapfen höchstens ist - für das Ausweichen unter Dialogen. */
@@ -28,14 +30,19 @@ function sameCaps(a, b) {
   });
 }
 
+/** Das Licht des Tages, wenn der Himmel keines sagt: die Farben von früher (weiß, nach unten blauer). */
+const DAYLIGHT = { night: 0, warmth: 0, side: 0.7, clouds: 0, stars: 0, moon: 0 };
+
 /** Eine Haube: je freiem Stück der Kante ein eigenes SVG, damit ihr Kasten nur dort liegt, wo Schnee ist. */
-function Cap({ cap, level }) {
+function Cap({ cap, level, light, moonX }) {
   const ids = useId().replace(/[^a-zA-Z0-9]/g, "");
   const thickness = capThickness(level, cap.growth);
   const base = thickness + OVERHANG;
   return cap.runs.map((run, index) => {
     const width = run.to - run.from;
     const { d, height } = capPath({ width, thickness, seed: `${cap.seed}:${index}`, level });
+    const viewWidth = typeof window === "undefined" ? 1280 : window.innerWidth || 1280;
+    const tone = snowLightAt(light, (cap.x - (typeof window === "undefined" ? 0 : window.scrollX || 0) + run.from + width / 2) / viewWidth, moonX);
     return (
       <svg
         key={`${cap.key}:${index}`}
@@ -49,12 +56,13 @@ function Cap({ cap, level }) {
         data-kind={cap.kind}
         data-level={level}
         data-yield={cap.yield ? "1" : undefined}
+        data-tone={tone.top}
       >
         <defs>
           <linearGradient id={`${ids}-${index}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stopColor="#ffffff" />
-            <stop offset="0.7" stopColor="#e6eff8" />
-            <stop offset="1" stopColor="#c7d8ea" />
+            <stop offset="0" stopColor={tone.top} />
+            <stop offset="0.7" stopColor={tone.mid} />
+            <stop offset="1" stopColor={tone.bottom} />
           </linearGradient>
         </defs>
         <path d={d} fill={`url(#${ids}-${index})`} />
@@ -65,9 +73,9 @@ function Cap({ cap, level }) {
 
 /**
  * Hauben auf den Kanten im Fenster. `stage` (1–3) und `tempC` vom Server bzw. Wetter, `salt` das Jahres-Salz,
- * `max` die Obergrenze je Seite (Klasse).
+ * `max` die Obergrenze je Seite (Klasse), `light` das Licht des Himmels (skyLight.js), `moonX` wo der Mond steht.
  */
-export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24 }) {
+export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24, light = DAYLIGHT, moonX = null }) {
   const location = useLocation();
   const [caps, setCaps] = useState([]);
   const capsRef = useRef([]);
@@ -120,7 +128,7 @@ export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24 }) {
   if (typeof document === "undefined" || !caps.length) return null;
   return createPortal(
     <div className="tls-snowcaps" aria-hidden="true" data-testid="snow-caps" data-level={level}>
-      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} />)}
+      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} light={light || DAYLIGHT} moonX={moonX} />)}
     </div>,
     document.body,
   );

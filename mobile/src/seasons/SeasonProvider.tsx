@@ -39,6 +39,9 @@ export type SeasonWeather = {
   rain_mm?: number | null;
   snow_cm?: number | null;
   code?: number | null;
+  /** Sonnenauf- und -untergang am Vereinsort (heute) - für das Licht am Winterhimmel (W4 #730). */
+  sunrise?: string | null;
+  sunset?: string | null;
   stale?: boolean;
   source?: string;
 };

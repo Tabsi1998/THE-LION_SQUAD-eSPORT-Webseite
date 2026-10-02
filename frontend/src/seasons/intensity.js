@@ -95,13 +95,19 @@ function halloweenKeys(fx, { narrow = false } = {}) {
   };
 }
 
-/** Schnee: Anteil der Flocken aus der Atmosphäre, Hauben aus den Ecken (Handy keine), Blauschein wo Atmosphäre erlaubt ist. */
-function snowKeys(fx) {
+/**
+ * Schnee: Anteil der Flocken aus der Atmosphäre, Hauben aus den Ecken (Handy keine), Winterhimmel (W4 #730) wo
+ * Atmosphäre erlaubt ist - Blauschein, Glühen und Mond; Sterne lebendig mehr, sonst weniger, auf dem Handy wenige.
+ */
+function snowKeys(fx, { mobile = false } = {}) {
+  const sky = fx.ambient !== "none";
   return {
     flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6,
     caps: fx.corner > 0,
     capsMax: fx.corner * 6,
-    tint: fx.ambient !== "none",
+    tint: sky,
+    stars: !sky ? 0 : mobile ? 8 : fx.ambient === "near" ? 32 : 18,
+    moon: sky && !mobile,
   };
 }
 

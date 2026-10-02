@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { moonPosition, skyPlacement } from "../astronomy";
+import { DEFAULT_LOCATION } from "../MoonInSky";
 import { seasonSeed, seasonYear } from "../rng";
 import { capabilities, scaleForViewport } from "../intensity";
 import { useSeason } from "../SeasonContext";
 import { recordSignal } from "../signals";
+import { skyLight } from "../skyLight";
 import { createSnowLayer } from "./layer";
 import { SnowCaps } from "./SnowCaps";
+import { WinterSky } from "./WinterSky";
 import "./snow.css";
 
 // Schnee (Jahreszeiten II S7, #638; Advent & Winter W2 und W3, #728, #729): vom 1. Advent bis Dreikönig fällt
@@ -14,6 +18,8 @@ import "./snow.css";
 // Nachts bei „voll“ ein leiser Blauschein hinter dem Inhalt. Neben dem Logo eine Schneeflocke zum Fangen: fünfzig
 // Klicks sind das Signal für den geheimen Erfolg „Schneekönig“. Reduced Motion und „dezent“: keine Flocken, die
 // Hauben bleiben. Alles aus dem Jahres-Seed; die Seitenklasse (intensity.js, Saison `snow`) sagt, wie viel.
+// Winterhimmel (W4 #730): hinter dem Inhalt Blauschein, Glühen, Sterne und Mond nach Sonnenzeiten und Wetter; die
+// Hauben nehmen dasselbe Licht an - tags weiß, nachts kühl, im Abendglühen warm, unter dem Mond heller.
 
 export const SIGNAL_KEY = "snowflakes_clicked";
 export const SNOW_KING_AT = 50;
@@ -35,7 +41,7 @@ export function yearSaltFor(season, now = new Date()) {
 /** Was diese Seite bekommt: Anteil der Flocken, ob und wie viele Hauben, Blauschein - aus den Effektklassen (C5). */
 export function snowLayout(pathname = "/", effective = "normal", width = typeof window === "undefined" ? 1280 : window.innerWidth) {
   const caps = scaleForViewport(capabilities(pathname, effective, "snow"), width);
-  return { cls: caps.cls, share: caps.flakes, caps: Boolean(caps.caps) && caps.capsMax > 0, capsMax: caps.capsMax, tint: Boolean(caps.tint), mobile: Boolean(caps.mobile) };
+  return { cls: caps.cls, share: caps.flakes, caps: Boolean(caps.caps) && caps.capsMax > 0, capsMax: caps.capsMax, tint: Boolean(caps.tint), stars: Number(caps.stars) || 0, moon: Boolean(caps.moon), mobile: Boolean(caps.mobile) };
 }
 
 /** Die Ebene für den gemeinsamen Canvas-Loop: Flocken - nicht ohne Bewegung, nicht bei „dezent“, nicht ohne Budget. */
@@ -47,10 +53,45 @@ export function skyLayers({ season, budget = 0, reducedMotion = false, weather =
   return [createSnowLayer({ budget, share: layout.share, seed: seasonSeed({ season: "snow", year: yearSaltFor(season), route: pathname }), weather, endsAt: season.ends_at || "" })];
 }
 
-/** Hintergrund: nachts bei „voll“ ein leiser Blauschein - nie über Schrift (liegt hinter dem Inhalt). */
-export function Backdrop({ season }) {
-  if (season.effective !== "full" || !season.data?.night) return null;
-  return <div className="tls-season-backdrop tls-snow-tint" aria-hidden="true" data-testid="snow-tint" />;
+/** Die Uhr des Himmels: jede Minute neu - das Licht ändert sich langsam. `now` nur für Tests. */
+function useSkyClock(now) {
+  const [at, setAt] = useState(() => (now ? now() : Date.now()));
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const timer = window.setInterval(() => setAt(now ? now() : Date.now()), 60000);
+    return () => window.clearInterval(timer);
+  }, [now]);
+  return at;
+}
+
+/** Das Licht dieser Minute aus den Sonnenzeiten und dem Wetter (Server); ohne Wetter die Nacht der Saison. */
+function useWinterLight(season, now) {
+  const { weather } = useSeason();
+  const at = useSkyClock(now);
+  return skyLight({ now: at, sunrise: weather?.sunrise, sunset: weather?.sunset, code: weather?.code, night: season.data?.night });
+}
+
+/**
+ * Hintergrund: der Winterhimmel, wo die Seite Atmosphäre erlaubt - immer hinter dem Inhalt. „dezent“ und „Bewegung
+ * reduzieren“ (beides kommt als `subtle`): derselbe Himmel still, mit halb so vielen Sternen.
+ */
+export function Backdrop({ season, now }) {
+  const location = useLocation();
+  const { location: place } = useSeason();
+  const width = useViewportWidth();
+  const light = useWinterLight(season, now);
+  const layout = snowLayout(location.pathname, season.effective, width);
+  if (!layout.tint) return null;
+  const still = season.effective === "subtle";
+  return <WinterSky light={light} stars={still ? Math.round(layout.stars / 2) : layout.stars} moon={layout.moon} year={yearSaltFor(season)} moving={!still} location={place} />;
+}
+
+/** Wo der Mond gerade über den Hauben steht (0…1 der Fensterbreite) - null, wenn er unter dem Horizont ist. */
+export function moonSide(place, at, width = typeof window === "undefined" ? 1280 : window.innerWidth) {
+  const spot = place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lon)) ? { lat: Number(place.lat), lon: Number(place.lon) } : DEFAULT_LOCATION;
+  const position = moonPosition(new Date(at), spot.lat, spot.lon);
+  if (position.altitude <= 0) return null;
+  return skyPlacement(position, { width, height: 800 }).x / width;
 }
 
 function useViewportWidth() {
@@ -64,14 +105,16 @@ function useViewportWidth() {
   return width;
 }
 
-/** Ecken und Kanten: die Hauben (nach Klasse und Fensterbreite; Handy keine). */
-export function Corners({ season }) {
+/** Ecken und Kanten: die Hauben (nach Klasse und Fensterbreite; Handy keine) im Licht des Himmels. */
+export function Corners({ season, now }) {
   const location = useLocation();
-  const { weather } = useSeason();
+  const { weather, location: place } = useSeason();
   const width = useViewportWidth();
+  const light = useWinterLight(season, now);
   const layout = snowLayout(location.pathname, season.effective, width);
   if (!layout.caps) return null;
-  return <SnowCaps stage={Number(season.data?.snowcap_stage) || 1} tempC={weather && weather.temp_c !== undefined ? weather.temp_c : null} salt={yearSaltFor(season)} max={layout.capsMax} />;
+  const moonX = light.night > 0.05 ? moonSide(place, now ? now() : Date.now(), width) : null;
+  return <SnowCaps stage={Number(season.data?.snowcap_stage) || 1} tempC={weather && weather.temp_c !== undefined ? weather.temp_c : null} salt={yearSaltFor(season)} max={layout.capsMax} light={light} moonX={moonX} />;
 }
 
 function readClicks(storage) {

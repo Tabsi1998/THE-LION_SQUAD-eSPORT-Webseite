@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-// Schnee (S7, W2, W3): Anteil und Hauben je Seitenklasse und Fensterbreite; Flocken nur mit Bewegung und Budget;
-// Blauschein nur nachts bei „voll“; Hauben mit Stufe und Tauwetter; die Schneeflocke zählt, platzt und meldet das
-// Signal - fünfzig ergeben den Schneekönig; Jahres-Salz über Silvester.
+// Schnee (S7, W2, W3, W4): Anteil und Hauben je Seitenklasse und Fensterbreite; Flocken nur mit Bewegung und Budget;
+// der Winterhimmel nach Sonnenzeiten und Wetter hinter dem Inhalt; Hauben mit Stufe, Tauwetter und Licht; die
+// Schneeflocke zählt, platzt und meldet das Signal - fünfzig ergeben den Schneekönig; Jahres-Salz über Silvester.
 
 const mockWeather = { temp_c: -3, wind_factor: 0.8, wind_dir: 270, snow_cm: 0 };
 vi.mock("../SeasonContext", () => ({ useSeason: () => ({ weather: mockWeather }) }));
@@ -66,11 +66,28 @@ test("Jahres-Salz: fest in Tests, sonst aus dem Beginn - Schnee im Jänner zähl
   setYearSalt("test");
 });
 
-test("Blauschein nur nachts bei „voll“", () => {
-  expect(render(<Backdrop season={snow()} />).container.innerHTML).toBe("");
-  expect(render(<Backdrop season={snow({ effective: "full" })} />).container.innerHTML).toBe("");
-  render(<Backdrop season={snow({ effective: "full" }, { night: true })} />);
-  expect(screen.getByTestId("snow-tint").className).toContain("tls-season-backdrop");
+test("Winterhimmel: tagsüber ohne Blauschein und Sterne, nachts mit; „dezent“ still mit halb so vielen; stille Seiten nichts", () => {
+  Object.assign(mockWeather, { sunrise: "2026-12-12T07:45:00+01:00", sunset: "2026-12-12T16:25:00+01:00", code: 0 });
+  const noon = () => Date.parse("2026-12-12T12:00:00+01:00");
+  const night = () => Date.parse("2026-12-12T21:00:00+01:00");
+  const day = render(<MemoryRouter initialEntries={["/"]}><Backdrop season={snow()} now={noon} /></MemoryRouter>);
+  expect(screen.getByTestId("winter-sky").className).toContain("tls-season-backdrop");
+  expect(screen.queryByTestId("snow-tint")).toBeNull();
+  expect(screen.queryByTestId("winter-stars")).toBeNull();
+  day.unmount();
+  const dark = render(<MemoryRouter initialEntries={["/"]}><Backdrop season={snow()} now={night} /></MemoryRouter>);
+  expect(screen.getByTestId("snow-tint").style.opacity).toBe("1");
+  expect(screen.getByTestId("winter-stars").querySelectorAll("circle")).toHaveLength(snowLayout("/", "normal").stars);
+  expect(screen.getByTestId("winter-stars").getAttribute("class")).toContain("twinkle");
+  dark.unmount();
+  const still = render(<MemoryRouter initialEntries={["/"]}><Backdrop season={snow({ effective: "subtle" })} now={night} /></MemoryRouter>);
+  expect(screen.getByTestId("winter-stars").getAttribute("class")).not.toContain("twinkle");
+  expect(screen.getByTestId("winter-stars").querySelectorAll("circle")).toHaveLength(Math.round(snowLayout("/", "subtle").stars / 2));
+  still.unmount();
+  expect(render(<MemoryRouter initialEntries={["/admin"]}><Backdrop season={snow()} now={night} /></MemoryRouter>).container.innerHTML).toBe("");
+  delete mockWeather.sunrise;
+  delete mockWeather.sunset;
+  delete mockWeather.code;
 });
 
 test("Hauben auf der Startseite mit Stufe des Servers und Tauwetter aus dem Wetter; auf dem Handy keine", async () => {
