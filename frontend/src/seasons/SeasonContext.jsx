@@ -4,12 +4,14 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { serverOffset } from "./clock";
+import { PREVIEW_STORAGE_KEY, previewTokenFor, readPreviewToken } from "./preview";
+
+export { PREVIEW_STORAGE_KEY, previewTokenFor, readPreviewToken };
 
 // Jahreszeiten-Bühne (#634): eine Quelle für „was ist gerade aktiv“ (Server, /seasonal/active), die
 // persönliche Einstellung (an, dezent, aus - im Konto oder im Browser), „Bewegung reduzieren“ des
 // Systems und die Vorschau aus dem Admin (Token in dieser Sitzung, 60 Sekunden).
 
-export const PREVIEW_STORAGE_KEY = "tls-season-preview";
 export const PREFERENCE_STORAGE_KEY = "tls-season-preference";
 export const PREFERENCES = ["on", "subtle", "off"];
 export const REFRESH_MS = 10 * 60 * 1000;
@@ -19,20 +21,6 @@ const FAST_PHASES = new Set(["pre_countdown", "countdown", "show", "fade"]);
 
 const SeasonContext = createContext(null);
 
-export function readPreviewToken(now = Date.now()) {
-  try {
-    const raw = sessionStorage.getItem(PREVIEW_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed?.token || !(parsed.expires > now)) {
-      sessionStorage.removeItem(PREVIEW_STORAGE_KEY);
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 
 export function readStoredPreference() {
   try {

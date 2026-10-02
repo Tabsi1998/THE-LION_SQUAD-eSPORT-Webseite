@@ -120,7 +120,11 @@ export function salvoLaunches(hand, index, at) {
   return out.map((launch, n) => ({ ...launch, id: `salvo:${index}:${n}`, pattern }));
 }
 
-/** Die Startzeit einer großen Salve (ms, Serverzeit) aus dem Beginn der Show. */
-export function salvoTimes(showStart) {
-  return SALVO_MINUTES.map((minute) => showStart + minute * 60000);
+/**
+ * Die Startzeiten der großen Salven (ms, Serverzeit) aus dem Beginn der Show - um 00:00, 00:05 und 00:10. Die
+ * Probe-Show der Vorschau schickt eigene Abstände in Sekunden (`salvo_seconds`), damit alles in eine Minute passt.
+ */
+export function salvoTimes(showStart, seconds = null) {
+  const offsets = Array.isArray(seconds) && seconds.length ? seconds.map((second) => second * 1000) : SALVO_MINUTES.map((minute) => minute * 60000);
+  return offsets.map((offset) => showStart + offset);
 }

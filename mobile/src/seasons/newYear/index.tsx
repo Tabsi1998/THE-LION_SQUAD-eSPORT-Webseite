@@ -63,14 +63,14 @@ function handFor(season: ActiveSeason): Hand {
 /** Die Raketen der laufenden Stunde (Server) und - in der Show - die drei großen Salven; wie `currentPlan` im Web. */
 export function planFor(season: ActiveSeason, serverNow: string | null): Launch[] {
   if (season.key !== "new_year") return [];
-  const data = (season.data || {}) as { seed?: number; salvos?: number[]; show_start?: string };
+  const data = (season.data || {}) as { seed?: number; salvos?: number[]; show_start?: string; salvo_seconds?: number[] };
   const hand = handFor(season);
   const payloadNow = Date.parse(serverNow || "");
   const hourStart = Number.isFinite(payloadNow) ? Math.floor(payloadNow / 3600000) * 3600000 : 0;
   const launches = planHour(hand, { hourSeed: data.seed ?? 0, salvos: Array.isArray(data.salvos) ? data.salvos : [], phase: season.phase, hourStart });
   const showStart = Date.parse(data.show_start || "");
   if (Number.isFinite(showStart) && ["pre_countdown", "countdown", "show"].includes(season.phase)) {
-    salvoTimes(showStart).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
+    salvoTimes(showStart, data.salvo_seconds ?? null).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
   }
   return launches;
 }
@@ -239,10 +239,10 @@ export function SoundSwitch({ testID = "new-year-sound" }: { testID?: string }) 
  */
 export function NewYearWidget({ season }: { season: ActiveSeason; screen?: string }) {
   const now = useServerClock(5000);
-  const data = (season.data || {}) as { show_start?: string };
+  const data = (season.data || {}) as { show_start?: string; new_year?: number };
   const state = countdownState(now, Date.parse(data.show_start || ""));
   if (!ROCKET_PHASES.has(season.phase)) return null;
-  const year = newYearOf(data.show_start);
+  const year = data.new_year || newYearOf(data.show_start);
   return (
     <View style={styles.widget} testID="new-year-widget">
       {state.stage === "hint" ? (
@@ -264,12 +264,12 @@ export function NewYearGreeting({ season, screen }: { season: ActiveSeason; scre
   const { reducedMotion } = useSeason();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const data = (season.data || {}) as { show_start?: string };
+  const data = (season.data || {}) as { show_start?: string; new_year?: number; salvo_seconds?: number[] };
   const showStart = Date.parse(data.show_start || "");
   const near = ["pre_countdown", "countdown", "show"].includes(season.phase);
   const now = useServerClock(near ? 100 : 5000);
   const state = countdownState(now, showStart);
-  const year = newYearOf(data.show_start);
+  const year = data.new_year || newYearOf(data.show_start);
   const still = season.effective === "subtle" || reducedMotion;
   const greeting = season.texts?.greeting || "Frohes neues Jahr wünscht THE LION SQUAD";
   const beat = useRef(new RNAnimated.Value(0)).current;
@@ -297,7 +297,7 @@ export function NewYearGreeting({ season, screen }: { season: ActiveSeason; scre
   useEffect(() => {
     if (!Number.isFinite(showStart) || season.effective === "subtle") return undefined;
     const offsetNow = now;
-    const timers = salvoTimes(showStart)
+    const timers = salvoTimes(showStart, data.salvo_seconds ?? null)
       .map((at) => at + 1300 - offsetNow)
       .filter((delay) => delay > 0 && delay < 15 * 60 * 1000)
       .map((delay) => setTimeout(() => void Promise.resolve(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => {}), delay));

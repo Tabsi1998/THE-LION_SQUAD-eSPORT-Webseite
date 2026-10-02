@@ -55,6 +55,17 @@ async def boot_state(db, user: dict, season: dict | None) -> dict:
     return {"active": True, "year": year, "opened": bool(gift), "sticker": sticker}
 
 
+def preview_open(user: dict, season: dict) -> dict:
+    """Vorschau (nur mit Token, nur für diese Person): der Stiefel geht auf und zeigt den Sticker, den sie bekäme -
+    ohne etwas zu vergeben oder zu speichern; beliebig oft."""
+    year = season_year(season)
+    pack = seasonal_pack(SEASON)
+    if not pack:
+        return {"year": year, "sticker": None, "new": False, "preview": True}
+    sticker = pick_sticker(pack["stickers"], user["id"], year, set())
+    return {"year": year, "sticker": _public(pack, sticker["id"]), "new": True, "preview": True}
+
+
 async def open_boot(db, user: dict, season: dict) -> dict:
     """Den Stiefel öffnen: beim ersten Mal im Jahr ein neuer Sticker (``new``), danach derselbe noch einmal."""
     year = season_year(season)

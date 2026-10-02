@@ -19,6 +19,7 @@ const mockFs = {
 jest.mock("expo-file-system/legacy", () => mockFs);
 
 const { BURST_VOICES, MAX_VOICES, NEW_YEAR_SOUND_KEY, playFireSound, readNewYearSound, renderBoom, renderWhistle, resetNewYearSound, setNewYearSound, volumeFor } = require("./sound");
+const { seasonAudioMode } = require("../sound/player");
 
 beforeEach(async () => {
   resetNewYearSound();
@@ -47,7 +48,7 @@ test("eingeschaltet: Zischen und Knall aus dem Cache, ohne fremde Musik zu unter
   const results: boolean[] = [];
   for (let i = 0; i < 5; i += 1) results.push(await playFireSound("boom-crackle", 0.9, 10_000 + i * 200));
   expect(results.filter(Boolean)).toHaveLength(MAX_VOICES);
-  expect(mockAudio.setAudioModeAsync).toHaveBeenCalledWith({ playsInSilentMode: false, interruptionMode: "mixWithOthers" });
+  expect(mockAudio.setAudioModeAsync).toHaveBeenCalledWith(seasonAudioMode());
   expect(mockFs.writeAsStringAsync).toHaveBeenCalledTimes(1);
   const player = mockAudio.createAudioPlayer.mock.results[0].value;
   expect(player.volume).toBeCloseTo(volumeFor(0.9), 2);

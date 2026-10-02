@@ -80,7 +80,9 @@ test("Vorschau merkt sich das Token nur in dieser Sitzung und sagt der Bühne so
   expect(JSON.parse(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).token).toBe("halloween.123.456.abc");
   expect(toastMock.success).toHaveBeenCalledWith("Vorschau läuft 60 Sekunden – hier und auf jeder Seite in diesem Tab.");
   expect(previewEvents).toBe(1);
-  expect(screen.queryByTestId("season-halloween-preview-at")).toBeNull();
+  // Jede Saison lässt sich zu einer gewählten Zeit vorschauen - nur das Wetter nicht (es zeigt ohnehin ein Gewitter).
+  expect(screen.getByTestId("season-halloween-preview-at")).toBeTruthy();
+  expect(screen.queryByTestId("season-weather-preview-at")).toBeNull();
   await user.type(screen.getByTestId("season-new_year-preview-at"), "2026-12-31T23:59");
   await user.click(screen.getByTestId("season-new_year-preview"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/seasons/new_year/preview", { at: "2026-12-31T23:59" }));

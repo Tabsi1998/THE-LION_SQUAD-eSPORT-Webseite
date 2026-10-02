@@ -53,14 +53,21 @@ export function skyLayers({ season, budget = 0, reducedMotion = false, weather =
   return [createSnowLayer({ budget, share: layout.share, seed: seasonSeed({ season: "snow", year: yearSaltFor(season), route: pathname }), weather, endsAt: season.ends_at || "" })];
 }
 
-/** Die Uhr des Himmels: jede Minute neu - das Licht ändert sich langsam. `now` nur für Tests. */
+/**
+ * Die Uhr des Himmels nach der Serverzeit (eine Vorschau „zu dieser Zeit“ verschiebt sie): jede Minute neu - das Licht
+ * ändert sich langsam. `now` nur für Tests.
+ */
 function useSkyClock(now) {
-  const [at, setAt] = useState(() => (now ? now() : Date.now()));
+  const { serverOffset } = useSeason();
+  const read = () => (now ? now() : Date.now() + (serverOffset || 0));
+  const [at, setAt] = useState(read);
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const timer = window.setInterval(() => setAt(now ? now() : Date.now()), 60000);
+    setAt(read());
+    const timer = window.setInterval(() => setAt(read()), 60000);
     return () => window.clearInterval(timer);
-  }, [now]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now, serverOffset]);
   return at;
 }
 

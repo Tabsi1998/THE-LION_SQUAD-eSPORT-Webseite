@@ -68,6 +68,9 @@ test("Große Salven um 00:00, 00:05, 00:10: je eigenes Muster - Fächer, Welle, 
   const hand = { ...handwriting(2026), salvos: ["fan", "wave", "crown"] };
   const showStart = Date.UTC(2026, 11, 31, 23, 0, 0);
   expect(salvoTimes(showStart)).toEqual([showStart, showStart + 300000, showStart + 600000]);
+  // Die Probe-Show der Vorschau schickt die Abstände in Sekunden - alles passt in eine Minute.
+  expect(salvoTimes(showStart, [0, 12, 24])).toEqual([showStart, showStart + 12000, showStart + 24000]);
+  expect(salvoTimes(showStart, [])).toEqual(salvoTimes(showStart));
   const fan = salvoLaunches(hand, 0, showStart);
   expect(fan).toHaveLength(7);
   expect(new Set(fan.map((launch) => launch.x)).size).toBe(1);

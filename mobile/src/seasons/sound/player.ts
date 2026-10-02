@@ -1,10 +1,21 @@
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { Platform } from "react-native";
 import { MEOWS, SAMPLE_RATE, encodeWav, pickMeow, renderMeow, toBase64 } from "./synth";
 
 // Klänge der Saison-Deko in der App (#772): der Schalter „Töne“ (je Gerät, wie im Web), der Cache der vorgerechneten
-// Laute und das Abspielen. Leise, nur nach einem Antippen, nie bei Lautlos oder Vibration (`playsInSilentMode: false`
-// gilt auf Android und iOS) und ohne die Musik anderer Apps zu unterbrechen (`mixWithOthers`).
+// Laute und das Abspielen. Leise, nur nach einem Antippen und ohne die Musik anderer Apps zu unterbrechen
+// (`mixWithOthers`); wie laut, sagt das Handy (siehe `seasonAudioMode`).
+
+/**
+ * Wie Saison-Töne mit dem Handy umgehen. Auf dem iPhone gilt der Stummschalter (wie bei allen Umgebungs-Tönen). Auf
+ * Android zählt die Medienlautstärke, wie bei jedem Video: mit `playsInSilentMode: false` überspringt expo-audio das
+ * Abspielen dort stillschweigend, sobald das Handy auf Vibration oder Lautlos steht - und das ist auf Android fast
+ * immer so (Rückmeldung des Betreibers vom 02.10.2026: „in der Handy-App geht kein Ton“).
+ */
+export function seasonAudioMode(): { playsInSilentMode: boolean; interruptionMode: "mixWithOthers" } {
+  return { playsInSilentMode: Platform.OS === "android", interruptionMode: "mixWithOthers" };
+}
 
 export const SOUND_KEY = "season_sounds";
 /** Zwei Klänge nie dichter als das - wie `MIN_GAP_MS` im Web, kein Geknatter bei schnellem Tippen. */
@@ -128,7 +139,7 @@ export async function playSeasonSound(name: SeasonSound, { rng = Math.random, no
       uri = await soundFile(fs, `meow-${kind}`, () => renderMeow(MEOWS[kind]));
     }
     if (!uri) return false;
-    audioReady = audioReady || audio.setAudioModeAsync({ playsInSilentMode: false, interruptionMode: "mixWithOthers" }).catch(() => undefined);
+    audioReady = audioReady || audio.setAudioModeAsync(seasonAudioMode()).catch(() => undefined);
     await audioReady;
     const player = audio.createAudioPlayer({ uri });
     player.play();

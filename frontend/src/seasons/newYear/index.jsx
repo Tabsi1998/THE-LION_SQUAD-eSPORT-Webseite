@@ -67,7 +67,7 @@ export function currentPlan() {
     launches = planHour(hand, { hourSeed: data.seed, salvos: Array.isArray(data.salvos) ? data.salvos : [], phase: season.phase, hourStart });
     const showStart = Date.parse(data.show_start || "");
     if (Number.isFinite(showStart) && (season.phase === "countdown" || season.phase === "show" || season.phase === "pre_countdown")) {
-      salvoTimes(showStart).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
+      salvoTimes(showStart, data.salvo_seconds).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
     }
   }
   planCache = { version: live.version, launches };
@@ -152,7 +152,7 @@ export function Widget({ season }) {
   const now = useServerClock(5000);
   const state = countdownState(now, Date.parse(season.data?.show_start || ""));
   if (!ROCKET_PHASES.has(season.phase)) return null;
-  const year = newYearOf(season.data?.show_start);
+  const year = season.data?.new_year || newYearOf(season.data?.show_start);
   return (
     <span className="tls-ny-widget" data-testid="new-year-widget">
       {state.stage === "hint" && (
@@ -175,7 +175,8 @@ export function Toast({ season }) {
   const near = season.phase === "pre_countdown" || season.phase === "countdown" || season.phase === "show";
   const now = useServerClock(near ? 100 : 5000);
   const state = countdownState(now, showStart);
-  const year = newYearOf(season.data?.show_start);
+  // Das Jahr sagt der Server (die Probe-Show der Vorschau läuft mitten im Jahr), sonst der Beginn der Show.
+  const year = season.data?.new_year || newYearOf(season.data?.show_start);
   const still = season.effective === "subtle";
   const greeting = season.texts?.greeting || "Frohes neues Jahr wünscht THE LION SQUAD";
   const [toast, setToast] = useState(false);

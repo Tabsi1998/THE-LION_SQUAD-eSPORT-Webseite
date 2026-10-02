@@ -104,6 +104,8 @@ export function salvoLaunches(hand: Hand, index: number, at: number): Launch[] {
   return out.map((launch, n) => ({ ...launch, id: `salvo:${index}:${n}`, pattern }));
 }
 
-export function salvoTimes(showStart: number): number[] {
-  return SALVO_MINUTES.map((minute) => showStart + minute * 60000);
+/** Wie im Web: 00:00, 00:05, 00:10 - oder die Abstände der Probe-Show in Sekunden (`salvo_seconds`). */
+export function salvoTimes(showStart: number, seconds: number[] | null = null): number[] {
+  const offsets = Array.isArray(seconds) && seconds.length ? seconds.map((second) => second * 1000) : SALVO_MINUTES.map((minute) => minute * 60000);
+  return offsets.map((offset) => showStart + offset);
 }

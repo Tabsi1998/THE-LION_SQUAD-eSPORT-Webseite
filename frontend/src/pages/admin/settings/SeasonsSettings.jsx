@@ -135,7 +135,7 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
         <button type="button" onClick={() => onPreview(previewAt)} disabled={busy} data-testid={`season-${season.key}-preview`} className="px-3 py-1.5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
           <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
         </button>
-        {["new_year", "advent", "snow", "advent_calendar"].includes(season.key) && (
+        {season.key !== "weather" && (
           <label className="flex items-center gap-2 text-[11px] text-white/50">
             <span>zu dieser Zeit</span>
             <input type="datetime-local" value={previewAt} onChange={(e) => setPreviewAt(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" data-testid={`season-${season.key}-preview-at`} />
