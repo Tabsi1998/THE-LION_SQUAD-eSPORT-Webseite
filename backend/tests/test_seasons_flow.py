@@ -4,7 +4,7 @@ mit Erzwingen und Protokoll, die öffentliche Abfrage gecacht und ohne Anmeldung
 den, der das Token hat, und der persönliche Schalter am Konto."""
 import pathlib
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -38,8 +38,9 @@ def test_ostern_advent_fasching_aus_formeln():
     assert [seasons.first_advent(y) for y in (2026, 2027, 2028, 2029)] == [date(2026, 11, 29), date(2027, 11, 28), date(2028, 12, 3), date(2029, 12, 2)]
     # Fällt der 24.12. auf einen Sonntag (2028), ist er selbst der 4. Advent.
     assert seasons.fourth_advent(2028) == date(2028, 12, 24)
-    assert seasons.carnival_tuesday(2027) == date(2027, 2, 9)
-    assert seasons.carnival_tuesday(2028) == date(2028, 2, 29)
+    # Faschingsdienstag (#643): 47 Tage vor Ostern - 2028 der Schalttag, 2030 erst im März.
+    assert [seasons.carnival_tuesday(y) for y in (2027, 2028, 2029, 2030)] == [
+        date(2027, 2, 9), date(2028, 2, 29), date(2029, 2, 13), date(2030, 3, 5)]
     assert seasons.palm_sunday(2027) == date(2027, 3, 21)
     assert seasons.good_friday(2027) == date(2027, 3, 26)
     assert seasons.easter_monday(2027) == date(2027, 3, 29)
@@ -141,6 +142,12 @@ def test_silvester_rampe_wie_in_der_tabelle():
 def test_ostern_fasching_und_vereinsgeburtstag():
     assert keys(seasons.active(at(2027, 2, 9, 10), {}))["carnival"]["phase"] == "deko"
     assert "carnival" not in keys(seasons.active(at(2027, 2, 10, 10), {}))
+    # Ein Tag, nicht mehr: von 00:00 bis 23:59 Wiener Zeit, in jedem Jahr am berechneten Dienstag.
+    for day in (date(2028, 2, 29), date(2029, 2, 13), date(2030, 3, 5)):
+        assert "carnival" in keys(seasons.active(at(day.year, day.month, day.day, 0, 1), {}))
+        assert "carnival" in keys(seasons.active(at(day.year, day.month, day.day, 23, 58), {}))
+        before = day - timedelta(days=1)
+        assert "carnival" not in keys(seasons.active(at(before.year, before.month, before.day, 23, 58), {}))
     palm = keys(seasons.active(at(2027, 3, 21, 10), {}))
     assert palm["easter"]["phase"] == "deko" and "easter_hunt" not in palm
     friday = keys(seasons.active(at(2027, 3, 26, 10), {}))

@@ -148,13 +148,22 @@ jest.mock("react-native-reanimated", () => {
   };
 });
 
-// Skia (Silvester, #642): im Test gibt es keine Zeichenfläche. Die Attrappe nimmt Zeichenbefehle entgegen und zählt
-// sie (`__skiaDraws`), damit Tests sehen, dass gezeichnet wird.
+// Skia (Silvester, #642; Fasching #643): im Test gibt es keine Zeichenfläche. Die Attrappe nimmt Zeichenbefehle
+// entgegen und zählt sie (`__skiaDraws`), damit Tests sehen, dass gezeichnet wird.
 jest.mock("@shopify/react-native-skia", () => {
   const React = require("react");
   const { View } = require("react-native");
-  const draws = { circles: 0 };
-  const canvas = { drawCircle: () => { draws.circles += 1; } };
+  const draws = { circles: 0, rects: 0, paths: 0 };
+  const canvas = {
+    drawCircle: () => { draws.circles += 1; },
+    drawRect: () => { draws.rects += 1; },
+    drawPath: () => { draws.paths += 1; },
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    scale() {},
+  };
   const paint = () => ({ setColor() {}, setAlphaf() {}, setBlendMode() {}, setAntiAlias() {} });
   return {
     __esModule: true,
@@ -167,6 +176,7 @@ jest.mock("@shopify/react-native-skia", () => {
       Paint: paint,
       Color: (value) => value,
       XYWHRect: (x, y, width, height) => ({ x, y, width, height }),
+      Path: { Make: () => ({ moveTo() {}, lineTo() {}, close() {} }) },
     },
     __skiaDraws: draws,
   };

@@ -1,0 +1,36 @@
+/* Fasching (S12 #643, F1–F3): Partyhut auf dem Löwen (antippbar, sonst nichts), Luftschlangen am oberen Rand des
+   Inhalts (gehören zur Seite), der Gruß als Karte. Konfetti zeichnet die gemeinsame Himmelsfläche. */
+.tls-party-hat { position: absolute; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; line-height: 0; transform: rotate(-12deg); transform-origin: 50% 90%; z-index: 62; }
+.tls-party-hat:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; border-radius: 4px; }
+.tls-party-hat svg { max-width: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.tls-party-hat--hero { position: relative; transform: rotate(-8deg); }
+.tls-party-hat--still { display: inline-block; cursor: default; pointer-events: none; }
+.tls-party-hat--wiggle { animation: tls-hat-wiggle 0.7s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes tls-hat-wiggle {
+  0% { transform: rotate(-12deg) translateY(0); }
+  25% { transform: rotate(-24deg) translateY(-6px); }
+  55% { transform: rotate(4deg) translateY(-2px); }
+  80% { transform: rotate(-16deg) translateY(0); }
+  100% { transform: rotate(-12deg) translateY(0); }
+}
+.tls-party-hat-page { position: absolute; z-index: 40; pointer-events: none; }
+
+.tls-streamers { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; pointer-events: none; }
+.tls-streamer { position: absolute; max-width: none; overflow: visible; transform-origin: 50% 0; }
+.tls-streamer--sway { animation: tls-streamer-sway var(--sway, 5s) ease-in-out infinite alternate; }
+@keyframes tls-streamer-sway {
+  from { transform: rotate(-2.2deg); }
+  to { transform: rotate(2.6deg); }
+}
+.tls-streamer--unfold path { stroke-dasharray: var(--length) var(--length); stroke-dashoffset: var(--length); animation: tls-streamer-unfold 1.2s cubic-bezier(0.2, 0.8, 0.3, 1) forwards; animation-delay: inherit; }
+.tls-streamer--unfold path + path { stroke-dasharray: 5 8; stroke-dashoffset: 0; animation: tls-streamer-fade 1.2s ease-out both; animation-delay: inherit; }
+@keyframes tls-streamer-unfold { to { stroke-dashoffset: 0; } }
+@keyframes tls-streamer-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.tls-carnival-toast { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem; background: #0e1220; border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 0.6rem; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); color: #fff6e0; }
+.tls-carnival-toast__text { font-weight: 800; letter-spacing: 0.02em; }
+.tls-carnival-toast__close { margin-left: 0.4rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.1rem; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-streamer--sway, .tls-party-hat--wiggle, .tls-streamer--unfold path { animation: none; stroke-dashoffset: 0; }
+}
