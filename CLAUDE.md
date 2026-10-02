@@ -3018,6 +3018,44 @@ Seit dem 15. September gilt:
   `seasons/clock.js` (`serverOffset` gegen die Mitte der Abfrage),
   `SeasonContext` gibt `serverOffset` und `serverNow` weiter; der Server
   cacht `/api/seasonal/active` in `NEW_YEAR_LIVE_PHASES` (23:45–00:44) nicht.
+  Die Teilchen gehören zur Seite (`layer.js` schiebt sie mit dem Scrollen);
+  wer die Null gesehen hat, bekommt den Gruß danach nicht noch einmal.
+- Silvester in der App (#642, #739–#743; PR #803): `mobile/src/seasons/newYear/`
+  – `fireworks.ts` und `choreography.ts` als Worklet-Port der Web-Rechnung
+  (Parität `2787607397` Feuerwerk, `681797588` Choreografie in beiden
+  Test-Dateien), `countdown.ts` (wie im Web, dazu `serverOffset`), `sky.ts`
+  (`stepFire`/`drawFire` auf dem UI-Thread, Budget 200 „normal“/400
+  „kräftig“, Rauch als Ringe mit eigenem Pinsel, Scrollen schiebt mit,
+  `fireIdle`/`nextLaunchAt` zum Schlafen), `sound.ts` (eigener Schalter
+  `newyear_sounds`, Vorgabe aus, höchstens drei Stimmen, Zischen/Knall als
+  WAV im Cache), `index.tsx` (`FireworksSky`: Skia-`Picture` je Bild über
+  `useFrameCallback`, weckt sich 1,5 s vor der nächsten Rakete;
+  `NewYearWidget` schmal – „noch“ / „42 Min.“ übereinander und ein
+  Lautsprecher-Knopf, sonst drückt er den Namen in der Begrüßungskarte weg;
+  `NewYearGreeting`: Countdown-Karte oben, Null mit Gruß, einmal am Tag der
+  Gruß; was je Jahr nur einmal geschehen darf – Signal, Tippen um 00:00,
+  Merker –, steht in `seen` auf Modulebene, weil die Bühne den Gruß bei jedem
+  Phasenwechsel neu einhängt). `SeasonProvider` misst den Versatz zur
+  Serveruhr. Skia (`@shopify/react-native-skia` 2.6.2) ist nativ – wirkt erst
+  mit Build 85; `jest.setup.js` hat Attrappen für Skia (`__skiaDraws`) und
+  `runOnJS`.
+- Winterhimmel (#730; PR #804): Web `seasons/skyLight.js` (`skyLight` aus
+  Sonnenauf-/-untergang und WMO-Code: `night` mit 45 min Dämmerung,
+  `warmth` um Auf- und Untergang, `side` 0,7 abends/0,3 morgens, `clouds`,
+  `stars`, `moon`; `snowLightAt` Haubenfarben je Lage; `winterStars`),
+  `snow/WinterSky.jsx` (wirklich hinter dem Inhalt: z-index −1; `pointFree`
+  mit `SKY_BLOCKERS` – der ganze Kasten von Schrift, Bild, Grafik,
+  Bedienelement sperrt; Sterne und `WinterMoon` sehen nach Laden, Scrollen
+  und Größenänderung neu nach; der Mond tritt zurück, wenn Inhalt über
+  seiner Scheibe liegt; Funkeln nur mit Bewegung), `MoonArt.jsx` und
+  `moon.js` (Mond und Mondphase, mit #804 aus Halloween in den Kern gezogen;
+  `halo` verstärkt den Schein), `SnowCaps.jsx` nimmt `light`/`moonX`. Dafür
+  malt nur `<html>` das Schwarz – body, `#root` und das Gerüst in
+  `PublicLayout.jsx` sind durchsichtig. App `sky/light.ts` (Parität
+  `2188173118` mit `skyLight.test.js`), `snow/WinterSky.tsx`
+  (`WinterSkyBackdrop` im Backdrop-Slot: Blauschein, Glühen, wenige stille
+  Sterne, oben weich eingeblendet; kein Mond – keine freie Himmelsfläche).
+  Der Server schickt `sunrise`, `sunset` und `code` im Wetter schon mit.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3384,6 +3422,22 @@ npx expo install --check
   5 min), die Datei danach wieder löschen. Aufnahmen mit `adb shell
   screenrecord`, Bilder mit ffmpeg; Git Bash braucht `MSYS_NO_PATHCONV=1`
   für `/sdcard/…` und Windows-Pfade für das Ziel von `adb pull`.
+- **GitHub-CI läuft in UTC**, die Maschine hier in Wien: ein Test, der um
+  Mitternacht einen Kalendertag erwartet, war lokal grün und in CI rot
+  (#803). Erwartung mit demselben Helfer rechnen (`localDay`) statt mit
+  festem Datum; vor dem Push `TZ=UTC node node_modules/jest/bin/jest.js …`
+  (Node nimmt `TZ` auch unter Windows).
+- **Saison-Hintergründe im Web:** `.tls-season-backdrop` (fixed, z-index 0)
+  liegt ÜBER nicht positioniertem Inhalt, nur sehr durchsichtig. Wirklich
+  dahinter liegt nur, was z-index −1 hat UND vor dem kein Hintergrund malt –
+  deshalb malt seit #804 nur `<html>` das Schwarz. Eine spätere Regel
+  `body { background }` in `index.css` hebt das wieder auf.
+- **Paritäts-Seeds:** im Web heißt der Ort im `seasonSeed` `route`, in der
+  App `screen`. Für gleiche Zufallsströme beide mit demselben Wert füllen
+  (Winterhimmel: `route: "sky"` / `screen: "sky"`).
+- **Widgets im Dashboard-Kopf der App** müssen schmal bleiben (zwei Zeilen,
+  Knöpfe als Symbol): ein breites Widget drückt den Namen in der
+  Begrüßungskarte auf null Breite – die Karte wird riesig und leer (#803).
 
 ---
 
@@ -3469,6 +3523,13 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 2. Oktober (Nacht)
+#801 (Release App 1.0.5 – Build 84 gebaut und veröffentlicht, siehe
+App-Builds), #802 (Doku-Stand nach #800), #803 (Silvester in der App mit
+Skia, schließt #739–#743; wirkt erst mit Build 85), #804 (Winterhimmel in
+Web und App, schließt #730). Die Website braucht `update.sh` (Winterhimmel,
+Silvester-Angleichungen im Web).
 
 ### Gemergt 2. Oktober (später Abend)
 #798 (Nikolaus in Web und App, schließt #736), #799 (Doku-Stand nach #797),
@@ -3642,20 +3703,18 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (2.10. spät): #801 Release-PR für App 1.0.5 (Build 84: Schnee,
-  Wetter, Weihnachten, Nikolaus) – nach dem Merge baue ich ihn. Danach
-  Silvester in der App (#642, #739–#744) mit eigenem Build bis Mitte
-  Dezember; Entscheidung beim Betreiber: Skia (#667) für hunderte Funken
-  oder eine sparsamere Fassung mit Reanimated. Offene Issues: #772
-  Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
-  Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
-  einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
-  verstellter Uhr (Entscheidung A/B/C offen), #678 Rest (Schalter
-  „Fundstücke im öffentlichen Profil“); Skia (#667) ist für Schnee und
-  Wetter nicht nötig (Reanimated reicht), bleibt ein möglicher Ausbau.
-  Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, W5 #731
-  Winter-Interaktionen, Eiersuche S15 #646 (Verlosung über
-  `season_raffles`). Offen bleibt:
+- Offen (2.10. Nacht): keine Feature-PRs. Als Nächstes W5 #731
+  Winter-Interaktionen (Web und App), dann der Release-PR für App 1.0.6
+  (Build 85: Silvester mit Skia #803, Winterhimmel #804, W5) – bis Mitte
+  Dezember in die Play-Prüfung. Offene Issues: #772 Klammer App-Parität
+  (Wunsch des Betreibers vom 29.09.: Wetter und Jahreszeiten sollen in der
+  App gleich gut funktionieren – jeder Web-PR einer Jahreszeit nennt sein
+  App-Gegenstück; Tabelle aktuell), #744 Abnahme Silvester Web+App (mit
+  Build 85), #733 Abnahme Winter, #775 Frühwarnung mit verstellter Uhr
+  (Entscheidung A/B/C offen), #678 Rest (Schalter „Fundstücke im
+  öffentlichen Profil“). Danach Jahreszeiten II weiter: Eiersuche S15 #646
+  (Verlosung über `season_raffles`), Fasching S12 #643 mit F1–F4
+  (#745–#748). Offen bleibt:
   Erfolge II Rest (E10 Teil 2 – acht Admin-Reiter im Web –, E12 #622, E13
   #623; die vier zurückgestellten Gruppen aus #614 warten auf
   Datenquellen),
@@ -3719,6 +3778,13 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
+- **Build 84** (`mobile-v1.0.5-build84`, Commit 155d699, 02.10.; #795 Schnee
+  und Wetter, #797 Weihnachten, #798 Nikolaus). APK nur für ARM (60 MB,
+  SHA-256 beginnt mit `d0fc588e`) am Vereinsserver und am GitHub-Release,
+  AAB (72 MB, `039c9fe9`) auf dem Desktop des Betreibers; den Play-Upload
+  macht der Betreiber (Notiz mit 440 Zeichen im PR #801). **Build 85
+  (1.0.6)** folgt mit Silvester (#803 – Skia ist nativ, also nur mit neuem
+  Build) und dem Winterhimmel (#804).
 - **Build 83** (`mobile-v1.0.4-build83`, Commit d7fe6de, 02.10.; #788
   Adventkranz, #789 Katze, #792 Halloween-Rest mit Ton, dazu Adventkalender
   #785, Signale #777, News-Lesen #781). APK-SHA-256 beginnt mit `ca7cb41c`
