@@ -1,13 +1,12 @@
 {
-  "version": "1.0.4",
-  "build": 83,
+  "version": "1.0.5",
+  "build": 84,
   "date": "2026-10-02",
   "items": [
-    "Adventkalender in der App: dasselbe Bild und dieselben 24 Türchen wie auf der Website und derselbe Stand – was am Handy geöffnet wird, ist auch im Web offen. Jedes Türchen geht an seinem Tag um 6 Uhr auf, mit Text, Bild, Quiz, Gewinn und mehr; Videos und Clips öffnen YouTube oder Twitch. Zu finden unter Mehr → Verein und als Hinweis im Dashboard, solange der Kalender läuft.",
-    "Adventkranz im Dashboard-Kopf ab dem 1. Advent: vier Kerzen, jede anders, eine brennt je Adventsonntag; am Sonntag zündet die neue Kerze sichtbar an. Antippen zeigt, wie viele Tage es noch bis Weihnachten sind.",
-    "Halloween-Fundstücke zählen jetzt auch aus der App – verscheuchte Fledermäuse, befreite Geister, die angestupste Katze und der Kürbis am 31.10. ab 18 Uhr. Ohne Anmeldung sammelt das Handy und meldet nach dem Anmelden nach. Unter Profil → Erfolge zeigt die neue Karte „Saison-Fundstücke“, was du über die Jahreszeiten gesammelt hast, mit dem Stand von heute.",
-    "Ein geöffneter News-Beitrag zählt für den Erfolg „Immer informiert“.",
-    "Die Halloween-Katze miaut beim Antippen – leise und still bei Lautlos oder Vibration; abschalten lässt sich das unter Mehr → Darstellung → Töne. Dazu wedelt sie mit dem Schwanz an der Wurzel und blinzelt an Ort und Stelle – vorher wanderte der Schwanz am Körper entlang, und die Augen sprangen über den Kopf.",
-    "Unter Mehr → Darstellung stehen nur noch Saisonen, die die App auch zeigt."
+    "Schnee in der App ab dem 1. Advent bis Dreikönig: Flocken in drei Tiefen, hinten klein und weich, vorne groß als Kristall, mit Wind und Böen aus dem echten Wetter am Vereinsort – schneit es draußen, wird es dichter. Die Flocken gehören zum Screen und ziehen beim Scrollen mit. Im Dashboard-Kopf schwebt eine Schneeflocke zum Fangen; fünfzig gefangene ergeben den Schneekönig.",
+    "Wetter das ganze Jahr wie auf der Website: Regnet es am Vereinsort, regnet es in der App in feinen, schrägen Strichen; schneit es außerhalb der Schnee-Saison, fällt leichter Schnee; bei Gewitter leuchtet es leise am Himmel. Trocken ist nichts zu sehen und nichts kostet Akku.",
+    "Weihnachten vom 24. bis 26. Dezember: eine Lichterkette an der Begrüßungskarte im Dashboard – dieselbe Kette wie auf der Website, jedes Lämpchen glimmt in seinem eigenen Takt –, warme Lichtinseln hinter dem Inhalt und einmal am Tag der Gruß des Vereins als Karte über der Tab-Leiste; am 6. Jänner der Abschied.",
+    "Nikolaus am 6. Dezember: im Tab „Mehr“ steht ein Stiefel, und das Symbol des Tabs ist an dem Tag der Stiefel. Antippen holt einen Sticker aus dem neuen Paket „Vom Nikolaus“ heraus – einer je Person und Jahr, danach im Chat zu verwenden. Ein Hinweis im Dashboard führt hin.",
+    "Saisonen über den Jahreswechsel rechnen jetzt im Jänner dasselbe Jahr wie die Website."
   ]
 }
