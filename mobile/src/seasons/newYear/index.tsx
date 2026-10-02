@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { BlendMode, Canvas, Picture, Skia, createPicture, type SkPicture } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -159,9 +160,11 @@ export function FireworksSky({ season, screen, reducedMotion }: { season: Active
     const paint = Skia.Paint();
     paint.setAntiAlias(true);
     paint.setBlendMode(BlendMode.Plus);
+    const smokePaint = Skia.Paint();
+    smokePaint.setAntiAlias(true);
     const colors: Record<string, ReturnType<typeof Skia.Color>> = {};
     for (const name of Object.keys(COLORS)) colors[name] = Skia.Color(COLORS[name as keyof typeof COLORS]);
-    drawFire(canvas, state.value, now, size, wind, { paint, colors, ember: Skia.Color(EMBER), smoke: Skia.Color("#8f95a8") });
+    drawFire(canvas, state.value, now, size, wind, { paint, smokePaint, colors, ember: Skia.Color(EMBER), smoke: Skia.Color("#aaafbe") });
     picture.value = recorder.finishRecordingAsPicture();
     if (!sleeping.value && fireIdle(state.value, launches, now)) {
       sleeping.value = true;
@@ -220,17 +223,20 @@ function useServerClock(ms: number): number {
   return now;
 }
 
-/** Ton an oder aus - ein runder Knopf mit Lautsprecher. */
+/** Ton an oder aus - ein runder Knopf mit Lautsprecher wie im Web (durchgestrichen = aus). */
 export function SoundSwitch({ testID = "new-year-sound" }: { testID?: string }) {
   const [on, setOn] = useNewYearSound();
   return (
-    <Pressable onPress={() => setOn(!on)} accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={on ? "Feuerwerk-Ton ausschalten" : "Feuerwerk-Ton einschalten"} hitSlop={8} style={[styles.sound, on && styles.soundOn]} testID={testID}>
-      <Body style={[styles.soundText, on && styles.soundTextOn]}>{on ? "Ton an" : "Ton aus"}</Body>
+    <Pressable onPress={() => setOn(!on)} accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={on ? "Feuerwerk-Ton ausschalten" : "Feuerwerk-Ton einschalten"} hitSlop={10} style={[styles.sound, on && styles.soundOn]} testID={testID}>
+      <Ionicons name={on ? "volume-high-outline" : "volume-mute-outline"} size={15} color={on ? "#ffc857" : "rgba(255, 255, 255, 0.75)"} />
     </Pressable>
   );
 }
 
-/** Im Dashboard-Kopf: ab 23:00 „noch 42 Min. bis 2027“, dazu der Ton-Schalter, solange Raketen fliegen können. */
+/**
+ * Im Dashboard-Kopf: ab 23:00 „noch / 42 Min.“ übereinander, darunter der Ton-Schalter, solange Raketen fliegen können.
+ * Schmal wie Kranz und Schneeflocke - in einer Zeile nahm der Hinweis dem Namen in der Begrüßungskarte den Platz.
+ */
 export function NewYearWidget({ season }: { season: ActiveSeason; screen?: string }) {
   const now = useServerClock(5000);
   const data = (season.data || {}) as { show_start?: string };
@@ -239,7 +245,12 @@ export function NewYearWidget({ season }: { season: ActiveSeason; screen?: strin
   const year = newYearOf(data.show_start);
   return (
     <View style={styles.widget} testID="new-year-widget">
-      {state.stage === "hint" ? <Body style={styles.hint} testID="new-year-hint">noch {state.minutes} Min.{year ? ` bis ${year}` : ""}</Body> : null}
+      {state.stage === "hint" ? (
+        <View accessible accessibilityLabel={`Noch ${state.minutes} Minuten bis ${year || "Mitternacht"}`} style={styles.hintBox} testID="new-year-hint">
+          <Body style={styles.hintSmall}>noch</Body>
+          <Body style={styles.hint}>{state.minutes} Min.</Body>
+        </View>
+      ) : null}
       {season.effective !== "subtle" ? <SoundSwitch /> : null}
     </View>
   );
@@ -361,14 +372,14 @@ export function NewYearGreeting({ season, screen }: { season: ActiveSeason; scre
 export { ZERO_SECONDS };
 
 const styles = StyleSheet.create({
-  widget: { flexDirection: "row", alignItems: "center", gap: 6 },
-  hint: { color: "#ffc857", fontSize: 11, fontWeight: "800" },
-  sound: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.18)", backgroundColor: "rgba(255, 255, 255, 0.04)" },
-  soundOn: { borderColor: "rgba(255, 200, 87, 0.6)" },
-  soundText: { color: "rgba(255, 255, 255, 0.75)", fontSize: 11, fontWeight: "800" },
-  soundTextOn: { color: "#ffc857" },
+  widget: { alignItems: "center", gap: 3 },
+  hintBox: { alignItems: "center" },
+  hintSmall: { color: "rgba(255, 200, 87, 0.8)", fontSize: 9, lineHeight: 11, fontWeight: "800", letterSpacing: 1, textTransform: "uppercase" },
+  hint: { color: "#ffc857", fontSize: 12, lineHeight: 15, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  sound: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255, 255, 255, 0.18)", backgroundColor: "rgba(255, 255, 255, 0.04)" },
+  soundOn: { borderColor: "rgba(255, 200, 87, 0.6)", backgroundColor: "rgba(255, 200, 87, 0.08)" },
   countWrap: { position: "absolute", alignItems: "center" },
-  countCard: { width: "100%", alignItems: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255, 200, 87, 0.35)", backgroundColor: "rgba(10, 12, 22, 0.95)", shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 22, shadowOffset: { width: 0, height: 14 }, elevation: 12 },
+  countCard: { width: "100%", alignItems: "center", paddingVertical: 14, paddingHorizontal: 18, borderRadius: 16, borderWidth: 1, borderColor: "rgba(255, 200, 87, 0.35)", backgroundColor: "#0a0c16", shadowColor: "#000", shadowOpacity: 0.55, shadowRadius: 22, shadowOffset: { width: 0, height: 14 }, elevation: 12 },
   countLabel: { color: "#ffc857", fontSize: 11, fontWeight: "800", letterSpacing: 2, textTransform: "uppercase" },
   digits: { color: "#fff6e0", fontSize: 54, lineHeight: 60, fontWeight: "900", fontVariant: ["tabular-nums"] },
   digitsPulse: { fontSize: 66, lineHeight: 72 },

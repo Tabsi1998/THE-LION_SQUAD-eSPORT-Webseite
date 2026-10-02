@@ -144,16 +144,20 @@ test("Ton: aus bleibt still; eingeschaltet zischen und knallen nahe Raketen und 
   expect(names.some((name: string) => name.startsWith("boom-"))).toBe(true);
 });
 
-test("Kopf: ab 23:00 „noch X Min. bis 2027“ mit dem Ton-Schalter; Vorgabe aus, Antippen schaltet ein und merkt es", async () => {
+test("Kopf: ab 23:00 „noch 42 Min.“ (bis 2027) mit dem Ton-Schalter; Vorgabe aus, Antippen schaltet ein und merkt es", async () => {
   at(MIDNIGHT - 42 * 60000 + 10000);
   await render(<NewYearWidget season={silvester({ phase: "evening_31" })} />);
   await flush();
-  expect(screen.getByTestId("new-year-hint")).toHaveTextContent("noch 42 Min. bis 2027");
+  const hint = screen.getByTestId("new-year-hint");
+  expect(hint).toHaveTextContent(/noch\s*42 Min\./);
+  expect(hint.props.accessibilityLabel).toBe("Noch 42 Minuten bis 2027");
   const sound = screen.getByTestId("new-year-sound");
-  expect(sound).toHaveTextContent("Ton aus");
+  expect(sound.props.accessibilityLabel).toBe("Feuerwerk-Ton einschalten");
+  expect(sound.props.accessibilityState).toEqual({ checked: false });
   await fireEvent.press(sound);
   await flush();
-  expect(screen.getByTestId("new-year-sound")).toHaveTextContent("Ton an");
+  expect(screen.getByTestId("new-year-sound").props.accessibilityState).toEqual({ checked: true });
+  expect(screen.getByTestId("new-year-sound").props.accessibilityLabel).toBe("Feuerwerk-Ton ausschalten");
   expect(await SecureStore.getItemAsync(NEW_YEAR_SOUND_KEY)).toBe("on");
   await screen.unmount();
   at(MIDNIGHT - 3 * 3600000);

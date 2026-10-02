@@ -62,7 +62,8 @@ test("Zeichnen: Rauch, Funken, Rakete, Sterne - je Leuchtpunkt Schein und Kern",
   let state = stepFire(emptyFire(), plan, 1_500, SIZE, 0, 200);
   const circles: number[] = [];
   const canvas = { drawCircle: (_x: number, y: number) => circles.push(y) } as never;
-  const kit = { paint: { setColor() {}, setAlphaf() {} }, colors: { blue: 1, gold: 2, white: 3 }, ember: 4, smoke: 5 } as unknown as DrawKit;
+  const paint = { setColor() {}, setAlphaf() {} };
+  const kit = { paint, smokePaint: paint, colors: { blue: 1, gold: 2, white: 3 }, ember: 4, smoke: 5 } as unknown as DrawKit;
   drawFire(canvas, state, 1_500, SIZE, 0, kit);
   expect(circles.length).toBeGreaterThan(2);
   circles.length = 0;

@@ -129,7 +129,10 @@ export function nextLaunchAt(plan: Launch[], now: number): number | null {
   return best;
 }
 
-export type DrawKit = { paint: SkPaint; colors: Record<string, SkColor>; ember: SkColor; smoke: SkColor };
+export type DrawKit = { paint: SkPaint; smokePaint: SkPaint; colors: Record<string, SkColor>; ember: SkColor; smoke: SkColor };
+
+/** So viele Ringe je Rauchwolke: innen dicht, nach außen immer dünner - wie der Verlauf im Web. */
+export const SMOKE_RINGS = 6;
 
 /** Ein leuchtender Punkt: weicher Schein und heller Kern (additiv) - ohne teure Unschärfe. */
 function glow(canvas: SkCanvas, kit: DrawKit, color: SkColor, x: number, y: number, radius: number, alpha: number) {
@@ -145,14 +148,15 @@ function glow(canvas: SkCanvas, kit: DrawKit, color: SkColor, x: number, y: numb
 /** Das Bild der Ebene: Rauch, Funkenspuren, Raketen, Sterne (mit Spuren, Glut und Knister-Blitzen). */
 export function drawFire(canvas: SkCanvas, state: FireState, now: number, size: Size, wind: number, kit: DrawKit) {
   "worklet";
+  // Rauch deckt ab statt zu leuchten (eigener Pinsel ohne „Plus“) und hat keinen harten Rand: gestapelte Ringe, jeder
+  // kleiner und gleich dünn - in der Mitte am dichtesten, am Rand kaum noch da. Eine Scheibe sah aus wie eine Blase.
+  kit.smokePaint.setColor(kit.smoke);
+  kit.smokePaint.setAlphaf(0);
   for (const puff of state.smoke) {
     const smoke = smokeAt(puff.origin, (now - puff.t0) / 1000, wind, puff.distance);
     if (!smoke || smoke.alpha <= 0.005) continue;
-    kit.paint.setColor(kit.smoke);
-    kit.paint.setAlphaf(smoke.alpha * 0.6);
-    canvas.drawCircle(smoke.x, smoke.y + puff.shift, smoke.r, kit.paint);
-    kit.paint.setAlphaf(smoke.alpha);
-    canvas.drawCircle(smoke.x, smoke.y + puff.shift, smoke.r * 0.6, kit.paint);
+    kit.smokePaint.setAlphaf(smoke.alpha / SMOKE_RINGS);
+    for (let ring = 0; ring < SMOKE_RINGS; ring += 1) canvas.drawCircle(smoke.x, smoke.y + puff.shift, smoke.r * (1 - ring / SMOKE_RINGS), kit.smokePaint);
   }
   for (const item of state.live) {
     const { launch } = item;
