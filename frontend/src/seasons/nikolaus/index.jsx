@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { stickerSrc } from "@/lib/stickers";
 import { useFooterLineTop } from "../footerLine";
+import { previewTokenFor } from "../preview";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { BOOT_COLORS as C, BOOT_PATHS as P, BOOT_SIZE, BOOT_VIEWBOX, CARD_MS, FUR, FUR_BAND, OPEN_MS, TREATS, USED_TILT, bootFit, cardFor, leafPath } from "./boot";
 import "./nikolaus.css";
@@ -25,12 +26,16 @@ const HINT_KEY = "nikolaus-hint";
 /** Der Zustand des Stiefels für die angemeldete Person - Footer und Hinweis fragen einmal gemeinsam. */
 let pendingState = null;
 let pendingUser = null;
+let pendingPreview = null;
 
-export function loadBootState(userId, get = (url) => api.get(url)) {
+export function loadBootState(userId, get = (url, config) => api.get(url, config)) {
+  // In der Vorschau (Admin) fragt der Stiefel mit dem Token: dann steht er geschlossen da und lässt sich probehalber öffnen.
+  const preview = previewTokenFor("nikolaus");
   if (!userId) return Promise.resolve(null);
-  if (pendingUser !== userId || !pendingState) {
+  if (pendingUser !== userId || pendingPreview !== preview || !pendingState) {
     pendingUser = userId;
-    pendingState = get("/seasonal/nikolaus").then(({ data }) => data || null).catch(() => null);
+    pendingPreview = preview;
+    pendingState = get("/seasonal/nikolaus", preview ? { params: { preview } } : undefined).then(({ data }) => data || null).catch(() => null);
   }
   return pendingState;
 }
@@ -39,6 +44,7 @@ export function loadBootState(userId, get = (url) => api.get(url)) {
 export function resetBootState() {
   pendingState = null;
   pendingUser = null;
+  pendingPreview = null;
 }
 
 /**
@@ -184,9 +190,11 @@ export function Footer({ season }) {
       next = cardFor({ reason: "guest", greeting });
     } else {
       try {
-        const { data } = await api.post("/seasonal/nikolaus/open");
+        const preview = previewTokenFor("nikolaus");
+        const { data } = await api.post("/seasonal/nikolaus/open", null, preview ? { params: { preview } } : undefined);
         next = cardFor({ result: data, greeting });
-        setOpened(true);
+        // Die Vorschau verschenkt nichts - der Stiefel bleibt zu und lässt sich wieder öffnen.
+        if (!data?.preview) setOpened(true);
       } catch (error) {
         next = cardFor({ reason: error?.response?.status === 409 ? "closed" : "error", greeting });
       }

@@ -321,6 +321,31 @@ def next_window(key: str, now: datetime, founded: date | None = None) -> dict | 
 # Silvester (#741): in diesen Phasen braucht der Countdown die echte Serverzeit - die Abfrage wird dann nicht gecacht.
 NEW_YEAR_LIVE_PHASES = ("pre_countdown", "countdown", "show", "fade")
 
+# Vorschau ohne gewählte Zeit (Rückmeldung des Betreibers, 02.10.2026): eine verdichtete Probe-Show, damit man in den
+# 60 Sekunden alles sieht - sofort Raketen, der Countdown ab 15 Sekunden, um „Mitternacht“ der Gruß und die drei
+# großen Salven im Abstand von 12 Sekunden. Vorher kam „Show“ ohne eine einzige Rakete.
+NEW_YEAR_DEMO_COUNTDOWN_S = 15
+NEW_YEAR_DEMO_SALVOS_S = (0, 12, 24)
+NEW_YEAR_DEMO_ROCKETS_S = (1, 2, 4, 6, 8, 10, 12, 14, 17, 21, 25, 29, 33, 36, 40, 44, 47, 51, 54, 57)
+
+
+def new_year_demo(now: datetime, window: dict) -> dict:
+    """Die Probe-Show der Vorschau: Raketen in den nächsten 60 Sekunden (Sekunden in dieser Stunde, wie ``salvos``),
+    Mitternacht in 15 Sekunden, die großen Salven in Sekunden statt Minuten (``salvo_seconds``)."""
+    hour_start = now.replace(minute=0, second=0, microsecond=0)
+    base = int((now - hour_start).total_seconds())
+    show_start = (now + timedelta(seconds=NEW_YEAR_DEMO_COUNTDOWN_S)).replace(microsecond=0)
+    return {"salvos": [base + second for second in NEW_YEAR_DEMO_ROCKETS_S], "show_start": show_start.isoformat(),
+            "salvo_seconds": list(NEW_YEAR_DEMO_SALVOS_S), "new_year": window["year"] + 1, "demo": True}
+
+
+def new_year_forced(now: datetime, window: dict) -> dict:
+    """Silvester erzwungen außerhalb des Fensters (etwa für eine Vereinsfeier): Raketen wie am späten 31. Abend -
+    ohne Countdown, ohne Neujahrsgruß."""
+    rng = random.Random(hourly_seed(now))
+    count = rng.randint(20, 40)
+    return {"salvos": sorted(rng.randrange(0, 3600) for _ in range(count)), "new_year": window["year"] + 1}
+
 
 def rocket_rate(phase: str, now: datetime) -> dict:
     """Raketen je Stunde (min/max) laut Rampe - untertags nichts, am 1. Jänner abends vereinzelt."""
@@ -420,14 +445,18 @@ def season_state(key: str, cfg: dict, now: datetime, founded: date | None, previ
             forced = True
     elif window is None:
         forced = True
+    borrowed = window is None
     if window is None:
         if not forced:
             return None
-        # Erzwungen außerhalb des Fensters: das nächste Fenster leiht Phase und Jahr.
+        # Erzwungen außerhalb des Fensters: das nächste Fenster leiht Phase und Jahr. Silvester: die Vorschau zeigt die
+        # Probe-Show (Countdown, Salven), das Erzwingen Raketen wie am späten Abend - ohne Gruß zur falschen Zeit.
         window = next_window(key, now, founded) or {"phase": "deko", "start": now, "end": now, "year": now.year}
         if key == "new_year":
-            window = {**window, "phase": "show"}
+            window = {**window, "phase": "countdown" if preview else "evening_31"}
     data = phase_data(key, window, now, founded, night)
+    if borrowed and key == "new_year":
+        data = {**data, **(new_year_demo(now, window) if preview else new_year_forced(now, window))}
     return {
         "key": key,
         "label": SEASONS[key]["label"],

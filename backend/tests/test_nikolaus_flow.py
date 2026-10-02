@@ -188,3 +188,22 @@ async def test_other_places_never_offer_the_gift_pack(flow):
     packs = await stickers.list_sticker_packs(flow.db)
     assert pack_of(packs) is None
     assert await stickers.resolve_sticker(flow.db, "fluent-santa-claus") is None
+
+
+@pytest.mark.asyncio
+async def test_the_preview_opens_the_boot_as_often_as_you_like_and_gives_nothing(flow, monkeypatch):
+    """Rückmeldung des Betreibers (02.10.2026): in der Vorschau stand der Stiefel da, ließ sich aber nicht öffnen
+    („kommt am 6. Dezember“). Mit dem Vorschau-Token geht er auf und zeigt den Sticker - vergeben wird nichts."""
+    clock(monkeypatch, 2026, 10, 2, 20, 0)
+    alice = await flow.add_user(name="alice")
+    flow.act_as(alice)
+    token = seasons.preview_token("nikolaus")
+    state = (await flow.get("/api/seasonal/nikolaus", params={"preview": token})).json()
+    assert state == {"active": True, "year": 2026, "opened": False, "sticker": None, "preview": True}
+    for _ in range(2):
+        opened = (await flow.post("/api/seasonal/nikolaus/open", params={"preview": token})).json()
+        assert opened["preview"] is True and opened["new"] is True and opened["sticker"]["pack_id"] == PACK
+    assert await flow.db.user_stickers.count_documents({}) == 0
+    # Ein Token einer anderen Saison öffnet den Stiefel nicht.
+    other = seasons.preview_token("snow")
+    assert (await flow.post("/api/seasonal/nikolaus/open", params={"preview": other})).status_code == 409

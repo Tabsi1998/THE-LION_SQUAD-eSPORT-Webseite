@@ -96,19 +96,37 @@ async def nikolaus_season(db) -> dict | None:
     return next((season for season in seasons.active(None, stored, founded)["seasons"] if season["key"] == nikolaus.SEASON), None)
 
 
+async def nikolaus_preview(db, token: str | None) -> dict | None:
+    """Der Nikolaus aus einem gültigen Vorschau-Token für genau diese Saison - sonst None."""
+    preview = seasons.read_preview_token(token)
+    if not preview or preview[0] != nikolaus.SEASON:
+        return None
+    stored, founded = await load_context(db)
+    payload = seasons.active(preview[1], stored, founded, preview_key=nikolaus.SEASON)
+    return next((season for season in payload["seasons"] if season["key"] == nikolaus.SEASON), None)
+
+
 @router.get("/nikolaus")
-async def nikolaus_boot(response: Response, user: dict = Depends(get_current_user)):
-    """Der Stiefel für diese Person (#736): da oder nicht, schon geöffnet, und welcher Sticker drin war."""
+async def nikolaus_boot(response: Response, preview: str | None = Query(None), user: dict = Depends(get_current_user)):
+    """Der Stiefel für diese Person (#736): da oder nicht, schon geöffnet, und welcher Sticker drin war. In der
+    Vorschau steht er geschlossen da - man kann ihn so oft öffnen, wie man will."""
     response.headers["Cache-Control"] = "private, no-store"
     db = get_db()
+    demo = await nikolaus_preview(db, preview)
+    if demo:
+        return {"active": True, "year": nikolaus.season_year(demo), "opened": False, "sticker": None, "preview": True}
     return await nikolaus.boot_state(db, user, await nikolaus_season(db))
 
 
 @router.post("/nikolaus/open")
-async def nikolaus_open(response: Response, user: dict = Depends(get_current_user)):
-    """Den Stiefel öffnen: einmal je Person und Jahr ein Sticker aus „Vom Nikolaus“, danach derselbe noch einmal."""
+async def nikolaus_open(response: Response, preview: str | None = Query(None), user: dict = Depends(get_current_user)):
+    """Den Stiefel öffnen: einmal je Person und Jahr ein Sticker aus „Vom Nikolaus“, danach derselbe noch einmal. In
+    der Vorschau zeigt er den Sticker nur - vergeben und gespeichert wird nichts."""
     response.headers["Cache-Control"] = "private, no-store"
     db = get_db()
+    demo = await nikolaus_preview(db, preview)
+    if demo:
+        return nikolaus.preview_open(user, demo)
     season = await nikolaus_season(db)
     if not season:
         raise HTTPException(status_code=409, detail="Der Nikolaus kommt am 6. Dezember.")

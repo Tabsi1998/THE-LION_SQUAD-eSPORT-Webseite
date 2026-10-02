@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { pageClass } from "./intensity";
+import { readPreviewToken } from "./preview";
 import { useSeason } from "./SeasonContext";
 import { SEASON_MODULES, hasModule } from "./registry";
 import { budgetFor, createSkyLoop } from "./sky";
@@ -18,7 +19,12 @@ export function isQuietPath(pathname) {
   return QUIET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
+/**
+ * Kam der Gruß heute schon? In der Vorschau nie - wer testet, will ihn sehen, auch zum zweiten Mal; und die Vorschau
+ * verbraucht den echten Gruß des Tages nicht (`markToastShown` merkt sich dann nichts).
+ */
 export function toastShownToday(key, now = new Date()) {
+  if (readPreviewToken()) return false;
   try {
     return localStorage.getItem(`tls-season-toast-${key}`) === now.toISOString().slice(0, 10);
   } catch {
@@ -27,6 +33,7 @@ export function toastShownToday(key, now = new Date()) {
 }
 
 export function markToastShown(key, now = new Date()) {
+  if (readPreviewToken()) return;
   try {
     localStorage.setItem(`tls-season-toast-${key}`, now.toISOString().slice(0, 10));
   } catch {

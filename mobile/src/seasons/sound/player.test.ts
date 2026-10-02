@@ -50,6 +50,7 @@ test("die Katze miaut: einmal gerechnet und in den Cache geschrieben, still bei 
   expect(uri).toBe("file:///cache/season-sounds/meow-1-v1.wav");
   expect(options).toEqual({ encoding: "base64" });
   expect(Buffer.from(content, "base64").subarray(0, 4).toString()).toBe("RIFF");
+  // Im Test läuft die iPhone-Fassung: dort gilt der Stummschalter.
   expect(mockAudio.setAudioModeAsync).toHaveBeenCalledWith({ playsInSilentMode: false, interruptionMode: "mixWithOthers" });
   expect(mockAudio.createAudioPlayer).toHaveBeenCalledWith({ uri });
   expect(mockPlayer.play).toHaveBeenCalledTimes(1);
@@ -87,4 +88,18 @@ test("kein Speicher oder kein Audio: still und ohne Fehler, der nächste Versuch
     throw new Error("kein Audio");
   });
   expect(await playSeasonSound("cat_meow", { rng: () => 0.9, now: 3000 })).toBe(false);
+});
+
+test("Android: die Medienlautstärke entscheidet - auch bei Vibration oder Lautlos (sonst überspringt expo-audio den Ton)", () => {
+  const { Platform } = require("react-native");
+  const original = Platform.OS;
+  Object.defineProperty(Platform, "OS", { value: "android", configurable: true });
+  try {
+    const { seasonAudioMode } = require("./player");
+    expect(seasonAudioMode()).toEqual({ playsInSilentMode: true, interruptionMode: "mixWithOthers" });
+  } finally {
+    Object.defineProperty(Platform, "OS", { value: original, configurable: true });
+  }
+  const { seasonAudioMode } = require("./player");
+  expect(seasonAudioMode()).toEqual({ playsInSilentMode: false, interruptionMode: "mixWithOthers" });
 });

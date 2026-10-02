@@ -99,6 +99,8 @@ export function cardFor({ result = null, reason = null, greeting = "" } = {}) {
   if (reason === "closed") return { kind: "closed", title: "Der Nikolaus kommt am 6. Dezember", text: "Dann liegt hier etwas für dich.", sticker: null };
   if (reason === "error" || !result) return { kind: "error", title, text: "Der Stiefel klemmt gerade – versuch es gleich noch einmal.", sticker: null };
   if (!result.sticker) return { kind: "empty", title, text: "Schönen Nikolaustag!", sticker: null };
+  // Vorschau im Admin: so sieht es am 6. Dezember aus - vergeben wird nichts.
+  if (result.preview) return { kind: "preview", title, text: "Vorschau – diesen Sticker bekämst du am 6. Dezember. Vergeben wird nichts.", sticker: result.sticker };
   const where = `im Chat unter „${result.sticker.pack_name || "Vom Nikolaus"}“`;
   return result.new
     ? { kind: "new", title, text: `Neu in deinen Stickern – ${where}.`, sticker: result.sticker }

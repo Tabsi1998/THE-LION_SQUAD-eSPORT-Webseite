@@ -61,6 +61,13 @@ test("Pfade ohne Deko und der Gruß-Merker", () => {
   markToastShown("christmas", day);
   expect(toastShownToday("christmas", day)).toBe(true);
   expect(toastShownToday("christmas", new Date("2026-12-25T10:00:00Z"))).toBe(false);
+  // In der Vorschau kommt jeder Gruß - auch zum zweiten Mal -, und sie verbraucht den echten Gruß des Tages nicht.
+  sessionStorage.setItem("tls-season-preview", JSON.stringify({ token: "christmas.1.x.y", expires: Date.now() + 60000 }));
+  expect(toastShownToday("christmas", day)).toBe(false);
+  markToastShown("christmas", new Date("2026-12-26T10:00:00Z"));
+  sessionStorage.removeItem("tls-season-preview");
+  expect(toastShownToday("christmas", new Date("2026-12-26T10:00:00Z"))).toBe(false);
+  expect(toastShownToday("christmas", day)).toBe(true);
 });
 
 test("ohne aktive Saison lädt kein Modul und nichts steht am <html>", async () => {

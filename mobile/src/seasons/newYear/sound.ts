@@ -1,12 +1,14 @@
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
+import { seasonAudioMode } from "../sound/player";
 import { SAMPLE_RATE, encodeWav, toBase64 } from "../sound/synth";
 import type { ShellType } from "./fireworks";
 
 // Silvester-Klang in der App (N4 #742, wie newYear/sound.js im Web): Zischen beim Aufstieg, Knall je Art, Knistern -
 // einmal als Zahlenreihe gerechnet, als WAV in den Cache gelegt und von dort gespielt. Nur nach ausdrücklichem
-// Einschalten (eigener Schalter, Vorgabe aus, je Gerät), nie bei Lautlos oder Vibration, ohne andere Apps zu
-// unterbrechen; ferne Raketen leiser, höchstens drei Klänge zugleich.
+// Einschalten (eigener Schalter, Vorgabe aus, je Gerät), ohne andere Apps zu unterbrechen; wie laut, sagt das Handy
+// (`seasonAudioMode`: iPhone mit Stummschalter, Android nach Medienlautstärke); ferne Raketen leiser, höchstens drei
+// Klänge zugleich.
 
 export const NEW_YEAR_SOUND_KEY = "newyear_sounds";
 export const MAX_VOICES = 3;
@@ -213,7 +215,7 @@ export async function playFireSound(name: FireSound, distance = 0.5, now = Date.
       voices = Math.max(0, voices - 1);
       return false;
     }
-    audioReady = audioReady || audio.setAudioModeAsync({ playsInSilentMode: false, interruptionMode: "mixWithOthers" }).catch(() => undefined);
+    audioReady = audioReady || audio.setAudioModeAsync(seasonAudioMode()).catch(() => undefined);
     await audioReady;
     const player = audio.createAudioPlayer({ uri });
     player.volume = volumeFor(distance);

@@ -2,7 +2,14 @@ import * as Haptics from "expo-haptics";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from "react-native-svg";
-import { INK, RIM } from "./batArt";
+import { INK, RIM_EDGE } from "./batArt";
+
+/**
+ * Die Katze auf dunklem Grund (Rückmeldung des Betreibers, 02.10.2026: „die Katze sieht man nicht“): ein kräftigerer
+ * Mondlicht-Saum als bei den Fledermäusen und ein leiser Schein hinter ihr - schwarz auf fast Schwarz war sie am
+ * Handy kaum zu finden.
+ */
+const CAT_RIM = RIM_EDGE;
 import { recordSignal } from "./signals";
 import { playSeasonSound } from "./sound/player";
 
@@ -101,15 +108,22 @@ export function CatShape({ size = 56, tailRotate, eyesScale, pupilX }: { size?: 
   return (
     <View style={{ width, height }}>
       <PivotLayer pivot={TAIL_ROOT} half={TAIL_HALF} scale={scale} rotate={tailRotate ?? "0deg"} testID="halloween-cat-tail">
-        <Path d={tail} stroke={RIM} strokeWidth={7.6} fill="none" strokeLinecap="round" />
+        <Path d={tail} stroke={CAT_RIM} strokeWidth={7.8} fill="none" strokeLinecap="round" />
         <Path d={tail} stroke={INK} strokeWidth={6} fill="none" strokeLinecap="round" />
       </PivotLayer>
       <Svg width={width} height={height} viewBox={viewBox} style={styles.layer}>
-        <Path d={body} fill={RIM} transform="translate(0.6 -0.9)" />
+        <Defs>
+          <RadialGradient id="catGlow" cx="42%" cy="62%" rx="50%" ry="45%">
+            <Stop offset="0" stopColor="#aae1f0" stopOpacity={0.16} />
+            <Stop offset="1" stopColor="#aae1f0" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={38} cy={50} rx={38} ry={30} fill="url(#catGlow)" />
+        <Path d={body} fill={CAT_RIM} transform="translate(0.6 -0.9)" />
         <Path d={body} fill={INK} />
         <G>
-          <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={RIM} transform="translate(0 -1)" />
-          <Circle cx={34} cy={30} r={13.8} fill={RIM} />
+          <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={CAT_RIM} transform="translate(0 -1)" />
+          <Circle cx={34} cy={30} r={13.8} fill={CAT_RIM} />
           <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={INK} />
           <Circle cx={34} cy={30} r={13} fill={INK} />
           <Path d="M23 18 L21 9 L28 15 Z M45 18 L47 9 L40 15 Z" fill="rgba(170, 225, 240, 0.12)" />

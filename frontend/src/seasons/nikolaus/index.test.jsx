@@ -67,7 +67,7 @@ test("angemeldet: Klick wackelt, der Gutschein steigt, dann die Karte mit dem ne
   apiMock.post.mockResolvedValue({ data: { year: 2026, new: true, sticker: STICKER } });
   renderFooter();
   await flush();
-  expect(apiMock.get).toHaveBeenCalledWith("/seasonal/nikolaus");
+  expect(apiMock.get).toHaveBeenCalledWith("/seasonal/nikolaus", undefined);
   const boot = screen.getByTestId("nikolaus-boot");
   expect(boot.id).toBe(BOOT_ID);
   expect(boot.getAttribute("aria-label")).toBe("Nikolausstiefel öffnen");
@@ -75,7 +75,7 @@ test("angemeldet: Klick wackelt, der Gutschein steigt, dann die Karte mit dem ne
   await act(async () => {
     fireEvent.click(boot);
   });
-  expect(apiMock.post).toHaveBeenCalledWith("/seasonal/nikolaus/open");
+  expect(apiMock.post).toHaveBeenCalledWith("/seasonal/nikolaus/open", null, undefined);
   expect(boot.className).toContain("tls-nikolaus-boot--opening");
   expect(screen.queryByTestId("nikolaus-card")).toBeNull();
   await advance(OPEN_MS);
@@ -88,6 +88,28 @@ test("angemeldet: Klick wackelt, der Gutschein steigt, dann die Karte mit dem ne
   expect(screen.queryByTestId("nikolaus-voucher")).toBeNull();
   await advance(CARD_MS);
   expect(screen.queryByTestId("nikolaus-card")).toBeNull();
+});
+
+test("Vorschau im Admin: der Stiefel fragt mit dem Token, zeigt den Probe-Sticker und bleibt zu - beliebig oft", async () => {
+  vi.useFakeTimers();
+  authState.user = { id: "u1" };
+  sessionStorage.setItem("tls-season-preview", JSON.stringify({ token: "nikolaus.9999999999..abc", expires: Date.now() + 60000 }));
+  apiMock.get.mockResolvedValue({ data: { active: true, year: 2026, opened: false, sticker: null, preview: true } });
+  apiMock.post.mockResolvedValue({ data: { year: 2026, new: true, sticker: STICKER, preview: true } });
+  renderFooter();
+  await flush();
+  expect(apiMock.get).toHaveBeenCalledWith("/seasonal/nikolaus", { params: { preview: "nikolaus.9999999999..abc" } });
+  const boot = screen.getByTestId("nikolaus-boot");
+  await act(async () => {
+    fireEvent.click(boot);
+  });
+  expect(apiMock.post).toHaveBeenCalledWith("/seasonal/nikolaus/open", null, { params: { preview: "nikolaus.9999999999..abc" } });
+  await advance(OPEN_MS);
+  const card = screen.getByTestId("nikolaus-card");
+  expect(card.dataset.kind).toBe("preview");
+  expect(card).toHaveTextContent("Vorschau – diesen Sticker bekämst du am 6. Dezember. Vergeben wird nichts.");
+  expect(boot.dataset.used).not.toBe("1");
+  sessionStorage.removeItem("tls-season-preview");
 });
 
 test("heuer schon geöffnet: der Stiefel steht benutzt da, ein Klick zeigt denselben Sticker noch einmal; × schließt", async () => {

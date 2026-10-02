@@ -108,15 +108,23 @@ export const INK = "#0b0a0f";
 export function Cat({ className = "", style, size = 68 }) {
   const body = "M18 78 C 9 66, 12 48, 28 42 C 36 38, 50 38, 58 44 C 71 52, 71 68, 63 78 Z";
   const tail = "M60 76 C 79 74, 87 58, 75 46 C 70 42, 63 44, 65 50";
+  // Schwarz auf dem dunklen Footer war sie kaum zu finden (Rückmeldung 02.10.): kräftigerer Mondlicht-Saum, leiser Schein.
   return (
     <svg className={`tls-cat ${className}`} style={style} width={size} height={size * 0.9} viewBox="0 0 90 81" aria-hidden="true">
-      <path className="tls-cat__tail" d={tail} stroke={RIM} strokeWidth="7.6" fill="none" strokeLinecap="round" />
+      <defs>
+        <radialGradient id="tls-cat-glow" cx="0.42" cy="0.62" r="0.5">
+          <stop offset="0" stopColor="rgba(170, 225, 240, 0.16)" />
+          <stop offset="1" stopColor="rgba(170, 225, 240, 0)" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="38" cy="50" rx="38" ry="30" fill="url(#tls-cat-glow)" />
+      <path className="tls-cat__tail" d={tail} stroke={RIM_EDGE} strokeWidth="7.8" fill="none" strokeLinecap="round" />
       <path className="tls-cat__tail" d={tail} stroke={INK} strokeWidth="6" fill="none" strokeLinecap="round" />
-      <path d={body} fill={RIM} transform="translate(0.6 -0.9)" />
+      <path d={body} fill={RIM_EDGE} transform="translate(0.6 -0.9)" />
       <path d={body} fill={INK} />
       <g className="tls-cat__head">
-        <path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={RIM} transform="translate(0 -1)" />
-        <circle cx="34" cy="30" r="13.8" fill={RIM} />
+        <path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={RIM_EDGE} transform="translate(0 -1)" />
+        <circle cx="34" cy="30" r="13.8" fill={RIM_EDGE} />
         <path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={INK} />
         <circle cx="34" cy="30" r="13" fill={INK} />
         <path d="M23 18 L21 9 L28 15 Z M45 18 L47 9 L40 15 Z" fill="rgba(170, 225, 240, 0.12)" />
@@ -223,25 +231,25 @@ export function CatWalking({ className = "", style, size = 68 }) {
   const legs = [[31, "a", "far"], [38, "b", "near"], [53, "b", "far"], [60, "a", "near"]];
   return (
     <svg className={`tls-cat tls-cat-walking ${className}`} style={style} width={size} height={size * 0.9} viewBox="0 0 90 81" aria-hidden="true">
-      <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={RIM} strokeWidth="7.4" fill="none" strokeLinecap="round" />
+      <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={RIM_EDGE} strokeWidth="7.4" fill="none" strokeLinecap="round" />
       <path className="tls-cat-walking__tail" d="M68 46 C 84 40, 88 24, 76 16 C 72 13, 66 16, 68 22" stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" />
       {legs.map(([x, group, depth]) => {
         const shank = depth === "far" ? 24 : 27;
         const leg = `M${x} 50 L${x - 1.5} ${50 + shank * 0.5} L${x + 1} ${50 + shank}`;
         return (
           <g key={x} className={`tls-cat-walking__leg tls-cat-walking__leg--${group} tls-cat-walking__leg--${depth}`} style={{ transformOrigin: `${x}px 50px` }}>
-            <path d={leg} stroke={RIM} strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={leg} stroke={RIM_EDGE} strokeWidth="8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
             <path d={leg} stroke={INK} strokeWidth="5.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            <ellipse className="tls-cat-walking__paw" cx={x - 0.5} cy={50 + shank + 1} rx="4.4" ry="2.4" fill={RIM} />
+            <ellipse className="tls-cat-walking__paw" cx={x - 0.5} cy={50 + shank + 1} rx="4.4" ry="2.4" fill={RIM_EDGE} />
             <ellipse cx={x - 0.5} cy={50 + shank + 0.6} rx="3.6" ry="1.9" fill={INK} />
           </g>
         );
       })}
-      <ellipse cx="46" cy="46" rx="25.5" ry="12.8" fill={RIM} />
+      <ellipse cx="46" cy="46" rx="25.5" ry="12.8" fill={RIM_EDGE} />
       <ellipse cx="46" cy="46" rx="24.5" ry="12" fill={INK} />
       <g className="tls-cat__head">
-        <path d="M11 24 L8 8 L20 18 Z M28 24 L32 8 L22 18 Z" fill={RIM} transform="translate(0 -1)" />
-        <circle cx="20" cy="32" r="12.6" fill={RIM} />
+        <path d="M11 24 L8 8 L20 18 Z M28 24 L32 8 L22 18 Z" fill={RIM_EDGE} transform="translate(0 -1)" />
+        <circle cx="20" cy="32" r="12.6" fill={RIM_EDGE} />
         <path d="M11 24 L8 8 L20 18 Z M28 24 L32 8 L22 18 Z" fill={INK} />
         <circle cx="20" cy="32" r="11.8" fill={INK} />
         <g className="tls-cat__eyes">

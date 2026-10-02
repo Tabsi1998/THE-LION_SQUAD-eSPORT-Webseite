@@ -20,6 +20,7 @@ import { capabilities, scaleForViewport } from "../intensity";
 import { getMotionScheduler, releaseMotion, requestMotion } from "../motion";
 import { MoonInSky } from "../MoonInSky";
 import { useSeason } from "../SeasonContext";
+import { CAT_BLOCKERS, PHONE_CAT_SIZE, catSpot, phoneCatTarget } from "./catSpot";
 import { ScareToggle, Scares } from "./Scare";
 import "./halloween.css";
 
@@ -102,7 +103,8 @@ export function applyCapabilities(layout, caps) {
     scares: Boolean(caps.scares),
     // Kleine Netze an echten Ecken (H12) und die Fußzeilen-Szene (H16) je Seite und Fenster - Seed bleibt der des großen Netzes.
     cornerWebs: caps.cornerWebs > 0 ? { count: caps.cornerWebs, seed: layout.web.seed } : null,
-    cat: caps.footerScene === "full" ? layout.cat : null,
+    // Am Handy (kleine Szene) sitzt sie auch - dort sucht sie sich auf dem Strich eine freie Stelle (catSpot.js).
+    cat: caps.footerScene === "full" || (caps.mobile && caps.footerScene === "small") ? layout.cat : null,
     graves: caps.footerScene === "none" ? [] : caps.footerScene === "small" ? layout.graves.slice(0, 2) : layout.graves,
     footerPumpkins: caps.footerScene === "none" ? [] : caps.footerScene === "small" ? layout.footerPumpkins.slice(0, 1) : layout.footerPumpkins,
   };
@@ -349,8 +351,8 @@ export function useSceneBusy(active) {
 
 /**
  * Die Fußzeilen-Szene (H16): Katze, Gräber, Kürbisse und (aus H7) Fledermäuse teilen sich den Strich über dem
- * Impressum; Links und Impressum bleiben frei. Schmale Fenster bekommen die kleine Fassung (ein Kürbis, zwei Gräber,
- * keine Katze), stille Seiten gar nichts. Während die Abseil-Spinne oder ein Geist unterwegs ist, ruhen die anderen.
+ * Impressum; Links und Impressum bleiben frei. Schmale Fenster bekommen die kleine Fassung (ein Kürbis, zwei Gräber;
+ * die Katze am Handy nur dort, wo auf dem Strich Platz ist), stille Seiten gar nichts. Während die Abseil-Spinne oder ein Geist unterwegs ist, ruhen die anderen.
  */
 export function Footer({ season }) {
   const layout = useLayout(season);
@@ -361,7 +363,7 @@ export function Footer({ season }) {
   if (!layout.cat && !layout.graves.length && !layout.footerPumpkins.length) return null;
   return (
     <div className="tls-footer-scene" data-testid="halloween-footer-scene" data-busy={busy ? "1" : undefined} data-size={layout.caps?.footerScene}>
-      {layout.cat && <CatOnEdge size={layout.cat.size} startX={layout.cat.x} moving={moving} />}
+      {layout.cat && <CatOnEdge size={layout.cat.size} startX={layout.cat.x} moving={moving} phone={Boolean(layout.caps?.mobile)} />}
       {moving && <Graveyard graves={layout.graves} salt={YEAR_SALT} />}
       {layout.footerPumpkins.length > 0 && (
         <div className={`tls-footer-pumpkins${lineTop === null ? "" : " tls-footer-pumpkins--line"}`} style={lineTop === null ? undefined : { top: `${lineTop}px` }} data-testid="halloween-pumpkins">
@@ -439,13 +441,31 @@ export function catTarget(currentX, width, rng = Math.random) {
 }
 
 /** Die Katze auf dem Strich über dem Impressum: Kopf und Pupillen folgen dem Zeiger; ein Klick lässt sie ein Stück weitertrotten. */
-function CatOnEdge({ size, startX = 40, moving }) {
+function CatOnEdge({ size: fullSize, startX = 40, moving, phone = false }) {
   const ref = useRef(null);
   const timer = useRef(0);
+  const size = phone ? Math.min(fullSize, PHONE_CAT_SIZE) : fullSize;
   const [x, setX] = useState(startX);
   const [walk, setWalk] = useState(null);
   // Hockt auf dem Strich über dem Impressum - wie die Gräber; ohne Strich auf der Oberkante des Footers.
   const lineTop = useFooterLineTop([size]);
+  // Am Handy: eine freie Stelle auf dem Strich (nie über Text, Links oder Symbolen) - neu gemessen bei neuer Breite.
+  const [spot, setSpot] = useState(null);
+  useEffect(() => {
+    if (!phone || typeof document === "undefined") return undefined;
+    const measure = () => {
+      const footer = document.querySelector("footer");
+      const line = footer?.querySelector("[data-season-line]");
+      const slot = document.querySelector(".tls-season-footer-slot");
+      const blockers = footer ? [...footer.querySelectorAll(CAT_BLOCKERS)].filter((node) => !node.closest(".tls-season-footer-slot")).map((node) => node.getBoundingClientRect()) : [];
+      const next = catSpot({ line: line ? line.getBoundingClientRect() : null, slot: slot ? slot.getBoundingClientRect() : null, blockers, size, startX });
+      setSpot(next);
+      if (next) setX((current) => Math.min(next.max, Math.max(next.min, current)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [phone, size, startX, lineTop]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
   useEffect(() => {
     if (!moving || typeof window === "undefined") return undefined;
@@ -470,7 +490,7 @@ function CatOnEdge({ size, startX = 40, moving }) {
   const onClick = () => {
     if (!moving || walk) return;
     const width = ref.current?.parentElement?.clientWidth || (typeof window !== "undefined" ? window.innerWidth : 1280);
-    const target = catTarget(x, width);
+    const target = phone ? phoneCatTarget(x, spot) : catTarget(x, width);
     const seconds = Math.abs(target - x) / CAT_WALK_SPEED;
     // Sie miaut und läuft dann los (Rückmeldung 29.09.) - nur mit eingeschaltetem Ton.
     emitSound("cat_meow");
@@ -480,6 +500,7 @@ function CatOnEdge({ size, startX = 40, moving }) {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setWalk(null), seconds * 1000 + 100);
   };
+  if (phone && !spot) return null;
   const classes = ["tls-footer-cat", lineTop === null ? "" : "tls-footer-cat--line", walk ? "tls-footer-cat--walk" : "", (walk ? walk.facing : 1) < 0 ? "tls-footer-cat--flip" : ""].filter(Boolean).join(" ");
   const style = { left: `${x}px`, "--cat-seconds": walk ? `${walk.seconds.toFixed(2)}s` : "0s" };
   if (lineTop !== null) style.top = `${lineTop}px`;

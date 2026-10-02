@@ -101,6 +101,10 @@ test("Plan: die Raketen der Stunde nach dem Server, in der Show dazu die drei gr
   expect(new Set(salvos.map((launch: { at: number }) => Math.floor((launch.at - MIDNIGHT) / 60000)))).toEqual(new Set([0, 5, 10]));
   expect(planFor(silvester({ phase: "greeting" }), mockSeasonState.serverNow).some((launch: { id: string }) => launch.id.startsWith("salvo:"))).toBe(false);
   expect(planFor({ ...silvester(), key: "christmas" }, mockSeasonState.serverNow)).toEqual([]);
+  // Probe-Show (Vorschau): die großen Salven in Sekunden statt Minuten - wie im Web.
+  const demo = planFor(silvester({ phase: "countdown", data: { ...silvester().data, salvo_seconds: [0, 12, 24] } }), mockSeasonState.serverNow);
+  const demoSeconds = new Set<number>(demo.filter((launch: { id: string }) => launch.id.startsWith("salvo:")).map((launch: { at: number }) => Math.round((launch.at - MIDNIGHT) / 1000)));
+  expect([...demoSeconds].every((second) => second >= 0 && second <= 30)).toBe(true);
   expect([fireShare("Dashboard"), fireShare("Teams"), fireShare("TournamentList"), fireShare("Settings")]).toEqual([1, 0.7, 0.45, 0]);
   const thin = thinPlan(show, 0.45);
   expect(thin.length).toBeLessThan(show.length);

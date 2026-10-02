@@ -13,20 +13,21 @@ import { skyLight, winterStars } from "../sky/light";
 // Schrift liegt darüber. Der Mond bleibt dem Web vorbehalten: die Screens der App haben keine freie Himmelsfläche, er
 // hinge halb hinter Karten. Stille Screens bekommen nichts.
 
-/** Die Uhr des Himmels: jede Minute neu - das Licht ändert sich langsam. */
-function useSkyMinute(): number {
-  const [now, setNow] = useState(() => Date.now());
+/** Die Uhr des Himmels nach der Serverzeit: jede Minute neu - das Licht ändert sich langsam. */
+function useSkyMinute(offset: number): number {
+  const [now, setNow] = useState(() => Date.now() + offset);
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60000);
+    setNow(Date.now() + offset);
+    const timer = setInterval(() => setNow(Date.now() + offset), 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [offset]);
   return now;
 }
 
 export function WinterSkyBackdrop({ season, screen }: { season: ActiveSeason; screen: string }) {
-  const { weather } = useSeason();
+  const { weather, serverOffset } = useSeason();
   const { width, height } = useWindowDimensions();
-  const now = useSkyMinute();
+  const now = useSkyMinute(serverOffset || 0);
   const caps = useMemo(() => seasonCapabilities("snow", screen, season.effective), [screen, season.effective]);
   const data = (season.data || {}) as { night?: boolean };
   const light = skyLight({ now, sunrise: weather?.sunrise, sunset: weather?.sunset, code: weather?.code, night: data.night ?? weather?.night ?? null });

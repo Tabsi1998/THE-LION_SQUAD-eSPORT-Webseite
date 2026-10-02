@@ -166,8 +166,10 @@ def test_schalter_erzwingen_und_kanaele():
     muted = {"seasons": {"snow": {"mode": "force_off", "until": "2026-12-05T00:00"}}}
     assert "snow" not in keys(seasons.active(at(2026, 12, 1, 12), muted))
     assert "snow" in keys(seasons.active(at(2026, 12, 6, 12), muted))
-    # Erzwungenes Silvester zeigt die Show, damit die Vorschau etwas zu sehen hat.
-    assert keys(seasons.active(at(2026, 6, 1, 12), {"seasons": {"new_year": {"mode": "force_on"}}}))["new_year"]["phase"] == "show"
+    # Erzwungenes Silvester (etwa für eine Vereinsfeier): Raketen wie am späten 31. Abend, ohne Countdown und Gruß.
+    party = keys(seasons.active(at(2026, 6, 1, 12), {"seasons": {"new_year": {"mode": "force_on"}}}))["new_year"]
+    assert party["phase"] == "evening_31" and 20 <= len(party["data"]["salvos"]) <= 40 and party["data"]["new_year"] == 2027
+    assert party["data"]["show_start"] == "2027-01-01T00:00:00+01:00" and "salvo_seconds" not in party["data"]
     view = seasons.admin_view(forced, at(2026, 9, 29, 12))
     by_key = {s["key"]: s for s in view["seasons"]}
     assert by_key["snow"]["active_now"] and by_key["snow"]["forced"] and by_key["halloween"]["next_start"] == "2026-10-25T00:00:00+02:00"
@@ -389,3 +391,19 @@ async def test_wetter_in_der_app_ein_und_aus(flow):
     await flow.put("/api/settings/seasons", json={"seasons": {"weather": {"enabled": False}}})
     flow.act_as(None)
     assert all(s["key"] != "weather" for s in (await flow.get("/api/seasonal/active")).json()["seasons"])
+
+
+def test_preview_without_a_time_plays_a_compressed_new_year_show():
+    """Rückmeldung des Betreibers (02.10.2026): die Vorschau zeigte „Show“ ohne eine einzige Rakete. Jetzt eine Probe-Show
+    in einer Minute - Raketen sofort, Mitternacht nach 15 Sekunden, die drei großen Salven im Abstand von 12 Sekunden."""
+    now = at(2026, 10, 2, 20, 30, 10)
+    demo = keys(seasons.active(now, {}, preview_key="new_year"))["new_year"]
+    data = demo["data"]
+    assert demo["phase"] == "countdown" and demo["forced"] is True and data["demo"] is True
+    assert data["show_start"] == "2026-10-02T20:30:25+02:00" and data["salvo_seconds"] == [0, 12, 24] and data["new_year"] == 2027
+    seconds_into_hour = 30 * 60 + 10
+    assert data["salvos"][0] == seconds_into_hour + 1 and data["salvos"][-1] <= seconds_into_hour + 60
+    assert len(data["salvos"]) == len(seasons.NEW_YEAR_DEMO_ROCKETS_S)
+    # Mit gewählter Zeit im echten Fenster bleibt alles echt: Rampe des Servers, Mitternacht zur echten Zeit.
+    real = keys(seasons.active(at(2026, 12, 31, 23, 59, 30), {}, preview_key="new_year"))["new_year"]
+    assert real["phase"] == "countdown" and "demo" not in real["data"] and real["data"]["show_start"] == "2027-01-01T00:00:00+01:00"
