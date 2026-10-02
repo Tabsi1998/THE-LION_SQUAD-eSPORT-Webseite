@@ -1,6 +1,6 @@
 # Jahreszeiten: der gemeinsame Kern (Seasonal Core)
 
-Stand: 30. September 2026 (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766, Weihnachten #767, Wetter #770). Gilt für Web (`frontend/src/seasons/`) und App
+Stand: 2. Oktober 2026 (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766, Weihnachten #767, Wetter #770, Adventkalender #785; Fundstücke #773, #776, #777). Gilt für Web (`frontend/src/seasons/`) und App
 (`mobile/src/seasons/`). Halloween ist die erste Saison auf diesem Kern; Winter, Weihnachten, Silvester, Fasching,
 Ostern und Geburtstage bringen nur noch ihre Figuren und ihren Plan mit, nicht ihre eigenen Regeln.
 
@@ -13,7 +13,7 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: weather, halloween, advent, snow, christmas) | `halloween.tsx` über `SEASON_MODULES` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
@@ -213,3 +213,43 @@ großen Fenstern (Fläche gegen 1440 × 900, höchstens das Doppelte).
 - Deckkraft: kein Strich über 0,35. Wo sich durchscheinende Formen überlagern, addiert sich die Deckkraft –
   mehrere Formen derselben Figur in einem Pfad zeichnen, und in Tests den Anteil der Punkte über der Grenze
   prüfen, nicht den hellsten Punkt.
+
+## 10. Fundstücke und Signale (#678; #773, #776, #777)
+
+Was man auf der Seite oder in der App findet, zählt als **Signal** am Server (`SIGNAL_RULES` in
+`backend/services/achievement_counters.py`):
+
+| Signal | Wann | Deckel je Tag |
+|---|---|---|
+| `halloween_pumpkin` | Halloween; Web und App melden ihn nur am 31.10. ab 18 Uhr | 1 |
+| `halloween_bats_scared` | Halloween, nur von Hand verscheucht (der Mauszeiger scheucht auch, zählt aber nicht) | 30 |
+| `halloween_ghosts_freed` | Halloween, außerhalb der Sperrzeit | 20 |
+| `halloween_cat_petted` | Halloween, nicht während die Katze läuft oder ruht | 10 |
+| `snowflakes_clicked` | Schnee-Saison | 200 |
+| `advent_door` | Adventkalender – meldet **nur der Server** beim Öffnen (`server`) | 24 |
+| `easter_egg` | Eiersuche (#646) | 50 |
+
+- Über Saison und Deckel entscheidet der Server, nie der Client.
+- Gäste sammeln im Ausgang am Gerät (Web `seasons/signals.js`; App `signals.ts` im SecureStore, höchstens 24 Zeilen).
+  Nach dem Login wird mit dem Tag des Fundes nachgemeldet (`POST /api/achievements/signals`, bis 40 Zeilen, höchstens
+  sieben Tage zurück, nur Tage, an denen die Saison lief). Der Ausgang trägt seinen Eigentümer – am geteilten Gerät
+  bekommt niemand fremde Funde.
+- Der Tag ist der Tag in Wien, über Mitternacht und die Zeitumstellung getestet; die App rechnet ihn ohne
+  Zeitzonendaten nach der Regel der EU-Sommerzeit.
+- Vergibt der Server eine Stufe, kommt die Zeremonie sofort (`tls:achievements-awarded` im Web, Hinweis in der App).
+- Eine neue Saison mit Fundstück: Signal in `SIGNAL_RULES`, Zähler und Katalog-Gruppe, Eintrag in
+  `services/collectibles.py` (Karte „Saison-Fundstücke“), Melden im Web- **und** im App-Modul.
+
+## 11. Adventkalender (#641, #732, #785)
+
+Der Adventkalender ist eine Saison mit **eigener Seite** statt Deko: Web `/advent`, App-Screen unter Mehr → Verein
+(`SCREEN_SEASONS` in `SeasonStage.tsx`). Die Deko rundherum hält sich zurück (Seitenklasse `calm` im Web, `CALM` in
+der App).
+
+- Einstieg nur, wenn für das Jahr Türchen angelegt sind (`data.ready` aus `/api/seasonal/active`): ein kleines
+  Türchen neben dem Logo, ein Hinweis im Dashboard, der Adventkranz nennt das offene Türchen.
+- Ein Türchen geht an seinem Tag um 6 Uhr in Wien auf (`ADVENT_DOOR_HOUR`); nachholen bis 6. Jänner, 23:59 Uhr.
+- Bild und Türchen sind reine Rechnung aus dem Jahres-Seed (Web `advent/scene.js` und `advent/doors.js`, App
+  `scene.ts` und `doors.ts`) – ein Paritätstest auf festen Werten hält Web und App zusammen.
+- „Bewegung reduzieren“: nichts schwingt, der Inhalt erscheint sofort.
+- Gewinne laufen über `services/season_raffles.py`; dieselbe Verlosung nutzt später die Eiersuche (#646).

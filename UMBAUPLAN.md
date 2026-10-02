@@ -2663,6 +2663,55 @@ der Erfolge - und vier neue Regeln, die für alles gelten.
   durchscheinende Striche kreuzen. Die App folgt mit #771; die Übersicht, was der App gegenüber
   dem Web noch fehlt, steht in #772.
 
+## Neu aufgenommen vom 30. September bis 2. Oktober
+
+Die Fundstücke kommen am Server an, die Tests hängen nicht mehr am Kalender, zwei unerreichbare
+Erfolge sind erreichbar – und der Adventkalender ist fertig: auf der Website, in der App und in
+der Verwaltung.
+
+- **Saison-Fundstücke** ([#678](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/678),
+  PRs #773, #776, #777): Weder Website noch App hatten je ein Signal an den Server geschickt –
+  „Gruselnacht“ und „Schneekönig“ konnte niemand bekommen. Jetzt zählen verscheuchte
+  Fledermäuse, befreite Geister, die angestupste Katze, der Kürbis am 31.10. ab 18 Uhr und
+  gefangene Schneeflocken, jeweils mit Tagesdeckel; über Saison und Deckel entscheidet der
+  Server. Gäste sammeln am Gerät, nach dem Login wird bis zu eine Woche nachgemeldet; am
+  geteilten Rechner bekommt niemand fremde Funde. Vergibt der Server eine Stufe, kommt die
+  Zeremonie sofort. Neu im Katalog: Fledermausflüsterer, Flockenfänger und
+  Jahreszeiten-Sammler, dazu die Karte „Saison-Fundstücke“ im Profil mit denselben Figuren wie
+  auf der Seite. Weil damit zum ersten Mal Zahlen je Person und Tag am Server liegen, gehören
+  Auskunft, Löschen und ein Absatz in der Datenschutzerklärung dazu.
+- **Tests ohne Kalender** (PR #774): Eine Probe mit verstellter Uhr zeigte, dass ab dem 11.10.
+  jeder Check von selbst rot geworden wäre – Testdaten mit festen Terminen, die der echte
+  Kalender überholt. Feste Uhr, wo die Daten fest sind, sonst Termine relativ zu heute.
+  Nebenbei eine echte Schwäche: der Server läuft in UTC und meldete nach Mitternacht bis zu zwei
+  Stunden „gestern“ – Fristen, Termine, das Alter ab 18 und die Zeit auf PDFs gelten jetzt nach
+  dem Tag in Wien. Die Probe als regelmäßige Frühwarnung ist vorgeschlagen
+  ([#775](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/775)).
+- **Gelesen und gesehen** ([#780](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/780),
+  PR #781): „Immer informiert“ und „Zuschauer“ waren unerreichbar – der Server suchte News in
+  der falschen Sammlung (und der Test legte sie in dieselbe falsche), Streams meldete nie
+  jemand. Jetzt zählt ein geöffneter Beitrag, den die Person lesen darf, und ein Stream, der
+  eine Minute im sichtbaren Tab läuft. Lehre: ein Test, der seine Daten am Weg der echten
+  Verwaltung vorbei anlegt, kann denselben Fehler haben wie der Code.
+- **Adventkalender** ([#641](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/641),
+  [#732](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/732), PR #785): ein
+  Bild – eine Winternacht über einem Tiroler Dorf mit dem Sternbild Löwe und einer Tatzenspur
+  im Schnee –, aus dem 24 Türchen geschnitten sind, jedes in Form, Scharnier, Licht und Schmuck
+  anders und jedes Jahr neu. Website und App zeigen dasselbe Bild und denselben Stand. Ein
+  Türchen geht um 6 Uhr auf; Inhalte von Text bis Quiz, das Mitglied der Woche nur mit
+  Einwilligung. Gewinne laufen als Verlosung: Mitmachen ist ein eigener Klick, die
+  Vereinsleitung zieht mit Protokoll, nur wer gewinnt, erfährt es – privat –, abgeholt wird wie
+  ein Turnierpreis unter „Meine Gewinne“. Gepflegt unter Verwaltung → Content → Adventkalender
+  mit Sofort-Vorschau, Vorschau je Tag und Übernahme aus dem Vorjahr. Die vier gestapelten
+  Einzel-PRs (#782–#784 und der App-Teil) wurden auf Wunsch des Betreibers zu einem
+  zusammengefasst – ein Klick, alles drin.
+- **App-Sicherheits-Update** (PR #786): neue Meldungen zu fremden Paketen sperrten jeden
+  App-PR. `@grpc/grpc-js` und `brace-expansion` sind gehoben; für `node-forge` gibt es keine
+  reparierte Version – die Ausnahme gilt bis 2.11.2026, dann wird neu geprüft.
+- **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
+  Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
+  nie fix, close oder resolve schreiben.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
@@ -2686,6 +2735,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Alte App einmal löschen** | Build 57 lässt sich wegen des neuen Schlüssels nicht über Build 56 installieren: alte LionsAPP löschen, neue installieren, neu anmelden. Das gilt für alle, die die App schon haben. |
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
+| **Rechtstexte lesen (Oktober 2026)** | Datenschutzerklärung: der Absatz zu den Zählern der Fundstücke (#773), der Satz zum Adventkalender und der Absatz zu Verlosungen (#785); dazu die fünf Sätze der Teilnahmebedingungen. Ergänzungen wie ein Mindestalter oder Versand statt Abholung sind ein paar Zeilen. |
+| **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
 eine Datenbank im Speicher (`backend/tests/flow_harness.py`) — damit lassen sich vollständige
