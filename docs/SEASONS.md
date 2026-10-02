@@ -13,7 +13,7 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
@@ -204,8 +204,10 @@ großen Fenstern (Fläche gegen 1440 × 900, höchstens das Doppelte).
 | Wettercode 95–99 | Wetterleuchten im Bewegungsbudget (`lightning`), nie in der Schnee-Saison |
 | trocken oder Stand älter als drei Stunden | nichts |
 
-- Server: `always` (kein Eintrag im Kalender), `channels` (was die Saison bedienen kann – das Wetter vorerst nur
-  `web`, die App mit #771). Die Vorschau der Saison `weather` liefert einen Gewitterregen (`weather.demo()`).
+- Server: `always` (kein Eintrag im Kalender), `channels` (was die Saison bedienen kann – das Wetter seit #795 in
+  Web und App). Die Vorschau der Saison `weather` liefert einen Gewitterregen (`weather.demo()`).
+- Seit #795 bedient das Wetter auch die App (dieselben Regeln, `weather/index.tsx`); ein alter Speicherstand mit nur
+  „web“ bekommt die App dazu (`channels_known`, `stored_channels`).
 - `skyOnly`: die Saison hat keine Ecken, kein Widget, keinen Farbschein; ihre Stärke steht nicht in
   `data-season-intensity`, damit „Wetter: dezent“ keine andere Saison anhält.
 - „Bewegung reduzieren“ und „dezent“: kein Wetter. Lebendige Seiten bekommen alles, mittlere und ruhige 60 %,
@@ -280,3 +282,22 @@ Saison in der App:
   `playSeasonSound`. Ändert sich die Rechnung, `SOUND_VERSION` erhöhen – sonst spielt der Cache den alten Laut.
 - Nie Musik anderer Apps unterbrechen (`mixWithOthers`), nie Mikrofon oder Hintergrund-Wiedergabe (Plugin-Optionen von
   `expo-audio`), Spieler nach dem Laut freigeben (`remove()` und `release()`).
+
+## 14. Teilchen in der App (#795)
+
+Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist nicht nötig), mit Reanimated:
+
+| Teil | Wo | Was |
+|---|---|---|
+| Rechnung | `snow/flakes.ts`, `weather/rain.ts`, `weather/storm.ts` | dieselbe wie im Web, je Bild als Worklet auf dem UI-Thread |
+| Feld | `sky/SnowField.tsx`, `sky/RainField.tsx` | feste Plätze je Tiefe; die gerade gebrauchten schneien oder regnen, die übrigen fallen zu Ende |
+| Teilchen | `FlakeSvg` (sechs Formen), Strich je Tropfen | eine kleine Ansicht, bewegt nur über Versatz und Drehung um ihre Mitte |
+| Blitz | `sky/Lightning.tsx` | Schein und Blitz, Helligkeit als Folge (`pulseSteps`), Bewegungsbudget `lightning` |
+| Scrollen | `sky/scroll.ts` | die Screens melden ihre Position (`seasonScrollProps`), die Teilchen gehören zum Screen |
+
+- Wie viel: `skyBudget` (dezent 0, normal 30, kräftig 60) mal Anteil des Screens (lebendig 1, mittel und ruhig 0,6,
+  still 0) mal Wetter. Im Hintergrund ruht der Frame-Callback.
+- Eine neue Saison mit Teilchen (Silvester, Konfetti): Rechnung als reine Funktionen mit `"worklet"`, ein Feld nach dem
+  Muster von `SnowField` (Plätze, `step…` ohne Reanimated testbar), Paritätstest mit dem Web.
+- Tests: `jest.setup.js` bildet Reanimated nach; `__frameCallbacks` schaltet Bilder weiter. Zeitpunkte aus dem festen
+  Seed vorher ausrechnen statt in kleinen Schritten vorzuspulen.
