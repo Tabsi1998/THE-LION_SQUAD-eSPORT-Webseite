@@ -114,3 +114,21 @@ test("Jumpscares (#680): ob jemand welche bekommen darf, fragt der Client nur an
   await waitFor(() => expect(screen.getAllByTestId("scares")[1]).toHaveTextContent("true"));
   expect(apiMock.get).toHaveBeenCalledWith("/seasonal/me", { skipInvalidation: true });
 });
+
+test("Serveruhr (Silvester, #741): der Abstand zur Geräteuhr kommt aus `now` der Antwort, gemessen gegen die Mitte der Abfrage", async () => {
+  function Clock() {
+    const { serverOffset, serverNow } = useSeason();
+    return <span data-testid="offset">{`${serverOffset}|${serverNow}`}</span>;
+  }
+  // Die Geräteuhr geht zwei Minuten nach; die Abfrage dauert 400 ms.
+  let device = Date.parse("2026-12-31T23:57:00+01:00");
+  const spy = vi.spyOn(Date, "now").mockImplementation(() => device);
+  apiMock.get.mockImplementation(async (url) => {
+    if (url !== "/seasonal/active") return { data: {} };
+    device += 400;
+    return { data: { ...PAYLOAD, now: "2026-12-31T23:59:00.200+01:00", seasons: [] } };
+  });
+  render(<MemoryRouter><SeasonProvider><Clock /></SeasonProvider></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("offset").textContent).toBe("120000|2026-12-31T23:59:00.200+01:00"));
+  spy.mockRestore();
+});

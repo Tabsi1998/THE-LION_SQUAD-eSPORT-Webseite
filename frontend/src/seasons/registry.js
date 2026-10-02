@@ -9,6 +9,7 @@ export const SEASON_MODULES = {
   advent: () => import("./advent/index.jsx"),
   snow: () => import("./snow/index.jsx"),
   christmas: () => import("./christmas/index.jsx"),
+  new_year: () => import("./newYear/index.jsx"),
   advent_calendar: () => import("./adventCalendar/index.jsx"),
 };
 

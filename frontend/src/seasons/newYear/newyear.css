@@ -1,0 +1,65 @@
+/* Silvester (S9 #640, N3 #741): Countdown als Karte oben in der Mitte (nie Vollbild, nie blockierend), die letzten
+   zehn Sekunden mit Puls, um 00:00 bricht die Null auf und der Gruß kommt; der Gruß am 1. Jänner mit kurzem Konfetti.
+   „dezent“ und „Bewegung reduzieren“: alles steht still, nur die Zahlen wechseln. */
+.tls-ny-widget { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.4rem; }
+.tls-ny-hint { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; color: #ffc857; white-space: nowrap; }
+.tls-ny-sound { display: inline-flex; align-items: center; justify-content: center; width: 1.9rem; height: 1.9rem; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.7); cursor: pointer; }
+.tls-ny-sound--on { color: #ffc857; border-color: rgba(255, 200, 87, 0.5); }
+.tls-ny-sound:hover { background: rgba(255, 255, 255, 0.1); }
+.tls-ny-sound:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
+
+.tls-ny-countdown { position: fixed; top: 6.5rem; left: 50%; transform: translateX(-50%); z-index: 61; display: flex; flex-direction: column; align-items: center; gap: 0.1rem; min-width: 13rem; padding: 0.9rem 2.7rem 1rem; border-radius: 1rem; border: 1px solid rgba(255, 200, 87, 0.35); background: radial-gradient(ellipse at 50% 0%, rgba(30, 36, 64, 0.95), rgba(8, 10, 18, 0.94) 75%); color: #fff6e0; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 40px rgba(41, 182, 232, 0.12); animation: tls-ny-in 0.6s ease-out both; }
+@keyframes tls-ny-in {
+  0% { opacity: 0; transform: translate(-50%, -10px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.tls-ny-countdown__label { font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: #ffc857; }
+.tls-ny-countdown__digits { font-size: 3.4rem; line-height: 1.05; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 0 calc(10px + var(--beat, 0) * 26px) rgba(255, 200, 87, calc(0.25 + var(--beat, 0) * 0.6)); }
+/* Letzte zehn Sekunden: jede neue Zahl kommt mit einem Schlag. */
+.tls-ny-countdown--pulse .tls-ny-countdown__digits { font-size: 4.4rem; animation: tls-ny-beat 1s ease-out both; }
+@keyframes tls-ny-beat {
+  0% { transform: scale(1.28); opacity: 0.6; }
+  18% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.96); opacity: 1; }
+}
+.tls-ny-countdown .tls-ny-sound { position: absolute; top: 0.45rem; right: 0.45rem; width: 1.65rem; height: 1.65rem; }
+/* 00:00: die Null bricht auf, der Gruß kommt. */
+.tls-ny-countdown--zero { gap: 0.25rem; padding: 1rem 2rem 1.2rem; }
+.tls-ny-countdown__burst { font-size: 4.4rem; line-height: 1; font-weight: 800; color: #ffc857; animation: tls-ny-burst 0.9s ease-out both; }
+@keyframes tls-ny-burst {
+  0% { transform: scale(1); opacity: 1; filter: blur(0); }
+  100% { transform: scale(2.6); opacity: 0; filter: blur(6px); }
+}
+.tls-ny-countdown--zero .tls-ny-countdown__burst { position: absolute; top: 0.6rem; }
+.tls-ny-countdown__title { margin-top: 0.4rem; font-size: 1.7rem; font-weight: 800; color: #fff6e0; animation: tls-ny-rise 0.7s ease-out 0.35s both; }
+.tls-ny-countdown__text { font-size: 0.95rem; color: rgba(255, 246, 224, 0.85); animation: tls-ny-rise 0.7s ease-out 0.6s both; }
+@keyframes tls-ny-rise {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.tls-ny-toast { position: fixed; overflow: hidden; width: min(92vw, 26rem); padding: 0.9rem 2.4rem 1rem 1.1rem; border-radius: 0.9rem; border: 1px solid rgba(255, 200, 87, 0.35); background: radial-gradient(ellipse at 20% 0%, #1e2440, #0a0c14 72%); color: #fff6e0; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); animation: tls-ny-toast-in 0.6s ease-out both; }
+@keyframes tls-ny-toast-in {
+  0% { opacity: 0; transform: translate(-50%, 14px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.tls-ny-toast__title { font-size: 0.75rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-ny-toast__text { margin: 0.2rem 0 0; font-size: 1rem; line-height: 1.35; }
+.tls-ny-toast__close { position: absolute; top: 0.35rem; right: 0.4rem; width: 1.7rem; height: 1.7rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff6e0; font-size: 1.05rem; line-height: 1; cursor: pointer; }
+.tls-ny-toast__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
+/* Drei Sekunden Konfetti in den Vereinsfarben, dann Ruhe. */
+.tls-ny-toast__confetti { position: absolute; inset: 0; pointer-events: none; }
+.tls-ny-toast__confetti span { position: absolute; top: -10px; left: calc(4% + var(--i) * 5.3%); width: 6px; height: 10px; border-radius: 1px; background: #29B6E8; opacity: 0; animation: tls-ny-confetti 3s ease-in calc(var(--i) * 0.07s) 1 both; }
+.tls-ny-toast__confetti span:nth-child(3n) { background: #ffc857; }
+.tls-ny-toast__confetti span:nth-child(4n) { background: #ffffff; }
+@keyframes tls-ny-confetti {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(140px) rotate(320deg); }
+}
+
+.tls-ny-countdown--still, .tls-ny-countdown--still *, .tls-ny-toast--still { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-ny-countdown, .tls-ny-countdown *, .tls-ny-toast, .tls-ny-toast__confetti span { animation: none !important; }
+  .tls-ny-toast__confetti { display: none; }
+}

@@ -318,6 +318,10 @@ def next_window(key: str, now: datetime, founded: date | None = None) -> dict | 
 
 # ------------------------------------------------------------------ Phasendaten
 
+# Silvester (#741): in diesen Phasen braucht der Countdown die echte Serverzeit - die Abfrage wird dann nicht gecacht.
+NEW_YEAR_LIVE_PHASES = ("pre_countdown", "countdown", "show", "fade")
+
+
 def rocket_rate(phase: str, now: datetime) -> dict:
     """Raketen je Stunde (min/max) laut Rampe - untertags nichts, am 1. Jänner abends vereinzelt."""
     hour = now.hour + now.minute / 60

@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
+import { serverOffset } from "./clock";
 
 // Jahreszeiten-Bühne (#634): eine Quelle für „was ist gerade aktiv“ (Server, /seasonal/active), die
 // persönliche Einstellung (an, dezent, aus - im Konto oder im Browser), „Bewegung reduzieren“ des
@@ -69,11 +70,16 @@ export function SeasonProvider({ children, channel = "web" }) {
   const timer = useRef(0);
   const location = useLocation();
 
+  // Abstand der Serveruhr (Silvester, #741): Countdown und Show laufen nach dem Server, nicht nach der Geräteuhr.
+  const [offset, setOffset] = useState(0);
+
   const load = useCallback(async () => {
     const preview = readPreviewToken();
     setPreviewToken(preview?.token || null);
     try {
+      const requestedAt = Date.now();
       const { data } = await api.get("/seasonal/active", { params: preview ? { preview: preview.token } : {}, skipInvalidation: true });
+      if (data?.now) setOffset(serverOffset(data.now, requestedAt, Date.now()));
       setPayload(data && Array.isArray(data.seasons) ? data : { seasons: [] });
     } catch {
       setPayload((current) => current || { seasons: [] });
@@ -179,14 +185,17 @@ export function SeasonProvider({ children, channel = "web" }) {
       // Ort des Vereins (#681): Breite/Länge für den Himmel - fehlt er, rechnen die Module mit Innsbruck.
       location: payload?.location || null,
       scaresAllowed,
+      // Serverzeit (Silvester): `serverOffset` ms zur Geräteuhr, `serverNow` der Zeitpunkt der letzten Antwort.
+      serverOffset: offset,
+      serverNow: payload?.now || null,
       reload: load,
     };
-  }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load, scaresAllowed]);
+  }, [payload, channel, preference, setPreference, reducedMotion, previewToken, load, scaresAllowed, offset]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }
 
-const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, location: null, scaresAllowed: false, reload: () => {} };
+const EMPTY = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: () => {}, reducedMotion: false, preview: false, weather: null, location: null, scaresAllowed: false, serverOffset: 0, serverNow: null, reload: () => {} };
 
 export function useSeason() {
   return useContext(SeasonContext) || EMPTY;
