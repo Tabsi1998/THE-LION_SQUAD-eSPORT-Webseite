@@ -178,9 +178,10 @@ def _windows_easter_hunt(year: int, _founded) -> list[dict]:
 
 # Saisonen in der Reihenfolge des Jahres. ``texts``: Vorgaben, die der Betreiber überschreiben kann.
 # ``always``: läuft das ganze Jahr (kein Termin im Kalender). ``channels``: was die Saison bedienen kann, wenn nicht alle.
+# ``added_channels``: Kanäle, die erst später dazukamen - wer die Saison vorher gespeichert hat, bekommt sie an.
 SEASONS: dict[str, dict] = {
     "weather": {"label": "Wetter", "description": "Regen, Schnee und Wetterleuchten vom Vereinsort auf der Seite – das ganze Jahr. In der Schnee-Saison wird Regen zu Schnee.",
-                "windows": _windows_weather, "texts": {}, "always": True, "channels": ("web",)},
+                "windows": _windows_weather, "texts": {}, "always": True, "added_channels": ("app",)},
     "halloween": {"label": "Halloween", "description": "Spinnweben, Fledermäuse und Kürbisse in der Woche um den 31. Oktober.",
                   "windows": _windows_halloween, "texts": {"greeting": "Happy Halloween von THE LION SQUAD"}},
     "advent": {"label": "Adventkranz", "description": "Vier Kerzen, angezündet je Adventsonntag, bis zum 26. Dezember.",
@@ -207,8 +208,19 @@ SEASONS: dict[str, dict] = {
 
 
 def supported_channels(key: str) -> tuple[str, ...]:
-    """Die Kanäle, die eine Saison bedienen kann - das Wetter gibt es vorerst nur im Web (die App folgt mit #667)."""
+    """Die Kanäle, die eine Saison bedienen kann. Das Wetter gibt es seit #771 auch in der App."""
     return tuple(SEASONS[key].get("channels") or CHANNELS)
+
+
+def stored_channels(key: str, saved: dict) -> list[str]:
+    """Die gespeicherten Kanäle einer Saison. ``channels_known`` hält fest, was beim Speichern zur Auswahl stand -
+    ein Kanal, der erst danach dazukam, ist an. Wer das Wetter vor #771 gespeichert hat, hat dort nur „web“ stehen
+    und kein ``channels_known``: dann gelten die ``added_channels`` der Saison als neu."""
+    known = saved.get("channels_known")
+    if not isinstance(known, list):
+        known = [c for c in supported_channels(key) if c not in (SEASONS[key].get("added_channels") or ())]
+    chosen = saved.get("channels") or []
+    return [c for c in supported_channels(key) if c in chosen or c not in known]
 
 
 def runs_all_year(key: str) -> bool:
@@ -249,7 +261,7 @@ def merge_settings(stored: dict | None) -> dict:
         if saved.get("intensity") in INTENSITIES:
             cfg["intensity"] = saved["intensity"]
         if isinstance(saved.get("channels"), list):
-            cfg["channels"] = [c for c in supported_channels(key) if c in saved["channels"]]
+            cfg["channels"] = stored_channels(key, saved)
         for name in cfg["texts"]:
             value = (saved.get("texts") or {}).get(name)
             if isinstance(value, str) and value.strip():

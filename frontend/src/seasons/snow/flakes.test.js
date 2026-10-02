@@ -1,5 +1,5 @@
 import { DEPTHS, DEPTH_ORDER, FAST_EVERY, GUST, SHAPES, advanceFlake, createFlake, fadeAt, flakeCounts, gustAt, nextGust, scrollFlake, snowfallFactor, windAt, windFrom } from "./flakes";
-import { mulberry32 } from "../rng";
+import { hashString, mulberry32 } from "../rng";
 
 // Schneefall (S7, W2): drei Tiefen mit klar verschiedenen Größen und Tempi, keine zwei Flocken gleich, Wind aus
 // dem Wetter mit einheitlicher Richtung, Böen mit weichem Anstieg und Abklingen, Zahl aus Budget, Seite, Wetter
@@ -148,4 +148,28 @@ test("Dichte nach dem Wetter: ohne Niederschlag 55 %, Schnee und - im Winter wir
   expect(flakeCounts(240, { factor: 0.8, share: 0.5 }).total).toBe(96);
   expect(flakeCounts(240, { factor: 0.55 }).total).toBe(flakeCounts(240, { snowing: false }).total);
   expect(flakeCounts(240, { factor: 1 }).total).toBe(flakeCounts(240, { snowing: true }).total);
+});
+
+// Parität mit der App (#771): derselbe Fingerabdruck steht in `mobile/src/seasons/snow/flakes.test.ts` - weicht eine
+// Seite ab, wird die andere rot. Flocken aus festem Seed, ein Böenplan, Wind, zwanzig Schritte und ein Scroll.
+const PARITY = 1298028011;
+
+test("Parität mit der App: derselbe Fingerabdruck aus Flocken, Böen, Wind, Schritten und Scrollen", () => {
+  const size = { width: 390, height: 844 };
+  const rng = mulberry32(hashString("snow:parity"));
+  const flakes = [];
+  DEPTH_ORDER.forEach((depth) => {
+    for (let index = 0; index < 12; index += 1) flakes.push(createFlake(depth, size, rng, { index, anywhere: index % 2 === 0 }));
+  });
+  const gust = nextGust(rng, 3);
+  const base = windFrom({ wind_factor: 0.9, wind_dir: 250 });
+  const fixed = mulberry32(7);
+  for (let step = 0; step < 20; step += 1) {
+    const t = 3 + step * 0.05 + gust.at - 3;
+    const wind = windAt(t, base, gust);
+    flakes.forEach((flake) => advanceFlake(flake, 0.05, wind, size, fixed));
+  }
+  flakes.forEach((flake) => scrollFlake(flake, 120, size, fixed));
+  const round = (value) => Math.round(value * 1000);
+  expect(hashString(JSON.stringify(flakes.map((flake) => [flake.shape, round(flake.x), round(flake.y), round(flake.radius), round(flake.fall), round(flake.rotation), round(flake.opacity), flake.spiral ? 1 : 0])))).toBe(PARITY);
 });

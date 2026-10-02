@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { formatDate } from "../../lib/format";
@@ -56,7 +57,7 @@ export function GalleryAlbumScreen({ navigation, route }: Props) {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
+      <ScrollView {...seasonScrollProps("GalleryAlbum")} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
         <View style={styles.header}>
           <Title>{album.title}</Title>
           <Muted>{[formatDate(album.taken_at), albumCountLabel(album), album.event?.name].filter(Boolean).join(" · ")}</Muted>

@@ -11,6 +11,7 @@ import { ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
@@ -204,6 +205,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        {...seasonScrollProps("EventDetail")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >

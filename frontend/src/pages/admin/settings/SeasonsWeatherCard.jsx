@@ -5,11 +5,14 @@ import { describeWeather } from "../../../seasons/weather";
 // Wetter am Vereinsort (#666): was der Server alle zehn Minuten von Open-Meteo holt (ohne Schlüssel), in Worten -
 // und der Ort selbst (Breite, Länge, Name), den der Verein hier ändert. Die Deko nimmt Wind, Regen, Schnee und
 // die echte Nacht daraus; fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
-// Das Wetter auf der Seite (#673) wird auch hier geschaltet - an, aus, Stärke, Vorschau: ein Ort für das Wetter.
+// Das Wetter auf der Seite (#673) wird auch hier geschaltet - an, aus, Stärke, wo (Website, App seit #771), Vorschau:
+// ein Ort für das Wetter.
 
 export const COMPASS = ["N", "NO", "O", "SO", "S", "SW", "W", "NW"];
 /** Stärken für das Wetter: „dezent“ gibt es nicht - ohne Bewegung hat das Wetter nichts zu zeigen. */
 export const WEATHER_INTENSITIES = { normal: "normal", full: "kräftig" };
+/** Wo das Wetter läuft - dieselben Namen wie in den Karten der anderen Saisonen. */
+export const WEATHER_CHANNELS = { web: "Website", app: "App" };
 
 export function compass(degrees) {
   const index = Math.round((((Number(degrees) % 360) + 360) % 360) / 45) % 8;
@@ -51,15 +54,15 @@ export function weatherText(weather) {
   return parts.join(", ");
 }
 
-/** Die Schalter der Saison „Wetter“: an/aus, Stärke, Vorschau - die Saison läuft das ganze Jahr, deshalb ohne Datum. */
+/** Die Schalter der Saison „Wetter“: an/aus, Stärke, wo, Vorschau - die Saison läuft das ganze Jahr, deshalb ohne Datum. */
 function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
   const intensities = season.intensity === "subtle" ? { subtle: "dezent (nichts zu sehen)", ...WEATHER_INTENSITIES } : WEATHER_INTENSITIES;
   return (
     <div className="pt-3 border-t border-white/5 space-y-2" data-testid="season-weather">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={!!season.enabled} disabled={busy} onChange={(e) => onSeasonSave({ enabled: e.target.checked }, e.target.checked ? "Wetter auf der Seite an." : "Wetter auf der Seite aus.")} className="accent-[#29B6E8]" data-testid="season-weather-enabled" />
-          <span>Wetter auf der Seite zeigen</span>
+          <input type="checkbox" checked={!!season.enabled} disabled={busy} onChange={(e) => onSeasonSave({ enabled: e.target.checked }, e.target.checked ? "Wetter an." : "Wetter aus.")} className="accent-[#29B6E8]" data-testid="season-weather-enabled" />
+          <span>Wetter zeigen</span>
         </label>
         <label className="flex items-center gap-2">
           <span className="text-white/45 uppercase tracking-wider text-[10px]">Stärke</span>
@@ -67,12 +70,25 @@ function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
             {Object.entries(intensities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
+        <div className="flex items-center gap-3">
+          <span className="text-white/45 uppercase tracking-wider text-[10px]">Wo</span>
+          {Object.entries(WEATHER_CHANNELS).filter(([value]) => !season.supported_channels || season.supported_channels.includes(value)).map(([value, label]) => (
+            <label key={value} className="flex items-center gap-1.5">
+              <input type="checkbox" checked={(season.channels || []).includes(value)} disabled={busy || !season.enabled} onChange={(e) => {
+                const current = season.channels || [];
+                const next = e.target.checked ? [...current, value] : current.filter((channel) => channel !== value);
+                onSeasonSave({ channels: next }, next.length ? `Wetter: ${next.map((channel) => WEATHER_CHANNELS[channel]).join(" und ")}.` : "Das Wetter läuft nirgends – schalte Website oder App ein.");
+              }} className="accent-[#29B6E8]" data-testid={`season-weather-channel-${value}`} />
+              <span>{label}</span>
+            </label>
+          ))}
+        </div>
         <button type="button" onClick={onPreview} disabled={busy} data-testid="season-weather-preview" className="px-3 py-1.5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
           <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
         </button>
       </div>
       <p className="text-[11px] text-white/40 max-w-2xl">
-        Das ganze Jahr: regnet, schneit oder gewittert es am Vereinsort, zeigt es die Website – sonst nichts. Vom 1. Advent bis Dreikönig schneit es immer, Regen wird zu Schnee.
+        Das ganze Jahr: regnet, schneit oder gewittert es am Vereinsort, zeigen es Website und App (wo angehakt) – sonst nichts. Vom 1. Advent bis Dreikönig schneit es immer, Regen wird zu Schnee.
         Die Vorschau zeigt einen Gewitterregen, auch wenn es draußen trocken ist – nur dir, sofort, in diesem Tab.
       </p>
     </div>

@@ -91,6 +91,62 @@ jest.mock("expo-haptics", () => ({
   NotificationFeedbackType: { Success: "success", Warning: "warning", Error: "error" },
 }));
 
+// Reanimated 4 (Schnee und Wetter in der App, #642/#771): im Test gibt es keinen UI-Thread und keine
+// Worklet-Laufzeit - die mitgelieferte Attrappe lädt sie trotzdem und kennt useFrameCallback nicht. Diese kleine
+// Nachbildung deckt ab, was die Saison-Ebenen nutzen; `__frameCallbacks` lässt Tests Bilder von Hand weiterschalten.
+jest.mock("react-native-reanimated", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const frameCallbacks = new Set();
+  const mutable = (initial) => {
+    const holder = {
+      value: initial,
+      get: () => holder.value,
+      set: (next) => {
+        holder.value = typeof next === "function" ? next(holder.value) : next;
+      },
+      modify: (modifier) => {
+        holder.value = modifier ? modifier(holder.value) : holder.value;
+      },
+    };
+    return holder;
+  };
+  const Animated = { View, createAnimatedComponent: (component) => component };
+  return {
+    __esModule: true,
+    default: Animated,
+    View,
+    makeMutable: mutable,
+    useSharedValue: (initial) => {
+      const ref = React.useRef(null);
+      if (!ref.current) ref.current = mutable(initial);
+      return ref.current;
+    },
+    useAnimatedStyle: (updater) => updater(),
+    useFrameCallback: (callback, autostart = true) => {
+      const ref = React.useRef(null);
+      if (!ref.current) {
+        ref.current = { isActive: autostart, callbackId: 1, setActive: (active) => { ref.current.isActive = Boolean(active); } };
+      }
+      React.useEffect(() => {
+        const entry = { callback, handle: ref.current };
+        frameCallbacks.add(entry);
+        return () => {
+          frameCallbacks.delete(entry);
+        };
+      }, [callback]);
+      return ref.current;
+    },
+    withTiming: (toValue) => toValue,
+    withSequence: (...steps) => steps[steps.length - 1],
+    withDelay: (_ms, value) => value,
+    withRepeat: (value) => value,
+    cancelAnimation: () => {},
+    Easing: { linear: (t) => t, quad: (t) => t * t, inOut: (fn) => fn, out: (fn) => fn, in: (fn) => fn },
+    __frameCallbacks: frameCallbacks,
+  };
+});
+
 beforeEach(() => {
   // Vor jedem Test neu setzen: sonst kann eine andere Einrichtung die Kennung
   // zurueckdrehen und React verweigert Zustandsaenderungen ausserhalb von act().

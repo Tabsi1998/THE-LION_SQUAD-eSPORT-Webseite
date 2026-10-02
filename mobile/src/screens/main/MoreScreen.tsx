@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
@@ -152,7 +153,7 @@ export function MoreScreen({ navigation }: Props) {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView {...seasonScrollProps("MoreHub")} contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Muted style={styles.eyebrow}>{clubName}</Muted>
           <Title>Mehr</Title>

@@ -72,7 +72,7 @@ test("Effektklassen je Screen-Klasse: nicht nur wie viel, sondern welche Art - S
 });
 
 test("Saison-Übersetzung: Halloween leitet seine Schlüssel aus den Effektklassen ab, eine Saison ohne Übersetzung bekommt nur die Klassen", () => {
-  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween"]);
+  expect(Object.keys(SEASON_CAPABILITIES)).toEqual(["halloween", "snow"]);
   (["lively", "medium", "calm", "quiet"] as const).forEach((cls) => {
     ["normal", "subtle", "full"].forEach((intensity) => {
       const caps = capabilitiesFor(cls, intensity);

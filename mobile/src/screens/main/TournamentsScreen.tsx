@@ -5,6 +5,7 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { MonthCalendar } from "../../components/MonthCalendar";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted } from "../../components/Text";
@@ -186,6 +187,7 @@ export function TournamentsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        {...seasonScrollProps("TournamentList")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >

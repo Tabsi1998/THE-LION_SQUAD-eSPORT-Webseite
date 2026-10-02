@@ -9,6 +9,7 @@ import { ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
@@ -86,7 +87,7 @@ export function NewsDetailScreen({ navigation, route }: Props) {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView {...seasonScrollProps("NewsDetail")} contentContainerStyle={styles.content}>
         <MediaImage
           uri={post.banner_url}
           style={styles.hero}

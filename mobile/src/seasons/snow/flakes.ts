@@ -1,26 +1,53 @@
-// Schneefall (Jahreszeiten II S7, #638; Advent & Winter W2, #728): Flocken in drei Tiefen - hinten klein, weich
-// und schnell, in der Mitte mittel, vorne groß, langsam und als Kristall. Keine zwei Flocken gleich: eigene Form,
-// Größe, Fallgeschwindigkeit, Taumeln (Drehung), Schwingen oder Spiralen mit eigener Phase, ein paar schnelle
-// Ausreißer. Der Wind kommt aus dem Wetter (Stärke und Richtung), dazu Böen alle 20–40 s, die alle Ebenen
-// gemeinsam schieben - vorne mehr als hinten. Die Flocken gehören zur Seite: beim Scrollen fährt man an ihnen
-// vorbei (`scrollFlake`). Reine Rechnung für den gemeinsamen Canvas-Loop (sky.js); das Zeichnen liegt in layer.js.
+// Schneefall in der App (#642, #771) - dieselbe Rechnung wie im Web (`frontend/src/seasons/snow/flakes.js`): Flocken
+// in drei Tiefen, hinten klein, weich und schnell, vorne groß, langsam und als Kristall; jede mit eigener Form, Größe,
+// Fallgeschwindigkeit, Taumeln und Schwingen; Wind aus dem Wetter mit Böen alle 20–40 s. Die Funktionen, die je Bild
+// laufen, sind Worklets: Reanimated rechnet sie auf dem UI-Thread, ohne JavaScript je Bild. Ein Paritätstest hält die
+// Werte mit dem Web zusammen (`flakes.test.ts` und `frontend/src/seasons/snow/flakes.test.js`).
+
+export type DepthKey = "back" | "mid" | "front";
+export type FlakeShape = "dot" | "star" | "plate" | "needle" | "clump" | "dendrite";
+export type Depth = { share: number; size: [number, number]; fall: [number, number]; wind: number; sway: [number, number]; spin: number; soft: boolean; scroll: number };
+export type Gust = { at: number; length: number; strength: number };
+export type Wind = { x: number; y: number; strength: number };
+export type WindBase = { factor: number; sign: number };
+export type Size = { width: number; height: number };
+export type Flake = {
+  depth: DepthKey;
+  shape: FlakeShape;
+  x: number;
+  y: number;
+  radius: number;
+  fall: number;
+  fast: boolean;
+  swayAmp: number;
+  swayFreq: number;
+  phase: number;
+  spiral: boolean;
+  rotation: number;
+  spin: number;
+  opacity: number;
+  age: number;
+  leaving?: boolean;
+  done?: boolean;
+};
+export type WeatherLike = { wind_factor?: number | null; wind_dir?: number | null; snow_cm?: number | null; rain_mm?: number | null } | null | undefined;
 
 /** Die drei Tiefen: Anteil am Budget, Größe, Fallgeschwindigkeit (px/s), Anteil des Winds, Schwingweite. */
-export const DEPTHS = {
+export const DEPTHS: Record<DepthKey, Depth> = {
   back: { share: 0.5, size: [1.2, 2.2], fall: [42, 70], wind: 0.45, sway: [4, 10], spin: 0, soft: true, scroll: 0.55 },
   mid: { share: 0.32, size: [2.2, 3.6], fall: [30, 52], wind: 0.75, sway: [8, 18], spin: 0.6, soft: false, scroll: 0.8 },
   front: { share: 0.18, size: [3.8, 6.5], fall: [18, 36], wind: 1.1, sway: [12, 26], spin: 1.2, soft: false, scroll: 1 },
 };
-export const DEPTH_ORDER = ["back", "mid", "front"];
+export const DEPTH_ORDER: DepthKey[] = ["back", "mid", "front"];
 /** Sechs Formen: weicher Punkt, Sternkristall, Plättchen, Nadelpaar, Klümpchen, Dendrit. */
-export const SHAPES = ["dot", "star", "plate", "needle", "clump", "dendrite"];
+export const SHAPES: FlakeShape[] = ["dot", "star", "plate", "needle", "clump", "dendrite"];
 /** Böen: alle 20–40 s, 3–6 s lang, 1,6- bis 2,8-fach, mit weichem Anstieg und Abklingen. */
 export const GUST = { every: [20, 40], length: [3, 6], strength: [1.6, 2.8], attack: 1, release: 2 };
-/** Jede zwölfte Flocke ist ein schneller Ausreißer (W2: „einzelne schnelle Flocken“). */
+/** Jede zwölfte Flocke ist ein schneller Ausreißer. */
 export const FAST_EVERY = 12;
 
 /** Der Wind aus dem Wetter: Stärke 0,3–1,6 (`wind_factor`), Richtung in Grad, aus der er kommt (270 = West → nach rechts). */
-export function windFrom(weather) {
+export function windFrom(weather: WeatherLike): WindBase {
   const factor = Math.max(0.3, Math.min(1.6, Number(weather && weather.wind_factor) || 0.6));
   const direction = Number(weather && weather.wind_dir);
   const sign = Number.isFinite(direction) ? (Math.sin((direction * Math.PI) / 180) <= 1e-9 ? 1 : -1) : 1;
@@ -28,13 +55,15 @@ export function windFrom(weather) {
 }
 
 /** Der Böenplan aus dem Zufallsstrom: wann die nächste kommt, wie lang, wie stark. */
-export function nextGust(rng, now = 0) {
+export function nextGust(rng: () => number, now = 0): Gust {
+  "worklet";
   const at = now + GUST.every[0] + rng() * (GUST.every[1] - GUST.every[0]);
   return { at, length: GUST.length[0] + rng() * (GUST.length[1] - GUST.length[0]), strength: GUST.strength[0] + rng() * (GUST.strength[1] - GUST.strength[0]) };
 }
 
 /** Wie stark die Böe gerade weht (1 = kein Zuschlag): weicher Anstieg, Plateau, Abklingen. */
-export function gustAt(gust, t) {
+export function gustAt(gust: Gust | null, t: number): number {
+  "worklet";
   if (!gust || t < gust.at) return 1;
   const into = t - gust.at;
   if (into < GUST.attack) return 1 + (gust.strength - 1) * (into / GUST.attack);
@@ -45,18 +74,21 @@ export function gustAt(gust, t) {
 }
 
 /** Der Wind zum Zeitpunkt t (Sekunden): Grundwind mit langsamem Auf und Ab mal Böe; x in px/s (Vorzeichen = Richtung), y drückt etwas nach unten. */
-export function windAt(t, { factor = 0.6, sign = 1 } = {}, gust = null) {
+export function windAt(t: number, base: WindBase = { factor: 0.6, sign: 1 }, gust: Gust | null = null): Wind {
+  "worklet";
   const breath = 1 + 0.25 * Math.sin(t / 5.3) + 0.12 * Math.sin(t / 1.9 + 1);
-  const strength = factor * breath * gustAt(gust, t);
-  return { x: sign * (8 + 38 * strength), y: 6 * strength, strength };
+  const strength = base.factor * breath * gustAt(gust, t);
+  return { x: base.sign * (8 + 38 * strength), y: 6 * strength, strength };
 }
 
-function between(rng, [min, max]) {
+function between(rng: () => number, [min, max]: [number, number]): number {
+  "worklet";
   return min + rng() * (max - min);
 }
 
 /** Eine neue Flocke oben (oder, beim Start, irgendwo im Bild). */
-export function createFlake(depthKey, size, rng, { index = 0, anywhere = false } = {}) {
+export function createFlake(depthKey: DepthKey, size: Size, rng: () => number, { index = 0, anywhere = false }: { index?: number; anywhere?: boolean } = {}): Flake {
+  "worklet";
   const depth = DEPTHS[depthKey] || DEPTHS.mid;
   const fast = !depth.soft && index % FAST_EVERY === FAST_EVERY - 1;
   const radius = between(rng, depth.size);
@@ -82,10 +114,11 @@ export function createFlake(depthKey, size, rng, { index = 0, anywhere = false }
 }
 
 /**
- * Einen Schritt weiter: fallen, schwingen oder spiralen, driften mit dem Wind, taumeln; unten und seitlich wieder hinein.
- * `random` liefert die neue Stelle oben - in Tests fest, damit Web und App denselben Fingerabdruck rechnen (#771).
+ * Einen Schritt weiter: fallen, schwingen oder spiralen, driften mit dem Wind, taumeln; unten und seitlich wieder
+ * hinein. `random` liefert die neue Stelle oben (im Web `Math.random`; in Tests fest).
  */
-export function advanceFlake(flake, dt, wind, size, random = Math.random) {
+export function advanceFlake(flake: Flake, dt: number, wind: Wind, size: Size, random: () => number = Math.random): Flake {
+  "worklet";
   const depth = DEPTHS[flake.depth] || DEPTHS.mid;
   flake.age += dt;
   const swing = Math.sin(flake.age * flake.swayFreq * Math.PI * 2 + flake.phase);
@@ -108,12 +141,11 @@ export function advanceFlake(flake, dt, wind, size, random = Math.random) {
 }
 
 /**
- * Scrollen (Rückmeldung des Betreibers, 29.09.): die Flocken gehören zur Seite, nicht zum Fenster. Wer scrollt,
- * fährt an ihnen vorbei - vorne ganz (`scroll` 1: die Flocke steht in der Seite), in der Mitte und hinten weniger
- * (Ferne). Was oben oder unten hinausgeschoben wird, kommt auf der anderen Seite an einer neuen Stelle herein, damit
- * es überall gleich dicht schneit; auch ein Sprung über viele Fensterhöhen bleibt im Bild.
+ * Scrollen: die Flocken gehören zum Screen, nicht zum Glas davor - wer scrollt, fährt an ihnen vorbei, vorne ganz,
+ * hinten weniger (Ferne). Was oben oder unten hinausgeschoben wird, kommt auf der anderen Seite an neuer Stelle herein.
  */
-export function scrollFlake(flake, deltaY, size, random = Math.random) {
+export function scrollFlake(flake: Flake, deltaY: number, size: Size, random: () => number = Math.random): Flake {
+  "worklet";
   if (!deltaY) return flake;
   const depth = DEPTHS[flake.depth] || DEPTHS.mid;
   const margin = flake.radius * 3 + 10;
@@ -126,10 +158,10 @@ export function scrollFlake(flake, deltaY, size, random = Math.random) {
 }
 
 /**
- * Wie viele Flocken je Tiefe: `budget` vom Gerät und der Stärke (sky.js), `share` der Seite (Klasse), `factor` aus
- * dem Wetter (`snowfallFactor`; ohne Angabe `snowing` → volle Zahl, sonst 55 %), `fade` 0–1 gegen Ende der Saison.
+ * Wie viele Flocken je Tiefe: `budget` vom Gerät, `share` des Screens (Klasse), `factor` aus dem Wetter
+ * (`snowfallFactor`; ohne Angabe `snowing` → volle Zahl, sonst 55 %), `fade` 0–1 gegen Ende der Saison.
  */
-export function flakeCounts(budget, { share = 1, snowing = false, factor = null, fade = 1 } = {}) {
+export function flakeCounts(budget: number, { share = 1, snowing = false, factor = null, fade = 1 }: { share?: number; snowing?: boolean; factor?: number | null; fade?: number } = {}) {
   const weight = factor === null || factor === undefined ? (snowing ? 1 : 0.55) : Math.max(0, Number(factor) || 0);
   const total = Math.round(Math.max(0, budget) * Math.max(0, Math.min(1, share)) * weight * Math.max(0, Math.min(1, fade)));
   const back = Math.round(total * DEPTHS.back.share);
@@ -138,12 +170,10 @@ export function flakeCounts(budget, { share = 1, snowing = false, factor = null,
 }
 
 /**
- * Wie dicht es schneit (#673, Betreiber 29.09.): ohne Niederschlag draußen 55 %, mit echtem Schnee mehr - und weil es
- * in der Schnee-Saison nie regnet, zählt Regen wie Schnee (1 mm Regen wie 1 cm Schnee). Bei starkem Niederschlag bis
- * 125 % des Budgets. `base` ist die Menge ohne Niederschlag (außerhalb der Schnee-Saison 0: dann schneit es nur,
- * wenn es wirklich schneit).
+ * Wie dicht es schneit: ohne Niederschlag draußen `base` (in der Schnee-Saison 55 %), mit echtem Schnee mehr - und
+ * weil es in der Schnee-Saison nie regnet, zählt Regen wie Schnee. Bei starkem Niederschlag bis 125 %.
  */
-export function snowfallFactor(weather, base = 0.55) {
+export function snowfallFactor(weather: WeatherLike, base = 0.55): number {
   const snow = Math.max(0, Number(weather && weather.snow_cm) || 0);
   const rain = Math.max(0, Number(weather && weather.rain_mm) || 0);
   const amount = snow + rain;
@@ -153,8 +183,8 @@ export function snowfallFactor(weather, base = 0.55) {
   return 1.25;
 }
 
-/** Der Ausklang (S7): in den letzten zehn Minuten der Saison werden es weniger, kein hartes Abschalten. */
-export function fadeAt(endsAt, now = Date.now()) {
+/** Der Ausklang: in den letzten zehn Minuten der Saison werden es weniger, kein hartes Abschalten. */
+export function fadeAt(endsAt: string | null | undefined, now: number = Date.now()): number {
   const end = Date.parse(endsAt || "");
   if (!Number.isFinite(end)) return 1;
   const left = end - now;

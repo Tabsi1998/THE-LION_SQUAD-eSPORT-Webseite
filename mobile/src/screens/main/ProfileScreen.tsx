@@ -11,6 +11,7 @@ import { BlockedUsersCard } from "../../components/BlockedUsersCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { availabilityText } from "../../lib/appLock";
@@ -453,6 +454,7 @@ export function ProfileScreen() {
   return (
     <Screen padded={false}>
       <ScrollView
+        {...seasonScrollProps("Profile")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfile} tintColor={colors.cyan} />}
       >

@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { SeasonWidgetSlot } from "../../seasons/SeasonStage";
 import { AdventHint } from "../../advent/entry";
 import { Body, Heading, Muted, Title } from "../../components/Text";
@@ -176,6 +177,7 @@ export function DashboardScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        {...seasonScrollProps("Dashboard")}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}
       >

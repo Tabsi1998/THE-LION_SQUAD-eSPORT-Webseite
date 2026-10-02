@@ -28,7 +28,21 @@ export type Season = {
   data: Record<string, unknown>;
 };
 export type ActiveSeason = Season & { effective: Intensity | "off" };
-type Payload = { seasons: Season[]; preview?: boolean };
+/** Das Wetter am Vereinsort, wie es der Server mit der Saison-Abfrage schickt (#666, #771). */
+export type SeasonWeather = {
+  location?: string;
+  night?: boolean;
+  temp_c?: number | null;
+  wind_kmh?: number | null;
+  wind_dir?: number | null;
+  wind_factor?: number | null;
+  rain_mm?: number | null;
+  snow_cm?: number | null;
+  code?: number | null;
+  stale?: boolean;
+  source?: string;
+};
+type Payload = { seasons: Season[]; preview?: boolean; weather?: SeasonWeather | null };
 
 export const PREFERENCES: SeasonPreference[] = ["on", "subtle", "off"];
 export const PREFERENCE_KEY = "season_preference";
@@ -74,9 +88,11 @@ type SeasonContextValue = {
   /** Gruß als Overlay-Karte (#655): ein Text für ein paar Sekunden, unabhängig vom Screen-Layout. */
   toast: SeasonToast | null;
   showToast: (text: string, ms?: number) => void;
+  /** Das Wetter am Vereinsort (Wind, Regen, Schnee, Gewitter) - alle zehn Minuten mit der Saison-Abfrage neu. */
+  weather: SeasonWeather | null;
 };
 
-const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {}, toast: null, showToast: () => {} };
+const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {}, toast: null, showToast: () => {}, weather: null };
 const SeasonContext = createContext<SeasonContextValue>(EMPTY);
 
 export function SeasonProvider({ children }: { children: React.ReactNode }) {
@@ -157,7 +173,7 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     (payload?.seasons || []).filter((season) => (season.channels || []).includes("app")).forEach((season) => {
       byKey[season.key] = { ...season, effective: effectiveIntensity(season, preference, reducedMotion) };
     });
-    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load, toast, showToast };
+    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load, toast, showToast, weather: payload?.weather || null };
   }, [payload, preference, reducedMotion, setPreference, load, toast, showToast]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { SeasonsWeatherCard, WEATHER_INTENSITIES, compass, skyText, weatherText } from "./SeasonsWeatherCard";
+import { SeasonsWeatherCard, WEATHER_CHANNELS, WEATHER_INTENSITIES, compass, skyText, weatherText } from "./SeasonsWeatherCard";
 
 // Wetter am Vereinsort (#666): Satz in Worten, Himmelsrichtung, Vorgabe bei altem Stand, Ort speichern nur mit
 // gültigen Zahlen und nur bei Änderung, „Jetzt abrufen“.
@@ -68,7 +68,7 @@ test("Schalter der Saison Wetter: nur mit der Saison, Stärke gesperrt solange a
   expect(screen.getByTestId("season-weather-enabled")).not.toBeChecked();
   expect(screen.getByTestId("season-weather-intensity")).toBeDisabled();
   fireEvent.click(screen.getByTestId("season-weather-enabled"));
-  expect(onSeasonSave).toHaveBeenCalledWith({ enabled: true }, "Wetter auf der Seite an.");
+  expect(onSeasonSave).toHaveBeenCalledWith({ enabled: true }, "Wetter an.");
   fireEvent.click(screen.getByTestId("season-weather-preview"));
   expect(onPreview).toHaveBeenCalledTimes(1);
   rerender(<SeasonsWeatherCard {...props} season={{ key: "weather", enabled: true, intensity: "subtle" }} onSeasonSave={onSeasonSave} onPreview={onPreview} />);
@@ -77,4 +77,23 @@ test("Schalter der Saison Wetter: nur mit der Saison, Stärke gesperrt solange a
   fireEvent.change(screen.getByTestId("season-weather-intensity"), { target: { value: "full" } });
   expect(onSeasonSave).toHaveBeenLastCalledWith({ intensity: "full" }, "Wetter: kräftig.");
   expect(Object.keys(WEATHER_INTENSITIES)).toEqual(["normal", "full"]);
+});
+
+test("Wo das Wetter läuft: Website und App (#771) - angeboten wird nur, was die Saison bedienen kann, gesperrt solange aus", () => {
+  const props = { weather: FRESH, location: LOCATION, busy: false, onSave: vi.fn(), onRefresh: vi.fn(), onPreview: vi.fn() };
+  const onSeasonSave = vi.fn();
+  const season = { key: "weather", enabled: true, intensity: "normal", channels: ["web"], supported_channels: ["web", "app"] };
+  const { rerender } = render(<SeasonsWeatherCard {...props} season={season} onSeasonSave={onSeasonSave} />);
+  expect(screen.getByTestId("season-weather-channel-web")).toBeChecked();
+  expect(screen.getByTestId("season-weather-channel-app")).not.toBeChecked();
+  fireEvent.click(screen.getByTestId("season-weather-channel-app"));
+  expect(onSeasonSave).toHaveBeenLastCalledWith({ channels: ["web", "app"] }, "Wetter: Website und App.");
+  rerender(<SeasonsWeatherCard {...props} season={{ ...season, channels: ["app"] }} onSeasonSave={onSeasonSave} />);
+  fireEvent.click(screen.getByTestId("season-weather-channel-app"));
+  expect(onSeasonSave).toHaveBeenLastCalledWith({ channels: [] }, "Das Wetter läuft nirgends – schalte Website oder App ein.");
+  rerender(<SeasonsWeatherCard {...props} season={{ ...season, supported_channels: ["web"] }} onSeasonSave={onSeasonSave} />);
+  expect(screen.queryByTestId("season-weather-channel-app")).toBeNull();
+  rerender(<SeasonsWeatherCard {...props} season={{ ...season, enabled: false }} onSeasonSave={onSeasonSave} />);
+  expect(screen.getByTestId("season-weather-channel-web")).toBeDisabled();
+  expect(WEATHER_CHANNELS).toEqual({ web: "Website", app: "App" });
 });

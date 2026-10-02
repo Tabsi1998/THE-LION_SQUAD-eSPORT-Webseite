@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { fireEvent, render, screen, within } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 
@@ -59,12 +59,26 @@ test("„aus“ zeigt nichts", async () => {
 });
 
 test("Deko-Schalter nennt die laufende Saison und stellt um - nur Saisonen, die die App zeigen kann", async () => {
-  mockSeasonState.seasons = [halloween("normal"), { ...halloween("normal"), key: "snow", label: "Schneefall" }, { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender" }];
+  mockSeasonState.seasons = [halloween("normal"), { ...halloween("normal"), key: "nikolaus", label: "Nikolaus" }, { ...halloween("normal"), key: "snow", label: "Schneefall" }, { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender" }, { ...halloween("normal"), key: "weather", label: "Wetter" }];
   await render(<DecoSetting />);
-  expect(screen.getByText(/Gerade läuft: Halloween, Adventkalender\./)).toBeTruthy();
-  expect(screen.queryByText(/Schneefall/)).toBeNull();
+  // Schnee kann die App seit #642; das Wetter ist nur Himmel und keine Saison zum Nennen (#771).
+  expect(screen.getByText(/Gerade läuft: Halloween, Schneefall, Adventkalender\./)).toBeTruthy();
+  expect(screen.queryByText(/Nikolaus/)).toBeNull();
+  expect(screen.queryByText(/Wetter/)).toBeNull();
   await fireEvent.press(screen.getByText("Dezent"));
   expect(mockSeasonState.setPreference).toHaveBeenCalledWith("subtle");
+});
+
+test("mehrere Widgets im Kopf stehen übereinander, die Schneeflocke oben - der Name behält seinen Platz", async () => {
+  mockSeasonState.seasons = [{ ...halloween("normal"), key: "advent", label: "Adventkranz", data: { candles: 2 } }, { ...halloween("normal"), key: "snow", label: "Schneefall" }];
+  await render(<SeasonWidgetSlot />);
+  const slot = screen.getByTestId("season-widget-slot");
+  expect(StyleSheet.flatten(slot.props.style).flexDirection).toBe("column");
+  expect(slot.props.children[0].key).toBe("snow");
+  await screen.unmount();
+  mockSeasonState.seasons = [halloween("normal")];
+  await render(<SeasonWidgetSlot />);
+  expect(StyleSheet.flatten(screen.getByTestId("season-widget-slot").props.style).flexDirection).toBe("row");
 });
 
 test("Töne unter Darstellung: Vorgabe an wie im Web, „Aus“ merkt sich das Gerät", async () => {
