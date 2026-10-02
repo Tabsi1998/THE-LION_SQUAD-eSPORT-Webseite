@@ -97,6 +97,11 @@ test("vor dem 31. zählt der Klick nicht", async () => {
   expect(mockSignals.recordSignal).not.toHaveBeenCalled();
 });
 
+// Der Netzbau läuft hier wirklich Schritt für Schritt: jeder der Faden-Schritte zeichnet das ganze Netz neu. Auf dem
+// GitHub-Rechner brauchte das bis über 15 s (Vorgabe von Jest), sobald andere Testdateien parallel liefen (#795) - deshalb
+// ein eigenes Zeitlimit statt eines Tests, der je nach Last rot wird.
+const NETZBAU_TIMEOUT_MS = 60000;
+
 test("Netzbau: Schritt für Schritt nach der Uhr, am Ende fertig; ohne Bau oder bei Bewegung reduzieren sofort fertig", async () => {
   jest.useFakeTimers();
   const web = { corner: "tl", factor: 1, seed: 0.42, build: true };
@@ -124,7 +129,7 @@ test("Netzbau: Schritt für Schritt nach der Uhr, am Ende fertig; ohne Bau oder 
   await screen.unmount();
   await render(<OrbWeb web={web} width={360} reduced />);
   expect(screen.getByTestId("halloween-web-built")).toBeTruthy();
-});
+}, NETZBAU_TIMEOUT_MS);
 
 test("Ecken: Netz immer, Spinne am Faden und Gräber nur mit Bewegung; dezent zeigt das fertige Netz", async () => {
   const name = SCREENS.find((candidate) => {

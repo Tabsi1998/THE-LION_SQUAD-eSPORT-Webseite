@@ -11,7 +11,8 @@ jest.mock("../SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
 const { WeatherSky } = require("./index");
 const { createMotionScheduler, resetMotionScheduler } = require("../motion");
-const { FLASH_GAP, FLASH_SECONDS } = require("./storm");
+const { FLASH_GAP, FLASH_SECONDS, nextFlashAt } = require("./storm");
+const { hashString, mulberry32, seasonSeed, seasonYear } = require("../rng");
 
 function season(key: string, effective = "normal") {
   return { key, label: key, phase: key, intensity: "normal", effective, channels: ["app"], texts: {}, data: {}, starts_at: "", ends_at: "", forced: false };
@@ -73,15 +74,20 @@ test("Gewitter: frühestens nach acht Sekunden ein Wetterleuchten, nach einem Au
   mockSeasonState.weather = { ...RAIN, rain_mm: 2.5, code: 95 };
   await render(<WeatherSky season={season("weather")} screen="Dashboard" reducedMotion={false} />);
   expect(screen.getByTestId("weather-rain")).toBeTruthy();
-  let firstAt = -1;
-  for (let ms = 100; ms <= FLASH_GAP[1] * 1000 + 200 && firstAt < 0; ms += 100) {
-    await act(async () => {
-      jest.advanceTimersByTime(100);
-    });
-    if (screen.queryByTestId("weather-lightning")) firstAt = ms;
-  }
-  expect(firstAt).toBeGreaterThanOrEqual(FLASH_GAP[0] * 1000);
-  expect(firstAt).toBeLessThanOrEqual(FLASH_GAP[1] * 1000 + 100);
+  // Wann der erste Blitz kommt, sagt derselbe Zufall wie in der Ebene (Seed der Saison) - so reichen drei Schritte
+  // statt eines Vorspulens in Zehntelsekunden (das kostete auf dem GitHub-Rechner spürbar Zeit, #795).
+  const seed = seasonSeed({ season: "weather", year: seasonYear(season("weather")), screen: "storm" });
+  const first = nextFlashAt(mulberry32(hashString(`storm:${seed}`)), 0);
+  expect(first).toBeGreaterThanOrEqual(FLASH_GAP[0]);
+  expect(first).toBeLessThanOrEqual(FLASH_GAP[1]);
+  await act(async () => {
+    jest.advanceTimersByTime(first * 1000 - 50);
+  });
+  expect(screen.queryByTestId("weather-lightning")).toBeNull();
+  await act(async () => {
+    jest.advanceTimersByTime(100);
+  });
+  expect(screen.getByTestId("weather-lightning")).toBeTruthy();
   await act(async () => {
     jest.advanceTimersByTime(FLASH_SECONDS * 1000 + 200);
   });
