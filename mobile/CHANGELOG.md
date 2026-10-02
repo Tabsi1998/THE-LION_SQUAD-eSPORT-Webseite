@@ -1,14 +1,23 @@
 # Changelog
 
-## 1.0.3 - 2026-10-12
+## 1.0.4 - 2026-10-02
+
+- Mobile: Adventkalender in der App: dasselbe Bild und dieselben 24 Türchen wie auf der Website und derselbe Stand – was am Handy geöffnet wird, ist auch im Web offen. Jedes Türchen geht an seinem Tag um 6 Uhr auf, mit Text, Bild, Quiz, Gewinn und mehr; Videos und Clips öffnen YouTube oder Twitch. Zu finden unter Mehr → Verein und als Hinweis im Dashboard, solange der Kalender läuft (#641, #732).
+- Mobile: Adventkranz im Dashboard-Kopf ab dem 1. Advent: vier Kerzen, jede anders, eine brennt je Adventsonntag; am Sonntag zündet die neue Kerze sichtbar an. Antippen zeigt, wie viele Tage es noch bis Weihnachten sind (#637, #727).
+- Mobile: Halloween-Fundstücke zählen jetzt auch aus der App – verscheuchte Fledermäuse, befreite Geister, die angestupste Katze und der Kürbis am 31.10. ab 18 Uhr. Ohne Anmeldung sammelt das Handy und meldet nach dem Anmelden nach (#678).
+- Mobile: Ein geöffneter News-Beitrag zählt für den Erfolg „Immer informiert“ (#780).
+- Mobile: Die Halloween-Katze wedelt mit dem Schwanz an der Wurzel und blinzelt an Ort und Stelle – vorher wanderte der Schwanz am Körper entlang, und die Augen sprangen über den Kopf.
+- Mobile: Unter Mehr → Darstellung stehen nur noch Saisonen, die die App auch zeigt.
+
+## 1.0.3 - 2026-09-28
 
 - Mobile: Halloween wie im Web: ein rundes Netz, das die Spinne Faden für Faden in echter Reihenfolge spinnt (Anker, Rahmen, Speichen, Nabe, Spirale) und das je Screen anders ausfällt; Fledermäuse hängen unter der Kopfzeile und fliegen beim Antippen davon; ein winziger Friedhof über der Tab-Leiste gibt beim Antippen türkise Geister frei; die Spinne am Faden kommt vom oberen Rand, seilt sich bis über die Tab-Leiste ab, lässt los, läuft weg, und der Faden schwingt und reißt ab (#665).
 
-## 1.0.2 - 2026-10-10
+## 1.0.2 - 2026-09-28
 
 - Mobile: Halloween dezent und detailreich: Netz in Silber-Türkis, das eine Spinne auf vielen Screens sichtbar spinnt, eine kleine Spinne am Faden, selten ein Krabbler, wenige Fledermäuse in ruhiger Größe; jeder Screen mit eigener Anordnung, der Gruß der Laterne als Karte unter der Kopfzeile statt als Rahmen über dem halben Screen (#655).
 
-## 1.0.1 - 2026-10-10
+## 1.0.1 - 2026-09-28
 
 - Mobile: Saisonale Deko: Halloween mit Spinnweben in den Ecken, Fledermausschwärmen alle paar Minuten, der Kürbislaterne im Dashboard-Kopf (antippen: Gruß und Haptik) und dem Kürbis im Tab „Mehr“. Der Verein schaltet die Saisonen unter Auftritt → Jahreszeiten; jede Person stellt die Deko unter Mehr → Darstellung auf an, dezent oder aus – angemeldet gilt die Wahl auch auf der Website. „Bewegung reduzieren“ des Handys macht alles ruhig. Advent, Weihnachten, Silvester, Fasching und Ostern kommen als weitere Module mit den nächsten Builds (#636).
 
