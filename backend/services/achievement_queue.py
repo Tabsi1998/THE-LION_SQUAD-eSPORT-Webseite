@@ -112,6 +112,8 @@ async def note_award(user_id: str, tier: dict, group: dict) -> None:
         "id": new_id(), "user_id": user_id, "tier_code": tier.get("code"), "tier_name": tier.get("name"),
         "tier_description": tier.get("description") or "", "points": int(tier.get("points") or 0),
         "level": int(tier.get("level") or 1), "material": tier.get("material"), "group_name": group.get("name"),
+        # Für das Abzeichen im Postfach (#622): Motiv und Symbol der Stufe.
+        "art": tier.get("art"), "icon": tier.get("icon") or group.get("icon"), "rank": int(tier.get("rank") or 0),
         "group_public": bool(group.get("public", True)), "created_at": now_utc().isoformat(),
     })
 
@@ -177,7 +179,8 @@ async def _notify_user(user_id: str, rows: list[dict]) -> bool:
     awards = [{"name": row.get("tier_name"), "group": row.get("group_name"), "points": int(row.get("points") or 0), "level": int(row.get("level") or 1), "material": row.get("material")} for row in rows[:10]]
     meta = {"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}",
             "awards": awards, "points": _points(rows), "level": max(int(row.get("level") or 1) for row in rows),
-            "top": {"name": top.get("tier_name"), "material": top.get("material")}}
+            "top": {"name": top.get("tier_name"), "material": top.get("material"), "level": int(top.get("level") or 1),
+                    "rank": int(top.get("rank") or 0), "art": top.get("art"), "icon": top.get("icon")}}
     share_id = await _share_award_id(user_id, top)
     if share_id:
         meta["share_award_id"] = share_id
