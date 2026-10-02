@@ -2734,6 +2734,17 @@ der Verwaltung.
   der Sichtprobe: das „×“ der Karte lag auf dem letzten Licht (jetzt im Textteil wie im Web); bleibt
   die App über Nacht offen, gilt morgens der neue Tag; und der Abschied hatte im Web wie in der App
   zweimal „Danke fürs Mitfeiern“ – der Titel ist jetzt der Name des Tages.
+- **Nikolaus** (PR #798, schließt #736): Am 6. Dezember steht ein Stiefel auf der Linie über dem
+  Impressum der Website und im Tab „Mehr“ der App. Antippen bringt einen Sticker aus dem neuen
+  Paket „Vom Nikolaus“ – einer je Person und Jahr, danach im Chat zu verwenden; über die Jahre
+  lässt sich das Paket sammeln. Lehren: ein Stiefel, der auf dem Handy die Social-Leiste
+  verdeckte, misst jetzt seinen Platz; in der App brach ein Aufräumen beim Phasenwechsel die
+  Bewegung ab; und das Paket gehört ans Ende des Katalogs, weil die Auswahl beim ersten öffnet.
+- **Silvester auf der Website** (PR #800, schließt #640): Ab dem 29.12. abends Raketen nach der
+  Rampe des Servers, ab 23:59 der Countdown nach der Serveruhr, um 00:00 „Frohes neues Jahr“ und
+  die Show mit drei großen Salven, danach der Ausklang und am 1. Jänner der Gruß. Sechs
+  Feuerwerksarten mit eigener Physik, jedes Jahr eine eigene Choreografie, Ton nur nach
+  Einschalten. Gemessen: rund 1 ms je Bild bei voller Teilchenzahl. Die App folgt.
 - **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.
