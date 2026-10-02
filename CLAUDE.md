@@ -2982,6 +2982,42 @@ Seit dem 15. September gilt:
   `components/Screen.tsx`, hinter dem Inhalt jedes Screens); `christmasKeys`
   in `intensity.ts`. Der Abschied am 6. Jänner trägt in Web und App den
   Titel „Heilige Drei Könige“ (vorher stand „Danke fürs Mitfeiern“ doppelt).
+- Nikolaus (X3 #736; PR #798): Server `services/nikolaus.py` (`boot_state`,
+  `open_boot`, `pick_sticker` – fest aus Person und Jahr, zuerst ein noch
+  fehlender), Sammlung `user_stickers` (eindeutig je `user_id`, `source`,
+  `year`), Abfragen `GET /api/seasonal/nikolaus` und `POST …/open` (409
+  außerhalb der Saison, 401 ohne Anmeldung). Saison-Pakete im Sticker-Katalog
+  (`seasonal`): „Vom Nikolaus“ mit acht Fluent-Bildern steht **hinten** im
+  Katalog (die Auswahl im Chat öffnet beim ersten Paket), erscheint im Chat
+  nur mit den eigenen Stickern (`list_sticker_packs(user_id=…)`), senden kann
+  ihn nur, wer ihn hat (`resolve_sticker`/`sticker_for_message` mit
+  `user_id`); im Admin ganz sichtbar und abschaltbar (dann bleibt der Stiefel
+  leer). Web `seasons/nikolaus/`: `boot.js` (Form, `cardFor`, `bootFit` misst
+  den freien Platz über der Footer-Linie – Handy kleiner, PC frei vom Knopf
+  „Nach oben“), `index.jsx` (`Footer` mit Stiefel und Karte, `Toast` als
+  Hinweis „Zum Stiefel“, `footerAccessible`: der Footer-Platz versteckt eine
+  bedienbare Szene nicht mehr vor Screenreadern), gemeinsame Kante
+  `seasons/footerLine.js`. App `seasons/nikolaus/`: `boot.ts`, `BootSvg.tsx`
+  (Gutschein als eigene Ebene hinter dem Stiefel), `index.tsx` (`Shelf` im
+  Kopf von „Mehr“ über `SeasonShelfSlot`, links neben der Glocke; `Greeting`
+  mit „Zum Stiefel“; `TabIcon`). Parität der Form `102233374`.
+- Silvester im Web (#640; PR #800): `seasons/newYear/` – `fireworks.js`
+  (sechs Arten `SHELLS`, Bahnen geschlossen mit Luftwiderstand und
+  Schwerkraft `starAt`, `starLight` mit Nachglühen, `smokeAt`, `rocketAt`,
+  `burstPoint`, `spreadFor` nach Fensterhöhe, `windDrift`, `soundDelay`),
+  `choreography.js` (`handwriting(year)` aus dem Jahres-Seed: Zonen,
+  Lieblingsart, Farbpaare, Muster der Salven um 00:00/00:05/00:10 – Fächer,
+  Welle, Krone, Kaskade; `planHour` aus den Startsekunden des Servers),
+  `countdown.js` (Stufen hint ab 23:00, calm ab 23:59:00, pulse, zero, done),
+  `layer.js` (Himmels-Ebene, Budget 200/600/1200, `LATE_MS` 1,5 s ohne
+  Nachholen, schläft mit 4 s Vorschau; gemessen 1,05 ms je Bild bei rund 1225
+  Teilchen), `sound.js` (eigener Schalter `tls-newyear-sound`, Vorgabe aus,
+  höchstens sechs Stimmen, Begrenzer), `index.jsx` (`Corners` hält die Ebene
+  aktuell und zählt `online_at_new_year`, `Widget` mit Hinweis und
+  Ton-Schalter, `Toast` mit Countdown-Karte und Gruß). Serveruhr:
+  `seasons/clock.js` (`serverOffset` gegen die Mitte der Abfrage),
+  `SeasonContext` gibt `serverOffset` und `serverNow` weiter; der Server
+  cacht `/api/seasonal/active` in `NEW_YEAR_LIVE_PHASES` (23:45–00:44) nicht.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3287,6 +3323,14 @@ npx expo install --check
   vor dem `Date` der Antwort, gilt sie als frisch – die App zeigt die
   Saisonen eines anderen Tages. Vor dem Neustart `adb shell run-as
   at.lionsquad.app rm -rf cache/http-cache`. Kein Fehler der App.
+- **Animated in der App:** `setValue()` stoppt die laufende Animation eines
+  Werts – und `Animated.parallel` stoppt dann alle anderen. Ein
+  Aufräum-Effekt beim Phasenwechsel brach so das Öffnen des Nikolausstiefels
+  ab (#798): getrennte Werte für Dauer- und Klick-Bewegung, mit
+  `Animated.add` verbinden.
+- **Sichtprobe im Emulator:** `uiautomator dump` scheitert, solange etwas
+  dauernd animiert („could not get idle state“) – Koordinaten aus dem
+  Bildschirmfoto nehmen.
 - **Versteckte Elemente in App-Tests:** was unter
   `accessibilityElementsHidden`/`importantForAccessibility="no-hide-descendants"`
   liegt (Lämpchen, Lichterfolge), findet `getByTestId` nur mit
@@ -3425,6 +3469,11 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 2. Oktober (später Abend)
+#798 (Nikolaus in Web und App, schließt #736), #799 (Doku-Stand nach #797),
+#800 (Silvester im Web, schließt #640). Beide brauchen `update.sh` (neue
+Abfragen, Sticker-Paket mit Index, kein Cache um Mitternacht).
 
 ### Gemergt 2. Oktober (Abend)
 #796 (Doku-Stand nach #795), #797 (Weihnachten in der App: Lichterkette an
@@ -3593,11 +3642,11 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (2.10. nachts): #798 Nikolaus in Web und App (schließt #736; neuer
-  Sticker je Person und Jahr aus dem Saison-Paket „Vom Nikolaus“; braucht
-  nach dem Merge `update.sh`). Reihenfolge danach: Build 84 (1.0.5) vor dem
-  1. Advent, Silvester (#640, #739–#744 – gibt es weder im Web noch in der
-  App) mit eigenem Build bis Mitte Dezember. Offene Issues: #772
+- Offen (2.10. spät): #801 Release-PR für App 1.0.5 (Build 84: Schnee,
+  Wetter, Weihnachten, Nikolaus) – nach dem Merge baue ich ihn. Danach
+  Silvester in der App (#642, #739–#744) mit eigenem Build bis Mitte
+  Dezember; Entscheidung beim Betreiber: Skia (#667) für hunderte Funken
+  oder eine sparsamere Fassung mit Reanimated. Offene Issues: #772
   Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
   Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
   einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
@@ -3605,9 +3654,8 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   „Fundstücke im öffentlichen Profil“); Skia (#667) ist für Schnee und
   Wetter nicht nötig (Reanimated reicht), bleibt ein möglicher Ausbau.
   Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, W5 #731
-  Winter-Interaktionen, Nikolausstiefel X3 #736 (braucht einen
-  Sticker-Grant in `services/stickers.py`), Eiersuche S15 #646 (Verlosung
-  über `season_raffles`). Offen bleibt:
+  Winter-Interaktionen, Eiersuche S15 #646 (Verlosung über
+  `season_raffles`). Offen bleibt:
   Erfolge II Rest (E10 Teil 2 – acht Admin-Reiter im Web –, E12 #622, E13
   #623; die vier zurückgestellten Gruppen aus #614 warten auf
   Datenquellen),

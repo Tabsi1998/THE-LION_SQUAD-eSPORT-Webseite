@@ -13,8 +13,8 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather, christmas), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
-| Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | `SeasonWidgetSlot` (Dashboard-Kopf), `SeasonEdgeSlot` (Unterkante der Begrüßungskarte), `SeasonBackdropSlot` (in `Screen`, hinter dem Inhalt); Screens hängen `SeasonPerch`/`Card perch` ein |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, new_year, advent, snow, christmas, nikolaus, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent, snow, weather, christmas, nikolaus), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow`, `appNamesSeason` |
+| Slots im Layout | `SeasonSlots.jsx` (Widget, Footer – mit `footerAccessible` für bedienbare Szenen –, Sound- und Schreck-Schalter) | `SeasonWidgetSlot` (Dashboard-Kopf), `SeasonEdgeSlot` (Unterkante der Begrüßungskarte), `SeasonBackdropSlot` (in `Screen`, hinter dem Inhalt), `SeasonShelfSlot` (Kopf von „Mehr“); Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
 dem Inhalt, nie klickbar), `Corners` (Ecken und Anker), `Widget` (klickbar im Kopfbereich), `Footer`, `Toast`,
@@ -315,3 +315,29 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
 - Gleich wie im Web: Fingerabdruck der Kette `2814731317`, der Sterne `2991777711` – in den Tests beider Seiten.
 - „dezent“ und „Bewegung reduzieren“: Kette ruhig und leicht gedämpft (0,9), Karte ohne Hereingleiten, Lichter und
   Sterne still. Ist das Dashboard nicht im Blick, leuchtet die Kette ruhig, ohne Takt.
+
+## 16. Nikolaus (#798)
+
+| Teil | Web | App |
+|---|---|---|
+| Stiefel | `Footer` auf der Linie über dem Impressum (`footerLine.js`), Größe nach freiem Platz (`bootFit`) | `Shelf` im Kopf von „Mehr“, auf der Kante der ersten Karte, links neben der Glocke |
+| Öffnen | wackeln, der Gutschein steigt, Karte mit dem Sticker; danach gekippt und leer | gleich, dazu leichtes Tippen beim Öffnen und ein Erfolgs-Tippen beim neuen Sticker |
+| Hinweis | `Toast` einmal am Tag mit „Zum Stiefel“ (scrollt hin) | `Greeting` einmal am Tag mit „Zum Stiefel“ (führt in „Mehr“), Tab-Symbol Stiefel |
+
+- Der Sticker kommt vom Server: einer je Person und Jahr aus dem Saison-Paket „Vom Nikolaus“ (Abschnitt 5 in
+  CLAUDE.md). Ohne Anmeldung sagt die Karte, dass Angemeldete einen Sticker finden.
+- Gleiche Form: Fingerabdruck `102233374` in `nikolaus/boot.test.js` und `boot.test.ts`.
+
+## 17. Silvester im Web (#800)
+
+| Teil | Datei | Was |
+|---|---|---|
+| Feuerwerk | `newYear/fireworks.js` | sechs Arten mit eigener Physik, geschlossene Bahnen, Nachglühen, Rauch, Wind, Entfernung |
+| Handschrift | `newYear/choreography.js` | je Jahr aus dem Jahres-Seed; wann eine Rakete steigt, sagt der Server (`data.salvos`) |
+| Countdown | `newYear/countdown.js`, `clock.js` | nach der Serveruhr: Hinweis ab 23:00, Karte ab 23:59:00, Puls, Null mit Gruß |
+| Ebene | `newYear/layer.js` | auf der gemeinsamen Himmelsfläche, Budget 200/600/1200, kein Nachholen, schläft ohne Raketen |
+| Klang | `newYear/sound.js` | eigener Schalter, Vorgabe aus; Zischen, Knall, Knistern nach Art und Entfernung |
+
+- Eine Saison, die die Serverzeit braucht, liest `serverOffset` aus `useSeason()`; der Server cacht die Abfrage in den
+  Phasen um Mitternacht nicht.
+- Die App übernimmt die Rechnung (Paritätstests auf beiden Seiten) und zeichnet nativ – #642.
