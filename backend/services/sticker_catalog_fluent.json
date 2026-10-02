@@ -5,102 +5,6 @@
   "project_url": "https://github.com/microsoft/fluentui-emoji",
   "packs": [
     {
-      "id": "fluent-nikolaus",
-      "name": "Vom Nikolaus",
-      "seasonal": "nikolaus",
-      "stickers": [
-        {
-          "id": "fluent-santa-claus",
-          "name": "Nikolaus",
-          "keywords": [
-            "nikolaus",
-            "advent"
-          ],
-          "url": "/api/stickers/files/fluent/santa-claus.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-womans-boot",
-          "name": "Nikolausstiefel",
-          "keywords": [
-            "stiefel",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/womans-boot.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-tangerine",
-          "name": "Mandarine",
-          "keywords": [
-            "mandarine",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/tangerine.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-peanuts",
-          "name": "Nüsse",
-          "keywords": [
-            "nüsse",
-            "erdnuss",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/peanuts.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-chocolate-bar",
-          "name": "Schokolade",
-          "keywords": [
-            "schokolade",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/chocolate-bar.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-ogre",
-          "name": "Krampus",
-          "keywords": [
-            "krampus",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/ogre.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-wrapped-gift",
-          "name": "Geschenk",
-          "keywords": [
-            "geschenk",
-            "nikolaus"
-          ],
-          "url": "/api/stickers/files/fluent/wrapped-gift.png",
-          "width": 256,
-          "height": 256
-        },
-        {
-          "id": "fluent-glowing-star",
-          "name": "Stern",
-          "keywords": [
-            "stern",
-            "advent"
-          ],
-          "url": "/api/stickers/files/fluent/glowing-star.png",
-          "width": 256,
-          "height": 256
-        }
-      ]
-    },
-    {
       "id": "fluent-reaktionen",
       "name": "Reaktionen",
       "stickers": [
@@ -912,6 +816,102 @@
             "warten"
           ],
           "url": "/api/stickers/files/fluent/hourglass-done.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
+    },
+    {
+      "id": "fluent-nikolaus",
+      "name": "Vom Nikolaus",
+      "seasonal": "nikolaus",
+      "stickers": [
+        {
+          "id": "fluent-santa-claus",
+          "name": "Nikolaus",
+          "keywords": [
+            "nikolaus",
+            "advent"
+          ],
+          "url": "/api/stickers/files/fluent/santa-claus.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-womans-boot",
+          "name": "Nikolausstiefel",
+          "keywords": [
+            "stiefel",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/womans-boot.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-tangerine",
+          "name": "Mandarine",
+          "keywords": [
+            "mandarine",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/tangerine.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-peanuts",
+          "name": "Nüsse",
+          "keywords": [
+            "nüsse",
+            "erdnuss",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/peanuts.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-chocolate-bar",
+          "name": "Schokolade",
+          "keywords": [
+            "schokolade",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/chocolate-bar.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-ogre",
+          "name": "Krampus",
+          "keywords": [
+            "krampus",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/ogre.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-wrapped-gift",
+          "name": "Geschenk",
+          "keywords": [
+            "geschenk",
+            "nikolaus"
+          ],
+          "url": "/api/stickers/files/fluent/wrapped-gift.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-glowing-star",
+          "name": "Stern",
+          "keywords": [
+            "stern",
+            "advent"
+          ],
+          "url": "/api/stickers/files/fluent/glowing-star.png",
           "width": 256,
           "height": 256
         }

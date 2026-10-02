@@ -47,6 +47,8 @@ def test_the_pack_has_eight_pictures_of_its_own_and_only_the_nikolaus_gives_from
     others = {sticker["url"] for entry in stickers.builtin_catalog()["packs"] if entry["id"] != PACK for sticker in entry["stickers"]}
     assert not others & {sticker["url"] for sticker in pack["stickers"]}
     assert {sticker["name"] for sticker in pack["stickers"]} >= {"Nikolaus", "Krampus", "Mandarine", "Nüsse", "Schokolade"}
+    # Hinten im Katalog: die Auswahl im Chat öffnet beim ersten Paket - das soll nicht das ganze Jahr „Vom Nikolaus“ sein.
+    assert stickers.builtin_catalog()["packs"][-1]["id"] == PACK
 
 
 def test_the_sticker_is_fixed_by_person_and_year_and_new_ones_come_first():
