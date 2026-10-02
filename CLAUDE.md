@@ -2928,6 +2928,41 @@ Seit dem 15. September gilt:
   `enableBackgroundRecording` = `false` (Test in
   `scripts/release-version.test.mjs`); `expo-asset` direkt eingetragen
   (expo-doctor verlangt es als Peer von expo-audio).
+- Schnee und Wetter in der App (#642, #771; PR #795): Rechnung aus dem Web
+  übernommen – `mobile/src/seasons/snow/flakes.ts` (Tiefen, Formen, Wind,
+  Böen, `advanceFlake`, `scrollFlake`, `flakeCounts`, `snowfallFactor`,
+  `fadeAt`), `weather/rain.ts` (`rainFactor`, `dropCounts`, `createDrop`,
+  `advanceDrop`, `scrollDrop`), `weather/storm.ts` (`isThunderstorm`,
+  `nextFlashAt`, `boltPath`, `createFlash`, `flashLevel`). Parität: derselbe
+  Fingerabdruck `1298028011` in `mobile/src/seasons/snow/flakes.test.ts` und
+  `frontend/src/seasons/snow/flakes.test.js` (dafür hat `advanceFlake` im Web
+  einen optionalen `random`). Gezeichnet mit Reanimated 4: `sky/SnowField.tsx`
+  und `sky/RainField.tsx` halten feste Plätze je Tiefe (`poolLayout`,
+  `rainLayout`), die Rechnung je Bild läuft als Worklet im
+  `useFrameCallback` (`stepFlakes`, `stepDrops` – ohne Reanimated testbar);
+  jede Flocke ist eine `Animated.View` mit `FlakeSvg`, jeder Tropfen ein
+  dünner Strich, bewegt nur über Versatz und Drehung um die Mitte.
+  `sky/Lightning.tsx`: Schein und Blitz, Helligkeit als `withSequence`
+  (`pulseSteps`), jeder Blitz fragt das Bewegungsbudget (`lightning` in
+  `motion.ts`). `sky/scroll.ts`: eine Scroll-Quelle (`seasonScroll`,
+  `reportScroll`, `seasonScrollProps(screen)` – je Screen dieselben
+  Eigenschaften), elf Screens melden ihre Position; die Felder schieben nur
+  innerhalb desselben Screens. Module: `snow/index.tsx` (`SnowSky`,
+  `SnowflakeWidget` – fangen zählt `snowflakes_clicked`, Zahl am Gerät,
+  Schneekönig bei 50; `skyBudget`: dezent 0, normal 30, kräftig 60;
+  `snowShare` aus `snowKeys` in `intensity.ts`), `weather/index.tsx`
+  (`weatherPlan`, `weatherShare`, `shouldFlash`, `WeatherSky`; Modul mit
+  `skyOnly`, steht nicht unter „Gerade läuft“). `SeasonProvider` reicht
+  `weather` aus `/seasonal/active` weiter. Mehrere Widgets im Kopf stehen
+  übereinander (`widgetOnTop`: die Schneeflocke über dem Kranz) – nebeneinander
+  brach der Name mitten im Wort um. `rng.ts` `SPANS_NEW_YEAR` jetzt wie im
+  Web. Server: das Wetter bedient den Kanal App (`added_channels: ("app",)`);
+  `seasons.stored_channels` und `channels_known` beim Speichern sorgen dafür,
+  dass ein später dazugekommener Kanal bei alten Speicherständen an ist.
+  Admin: `SeasonsWeatherCard.jsx` mit „Wo: Website / App“. Jest:
+  `jest.setup.js` bildet Reanimated selbst nach (die mitgelieferte Attrappe
+  lädt die Worklet-Laufzeit und kennt `useFrameCallback` nicht);
+  `__frameCallbacks` lässt Tests Bilder weiterschalten.
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3219,6 +3254,15 @@ npx expo install --check
   vitest-Konfiguration mit `vi.useFakeTimers({ now, toFake: ["Date"],
   shouldAdvanceTime: true })`; App: jest mit `jest.useFakeTimers({ now,
   advanceTimers: true })`. Ein Kanarien-Test beweist, dass die Uhr ankommt.
+- **Worklets:** eine Funktion im Worklet kann keine Variable draußen setzen –
+  sie bekommt eine Kopie (Wert außerhalb rechnen, wie `windX` im
+  `RainField`). Funktionen, die je Bild laufen, tragen `"worklet"`; was sie
+  aufrufen, auch.
+- **Zeitlimit in App-Tests auf GitHub:** der 2-Kern-Rechner ist langsam; der
+  Netzbau-Test brauchte bis über 15 s, sobald mehr Testdateien parallel
+  liefen (#795) – er hat jetzt 60 s. Tests nie in vielen kleinen
+  `act()`-Schritten vorspulen, sondern Zeitpunkte aus dem festen Seed
+  vorher ausrechnen und springen.
 - **Bewegung in der App auf Android:** bewegte Drehung und Skalierung an
   `react-native-svg`-Gruppen landen auf der Matrix der Android-Ansicht, deren
   Drehpunkt die Ecke der Zeichnung ist – `origin` geht verloren (Flammen
@@ -3347,6 +3391,12 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 2. Oktober (Nachmittag)
+#793 (Release-APK nur für ARM-Handys, 59 statt 105 MB – Cloudflare nimmt
+höchstens 100 MB je Anfrage), #794 (Doku-Stand), #795 (Schnee und Wetter in
+der App, schließt #771; der erste GitHub-Lauf war rot, weil der Netzbau-Test
+sein Zeitlimit riss – siehe 6.4). `update.sh` danach eingespielt.
 
 ### Gemergt 2. Oktober (Vormittag)
 #788 (Adventkranz in der App, schließt #637 und #727), #789 (Halloween-Katze
@@ -3503,21 +3553,20 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (2.10. mittags): #793 Release-APK nur für ARM-Handys (59 statt 105 MB,
-  wegen der 100-MB-Grenze von Cloudflare). Build 83 (1.0.4) ist gebaut und
-  wartet auf den Upload in die Play Console. Offene Issues dieser Runde: #771
-  Wetter in der App, #772
+- Offen (2.10. abends): keine PRs. Reihenfolge: Weihnachten in der App
+  (Lichterkette, Gruß; #642), Nikolaus #736 in Web und App, Build 84 (1.0.5)
+  vor dem 1. Advent, danach Silvester (#640, #739–#744 – gibt es weder im Web
+  noch in der App) mit eigenem Build bis Mitte Dezember. Offene Issues: #772
   Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
   Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
   einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
   verstellter Uhr (Entscheidung A/B/C offen), #678 Rest (Schalter
-  „Fundstücke im öffentlichen Profil“), Entscheidung in #772: Skia (#667)
-  vor oder nach dem Advent-Build.
+  „Fundstücke im öffentlichen Profil“); Skia (#667) ist für Schnee und
+  Wetter nicht nötig (Reanimated reicht), bleibt ein möglicher Ausbau.
   Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, W5 #731
-  Winter-Interaktionen, Silvester S9 #640 mit N1–N5 (#739–#743),
-  Nikolausstiefel X3 #736 (braucht einen Sticker-Grant in
-  `services/stickers.py`), App S11 #642 (Schnee, Kette, Gruß nativ),
-  Eiersuche S15 #646 (Verlosung über `season_raffles`). Offen bleibt:
+  Winter-Interaktionen, Nikolausstiefel X3 #736 (braucht einen
+  Sticker-Grant in `services/stickers.py`), Eiersuche S15 #646 (Verlosung
+  über `season_raffles`). Offen bleibt:
   Erfolge II Rest (E10 Teil 2 – acht Admin-Reiter im Web –, E12 #622, E13
   #623; die vier zurückgestellten Gruppen aus #614 warten auf
   Datenquellen),

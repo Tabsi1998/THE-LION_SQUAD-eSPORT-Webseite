@@ -2718,6 +2718,15 @@ der Verwaltung.
   Android drehen bewegte Teile nur sauber, wenn ihr Kasten mittig auf dem Drehpunkt sitzt; ein
   neues Audio-Paket bringt ungefragt Mikrofon- und Hintergrund-Rechte mit, die der Play Store
   erklärt haben will – beides ist abgeschaltet und mit einem Test festgehalten.
+- **Schnee und Wetter in der App** (PR #795, schließt #771): Vom 1. Advent bis Dreikönig schneit es
+  auch in der App – Flocken in drei Tiefen mit Wind und Böen aus dem echten Wetter, dazu die
+  Schneeflocke zum Fangen über dem Adventkranz. Das ganze Jahr regnet es in der App, wenn es am
+  Vereinsort regnet, und bei Gewitter leuchtet es leise. Die Rechnung ist dieselbe wie im Web, ein
+  Test auf beiden Seiten hält sie zusammen; gezeichnet wird ohne neues Paket mit Reanimated auf dem
+  UI-Thread. Im Admin steht beim Wetter jetzt „Wo: Website / App“. Lehren: ein Kanal, der später zu
+  einer Saison dazukommt, muss bei alten Speicherständen an sein (sonst bleibt die App unbemerkt
+  draußen); und ein Test, der knapp unter dem Zeitlimit lag, reißt, sobald andere schwere Tests
+  parallel laufen.
 - **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.
