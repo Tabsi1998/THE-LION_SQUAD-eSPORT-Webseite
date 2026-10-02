@@ -4,6 +4,7 @@ import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from "react-native-svg";
 import { INK, RIM } from "./batArt";
 import { recordSignal } from "./signals";
+import { playSeasonSound } from "./sound/player";
 
 // Atmosphäre der App (A4, #718 - wie H14/H16 im Web): Nebel in einer oder zwei sehr leisen Ebenen unten im Bild als
 // Screen-Mischung (hellt nur dunkle Flächen auf), still - auf dem Handy kein Drift; und die Katze, die auf
@@ -167,6 +168,8 @@ export function CatOnEdge({ size = 56, bottom, width, moving, testID = "hallowee
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     // Die Katze anstupsen zählt für die Saison-Fundstücke (#678) - der Server deckelt je Tag.
     void recordSignal(CAT_SIGNAL, { onceIf: false });
+    // Sie miaut, bevor sie losläuft (Web #768) - nur mit eingeschalteten Tönen.
+    void playSeasonSound("cat_meow");
     const room = Math.max(60, width - size - 40);
     const target = offset > room * 0.5 ? Math.max(0, offset - 90 - Math.random() * 60) : Math.min(room, offset + 90 + Math.random() * 60);
     setFacing(target < offset ? -1 : 1);

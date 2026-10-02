@@ -130,6 +130,17 @@ test("die App im Repo erfüllt das Schema und zählt über Build 56 hinaus", asy
   assert.ok(app.expo.android.versionCode > 56, `versionCode ${app.expo.android.versionCode}`);
 });
 
+// Töne der Saison-Deko (#772): expo-audio trägt ohne Optionen RECORD_AUDIO, die Mikrofon-Frage unter iOS und einen
+// Dienst für Wiedergabe im Hintergrund ein (FOREGROUND_SERVICE_MEDIA_PLAYBACK). Die App spielt nur kurze Laute nach
+// einem Antippen - Google Play verlangt für jede dieser Berechtigungen eine Erklärung, also kommen sie nicht hinein.
+test("expo-audio ohne Mikrofon und ohne Wiedergabe im Hintergrund", async () => {
+  const app = JSON.parse(await readFile(new URL("../app.json", import.meta.url), "utf8"));
+  const entry = app.expo.plugins.find((plugin) => (Array.isArray(plugin) ? plugin[0] : plugin) === "expo-audio");
+  assert.ok(Array.isArray(entry), "expo-audio braucht seine Optionen - ohne sie kommen Mikrofon und Hintergrund-Dienst hinein");
+  assert.deepEqual(entry[1], { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: false, enableBackgroundRecording: false });
+  assert.ok(!app.expo.android.permissions.some((permission) => /RECORD_AUDIO|FOREGROUND_SERVICE/.test(permission)));
+});
+
 test("der Preflight besteht für den Stand im Repo und lehnt einen falschen Tag ab", () => {
   const preflight = fileURLToPath(new URL("./release-preflight.cjs", import.meta.url));
   const onBranch = spawnSync(process.execPath, [preflight], {

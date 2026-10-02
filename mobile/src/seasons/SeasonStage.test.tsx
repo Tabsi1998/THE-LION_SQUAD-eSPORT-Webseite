@@ -1,6 +1,7 @@
 import React from "react";
 import { Text } from "react-native";
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
+import * as SecureStore from "expo-secure-store";
 
 // Die Bühne in der App (#636, #655): ohne Saison nichts, mit Halloween Ecken und Widget, Tab-Symbol nur dann,
 // der Gruß als Overlay-Karte; der Deko-Schalter zeigt die eigene Wahl und stellt um.
@@ -64,4 +65,17 @@ test("Deko-Schalter nennt die laufende Saison und stellt um - nur Saisonen, die 
   expect(screen.queryByText(/Schneefall/)).toBeNull();
   await fireEvent.press(screen.getByText("Dezent"));
   expect(mockSeasonState.setPreference).toHaveBeenCalledWith("subtle");
+});
+
+test("Töne unter Darstellung: Vorgabe an wie im Web, „Aus“ merkt sich das Gerät", async () => {
+  const { SOUND_KEY, readSoundsOn, resetSounds } = require("./sound/player");
+  resetSounds();
+  await SecureStore.deleteItemAsync(SOUND_KEY);
+  await render(<DecoSetting />);
+  expect(screen.getByText(/die Katze miaut/)).toBeTruthy();
+  await fireEvent.press(within(screen.getByTestId("season-sound-setting")).getByText("Aus"));
+  expect(await SecureStore.getItemAsync(SOUND_KEY)).toBe("off");
+  expect(await readSoundsOn()).toBe(false);
+  await fireEvent.press(within(screen.getByTestId("season-sound-setting")).getByText("An"));
+  expect(await readSoundsOn()).toBe(true);
 });
