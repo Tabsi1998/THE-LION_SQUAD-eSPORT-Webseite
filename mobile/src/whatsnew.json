@@ -1,8 +1,13 @@
 {
-  "version": "1.0.3",
-  "build": 82,
-  "date": "2026-10-12",
+  "version": "1.0.4",
+  "build": 83,
+  "date": "2026-10-02",
   "items": [
-    "Halloween wie im Web: ein rundes Netz, das die Spinne Faden für Faden in echter Reihenfolge spinnt (Anker, Rahmen, Speichen, Nabe, Spirale) und das je Screen anders ausfällt; Fledermäuse hängen unter der Kopfzeile und fliegen beim Antippen davon; ein winziger Friedhof über der Tab-Leiste gibt beim Antippen türkise Geister frei; die Spinne am Faden kommt vom oberen Rand, seilt sich bis über die Tab-Leiste ab, lässt los, läuft weg, und der Faden schwingt und reißt ab."
+    "Adventkalender in der App: dasselbe Bild und dieselben 24 Türchen wie auf der Website und derselbe Stand – was am Handy geöffnet wird, ist auch im Web offen. Jedes Türchen geht an seinem Tag um 6 Uhr auf, mit Text, Bild, Quiz, Gewinn und mehr; Videos und Clips öffnen YouTube oder Twitch. Zu finden unter Mehr → Verein und als Hinweis im Dashboard, solange der Kalender läuft.",
+    "Adventkranz im Dashboard-Kopf ab dem 1. Advent: vier Kerzen, jede anders, eine brennt je Adventsonntag; am Sonntag zündet die neue Kerze sichtbar an. Antippen zeigt, wie viele Tage es noch bis Weihnachten sind.",
+    "Halloween-Fundstücke zählen jetzt auch aus der App – verscheuchte Fledermäuse, befreite Geister, die angestupste Katze und der Kürbis am 31.10. ab 18 Uhr. Ohne Anmeldung sammelt das Handy und meldet nach dem Anmelden nach. Unter Profil → Erfolge zeigt die neue Karte „Saison-Fundstücke“, was du über die Jahreszeiten gesammelt hast, mit dem Stand von heute.",
+    "Ein geöffneter News-Beitrag zählt für den Erfolg „Immer informiert“.",
+    "Die Halloween-Katze miaut beim Antippen – leise und still bei Lautlos oder Vibration; abschalten lässt sich das unter Mehr → Darstellung → Töne. Dazu wedelt sie mit dem Schwanz an der Wurzel und blinzelt an Ort und Stelle – vorher wanderte der Schwanz am Körper entlang, und die Augen sprangen über den Kopf.",
+    "Unter Mehr → Darstellung stehen nur noch Saisonen, die die App auch zeigt."
   ]
 }
