@@ -138,7 +138,7 @@ test("Wetter: Schalter, Stärke und Vorschau stehen in der Wetter-Karte - keine 
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/seasons", { seasons: { weather: { intensity: "full" } } }));
   await user.click(screen.getByTestId("season-weather-enabled"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/seasons", { seasons: { weather: { enabled: false } } }));
-  expect(toastMock.success).toHaveBeenCalledWith("Wetter auf der Seite aus.");
+  expect(toastMock.success).toHaveBeenCalledWith("Wetter aus.");
   await user.click(screen.getByTestId("season-weather-preview"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/seasons/weather/preview", {}));
   expect(JSON.parse(sessionStorage.getItem(PREVIEW_STORAGE_KEY)).token).toBe("weather.123..abc");

@@ -10,7 +10,7 @@ export const INITIAL_DELAY_MS = 4000;
 export const MIN_GAP_MS = 2500;
 export const RESUME_GRACE_MS = 1500;
 
-export type EffectKind = "flock" | "bat_flight" | "bat_scare" | "rappel" | "crawler" | "ghost" | "web_spider" | "drop_spider";
+export type EffectKind = "flock" | "bat_flight" | "bat_scare" | "rappel" | "crawler" | "ghost" | "web_spider" | "drop_spider" | "lightning";
 export type EffectSpec = { slots: number; cooldownMs: number; priority: number; ttlMs: number; user?: boolean };
 
 export const EFFECTS: Record<EffectKind, EffectSpec> = {
@@ -22,6 +22,8 @@ export const EFFECTS: Record<EffectKind, EffectSpec> = {
   ghost: { slots: 1, cooldownMs: 0, priority: 4, ttlMs: 9000, user: true },
   web_spider: { slots: 0, cooldownMs: 25000, priority: 1, ttlMs: 8000 },
   drop_spider: { slots: 1, cooldownMs: 20000, priority: 1, ttlMs: 12000 },
+  // Wetterleuchten (#771) wie im Web: belegt keinen Platz, aber nie zwei Blitze binnen acht Sekunden.
+  lightning: { slots: 0, cooldownMs: 8000, priority: 1, ttlMs: 600 },
 };
 
 export type MotionToken = { id: number; kind: EffectKind; cost: number; startedAt: number; until: number };

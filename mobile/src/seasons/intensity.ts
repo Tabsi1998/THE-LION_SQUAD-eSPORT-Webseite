@@ -129,8 +129,13 @@ function halloweenKeys(fx: EffectClasses, { small = false }: { small?: boolean }
   };
 }
 
+/** Schnee (#642) wie `snowKeys` im Web: Anteil der Flocken aus der Atmosphäre - in der App ohne Hauben. */
+function snowKeys(fx: EffectClasses): Record<string, unknown> {
+  return { flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6 };
+}
+
 /** Je Saison die Übersetzung der Effektklassen in ihre eigenen Schlüssel - eine neue Saison trägt sich hier ein. */
-export const SEASON_CAPABILITIES: Record<string, (fx: EffectClasses, ctx: { small?: boolean }) => Record<string, unknown>> = { halloween: halloweenKeys };
+export const SEASON_CAPABILITIES: Record<string, (fx: EffectClasses, ctx: { small?: boolean }) => Record<string, unknown>> = { halloween: halloweenKeys, snow: snowKeys };
 
 /** Effektklassen plus die Schlüssel einer beliebigen Saison (ohne Übersetzung nur die Klassen). */
 export function seasonCapabilities(season: string, screen: string, intensity: Intensity | string = "normal"): EffectClasses & Record<string, unknown> {

@@ -5,6 +5,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-n
 import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
@@ -126,6 +127,7 @@ export function SeasonPassScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <ScrollView
+        {...seasonScrollProps("SeasonPass")}
         contentContainerStyle={styles.content}
         refreshControl={
           <RefreshControl

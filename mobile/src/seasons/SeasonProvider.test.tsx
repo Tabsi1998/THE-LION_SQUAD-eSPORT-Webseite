@@ -21,12 +21,13 @@ const PAYLOAD = { seasons: [
 ] };
 
 function Probe() {
-  const { seasons, preference, setPreference, ready } = useSeason();
+  const { seasons, preference, setPreference, ready, weather } = useSeason();
   return (
     <>
       <Text testID="ready">{String(ready)}</Text>
       <Text testID="keys">{seasons.map((s: { key: string; effective: string }) => `${s.key}:${s.effective}`).join(",")}</Text>
       <Text testID="pref">{preference}</Text>
+      <Text testID="weather">{weather ? `${weather.rain_mm} mm, Code ${weather.code}` : "kein Wetter"}</Text>
       <Text testID="set" onPress={() => { void setPreference("subtle"); }}>dezent</Text>
     </>
   );
@@ -79,4 +80,15 @@ test("Serverfehler heißt keine Deko, die App läuft weiter", async () => {
   await render(<SeasonProvider><Probe /></SeasonProvider>);
   await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
   expect(screen.getByTestId("keys")).toHaveTextContent("");
+});
+
+test("das Wetter vom Server geht an die Saison-Ebenen (#771) - ohne Angabe gibt es keins", async () => {
+  mockApi.get.mockResolvedValue({ data: { ...PAYLOAD, weather: { rain_mm: 1.2, snow_cm: 0, code: 61, wind_factor: 0.9, stale: false } } });
+  await render(<SeasonProvider><Probe /></SeasonProvider>);
+  await waitFor(() => expect(screen.getByTestId("weather")).toHaveTextContent("1.2 mm, Code 61"));
+  await screen.unmount();
+  mockApi.get.mockResolvedValue({ data: PAYLOAD });
+  await render(<SeasonProvider><Probe /></SeasonProvider>);
+  await waitFor(() => expect(screen.getByTestId("ready")).toHaveTextContent("true"));
+  expect(screen.getByTestId("weather")).toHaveTextContent("kein Wetter");
 });

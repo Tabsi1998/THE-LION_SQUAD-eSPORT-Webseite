@@ -6,6 +6,8 @@ import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
+import { SnowSky, SnowflakeWidget } from "./snow";
+import { WeatherSky } from "./weather";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
 
 // Die Bühne in der App (#636, #655, #665): Ebenen über allen Tabs; nur Fledermäuse und Gräber nehmen Berührungen. Je Saison ein
@@ -18,18 +20,29 @@ type SeasonModule = {
   Sky?: React.ComponentType<{ season: ActiveSeason; screen: string; reducedMotion: boolean }>;
   Widget?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
   TabIcon?: React.ComponentType<{ size: number }>;
+  /** Nur Himmel (das Wetter): keine eigene Deko, deshalb nicht unter „Gerade läuft“ genannt. */
+  skyOnly?: boolean;
 };
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
   halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
   // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
   advent: { Widget: AdventWidget },
+  // Schnee (S7, #642): Flocken in drei Tiefen mit Wind und Böen aus dem Wetter, die Schneeflocke zum Fangen im Kopf.
+  snow: { Sky: SnowSky, Widget: SnowflakeWidget },
+  // Wetter das ganze Jahr (#771): Regen, leichter Schnee, Wetterleuchten - wie im Web; in der Schnee-Saison schneit es.
+  weather: { Sky: WeatherSky, skyOnly: true },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
 export const SCREEN_SEASONS = new Set(["advent_calendar"]);
 
 /** Kann die App diese Saison zeigen? Sonst steht sie nirgends als „läuft gerade“, ohne dass etwas zu sehen wäre (#772). */
+/** Eine Saison, die der Person als Deko auffällt - das Wetter ist nur Himmel und steht nicht unter „Gerade läuft“. */
+export function appNamesSeason(season: Pick<ActiveSeason, "key">): boolean {
+  return appCanShow(season) && !SEASON_MODULES[season.key]?.skyOnly;
+}
+
 export function appCanShow(season: Pick<ActiveSeason, "key">): boolean {
   return Boolean(SEASON_MODULES[season.key]) || SCREEN_SEASONS.has(season.key);
 }

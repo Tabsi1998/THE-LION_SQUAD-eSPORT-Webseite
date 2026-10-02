@@ -34,7 +34,8 @@ export function screenRng(screen: string, salt = ""): () => number {
 export type SeasonLike = string | { key: string; starts_at?: string | null } | null | undefined;
 
 /** Saisons, die über Silvester gehen: im Januar bis Juni zählen sie noch zum Jahr ihres Beginns. */
-export const SPANS_NEW_YEAR = ["winter", "new_year"];
+// Dieselbe Liste wie im Web (`frontend/src/seasons/rng.js`) - sonst würfelt die App im Jänner ein anderes Jahr als die Website.
+export const SPANS_NEW_YEAR = ["winter", "snow", "new_year", "advent_calendar", "christmas"];
 
 /**
  * Das Jahr einer Saison: aus `starts_at` des Servers, sonst aus der Uhr - eine Saison, die über Silvester geht,

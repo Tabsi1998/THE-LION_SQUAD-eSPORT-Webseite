@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { EmptyState, ErrorState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage, resolveMediaUrl, responseFromCache } from "../../lib/api";
 import { formatDate } from "../../lib/format";
@@ -52,7 +53,7 @@ export function GalleryScreen({ navigation }: Props) {
 
   return (
     <Screen padded={false}>
-      <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
+      <ScrollView {...seasonScrollProps("Gallery")} contentContainerStyle={styles.content} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.cyan} />}>
         <View style={styles.header}>
           <Heading>Galerie</Heading>
           <Muted>Bilder und Videos von Events, Turnieren und dem Vereinsleben.</Muted>

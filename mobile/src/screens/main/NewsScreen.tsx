@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage, responseFromCache } from "../../lib/api";
 import { formatDate, formatNewsCategory } from "../../lib/format";
@@ -90,6 +91,7 @@ export function NewsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <FlatList
+        {...seasonScrollProps("NewsList")}
         data={listItems}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={

@@ -6,6 +6,7 @@ import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import { chatTitle, splitTeams, teamMembers, teamMeta, teamSquads } from "../../lib/teams";
@@ -96,6 +97,7 @@ export function TeamsScreen({ navigation }: Props) {
   return (
     <Screen padded={false}>
       <FlatList
+        {...seasonScrollProps("TeamList")}
         data={rows}
         keyExtractor={(item) => item.key}
         ListHeaderComponent={

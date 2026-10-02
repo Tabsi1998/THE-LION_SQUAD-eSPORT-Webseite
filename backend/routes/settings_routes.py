@@ -1743,7 +1743,8 @@ async def update_seasons(body: SeasonsSettings, me: dict = Depends(require_club_
             if value is not None or name == "until":
                 cfg[name] = value
         if cfg != current["seasons"][key]:
-            updates[f"seasons.{key}"] = cfg
+            # Was beim Speichern zur Auswahl stand: ein Kanal, der später dazukommt, ist dann an (seasons.stored_channels).
+            updates[f"seasons.{key}"] = {**cfg, "channels_known": list(seasons.supported_channels(key))}
             changed_fields.append(f"seasons.{key}")
     if body.location is not None:
         if not (-90 <= body.location.lat <= 90 and -180 <= body.location.lon <= 180):

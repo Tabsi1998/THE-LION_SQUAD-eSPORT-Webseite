@@ -59,10 +59,12 @@ test("„aus“ zeigt nichts", async () => {
 });
 
 test("Deko-Schalter nennt die laufende Saison und stellt um - nur Saisonen, die die App zeigen kann", async () => {
-  mockSeasonState.seasons = [halloween("normal"), { ...halloween("normal"), key: "snow", label: "Schneefall" }, { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender" }];
+  mockSeasonState.seasons = [halloween("normal"), { ...halloween("normal"), key: "nikolaus", label: "Nikolaus" }, { ...halloween("normal"), key: "snow", label: "Schneefall" }, { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender" }, { ...halloween("normal"), key: "weather", label: "Wetter" }];
   await render(<DecoSetting />);
-  expect(screen.getByText(/Gerade läuft: Halloween, Adventkalender\./)).toBeTruthy();
-  expect(screen.queryByText(/Schneefall/)).toBeNull();
+  // Schnee kann die App seit #642; das Wetter ist nur Himmel und keine Saison zum Nennen (#771).
+  expect(screen.getByText(/Gerade läuft: Halloween, Schneefall, Adventkalender\./)).toBeTruthy();
+  expect(screen.queryByText(/Nikolaus/)).toBeNull();
+  expect(screen.queryByText(/Wetter/)).toBeNull();
   await fireEvent.press(screen.getByText("Dezent"));
   expect(mockSeasonState.setPreference).toHaveBeenCalledWith("subtle");
 });
