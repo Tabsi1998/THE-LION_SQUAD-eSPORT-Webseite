@@ -2897,6 +2897,37 @@ Seit dem 15. September gilt:
   Clips bettet die App nicht ein. Offene Entscheidungen des Betreibers: 6 Uhr
   oder Mitternacht, Staff in Verlosungen, wer zieht, Hauptgewinn unter allen
   mit 24 Türchen.
+- Saisonen in der App, Oktober 2026 (PRs #788 Adventkranz, #789 Katze, #792
+  Halloween-Rest; App-Gegenstücke aus #772): `mobile/src/seasons/advent/`
+  (`calendar.ts` Adventsonntage wie der Server, `wreath.ts` derselbe Kranz
+  wie im Web aus `seasonRng` – Paritätstest mit festen Prüfsummen 2026 und
+  2027 in `wreath.test.ts` und `frontend/src/seasons/advent/wreath.test.js`
+  –, `ignition.ts` Anzünden einmal je Tag und Kerze im SecureStore,
+  `WreathSvg.tsx` Kranz in SVG, Flammen und Streichholz als eigene
+  `Animated.View`s mit nativem Treiber, ihr Kasten `FLAME_BOX` mittig auf
+  dem Docht, `AdventWidget.tsx` im Dashboard-Kopf mit Gruß-Karte);
+  `anchors.tsx` `useScreenFocused()` lässt Bewegung auf verdeckten Tabs
+  ruhen. Halloween-Katze (`atmosphere.tsx`): Schwanz und Augen als
+  `PivotLayer` – ein Kasten mittig auf dem Drehpunkt (`pivotBox`,
+  `CAT_VIEW`, `TAIL_ROOT`, `EYES_CENTER`, `TAIL_HALF`, `EYES_HALF`);
+  Tautropfen im Netz mit Index-Schlüssel. Karte „Saison-Fundstücke“ unter
+  Profil → Erfolge (`SeasonFinds.tsx` mit `dayText`, `seasonHint`,
+  `orderSeasons` wie im Web; `findIcons.tsx` Figuren auf einer
+  Mondlicht-Scheibe, `findMotion`/`usePoke` – Antippen regt die Figur,
+  nicht bei „Bewegung reduzieren“; lädt nach `onSignal` neu). Klänge:
+  `sound/synth.ts` rechnet einen Laut wie die Web-Instrumente (Sägezahn mit
+  PolyBLEP, Bandpass nach RBJ, Verläufe wie `AudioParam`; `MEOWS` wie im
+  Web) und `encodeWav`/`toBase64`; `sound/player.ts` legt ihn einmal als
+  `cache/season-sounds/<name>-v<SOUND_VERSION>.wav` ab und spielt ihn über
+  `expo-audio` (`playsInSilentMode: false` – auch auf Android still bei
+  Lautlos und Vibration –, `interruptionMode: "mixWithOthers"` – kein
+  Audio-Fokus), danach `remove()` **und** `release()`; Schalter „Töne“ in
+  `DecoSetting.tsx`, je Gerät (`season_sounds`), Vorgabe an wie im Web.
+  `expo-audio` nur mit den Plugin-Optionen `microphonePermission`,
+  `recordAudioAndroid`, `enableBackgroundPlayback`,
+  `enableBackgroundRecording` = `false` (Test in
+  `scripts/release-version.test.mjs`); `expo-asset` direkt eingetragen
+  (expo-doctor verlangt es als Peer von expo-audio).
 - Halloween IV, Feinschliff (Meilenstein 43, #695–#708; PRs #710–#714): Regeln
   in `seasons/quiet.js` (Ruhezonen `QUIET_SELECTOR` – `[data-season-quiet]`,
   Formulare, Dialoge, Menüs, Radix-Popper, Tabellen; `measureQuietZones`,
@@ -3188,6 +3219,49 @@ npx expo install --check
   vitest-Konfiguration mit `vi.useFakeTimers({ now, toFake: ["Date"],
   shouldAdvanceTime: true })`; App: jest mit `jest.useFakeTimers({ now,
   advanceTimers: true })`. Ein Kanarien-Test beweist, dass die Uhr ankommt.
+- **Bewegung in der App auf Android:** bewegte Drehung und Skalierung an
+  `react-native-svg`-Gruppen landen auf der Matrix der Android-Ansicht, deren
+  Drehpunkt die Ecke der Zeichnung ist – `origin` geht verloren (Flammen
+  flogen von links oben ein, der Schwanz der Katze wanderte, ihre Augen
+  sprangen über den Kopf; so ausgeliefert in Build 82). Auch
+  `transformOrigin` in Prozent war unzuverlässig (ein fest gedrehter Schwanz
+  verschwand). Regel: jedes bewegte Teil als eigene `Animated.View`, deren
+  Kasten **mittig auf dem Drehpunkt** sitzt (Android dreht und skaliert um
+  die Mitte), darin ein kleines Svg mit `viewBox` um den Drehpunkt, nativer
+  Treiber. Prüfen mit Signalfarben: fester Teil bei 0° rot, bei −12° grün,
+  der bewegte gelb dazwischen.
+- **Metro liefert alten Stand:** nach Worktree-Wechseln oder Änderungen an
+  Modulen ohne Komponente lieferte Metro (Expo CLI, CI=1) auch mit `--clear`
+  alte Dateien. Abhilfe: Metro über den Port 8081 beenden
+  (`Get-NetTCPConnection -LocalPort 8081`), `%TEMP%\metro-cache` und
+  `%TEMP%\metro-file-map-expo-*` löschen, neu starten, ein frisches Bundle
+  holen (alte Datei vorher löschen, HTTP-Code prüfen) und ein Merkmal darin
+  suchen, bevor man einem Bildschirmfoto traut.
+- **expo-audio:** jeder Spieler legt eine Media3-Media-Session an
+  („Media button session is changed to at.lionsquad.app“). `remove()` nimmt
+  ihn nur aus der Liste des Moduls – Spieler und Session leben bis zur
+  nächsten Speicherbereinigung weiter (6–8 s, so lange gehen die Tasten am
+  Kopfhörer an die App). Nach dem Laut `remove()` und `release()`. Ohne
+  Plugin-Optionen trägt das Paket Mikrofon und einen Dienst für Wiedergabe
+  im Hintergrund ein – beides will Google erklärt haben.
+- **Cloudflare vor lionsquad.at:** höchstens 100 MB je Anfrage – größere
+  Uploads enden mit HTTP 413, auch von Hand im Admin. Die Release-APK bleibt
+  deshalb ohne x86/x86_64 (#793).
+- **Jest und `import()`:** dynamisches `await import("…")` scheitert in Jest
+  („dynamic import callback … --experimental-vm-modules“). Native Module
+  lazy mit `require` in try/catch laden wie `src/lib/installSource.ts`.
+- **Sichtprobe der App im Emulator** (AVD `tls`, ohne Fenster): Uhr über
+  `adb root`, `settings put global auto_time 0`,
+  `setprop persist.sys.timezone Europe/Vienna`, `adb shell date
+  MMDDhhmmYYYY.ss`; Backend als Probe-Server (echte App, mongomock,
+  freezegun auf dem Zeitpunkt, Port 8010) und Metro mit
+  `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8010`, `adb reverse tcp:8081
+  tcp:8081`. Für neue native Module einen Debug-Build im Worktree:
+  `google-services.json` aus dem Hauptordner kurz hineinkopieren, `expo
+  prebuild --platform android --no-install`, `gradlew assembleDebug` (etwa
+  5 min), die Datei danach wieder löschen. Aufnahmen mit `adb shell
+  screenrecord`, Bilder mit ffmpeg; Git Bash braucht `MSYS_NO_PATHCONV=1`
+  für `/sdcard/…` und Windows-Pfade für das Ziel von `adb pull`.
 
 ---
 
@@ -3250,6 +3324,13 @@ npm run release:local -- --upload-only  # nur die zuletzt gebaute APK an den Ser
   App-Versionen von Hand.
 - Nach jedem Build dem Betreiber Klick-Schritte geben (Release-Seite, APK,
   Installation; bei Schlüsselwechsel einmal deinstallieren).
+- Versionshinweise für die Play Console nimmt das Skript aus dem
+  Changelog-Abschnitt und schneidet bei 500 Zeichen mitten im Satz ab. Ein
+  Release-PR enthält deshalb eine eigene Fassung mit höchstens 500 Zeichen
+  zum Einfügen von Hand (zuerst in #791). Das Datum im Changelog ist der Tag
+  des Builds (1.0.1–1.0.3 trugen Oktober-Daten, berichtigt in #791).
+- Die Version folgt dem Plan: Jahreszeiten II läuft als 1.0.x (1.0.4 =
+  Build 83), 1.1.0 ist für die Erfolge in der App reserviert (#623).
 
 ---
 
@@ -3266,6 +3347,15 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (2. Oktober 2026)
+
+### Gemergt 2. Oktober (Vormittag)
+#788 (Adventkranz in der App, schließt #637 und #727), #789 (Halloween-Katze
+in der App: Schwanz an der Wurzel, Augen an Ort und Stelle), #790
+(Doku-Stand), #791 (Release 1.0.4, Build 83), #792 (Halloween-Rest in der
+App: Karte „Saison-Fundstücke“, die Katze miaut, Schalter „Töne“) – alle
+innerhalb von zwei Minuten gemergt, ohne Konflikt (Probe-Merge aller vier
+App-Zweige vorher grün, 461 Tests). Danach Build 83 gebaut (siehe
+App-Builds).
 
 ### Gemergt 30. September – 2. Oktober
 #773 (Saison-Fundstücke I: Signale kommen am Server an, Nachmelden nach dem
@@ -3413,20 +3503,16 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (2.10.): #788 Adventkranz in der App (schließt #637 und #727 – das
-  App-Gegenstück zu #765; die Flammen sind eigene Ebenen mit dem nativen
-  Animationstreiber, ihr Kasten sitzt mittig auf dem Docht) und #789
-  Halloween-Katze in der App (Schwanz und Blinzeln drehten sich in Build 82
-  auf Android um die Ecke der Zeichnung; jetzt eigene Ebenen mittig auf dem
-  Drehpunkt). Danach der Release-PR für den nächsten App-Build vor
-  Halloween: Adventkalender (#785), Kranz, Katze, Signale aus der App (#777)
-  und News-Lesen (#781) – ohne diesen Build zählt der Kürbis am 31.10. aus
-  der App nicht. Offene Issues dieser Runde: #771 Wetter in der App, #772
+- Offen (2.10. mittags): #793 Release-APK nur für ARM-Handys (59 statt 105 MB,
+  wegen der 100-MB-Grenze von Cloudflare). Build 83 (1.0.4) ist gebaut und
+  wartet auf den Upload in die Play Console. Offene Issues dieser Runde: #771
+  Wetter in der App, #772
   Klammer App-Parität (Wunsch des Betreibers vom 29.09.: Wetter und
   Jahreszeiten sollen in der App gleich gut funktionieren – jeder Web-PR
   einer Jahreszeit nennt sein App-Gegenstück), #775 Frühwarnung mit
   verstellter Uhr (Entscheidung A/B/C offen), #678 Rest (Schalter
-  „Fundstücke im öffentlichen Profil“, die Karte in der App).
+  „Fundstücke im öffentlichen Profil“), Entscheidung in #772: Skia (#667)
+  vor oder nach dem Advent-Build.
   Danach Jahreszeiten II weiter: W4 #730 Winterhimmel, W5 #731
   Winter-Interaktionen, Silvester S9 #640 mit N1–N5 (#739–#743),
   Nikolausstiefel X3 #736 (braucht einen Sticker-Grant in
@@ -3495,12 +3581,19 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
+- **Build 83** (`mobile-v1.0.4-build83`, Commit d7fe6de, 02.10.; #788
+  Adventkranz, #789 Katze, #792 Halloween-Rest mit Ton, dazu Adventkalender
+  #785, Signale #777, News-Lesen #781). APK-SHA-256 beginnt mit `ca7cb41c`
+  (106 MB), AAB-SHA-256 mit `e64f19ad` (72 MB); beides am GitHub-Release, das
+  Bundle auch auf dem Desktop des Betreibers. Der Upload der APK an den
+  Vereinsserver scheiterte mit HTTP 413: vor lionsquad.at sitzt Cloudflare
+  und nimmt höchstens 100 MB je Anfrage (schon bei Build 81 und 82 so). Mit
+  #793 enthält die Release-APK nur `armeabi-v7a` und `arm64-v8a` (59 statt
+  105 MB); das App-Bundle behält alle vier Arten. Das Play-Dienstkonto
+  (`--play`, #412) ist weiter nicht eingerichtet.
 - **Build 82** (`mobile-v1.0.3-build82`, Commit 6ff7141, 28.09.; #665
-  Halloween III in der App). Die Daten der Abschnitte 1.0.1–1.0.3 in
-  `mobile/CHANGELOG.md` (10. und 12.10.) stimmen nicht – gebaut wurde am
-  28.09.; der nächste Release-PR berichtigt sie. Der nächste Build (83)
-  bringt Adventkalender, Kranz, Katze, Signale und News-Lesen in die App –
-  über den Play Store ausgeliefert vor dem 25.10.
+  Halloween III in der App). Die Changelog-Daten von 1.0.1–1.0.3 sind mit
+  #791 auf den 28.09. berichtigt.
 - **Build 78** (`mobile-v0.18.0-beta-build78`, #585), **Build 79**
   (`mobile-v1.0.0-build79`, #594 – App 1.0.0 für den offenen Play-Test),
   **Build 80** (`mobile-v1.0.1-build80`, Commit 465a627, 28.09.; #650
@@ -3562,6 +3655,12 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   Dienstkonto `--play`).
 
 ### Erledigungen beim Betreiber
+- Nach Build 83 (02.10.): das App-Bundle
+  `LionsAPP-v1.0.4-build83-d7fe6de.aab` (Desktop oder GitHub-Release
+  `mobile-v1.0.4-build83`) in der Play Console hochladen – erst in den internen
+  Test, dann in den geschlossenen Test. Die Versionshinweise mit 426 Zeichen
+  stehen in #791. Vor dem 25.10. ausrollen, sonst zählen Kürbis, Fledermäuse,
+  Geister und Katze am 31.10. aus der App nicht.
 - Nach #773–#787 (30.09.–2.10.): `update.sh` (neue Routen und Sammlungen für
   Signale, Fundstücke, Adventkalender und Verlosungen). Rechtstexte einmal
   lesen: Datenschutzerklärung (Absatz zu den Zählern aus #773, Satz zum

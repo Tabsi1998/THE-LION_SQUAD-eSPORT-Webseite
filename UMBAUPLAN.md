@@ -2708,6 +2708,16 @@ der Verwaltung.
 - **App-Sicherheits-Update** (PR #786): neue Meldungen zu fremden Paketen sperrten jeden
   App-PR. `@grpc/grpc-js` und `brace-expansion` sind gehoben; für `node-forge` gibt es keine
   reparierte Version – die Ausnahme gilt bis 2.11.2026, dann wird neu geprüft.
+- **Die App zieht nach** (PRs #788, #789, #792; Build 83 als App 1.0.4 mit #791): der
+  Adventkranz steht im Dashboard-Kopf wie neben dem Logo der Website – derselbe Kranz im selben
+  Jahr, am Adventsonntag zündet die neue Kerze sichtbar an. Die Halloween-Katze wedelt wieder an
+  der Wurzel und blinzelt an Ort und Stelle; in Build 82 wanderte ihr Schwanz am Körper, und die
+  Augen sprangen über den Kopf. Unter Profil → Erfolge steht die Karte „Saison-Fundstücke“ wie im
+  Web, und die Katze miaut beim Antippen – die App hat dafür zum ersten Mal Ton, live gerechnet
+  wie im Web, leise, still bei Lautlos, abschaltbar unter Mehr → Darstellung. Lehren: auf
+  Android drehen bewegte Teile nur sauber, wenn ihr Kasten mittig auf dem Drehpunkt sitzt; ein
+  neues Audio-Paket bringt ungefragt Mikrofon- und Hintergrund-Rechte mit, die der Play Store
+  erklärt haben will – beides ist abgeschaltet und mit einem Test festgehalten.
 - **Lehre zu GitHub:** ein „Fix“ direkt vor der Nummer eines anderen PRs in einer
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.

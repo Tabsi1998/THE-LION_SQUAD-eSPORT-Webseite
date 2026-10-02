@@ -1,6 +1,6 @@
 # Jahreszeiten: der gemeinsame Kern (Seasonal Core)
 
-Stand: 2. Oktober 2026 (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765, Schnee #766, Weihnachten #767, Wetter #770, Adventkalender #785; Fundstücke #773, #776, #777). Gilt für Web (`frontend/src/seasons/`) und App
+Stand: 2. Oktober 2026 mittags (Seasonal Core C1–C6, #721–#726; Saisons: Halloween, Adventkranz #765 und App #788, Schnee #766, Weihnachten #767, Wetter #770, Adventkalender #785; Fundstücke #773, #776, #777, #792; Klang in der App #792). Gilt für Web (`frontend/src/seasons/`) und App
 (`mobile/src/seasons/`). Halloween ist die erste Saison auf diesem Kern; Winter, Weihnachten, Silvester, Fasching,
 Ostern und Geburtstage bringen nur noch ihre Figuren und ihren Plan mit, nicht ihre eigenen Regeln.
 
@@ -13,7 +13,7 @@ als die Bedienung.
 |---|---|---|
 | Saisondaten (Server) | `SeasonContext.jsx` (`/api/seasonal/active`, `effective` je Saison) | `SeasonProvider.tsx` |
 | Bühne | `SeasonStage.jsx` (setzt `data-season`, `data-season-intensity`, `data-season-page` auf `<html>`) | `SeasonStage.tsx` |
-| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow` |
+| Modulregister | `registry.js` (`SEASON_MODULES`, lazy: halloween, weather, advent, snow, christmas, advent_calendar) | `SeasonStage.tsx`: `SEASON_MODULES` (halloween, advent), `SCREEN_SEASONS` für Saisonen mit eigenem Screen (Adventkalender), `appCanShow` |
 | Slots im Layout | `SeasonSlots.jsx` (Widget, Footer, Sound- und Schreck-Schalter) | Screens hängen `SeasonPerch`/`Card perch` ein |
 
 Ein Web-Modul exportiert `season` mit optionalen Teilen: `Backdrop` (hinter dem Inhalt), `skyLayers` (Canvas über
@@ -253,3 +253,30 @@ der App).
   `scene.ts` und `doors.ts`) – ein Paritätstest auf festen Werten hält Web und App zusammen.
 - „Bewegung reduzieren“: nichts schwingt, der Inhalt erscheint sofort.
 - Gewinne laufen über `services/season_raffles.py`; dieselbe Verlosung nutzt später die Eiersuche (#646).
+
+## 12. Bewegung in der App: Drehpunkt in der Mitte (#788, #789)
+
+Auf Android landen bewegte Drehung und Skalierung an `react-native-svg`-Gruppen auf der Matrix der Android-Ansicht,
+deren Drehpunkt die Ecke der Zeichnung ist; auch `transformOrigin` in Prozent war unzuverlässig. Deshalb gilt für jede
+Saison in der App:
+
+- Jedes bewegte Teil (Flamme, Schwanz, Augen, Figur) ist eine eigene `Animated.View`, deren Kasten **mittig auf dem
+  Drehpunkt** sitzt – Android dreht und skaliert eine Ansicht um ihre Mitte. Darin ein kleines Svg mit einer `viewBox`
+  um den Drehpunkt (`pivotBox` in `atmosphere.tsx`, `FLAME_BOX` in `advent/WreathSvg.tsx`).
+- Animiert wird mit dem nativen Treiber (`useNativeDriver: true`) – kein JavaScript je Bild.
+- Prüfen im Emulator mit Signalfarben: ein fester Teil bei 0° und einer bei der Endstellung, der bewegte muss dazwischen
+  pendeln. Tests prüfen, dass der Kasten mittig auf dem Drehpunkt liegt und kein `transformOrigin` gesetzt ist.
+
+## 13. Klänge (Web #679/#768, App #792)
+
+| | Web | App |
+|---|---|---|
+| Erzeugung | live mit der Web Audio API (`seasons/audio.js`, Instrumente je Saison, z. B. `halloween/sounds.js`) | dieselbe Rechnung einmal als Zahlenreihe (`sound/synth.ts`), als WAV im Cache (`sound/player.ts`) |
+| Schalter | Töne und Musik neben der Laterne, je Gerät (`tls-season-sound`) | „Töne“ unter Mehr → Darstellung, je Gerät (`season_sounds`); Musik gibt es in der App noch nicht |
+| Vorgabe | an (der Browser spielt erst nach der ersten Geste) | an; nur nach einem Antippen, still bei Lautlos und Vibration |
+| Dichte | `MIN_GAP_MS` 150 | `MIN_GAP_MS` 150 |
+
+- Ein neuer Laut in der App: Rechnung in `synth.ts` nach dem Vorbild des Web-Instruments, Name in `SeasonSound`, Fall in
+  `playSeasonSound`. Ändert sich die Rechnung, `SOUND_VERSION` erhöhen – sonst spielt der Cache den alten Laut.
+- Nie Musik anderer Apps unterbrechen (`mixWithOthers`), nie Mikrofon oder Hintergrund-Wiedergabe (Plugin-Optionen von
+  `expo-audio`), Spieler nach dem Laut freigeben (`remove()` und `release()`).
