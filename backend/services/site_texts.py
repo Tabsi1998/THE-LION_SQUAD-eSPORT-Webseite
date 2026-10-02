@@ -241,11 +241,18 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "Negative oder geheime Fun-/Negative-Achievements werden erst nach Freischaltung im Profil angezeigt."),
                 # Zähler hinter den Erfolgen (#616, #678): was gezählt wird, wer es sieht, wann es weg ist.
                 p("Damit Erfolge freigeschaltet werden können, zählen Website und LionsAPP mit, wenn du angemeldet bist: gelesene News, "
-                  "geöffnete Streams und Fundstücke der Jahreszeiten – etwa aufgescheuchte Fledermäuse, gefangene Schneeflocken oder der "
-                  "Kürbis zu Halloween. Gespeichert wird nur, wie oft und an welchem Tag; ohne Anmeldung wird nichts übertragen. Diese Zahlen "
+                  "geöffnete Streams und Fundstücke der Jahreszeiten – etwa aufgescheuchte Fledermäuse, gefangene Schneeflocken, geöffnete "
+                  "Türchen im Adventkalender oder der Kürbis zu Halloween. Gespeichert wird nur, wie oft und an welchem Tag; beim Quiz im "
+                  "Adventkalender nie, welche Antwort du gegeben hast. Ohne Anmeldung wird nichts übertragen. Diese Zahlen "
                   "sind nicht öffentlich – sichtbar wird erst der freigeschaltete Erfolg. Sie stehen in deinem Datenexport und werden "
                   "gelöscht, wenn du dein Konto löschst. Grundlage ist die Nutzung der Plattform, zu der die Erfolge gehören "
                   "(Art. 6 Abs. 1 lit. b DSGVO).", "privacy-achievement-counters"),
+                # Verlosungen (#641): nur wer selbst auf „Mitmachen“ klickt, nimmt teil.
+                p("Bei Verlosungen – etwa im Adventkalender – nimmst du nur teil, wenn du selbst auf „Mitmachen“ klickst. Gespeichert wird "
+                  "dann, dass und wann du mitmachst; bis zum Teilnahmeschluss kannst du das zurückziehen. Gezogen wird per Zufall. Wer "
+                  "gewinnt, bekommt eine Nachricht auf der Plattform; Namen werden nicht veröffentlicht. Die Ziehung steht mit Zeitpunkt "
+                  "und Gewinnern in einem Protokoll, das nur die Vereinsleitung sieht. Grundlage ist deine Teilnahme "
+                  "(Art. 6 Abs. 1 lit. b DSGVO).", "privacy-raffles"),
                 p("Öffentliche Community-Profile registrierter Benutzer werden nicht in die Sitemap aufgenommen und mit einem technischen "
                   "Noindex-Hinweis für Suchmaschinen versehen. Sichtbar bleiben sie nur, wenn die Profilfreigabe aktiv ist. Offizielle "
                   "Vereinsmitglieder-Profile werden separat gepflegt und können als Teil der Vereinsdarstellung öffentlich auffindbar sein.")),

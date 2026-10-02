@@ -88,7 +88,7 @@ async def _ensure_prize_manager(user: dict, tournament_id: str | None) -> None:
 async def list_prizes(
     status: Optional[PrizeStatus] = None,
     tournament_id: Optional[str] = None,
-    source_type: Optional[Literal["tournament", "fastlap"]] = None,
+    source_type: Optional[Literal["tournament", "fastlap", "season"]] = None,
     me: dict = Depends(get_current_user),
 ):
     await _ensure_prize_manager(me, tournament_id)
@@ -98,8 +98,8 @@ async def list_prizes(
         q["status"] = status
     if tournament_id:
         q["tournament_id"] = tournament_id
-    if source_type == "fastlap":
-        q["source_type"] = "fastlap"
+    if source_type in ("fastlap", "season"):
+        q["source_type"] = source_type
     elif source_type == "tournament":
         q["$or"] = [{"source_type": {"$exists": False}}, {"source_type": "tournament"}]
     pickups = await db.prize_pickups.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)

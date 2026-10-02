@@ -126,12 +126,14 @@ export default function AdminPrizesPage() {
   const items = allItems.filter((p) => {
     if (filter && p.status !== filter) return false;
     if (sourceFilter === "fastlap" && p.source_type !== "fastlap") return false;
-    if (sourceFilter === "tournament" && p.source_type === "fastlap") return false;
+    if (sourceFilter === "season" && p.source_type !== "season") return false;
+    if (sourceFilter === "tournament" && ["fastlap", "season"].includes(p.source_type)) return false;
     if (!normalizedQuery) return true;
     return [
       p.tournament_title,
       p.fastlap_challenge_title,
       p.fastlap_source_label,
+      p.season_source_label,
       p.prize_label,
       p.prize_value,
       p.recipient_label,
@@ -141,7 +143,7 @@ export default function AdminPrizesPage() {
   });
   const counts = allItems.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc; }, {});
   const sourceCounts = allItems.reduce((acc, p) => {
-    const key = p.source_type === "fastlap" ? "fastlap" : "tournament";
+    const key = ["fastlap", "season"].includes(p.source_type) ? p.source_type : "tournament";
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
@@ -174,7 +176,7 @@ export default function AdminPrizesPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {[["", "Alle", allItems.length], ["tournament", "Turniere", sourceCounts.tournament || 0], ["fastlap", "Fast Lap", sourceCounts.fastlap || 0]].map(([value, label, count]) => (
+        {[["", "Alle", allItems.length], ["tournament", "Turniere", sourceCounts.tournament || 0], ["fastlap", "Fast Lap", sourceCounts.fastlap || 0], ["season", "Verlosungen", sourceCounts.season || 0]].map(([value, label, count]) => (
           <button
             key={value || "all"}
             type="button"
@@ -266,6 +268,7 @@ export default function AdminPrizesPage() {
                       <div className="font-semibold">{p.fastlap_challenge_title || p.tournament_title || "—"}</div>
                       {p.fastlap_source_label && <div className="text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
                       {p.source_type === "fastlap" && <div className="text-[10px] uppercase tracking-widest text-white/35">Fast Lap</div>}
+                      {p.source_type === "season" && <div className="text-xs text-[#e9c46a]">Verlosung{p.season_source_label ? ` · ${p.season_source_label}` : ""}</div>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -330,9 +333,10 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove }) {
     <article data-testid={`prize-mobile-${p.id}`} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/35">{p.source_type === "fastlap" ? "Fast Lap" : "Turnier"}</div>
+          <div className="text-[10px] uppercase tracking-widest text-white/35">{p.source_type === "fastlap" ? "Fast Lap" : p.source_type === "season" ? "Verlosung" : "Turnier"}</div>
           <h2 className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{p.fastlap_challenge_title || p.tournament_title || "Quelle offen"}</h2>
           {p.fastlap_source_label && <div className="mt-1 text-xs text-[#29B6E8]">{p.fastlap_source_label}</div>}
+          {p.source_type === "season" && p.season_source_label && <div className="mt-1 text-xs text-[#e9c46a]">{p.season_source_label}</div>}
         </div>
         <span className={`shrink-0 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-sm border ${s.color}`}>
           <Icn className="w-3 h-3" /> {s.label}

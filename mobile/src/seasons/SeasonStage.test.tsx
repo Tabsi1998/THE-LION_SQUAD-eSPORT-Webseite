@@ -57,10 +57,11 @@ test("„aus“ zeigt nichts", async () => {
   expect(screen.queryByTestId("season-widget-slot")).toBeNull();
 });
 
-test("Deko-Schalter nennt die laufende Saison und stellt um", async () => {
-  mockSeasonState.seasons = [halloween("normal")];
+test("Deko-Schalter nennt die laufende Saison und stellt um - nur Saisonen, die die App zeigen kann", async () => {
+  mockSeasonState.seasons = [halloween("normal"), { ...halloween("normal"), key: "snow", label: "Schneefall" }, { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender" }];
   await render(<DecoSetting />);
-  expect(screen.getByText(/Gerade läuft: Halloween/)).toBeTruthy();
+  expect(screen.getByText(/Gerade läuft: Halloween, Adventkalender\./)).toBeTruthy();
+  expect(screen.queryByText(/Schneefall/)).toBeNull();
   await fireEvent.press(screen.getByText("Dezent"));
   expect(mockSeasonState.setPreference).toHaveBeenCalledWith("subtle");
 });

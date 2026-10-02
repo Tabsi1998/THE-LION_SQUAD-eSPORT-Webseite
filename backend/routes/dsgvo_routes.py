@@ -47,6 +47,10 @@ async def _user_data_export(db, user_id: str) -> dict:
         "achievement_signals": await rows(db.user_signals, {"user_id": user_id}),
         "news_reads": await rows(db.news_reads, {"user_id": user_id}),
         "stream_watches": await rows(db.stream_watches, {"user_id": user_id}),
+        # Adventkalender (#641): welches Türchen wann geöffnet wurde - beim Quiz nur, dass mitgemacht wurde.
+        "advent_openings": await rows(db.advent_openings, {"user_id": user_id}),
+        # Verlosungen (#641): wo die Person mitmacht. Ein Gewinn steht bei ``prize_pickups``.
+        "raffle_entries": await rows(db.season_raffle_entries, {"user_id": user_id}),
         "commendations_given": await rows(db.match_commendations, {"from_user_id": user_id}),
         "season_points": await rows(db.season_points, {"user_id": user_id}),
         "prize_pickups": await rows(db.prize_pickups, {"user_id": user_id}),
@@ -96,7 +100,9 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
                        # Verhalten, das nur für die Erfolge gezählt wurde (#616, #678) - ohne Konto ohne Zweck.
                        # Das gegebene GG bleibt: es gehört zum Match wie das Ergebnis, und das Lob der anderen Seite
                        # soll nicht verschwinden, weil jemand sein Konto löscht.
-                       db.user_signals, db.news_reads, db.stream_watches, db.user_achievement_stats):
+                       db.user_signals, db.news_reads, db.stream_watches, db.user_achievement_stats, db.advent_openings,
+                       # Teilnahmen an Verlosungen: wer kein Konto mehr hat, kann nicht gewinnen.
+                       db.season_raffle_entries):
         await collection.delete_many({"user_id": user_id})
     await db.friendships.delete_many({"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})
     await db.user_blocks.delete_many({"$or": [{"blocker_id": user_id}, {"blocked_id": user_id}]})

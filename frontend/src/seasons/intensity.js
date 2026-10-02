@@ -13,6 +13,8 @@ const RULES = [
   { test: (p) => /^\/(admin|display|setup|consent)(\/|$)/.test(p), cls: "quiet" },
   { test: (p) => /^\/tournaments\/[^/]+\/(bracket|matches|standings)/.test(p), cls: "calm" },
   { test: (p) => /^\/(fastlap|f1)(\/|$)/.test(p), cls: "calm" },
+  // Der Adventkalender ist selbst das Bild - die Deko rundherum hält sich zurück.
+  { test: (p) => /^\/advent(\/|$)/.test(p), cls: "calm" },
   { test: (p) => /^\/(login|register|contact|kontakt|password-recovery|verify|profile|messages|notifications|privacy-account|membership|members\/membership|my|invoices|checkout|apply)(\/|$)/.test(p), cls: "calm" },
   { test: (p) => /^\/(events|news)\/[^/]+/.test(p), cls: "medium" },
   { test: (p) => /^\/(servers|community|players|teams|u|members|about|verein|partners|sponsors|references|achievements|seasons|tournaments)(\/|$)/.test(p), cls: "medium" },

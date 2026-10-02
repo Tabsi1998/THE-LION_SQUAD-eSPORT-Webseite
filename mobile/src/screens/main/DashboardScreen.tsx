@@ -8,6 +8,7 @@ import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { SeasonWidgetSlot } from "../../seasons/SeasonStage";
+import { AdventHint } from "../../advent/entry";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { useBranding } from "../../branding/BrandingProvider";
@@ -205,6 +206,10 @@ export function DashboardScreen({ navigation }: Props) {
           </View>
           {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News aus der Website.</Body> : null}
         </Card>
+
+        {/* Adventkalender (#641): der Weg zu den Türchen - nur solange der Kalender läuft. */}
+        {/* `initial: false`: unter dem Kalender liegt das Verzeichnis „Mehr“ - der Pfeil zurück führt dorthin. */}
+        <AdventHint onOpen={() => navigation.navigate("More", { screen: "AdventCalendar", initial: false })} />
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
         {offline && !error ? <OfflineNotice /> : null}

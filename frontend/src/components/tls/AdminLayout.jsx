@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
@@ -81,6 +81,7 @@ export const ADMIN_GROUPS = [
       { to: "/admin/nav", label: "Navigation", icon: Code2, areas: ["content"] },
       { to: "/admin/achievements", label: "Achievements", icon: Medal, areas: ["content"] },
       { to: "/admin/stickers", label: "Sticker", icon: Sticker, areas: ["content"] },
+      { to: "/admin/advent", label: "Adventkalender", icon: CalendarHeart, areas: ["content", "club"] },
       { to: "/admin/downloads", label: "Downloads & QR", icon: QrCode, areas: ["tournaments", "content", "club", "system"] },
     ],
   },
@@ -156,6 +157,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/nav": ["menue", "navigation"],
   "/admin/achievements": ["badges", "punkte", "level"],
   "/admin/stickers": ["chat", "emoji", "fluent"],
+  "/admin/advent": ["advent", "adventkalender", "türchen", "tuerchen", "weihnachten", "verlosung", "gewinnspiel", "ziehung", "quiz", "kalender"],
   "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],
   "/admin/partners": ["kooperationen", "netzwerk", "dolibarr", "kategorie"],
   "/admin/references": ["erfolge", "platzierungen", "results"],

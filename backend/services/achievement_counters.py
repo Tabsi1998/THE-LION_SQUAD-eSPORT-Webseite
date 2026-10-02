@@ -315,7 +315,10 @@ async def _onboarding(ctx):
 
 @counter("advent_doors_opened", "signal")
 async def _advent(ctx):
-    return _signal_count(await ctx.signals(), "advent_door")
+    """Die meisten Türchen in einem Advent (#641) - aus den echten Öffnungen, nicht aus dem Signal: „Alle Türchen“
+    heißt 24 von 24 im selben Jahr."""
+    from services.advent_calendar import doors_in_best_year
+    return await doors_in_best_year(ctx.db, ctx.user_id)
 
 
 @counter("easter_eggs_found", "signal")
@@ -748,6 +751,7 @@ async def reconcile(days: int = 7, limit: int = 5000) -> dict:
 
 # Name → Regeln: höchstens so oft je Tag, nur in dieser Saison (wenn gesetzt), nur in diesen Phasen.
 # ``live``: zählt nur im Augenblick selbst und lässt sich nicht nachmelden (Silvester um Mitternacht, App geöffnet).
+# ``server``: zählt nur der Server selbst, wenn er das Ereignis geprüft hat (Türchen geöffnet) - ein Client kann es nicht melden.
 SIGNAL_RULES: dict[str, dict] = {
     "halloween_pumpkin": {"per_day": 1, "season": "halloween"},
     "halloween_bats_scared": {"per_day": 30, "season": "halloween"},
@@ -763,7 +767,7 @@ SIGNAL_RULES: dict[str, dict] = {
     "member_card_added": {"per_day": 1},
     "app_open": {"per_day": 1, "live": True},
     "tutorial_done": {"per_day": 1},
-    "advent_door": {"per_day": 24, "season": "advent_calendar"},
+    "advent_door": {"per_day": 24, "season": "advent_calendar", "server": True},
     "easter_egg": {"per_day": 50, "season": "easter_hunt"},
 }
 # So viele Tage zurück lässt sich nachmelden (#678): wer ohne Anmeldung gesammelt hat, verliert die Woche nicht.
@@ -804,13 +808,16 @@ async def season_allows(name: str, day: date | None = None) -> bool:
     return not rule.get("phases") or state.get("phase") in rule["phases"]
 
 
-async def record_signal(user_id: str, name: str, count: int = 1, day: str | None = None) -> dict:
+async def record_signal(user_id: str, name: str, count: int = 1, day: str | None = None, trusted: bool = False) -> dict:
     """Ein Signal zählen. Liefert {accepted, count, day_count, day} - abgelehnt bei Deckel (``cap``), falscher Saison
     (``season``), kaputtem oder künftigem Tag (``day``), zu altem Tag (``old``) oder einem Signal, das nur im
-    Augenblick zählt (``live``)."""
+    Augenblick zählt (``live``). ``trusted`` setzt nur der Server selbst: Signale mit ``server`` gelten für Clients
+    als unbekannt."""
     if name not in SIGNAL_RULES or not user_id:
         return {"accepted": False, "reason": "unknown"}
     rule = SIGNAL_RULES[name]
+    if rule.get("server") and not trusted:
+        return {"accepted": False, "reason": "unknown"}
     today = now_utc().astimezone(VIENNA).date()
     when, problem = signal_day(day, today)
     if problem:

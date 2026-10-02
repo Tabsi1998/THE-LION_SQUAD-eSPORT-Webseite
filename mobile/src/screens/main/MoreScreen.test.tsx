@@ -1,7 +1,7 @@
 import React from "react";
 import { Linking } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { MoreScreen, socialIcon } from "./MoreScreen";
+import { MoreScreen, moreGroups, socialIcon } from "./MoreScreen";
 
 // "Mehr": Die Vereinskanäle kommen aus den Einstellungen, nicht aus dem Code.
 // Der fest eingebaute Discord-Link war falsch (#214).
@@ -17,12 +17,17 @@ jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 const mockOpenWhatsNew = jest.fn();
 jest.mock("../../update/AppUpdateProvider", () => ({ useAppUpdate: () => ({ openWhatsNew: mockOpenWhatsNew, info: null, check: jest.fn() }) }));
 
+// Adventkalender (#641): die Zeile steht nur da, solange der Kalender läuft.
+const mockAdvent: { value: { door: number } | null } = { value: null };
+jest.mock("../../advent/entry", () => ({ useAdventEntry: () => mockAdvent.value }));
+
 const navigate = jest.fn();
 const navigation = { navigate } as never;
 const route = { key: "more", name: "MoreHub" } as never;
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockAdvent.value = null;
   mockGet.mockResolvedValue({
     data: {
       social_links: [
@@ -82,6 +87,25 @@ test("wer kein Mitglied ist, sieht „Mitglied werden“ mit Link zur Beitrittss
   } finally {
     mockUser.is_club_member = true;
   }
+});
+
+test("Adventkalender: die Zeile steht nur da, solange der Kalender läuft - als erste unter „Verein“", async () => {
+  const first = await render(<MoreScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalled());
+  expect(screen.queryByText("Adventkalender")).toBeNull();
+  expect(screen.queryByTestId("more-advent")).toBeNull();
+  await first.unmount();
+
+  mockAdvent.value = { door: 12 };
+  await render(<MoreScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("more-advent")).toBeTruthy());
+  expect(screen.getAllByText("Adventkalender")).toHaveLength(1);
+  await fireEvent.press(screen.getByTestId("more-advent"));
+  expect(navigate).toHaveBeenCalledWith("AdventCalendar");
+
+  const titles = (advent: boolean) => moreGroups(advent).map((group) => [group.title, group.entries.map((entry) => entry.title)]);
+  expect(titles(true)).toEqual([["Gaming", ["Jahreswertung", "Spielerprofile"]], ["Verein", ["Adventkalender", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
+  expect(titles(false)).toEqual([["Gaming", ["Jahreswertung", "Spielerprofile"]], ["Verein", ["News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
 });
 
 test("Symbole je Kanal, Unbekanntes als Link", () => {

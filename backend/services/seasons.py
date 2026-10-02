@@ -125,6 +125,20 @@ def _windows_advent_calendar(year: int, _founded) -> list[dict]:
     return [{"phase": "tuerchen", "start": at(date(year, 12, 1)), "end": end_of(date(year + 1, 1, 6))}]
 
 
+# Ein Türchen geht an seinem Tag um 6 Uhr auf (#641) - nicht um Mitternacht.
+ADVENT_DOOR_HOUR = 6
+ADVENT_DOORS = 24
+
+
+def advent_door_opens_at(year: int, day: int) -> datetime:
+    return at(date(year, 12, day), ADVENT_DOOR_HOUR)
+
+
+def advent_doors_open(year: int, now: datetime) -> int:
+    """So viele Türchen sind zu ``now`` offen - 0 vor dem 1. Dezember um 6 Uhr, 24 ab dem Heiligen Abend."""
+    return sum(1 for day in range(1, ADVENT_DOORS + 1) if advent_door_opens_at(year, day) <= now)
+
+
 def _windows_new_year(year: int, _founded) -> list[dict]:
     d29, d30, d31, jan1 = date(year, 12, 29), date(year, 12, 30), date(year, 12, 31), date(year + 1, 1, 1)
     return [
@@ -349,7 +363,8 @@ def phase_data(key: str, window: dict, now: datetime, founded: date | None, nigh
         stage = 1 if day < date(window["year"], 12, 10) else 2 if day < date(window["year"], 12, 24) else 3
         return {"night": night if night is not None else (now.hour >= 20 or now.hour < 7), "snowcap_stage": stage}
     if key == "advent_calendar":
-        return {"today_door": min(24, day.day) if (day.month == 12 and day.year == window["year"]) else 24, "catch_up": day.month == 1}
+        # ``today_door`` ist das neueste offene Türchen; nach dem 24. wird nur noch nachgeholt.
+        return {"today_door": advent_doors_open(window["year"], now), "catch_up": day > date(window["year"], 12, ADVENT_DOORS), "door_hour": ADVENT_DOOR_HOUR}
     if key == "new_year":
         rate = rocket_rate(window["phase"], now)
         return {"rate_per_hour": rate, "salvos": new_year_salvos(now), "seed": hourly_seed(now), "show_start": at(date(window["year"] + 1, 1, 1)).isoformat()}

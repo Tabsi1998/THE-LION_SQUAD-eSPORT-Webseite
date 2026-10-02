@@ -25,6 +25,16 @@ async def load_context(db) -> tuple[dict, str | None]:
     return stored, about.get("founded_on")
 
 
+async def with_calendar(db, payload: dict) -> dict:
+    """Adventkalender (#641): ``ready`` sagt, ob für dieses Jahr Türchen angelegt sind - ohne sie zeigen Web und
+    App keinen Einstieg in einen Kalender, den es nicht gibt."""
+    for season in payload.get("seasons") or []:
+        if season.get("key") == "advent_calendar":
+            year = int(str(season.get("starts_at") or "0000")[:4] or 0)
+            season["data"] = {**(season.get("data") or {}), "ready": bool(await db.advent_doors.find_one({"year": year}, {"_id": 0, "id": 1}))}
+    return payload
+
+
 @router.get("/active")
 async def active_seasons(request: Request, response: Response, preview: str | None = Query(None)):
     db = get_db()
@@ -37,13 +47,13 @@ async def active_seasons(request: Request, response: Response, preview: str | No
         if key == "weather":
             # Die Vorschau soll auch an einem trockenen Tag etwas zeigen: ein Gewitterregen, nur für diese Person.
             conditions = weather.demo(conditions)
-        payload = seasons.active(at_time, stored, founded, preview_key=key, night=conditions["night"])
+        payload = await with_calendar(db, seasons.active(at_time, stored, founded, preview_key=key, night=conditions["night"]))
         payload["weather"] = conditions
         response.headers["Cache-Control"] = "no-store"
         return payload
     # Nacht nach der echten Sonne, Wind und Niederschlag vom Vereinsort (#666) - alles ohne Anmeldung, ohne Personenbezug.
     conditions = weather.current(cache, location)
-    payload = seasons.active(None, stored, founded, night=conditions["night"])
+    payload = await with_calendar(db, seasons.active(None, stored, founded, night=conditions["night"]))
     payload["weather"] = conditions
     # Die Sekunde in „now“ würde jeden ETag brechen; für den Vergleich zählt nur, was gezeigt wird.
     etag = seasons.etag_for({k: v for k, v in payload.items() if k != "now"})

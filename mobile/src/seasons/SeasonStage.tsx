@@ -23,6 +23,14 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
 };
 
+/** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
+export const SCREEN_SEASONS = new Set(["advent_calendar"]);
+
+/** Kann die App diese Saison zeigen? Sonst steht sie nirgends als „läuft gerade“, ohne dass etwas zu sehen wäre (#772). */
+export function appCanShow(season: Pick<ActiveSeason, "key">): boolean {
+  return Boolean(SEASON_MODULES[season.key]) || SCREEN_SEASONS.has(season.key);
+}
+
 /** Der Name des Screens, der gerade zu sehen ist - Saat für die Anordnung je Screen. */
 export function useCurrentScreen(): string {
   const [screen, setScreen] = useState<string>(() => (navigationRef.isReady() ? navigationRef.getCurrentRoute()?.name || "Dashboard" : "Dashboard"));

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarDays, Eye, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
@@ -141,6 +142,9 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
           </label>
         )}
         <span className="text-[11px] text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
+        {season.key === "advent_calendar" && (
+          <Link to="/admin/advent" data-testid="season-advent_calendar-doors" className="ml-auto px-3 py-1.5 border border-[#e9c46a]/50 text-[#e9c46a] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#e9c46a]/10">Türchen pflegen</Link>
+        )}
       </div>
     </div>
   );
