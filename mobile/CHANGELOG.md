@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.5 - 2026-10-02
+
+- Mobile: Schnee in der App ab dem 1. Advent bis Dreikönig: Flocken in drei Tiefen, hinten klein und weich, vorne groß als Kristall, mit Wind und Böen aus dem echten Wetter am Vereinsort – schneit es draußen, wird es dichter. Die Flocken gehören zum Screen und ziehen beim Scrollen mit. Im Dashboard-Kopf schwebt eine Schneeflocke zum Fangen; fünfzig gefangene ergeben den Schneekönig (#642, #678).
+- Mobile: Wetter das ganze Jahr wie auf der Website: Regnet es am Vereinsort, regnet es in der App in feinen, schrägen Strichen; schneit es außerhalb der Schnee-Saison, fällt leichter Schnee; bei Gewitter leuchtet es leise am Himmel. Trocken ist nichts zu sehen und nichts kostet Akku (#771).
+- Mobile: Weihnachten vom 24. bis 26. Dezember: eine Lichterkette an der Begrüßungskarte im Dashboard – dieselbe Kette wie auf der Website, jedes Lämpchen glimmt in seinem eigenen Takt –, warme Lichtinseln hinter dem Inhalt und einmal am Tag der Gruß des Vereins als Karte über der Tab-Leiste; am 6. Jänner der Abschied (#642).
+- Mobile: Nikolaus am 6. Dezember: im Tab „Mehr“ steht ein Stiefel, und das Symbol des Tabs ist an dem Tag der Stiefel. Antippen holt einen Sticker aus dem neuen Paket „Vom Nikolaus“ heraus – einer je Person und Jahr, danach im Chat zu verwenden. Ein Hinweis im Dashboard führt hin (#736).
+- Mobile: Saisonen über den Jahreswechsel rechnen jetzt im Jänner dasselbe Jahr wie die Website.
+
 ## 1.0.4 - 2026-10-02
 
 - Mobile: Adventkalender in der App: dasselbe Bild und dieselben 24 Türchen wie auf der Website und derselbe Stand – was am Handy geöffnet wird, ist auch im Web offen. Jedes Türchen geht an seinem Tag um 6 Uhr auf, mit Text, Bild, Quiz, Gewinn und mehr; Videos und Clips öffnen YouTube oder Twitch. Zu finden unter Mehr → Verein und als Hinweis im Dashboard, solange der Kalender läuft (#641, #732).
