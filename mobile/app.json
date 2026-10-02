@@ -82,6 +82,15 @@
           "calendarPermission": "Die LionsAPP trägt Termine in deinen Kalender ein, wenn du es antippst.",
           "remindersPermission": false
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
       ]
     ],
     "updates": {

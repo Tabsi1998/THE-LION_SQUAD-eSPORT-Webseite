@@ -34,6 +34,7 @@ import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
 import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../lib/prizes";
+import { SeasonFindsCard } from "../../seasons/SeasonFinds";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
 type TabKey = "overview" | "references" | "awards" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
@@ -686,6 +687,8 @@ export function ProfileScreen() {
               </View>
               <Muted>{insights.earned.length} von {insights.tiers.length} Stufen freigeschaltet · {insights.points} Punkte</Muted>
             </Card>
+            {/* Saison-Fundstücke (#678) wie im Web unter den Erfolgen - nur für die angemeldete Person selbst. */}
+            {!guest ? <SeasonFindsCard /> : null}
             {(achievements.groups || []).length ? (
               (achievements.groups || []).map((group, index) => (
                 <FadeIn key={group.code} delay={staggerDelay(index)}>

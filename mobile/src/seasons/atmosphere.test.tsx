@@ -3,11 +3,14 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 import * as Haptics from "expo-haptics";
 
 // Die Katze auf der Kante (#664): antippen lässt sie ein Stück gehen - mit Haptik, und jedes Mal zählt es als
-// Saison-Fundstück (#678). Während sie läuft, in der Ruhezeit danach und bei „Bewegung reduzieren“ passiert nichts.
+// Saison-Fundstück (#678), und sie miaut wie im Web (#768, #772 - nur mit eingeschalteten Tönen, das prüft der
+// Spieler). Während sie läuft, in der Ruhezeit danach und bei „Bewegung reduzieren“ passiert nichts.
 
 const mockSignals = { recordSignal: jest.fn(async () => true) };
 jest.mock("./signals", () => mockSignals);
 jest.mock("expo-haptics", () => ({ impactAsync: jest.fn(async () => {}), ImpactFeedbackStyle: { Light: "light" } }));
+const mockSound = { playSeasonSound: jest.fn(async () => true) };
+jest.mock("./sound/player", () => mockSound);
 
 const { CAT_COOLDOWN_MS, CAT_SIGNAL, CatOnEdge } = require("./atmosphere");
 
@@ -27,8 +30,11 @@ test("Katze antippen: sie geht los, es zählt als Fundstück - nicht noch einmal
   expect(mockSignals.recordSignal).toHaveBeenCalledTimes(1);
   expect(mockSignals.recordSignal).toHaveBeenCalledWith(CAT_SIGNAL, { onceIf: false });
   expect(CAT_SIGNAL).toBe("halloween_cat_petted");
+  expect(mockSound.playSeasonSound).toHaveBeenCalledTimes(1);
+  expect(mockSound.playSeasonSound).toHaveBeenCalledWith("cat_meow");
   await fireEvent.press(screen.getByTestId("halloween-cat-press"));
   expect(mockSignals.recordSignal).toHaveBeenCalledTimes(1);
+  expect(mockSound.playSeasonSound).toHaveBeenCalledTimes(1);
   await act(async () => {
     jest.advanceTimersByTime(CAT_COOLDOWN_MS + 500);
   });
@@ -42,4 +48,5 @@ test("Bewegung reduzieren: die Katze sitzt still, und Antippen zählt nicht", as
   expect(screen.getByTestId("halloween-cat").props["data-walking"]).toBe("0");
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
   expect(mockSignals.recordSignal).not.toHaveBeenCalled();
+  expect(mockSound.playSeasonSound).not.toHaveBeenCalled();
 });
