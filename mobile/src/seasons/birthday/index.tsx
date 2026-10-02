@@ -193,12 +193,19 @@ export function BirthdayCake({ plan, lit, lighting, still, width = 120 }: { plan
 
 type StickerState = { active: boolean; member: boolean; claimed: boolean; sticker: { url: string; name: string; pack_name?: string } | null };
 
-/** Der Jahres-Sticker für Mitglieder (wie im Web): abholen, dann zeigen, wo er im Chat liegt. */
-export function BirthdaySticker() {
+/**
+ * Der Jahres-Sticker für Mitglieder (wie im Web): abholen, dann zeigen, wo er im Chat liegt. `onWaiting(true)`, solange
+ * er noch abzuholen ist - die Karte bleibt dann offen.
+ */
+export function BirthdaySticker({ onWaiting }: { onWaiting?: (waiting: boolean) => void }) {
   const { user } = useAuth();
   const [state, setState] = useState<StickerState | null>(null);
   const [busy, setBusy] = useState(false);
   const [fresh, setFresh] = useState(false);
+  const waiting = Boolean(state?.active && state.member && !state.claimed);
+  useEffect(() => {
+    onWaiting?.(waiting);
+  }, [waiting, onWaiting]);
   useEffect(() => {
     if (!user?.id) return undefined;
     let alive = true;
@@ -246,6 +253,8 @@ export function BirthdayGreeting({ season, screen }: { season: ActiveSeason; scr
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [open, setOpen] = useState(false);
+  // Kann ein Mitglied seinen Sticker noch abholen, bleibt die Karte offen - bis zum Abholen oder Schließen.
+  const [waiting, setWaiting] = useState(false);
   const [covered, setCovered] = useState(() => anyOverlayOpen());
   useEffect(() => subscribeQuiet((quiet) => setCovered(quiet.overlays.length > 0)), []);
   const allowed = screenClass(screen) !== "quiet" && !covered;
@@ -269,10 +278,10 @@ export function BirthdayGreeting({ season, screen }: { season: ActiveSeason; scr
     };
   }, [allowed]);
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || waiting) return undefined;
     const timer = setTimeout(() => setOpen(false), CARD_MS);
     return () => clearTimeout(timer);
-  }, [open]);
+  }, [open, waiting]);
   if (!open || !allowed) return null;
   const moving = season.effective !== "subtle" && !reducedMotion;
   return (
@@ -283,7 +292,7 @@ export function BirthdayGreeting({ season, screen }: { season: ActiveSeason; scr
           <Body style={styles.eyebrow}>Vereinsgeburtstag</Body>
           <Body style={styles.years}>{years ? `${years} ${years === 1 ? "Jahr" : "Jahre"}` : "Geburtstag"}</Body>
           <Body style={styles.text}>{cardText(greeting, years)}</Body>
-          <BirthdaySticker />
+          <BirthdaySticker onWaiting={setWaiting} />
         </View>
         <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel="Gruß schließen" hitSlop={10} style={styles.close} testID="birthday-close">
           <Body style={styles.closeText}>×</Body>

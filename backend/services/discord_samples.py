@@ -14,7 +14,7 @@ Community“ und steht im Versand-Log mit ``test: True`` - zählt also nicht als
 """
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from database import get_db
 from models import new_id, now_utc
@@ -132,6 +132,23 @@ async def sample_catalog(db=None) -> list[dict]:
               stream_live_message(tournament or _example_tournament(), {"display_name": SAMPLE_NAME, "title": "Finale – wir holen den Cup!", "game_name": game_name or "Rocket League",
                                                                          "viewer_count": 12, "stream_url": "https://www.twitch.tv/paula", "thumbnail_url": None}),
               target="events", source_text=SOURCE_EXAMPLE)
+
+    # Vereinsgeburtstag (#644): der Gruß aus den Saison-Texten, die Jahre beim nächsten Gründungstag (sonst ein Beispiel).
+    from services import club_birthday, founding, seasons
+
+    founded_on = (await founding.founding(db))["founded_on"]
+    today = now_utc().date()
+    next_years = 8
+    if founded_on:
+        born = date.fromisoformat(founded_on)
+        next_years = (founding.years_on(founded_on, today) or 0) + (0 if (today.month, today.day) == (born.month, born.day) else 1)
+    stored = await db.settings.find_one({"id": seasons.SETTINGS_ID}, {"_id": 0}) or {}
+    texts = seasons.render_texts("club_birthday", seasons.merge_settings(stored)["seasons"]["club_birthday"]["texts"], {"years": next_years})
+    branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "club_name": 1}) or {}
+    title, text = club_birthday.discord_message({"data": {"years": next_years}, "texts": texts}, branding.get("club_name") or "THE LION SQUAD")
+    await add("club.birthday", EVENTS["club.birthday"]["label"], "public", {"title": title, "description": text, "color": 0xFFD700, "event_key": "club.birthday"},
+              target="community", source="latest" if founded_on else "example",
+              source_text=f"mit dem Gründungsdatum {born.strftime('%d.%m.%Y')}" if founded_on else SOURCE_EXAMPLE)
 
     # Vorstand: nie Namen oder Texte - die stehen im Admin.
     await add("membership.application", EVENTS["membership.application"]["label"], "board",

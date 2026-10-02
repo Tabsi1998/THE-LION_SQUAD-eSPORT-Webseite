@@ -197,3 +197,29 @@ test("in der Vorschau fragt der Baustein mit dem Token - nur für den Vereinsgeb
   await screen.findByTestId("birthday-sticker-claim");
   expect(apiMock.get).toHaveBeenCalledWith("/seasonal/birthday", { params: { preview: "club_birthday.123.0.sig" } });
 });
+
+test("ein Mitglied mit offenem Sticker: die Karte bleibt, bis er abgeholt ist - dann geht sie nach der üblichen Zeit", async () => {
+  vi.useFakeTimers();
+  const { CARD_MS } = await import("./index.jsx");
+  authState.user = { id: "u4", is_club_member: true };
+  apiMock.get.mockResolvedValue({ data: { active: true, member: true, claimed: false, sticker: null } });
+  apiMock.post.mockResolvedValue({ data: { new: true, sticker: { id: "s", name: "Kerze", pack_name: "Zum Vereinsgeburtstag", url: "/api/stickers/files/fluent/candle.png" } } });
+  render(<Toast season={birthday({ effective: "subtle" })} />);
+  await act(async () => {
+    vi.advanceTimersByTime(CARD_DELAY_MS);
+  });
+  await act(async () => {});
+  expect(screen.getByTestId("birthday-sticker-claim")).toBeTruthy();
+  await act(async () => {
+    vi.advanceTimersByTime(CARD_MS + 5000);
+  });
+  expect(screen.getByTestId("birthday-card")).toBeTruthy();
+  await act(async () => {
+    fireEvent.click(screen.getByTestId("birthday-sticker-claim"));
+  });
+  expect(screen.getByTestId("birthday-sticker")).toBeTruthy();
+  await act(async () => {
+    vi.advanceTimersByTime(CARD_MS + 10);
+  });
+  expect(screen.queryByTestId("birthday-card")).toBeNull();
+});

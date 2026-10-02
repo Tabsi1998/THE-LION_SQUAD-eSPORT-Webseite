@@ -211,6 +211,8 @@ export function Toast({ season }) {
   const { reducedMotion } = useSeason();
   const moving = season.effective !== "subtle" && !reducedMotion;
   const [open, setOpen] = useState(false);
+  // Kann ein Mitglied seinen Sticker noch abholen, bleibt die Karte offen - bis zum Abholen oder Schließen.
+  const [waiting, setWaiting] = useState(false);
   const cakeRef = useRef(null);
   const years = yearsOf(season);
   const plan = useMemo(() => cakePlan(years, yearOf(season)), [years, season]);
@@ -225,10 +227,10 @@ export function Toast({ season }) {
     return () => window.clearTimeout(show);
   }, []);
   useEffect(() => {
-    if (!open) return undefined;
+    if (!open || waiting) return undefined;
     const hide = window.setTimeout(() => setOpen(false), CARD_MS);
     return () => window.clearTimeout(hide);
-  }, [open]);
+  }, [open, waiting]);
   const celebrate = () => {
     // Alle Kerzen brennen: Konfetti aus der Torte, links und rechts.
     const box = cakeRef.current?.getBoundingClientRect();
@@ -246,7 +248,7 @@ export function Toast({ season }) {
         <div className="tls-birthday-card__eyebrow">Vereinsgeburtstag</div>
         <div className="tls-birthday-card__years">{years ? `${years} ${years === 1 ? "Jahr" : "Jahre"}` : "Geburtstag"}</div>
         <p className="tls-birthday-card__text">{cardText(greeting, years)}</p>
-        <StickerClaim />
+        <StickerClaim onWaiting={setWaiting} />
       </div>
       <button type="button" className="tls-birthday-card__close" onClick={() => setOpen(false)} aria-label="Gruß schließen">×</button>
     </div>

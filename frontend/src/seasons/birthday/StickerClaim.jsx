@@ -17,11 +17,16 @@ function previewConfig() {
   return preview ? { params: { preview } } : undefined;
 }
 
-export function StickerClaim({ className = "", testId = "birthday-sticker" }) {
+/** `onWaiting(true)`, solange ein Mitglied seinen Sticker noch abholen kann - die Karte bleibt dann offen. */
+export function StickerClaim({ className = "", testId = "birthday-sticker", onWaiting = null }) {
   const { user } = useAuth();
   const [state, setState] = useState(null);
   const [busy, setBusy] = useState(false);
   const [fresh, setFresh] = useState(false);
+  const waiting = Boolean(state?.active && state.member && !state.claimed);
+  useEffect(() => {
+    onWaiting?.(waiting);
+  }, [waiting, onWaiting]);
   useEffect(() => {
     if (!user?.id) {
       setState(null);

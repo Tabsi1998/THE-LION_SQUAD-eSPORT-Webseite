@@ -176,3 +176,24 @@ test("die Wimpelkette: über die Breite der Karte, Vereinsfarben, je Jahr etwas 
   });
   expect(screen.getAllByTestId("birthday-pennant")).toHaveLength(list.length);
 });
+
+test("ein Mitglied mit offenem Sticker: die Karte bleibt, bis er abgeholt ist - dann geht sie nach der üblichen Zeit", async () => {
+  const { CARD_MS } = require("./index");
+  mockAuth.user = { id: "u5", is_club_member: true };
+  mockApi.get.mockResolvedValue({ data: { active: true, member: true, claimed: false, sticker: null } });
+  mockApi.post.mockResolvedValue({ data: { new: true, sticker: { url: "/api/stickers/files/fluent/candle.png", name: "Kerze", pack_name: "Zum Vereinsgeburtstag" } } });
+  await render(<BirthdayGreeting season={birthday({ effective: "subtle" })} screen="Dashboard" />);
+  await flush();
+  await advance(CARD_DELAY_MS);
+  await flush();
+  expect(screen.getByTestId("birthday-sticker-claim")).toBeTruthy();
+  await advance(CARD_MS + 5000);
+  expect(screen.getByTestId("birthday-card")).toBeTruthy();
+  await act(async () => {
+    fireEvent.press(screen.getByTestId("birthday-sticker-claim"));
+  });
+  await flush();
+  expect(screen.getByTestId("birthday-sticker")).toBeTruthy();
+  await advance(CARD_MS + 10);
+  expect(screen.queryByTestId("birthday-card")).toBeNull();
+});
