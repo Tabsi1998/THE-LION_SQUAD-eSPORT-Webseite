@@ -55,6 +55,11 @@ async def active_seasons(request: Request, response: Response, preview: str | No
     conditions = weather.current(cache, location)
     payload = await with_calendar(db, seasons.active(None, stored, founded, night=conditions["night"]))
     payload["weather"] = conditions
+    # Silvester um Mitternacht (#741): Countdown und Show rechnen mit `now` - eine Minute alter Zwischenspeicher wäre
+    # dann eine Minute falsch. In diesen Phasen kein Cache und kein ETag.
+    if any(season["key"] == "new_year" and season["phase"] in seasons.NEW_YEAR_LIVE_PHASES for season in payload["seasons"]):
+        response.headers["Cache-Control"] = "no-store"
+        return payload
     # Die Sekunde in „now“ würde jeden ETag brechen; für den Vergleich zählt nur, was gezeigt wird.
     etag = seasons.etag_for({k: v for k, v in payload.items() if k != "now"})
     response.headers["ETag"] = etag

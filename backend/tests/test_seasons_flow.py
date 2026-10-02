@@ -227,6 +227,24 @@ async def test_oeffentliche_abfrage_ohne_anmeldung_gecacht(flow):
 
 
 @pytest.mark.asyncio
+async def test_um_mitternacht_zu_silvester_kein_zwischenspeicher(flow, monkeypatch):
+    """Countdown und Show rechnen mit `now` (#741): von 23:45 bis 00:44 wird die Abfrage nicht gecacht und hat keinen
+    ETag - eine Minute alter Zwischenspeicher wäre eine Minute falscher Countdown. Davor und danach wie immer."""
+    real = seasons.to_vienna
+    flow.act_as(None)
+    for moment, live in ((at(2026, 12, 31, 20, 0), False), (at(2026, 12, 31, 23, 50), True), (at(2026, 12, 31, 23, 59, 30), True),
+                         (at(2027, 1, 1, 0, 5), True), (at(2027, 1, 1, 0, 40), True), (at(2027, 1, 1, 10, 0), False)):
+        monkeypatch.setattr(seasons, "to_vienna", lambda now=None, moment=moment: real(now if now is not None else moment))
+        res = await flow.get("/api/seasonal/active")
+        assert res.status_code == 200
+        assert any(season["key"] == "new_year" for season in res.json()["seasons"]), moment
+        if live:
+            assert res.headers["cache-control"] == "no-store" and not res.headers.get("etag"), moment
+        else:
+            assert res.headers["cache-control"] == "public, max-age=60" and res.headers.get("etag"), moment
+
+
+@pytest.mark.asyncio
 async def test_admin_schaltet_und_protokolliert(flow):
     admin = await flow.add_user(role="club_admin", name="Vorstand")
     flow.act_as(None)
