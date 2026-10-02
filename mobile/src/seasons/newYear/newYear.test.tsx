@@ -24,6 +24,7 @@ const { FireworksSky, NewYearGreeting, NewYearWidget, fireShare, planFor, resetN
 const { resetNewYearSound, NEW_YEAR_SOUND_KEY } = require("./sound");
 const { SEASON_MODULES, appNamesSeason } = require("../SeasonStage");
 const { resetQuiet, setOverlay } = require("../quiet");
+const { localDay } = require("../christmas/greeting");
 
 const SHOW_START = "2027-01-01T00:00:00+01:00";
 const MIDNIGHT = Date.parse(SHOW_START);
@@ -197,7 +198,9 @@ test("Countdown ab 23:59:00, die letzten zehn mit Schlag, um 00:00 die Null mit 
   expect(screen.queryByTestId("new-year-zero")).toBeNull();
   await advance(3000);
   expect(screen.queryByTestId("new-year-toast")).toBeNull();
-  expect(await SecureStore.getItemAsync("season_greeting_new-year-greeting")).toBe("2027-01-01");
+  // Der Tag des Geräts zur Mitternacht in Wien - in Wien der 1. Jänner, auf einem Gerät in UTC noch der 31.12.;
+  // Merker und Prüfung rechnen mit demselben Tag.
+  expect(await SecureStore.getItemAsync("season_greeting_new-year-greeting")).toBe(localDay(new Date(MIDNIGHT)));
 });
 
 test("am 1. Jänner: der Gruß einmal am Tag über der Tab-Leiste - nicht auf stillen Screens, nicht über einem Dialog", async () => {
