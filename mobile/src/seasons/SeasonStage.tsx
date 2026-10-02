@@ -8,6 +8,7 @@ import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
+import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
 import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
 import { SnowSky, SnowflakeWidget } from "./snow";
 import { WeatherSky } from "./weather";
@@ -49,6 +50,8 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop },
   // Nikolaus (X3 #736, S11 „Stiefel im Tab Mehr“): der Stiefel im Kopf von „Mehr“, das Tab-Symbol, der Hinweis.
   nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon },
+  // Silvester (S11 #642, wie #800 im Web): Feuerwerk mit Skia über allen Tabs, Hinweis im Kopf, Countdown und Gruß.
+  new_year: { Sky: FireworksSky, Widget: NewYearWidget, Greeting: NewYearGreeting },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

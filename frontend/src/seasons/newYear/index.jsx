@@ -179,7 +179,12 @@ export function Toast({ season }) {
   const still = season.effective === "subtle";
   const greeting = season.texts?.greeting || "Frohes neues Jahr wünscht THE LION SQUAD";
   const [toast, setToast] = useState(false);
-  const after = (state.stage === "done" || (state.stage === "waiting" && state.remaining < 0)) && ["show", "fade", "greeting"].includes(season.phase);
+  const after = state.stage === "done" && ["show", "fade", "greeting"].includes(season.phase);
+  // Wer um Mitternacht den großen Gruß gesehen hat, bekommt danach nicht noch die Karte (sie käme mit der nächsten
+  // Antwort des Servers, ein paar Sekunden später, doppelt).
+  useEffect(() => {
+    if (state.stage === "zero") markToastShown(GREETING_KEY);
+  }, [state.stage]);
   useEffect(() => {
     if (!after || toastShownToday(GREETING_KEY)) return undefined;
     const show = window.setTimeout(() => {

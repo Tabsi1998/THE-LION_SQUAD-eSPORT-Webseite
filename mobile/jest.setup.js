@@ -137,6 +137,7 @@ jest.mock("react-native-reanimated", () => {
       }, [callback]);
       return ref.current;
     },
+    runOnJS: (fn) => fn,
     withTiming: (toValue) => toValue,
     withSequence: (...steps) => steps[steps.length - 1],
     withDelay: (_ms, value) => value,
@@ -144,6 +145,30 @@ jest.mock("react-native-reanimated", () => {
     cancelAnimation: () => {},
     Easing: { linear: (t) => t, quad: (t) => t * t, inOut: (fn) => fn, out: (fn) => fn, in: (fn) => fn },
     __frameCallbacks: frameCallbacks,
+  };
+});
+
+// Skia (Silvester, #642): im Test gibt es keine Zeichenfläche. Die Attrappe nimmt Zeichenbefehle entgegen und zählt
+// sie (`__skiaDraws`), damit Tests sehen, dass gezeichnet wird.
+jest.mock("@shopify/react-native-skia", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const draws = { circles: 0 };
+  const canvas = { drawCircle: () => { draws.circles += 1; } };
+  const paint = () => ({ setColor() {}, setAlphaf() {}, setBlendMode() {}, setAntiAlias() {} });
+  return {
+    __esModule: true,
+    Canvas: ({ children, ...props }) => React.createElement(View, props, children),
+    Picture: () => null,
+    BlendMode: { Plus: 12 },
+    createPicture: () => ({ kind: "picture" }),
+    Skia: {
+      PictureRecorder: () => ({ beginRecording: () => canvas, finishRecordingAsPicture: () => ({ kind: "picture" }) }),
+      Paint: paint,
+      Color: (value) => value,
+      XYWHRect: (x, y, width, height) => ({ x, y, width, height }),
+    },
+    __skiaDraws: draws,
   };
 });
 

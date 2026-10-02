@@ -1,10 +1,34 @@
-import { mulberry32 } from "../rng";
+import { hashString, mulberry32 } from "../rng";
+import { handwriting, planHour, salvoLaunches } from "./choreography";
 import { COLORS, GRAVITY, SHELLS, SHELL_TYPES, SMOKE_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, distanceScale, launchDuration, rocketAt, smokeAt, soundDelay, starAt, starLight, trailRate, windDrift } from "./fireworks";
 
 // Feuerwerksrechnung (N1, #739): jede Art eigen, Bahnen geschlossen gerechnet (Luftwiderstand, Schwerkraft, Wind),
 // Nachglühen, Rauch, Entfernung - und das Budget hält.
 
 const SIZE = { width: 1440, height: 900 };
+
+// Die App rechnet dasselbe Feuerwerk (mobile/src/seasons/newYear/fireworks.ts, #642) - dieselben Fingerabdrücke
+// stehen dort im Test: weicht eine Seite ab, wird die andere rot.
+const FIRE_PARITY = 2787607397;
+const CHOREO_PARITY = 681797588;
+const PARITY_LAUNCH = { id: "p", at: 0, type: "peony", x: 0.5, distance: 0.3, colors: ["blue", "gold"], burstY: 0.3, rise: 1.4, drift: 12 };
+
+test("Parität mit der App: dieselbe Feuerwerksrechnung und dieselbe Choreografie", () => {
+  const fire = hashString(JSON.stringify({
+    stars: SHELL_TYPES.map((type, i) => burstStars({ ...PARITY_LAUNCH, type }, mulberry32(1000 + i), 1, 1.1)),
+    path: [0, 0.4, 1.2, 2.5].map((age) => starAt({ vx: 120, vy: -80 }, age, SHELLS.willow, { x: 300, y: 200 }, 8, 0.4)),
+    light: [0, 0.3, 1.1, 1.9].map((age) => starLight({ life: 2, glitter: 1.1, crackleAt: null }, age)),
+    smoke: [0.5, 4, 8.9].map((age) => smokeAt({ x: 100, y: 200 }, age, 6, 0.3)),
+    rocket: [0, 0.7, 1.4].map((t) => rocketAt(PARITY_LAUNCH, t, { width: 1000, height: 800 }, 5)),
+  }));
+  expect(fire).toBe(FIRE_PARITY);
+  const choreo = hashString(JSON.stringify({
+    hands: [2026, 2027, 2031].map((year) => handwriting(year)),
+    plan: planHour(handwriting(2026), { hourSeed: 2026365023, salvos: [5, 90, 1800], phase: "evening_31", hourStart: 1767218400000 }),
+    salvos: [0, 1, 2].map((index) => salvoLaunches(handwriting(2027), index, 1767222000000)),
+  }));
+  expect(choreo).toBe(CHOREO_PARITY);
+});
 
 function launch(overrides = {}) {
   return { id: "t", at: 0, type: "peony", x: 0.5, distance: 0.2, colors: ["blue", "gold"], burstY: 0.25, rise: 1.4, drift: 10, ...overrides };
