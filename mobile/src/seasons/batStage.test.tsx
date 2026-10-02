@@ -9,7 +9,7 @@ import * as Haptics from "expo-haptics";
 
 jest.mock("expo-haptics", () => ({ impactAsync: jest.fn(async () => {}), ImpactFeedbackStyle: { Light: "light", Medium: "medium" } }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 0, left: 0, right: 0 }) }));
-jest.mock("@react-navigation/native", () => ({ NavigationRouteContext: require("react").createContext({ name: "Dashboard" }) }));
+jest.mock("@react-navigation/native", () => ({ NavigationRouteContext: require("react").createContext({ name: "Dashboard" }), NavigationContext: require("react").createContext(undefined) }));
 const mockSeasonState: Record<string, unknown> = { reducedMotion: false, showToast: jest.fn(), toast: null };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 
