@@ -375,11 +375,12 @@ test("Kleine Netze (H12): lebendige Seiten bis zu drei je Fensterhoehe, ruhige e
   expect(pageLayout("/", "subtle").cornerWebs.count).toBe(1);
 });
 
-test("Fusszeilen-Szene (H16): schmale Fenster und ruhige Seiten bekommen die kleine Fassung, stille Seiten nichts", () => {
+test("Fusszeilen-Szene (H16): schmale Fenster und ruhige Seiten bekommen die kleine Fassung, stille Seiten nichts; am Handy bleibt die Katze (02.10.)", () => {
   const full = PATHS.map((path) => pageLayout(path, "normal")).find((layout) => layout.cat && layout.graves.length > 2 && layout.footerPumpkins.length === 2);
   expect(full).toBeTruthy();
   const phone = pageLayout("/", "normal", "feinschliff", 390);
-  expect(phone.cat).toBeNull();
+  // Am Handy dieselbe Katze wie am PC - ihren Platz auf dem Strich sucht sie sich dort selbst (catSpot.js).
+  expect(phone.cat).toEqual(pageLayout("/", "normal", "feinschliff").cat);
   expect(phone.graves.length).toBeLessThanOrEqual(2);
   expect(phone.footerPumpkins.length).toBe(1);
   expect(phone.caps.footerScene).toBe("small");
