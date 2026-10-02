@@ -22,6 +22,8 @@ type SeasonModule = {
   TabIcon?: React.ComponentType<{ size: number }>;
   /** Nur Himmel (das Wetter): keine eigene Deko, deshalb nicht unter „Gerade läuft“ genannt. */
   skyOnly?: boolean;
+  /** Steht das Widget bei mehreren oben (die Schneeflocke schwebt über dem Kranz)? */
+  widgetOnTop?: boolean;
 };
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
@@ -29,7 +31,7 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
   advent: { Widget: AdventWidget },
   // Schnee (S7, #642): Flocken in drei Tiefen mit Wind und Böen aus dem Wetter, die Schneeflocke zum Fangen im Kopf.
-  snow: { Sky: SnowSky, Widget: SnowflakeWidget },
+  snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true },
   // Wetter das ganze Jahr (#771): Regen, leichter Schnee, Wetterleuchten - wie im Web; in der Schnee-Saison schneit es.
   weather: { Sky: WeatherSky, skyOnly: true },
 };
@@ -92,9 +94,12 @@ export function SeasonWidgetSlot() {
   const mounted = useMountedSeasons().filter(({ module }) => module.Widget);
   const screen = useCurrentScreen();
   if (!mounted.length) return null;
+  // Mehrere Widgets stehen übereinander: nebeneinander nahmen Kranz und Schneeflocke dem Namen den Platz (er
+  // brach mitten im Wort um). So ist die Spalte nur so breit wie das breiteste Widget.
+  const ordered = [...mounted].sort((a, b) => Number(Boolean(b.module.widgetOnTop)) - Number(Boolean(a.module.widgetOnTop)));
   return (
-    <View style={styles.widgetSlot} testID="season-widget-slot">
-      {mounted.map(({ season, module }) => {
+    <View style={[styles.widgetSlot, ordered.length > 1 && styles.widgetStack]} testID="season-widget-slot">
+      {ordered.map(({ season, module }) => {
         const Widget = module.Widget as React.ComponentType<{ season: ActiveSeason; screen: string }>;
         return <Widget key={season.key} season={season} screen={screen} />;
       })}
@@ -111,6 +116,7 @@ export function useSeasonTabIcon(): React.ComponentType<{ size: number }> | null
 const styles = StyleSheet.create({
   corners: { position: "absolute", left: 0, right: 0, bottom: 0 },
   widgetSlot: { flexDirection: "row", alignItems: "center" },
+  widgetStack: { flexDirection: "column", gap: 2 },
   toast: { position: "absolute", alignSelf: "center", left: 24, right: 24, backgroundColor: "rgba(12, 10, 16, 0.94)", borderColor: "rgba(255, 179, 102, 0.55)", borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 12, elevation: 6 },
   toastText: { color: "#FFB366", textAlign: "center", fontWeight: "700", fontSize: 15 },
 });
