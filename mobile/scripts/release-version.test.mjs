@@ -10,6 +10,7 @@ import releaseVersion from "./release-version.cjs";
 // sich nicht über die installierte App aktualisieren lässt.
 
 const {
+  APK_ARCHITECTURES,
   EXPECTED_SIGNER_SHA256,
   PREVIOUS_SIGNER_SHA256,
   aabName,
@@ -19,6 +20,8 @@ const {
   releaseChannel,
   releaseName,
   releaseNotes,
+  SERVER_UPLOAD_LIMIT_BYTES,
+  gradleTasks,
   releaseTag,
   signerDigest,
   signerName,
@@ -139,6 +142,17 @@ test("expo-audio ohne Mikrofon und ohne Wiedergabe im Hintergrund", async () => 
   assert.ok(Array.isArray(entry), "expo-audio braucht seine Optionen - ohne sie kommen Mikrofon und Hintergrund-Dienst hinein");
   assert.deepEqual(entry[1], { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: false, enableBackgroundRecording: false });
   assert.ok(!app.expo.android.permissions.some((permission) => /RECORD_AUDIO|FOREGROUND_SERVICE/.test(permission)));
+});
+
+// Build 83: die APK mit allen vier Prozessor-Arten war 105 MB groß, Cloudflare vor dem Vereinsserver nimmt
+// höchstens 100 MB je Anfrage (HTTP 413). Ohne die beiden Emulator-Arten waren es 59 MB.
+test("die APK nur für ARM-Handys, das App-Bundle für Google Play mit allen Arten", () => {
+  assert.deepEqual([...APK_ARCHITECTURES], ["armeabi-v7a", "arm64-v8a"]);
+  const tasks = gradleTasks();
+  assert.deepEqual(tasks.apk, ["assembleRelease", "--no-daemon", "-PreactNativeArchitectures=armeabi-v7a,arm64-v8a"]);
+  assert.deepEqual(tasks.bundle, ["bundleRelease", "--no-daemon"]);
+  assert.ok(!tasks.bundle.some((arg) => arg.startsWith("-PreactNativeArchitectures")));
+  assert.equal(SERVER_UPLOAD_LIMIT_BYTES, 100 * 1024 * 1024);
 });
 
 test("der Preflight besteht für den Stand im Repo und lehnt einen falschen Tag ab", () => {

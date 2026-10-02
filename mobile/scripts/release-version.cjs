@@ -143,13 +143,34 @@ function releaseNotes({ version, versionCode, apk, sha256, signatureText, change
   ].join("\n");
 }
 
+/**
+ * Die APK (Handys ohne Google Play, Ablage am Vereinsserver) nur für echte Handys: ARM in 64 und 32 Bit. x86 und
+ * x86_64 laufen nur in Emulatoren und machten die APK 105 statt 59 MB groß - zu groß für Cloudflare vor dem
+ * Vereinsserver, das je Anfrage höchstens 100 MB annimmt (Build 81 bis 83 kamen mit HTTP 413 nicht an). Das
+ * App-Bundle für Google Play behält alle Arten; Google liefert jedem Gerät nur seine eigene aus.
+ */
+const APK_ARCHITECTURES = Object.freeze(["armeabi-v7a", "arm64-v8a"]);
+/** So viel nimmt der Server je Upload an (Cloudflare, Free- und Pro-Tarif). */
+const SERVER_UPLOAD_LIMIT_BYTES = 100 * 1024 * 1024;
+
+/** Die Gradle-Aufrufe des Releases: APK nur für ARM, das App-Bundle mit allen Arten. */
+function gradleTasks() {
+  return {
+    apk: ["assembleRelease", "--no-daemon", `-PreactNativeArchitectures=${APK_ARCHITECTURES.join(",")}`],
+    bundle: ["bundleRelease", "--no-daemon"],
+  };
+}
+
 module.exports = {
+  APK_ARCHITECTURES,
   EXPECTED_SIGNER_SHA256,
   PREVIOUS_SIGNER_SHA256,
   TAG_PREFIX,
+  SERVER_UPLOAD_LIMIT_BYTES,
   aabName,
   apkName,
   changelogSection,
+  gradleTasks,
   highestBuild,
   parseVersion,
   releaseChannel,
