@@ -291,9 +291,10 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
         {lines.map((line, index) => (builtThreads.has(index) ? (
           <Line key={index} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={line.kind === "spiral" ? THREAD_SOFT : THREAD} strokeWidth={line.kind === "spiral" ? 0.65 : 0.9} strokeLinecap="round" />
         ) : null))}
-        {done ? plan.dew.map((id) => {
+        {/* Die Tropfen werden mit Zurücklegen gezogen - derselbe Knoten kann zweimal kommen, wie im Web. */}
+        {done ? plan.dew.map((id, n) => {
           const point = toPixels(plan.nodes[id], radius, mirror);
-          return <Circle key={id} cx={point.x} cy={point.y} r={1.3} fill="rgba(225,246,255,0.85)" />;
+          return <Circle key={`${id}-${n}`} cx={point.x} cy={point.y} r={1.3} fill="rgba(225,246,255,0.85)" />;
         }) : null}
       </Svg>
       {done ? (

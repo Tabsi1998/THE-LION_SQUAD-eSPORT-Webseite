@@ -43,3 +43,28 @@ test("Bewegung reduzieren: die Katze sitzt still, und Antippen zählt nicht", as
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
   expect(mockSignals.recordSignal).not.toHaveBeenCalled();
 });
+
+test("Schwanz wedelt an der Wurzel, Augen blinzeln an Ort und Stelle - als eigene Ebenen mit nativem Treiber", async () => {
+  const { Animated, StyleSheet } = require("react-native");
+  const { CAT_VIEW, EYES_CENTER, EYES_HALF, TAIL_HALF, TAIL_ROOT, pivotBox } = require("./atmosphere");
+  expect(CAT_VIEW).toEqual({ width: 90, height: 81 });
+  // Der Kasten jeder bewegten Ebene liegt mittig auf ihrem Drehpunkt - Android dreht und skaliert um die Mitte.
+  const scale = 56 / 90;
+  const timing = jest.spyOn(Animated, "timing");
+  await render(<CatOnEdge bottom={60} width={390} moving />);
+  const tail = StyleSheet.flatten(screen.getByTestId("halloween-cat-tail").props.style);
+  const eyes = StyleSheet.flatten(screen.getByTestId("halloween-cat-eyes").props.style);
+  for (const [layer, pivot, half] of [[tail, TAIL_ROOT, TAIL_HALF], [eyes, EYES_CENTER, EYES_HALF]]) {
+    expect(layer.left + layer.width / 2).toBeCloseTo(pivot.x * scale, 6);
+    expect(layer.top + layer.height / 2).toBeCloseTo(pivot.y * scale, 6);
+    expect(layer.transformOrigin).toBeUndefined();
+    expect(pivotBox(pivot, half, scale).viewBox).toBe(`${pivot.x - half.x} ${pivot.y - half.y} ${half.x * 2} ${half.y * 2}`);
+  }
+  expect(Object.keys(tail.transform[0])).toEqual(["rotate"]);
+  expect(Object.keys(eyes.transform[0])).toEqual(["scaleY"]);
+  // Schwanz und Blinzeln laufen über den nativen Treiber - kein JavaScript je Bild.
+  const configs = timing.mock.calls.map(([, config]) => config as { toValue: number; useNativeDriver: boolean });
+  expect(configs.length).toBeGreaterThanOrEqual(4);
+  expect(configs.every((config) => config.useNativeDriver)).toBe(true);
+  timing.mockRestore();
+});

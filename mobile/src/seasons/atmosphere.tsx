@@ -46,36 +46,82 @@ export function Fog({ level, width, height, bottom }: { level: "none" | "far" | 
   );
 }
 
-/** Die sitzende Katze von der Seite (wie art.jsx im Web): Ohren, Rücken, aufgerollter Schwanz, Augen im Türkis der Saison. */
-export function CatShape({ size = 56, tailRotate, eyesScale, pupilX }: { size?: number; tailRotate?: Animated.AnimatedInterpolation<number>; eyesScale?: Animated.AnimatedInterpolation<string>; pupilX?: number }) {
+/** Die Zeichenfläche der Katze und die beiden Drehpunkte: Wurzel des Schwanzes, Mitte zwischen den Augen. */
+export const CAT_VIEW = { width: 90, height: 81 };
+export const TAIL_ROOT = { x: 60, y: 76 };
+export const EYES_CENTER = { x: 34, y: 30 };
+/** Halbe Kastengröße um den Drehpunkt (Einheiten): groß genug, dass beim Wedeln nichts abgeschnitten wird. */
+export const TAIL_HALF = { x: 48, y: 48 };
+export const EYES_HALF = { x: 10, y: 4 };
+
+type Point = { x: number; y: number };
+type Turn = Animated.AnimatedInterpolation<string> | string;
+type Squash = Animated.Value | Animated.AnimatedInterpolation<number> | number;
+
+/** Wo der Kasten einer bewegten Ebene liegt (dp): seine Mitte genau auf dem Drehpunkt. */
+export function pivotBox(pivot: Point, half: Point, scale: number): { left: number; top: number; width: number; height: number; viewBox: string } {
+  return {
+    left: (pivot.x - half.x) * scale,
+    top: (pivot.y - half.y) * scale,
+    width: half.x * 2 * scale,
+    height: half.y * 2 * scale,
+    viewBox: `${pivot.x - half.x} ${pivot.y - half.y} ${half.x * 2} ${half.y * 2}`,
+  };
+}
+
+/**
+ * Eine bewegte Ebene, deren Kasten mittig auf dem Drehpunkt sitzt: Android dreht und skaliert eine Ansicht um ihre
+ * Mitte. Ein `transformOrigin` mit Prozenten war in der Sichtprobe nicht verlässlich (der Schwanz verschwand).
+ */
+function PivotLayer({ pivot, half, scale, rotate, scaleY, testID, children }: { pivot: Point; half: Point; scale: number; rotate?: Turn; scaleY?: Squash; testID?: string; children: React.ReactNode }) {
+  const box = pivotBox(pivot, half, scale);
+  const transform = rotate !== undefined ? [{ rotate }] : [{ scaleY: scaleY ?? 1 }];
+  return (
+    <Animated.View pointerEvents="none" style={[styles.layer, { left: box.left, top: box.top, width: box.width, height: box.height, transform }]} testID={testID}>
+      <Svg width={box.width} height={box.height} viewBox={box.viewBox}>{children}</Svg>
+    </Animated.View>
+  );
+}
+
+/**
+ * Die sitzende Katze von der Seite (wie art.jsx im Web): Ohren, Rücken, aufgerollter Schwanz, Augen im Türkis der
+ * Saison. Schwanz und Augen liegen als eigene Ebenen über bzw. unter dem Körper und bewegen sich mit dem nativen
+ * Treiber: so wedelt der Schwanz an seiner Wurzel und die Augen blinzeln an Ort und Stelle. Drehung und Skalierung
+ * direkt an SVG-Gruppen wirken auf Android um die Ecke der Zeichnung (react-native-svg setzt sie über die Matrix der
+ * Android-Ansicht) - der Schwanz wanderte dann am Körper auf und ab, die Augen sprangen beim Blinzeln über den Kopf.
+ */
+export function CatShape({ size = 56, tailRotate, eyesScale, pupilX }: { size?: number; tailRotate?: Turn; eyesScale?: Squash; pupilX?: number }) {
   const body = "M18 78 C 9 66, 12 48, 28 42 C 36 38, 50 38, 58 44 C 71 52, 71 68, 63 78 Z";
   const tail = "M60 76 C 79 74, 87 58, 75 46 C 70 42, 63 44, 65 50";
   const width = size;
   const height = size * 0.9;
-  const AnimatedG = Animated.createAnimatedComponent(G);
+  const viewBox = `0 0 ${CAT_VIEW.width} ${CAT_VIEW.height}`;
+  const scale = width / CAT_VIEW.width;
   return (
-    <Svg width={width} height={height} viewBox="0 0 90 81">
-      <AnimatedG rotation={tailRotate} origin="60, 76">
+    <View style={{ width, height }}>
+      <PivotLayer pivot={TAIL_ROOT} half={TAIL_HALF} scale={scale} rotate={tailRotate ?? "0deg"} testID="halloween-cat-tail">
         <Path d={tail} stroke={RIM} strokeWidth={7.6} fill="none" strokeLinecap="round" />
         <Path d={tail} stroke={INK} strokeWidth={6} fill="none" strokeLinecap="round" />
-      </AnimatedG>
-      <Path d={body} fill={RIM} transform="translate(0.6 -0.9)" />
-      <Path d={body} fill={INK} />
-      <G>
-        <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={RIM} transform="translate(0 -1)" />
-        <Circle cx={34} cy={30} r={13.8} fill={RIM} />
-        <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={INK} />
-        <Circle cx={34} cy={30} r={13} fill={INK} />
-        <Path d="M23 18 L21 9 L28 15 Z M45 18 L47 9 L40 15 Z" fill="rgba(170, 225, 240, 0.12)" />
-        <AnimatedG scale={eyesScale} origin="34, 30">
-          <Ellipse cx={28} cy={30} rx={3.2} ry={2.6} fill="#9be7ff" />
-          <Ellipse cx={40} cy={30} rx={3.2} ry={2.6} fill="#9be7ff" />
-          <Ellipse cx={28 + (pupilX || 0)} cy={30} rx={1} ry={2.3} fill={INK} />
-          <Ellipse cx={40 + (pupilX || 0)} cy={30} rx={1} ry={2.3} fill={INK} />
-        </AnimatedG>
-        <Path d="M12 33 l13 1 M12 37 l13 -1 M56 33 l-13 1 M56 37 l-13 -1" stroke="rgba(170, 225, 240, 0.3)" strokeWidth={0.7} />
-      </G>
-    </Svg>
+      </PivotLayer>
+      <Svg width={width} height={height} viewBox={viewBox} style={styles.layer}>
+        <Path d={body} fill={RIM} transform="translate(0.6 -0.9)" />
+        <Path d={body} fill={INK} />
+        <G>
+          <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={RIM} transform="translate(0 -1)" />
+          <Circle cx={34} cy={30} r={13.8} fill={RIM} />
+          <Path d="M24 21 L20 4 L33 16 Z M44 21 L48 4 L35 16 Z" fill={INK} />
+          <Circle cx={34} cy={30} r={13} fill={INK} />
+          <Path d="M23 18 L21 9 L28 15 Z M45 18 L47 9 L40 15 Z" fill="rgba(170, 225, 240, 0.12)" />
+          <Path d="M12 33 l13 1 M12 37 l13 -1 M56 33 l-13 1 M56 37 l-13 -1" stroke="rgba(170, 225, 240, 0.3)" strokeWidth={0.7} />
+        </G>
+      </Svg>
+      <PivotLayer pivot={EYES_CENTER} half={EYES_HALF} scale={scale} scaleY={eyesScale ?? 1} testID="halloween-cat-eyes">
+        <Ellipse cx={28} cy={30} rx={3.2} ry={2.6} fill="#9be7ff" />
+        <Ellipse cx={40} cy={30} rx={3.2} ry={2.6} fill="#9be7ff" />
+        <Ellipse cx={28 + (pupilX || 0)} cy={30} rx={1} ry={2.3} fill={INK} />
+        <Ellipse cx={40 + (pupilX || 0)} cy={30} rx={1} ry={2.3} fill={INK} />
+      </PivotLayer>
+    </View>
   );
 }
 
@@ -97,13 +143,13 @@ export function CatOnEdge({ size = 56, bottom, width, moving, testID = "hallowee
   useEffect(() => {
     if (!moving) return undefined;
     const tailLoop = Animated.loop(Animated.sequence([
-      Animated.timing(tail, { toValue: 1, duration: 2250, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      Animated.timing(tail, { toValue: 0, duration: 2250, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      Animated.timing(tail, { toValue: 1, duration: 2250, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(tail, { toValue: 0, duration: 2250, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
     ]));
     const blinkLoop = Animated.loop(Animated.sequence([
       Animated.delay(5600),
-      Animated.timing(blink, { toValue: 0.06, duration: 90, useNativeDriver: false }),
-      Animated.timing(blink, { toValue: 1, duration: 140, useNativeDriver: false }),
+      Animated.timing(blink, { toValue: 0.06, duration: 90, useNativeDriver: true }),
+      Animated.timing(blink, { toValue: 1, duration: 140, useNativeDriver: true }),
     ]));
     tailLoop.start();
     blinkLoop.start();
@@ -134,14 +180,13 @@ export function CatOnEdge({ size = 56, bottom, width, moving, testID = "hallowee
     walkTarget.current = target;
   };
   const walkTarget = useRef(0);
-  const tailRotate = tail.interpolate({ inputRange: [0, 1], outputRange: [0, -12] });
-  const eyesScale = blink.interpolate({ inputRange: [0.06, 1], outputRange: ["1, 0.06", "1, 1"] });
+  const tailRotate = tail.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "-12deg"] });
   const translateX = walk.interpolate({ inputRange: [0, 1], outputRange: [0, walking ? walkTarget.current - offset : 0] });
   const bob = walk.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -2, 0, -2, 0] });
   return (
     <Animated.View style={[styles.cat, { bottom, right: 18 + offset, transform: [{ translateX: Animated.multiply(translateX, -1) }, { translateY: bob }, { scaleX: facing === 1 ? -1 : 1 }] }]} testID={testID} data-walking={walking ? "1" : "0"}>
       <Pressable accessibilityRole="button" accessibilityLabel="Katze" onPress={onPress} hitSlop={6} testID="halloween-cat-press">
-        <CatShape size={size} tailRotate={tailRotate} eyesScale={eyesScale} />
+        <CatShape size={size} tailRotate={tailRotate} eyesScale={blink} />
       </Pressable>
     </Animated.View>
   );
@@ -150,4 +195,5 @@ export function CatOnEdge({ size = 56, bottom, width, moving, testID = "hallowee
 const styles = StyleSheet.create({
   fog: { position: "absolute", left: 0, right: 0, opacity: 0.9 },
   cat: { position: "absolute" },
+  layer: { position: "absolute", left: 0, top: 0 },
 });
