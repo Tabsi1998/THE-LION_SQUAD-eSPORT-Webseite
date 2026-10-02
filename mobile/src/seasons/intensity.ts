@@ -129,9 +129,13 @@ function halloweenKeys(fx: EffectClasses, { small = false }: { small?: boolean }
   };
 }
 
-/** Schnee (#642) wie `snowKeys` im Web: Anteil der Flocken aus der Atmosphäre - in der App ohne Hauben. */
+/**
+ * Schnee (#642) wie `snowKeys` im Web: Anteil der Flocken aus der Atmosphäre - in der App ohne Hauben. Winterhimmel
+ * (W4 #730) wo Atmosphäre erlaubt ist: Blauschein, Glühen und Sterne - am Handy wenige (wie im Web auf dem Handy).
+ */
 function snowKeys(fx: EffectClasses): Record<string, unknown> {
-  return { flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6 };
+  const sky = fx.ambient !== "none";
+  return { flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6, sky, stars: !sky ? 0 : fx.ambient === "near" ? 10 : 6 };
 }
 
 /** Weihnachten (#642) wie `christmasKeys` im Web: Kette außer auf stillen Screens, Lichtinseln mit der Atmosphäre - ohne Fußzeile. */

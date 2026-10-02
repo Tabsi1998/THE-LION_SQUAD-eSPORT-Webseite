@@ -11,6 +11,7 @@ import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./hal
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
 import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
 import { SnowSky, SnowflakeWidget } from "./snow";
+import { WinterSkyBackdrop } from "./snow/WinterSky";
 import { WeatherSky } from "./weather";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
 
@@ -42,8 +43,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
   // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
   advent: { Widget: AdventWidget },
-  // Schnee (S7, #642): Flocken in drei Tiefen mit Wind und Böen aus dem Wetter, die Schneeflocke zum Fangen im Kopf.
-  snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true },
+  // Schnee (S7, #642): Flocken in drei Tiefen mit Wind und Böen aus dem Wetter, die Schneeflocke zum Fangen im Kopf;
+  // dahinter der Winterhimmel (W4 #730): Blauschein, Glühen und Sterne nach Sonnenzeiten und Wetter.
+  snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true, Backdrop: WinterSkyBackdrop },
   // Wetter das ganze Jahr (#771): Regen, leichter Schnee, Wetterleuchten - wie im Web; in der Schnee-Saison schneit es.
   weather: { Sky: WeatherSky, skyOnly: true },
   // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag.

@@ -8,6 +8,16 @@
 .tls-season-widget-slot { display: inline-flex; align-items: center; margin-left: 0.25rem; }
 .tls-season-footer-slot { position: relative; height: 0; }
 
+/* Der Mond der Saisons (#681; MoonArt.jsx, MoonInSky.jsx): echte Phase und echter Stand am Himmel über dem
+   Vereinsort - der Halter steht dort, wo der Mond gerade ist, und wandert jede Minute weiter (weicher Übergang, beim
+   ersten Bild ohne). Als Schein (mix-blend-mode: screen), nie klickbar; nahe dem Horizont größer und wärmer, dazu die
+   leichte Parallaxe beim Scrollen. Halloween stellt ihn über die Seite, der Winterhimmel (W4 #730) hinter den Inhalt.
+   Tailwinds „svg { max-width: 100% }“ ließe das SVG im 0 px breiten Halter verschwinden. */
+.tls-moon-sky { position: fixed; left: 50vw; top: 20vh; width: 0; height: 0; z-index: 5; pointer-events: none; }
+.tls-moon-sky svg { max-width: none; }
+.tls-moon-sky--settled { transition: left 60s linear, top 60s linear; }
+.tls-moon { position: absolute; left: 0; top: 0; pointer-events: none; opacity: 0.82; mix-blend-mode: screen; transform: translate(-50%, -50%) translateY(calc(var(--season-scroll, 0px) * -0.08)) scale(var(--moon-scale, 1)); filter: sepia(calc(var(--moon-warmth, 0) * 0.55)) saturate(calc(1 + var(--moon-warmth, 0) * 0.4)); transition: transform 0.6s ease-out; }
+
 /* Farbschein auf den Hauptknöpfen bei „normal“ und „voll“ - der Knopf bleibt, nur der Schein kommt dazu. */
 html[style*="--season-accent"] .bg-\[\#29B6E8\] { box-shadow: 0 0 18px var(--season-accent); }
 

@@ -1,8 +1,6 @@
 // Halloween-Kunst (#655, #658, #660–#664): alles SVG, Silber-Türkis zum Blau der Seite, nichts Grelles. Das Netz
-// selbst lebt in web.js (Canvas mit Physik) - hier: die Spinne als Silhouette, Kürbisse und Laterne, der Mond mit
-// echter Phase, eine Katze, kleine Grabsteine für den Fußzeilen-Strich, ein Geist als Schwade, Fledermäuse zum
+// selbst lebt in web.js (Canvas mit Physik) - hier: die Spinne als Silhouette, Kürbisse und Laterne, eine Katze, kleine Grabsteine für den Fußzeilen-Strich, ein Geist als Schwade, Fledermäuse zum
 // Hängen und Fliegen. Ein Hauch heller Rand macht Silhouetten auf Dunkel lesbar - ohne Filter.
-import { illumination, litPath, moonPhase } from "./moon";
 
 export const THREAD = "rgba(170, 225, 240, 0.72)";
 export const THREAD_SOFT = "rgba(170, 225, 240, 0.42)";
@@ -105,33 +103,6 @@ export const RIM = "rgba(170, 225, 240, 0.26)";
 /** Feiner Mondlicht-Saum für Figuren auf dunklem Grund (Fledermäuse an dunklen Kanten). */
 export const RIM_EDGE = "rgba(170, 225, 240, 0.55)";
 export const INK = "#0b0a0f";
-
-/** Der Mond: echte Phase des Tages, warmweiß statt grau, feine Krater, dünner Schein - nichts Rechteckiges. */
-export function Moon({ className = "", style, phase = moonPhase() }) {
-  const lit = illumination(phase);
-  return (
-    <svg className={`tls-moon ${className}`} style={style} width="120" height="120" viewBox="0 0 120 120" aria-hidden="true" data-phase={phase.toFixed(2)}>
-      <defs>
-        <radialGradient id="tls-moon-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stopColor={`rgba(200, 235, 245, ${(0.05 + lit * 0.11).toFixed(2)})`} />
-          <stop offset="0.55" stopColor={`rgba(200, 235, 245, ${(0.02 + lit * 0.04).toFixed(2)})`} />
-          <stop offset="1" stopColor="rgba(200, 235, 245, 0)" />
-        </radialGradient>
-        <clipPath id="tls-moon-disc"><circle cx="60" cy="60" r="30" /></clipPath>
-      </defs>
-      <circle cx="60" cy="60" r="58" fill="url(#tls-moon-glow)" />
-      <circle cx="60" cy="60" r="30" fill="rgba(241, 238, 230, 0.08)" />
-      <path d={litPath(phase, 60, 60, 30)} fill="#f1eee6" opacity="0.92" />
-      <g clipPath="url(#tls-moon-disc)" opacity="0.07">
-        <circle cx="50" cy="50" r="6" fill="#1a2028" />
-        <circle cx="69" cy="64" r="8" fill="#1a2028" />
-        <circle cx="56" cy="74" r="4" fill="#1a2028" />
-        <circle cx="72" cy="46" r="3" fill="#1a2028" />
-      </g>
-      <circle cx="60" cy="60" r="30" fill="none" stroke="rgba(170, 225, 240, 0.2)" strokeWidth="0.8" />
-    </svg>
-  );
-}
 
 /** Eine sitzende Katze von der Seite: Ohren, Rücken, aufgerollter Schwanz (wedelt), Augen blinzeln, der Kopf folgt dem Zeiger ein wenig. */
 export function Cat({ className = "", style, size = 68 }) {

@@ -51,9 +51,12 @@ body {
   margin: 0;
   font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: var(--tls-black);
   color: var(--tls-white);
 }
+
+/* Das Schwarz malt nur <html>: Body und #root bleiben durchsichtig, damit der Winterhimmel (W4 #730) wirklich
+   HINTER dem Inhalt liegen kann (z-index -1). Ohne Himmel sieht alles gleich aus. */
+body, #root { background: transparent; }
 
 *, *::before, *::after { box-sizing: border-box; }
 

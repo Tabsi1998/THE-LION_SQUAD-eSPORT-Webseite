@@ -145,3 +145,66 @@ test.describe("Schnee: die Flocken gehören zur Seite", () => {
     expect(result.best.hits).toBeGreaterThan(result.zero * 1.4);
   });
 });
+
+test.describe("Schnee: Winterhimmel (W4 #730)", () => {
+  const WEATHER = { location: "Innsbruck", night: true, sunrise: "2026-12-22T07:53:00+01:00", sunset: "2026-12-22T16:23:00+01:00", temp_c: -4, wind_kmh: 8, wind_dir: 270, wind_factor: 0.6, rain_mm: 0, snow_cm: 0, code: 0, stale: false, source: "open-meteo" };
+
+  async function openAt(page, time, path, weather = {}) {
+    await page.clock.setFixedTime(new Date(time));
+    await mockSeason(page, { ...activePayload({ season: snow({ intensity: "normal", data: { night: true, snowcap_stage: 2 } }), now: time }), weather: { ...WEATHER, ...weather } });
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(4500);
+  }
+
+  function skyState() {
+    const sky = document.querySelector("[data-testid='winter-sky']");
+    const free = [...document.querySelectorAll("[data-testid='winter-stars'] circle")].filter((circle) => circle.getAttribute("data-free") === "1");
+    const blockers = "p, h1, h2, h3, h4, h5, h6, li, a, button, label, span, img, svg, input, video";
+    const starsOnContent = free.filter((circle) => {
+      const box = circle.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return Boolean(hit && hit.closest(blockers));
+    }).length;
+    const moon = document.querySelector("[data-testid='winter-moon']");
+    let moonOnContent = 0;
+    if (moon && moon.getAttribute("data-free") === "1") {
+      const disc = moon.querySelector("svg").getBoundingClientRect();
+      const cx = disc.left + disc.width / 2;
+      const cy = disc.top + disc.height / 2;
+      for (const [dx, dy] of [[0, 0], [20, 0], [-20, 0], [0, 20], [0, -20]]) {
+        const hit = document.elementFromPoint(cx + dx, cy + dy);
+        if (hit && hit.closest(blockers)) moonOnContent += 1;
+      }
+    }
+    return { z: sky ? getComputedStyle(sky).zIndex : null, night: sky?.getAttribute("data-night"), free: free.length, starsOnContent, moon: moon ? moon.getAttribute("data-free") : null, moonOnContent, tone: document.querySelector("[data-testid='snow-cap']")?.getAttribute("data-tone") || null };
+  }
+
+  test("nachts hinter dem Inhalt: Sterne und Mond nur an freien Stellen, Hauben kühl; tags nichts, Hauben weiß", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "PC-Probe");
+    for (const path of ["/", "/news", "/events"]) {
+      await openAt(page, "2026-12-22T21:00:00+01:00", path);
+      const night = await page.evaluate(skyState);
+      expect(night.z, `Himmel hinter dem Inhalt (${path})`).toBe("-1");
+      expect(night.night).toBe("1");
+      expect(night.free, `Sterne an freien Stellen (${path})`).toBeGreaterThan(0);
+      expect(night.starsOnContent, `kein Stern über Inhalt (${path})`).toBe(0);
+      expect(night.moonOnContent, `der Mond nie hinter Inhalt sichtbar (${path})`).toBe(0);
+    }
+    await openAt(page, "2026-12-22T21:00:00+01:00", "/");
+    expect((await page.evaluate(skyState)).tone).toBe("#dde7ff");
+    await openAt(page, "2026-12-22T12:00:00+01:00", "/");
+    const day = await page.evaluate(skyState);
+    expect(day.free).toBe(0);
+    expect(day.tone).toBe("#ffffff");
+  });
+
+  test("bei Schneefall keine Sterne, der Mond nur blass", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "PC-Probe");
+    await openAt(page, "2026-12-22T21:00:00+01:00", "/", { code: 73, snow_cm: 0.6 });
+    const state = await page.evaluate(skyState);
+    expect(state.free).toBe(0);
+    expect(await page.evaluate(() => document.querySelectorAll("[data-testid='winter-stars']").length)).toBe(0);
+  });
+});
