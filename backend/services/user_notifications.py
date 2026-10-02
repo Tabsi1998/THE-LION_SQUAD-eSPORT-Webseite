@@ -24,6 +24,30 @@ NO_COOLDOWN_KINDS = {
     "team_chat_mention",
     "tournament_chat_mention",
 }
+# Erfolge II (#622): Erfolge, Level und Prestige schicken höchstens drei Pushes am Tag (Wien) - der Rest steht im
+# Postfach. Ein Paket ist schon eine Meldung (achievement_queue bündelt eine Minute).
+ACHIEVEMENT_PUSH_KINDS = ("achievement", "level", "prestige")
+ACHIEVEMENT_PUSH_DAILY_CAP = 3
+
+
+def vienna_day_start(now=None) -> str:
+    """Der Beginn des heutigen Tages in Wien, als UTC-Zeitstempel wie in ``created_at``."""
+    from datetime import timezone
+    from zoneinfo import ZoneInfo
+
+    local = (now or now_utc()).astimezone(ZoneInfo("Europe/Vienna"))
+    return local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
+
+
+async def achievement_push_capped(db, user_id: str, kind: str, now=None) -> bool:
+    """Hat diese Person heute schon drei Erfolgs-Pushes bekommen?"""
+    if kind not in ACHIEVEMENT_PUSH_KINDS:
+        return False
+    sent = await db.notifications.count_documents({
+        "user_id": user_id, "kind": {"$in": list(ACHIEVEMENT_PUSH_KINDS)},
+        "created_at": {"$gte": vienna_day_start(now)}, "push_sent_count": {"$gt": 0},
+    })
+    return sent >= ACHIEVEMENT_PUSH_DAILY_CAP
 
 
 async def build_public_url(path: str = "") -> str:
@@ -57,8 +81,10 @@ async def create_user_notification(
     )
     category = (meta or {}).get("category")
     in_app_allowed = (not user) or notification_allowed(user, kind, category)
-    push_channel_allowed = push_allowed(user, kind, category)
-    discord_channel_allowed = discord_allowed(user, kind, category)
+    # `in_app_only`: nur ins Postfach - etwa eine Rücknahme (#622), die niemand per Push erfahren soll.
+    in_app_only = bool((meta or {}).get("in_app_only"))
+    push_channel_allowed = push_allowed(user, kind, category) and not in_app_only
+    discord_channel_allowed = discord_allowed(user, kind, category) and not in_app_only
     if not in_app_allowed and not push_channel_allowed and not discord_channel_allowed:
         return None
     meta = meta or {}
@@ -108,6 +134,8 @@ async def create_user_notification(
         await publish_user_change([user_id], "notifications")
     try:
         push_sent_count = 0
+        if push_channel_allowed and await achievement_push_capped(db, user_id, kind):
+            push_channel_allowed = False
         if push_channel_allowed:
             from services.push_notifications import send_mobile_push_for_notification
             push_sent_count = await send_mobile_push_for_notification(doc)

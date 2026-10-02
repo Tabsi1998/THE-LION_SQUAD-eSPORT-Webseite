@@ -26,8 +26,10 @@ KINDS = {
     "ranking": {"label": "Rangliste", "hint": "Die Jahreswertung der laufenden Saison: Top 10 mit Punkten und Link."},
     "events": {"label": "Nächste Events", "hint": "Die nächsten fünf Events und Turniere mit Wiener Zeit und Stand der Anmeldung."},
     "live": {"label": "Live jetzt", "hint": "Wer aus dem Verein gerade streamt, mit Link – leer heißt „gerade streamt niemand“."},
+    # Erfolge II (#622): einmal je Woche neu, nur Personen mit öffentlichem Profil und öffentlichen Erfolgen.
+    "achievement_week": {"label": "Erfolg der Woche", "hint": "Die seltenste Freischaltung der letzten Woche – mit Person (nur öffentliche Profile), Material und Seltenheit."},
 }
-COLORS = {"ranking": 0xFFD700, "events": 0x29B6E8, "live": 0x9146FF}
+COLORS = {"ranking": 0xFFD700, "events": 0x29B6E8, "live": 0x9146FF, "achievement_week": 0xA66BFF}
 MIN_EDIT_SECONDS = 60
 FULL_INTERVAL_MINUTES = 10
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -121,6 +123,29 @@ def live_embed(streams: list[dict], origin: str, now: datetime | None = None) ->
     return _embed("live", "🔴 Live jetzt", description, url=f"{origin}/#live", now=now)
 
 
+def achievement_week_embed(doc: dict | None, origin: str, now: datetime | None = None) -> dict:
+    """Der Erfolg der Woche (#622): was die Website-Kachel zeigt - die Person nur mit öffentlichem Profil (das prüft
+    schon die Auswahl), sonst „diese Woche keiner“."""
+    award = (doc or {}).get("award")
+    if not award:
+        return _embed("achievement_week", "🏅 Erfolg der Woche", "Diese Woche wurde kein Erfolg freigeschaltet, den wir zeigen dürfen – nächster Versuch am Montag.", url=f"{origin}/achievements", now=now)
+    user = award.get("user") or {}
+    name = user.get("display_name") or user.get("username") or "—"
+    material = f" · {award['material_name']}" if award.get("material_name") else ""
+    holders = int(award.get("holders") or 0)
+    rarity = f"{float(award.get('percent') or 0):g}".replace(".", ",")
+    lines = [f"**{award.get('name')}**{material} – {award.get('group_name') or ''}".rstrip(" –")]
+    if award.get("description"):
+        lines.append(str(award["description"])[:300])
+    lines.append(f"Freigeschaltet von **{name}**")
+    lines.append(f"Seltenheit: {rarity} % – {'nur diese Person' if holders <= 1 else f'{holders} Personen'}")
+    embed = _embed("achievement_week", f"🏅 Erfolg der Woche: {award.get('name')}", "\n".join(lines), url=f"{origin}/u/{user.get('username')}" if user.get("username") else f"{origin}/achievements", now=now)
+    color = str(award.get("material_color") or "").lstrip("#")
+    if len(color) == 6:
+        embed["color"] = int(color, 16)
+    return embed
+
+
 def content_hash(embed: dict) -> str:
     """Der Inhalt ohne Fußzeile – eine neue Uhrzeit allein ist keine Änderung."""
     body = {key: value for key, value in embed.items() if key != "footer"}
@@ -144,6 +169,10 @@ async def build(db, kind: str, now: datetime | None = None) -> dict:
         cutoff = (now or now_utc()).isoformat()
         items = [item for item in await collect(db, None) if item.get("start") and item["start"] >= cutoff]
         return events_embed(items, origin, now)
+    if kind == "achievement_week":
+        from services.achievement_visibility import achievement_of_week
+
+        return achievement_week_embed(await achievement_of_week(db, now=now), origin, now)
     from services.stream_visibility import homepage_visibility
 
     streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(50)

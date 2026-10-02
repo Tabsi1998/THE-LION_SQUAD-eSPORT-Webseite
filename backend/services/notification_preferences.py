@@ -43,6 +43,13 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "description": "Einmal im Jahr eine Geburtstagsmail vom Verein.",
         "default": True,
     },
+    # Wochenrückblick (#622): montags eine Mail an die Person selbst - nur bei Aktivität, nur per E-Mail.
+    "achievement_recap": {
+        "label": "Wochenrückblick",
+        "description": "Montags eine kurze Mail mit deinen XP, deinem Level und neuen Erfolgen – nur, wenn du in der Woche etwas erreicht hast.",
+        "default": True,
+        "channels": ["email"],
+    },
     "community_messages": {
         "label": "Nachrichten & Erwähnungen",
         "description": "Direktnachrichten, Team-Chat-Erwähnungen und ähnliche Community-Hinweise.",
@@ -120,6 +127,7 @@ TEMPLATE_CATEGORY = {
     "membership_approve": "membership_updates",
     "membership_reject": "membership_updates",
     "birthday_greeting": "birthday_greetings",
+    "achievement_recap": "achievement_recap",
     "direct_message": "community_messages",
     "team_chat_message": "community_messages",
     "team_chat_mention": "community_messages",
@@ -149,6 +157,9 @@ NOTIFICATION_KIND_CATEGORY = {
     "f1_prize_reminder": "prize_updates",
     "prize_pending": "prize_updates",
     "achievement": "achievements",
+    # Erfolge II (#622): Prestige und Rücknahme stehen im Postfach unter „Erfolge“.
+    "prestige": "achievements",
+    "achievement_revoked": "achievements",
     "news_mention": "news_events",
     # Interne Inhalte nur an Berechtigte (#342): Mitglieder bzw. Vorstand.
     "news_member": "club_internal",

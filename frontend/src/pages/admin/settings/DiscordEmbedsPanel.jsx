@@ -8,7 +8,7 @@ import { channelOptionLabel } from "./DiscordTargets";
 // pinnt sie und bearbeitet sie danach (höchstens einmal pro Minute, ein Sammler alle zehn Minuten).
 // Hier steht je Einbettung der Stand: gepostet, zuletzt aktualisiert, Fehler im Klartext.
 
-export const EMBED_ORDER = ["ranking", "events", "live"];
+export const EMBED_ORDER = ["ranking", "events", "live", "achievement_week"];
 
 export function whenText(value) {
   if (!value) return "";
