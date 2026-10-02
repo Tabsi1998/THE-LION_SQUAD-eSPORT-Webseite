@@ -141,6 +141,11 @@ Ablage, nicht mehr als Update-Weg der App; der Schalter „Server-Updater“ im 
 
 **Wie die APK auf den Server kommt**
 
+Vor dem Server sitzt Cloudflare und nimmt höchstens **100 MB je Anfrage** an. Die APK enthält deshalb seit
+Build 84 nur die beiden ARM-Arten echter Handys (`armeabi-v7a`, `arm64-v8a`, rund 60 MB); x86 und x86_64 laufen
+nur in Emulatoren und machten Build 81 bis 83 105 MB groß – deren Upload scheiterte mit HTTP 413. Das App-Bundle
+für Google Play behält alle Arten.
+
 1. Automatisch: Das Release-Skript schickt sie nach `gh release create`, wenn zwei Werte gesetzt
    sind – als Umgebungsvariablen `LIONSAPP_UPLOAD_URL` (z. B. `https://lionsquad.at`) und
    `LIONSAPP_UPLOAD_TOKEN`, oder als `uploadUrl`/`uploadToken` in `.lionsapp-release/signing.json`.

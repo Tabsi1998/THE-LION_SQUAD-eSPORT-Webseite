@@ -161,7 +161,9 @@ async function uploadToServer({ config, apkPath, apk, version, versionCode, chan
       } catch {
         reason = "";
       }
-      console.warn(`Warnung: Server-Upload fehlgeschlagen (HTTP ${response.status}${reason ? `: ${reason}` : ""}). Das GitHub-Release gilt trotzdem; APK unter Admin → App-Versionen von Hand hochladen.`);
+      // 413: Cloudflare vor dem Server nimmt höchstens 100 MB je Anfrage - auch von Hand im Admin käme die Datei nicht durch.
+      const tooLarge = response.status === 413 ? ` Die APK ist größer als ${Math.round(release.SERVER_UPLOAD_LIMIT_BYTES / 1048576)} MB, die Cloudflare vor dem Server annimmt.` : "";
+      console.warn(`Warnung: Server-Upload fehlgeschlagen (HTTP ${response.status}${reason ? `: ${reason}` : ""}).${tooLarge} Das GitHub-Release gilt trotzdem; APK unter Admin → App-Versionen von Hand hochladen.`);
       return false;
     }
     console.log(`Am Server abgelegt: Build ${versionCode} (Admin → App-Versionen).`);
@@ -462,10 +464,11 @@ async function main() {
     step("APK bauen (beim ersten Mal lädt Gradle einiges herunter)");
     // Mit vollem Pfad: Aus Git Bash gestartet sucht cmd.exe nicht im aktuellen
     // Ordner (NoDefaultCurrentDirectoryInExePath), "gradlew.bat" allein fehlt dann.
-    run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), ["assembleRelease", "--no-daemon"], { cwd: buildAndroid, env: signingEnv });
+    // Die APK nur für ARM-Handys (release-version.cjs, APK_ARCHITECTURES) - das Bundle danach mit allen Arten.
+    run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), release.gradleTasks().apk, { cwd: buildAndroid, env: signingEnv });
     if (wantBundle) {
       step("App Bundle bauen (Play Console)");
-      run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), ["bundleRelease", "--no-daemon"], { cwd: buildAndroid, env: signingEnv });
+      run(path.join(buildAndroid, isWindows ? "gradlew.bat" : "gradlew"), release.gradleTasks().bundle, { cwd: buildAndroid, env: signingEnv });
     }
   } finally {
     removeGeneratedPushConfig(buildMobile);
