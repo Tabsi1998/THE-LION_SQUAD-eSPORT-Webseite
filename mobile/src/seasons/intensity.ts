@@ -134,8 +134,13 @@ function snowKeys(fx: EffectClasses): Record<string, unknown> {
   return { flakes: fx.ambient === "none" ? 0 : fx.ambient === "near" ? 1 : 0.6 };
 }
 
+/** Weihnachten (#642) wie `christmasKeys` im Web: Kette außer auf stillen Screens, Lichtinseln mit der Atmosphäre - ohne Fußzeile. */
+function christmasKeys(fx: EffectClasses): Record<string, unknown> {
+  return { chain: fx.cls !== "quiet", glow: fx.ambient !== "none" };
+}
+
 /** Je Saison die Übersetzung der Effektklassen in ihre eigenen Schlüssel - eine neue Saison trägt sich hier ein. */
-export const SEASON_CAPABILITIES: Record<string, (fx: EffectClasses, ctx: { small?: boolean }) => Record<string, unknown>> = { halloween: halloweenKeys, snow: snowKeys };
+export const SEASON_CAPABILITIES: Record<string, (fx: EffectClasses, ctx: { small?: boolean }) => Record<string, unknown>> = { halloween: halloweenKeys, snow: snowKeys, christmas: christmasKeys };
 
 /** Effektklassen plus die Schlüssel einer beliebigen Saison (ohne Übersetzung nur die Klassen). */
 export function seasonCapabilities(season: string, screen: string, intensity: Intensity | string = "normal"): EffectClasses & Record<string, unknown> {

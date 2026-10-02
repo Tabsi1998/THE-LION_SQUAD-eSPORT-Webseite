@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { NavigationRouteContext } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body } from "../components/Text";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
+import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { SnowSky, SnowflakeWidget } from "./snow";
 import { WeatherSky } from "./weather";
@@ -24,6 +26,12 @@ type SeasonModule = {
   skyOnly?: boolean;
   /** Steht das Widget bei mehreren oben (die Schneeflocke schwebt über dem Kranz)? */
   widgetOnTop?: boolean;
+  /** An der Unterkante der Begrüßungskarte im Dashboard (Weihnachten: die Lichterkette). */
+  Edge?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
+  /** Eine Gruß-Karte über der Tab-Leiste, auf jedem Screen (Weihnachten). */
+  Greeting?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
+  /** Hinter dem Inhalt eines Screens (Weihnachten: warme Lichtinseln). */
+  Backdrop?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
 };
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
@@ -34,6 +42,8 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true },
   // Wetter das ganze Jahr (#771): Regen, leichter Schnee, Wetterleuchten - wie im Web; in der Schnee-Saison schneit es.
   weather: { Sky: WeatherSky, skyOnly: true },
+  // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag.
+  christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
@@ -80,6 +90,8 @@ export function SeasonStage() {
       <View pointerEvents="box-none" style={[styles.corners, { top: insets.top }]}>
         {mounted.map(({ season, module }) => (module.Corners ? <module.Corners key={`${season.key}-corners`} season={season} screen={screen} /> : null))}
       </View>
+      {/* Je Phase eine eigene Karte: der Abschied am 6. Jänner beginnt nicht dort, wo der Gruß aufgehört hat. */}
+      {mounted.map(({ season, module }) => (module.Greeting ? <module.Greeting key={`${season.key}-greeting-${season.phase}`} season={season} screen={screen} /> : null))}
       {toast ? (
         <View style={[styles.toast, { top: insets.top + 84 }]} testID="season-toast">
           <Body style={styles.toastText}>{toast.text}</Body>
@@ -104,6 +116,42 @@ export function SeasonWidgetSlot() {
         return <Widget key={season.key} season={season} screen={screen} />;
       })}
     </View>
+  );
+}
+
+/** Der Screen, in dem ein Slot liegt (Kante, Hintergrund) - ohne Navigation „Dashboard“. */
+function useSlotScreen(): string {
+  const route = useContext(NavigationRouteContext);
+  return (route && route.name) || "Dashboard";
+}
+
+/** Die Unterkante der Begrüßungskarte im Dashboard - eine Ebene über der Karte, nie klickbar. */
+export function SeasonEdgeSlot() {
+  const mounted = useMountedSeasons().filter(({ module }) => module.Edge);
+  const screen = useSlotScreen();
+  if (!mounted.length) return null;
+  return (
+    <>
+      {mounted.map(({ season, module }) => {
+        const Edge = module.Edge as React.ComponentType<{ season: ActiveSeason; screen: string }>;
+        return <Edge key={season.key} season={season} screen={screen} />;
+      })}
+    </>
+  );
+}
+
+/** Hinter dem Inhalt eines Screens (`Screen` legt sie unter alles) - nur, wenn eine Saison dort etwas zeigt. */
+export function SeasonBackdropSlot() {
+  const mounted = useMountedSeasons().filter(({ module }) => module.Backdrop);
+  const screen = useSlotScreen();
+  if (!mounted.length) return null;
+  return (
+    <>
+      {mounted.map(({ season, module }) => {
+        const Backdrop = module.Backdrop as React.ComponentType<{ season: ActiveSeason; screen: string }>;
+        return <Backdrop key={season.key} season={season} screen={screen} />;
+      })}
+    </>
   );
 }
 
