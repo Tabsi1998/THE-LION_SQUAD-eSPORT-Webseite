@@ -120,7 +120,7 @@ test("Hauben auf der Startseite mit Stufe des Servers und Tauwetter aus dem Wett
   expect(screen.queryAllByTestId("snow-cap")).toHaveLength(0);
 });
 
-test("Schneeflocke: fangen zählt, platzt und meldet das Signal; die fünfzigste macht den Schneekönig; dezent ohne Platzen", async () => {
+test("Schneeflocke: fangen zählt, bricht bei Frost (schmilzt bei Tauwetter) und meldet das Signal; die fünfzigste macht den Schneekönig; dezent ohne Bewegung", async () => {
   vi.useFakeTimers();
   const storage = memory();
   render(<Widget season={snow()} storage={storage} />);
@@ -133,12 +133,30 @@ test("Schneeflocke: fangen zählt, platzt und meldet das Signal; die fünfzigste
   await act(async () => {
     vi.advanceTimersByTime(1);
   });
-  expect(button.className).toContain("tls-snowflake--burst");
+  // −3 °C: der Kristall bricht - sechs Splitter entlang der Arme, sechs kleine Bruchstücke.
+  expect(button.className).toContain("tls-snowflake--break");
+  expect(button.querySelectorAll(".tls-snowflake__sliver")).toHaveLength(6);
+  expect(button.querySelectorAll(".tls-snowflake__chip")).toHaveLength(6);
   await act(async () => {
     vi.advanceTimersByTime(800);
   });
-  expect(button.className).not.toContain("tls-snowflake--burst");
+  expect(button.className).not.toContain("tls-snowflake--break");
   expect(screen.queryByTestId("snow-note")).toBeNull();
+  // Tauwetter (+4 °C): die Flocke schmilzt zu einem Tropfen, der fällt und einen Ring zieht - zählt genauso.
+  mockWeather.temp_c = 4;
+  fireEvent.click(button);
+  await act(async () => {
+    vi.advanceTimersByTime(1);
+  });
+  expect(button.getAttribute("data-catch")).toBe("melt");
+  expect(button.querySelector(".tls-snowflake__drop")).toBeTruthy();
+  expect(button.querySelector(".tls-snowflake__ripple")).toBeTruthy();
+  expect(storage.store.tls_snow_clicks).toBe("2");
+  await act(async () => {
+    vi.advanceTimersByTime(950);
+  });
+  expect(button.getAttribute("data-catch")).toBeNull();
+  mockWeather.temp_c = -3;
   const king = memory({ tls_snow_clicks: String(SNOW_KING_AT - 1) });
   render(<Widget season={snow({ effective: "subtle" })} storage={king} />);
   const second = screen.getAllByTestId("snow-flake")[1];
@@ -146,7 +164,7 @@ test("Schneeflocke: fangen zählt, platzt und meldet das Signal; die fünfzigste
   await act(async () => {
     vi.advanceTimersByTime(1);
   });
-  expect(second.className).not.toContain("tls-snowflake--burst");
+  expect(second.getAttribute("data-catch")).toBeNull();
   expect(screen.getByTestId("snow-note")).toHaveTextContent("Schneekönig");
   expect(second.getAttribute("aria-label")).toContain("Schneekönig");
   expect(season.Widget).toBe(Widget);
