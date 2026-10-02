@@ -147,8 +147,10 @@ async def test_gg_lob_nur_beteiligte_nach_dem_ende_einmal_je_seite(flow):
 @pytest.mark.asyncio
 async def test_gelesen_und_gesehen_je_einmal(flow):
     user = await flow.add_user(name="Leserin")
-    await flow.db.news.insert_one({"id": "n1", "slug": "sommer-cup", "title": "Sommer-Cup", "status": "published"})
-    await flow.db.news.insert_one({"id": "n2", "slug": "entwurf", "title": "Entwurf", "status": "draft"})
+    # Über die echte Verwaltung angelegt - so liegt der Beitrag dort, wo die Seite ihn auch findet.
+    flow.act_as(await flow.add_staff("Redaktion"))
+    assert (await flow.post("/api/news", json={"title": "Sommer-Cup", "slug": "sommer-cup", "content": "Bald geht es los."})).status_code == 200
+    assert (await flow.post("/api/news", json={"title": "Entwurf", "slug": "entwurf", "content": "Noch nicht fertig.", "published": False})).status_code == 200
     flow.act_as(user)
     assert (await flow.post("/api/news/sommer-cup/read")).json() == {"read": True, "total": 1}
     assert (await flow.post("/api/news/sommer-cup/read")).json()["total"] == 1

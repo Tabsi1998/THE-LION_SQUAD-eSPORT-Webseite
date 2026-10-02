@@ -145,10 +145,16 @@ async def post_commend(match_id: str, me: dict = Depends(get_current_user)):
 
 @router.post("/api/news/{slug}/read")
 async def mark_news_read(slug: str, me: dict = Depends(get_current_user)):
-    """Ein Aufruf mit Anmeldung zählt als gelesen - nur die Zahl, keine Liste in der API."""
+    """Ein Aufruf mit Anmeldung zählt als gelesen - nur die Zahl, keine Liste in der API. Gezählt wird, was die
+    Person auf der Seite auch lesen kann: veröffentlicht, Zeitpunkt erreicht, für sie sichtbar."""
+    from routes.news_routes import _published_now
+    from services.slug_utils import find_by_slug_or_history
+    from services.visibility import user_can_see
+
     db = get_db()
-    post = await db.news.find_one({"$or": [{"slug": slug}, {"id": slug}], "status": {"$nin": ["draft"]}}, {"_id": 0, "id": 1})
-    if not post:
+    post, _moved = await find_by_slug_or_history(db.news_posts, slug, {"_id": 0, "id": 1, "published": 1, "published_at": 1, "visibility": 1})
+    readable = bool(post) and post.get("published") is not False and _published_now(post) and await user_can_see(me, post.get("visibility") or "public")
+    if not readable:
         raise HTTPException(404, "Beitrag nicht gefunden.")
     result = await db.news_reads.update_one({"user_id": me["id"], "news_id": post["id"]}, {"$setOnInsert": {"user_id": me["id"], "news_id": post["id"], "read_at": now_utc().isoformat()}}, upsert=True)
     if result.upserted_id is not None:
@@ -157,16 +163,38 @@ async def mark_news_read(slug: str, me: dict = Depends(get_current_user)):
     return {"read": True, "total": await db.news_reads.count_documents({"user_id": me["id"]})}
 
 
+# Zuschauer-Ping: Plattform und Kanal (oder Video), so wie die Seite den Player einbettet.
+WATCH_PLATFORMS = ("twitch", "youtube", "kick")
+WATCH_NAME_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789_.@-")
+# So viele verschiedene Streams zählen je Tag - wer mehr offen hat, schaut nicht mehr zu.
+WATCHES_PER_DAY = 12
+
+
+def watch_key(value: str) -> str:
+    """``Twitch:The_Lion_Squad`` → ``twitch:the_lion_squad`` - leer, wenn es keine Kennung eines Streams ist."""
+    platform, _, name = str(value or "").strip().lower().partition(":")
+    fits = platform in WATCH_PLATFORMS and 2 <= len(name) <= 64 and set(name) <= WATCH_NAME_CHARS
+    return f"{platform}:{name}" if fits else ""
+
+
 class WatchBody(BaseModel):
     key: str = Field(min_length=2, max_length=120)
 
 
 @router.post("/api/streams/watch")
-async def stream_watched(body: WatchBody, me: dict = Depends(get_current_user)):
-    """Zuschauer-Ping: ein eingebetteter Stream wurde geöffnet - eins je Stream und Tag."""
+async def stream_watched(body: WatchBody, request: Request, me: dict = Depends(get_current_user)):
+    """Zuschauer-Ping: ein eingebetteter Stream war eine Minute offen - eins je Stream und Tag, höchstens
+    ``WATCHES_PER_DAY`` am Tag."""
+    await enforce_rate_limit(request, "stream_watch", 20, 60, subject=me["id"])
+    key = watch_key(body.key)
+    if not key:
+        raise HTTPException(400, "Diesen Stream gibt es nicht.")
     db = get_db()
     day = now_utc().astimezone(counters.VIENNA).date().isoformat()
-    result = await db.stream_watches.update_one({"user_id": me["id"], "key": body.key.strip(), "day": day}, {"$setOnInsert": {"user_id": me["id"], "key": body.key.strip(), "day": day, "at": now_utc().isoformat()}}, upsert=True)
+    known = await db.stream_watches.find_one({"user_id": me["id"], "key": key, "day": day}, {"_id": 0, "key": 1})
+    if not known and await db.stream_watches.count_documents({"user_id": me["id"], "day": day}) >= WATCHES_PER_DAY:
+        return {"watched": False, "reason": "cap", "total": await db.stream_watches.count_documents({"user_id": me["id"]})}
+    result = await db.stream_watches.update_one({"user_id": me["id"], "key": key, "day": day}, {"$setOnInsert": {"user_id": me["id"], "key": key, "day": day, "at": now_utc().isoformat()}}, upsert=True)
     if result.upserted_id is not None:
         from services.achievement_queue import request_evaluation
         await request_evaluation([me["id"]], "stream_watch", sources={"stream"})

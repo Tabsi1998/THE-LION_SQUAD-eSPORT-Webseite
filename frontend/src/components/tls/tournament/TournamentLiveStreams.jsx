@@ -5,6 +5,7 @@ import { api, resolveMediaUrl } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
+import { streamKey, useStreamWatched } from "@/lib/streamWatch";
 
 // „Turnier live“ (#579): streamt ein Teilnehmer, während das Turnier läuft, steht hier der Kasten
 // „Live“ mit den Streams - den ersten als Player (erst nach Zustimmung zu externen Medien), die
@@ -27,10 +28,12 @@ export function TournamentLiveStreams({ tournament }) {
   useEffect(() => { load(); }, [load]);
   // Ob jemand streamt, weiß der Server nur durch eigenes Nachfragen bei Twitch - deshalb einmal pro Minute.
   useLiveRefresh(load, ["streams"], { pollMs: 60000 });
+  const channel = String(streams[0]?.twitch_login || streams[0]?.username || "").toLowerCase();
+  // Zuschauer-Ping (#616): der eingebettete Stream zählt, sobald er eine Minute offen ist.
+  useStreamWatched(streamKey("twitch", channel), hasConsent("external_media"));
 
   if (!streams.length) return null;
   const [first, ...rest] = streams;
-  const channel = String(first.twitch_login || first.username || "").toLowerCase();
   const name = first.display_name || first.username || channel;
   return (
     <section className="border border-[#9146FF]/35 bg-[#0A0A0A] rounded-sm overflow-hidden" data-testid="tournament-live-streams">

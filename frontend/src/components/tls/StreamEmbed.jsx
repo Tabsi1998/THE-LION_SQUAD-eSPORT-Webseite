@@ -1,6 +1,7 @@
 import { Radio, ExternalLink } from "lucide-react";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
+import { streamKey, useStreamWatched } from "@/lib/streamWatch";
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
 const KICK_HOSTS = new Set(["kick.com", "www.kick.com"]);
@@ -59,8 +60,8 @@ function kickChannel(value) {
   return /^[a-zA-Z0-9_.-]{2,64}$/.test(channel) ? channel : "";
 }
 
-export function StreamEmbed({ source, compact = false, showExternalLink = true }) {
-  const { hasConsent } = useCookieConsent();
+/** Was eingebettet wird: Plattform, Adresse, Player-Adresse und die Kennung für den Zuschauer-Ping - oder null. */
+export function describeStream(source, host = typeof window !== "undefined" ? window.location.hostname : "") {
   if (!source) return null;
   const enabled = source.has_live_stream === true || (source.twitch_enabled && source.twitch_channel);
   if (!enabled) return null;
@@ -71,23 +72,43 @@ export function StreamEmbed({ source, compact = false, showExternalLink = true }
   if (!platform) return null;
 
   let embedSrc = null;
+  let watchKey = "";
   if (platform === "twitch") {
     const channel = normalizeTwitchChannel(source.stream_url || source.twitch_channel);
     if (channel) {
-      const params = new URLSearchParams({ channel, parent: window.location.hostname, muted: "true", autoplay: "false" });
+      const params = new URLSearchParams({ channel, parent: host, muted: "true", autoplay: "false" });
       embedSrc = `https://player.twitch.tv/?${params.toString()}`;
+      watchKey = streamKey("twitch", channel);
     }
   } else if (platform === "youtube" && source.stream_url) {
     const videoId = youtubeVideoId(source.stream_url);
-    if (videoId) embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=0`;
-    else {
+    if (videoId) {
+      embedSrc = `https://www.youtube.com/embed/${videoId}?autoplay=0`;
+      watchKey = streamKey("youtube", videoId);
+    } else {
       const handle = youtubeLiveHandle(source.stream_url);
-      if (handle) embedSrc = `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(handle)}`;
+      if (handle) {
+        embedSrc = `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(handle)}`;
+        watchKey = streamKey("youtube", handle);
+      }
     }
   } else if (platform === "kick" && source.stream_url) {
     const channel = kickChannel(source.stream_url);
-    if (channel) embedSrc = `https://player.kick.com/${channel}`;
+    if (channel) {
+      embedSrc = `https://player.kick.com/${channel}`;
+      watchKey = streamKey("kick", channel);
+    }
   }
+  return { platform, url, embedSrc, watchKey };
+}
+
+export function StreamEmbed({ source, compact = false, showExternalLink = true }) {
+  const { hasConsent } = useCookieConsent();
+  const stream = describeStream(source);
+  // Zuschauer-Ping (#616): zählt nur, wenn der Player wirklich eingebettet ist - und eine Minute offen bleibt.
+  useStreamWatched(stream?.watchKey || "", Boolean(stream?.embedSrc) && hasConsent("external_media"));
+  if (!stream) return null;
+  const { platform, url, embedSrc } = stream;
 
   return (
     <div className="border border-[#FF3B30]/30 bg-[#0A0A0A] rounded-sm overflow-hidden min-w-0 max-w-full">
