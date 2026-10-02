@@ -53,6 +53,17 @@ def _latest_window(key: str, now: datetime, founded) -> dict | None:
     return max(past, key=lambda window: window["end"]) if past else None
 
 
+def public_view(full: dict) -> dict:
+    """Was andere auf dem öffentlichen Profil sehen (#678, nur mit Schalter): je Saison und Fundstück die Summe - kein
+    „heute“, kein Datum, kein Tagesdeckel; das verriete, wann jemand online war. Saisonen ohne Fund fallen weg."""
+    seasons_out = []
+    for season in full.get("seasons") or []:
+        items = [{"signal": item["signal"], "label": item["label"], "icon": item["icon"], "count": item["count"]} for item in season.get("items") or [] if item.get("count")]
+        if items:
+            seasons_out.append({"key": season["key"], "label": season["label"], "count": sum(item["count"] for item in items), "items": items})
+    return {"total": full.get("total", 0), "seasons": seasons_out}
+
+
 async def overview(db, user_id: str, stored: dict | None = None, founded=None, now: datetime | None = None) -> dict:
     """Die Fundstücke einer Person je Saison: insgesamt, in der laufenden (oder letzten) Saison, heute - mit dem
     Tagesdeckel und dem nächsten Termin der Saison."""

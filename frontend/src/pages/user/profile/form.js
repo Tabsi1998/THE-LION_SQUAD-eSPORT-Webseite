@@ -70,6 +70,8 @@ export function profileToForm(user) {
     privacy_public_profile: user.privacy_public_profile ?? true,
     // Erfolge II (#619): Standard an - fehlt das Feld, gilt „öffentlich“.
     privacy_achievements_public: user.privacy_achievements_public ?? true,
+    // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
+    privacy_season_finds_public: user.privacy_season_finds_public ?? false,
     // Zeremonien (E8, #618): Ton an, volle Lautstärke, volle Bewegung - außer die Person will es dezent.
     ceremony_sound: user.ceremony_sound ?? true,
     ceremony_volume: Number.isFinite(Number(user.ceremony_volume)) && user.ceremony_volume !== null && user.ceremony_volume !== undefined ? Number(user.ceremony_volume) : 80,

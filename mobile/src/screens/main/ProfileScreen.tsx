@@ -241,6 +241,8 @@ export function ProfileScreen() {
       bluesky_handle: u.bluesky_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
+      // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
+      privacy_season_finds_public: u.privacy_season_finds_public ?? false,
       newsletter_consent: Boolean(u.newsletter_consent),
       show_twitch_embed: Boolean(u.show_twitch_embed),
       dm_privacy: u.dm_privacy || "everyone",
@@ -724,6 +726,7 @@ export function ProfileScreen() {
             <Muted>Änderungen werden von selbst gespeichert.</Muted>
             <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => { setField(setForm, "privacy_public_profile", v); scheduleSave(); }} />
             <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => { setField(setForm, "show_twitch_embed", v); scheduleSave(); }} />
+            <Toggle label="Saison-Fundstücke öffentlich" detail="Dein öffentliches Profil zeigt, was du über die Jahreszeiten gesammelt hast – nur die Summen, nie wann." value={form.privacy_season_finds_public === true} onValueChange={(v) => { setField(setForm, "privacy_season_finds_public", v); scheduleSave(); }} />
             <Muted>Direktnachrichten</Muted>
             <View style={styles.optionGrid}>
               {dmOptions.map(([value, label]) => (
