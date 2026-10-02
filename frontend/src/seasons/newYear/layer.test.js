@@ -97,3 +97,16 @@ test("schläft, wenn nichts in der Luft ist und in den nächsten Sekunden nichts
   layer.dispose();
   expect(layer.snapshot().live).toBe(0);
 });
+
+test("die Teilchen gehören zur Seite: Scrollen schiebt Rakete und Explosion mit (wie der Schnee)", () => {
+  const win = { scrollY: 0 };
+  const arcs = [];
+  const ctx = { ...mockCtx(), arc: (x, y) => arcs.push(y), createRadialGradient: () => ({ addColorStop() {} }) };
+  const layer = createFireworksLayer({ plan: () => [rocket("s", 1_000)], clock: () => 1_600, doc: null, win });
+  layer.draw(ctx, 16, SIZE);
+  const before = arcs[arcs.length - 1];
+  arcs.length = 0;
+  win.scrollY = 120;
+  layer.draw(ctx, 16, SIZE);
+  expect(arcs[arcs.length - 1]).toBeCloseTo(before - 120, 1);
+});

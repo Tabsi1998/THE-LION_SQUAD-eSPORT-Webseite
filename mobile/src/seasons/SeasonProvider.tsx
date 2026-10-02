@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useReduceMotion } from "../components/FadeIn";
 import { api } from "../lib/api";
 import { isGuestUser } from "../live";
+import { serverOffset as offsetFrom } from "./newYear/countdown";
 import { useSignalSync } from "./signalSync";
 
 // Jahreszeiten in der App (#636): dieselbe Quelle wie die Website (/seasonal/active, Kanal „app“),
@@ -42,7 +43,7 @@ export type SeasonWeather = {
   stale?: boolean;
   source?: string;
 };
-type Payload = { seasons: Season[]; preview?: boolean; weather?: SeasonWeather | null };
+type Payload = { seasons: Season[]; preview?: boolean; weather?: SeasonWeather | null; now?: string };
 
 export const PREFERENCES: SeasonPreference[] = ["on", "subtle", "off"];
 export const PREFERENCE_KEY = "season_preference";
@@ -90,9 +91,12 @@ type SeasonContextValue = {
   showToast: (text: string, ms?: number) => void;
   /** Das Wetter am Vereinsort (Wind, Regen, Schnee, Gewitter) - alle zehn Minuten mit der Saison-Abfrage neu. */
   weather: SeasonWeather | null;
+  /** Silvester (#741): Abstand der Serveruhr zur Geräteuhr (ms) und der Zeitpunkt der letzten Antwort. */
+  serverOffset: number;
+  serverNow: string | null;
 };
 
-const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {}, toast: null, showToast: () => {}, weather: null };
+const EMPTY: SeasonContextValue = { ready: false, seasons: [], byKey: {}, preference: "on", setPreference: async () => {}, reducedMotion: false, reload: async () => {}, toast: null, showToast: () => {}, weather: null, serverOffset: 0, serverNow: null };
 const SeasonContext = createContext<SeasonContextValue>(EMPTY);
 
 export function SeasonProvider({ children }: { children: React.ReactNode }) {
@@ -112,9 +116,14 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
   }, []);
 
+  // Silvester (#741): Countdown und Show laufen nach der Serveruhr - ein Handy kann Minuten danebenliegen.
+  const [offset, setOffset] = useState(0);
+
   const load = useCallback(async () => {
     try {
+      const requestedAt = Date.now();
       const { data } = await api.get<Payload>("/seasonal/active");
+      if (data?.now) setOffset(offsetFrom(data.now, requestedAt, Date.now()));
       setPayload(data && Array.isArray(data.seasons) ? data : { seasons: [] });
     } catch {
       setPayload((current) => current || { seasons: [] });
@@ -173,8 +182,8 @@ export function SeasonProvider({ children }: { children: React.ReactNode }) {
     (payload?.seasons || []).filter((season) => (season.channels || []).includes("app")).forEach((season) => {
       byKey[season.key] = { ...season, effective: effectiveIntensity(season, preference, reducedMotion) };
     });
-    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load, toast, showToast, weather: payload?.weather || null };
-  }, [payload, preference, reducedMotion, setPreference, load, toast, showToast]);
+    return { ready: payload !== null, seasons: Object.values(byKey), byKey, preference, setPreference, reducedMotion, reload: load, toast, showToast, weather: payload?.weather || null, serverOffset: offset, serverNow: payload?.now || null };
+  }, [payload, preference, reducedMotion, setPreference, load, toast, showToast, offset]);
 
   return <SeasonContext.Provider value={value}>{children}</SeasonContext.Provider>;
 }

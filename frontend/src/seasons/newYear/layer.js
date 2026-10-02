@@ -52,13 +52,15 @@ export function makeGlows(doc = typeof document === "undefined" ? null : documen
  * Die Ebene. `plan()` liefert die anstehenden Raketen (Choreografie aus der aktuellen Saison), `clock()` die Serverzeit
  * in ms, `wind()` die Drift in px/s, `onLaunch`/`onBurst` melden Klang (index.jsx). `budget` kommt vom Himmel (sky.js).
  */
-export function createFireworksLayer({ plan, clock = () => Date.now(), wind = () => 0, budget = 120, onLaunch = () => {}, onBurst = () => {}, doc = typeof document === "undefined" ? null : document, ratio = 1 } = {}) {
+export function createFireworksLayer({ plan, clock = () => Date.now(), wind = () => 0, budget = 120, onLaunch = () => {}, onBurst = () => {}, doc = typeof document === "undefined" ? null : document, win = typeof window === "undefined" ? null : window, ratio = 1 } = {}) {
   const cap = showCap(budget);
   const state = { live: [], started: new Set(), smoke: [], glows: null, particles: 0 };
+  // Die Teilchen gehören zur Seite (wie der Schnee): was in der Luft ist, zieht beim Scrollen mit.
+  let lastScrollY = win ? Number(win.scrollY) || 0 : 0;
 
   const start = (launch, now) => {
     state.started.add(launch.id);
-    state.live.push({ launch, t0: launch.at, stars: null, sparks: [], origin: null, rng: mulberry32(hashString(`burst:${launch.id}`)), lastSpark: launch.at, flashes: null });
+    state.live.push({ launch, t0: launch.at, stars: null, sparks: [], origin: null, rng: mulberry32(hashString(`burst:${launch.id}`)), lastSpark: launch.at, flashes: null, shift: 0 });
     onLaunch(launch, now);
   };
 
@@ -79,8 +81,19 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
 
   const countParticles = () => state.live.reduce((sum, item) => sum + (item.stars ? item.stars.length : 0) + item.sparks.length, 0);
 
-  const update = (now, size) => {
+  /** Scrollen schiebt alles in der Luft - neue Teilchen bekommen den Stand des Bildes. */
+  const scrollBy = (dy) => {
+    if (!dy) return;
+    for (const puff of state.smoke) puff.shift -= dy;
+    for (const item of state.live) {
+      item.shift -= dy;
+      for (const spark of item.sparks) spark.y -= dy;
+    }
+  };
+
+  const update = (now, size, scrolled = 0) => {
     const drift = wind();
+    scrollBy(scrolled);
     launchDue(now);
     state.particles = countParticles();
     for (const item of state.live) {
@@ -92,7 +105,7 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
         const every = 1000 / Math.max(1, trailRate(launch));
         while (rocket && item.lastSpark + every <= now && state.particles < cap) {
           item.lastSpark += every;
-          item.sparks.push({ x: rocket.x + (item.rng() - 0.5) * 2, y: rocket.y + 3, born: item.lastSpark, vx: (item.rng() - 0.5) * 10, vy: 12 + item.rng() * 18 });
+          item.sparks.push({ x: rocket.x + (item.rng() - 0.5) * 2, y: rocket.y + 3 + item.shift, born: item.lastSpark, vx: (item.rng() - 0.5) * 10, vy: 12 + item.rng() * 18 });
           state.particles += 1;
         }
       } else if (!item.stars) {
@@ -103,7 +116,7 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
         item.origin = burstPoint(launch, size, drift);
         item.stars = burstStars(launch, item.rng, Math.min(1, room / wanted), spreadFor(size));
         state.particles += item.stars.length;
-        if (state.smoke.length < MAX_SMOKE) state.smoke.push({ origin: item.origin, t0: item.t0 + launch.rise * 1000, distance: launch.distance });
+        if (state.smoke.length < MAX_SMOKE) state.smoke.push({ origin: item.origin, t0: item.t0 + launch.rise * 1000, distance: launch.distance, shift: item.shift });
         if (launch.type === "crackle") item.flashes = item.stars.map(() => crackleFlashes(null, item.rng));
         onBurst(launch, now);
       }
@@ -132,7 +145,9 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
   const draw = (ctx, dt, size) => {
     if (!state.glows) state.glows = makeGlows(doc, ratio);
     const now = clock();
-    update(now, size);
+    const scrollY = win ? Number(win.scrollY) || 0 : 0;
+    update(now, size, scrollY - lastScrollY);
+    lastScrollY = scrollY;
     const drift = wind();
     // Rauch zuerst - hinter allem, ohne Leuchten.
     ctx.save();
@@ -140,6 +155,7 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
     for (const puff of state.smoke) {
       const smoke = smokeAt(puff.origin, (now - puff.t0) / 1000, drift, puff.distance);
       if (!smoke || smoke.alpha <= 0.005) continue;
+      smoke.y += puff.shift || 0;
       const gradient = ctx.createRadialGradient(smoke.x, smoke.y, 0, smoke.x, smoke.y, smoke.r);
       gradient.addColorStop(0, `rgba(170, 175, 190, ${smoke.alpha})`);
       gradient.addColorStop(1, "rgba(170, 175, 190, 0)");
@@ -160,21 +176,22 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
       }
       if (t < launch.rise) {
         const rocket = rocketAt(launch, t, size, drift);
-        if (rocket) drawGlow(ctx, "gold", rocket.x, rocket.y, 1.6, 0.95 * light);
+        if (rocket) drawGlow(ctx, "gold", rocket.x, rocket.y + item.shift, 1.6, 0.95 * light);
         continue;
       }
       if (!item.stars) continue;
       const age = t - launch.rise;
+      const origin = { x: item.origin.x, y: item.origin.y + item.shift };
       item.stars.forEach((star, index) => {
         const lit = starLight(star, age);
-        const pos = starAt(star, age, shell, item.origin, drift, launch.distance);
+        const pos = starAt(star, age, shell, origin, drift, launch.distance);
         if (lit.alpha > 0) {
           // Spuren: ein paar frühere Punkte derselben Bahn, immer schwächer (Chrysantheme, Weide lang).
           if (shell.trail > 0) {
             for (let k = 1; k <= 3; k += 1) {
               const back = age - (shell.trail * k) / 3;
               if (back <= 0) break;
-              const prev = starAt(star, back, shell, item.origin, drift, launch.distance);
+              const prev = starAt(star, back, shell, origin, drift, launch.distance);
               drawGlow(ctx, lit.ember > 0.5 ? "ember" : star.color, prev.x, prev.y, star.size * (1 - k * 0.2), lit.alpha * light * (0.45 - k * 0.12));
             }
           }

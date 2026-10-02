@@ -113,6 +113,19 @@ test("Gruß danach einmal am Tag - auch für wen, der erst um halb eins kommt; �
   expect(screen.queryByTestId("new-year-toast")).toBeNull();
 });
 
+test("wer um Mitternacht den großen Gruß sah, bekommt danach keine zweite Karte", async () => {
+  vi.useFakeTimers({ now: new Date(Date.parse("2027-01-01T00:00:02+01:00")) });
+  const view = render(<Toast season={ny("countdown")} />);
+  expect(screen.getByTestId("new-year-zero")).toBeTruthy();
+  view.unmount();
+  vi.setSystemTime(new Date(Date.parse("2027-01-01T00:00:25+01:00")));
+  render(<Toast season={ny("show")} />);
+  await act(async () => {
+    vi.advanceTimersByTime(3000);
+  });
+  expect(screen.queryByTestId("new-year-toast")).toBeNull();
+});
+
 test("„um Mitternacht dabei“ zählt einmal und nur in den Phasen um Mitternacht; die Ebene bekommt den Stand", () => {
   contextState.serverOffset = 1234;
   contextState.serverNow = "2026-12-31T23:50:00+01:00";
