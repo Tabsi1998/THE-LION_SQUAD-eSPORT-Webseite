@@ -1,12 +1,7 @@
 {
-  "GHSA-5P2G-FCMC-QVQQ": {
-    "module": "image-size",
-    "expires": "2026-09-30",
-    "reason": "Expo 56 uses image-size only through the Metro build toolchain. No patched image-size release exists; npm's suggested force fix incorrectly downgrades Expo to 53."
-  },
-  "GHSA-W3RX-R6R6-PGPR": {
-    "module": "image-size",
-    "expires": "2026-09-30",
-    "reason": "Expo 56 uses image-size only through the Metro build toolchain. No patched image-size release exists; npm's suggested force fix incorrectly downgrades Expo to 53."
+  "GHSA-86W9-CPQP-85RV": {
+    "module": "node-forge",
+    "expires": "2026-11-02",
+    "reason": "node-forge 1.4.0 is the newest release and still affected; no patched version exists. It is used only by @expo/cli through @expo/code-signing-certificates (development tooling for signing over-the-air updates, which the app does not use) and is not part of the app bundle. Re-check on expiry."
   }
 }
