@@ -42,12 +42,25 @@ export function SeasonFooterSlot() {
   const mounted = useMountedSeasons();
   const withFooter = mounted.filter(({ module }) => module.Footer);
   if (!withFooter.length) return null;
+  // Deko bleibt für Screenreader unsichtbar. Eine Szene mit eigener Bedienung (`footerAccessible`, der
+  // Nikolausstiefel #736) sagt selbst, was sie ist - ihr Knopf darf nicht in einem versteckten Bereich liegen.
+  const decorative = withFooter.filter(({ module }) => !module.footerAccessible);
+  const accessible = withFooter.filter(({ module }) => module.footerAccessible);
+  const render = ({ season, module }) => {
+    const Footer = module.Footer;
+    return <Footer key={season.key} season={season} />;
+  };
+  if (!accessible.length) {
+    return (
+      <div className="tls-season-footer-slot" aria-hidden="true" data-testid="season-footer-slot">
+        {decorative.map(render)}
+      </div>
+    );
+  }
   return (
-    <div className="tls-season-footer-slot" aria-hidden="true" data-testid="season-footer-slot">
-      {withFooter.map(({ season, module }) => {
-        const Footer = module.Footer;
-        return <Footer key={season.key} season={season} />;
-      })}
+    <div className="tls-season-footer-slot" data-testid="season-footer-slot">
+      {decorative.length > 0 && <div className="tls-season-footer-deco" aria-hidden="true">{decorative.map(render)}</div>}
+      {accessible.map(render)}
     </div>
   );
 }

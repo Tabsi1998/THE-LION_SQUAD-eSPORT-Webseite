@@ -8,6 +8,7 @@ import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
+import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
 import { SnowSky, SnowflakeWidget } from "./snow";
 import { WeatherSky } from "./weather";
 import { useSeason, type ActiveSeason } from "./SeasonProvider";
@@ -32,6 +33,8 @@ type SeasonModule = {
   Greeting?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
   /** Hinter dem Inhalt eines Screens (Weihnachten: warme Lichtinseln). */
   Backdrop?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
+  /** Rechts im Kopf von „Mehr“, auf der Kante der ersten Karte (Nikolaus: der Stiefel). */
+  Shelf?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
 };
 
 export const SEASON_MODULES: Record<string, SeasonModule> = {
@@ -44,6 +47,8 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   weather: { Sky: WeatherSky, skyOnly: true },
   // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag.
   christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop },
+  // Nikolaus (X3 #736, S11 „Stiefel im Tab Mehr“): der Stiefel im Kopf von „Mehr“, das Tab-Symbol, der Hinweis.
+  nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */
@@ -138,6 +143,16 @@ export function SeasonEdgeSlot() {
       })}
     </>
   );
+}
+
+/** Rechts im Kopf von „Mehr“: eine Figur, die auf der Kante der ersten Karte steht (Nikolausstiefel). */
+export function SeasonShelfSlot() {
+  const mounted = useMountedSeasons().filter(({ module }) => module.Shelf);
+  const screen = useSlotScreen();
+  if (!mounted.length) return null;
+  const { season, module } = mounted[0];
+  const Shelf = module.Shelf as React.ComponentType<{ season: ActiveSeason; screen: string }>;
+  return <Shelf key={season.key} season={season} screen={screen} />;
 }
 
 /** Hinter dem Inhalt eines Screens (`Screen` legt sie unter alles) - nur, wenn eine Saison dort etwas zeigt. */

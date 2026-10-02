@@ -319,6 +319,8 @@ async def init_indexes():
     await db.advent_openings.create_index([("user_id", 1), ("year", 1), ("day", 1)], unique=True)
     await db.advent_openings.create_index([("year", 1), ("day", 1)])
     await db.advent_views.create_index([("year", 1), ("day", 1)], unique=True)
+    # Geschenkte Saison-Sticker (#736): der Nikolaus bringt jeder Person einen je Jahr.
+    await db.user_stickers.create_index([("user_id", 1), ("source", 1), ("year", 1)], unique=True)
     # Saison-Gewinne (#641): eine Verlosung je Quelle, eine Teilnahme je Person.
     await db.season_raffles.create_index("id", unique=True)
     await db.season_raffles.create_index("source_key", unique=True)

@@ -16,6 +16,7 @@ import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import { useAppUpdate } from "../../update/AppUpdateProvider";
 import { DecoSetting } from "../../seasons/DecoSetting";
+import { SeasonShelfSlot } from "../../seasons/SeasonStage";
 import { useAdventEntry } from "../../advent/entry";
 
 // "Mehr" ist das Verzeichnis: eine Zeile je Ziel, keine Beschreibungstexte.
@@ -157,6 +158,8 @@ export function MoreScreen({ navigation }: Props) {
         <View style={styles.header}>
           <Muted style={styles.eyebrow}>{clubName}</Muted>
           <Title>Mehr</Title>
+          {/* Nikolaus (#736): der Stiefel steht rechts auf der Kante der ersten Karte. */}
+          <SeasonShelfSlot />
         </View>
 
         {user && !isGuestUser(user) ? (
@@ -265,6 +268,8 @@ const styles = StyleSheet.create({
   },
   header: {
     gap: 2,
+    // Über den Karten darunter: die Karte unter dem Nikolausstiefel liegt sonst unter ihnen.
+    zIndex: 2,
   },
   eyebrow: {
     color: colors.cyan,
