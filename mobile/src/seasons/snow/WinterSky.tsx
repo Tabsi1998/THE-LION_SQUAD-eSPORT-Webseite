@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
-import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
+import { colors } from "../../theme";
 import { seasonCapabilities } from "../intensity";
 import { seasonYear } from "../rng";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
@@ -47,9 +48,15 @@ export function WinterSkyBackdrop({ season, screen }: { season: ActiveSeason; sc
             <Stop offset="0.45" stopColor="#ff8c80" stopOpacity={0.07 * light.warmth} />
             <Stop offset="0.75" stopColor="#ff8c80" stopOpacity={0} />
           </RadialGradient>
+          {/* Oben weich einblenden: der Screen beginnt unter der Statusleiste - ohne das stünde dort eine Kante. */}
+          <LinearGradient id="winterFadeIn" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.black} stopOpacity={1} />
+            <Stop offset="0.1" stopColor={colors.black} stopOpacity={0} />
+          </LinearGradient>
         </Defs>
         {light.night > 0.01 ? <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterNight)" testID="winter-tint" /> : null}
         {light.warmth > 0.01 ? <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterGlow)" testID="winter-glow" /> : null}
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterFadeIn)" />
         {stars.map((star) => (
           <Circle key={star.index} cx={star.x * width} cy={star.y * height} r={star.r} fill="#eef4ff" fillOpacity={star.bright * 0.8} testID="winter-star" />
         ))}
