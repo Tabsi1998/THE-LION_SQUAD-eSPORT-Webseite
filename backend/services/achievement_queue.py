@@ -140,19 +140,46 @@ def _points(rows: list[dict]) -> int:
     return sum(int(row.get("points") or 0) for row in rows)
 
 
+def top_award(rows: list[dict]) -> dict:
+    """Das Wertvollste eines Pakets: höchstes Material (Reihenfolge der Leiter), dann die meisten Punkte."""
+    order = list(__import__("achievement_catalog").MATERIALS)
+    return max(rows, key=lambda row: (order.index(row["material"]) if row.get("material") in order else -1, int(row.get("level") or 0), int(row.get("points") or 0)))
+
+
+def material_name(material: str | None) -> str:
+    return str((__import__("achievement_catalog").MATERIALS.get(material or "") or {}).get("name") or "")
+
+
+async def _share_award_id(user_id: str, top: dict) -> str | None:
+    """Für „Legendär“ (#622): die Vergabe, deren Teilen-Karte die DM als Bild zeigt - nur wenn sie geteilt werden darf."""
+    if top.get("material") != "legendary":
+        return None
+    from services.achievement_share import share_payload
+
+    db = get_db()
+    award = await db.user_achievements.find_one({"user_id": user_id, "tier_code": top.get("tier_code")}, {"_id": 0, "id": 1})
+    if not award or not award.get("id"):
+        return None
+    return award["id"] if await share_payload(db, award["id"]) else None
+
+
 async def _notify_user(user_id: str, rows: list[dict]) -> bool:
     from services.user_notifications import create_user_notification
 
+    # Ein Paket ist eine Meldung (#622): Postfach, höchstens eine Push, eine DM - mit dem Wertvollsten vorne.
+    top = top_award(rows)
+    top_label = f"{material_name(top.get('material'))}: {top.get('tier_name')}" if material_name(top.get("material")) else str(top.get("tier_name"))
     if len(rows) == 1:
-        title, body = "Erfolg freigeschaltet", f"{rows[0].get('tier_name')} · +{rows[0].get('points', 0)} Punkte"
+        title, body = "Erfolg freigeschaltet", f"{top_label} · +{rows[0].get('points', 0)} Punkte"
     else:
-        names = ", ".join(str(row.get("tier_name")) for row in rows[:4]) + (" …" if len(rows) > 4 else "")
-        title, body = f"{len(rows)} Erfolge freigeschaltet", f"{names} · +{_points(rows)} Punkte"
+        title, body = f"{len(rows)} neue Erfolge", f"darunter {top_label} · +{_points(rows)} Punkte"
     # Was die Gratulation per Discord (#568) braucht: Namen, Gruppe, Punkte und Stufe je Erfolg.
     awards = [{"name": row.get("tier_name"), "group": row.get("group_name"), "points": int(row.get("points") or 0), "level": int(row.get("level") or 1), "material": row.get("material")} for row in rows[:10]]
-    created = await create_user_notification(
-        user_id, title, body, url="/profile?tab=achievements", kind="achievement",
-        meta={"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}",
-              "awards": awards, "points": _points(rows), "level": max(int(row.get("level") or 1) for row in rows)},
-    )
+    meta = {"tier_codes": [row.get("tier_code") for row in rows], "dedupe_key": f"achievement:{rows[0].get('id')}",
+            "awards": awards, "points": _points(rows), "level": max(int(row.get("level") or 1) for row in rows),
+            "top": {"name": top.get("tier_name"), "material": top.get("material")}}
+    share_id = await _share_award_id(user_id, top)
+    if share_id:
+        meta["share_award_id"] = share_id
+    created = await create_user_notification(user_id, title, body, url="/profile?tab=achievements", kind="achievement", meta=meta)
     return created is not None

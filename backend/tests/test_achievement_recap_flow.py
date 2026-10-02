@@ -168,3 +168,38 @@ async def test_prestige_and_revocation_land_in_the_inbox_only(flow, monkeypatch)
     star = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "prestige"}, {"_id": 0})
     assert star["title"] == "Prestige ★" and star["meta"]["in_app_only"] is True
     assert pushed == [], "Prestige und Rücknahme schicken keinen Push"
+
+
+def test_a_package_names_its_most_valuable_award_and_the_dm_finds_words_for_the_material():
+    from services import achievement_queue, discord_dm
+
+    rows = [{"tier_name": "Champion I", "material": "bronze", "level": 1, "points": 10},
+            {"tier_name": "Champion III", "material": "gold", "level": 3, "points": 30},
+            {"tier_name": "Fleißig", "material": "silver", "level": 2, "points": 90}]
+    assert achievement_queue.top_award(rows)["tier_name"] == "Champion III", "Material vor Punkten"
+    note = {"url": "/profile?tab=achievements", "meta": {"awards": [{"name": "Champion III", "points": 30}], "top": {"name": "Champion III", "material": "gold"}, "level": 3}}
+    content = discord_dm.achievement_content(note, "Paula")
+    assert "Gold! Das schaffen nicht viele." in content["description"] and content["color"] == 0xFFD700
+    assert "image_path" not in content
+    legendary = discord_dm.achievement_content({**note, "meta": {**note["meta"], "top": {"material": "legendary"}, "share_award_id": "a9"}}, "Paula")
+    assert legendary["image_path"] == "/api/achievements/share/a9.png" and "Legendär" in legendary["description"]
+
+
+@pytest.mark.asyncio
+async def test_a_legendary_award_shows_its_share_card_only_on_a_public_profile(flow, monkeypatch):
+    from services import achievement_queue
+
+    await flow.db.achievement_groups.insert_one({"code": "myth", "name": "Mythen", "category": "special", "public": True, "is_negative": False})
+    await flow.db.achievements.insert_one({"code": "myth-1", "group_code": "myth", "name": "Unbesiegt", "material": "legendary", "material_name": "Legendär", "level": 8, "rank": 8, "points": 500})
+    public = await flow.add_user(name="paula")
+    hidden = await flow.add_user(name="privat")
+    await flow.db.users.update_one({"id": public["id"]}, {"$set": {"privacy_public_profile": True}})
+    for user in (public, hidden):
+        await flow.db.user_achievements.insert_one({"id": f"aw-{user['id']}", "user_id": user["id"], "tier_code": "myth-1", "earned_at": "2026-10-08T18:00:00+00:00"})
+        await achievement_queue.note_award(user["id"], {"code": "myth-1", "name": "Unbesiegt", "points": 500, "level": 8, "material": "legendary"}, {"name": "Mythen"})
+    monkeypatch.setattr(achievement_queue, "BUNDLE_WINDOW_SECONDS", -1)
+    await achievement_queue.flush_awards()
+    shown = await flow.db.notifications.find_one({"user_id": public["id"], "kind": "achievement"}, {"_id": 0})
+    kept = await flow.db.notifications.find_one({"user_id": hidden["id"], "kind": "achievement"}, {"_id": 0})
+    assert shown["body"].startswith("Legendär: Unbesiegt") and shown["meta"]["share_award_id"] == f"aw-{public['id']}"
+    assert "share_award_id" not in kept["meta"], "ohne öffentliches Profil keine öffentliche Karte"
