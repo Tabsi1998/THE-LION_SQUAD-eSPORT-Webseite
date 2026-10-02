@@ -80,6 +80,16 @@ test("neu ist, was seit dem letzten Blick freigeschaltet wurde – negative Grup
   expect(freshTiers(undefined, "2026-09-20T00:00:00Z")).toEqual([]);
 });
 
+test("still vergebene Stufen („ohne Zeremonie“ im Admin) zählen, werden aber nicht gefeiert", () => {
+  const groups: AchievementGroup[] = [
+    group([
+      { code: "laut", name: "Laut", earned: true, earned_at: "2026-09-21T10:00:00Z" },
+      { code: "still", name: "Still", earned: true, earned_at: "2026-09-21T12:00:00Z", silent: true },
+    ]),
+  ];
+  expect(freshTiers(groups, "2026-09-20T00:00:00Z").map((tier) => tier.code)).toEqual(["laut"]);
+});
+
 test("der Freischalt-Moment lässt sich abonnieren und wieder abbestellen", () => {
   const listener = jest.fn();
   const stop = onAchievementUnlocked(listener);

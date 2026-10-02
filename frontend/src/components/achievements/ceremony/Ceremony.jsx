@@ -123,10 +123,10 @@ function LevelUpStage({ levelUp, reduced }) {
   );
 }
 
-export function Ceremony({ plan, onClose, user = null, reduced = false, autoClose = true }) {
+export function Ceremony({ plan, onClose, user = null, reduced = false, autoClose = true, sound = "auto" }) {
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [muted, setMuted] = useState(() => readSoundPrefs(user).muted);
+  const [muted, setMuted] = useState(() => (sound === "auto" ? readSoundPrefs(user).muted : sound === "off"));
   const tiers = plan.tiers;
   const current = tiers[index] || plan.top;
   const look = MATERIAL_LOOKS[plan.material] || MATERIAL_LOOKS.gold;
@@ -135,10 +135,11 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
   const [phase, setPhase] = useState(isLevelOnly ? "level" : "badge");
   const duration = reduced ? Math.min(plan.duration, 4500) : plan.duration;
 
-  // Klang beim Öffnen, wie bisher einmal je Zeremonie.
+  // Klang beim Öffnen, wie bisher einmal je Zeremonie - in der Admin-Vorschau fest an oder aus.
   useEffect(() => {
-    playCeremonySound(plan.sound, { user });
-  }, [plan, user]);
+    if (sound === "off") return;
+    playCeremonySound(plan.sound, { user, force: sound === "on" });
+  }, [plan, user, sound]);
 
   // Automatisch schließen, außer die Maus liegt drauf; ein Level-up am Ende bekommt seine eigene Phase.
   useEffect(() => {

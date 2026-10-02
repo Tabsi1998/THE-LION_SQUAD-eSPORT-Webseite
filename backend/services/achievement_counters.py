@@ -1167,24 +1167,23 @@ async def _season_climbs(ctx):
     return climbs(await ctx.rank_snapshots(), 10)
 
 
+def fully_played(season: dict, points: list[dict]) -> bool:
+    """Bei jedem Turnier und jeder Challenge einer Saison Punkte geholt (``points``: Saisonpunkte der Person)."""
+    tournaments = [tid for tid in season.get("tournament_ids") or [] if tid]
+    challenges = [cid for cid in season.get("f1_challenge_ids") or [] if cid]
+    if not tournaments and not challenges:
+        return False
+    sources = {str(row.get("source_id") or "") for row in points if row.get("season_id") == season["id"]}
+    played_tournaments = all(tid in sources for tid in tournaments)
+    played_challenges = all(any(source == cid or source.startswith(f"{cid}:") for source in sources) for cid in challenges)
+    return played_tournaments and played_challenges
+
+
 @counter("seasons_fully_played", "season")
 async def _seasons_fully_played(ctx):
     """Abgeschlossene Saisons, in denen die Person bei jedem Turnier und jeder Challenge Punkte geholt hat."""
     points = await ctx.season_points()
-    count = 0
-    for season in await ctx.seasons():
-        if not _finished(season):
-            continue
-        tournaments = [tid for tid in season.get("tournament_ids") or [] if tid]
-        challenges = [cid for cid in season.get("f1_challenge_ids") or [] if cid]
-        if not tournaments and not challenges:
-            continue
-        sources = {str(row.get("source_id") or "") for row in points if row.get("season_id") == season["id"]}
-        played_tournaments = all(tid in sources for tid in tournaments)
-        played_challenges = all(any(source == cid or source.startswith(f"{cid}:") for source in sources) for cid in challenges)
-        if played_tournaments and played_challenges:
-            count += 1
-    return count
+    return sum(1 for season in await ctx.seasons() if _finished(season) and fully_played(season, points))
 
 
 @counter("season_openers_played", "season")

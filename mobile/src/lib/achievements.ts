@@ -20,6 +20,8 @@ export type AchievementTier = {
   manual_only?: boolean;
   condition_status?: string;
   earned_at?: string;
+  /** Vom Admin „ohne Zeremonie“ vergeben – zählt, wird aber nicht gefeiert. */
+  silent?: boolean;
 };
 
 export type AchievementGroup = {
@@ -157,7 +159,7 @@ function formatCount(value: number): string {
   return Number.isInteger(value) ? value.toLocaleString("de-DE") : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
 }
 
-/** Freigeschaltete Stufen seit `since`, die neuesten zuerst – negative Gruppen nie. */
+/** Freigeschaltete Stufen seit `since`, die neuesten zuerst – negative Gruppen und stille Vergaben („ohne Zeremonie“) nie. */
 export function freshTiers(groups: AchievementGroup[] | undefined, since: string | null, limit = 8): AchievementTier[] {
   if (!since) return [];
   const threshold = +new Date(since);
@@ -166,7 +168,7 @@ export function freshTiers(groups: AchievementGroup[] | undefined, since: string
   for (const group of groups || []) {
     if (group.is_negative) continue;
     for (const tier of group.tiers || []) {
-      if (tier.earned && tier.earned_at && +new Date(tier.earned_at) > threshold) earned.push(tier);
+      if (tier.earned && tier.earned_at && !tier.silent && +new Date(tier.earned_at) > threshold) earned.push(tier);
     }
   }
   return earned.sort((a, b) => +new Date(b.earned_at || 0) - +new Date(a.earned_at || 0)).slice(0, limit);

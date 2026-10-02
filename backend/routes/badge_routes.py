@@ -222,7 +222,15 @@ async def evaluation_state(me: dict = Depends(require_area("content"))):
 async def evaluate_everyone(me: dict = Depends(require_area("content"))):
     """Alle Konten vormerken; abgearbeitet wird im Hintergrund, 100 je halber Minute."""
     from services.achievement_queue import sweep
-    return await sweep(everyone=True)
+    result = await sweep(everyone=True)
+    await _log(me, "evaluate_all", data=result if isinstance(result, dict) else {})
+    return result
+
+
+async def _log(me: dict, kind: str, **kwargs) -> None:
+    """Jede Admin-Aktion ins Protokoll (E10) - Katalog-Änderungen, Vorfälle, Auswertungen."""
+    from services import achievement_admin
+    await achievement_admin.log_event(get_db(), kind, me, **kwargs)
 
 
 # ---- Group CRUD ----
@@ -238,6 +246,7 @@ class GroupCreate(BaseModel):
     is_negative: bool = False
     hidden: bool = False
     how_to: str = ""
+    art: Optional[str] = None
     sort_order: int = 600
 
 
@@ -252,6 +261,7 @@ class GroupPatch(BaseModel):
     is_negative: Optional[bool] = None
     hidden: Optional[bool] = None
     how_to: Optional[str] = None
+    art: Optional[str] = None
     sort_order: Optional[int] = None
 
 
@@ -281,6 +291,7 @@ async def admin_create_group(body: GroupCreate, me: dict = Depends(require_area(
            "created_at": now_utc().isoformat(), "created_by": me["id"]}
     await db.achievement_groups.insert_one(doc)
     doc.pop("_id", None)
+    await _log(me, "group_create", data={"group": body.code, "name": body.name})
     return doc
 
 
@@ -297,7 +308,9 @@ async def admin_patch_group(code: str, body: GroupPatch, me: dict = Depends(requ
     res = await db.achievement_groups.update_one({"code": code}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Group nicht gefunden.")
-    return await db.achievement_groups.find_one({"code": code}, {"_id": 0})
+    saved = await db.achievement_groups.find_one({"code": code}, {"_id": 0})
+    await _log(me, "group_update", data={"group": code, "name": saved.get("name"), "fields": sorted(updates)})
+    return saved
 
 
 @admin_router.delete("/groups/{code}")
@@ -309,8 +322,9 @@ async def admin_delete_group(code: str, me: dict = Depends(require_area("content
     if not g.get("is_admin_created"):
         raise HTTPException(400, "System-Group kann nicht gelöscht werden — deaktivieren via public=false.")
     await db.achievements.delete_many({"group_code": code})
-    await db.user_achievements.delete_many({"group_code": code})
+    removed = await db.user_achievements.delete_many({"group_code": code})
     await db.achievement_groups.delete_one({"code": code})
+    await _log(me, "group_delete", data={"group": code, "name": g.get("name"), "awards_removed": removed.deleted_count})
     return {"ok": True}
 
 
@@ -384,6 +398,7 @@ async def admin_create_tier(body: TierCreate, me: dict = Depends(require_area("c
     doc.update({"id": body.code, "created_at": now_utc().isoformat()})
     await db.achievements.insert_one(doc)
     doc.pop("_id", None)
+    await _log(me, "tier_create", tier_code=body.code, data={"group": body.group_code, "name": body.name})
     return doc
 
 
@@ -400,6 +415,8 @@ async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(requir
     current = await db.achievements.find_one({"code": code}, {"_id": 0})
     if not current:
         raise HTTPException(404, "Tier nicht gefunden.")
+    if updates.get("material") and updates["material"] != current.get("material"):
+        await _check_ladder_move(db, current, updates["material"])
     if "material" in updates or "level" in updates:
         merged = {**current, **updates}
         if "material" not in updates:
@@ -410,16 +427,36 @@ async def admin_patch_tier(code: str, body: TierPatch, me: dict = Depends(requir
     res = await db.achievements.update_one({"code": code}, {"$set": updates})
     if res.matched_count == 0:
         raise HTTPException(404, "Tier nicht gefunden.")
-    return await db.achievements.find_one({"code": code}, {"_id": 0})
+    saved = await db.achievements.find_one({"code": code}, {"_id": 0})
+    await _log(me, "tier_update", tier_code=code, data={"group": current.get("group_code"), "fields": sorted(raw)})
+    return saved
+
+
+async def _check_ladder_move(db, current: dict, material: str) -> None:
+    """Materialwechsel nur innerhalb der Leiter Holz bis Diamant und nur zwischen den Nachbarstufen der Gruppe -
+    sonst stünde die Stufe über oder unter einer anderen, und die Ziele stiegen nicht mehr."""
+    ladder = lambda m: m in MATERIALS and MATERIALS[m]["rank"] <= 7  # noqa: E731
+    if not ladder(current.get("material")) or not ladder(material):
+        raise HTTPException(400, "Das Material wechselt nur innerhalb der Leiter Holz bis Diamant.")
+    own = MATERIALS[current["material"]]["rank"]
+    ranks = [MATERIALS[t["material"]]["rank"] async for t in db.achievements.find({"group_code": current.get("group_code"), "code": {"$ne": current["code"]}}, {"_id": 0, "material": 1}) if t.get("material") in MATERIALS]
+    lower = max((r for r in ranks if r < own), default=0)
+    upper = min((r for r in ranks if r > own), default=8)
+    if not lower < MATERIALS[material]["rank"] < upper:
+        names = {m["rank"]: m["name"] for m in MATERIALS.values()}
+        span = " und ".join(n for n in (names.get(lower), names.get(upper)) if n and n not in ("Legendär", "Geheim"))
+        raise HTTPException(400, f"Das Material muss zwischen den Nachbarstufen bleiben ({span})." if span else "Das Material passt nicht in die Leiter.")
 
 
 @admin_router.delete("/tiers/{code}")
 async def admin_delete_tier(code: str, me: dict = Depends(require_area("content"))):
     db = get_db()
+    tier = await db.achievements.find_one({"code": code}, {"_id": 0, "name": 1, "group_code": 1})
     res = await db.achievements.delete_one({"code": code})
     if res.deleted_count == 0:
         raise HTTPException(404, "Tier nicht gefunden.")
-    await db.user_achievements.delete_many({"tier_code": code})
+    removed = await db.user_achievements.delete_many({"tier_code": code})
+    await _log(me, "tier_delete", data={"tier": code, "name": (tier or {}).get("name"), "group": (tier or {}).get("group_code"), "awards_removed": removed.deleted_count})
     return {"ok": True}
 
 
@@ -453,16 +490,18 @@ class AwardBody(BaseModel):
     note: Optional[str] = None
     earned_at: Optional[str] = None
     silent: bool = False
+    notify: bool = True
+
+
+async def _is_board(me: dict) -> bool:
+    """Massenvergabe, Import und XP-Eingriffe: nur Superadmin oder wer einen Vorstandsposten hält."""
+    from services.permissions import is_board_holder
+    return me.get("role") == "superadmin" or bool(await is_board_holder(get_db(), me.get("id")))
 
 
 async def _require_board(me: dict) -> None:
-    """Massenvergabe, Import und XP-Eingriffe: nur Superadmin oder wer einen Vorstandsposten hält."""
-    from services.permissions import is_board_holder
-    if me.get("role") == "superadmin":
-        return
-    if await is_board_holder(get_db(), me.get("id")):
-        return
-    raise HTTPException(403, "Nur der Vorstand oder die Systemverwaltung darf das.")
+    if not await _is_board(me):
+        raise HTTPException(403, "Nur der Vorstand oder die Systemverwaltung darf das.")
 
 
 @admin_router.post("/award")
@@ -470,7 +509,7 @@ async def admin_award(body: AwardBody, me: dict = Depends(require_area("content"
     from services import achievement_admin
     db = get_db()
     try:
-        result = await achievement_admin.award_with_options(db, me, body.user_id, body.tier_code, note=body.note, earned_at=body.earned_at, silent=body.silent)
+        result = await achievement_admin.award_with_options(db, me, body.user_id, body.tier_code, note=body.note, earned_at=body.earned_at, silent=body.silent, notify=body.notify)
     except LookupError as exc:
         raise HTTPException(404, str(exc))
     except ValueError as exc:
@@ -480,7 +519,7 @@ async def admin_award(body: AwardBody, me: dict = Depends(require_area("content"
             "id": new_id(),
             "action": "achievement.manual_award",
             "actor_id": me["id"], "target_id": body.user_id,
-            "data": {"tier_code": body.tier_code, "note": body.note, "earned_at": result.get("earned_at"), "silent": body.silent},
+            "data": {"tier_code": body.tier_code, "note": body.note, "earned_at": result.get("earned_at"), "silent": body.silent, "notify": body.notify},
             "created_at": now_utc().isoformat(),
         })
     return result
@@ -512,6 +551,8 @@ async def admin_revoke(body: AwardBody, me: dict = Depends(require_area("content
 class BulkAwardBody(BaseModel):
     tier_code: str
     user_ids: list[str] = Field(default_factory=list, max_length=600)
+    # Aus einer CSV-Liste: Benutzername, E-Mail oder Konto-ID je Zeile.
+    names: list[str] = Field(default_factory=list, max_length=600)
     tournament_id: Optional[str] = None
     event_id: Optional[str] = None
     team_id: Optional[str] = None
@@ -520,6 +561,7 @@ class BulkAwardBody(BaseModel):
     note: Optional[str] = None
     earned_at: Optional[str] = None
     silent: bool = False
+    notify: bool = True
     dry_run: bool = False
 
 
@@ -528,9 +570,9 @@ async def admin_bulk_award(body: BulkAwardBody, me: dict = Depends(require_area(
     """Massenvergabe (E10): Liste, Turnier-/Event-Teilnehmer, Team, Mitglieder oder Rolle - bis 500 auf einmal."""
     await _require_board(me)
     from services import achievement_admin
-    selection = {"user_ids": body.user_ids, "tournament_id": body.tournament_id, "event_id": body.event_id, "team_id": body.team_id, "members": body.members, "role": body.role}
+    selection = {"user_ids": body.user_ids, "names": body.names, "tournament_id": body.tournament_id, "event_id": body.event_id, "team_id": body.team_id, "members": body.members, "role": body.role}
     try:
-        return await achievement_admin.bulk_award(get_db(), me, body.tier_code, selection, note=body.note, earned_at=body.earned_at, silent=body.silent, dry_run=body.dry_run)
+        return await achievement_admin.bulk_award(get_db(), me, body.tier_code, selection, note=body.note, earned_at=body.earned_at, silent=body.silent, notify=body.notify, dry_run=body.dry_run)
     except LookupError as exc:
         raise HTTPException(404, str(exc))
     except ValueError as exc:
@@ -548,6 +590,33 @@ async def admin_events(limit: int = 100, kind: Optional[str] = None, user_id: Op
 async def admin_overview(me: dict = Depends(require_area("content"))):
     from services import achievement_admin
     return await achievement_admin.overview(get_db())
+
+
+@admin_router.get("/me")
+async def admin_rights(me: dict = Depends(require_area("content"))):
+    """Was diese Person im Erfolge-Admin darf: Massenvergabe, Import und XP-Eingriffe nur mit ``board``."""
+    return {"board": await _is_board(me)}
+
+
+@admin_router.get("/users/{user_id}/awards")
+async def admin_user_awards(user_id: str, me: dict = Depends(require_area("content"))):
+    """Alle Erfolge einer Person für die Rücknahme im Admin - mit Namen, Material, Datum, still und Notiz."""
+    db = get_db()
+    if not await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1}):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    awards = await db.user_achievements.find({"user_id": user_id}, {"_id": 0}).sort("earned_at", -1).to_list(2000)
+    tiers = {t["code"]: t async for t in db.achievements.find({"code": {"$in": [a["tier_code"] for a in awards]}}, {"_id": 0, "code": 1, "name": 1, "group_code": 1, "material": 1, "art": 1, "icon": 1})}
+    groups = {g["code"]: g async for g in db.achievement_groups.find({"code": {"$in": list({a.get("group_code") for a in awards})}}, {"_id": 0, "code": 1, "name": 1, "is_negative": 1, "art": 1})}
+    out = []
+    for a in awards:
+        tier = tiers.get(a["tier_code"], {})
+        group = groups.get(a.get("group_code"), {})
+        out.append({
+            "tier_code": a["tier_code"], "tier_name": tier.get("name"), "group_name": group.get("name"), "material": a.get("material") or tier.get("material"),
+            "art": tier.get("art") or group.get("art"), "icon": tier.get("icon"), "earned_at": a.get("earned_at"), "silent": bool(a.get("silent")),
+            "note": (a.get("context") or {}).get("note"), "is_negative": bool(group.get("is_negative")),
+        })
+    return out
 
 
 @admin_router.get("/catalog/check")
@@ -636,7 +705,7 @@ async def admin_list_negative_awards(me: dict = Depends(require_area("content"))
     user_ids = list({a["user_id"] for a in awards})
     users = {u["id"]: u for u in await db.users.find(
         {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1, "email": 1}).to_list(500)}
-    tiers_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0, "code": 1, "name": 1, "group_code": 1, "icon": 1})}
+    tiers_map = {t["code"]: t async for t in db.achievements.find({}, {"_id": 0, "code": 1, "name": 1, "group_code": 1, "icon": 1, "art": 1, "material": 1})}
     out = []
     for a in awards:
         u = users.get(a["user_id"])
@@ -648,6 +717,7 @@ async def admin_list_negative_awards(me: dict = Depends(require_area("content"))
             "tier_code": a["tier_code"],
             "tier_name": t.get("name"),
             "group_code": a.get("group_code"),
+            "art": t.get("art"), "icon": t.get("icon"), "material": t.get("material") or "hidden",
             "earned_at": a["earned_at"],
             "context": a.get("context", {}),
         })
@@ -709,6 +779,8 @@ async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_
         "data": {"incident_type": body.incident_type, "tier_code": code, "note": body.note},
         "created_at": now_utc().isoformat(),
     })
+    if code:
+        await _log(me, "incident", user_id=body.user_id, tier_code=code, note=body.note, data={"incident_type": body.incident_type})
     return {"ok": True, "tier_code": code, "newly_awarded": bool(code)}
 
 
@@ -716,8 +788,11 @@ async def admin_trigger_incident(body: IncidentBody, me: dict = Depends(require_
 @admin_router.post("/season/{season_id}/award")
 async def admin_season_award(season_id: str, me: dict = Depends(require_area("content"))):
     db = get_db()
-    if not await db.seasons.find_one({"id": season_id}, {"_id": 0, "id": 1}):
+    season = await db.seasons.find_one({"id": season_id}, {"_id": 0, "id": 1, "status": 1})
+    if not season:
         raise HTTPException(404, "Saison nicht gefunden.")
+    if season.get("status") not in ("completed", "archived"):
+        raise HTTPException(400, "Die Saison läuft noch. Abgeschlossen wird sie in der Jahreswertung – dabei werden die Saison-Erfolge von selbst vergeben.")
     result = await on_season_completed(season_id)
     from services import achievement_admin
     await achievement_admin.log_event(db, "season_award", me, data={"season_id": season_id, **result})
