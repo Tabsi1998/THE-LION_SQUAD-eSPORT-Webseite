@@ -1157,6 +1157,11 @@ async def public_members_directory():
     return out
 
 
+@router.get("/discord-voice")
+async def discord_voice_view(me: dict = Depends(require_club_member())):
+    """„Discord jetzt“ (#581): online und je belegtem Sprachkanal die Zahl - nur für Mitglieder, nie Namen."""
+    from services import discord_widget
+    return await discord_widget.member_view(get_db())
 @router.get("/discord-servers")
 async def discord_servers_view(me: dict = Depends(get_current_user)):
     """Alle eingeschalteten Discord-Server des Vereins mit „du bist dabei“ (#626) - nur der eigene Status, ohne

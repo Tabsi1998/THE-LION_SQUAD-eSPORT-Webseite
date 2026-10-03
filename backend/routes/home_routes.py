@@ -289,6 +289,9 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
 
     await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
+    # Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget.
+    from services.discord_widget import public_view as discord_view
+    discord = await discord_view(db)
     return {
         "has_live": has_live,
         "live": live,
@@ -300,6 +303,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "stats": stats,
         "club_numbers": club_numbers,
         "club_numbers_shown": club_numbers_shown,
+        "discord": discord,
     }
 
 

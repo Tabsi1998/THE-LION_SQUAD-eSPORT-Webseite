@@ -10,6 +10,7 @@ import { SteamPresence } from "@/components/tls/SteamPresence";
 import { useSeason } from "@/seasons/SeasonContext";
 import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
+import { DiscordVoice } from "@/components/tls/DiscordNow";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -34,6 +35,8 @@ export default function MemberAreaPage() {
   const [helping, setHelping] = useState({ my_count: 0, open_places: 0 });
   // „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
   const [steam, setSteam] = useState(null);
+  // „Discord jetzt“ (#581): online und je belegtem Sprachkanal die Zahl - nie Namen.
+  const [discordVoice, setDiscordVoice] = useState(null);
   // Discord-Server des Vereins (#626): alle eingeschalteten, mit „Du bist dabei“ für mich.
   const [discordServers, setDiscordServers] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -51,7 +54,8 @@ export default function MemberAreaPage() {
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
       api.get("/membership/discord-servers"),
-    ]).then(([b, m, d, n, e, p, s, mt, hs, sp, ds]) => {
+      api.get("/membership/discord-voice"),
+    ]).then(([b, m, d, n, e, p, s, mt, hs, sp, ds, dv]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -63,6 +67,7 @@ export default function MemberAreaPage() {
       if (hs.status === "fulfilled" && hs.value.data?.available) setHelping({ my_count: hs.value.data.my_count || 0, open_places: hs.value.data.open_places || 0 });
       if (sp.status === "fulfilled" && sp.value.data?.available) setSteam(sp.value.data);
       if (ds.status === "fulfilled") setDiscordServers(ds.value.data);
+      if (dv.status === "fulfilled" && dv.value.data?.available) setDiscordVoice(dv.value.data);
       setLoaded(true);
     });
   }, []);
@@ -207,6 +212,12 @@ export default function MemberAreaPage() {
           </div>
 
           <div className="space-y-6">
+            {discordVoice ? (
+              <Section title="Discord jetzt" icon={MessageCircle} testId="member-area-discord-now">
+                <DiscordVoice data={discordVoice} />
+              </Section>
+            ) : null}
+
             {discordServers?.servers?.length ? (
               <Section title="Discord-Server" icon={MessageCircle} testId="member-area-discord-servers">
                 <DiscordServerList data={discordServers} testId="member-area-discord-server" />

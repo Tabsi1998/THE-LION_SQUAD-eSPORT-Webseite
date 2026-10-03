@@ -34,6 +34,9 @@ const responses: Record<string, unknown> = {
     { user_id: "u9", username: "leon", display_name: "Leon", state: "playing", state_text: "spielt gerade Rocket League", game: "Rocket League" },
     { user_id: "u8", username: "mira", display_name: "Mira", state: "online", state_text: "online" },
   ] },
+  // „Discord jetzt“ (#581): nur Zahlen je Sprachkanal.
+  "/membership/discord-voice": { available: true, online: 42, in_voice: 3, invite: "https://discord.gg/lions",
+    voice: [{ name: "Chillen", count: 1 }, { name: "Turnier-Lobby", count: 2 }] },
 };
 
 beforeEach(() => {
@@ -76,6 +79,12 @@ test("zeigt nur Internes, mit Kacheln zu Mitgliedschaft, Karte, Dokumenten und V
   const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
   await fireEvent.press(screen.getByTestId("member-area-discord"));
   expect(openUrl).toHaveBeenCalledWith("https://discord.gg/lions");
+
+  // „Discord jetzt“ (#581): Summe und je belegtem Sprachkanal Name und Zahl - keine Namen von Personen.
+  expect(screen.getByTestId("member-area-discord-summary")).toHaveTextContent("42 online · 3 im Voice");
+  expect(screen.getByTestId("member-area-discord-voice-Turnier-Lobby")).toHaveTextContent("Turnier-Lobby2");
+  await fireEvent.press(screen.getByTestId("member-area-discord-open"));
+  expect(openUrl).toHaveBeenLastCalledWith("https://discord.gg/lions");
 });
 
 test("Discord-Server (#626): alle eingeschalteten mit eigenem Status; Beitreten öffnet die Einladung", async () => {
@@ -123,4 +132,5 @@ test("ohne Inhalte ein ruhiger Hinweis; eine kaputte Quelle reißt die anderen n
   expect(screen.getByText("Dokumente")).toBeTruthy();
   expect(screen.getByText("Aktives Mitglied")).toBeTruthy();
   expect(screen.queryByTestId("member-area-discord")).toBeNull();
+  expect(screen.queryByTestId("member-area-discord-now")).toBeNull();
 });
