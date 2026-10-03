@@ -2,11 +2,12 @@
 
 Statt immer neuer Meldungen postet der Bot je Einbettung **eine** Nachricht, pinnt sie und
 **bearbeitet** sie danach: die Rangliste der laufenden Saison (Top 10), die nächsten fünf Events
-und Turniere (Wiener Zeit, Stand der Anmeldung) und wer aus dem Verein gerade streamt. Je Einbettung
-wählt der Betreiber unter Verbindungen → Discord einen Kanal und schaltet sie ein.
+und Turniere (Wiener Zeit, Stand der Anmeldung) und den Erfolg der Woche. Je Einbettung wählt der
+Betreiber unter Verbindungen → Discord einen Kanal und schaltet sie ein. Wer gerade streamt, zeigen seit
+#883 die Stream-Meldungen (``discord_streams``) - die frühere Übersicht „Live jetzt“ räumt ``retire`` ab.
 
-Auslöser sind Änderungen (``request_refresh``: Ergebnis bestätigt, Event angelegt, Stream beginnt
-oder endet) - gebündelt auf höchstens eine Bearbeitung je Einbettung pro Minute (Discord-Limit),
+Auslöser sind Änderungen (``request_refresh``: Ergebnis bestätigt, Event angelegt) - gebündelt auf
+höchstens eine Bearbeitung je Einbettung pro Minute (Discord-Limit),
 und ein Sammler alle zehn Minuten schreibt „Stand: 18:32 Uhr“ in die Fußzeile neu. Gleicher Inhalt
 wird nicht noch einmal geschickt (``content_hash``). Ist die Nachricht gelöscht, postet der Bot neu.
 
@@ -29,11 +30,13 @@ logger = logging.getLogger("tls.discord.embeds")
 KINDS = {
     "ranking": {"label": "Rangliste", "hint": "Die Jahreswertung der laufenden Saison: Top 10 mit Punkten und Link."},
     "events": {"label": "Nächste Events", "hint": "Die nächsten fünf Events und Turniere mit Wiener Zeit und Stand der Anmeldung."},
-    "live": {"label": "Live jetzt", "hint": "Wer aus dem Verein gerade streamt, mit Link – leer heißt „gerade streamt niemand“."},
     # Erfolge II (#622): einmal je Woche neu, nur Personen mit öffentlichem Profil und öffentlichen Erfolgen.
     "achievement_week": {"label": "Erfolg der Woche", "hint": "Die seltenste Freischaltung der letzten Woche – mit Person (nur öffentliche Profile), Material und Seltenheit."},
 }
 COLORS = {"ranking": 0xFFD700, "events": 0x29B6E8, "live": 0x9146FF, "achievement_week": 0xA66BFF}
+# „Live jetzt“ (#883, Entscheidung des Betreibers vom 03.10.2026): keine angeheftete Übersicht mehr - wer live ist, zeigen
+# die Stream-Meldungen (eine Nachricht je Stream, am Ende gelöscht). Die Vorlage „live“ bleibt für /wer-streamt.
+RETIRED = ("live",)
 MIN_EDIT_SECONDS = 60
 FULL_INTERVAL_MINUTES = 10
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -42,6 +45,7 @@ REASON_TEXTS = {
     "channel_missing": "Kein Kanal gewählt (Verbindungen → Discord → Einbettungen).",
     "throttled": "Höchstens eine Bearbeitung pro Minute – kommt gleich.",
     "unchanged": "Inhalt unverändert – nichts zu bearbeiten.",
+    "build_failed": "Die Nachricht ließ sich nicht aufbauen",
 }
 # Was geändert wurde und noch nicht in der Nachricht steht (ein API-Prozess, siehe change_events).
 _dirty: set[str] = set()
@@ -238,9 +242,15 @@ async def _save(db, kind: str, patch: dict, unset: tuple[str, ...] = ()) -> None
     await db.settings.update_one({"id": "discord"}, op, upsert=True)
 
 
+async def _note(db, kind: str, now: datetime, paused: str) -> None:
+    """Der Lauf hat geprüft, durfte aber nichts schreiben (#883) - mit Grund, damit die Seite nicht still „Nachricht steht“ zeigt."""
+    await _save(db, kind, {"checked_at": now.isoformat(), "paused": paused})
+
+
 async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = None) -> dict:
     """Eine Einbettung aktuell halten: bearbeiten, wenn sich der Inhalt geändert hat; neu posten, wenn die
-    Nachricht weg ist; höchstens einmal pro Minute (``force`` überstimmt die Unveränderlichkeit, nie die Bremse)."""
+    Nachricht weg ist; höchstens einmal pro Minute (``force`` überstimmt die Unveränderlichkeit, nie die Bremse).
+    Jeder Lauf hält ``checked_at`` fest; bricht er ab, steht der Grund in ``paused`` bzw. ``error`` (#883)."""
     from discord_service import REASON_TEXTS as SEND_TEXTS
     from services.discord_bot import bot, bot_settings
 
@@ -256,18 +266,27 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
         _dirty.discard(kind)
         return {"ok": False, "reason": "channel_missing", "error": REASON_TEXTS["channel_missing"]}
     if not bool(settings.get("enabled", True)):
+        await _note(db, kind, current, SEND_TEXTS["disabled"])
         return {"ok": False, "reason": "disabled", "error": SEND_TEXTS["disabled"]}
     if not bot_settings(settings)["enabled"]:
+        await _note(db, kind, current, SEND_TEXTS["bot_off"])
         return {"ok": False, "reason": "bot_off", "error": SEND_TEXTS["bot_off"]}
     last = _dt(state.get("updated_at"))
     if last and current - last < timedelta(seconds=MIN_EDIT_SECONDS):
         _dirty.add(kind)
         return {"ok": False, "reason": "throttled", "error": REASON_TEXTS["throttled"]}
 
-    rendered = await build(db, kind, current)
+    try:
+        rendered = await build(db, kind, current)
+    except Exception as exc:  # noqa: BLE001 - ein Fehler beim Aufbauen darf den Job nicht still anhalten (#883)
+        logger.warning("[discord-embeds] %s: Aufbau fehlgeschlagen: %s", kind, type(exc).__name__)
+        error = f"{REASON_TEXTS['build_failed']} ({type(exc).__name__})."
+        await _save(db, kind, {"error": error, "checked_at": current.isoformat()})
+        return {"ok": False, "reason": "build_failed", "error": error}
     digest = content_hash(rendered)
     if state.get("message_id") and state.get("hash") == digest and not force:
         _dirty.discard(kind)
+        await _save(db, kind, {"checked_at": current.isoformat()}, unset=("paused",))
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
     embed = rendered["embed"]
     channel_id = str(state["channel_id"])
@@ -290,19 +309,60 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
     stamp = current.isoformat()
     if result.get("ok"):
-        patch = {"message_id": str(result.get("message_id") or message_id), "hash": digest, "updated_at": stamp, "error": None, "last_action": action}
+        patch = {"message_id": str(result.get("message_id") or message_id), "hash": digest, "updated_at": stamp, "checked_at": stamp, "error": None,
+                 "last_action": action}
         if action == "posted":
             patch["posted_at"] = stamp
-        await _save(db, kind, patch)
+        await _save(db, kind, patch, unset=("paused",))
         _dirty.discard(kind)
         return {"ok": True, "reason": action, "message_id": patch["message_id"], "pinned": result.get("pinned")}
     error = result.get("error") or SEND_TEXTS.get(result.get("reason") or "", "") or str(result.get("reason") or "error")
-    await _save(db, kind, {"error": error, "updated_at": stamp if result.get("reason") not in ("bot_offline",) else state.get("updated_at")})
+    await _save(db, kind, {"error": error, "checked_at": stamp,
+                           "updated_at": stamp if result.get("reason") not in ("bot_offline",) else state.get("updated_at")})
     return {"ok": False, "reason": result.get("reason") or "error", "error": error}
 
 
+async def retire(db) -> dict:
+    """Einmal aufräumen (#883): die angeheftete Nachricht einer weggefallenen Einbettung löscht der Bot - es ist seine eigene.
+    Ihr Kanal geht als Vorschlag an die Stream-Meldungen, solange dort keiner steht; sind sie noch aus, steht „Wenn der Stream
+    endet“ auf löschen. Eingeschaltet wird nichts. Ist der Bot gerade nicht verbunden, versucht es der nächste Lauf wieder."""
+    from services.discord_bot import bot
+
+    settings, embeds = await _config(db)
+    streams = settings.get("streams") if isinstance(settings.get("streams"), dict) else {}
+    retired = []
+    for kind in RETIRED:
+        state = embeds.get(kind)
+        if not isinstance(state, dict):
+            continue
+        channel_id = str(state.get("channel_id") or "").strip()
+        message_id = str(state.get("message_id") or "").strip()
+        if channel_id and message_id:
+            result = await bot.delete_message(channel_id, message_id)
+            if not result.get("ok") and result.get("reason") in ("bot_offline", "http", "error"):
+                continue
+            if not result.get("ok"):
+                logger.warning("[discord-embeds] alte Nachricht „%s“ nicht gelöscht: %s", kind, result.get("reason"))
+        patch: dict = {}
+        if channel_id and not str(streams.get("channel_id") or "").strip():
+            patch["streams.channel_id"] = channel_id
+        if not streams.get("enabled"):
+            patch["streams.on_end"] = "delete"
+        op: dict = {"$unset": {f"embeds.{kind}": ""}}
+        if patch:
+            op["$set"] = patch
+        await db.settings.update_one({"id": "discord"}, op)
+        retired.append(kind)
+    return {"retired": retired}
+
+
 async def sweep(db, *, full: bool = False) -> dict:
-    """Job: alle 60 s die geänderten Einbettungen, alle 10 min alle (mit neuem „Stand“)."""
+    """Job: alle 60 s die geänderten Einbettungen, alle 10 min alle (mit neuem „Stand“) - dann auch das Aufräumen (#883)."""
+    if full:
+        try:
+            await retire(db)
+        except Exception as exc:  # noqa: BLE001 - das Aufräumen darf die Einbettungen nicht aufhalten
+            logger.warning("[discord-embeds] Aufräumen fehlgeschlagen: %s", type(exc).__name__)
     _, embeds = await _config(db)
     kinds = [kind for kind in KINDS if (embeds.get(kind) or {}).get("enabled")] if full else [kind for kind in list(_dirty) if (embeds.get(kind) or {}).get("enabled")]
     outcome = {"checked": len(kinds), "edited": 0, "posted": 0, "errors": 0, "throttled": 0}
@@ -329,5 +389,6 @@ async def embeds_status(db) -> dict:
         channel_id = str(state.get("channel_id") or "")
         out[kind] = {"label": spec["label"], "hint": spec["hint"], "enabled": bool(state.get("enabled")), "channel_id": channel_id,
                      "channel_name": names.get(channel_id), "message_id": state.get("message_id"), "posted_at": state.get("posted_at"),
-                     "updated_at": state.get("updated_at"), "error": state.get("error"), "pending": kind in _dirty}
+                     "updated_at": state.get("updated_at"), "checked_at": state.get("checked_at"), "paused": state.get("paused"),
+                     "error": state.get("error"), "pending": kind in _dirty}
     return out

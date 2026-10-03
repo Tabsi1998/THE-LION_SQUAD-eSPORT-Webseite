@@ -15,10 +15,10 @@ const DATA = {
   embeds: {
     ranking: { label: "Rangliste", hint: "Top 10", enabled: false, channel_id: "", channel_name: null, message_id: null, updated_at: null, error: null, pending: false },
     events: { label: "Nächste Events", hint: "Fünf Termine", enabled: true, channel_id: "100000000000000001", channel_name: "termine", message_id: "m1", updated_at: "2026-09-25T10:00:00+00:00", error: null, pending: true },
-    live: { label: "Live jetzt", hint: "Wer streamt", enabled: true, channel_id: "", channel_name: null, message_id: null, updated_at: null, error: "Der Bot darf in diesem Kanal nicht schreiben", pending: false },
+    achievement_week: { label: "Erfolg der Woche", hint: "Seltenste Freischaltung", enabled: true, channel_id: "", channel_name: null, message_id: null, updated_at: null, error: "Der Bot darf in diesem Kanal nicht schreiben", pending: false },
   },
 };
-const CHANNELS = { ok: true, channels: [{ id: "100000000000000001", name: "termine", category: "Community", can_send: true, can_embed: true }, { id: "100000000000000002", name: "live", category: "", can_send: true, can_embed: true }] };
+const CHANNELS = { ok: true, channels: [{ id: "100000000000000001", name: "termine", category: "Community", can_send: true, can_embed: true }, { id: "100000000000000002", name: "erfolge", category: "", can_send: true, can_embed: true }] };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,26 +32,31 @@ test("Stand und Rückmeldung in Worten", () => {
   expect(stateText({ enabled: true, channel_id: "" })).toContain("kein Kanal");
   expect(stateText({ enabled: true, channel_id: "1", message_id: null })).toContain("nächsten Lauf");
   expect(stateText(DATA.embeds.events)).toContain("Änderung vorgemerkt");
-  expect(stateText(DATA.embeds.live)).toBe("Fehler: Der Bot darf in diesem Kanal nicht schreiben");
+  expect(stateText(DATA.embeds.achievement_week)).toBe("Fehler: Der Bot darf in diesem Kanal nicht schreiben");
+  // #883: ein Lauf, der nicht schreiben durfte, sagt warum - und wann er zuletzt geprüft hat.
+  const paused = { enabled: true, channel_id: "1", message_id: "m1", updated_at: "2026-09-29T18:12:32+00:00", paused: "Der Bot ist ausgeschaltet.", checked_at: "2026-10-03T16:00:00+00:00" };
+  expect(stateText(paused)).toMatch(/^Angehalten: Der Bot ist ausgeschaltet\. · zuletzt geprüft /);
+  expect(stateText({ ...paused, paused: null })).toMatch(/^Nachricht steht · Stand .* · zuletzt geprüft /);
   expect(refreshResultText({ ok: true, reason: "posted" })).toBe("Nachricht gepostet und angepinnt.");
   expect(refreshResultText({ ok: true, reason: "unchanged" })).toBe("Inhalt unverändert.");
   expect(refreshResultText({ ok: false, reason: "throttled", error: "kommt gleich" })).toBe("Nicht aktualisiert: kommt gleich");
 });
 
-test("drei Einbettungen: Schalter, Kanal aus der Liste, Speichern, Jetzt aktualisieren", async () => {
+test("drei Einbettungen ohne „Live jetzt“: Schalter, Kanal aus der Liste, Speichern, Jetzt aktualisieren", async () => {
   const user = userEvent.setup();
   render(<DiscordEmbedsPanel />);
   expect(await screen.findByTestId("discord-embed-events-state")).toHaveTextContent("Nachricht steht");
-  expect(screen.getByTestId("discord-embed-live-state")).toHaveTextContent("Fehler");
+  expect(screen.getByTestId("discord-embed-achievement_week-state")).toHaveTextContent("Fehler");
+  expect(screen.queryByTestId("discord-embed-live-state")).toBeNull();
   expect(screen.getByTestId("discord-embed-ranking-refresh")).toBeDisabled();
 
   await user.click(screen.getByTestId("discord-embed-ranking-enabled"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { embeds: { ranking: { enabled: true } } }));
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Einbettung an"));
 
-  await user.selectOptions(screen.getByTestId("discord-embed-live-channel"), "100000000000000002");
-  await user.click(screen.getByTestId("discord-embed-live-save"));
-  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { embeds: { live: { channel_id: "100000000000000002" } } }));
+  await user.selectOptions(screen.getByTestId("discord-embed-achievement_week-channel"), "100000000000000002");
+  await user.click(screen.getByTestId("discord-embed-achievement_week-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { embeds: { achievement_week: { channel_id: "100000000000000002" } } }));
 
   await user.click(screen.getByTestId("discord-embed-events-refresh"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/discord/embeds/events/refresh"));

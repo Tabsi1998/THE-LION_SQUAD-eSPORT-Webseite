@@ -1,6 +1,8 @@
-"""Live-Einbettungen (#569): Rechnung der drei Einbettungen, eine Nachricht je Einbettung (posten +
+"""Live-Einbettungen (#569): Rechnung der Einbettungen, eine Nachricht je Einbettung (posten +
 pinnen, dann bearbeiten), gleicher Inhalt = keine Bearbeitung, neu nach Löschung, Bremse eine Minute,
-Einstellungen mit Kanalwahl und „Jetzt aktualisieren“ - alles mit nachgestelltem Bot."""
+Einstellungen mit Kanalwahl und „Jetzt aktualisieren“ - alles mit nachgestelltem Bot. Seit #883: „Live jetzt“
+gibt es nicht mehr (einmal aufgeräumt), und eine stehende Einbettung sagt, warum."""
+import json
 import pathlib
 import sys
 from datetime import timedelta
@@ -24,6 +26,8 @@ class FakeBot:
         self.edited: list[dict] = []
         self.pinned: list[str] = []
         self.deleted: set[str] = set()
+        self.delete_calls: list[tuple[str, str]] = []
+        self.delete_result: dict = {"ok": True}
         self.counter = 0
 
     async def send_embed(self, channel_id, embed, buttons=None, *, content=None, mention_role_ids=None):
@@ -41,6 +45,10 @@ class FakeBot:
         self.pinned.append(message_id)
         return {"ok": True}
 
+    async def delete_message(self, channel_id, message_id):
+        self.delete_calls.append((channel_id, message_id))
+        return dict(self.delete_result)
+
 
 @pytest_asyncio.fixture
 async def flow():
@@ -57,6 +65,7 @@ def bot(monkeypatch):
     monkeypatch.setattr(discord_bot.bot, "send_embed", fake.send_embed)
     monkeypatch.setattr(discord_bot.bot, "edit_embed", fake.edit_embed)
     monkeypatch.setattr(discord_bot.bot, "pin_message", fake.pin_message)
+    monkeypatch.setattr(discord_bot.bot, "delete_message", fake.delete_message)
 
     async def fake_apply():
         return True
@@ -119,13 +128,14 @@ async def test_settings_validate_and_expose_the_embeds(flow, bot):
     assert saved.status_code == 200 and saved.json()["changed"] is True
     data = (await flow.get("/api/settings/discord")).json()
     assert data["embeds"]["events"]["enabled"] is True and data["embeds"]["events"]["channel_id"] == CHANNEL and data["embeds"]["events"]["label"] == "Nächste Events"
-    assert data["embeds"]["ranking"]["enabled"] is False and set(data["embeds"]) == {"ranking", "events", "live", "achievement_week"}
+    assert data["embeds"]["ranking"]["enabled"] is False and set(data["embeds"]) == {"ranking", "events", "achievement_week"}
+    assert (await flow.put("/api/settings/discord", json={"embeds": {"live": {"enabled": True}}})).status_code == 400, "„Live jetzt“ gibt es nicht mehr (#883)"
     assert "embeds" not in data.get("bot", {})
 
 
 @pytest.mark.asyncio
 async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_throttle(flow, bot):
-    await configure(flow, {"events": {"enabled": True, "channel_id": CHANNEL}, "live": {"enabled": True, "channel_id": CHANNEL}, "ranking": {"enabled": False}})
+    await configure(flow, {"events": {"enabled": True, "channel_id": CHANNEL}, "achievement_week": {"enabled": True, "channel_id": CHANNEL}, "ranking": {"enabled": False}})
     await flow.db.events.insert_one({"id": "e1", "slug": "lan", "name": "LAN-Party", "status": "scheduled", "visibility": "public",
                                      "start_date": (now_utc() + timedelta(days=3)).isoformat()})
     t0 = now_utc()
@@ -156,14 +166,15 @@ async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_th
     state = (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"]["events"]
     assert state["message_id"] == "m2" and state["last_action"] == "posted" and state["error"] is None
 
-    # Der Sammler alle 10 min schreibt den Stand neu (force), auch ohne Änderung; leer bleibt „niemand“.
+    # Der Sammler alle 10 min schreibt den Stand neu (force), auch ohne Änderung; ohne Freischaltung „diese Woche keiner“.
     outcome = await discord_embeds.sweep(flow.db, full=True)
-    assert outcome["checked"] == 2 and outcome["posted"] == 1, outcome   # live wird zum ersten Mal gepostet, events gebremst oder bearbeitet
-    assert "Gerade streamt niemand" in text_of(bot.sent[-1]["embed"])
+    assert outcome["checked"] == 2 and outcome["posted"] == 1, outcome   # Erfolg der Woche zum ersten Mal, events gebremst oder bearbeitet
+    assert "Diese Woche" in json.dumps(bot.sent[-1]["embed"], ensure_ascii=False)
 
     flow.act_as(await flow.add_user(role="club_admin", name="admin2"))
     status = (await flow.get("/api/settings/discord")).json()["embeds"]
-    assert status["events"]["message_id"] == "m2" and status["live"]["message_id"] == "m3" and status["events"]["updated_at"]
+    assert status["events"]["message_id"] == "m2" and status["achievement_week"]["message_id"] == "m3" and status["events"]["updated_at"]
+    assert status["events"]["checked_at"] and status["events"]["paused"] is None
     player = await flow.add_user(role="player", name="paula")
     flow.act_as(player)
     assert (await flow.post("/api/settings/discord/embeds/events/refresh")).status_code in (401, 403)
@@ -171,12 +182,85 @@ async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_th
 
 @pytest.mark.asyncio
 async def test_channel_change_starts_a_new_message_and_refresh_route_forces(flow, bot):
-    await configure(flow, {"live": {"enabled": True, "channel_id": CHANNEL}})
-    assert (await discord_embeds.refresh(flow.db, "live"))["reason"] == "posted"
+    await configure(flow, {"events": {"enabled": True, "channel_id": CHANNEL}})
+    assert (await discord_embeds.refresh(flow.db, "events"))["reason"] == "posted"
     other = "100000000000000012"
-    assert (await flow.put("/api/settings/discord", json={"embeds": {"live": {"channel_id": other}}})).status_code == 200
-    state = (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"]["live"]
+    assert (await flow.put("/api/settings/discord", json={"embeds": {"events": {"channel_id": other}}})).status_code == 200
+    state = (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"]["events"]
     assert "message_id" not in state and state["channel_id"] == other, "neuer Kanal = neue Nachricht"
-    forced = (await flow.post("/api/settings/discord/embeds/live/refresh")).json()
+    forced = (await flow.post("/api/settings/discord/embeds/events/refresh")).json()
     assert forced["reason"] == "posted" and bot.sent[-1]["channel_id"] == other
     assert (await flow.post("/api/settings/discord/embeds/gibt-es-nicht/refresh")).status_code == 404
+    assert (await flow.post("/api/settings/discord/embeds/live/refresh")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_the_live_overview_is_retired_once_and_its_channel_goes_to_the_stream_posts(flow, bot):
+    """#883 (Entscheidung A): „Live jetzt“ gibt es nicht mehr. Die alte angeheftete Nachricht löscht der Bot einmal (seine
+    eigene), ihr Kanal wird den Stream-Meldungen vorgeschlagen, „Wenn der Stream endet“ steht auf löschen - eingeschaltet
+    wird nichts. Ist der Bot nicht verbunden, versucht es der nächste Lauf wieder."""
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {
+        "id": "discord", "embeds": {"live": {"enabled": True, "channel_id": CHANNEL, "message_id": "m9"}},
+        "streams": {"enabled": False, "channel_id": "", "on_end": "edit"}}}, upsert=True)
+
+    bot.delete_result = {"ok": False, "reason": "bot_offline"}
+    assert (await discord_embeds.retire(flow.db))["retired"] == []
+    assert "live" in (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"], "der nächste Lauf versucht es wieder"
+
+    bot.delete_result = {"ok": True}
+    await discord_embeds.sweep(flow.db, full=True)
+    settings = await flow.db.settings.find_one({"id": "discord"}, {"_id": 0})
+    assert bot.delete_calls == [(CHANNEL, "m9"), (CHANNEL, "m9")]
+    assert "live" not in (settings.get("embeds") or {})
+    assert settings["streams"] == {"enabled": False, "channel_id": CHANNEL, "on_end": "delete"}, "Kanal vorgeschlagen, nichts eingeschaltet"
+    await discord_embeds.sweep(flow.db, full=True)
+    assert len(bot.delete_calls) == 2, "nur einmal aufräumen"
+
+    # /wer-streamt antwortet weiter mit der Vorlage „live“.
+    built = await discord_embeds.build(flow.db, "live")
+    assert "Gerade streamt niemand" in text_of(built["embed"])
+
+
+@pytest.mark.asyncio
+async def test_retiring_keeps_what_was_chosen_for_the_stream_posts(flow, bot):
+    await flow.db.settings.update_one({"id": "discord"}, {"$set": {
+        "id": "discord", "embeds": {"live": {"enabled": True, "channel_id": CHANNEL, "message_id": "m9"}},
+        "streams": {"enabled": True, "channel_id": "100000000000000099", "on_end": "edit"}}}, upsert=True)
+    bot.delete_result = {"ok": True, "gone": True}
+    assert (await discord_embeds.retire(flow.db))["retired"] == ["live"]
+    settings = await flow.db.settings.find_one({"id": "discord"}, {"_id": 0})
+    assert settings["streams"] == {"enabled": True, "channel_id": "100000000000000099", "on_end": "edit"}, "Eingestelltes bleibt"
+    assert "live" not in settings["embeds"]
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_embed_says_why_instead_of_standing_still(flow, bot, monkeypatch):
+    """#883: „Live jetzt“ stand vier Tage auf „Nachricht steht · Stand 29.9.“ - ohne Grund. Jeder Lauf hält fest, wann er
+    geprüft hat; darf er nicht schreiben (Bot aus) oder scheitert der Aufbau, steht der Grund da - und verschwindet wieder."""
+    await configure(flow, {"events": {"enabled": True, "channel_id": CHANNEL}})
+    t0 = now_utc()
+    assert (await discord_embeds.refresh(flow.db, "events", now=t0))["reason"] == "posted"
+
+    assert (await flow.put("/api/settings/discord", json={"bot_enabled": False})).status_code == 200
+    stopped = await discord_embeds.refresh(flow.db, "events", force=True, now=t0 + timedelta(minutes=10))
+    assert stopped["reason"] == "bot_off"
+    status = (await flow.get("/api/settings/discord")).json()["embeds"]["events"]
+    assert status["paused"] and status["checked_at"] == (t0 + timedelta(minutes=10)).isoformat() and status["updated_at"] == t0.isoformat()
+
+    assert (await flow.put("/api/settings/discord", json={"bot_enabled": True})).status_code == 200
+    original_build = discord_embeds.build
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("kaputt")
+
+    monkeypatch.setattr(discord_embeds, "build", broken)
+    failed = await discord_embeds.refresh(flow.db, "events", force=True, now=t0 + timedelta(minutes=20))
+    assert failed["reason"] == "build_failed" and "RuntimeError" in failed["error"]
+    status = (await flow.get("/api/settings/discord")).json()["embeds"]["events"]
+    assert "RuntimeError" in status["error"] and status["checked_at"] == (t0 + timedelta(minutes=20)).isoformat()
+
+    monkeypatch.setattr(discord_embeds, "build", original_build)
+    healed = await discord_embeds.refresh(flow.db, "events", force=True, now=t0 + timedelta(minutes=30))
+    assert healed["reason"] == "edited"
+    state = (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"]["events"]
+    assert "paused" not in state and state["error"] is None and state["checked_at"] == (t0 + timedelta(minutes=30)).isoformat()

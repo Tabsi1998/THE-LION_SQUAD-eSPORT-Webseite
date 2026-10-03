@@ -30,7 +30,7 @@ export function DiscordStreamsPanel({ onDesign }) {
     try {
       const { data } = await api.get("/settings/discord/streams");
       setState(data);
-      setDraft({ enabled: !!data.enabled, channel_id: data.channel_id || "", on_end: data.on_end || "edit", role_id: data.role_id || "" });
+      setDraft({ enabled: !!data.enabled, channel_id: data.channel_id || "", on_end: data.on_end || "delete", role_id: data.role_id || "" });
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
@@ -42,7 +42,7 @@ export function DiscordStreamsPanel({ onDesign }) {
 
   if (!state) return null;
   const chosenRole = (state.roles || []).find((role) => role.id === draft.role_id);
-  const dirty = draft.enabled !== !!state.enabled || draft.channel_id !== (state.channel_id || "") || draft.on_end !== (state.on_end || "edit") || draft.role_id !== (state.role_id || "");
+  const dirty = draft.enabled !== !!state.enabled || draft.channel_id !== (state.channel_id || "") || draft.on_end !== (state.on_end || "delete") || draft.role_id !== (state.role_id || "");
   const save = async () => {
     setBusy(true);
     try {
@@ -63,7 +63,8 @@ export function DiscordStreamsPanel({ onDesign }) {
           <h3 className="font-heading text-base font-black uppercase inline-flex items-center gap-2"><Radio className="w-4 h-4 text-[#9146FF]" /> Stream-Meldungen</h3>
           <p className="mt-1 text-xs text-white/55 max-w-2xl">
             Je Stream eine Meldung, sobald jemand aus dem Verein live geht – mit Titel, Spiel, Zuschauern und Vorschaubild. Alle zehn Minuten
-            aktualisiert, am Ende „war live“ oder gelöscht. Gemeldet wird, wer auch auf der Startseite erscheint.
+            aktualisiert, am Ende gelöscht oder „war live“. Gemeldet wird, wer auch auf der Startseite erscheint. Mit „Meldung löschen“
+            steht im Kanal immer genau, wer gerade live ist – das ersetzt die frühere Übersicht „Live jetzt“.
           </p>
         </div>
         {onDesign && (
@@ -89,8 +90,8 @@ export function DiscordStreamsPanel({ onDesign }) {
         <label className="block text-xs">
           <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Wenn der Stream endet</div>
           <select value={draft.on_end} onChange={(event) => setDraft((current) => ({ ...current, on_end: event.target.value }))} className={INPUT} data-testid="discord-streams-end">
+            <option value="delete">Meldung löschen – der Kanal zeigt, wer gerade live ist</option>
             <option value="edit">Meldung zu „war live“ machen</option>
-            <option value="delete">Meldung löschen</option>
           </select>
         </label>
         <label className="block text-xs">

@@ -98,8 +98,8 @@ KINDS: dict[str, dict] = {
         },
     },
     "live": {
-        "label": "Live jetzt", "group": "Angeheftete Einbettungen", "list": True, "max_rows": 10,
-        "hint": "Die angeheftete Übersicht, wer gerade streamt – ein Eintrag je Stream.",
+        "label": "Antwort auf /wer-streamt", "group": "Streams", "list": True, "max_rows": 10,
+        "hint": "Was /wer-streamt antwortet – sieht nur, wer fragt. Ein Eintrag je Stream.",
         "placeholders": {},
         "row_placeholders": {key: STREAM[key] for key in ("streamer", "login", "title", "game", "viewers", "url", "preview", "avatar", "started", "profile", "platform")},
         "default": {
@@ -443,7 +443,7 @@ def validate(kind: str, template, *, origin: str = "https://example.org") -> lis
         if not 1 <= max_rows <= LIMITS["fields"]:
             errors.append(f"„max_rows“ liegt zwischen 1 und {LIMITS['fields']}.")
     elif any(key in template for key in ("rows", "row", "row_field", "empty", "max_rows")):
-        errors.append("Zeilen je Eintrag gibt es nur bei Listen (Live jetzt, Nächste Events, Rangliste).")
+        errors.append("Zeilen je Eintrag gibt es nur bei Listen (Antwort auf /wer-streamt, Nächste Events, Rangliste).")
     for key, limit in (("content", LIMITS["content"]), ("title", LIMITS["title"]), ("description", LIMITS["description"])):
         if isinstance(template.get(key), str) and len(template[key]) > limit:
             errors.append(f"„{SLOT_LABELS[key]}“ ist zu lang – höchstens {limit} Zeichen.")

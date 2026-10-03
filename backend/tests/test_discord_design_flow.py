@@ -202,7 +202,7 @@ async def streams_on(flow, **extra):
 
 @pytest.mark.asyncio
 async def test_one_message_per_stream_updated_every_ten_minutes_and_finished(flow, bot):
-    await streams_on(flow)
+    await streams_on(flow, on_end="edit")   # „war live“ ausdrücklich - die Vorgabe ist seit #883 „löschen“
     await streamer(flow, "paula", stream_id="s1", viewers=4)
     await streamer(flow, "gast", member=False, stream_id="s2")
     t0 = now_utc()
@@ -247,6 +247,7 @@ async def test_switches_delete_mode_and_flood_cap(flow, bot):
     assert (await discord_streams.sync(flow.db))["reason"] == "disabled" and bot.sent == []
     assert (await flow.put("/api/settings/discord/streams", json={"enabled": True})).status_code == 200
     assert (await discord_streams.sync(flow.db))["reason"] == "channel_missing"
+    assert (await flow.get("/api/settings/discord/streams")).json()["on_end"] == "delete", "Vorgabe seit #883: löschen"
     assert (await flow.put("/api/settings/discord/streams", json={"channel_id": "abc"})).status_code == 400
     assert (await flow.put("/api/settings/discord/streams", json={"on_end": "irgendwas"})).status_code == 400
     assert (await flow.put("/api/settings/discord/streams", json={"role_id": "@rolle"})).status_code == 400
