@@ -1,7 +1,7 @@
 import React from "react";
 import { Linking } from "react-native";
 import { fireEvent, render, screen } from "@testing-library/react-native";
-import { AccountsCard, LinkedAccountsCard, PlatformLinkRows, accountDetail, accountGroups, accountTitle, isVerified, linkButtonLabel, platformColor } from "./LinkedAccounts";
+import { AccountsCard, LinkedAccountsCard, PlatformLinkRows, accountDetail, accountGroups, accountTitle, isVerified, linkButtonLabel, platformColor, psnProfileUrl } from "./LinkedAccounts";
 
 // Verknüpfte Konten (#459, wie im Web): Anzeigename, Plattform, Kennung, „seit …“ und der Link zum
 // echten Konto; eine Steam-ID als Name wird zu „Steam-Profil“; das Häkchen kommt nur vom Server.
@@ -51,7 +51,7 @@ test("accountGroups und AccountsCard: jedes Konto genau einmal, gruppiert, mit H
   expect(groups.games.map((entry) => entry.platform)).toEqual(["steam", "psn"]);
   expect(groups.socials[0]).toMatchObject({ title: "Paula B.", verified: true });
   expect(groups.games[0]).toMatchObject({ title: "Steam-Profil", verified: true });
-  expect(groups.games[1]).toMatchObject({ title: "paula_psn", label: "PlayStation", url: "", verified: false });
+  expect(groups.games[1]).toMatchObject({ title: "paula_psn", label: "PlayStation", url: "https://profile.playstation.com/paula_psn", verified: false });
   expect(groups.verifiedCount).toBe(2);
 
   await render(<AccountsCard groups={groups} />);
@@ -90,4 +90,12 @@ test("PlatformLinkRows: abgehakte Plattformen fehlen", async () => {
   await render(<PlatformLinkRows links={[]} available={{ discord: true, twitch: true }} disabled={["twitch"]} onLink={jest.fn()} onUnlink={jest.fn()} />);
   expect(screen.getByTestId("profile-link-discord")).toBeTruthy();
   expect(screen.queryByTestId("profile-link-twitch")).toBeNull();
+});
+
+test("PSN-ID: gültige Online-ID und eingefügte Profil-Adresse werden verlinkt, alles andere nicht (#891)", () => {
+  expect(psnProfileUrl("Tabsi98")).toBe("https://profile.playstation.com/Tabsi98");
+  expect(psnProfileUrl("https://profile.playstation.com/Tabsi-98?share=1")).toBe("https://profile.playstation.com/Tabsi-98");
+  for (const bad of ["", "ab", "1abc", "zu_lang_fuer_psn_x", "Tabsi 98", "Täbsi", "https://evil.example/Tabsi98"]) {
+    expect(psnProfileUrl(bad)).toBe("");
+  }
 });

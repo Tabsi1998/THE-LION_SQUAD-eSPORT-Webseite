@@ -221,10 +221,19 @@ const MANUAL_FIELDS = {
   threads: "threads_handle", facebook: "facebook_handle", linkedin: "linkedin_handle", snapchat: "snapchat_handle", pinterest: "pinterest_handle", telegram: "telegram_handle", wargaming: "wargaming_handle", bungie: "bungie_handle", mastodon: "mastodon_handle", bluesky: "bluesky_handle",
 };
 
+// PlayStation (#891): getippt bleibt getippt, aber ein Klick führt zu Sonys Web-Profil profile.playstation.com/<Online-ID>.
+// Verlinkt wird nur eine gültige Online-ID (3–16 Zeichen, Buchstabe vorne, dann Buchstaben, Ziffern, - und _); eine
+// eingefügte Profil-Adresse zählt als ihre ID. Alles andere bleibt Text zum Kopieren.
+export function psnProfileUrl(value) {
+  const id = String(value || "").trim().replace(/^https?:\/\/(www\.)?profile\.playstation\.com\//i, "").split(/[/?#]/)[0];
+  return /^[A-Za-z][A-Za-z0-9_-]{2,15}$/.test(id) ? `https://profile.playstation.com/${id}` : "";
+}
+
 function manualUrl(platform, value) {
   if (platform === "website") return externalUrl(value);
   if (platform === "twitch") return normalizeTwitchChannel(value) ? `https://www.twitch.tv/${normalizeTwitchChannel(value)}` : "";
   if (platform === "xbox") return `https://www.xbox.com/play/user/${encodeURIComponent(String(value).trim())}`;
+  if (platform === "psn") return psnProfileUrl(value);
   return socialUrl(platform, value);
 }
 

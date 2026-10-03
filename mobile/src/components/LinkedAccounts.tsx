@@ -236,10 +236,19 @@ function cleanHandle(value?: unknown): string {
   return String(value || "").trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?/i, "").replace(/^twitch\.tv\//i, "").split(/[/?#]/)[0];
 }
 
+// PlayStation (#891): getippt bleibt getippt, aber ein Klick führt zu Sonys Web-Profil profile.playstation.com/<Online-ID>.
+// Verlinkt wird nur eine gültige Online-ID (3–16 Zeichen, Buchstabe vorne, dann Buchstaben, Ziffern, - und _); eine
+// eingefügte Profil-Adresse zählt als ihre ID. Alles andere bleibt Text zum Kopieren.
+export function psnProfileUrl(value?: string | null): string {
+  const id = String(value || "").trim().replace(/^https?:\/\/(www\.)?profile\.playstation\.com\//i, "").split(/[/?#]/)[0];
+  return /^[A-Za-z][A-Za-z0-9_-]{2,15}$/.test(id) ? `https://profile.playstation.com/${id}` : "";
+}
+
 function manualUrl(platform: string, value: string): string {
   const raw = String(value || "").trim();
   if (!raw) return "";
   if (platform === "website") return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  if (platform === "psn") return psnProfileUrl(raw);
   if (/^https?:\/\//i.test(raw) && platform !== "xbox") return raw;
   const handle = cleanHandle(raw);
   if (platform === "twitch") return `https://www.twitch.tv/${handle}`;
