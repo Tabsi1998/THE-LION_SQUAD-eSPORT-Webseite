@@ -348,7 +348,9 @@ class BotRunner:
                 runner.last_action = f"verbunden, Befehle registriert ({now_utc().strftime('%H:%M')} UTC)"
             except Exception as exc:
                 runner.last_error = f"Befehle: {exc}"
-            await record_state(db, connected=True, guild_name=runner.guild_name, last_error=runner.last_error, last_action=runner.last_action, started_at=now_utc().isoformat())
+            # Die Server-ID merken: das Server-Widget für die Website (#581) braucht sie, auch ohne eingetragene ID.
+            await record_state(db, connected=True, guild_name=runner.guild_name, guild_id=str(guild.id) if guild else "", last_error=runner.last_error,
+                               last_action=runner.last_action, started_at=now_utc().isoformat())
 
         @client.event
         async def on_message(message):

@@ -274,6 +274,16 @@ async def _safe_discord_scheduled_events():
         _log_task_failure("discord_scheduled_events", exc)
 
 
+async def _safe_discord_widget():
+    """Online-Zahl und Sprachkanäle für die Website (#581): jede Minute das Server-Widget holen."""
+    try:
+        from database import get_db
+        from services.discord_widget import refresh
+        await refresh(get_db())
+    except Exception as exc:
+        _log_task_failure("discord_widget", exc)
+
+
 async def _safe_discord_bot_roles():
     """Discord-Rollen abgleichen (#302) - nur wenn der Bot verbunden ist."""
     try:
@@ -720,6 +730,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_discord_bot_watch, IntervalTrigger(minutes=5), id="discord_bot_watch", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_scheduled_events", _safe_discord_scheduled_events, lease_seconds=300.0), IntervalTrigger(minutes=5), id="discord_scheduled_events",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_widget", _safe_discord_widget), IntervalTrigger(seconds=60), id="discord_widget",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_embeds", _safe_discord_embeds), IntervalTrigger(seconds=60), id="discord_embeds",
                   max_instances=1, coalesce=True)

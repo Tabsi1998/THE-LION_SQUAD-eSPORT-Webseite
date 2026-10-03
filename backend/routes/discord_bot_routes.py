@@ -25,6 +25,21 @@ async def bot_sync_roles(me: dict = Depends(require_area("club", "system"))):
     return await discord_bot.bot.sync_roles()
 
 
+@router.get("/widget")
+async def bot_widget(me: dict = Depends(require_area("club", "system"))):
+    """Server-Widget für die Website (#581): läuft es, und wenn nicht, warum - mit Klickweg."""
+    from services import discord_widget
+    return await discord_widget.admin_view(get_db())
+
+
+@router.post("/widget/refresh")
+async def bot_widget_refresh(me: dict = Depends(require_area("club", "system"))):
+    """Nach dem Einschalten im Discord gleich prüfen statt eine Minute zu warten."""
+    from services import discord_widget
+    await discord_widget.refresh(get_db())
+    return await discord_widget.admin_view(get_db())
+
+
 @router.post("/restart")
 async def bot_restart(me: dict = Depends(require_area("system"))):
     running = await discord_bot.bot.apply_settings()

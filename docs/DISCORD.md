@@ -111,6 +111,24 @@ gelten wie bei Push. Ohne Verknüpfung gibt es den Kanal nicht.
   `notification_preferences.discord_allowed`, `BotRunner.send_dm`; der Fan-out sitzt in
   `user_notifications.create_user_notification` neben Push.
 
+## Discord auf der Website (#581)
+
+Die Website zeigt, dass im Discord was los ist – aus dem **Server-Widget** von Discord, ohne
+Bot-Recht und ohne die geschützten Presence-Intents:
+
+- **Startseite:** unter den Vereinszahlen eine Leiste „Discord: 42 online · 5 im Voice“ mit
+  „Beitreten“ (die Einladung aus den Einstellungen, sonst die des Widgets).
+- **Mitgliederbereich (Web und App):** „Discord jetzt“ mit je belegtem Sprachkanal Name und Zahl
+  („Turnier-Lobby: 4“).
+- **Nie Namen von Personen:** das Widget liefert sie mit, der Server verwirft sie beim Abruf.
+  Gezählt werden nur die Sprachkanäle, die das Widget selbst zeigt – private bleiben unsichtbar.
+
+Einschalten im Discord: **Servereinstellungen → Widget → „Server-Widget aktivieren“**. Die
+Server-ID kommt vom Bot (oder aus „Discord-Bot“ → Server-ID). Ein Job holt das Widget jede Minute;
+ein Stand älter als fünf Minuten wird nicht gezeigt, niemand online heißt keine Leiste. Ist das
+Widget aus oder der Server unbekannt, verschwindet die Anzeige, und der Bot-Kasten sagt unter
+„Discord auf der Website“, wo man es einschaltet („Jetzt prüfen“ fragt sofort neu).
+
 ## Konten verknüpfen (Discord, Twitch, Steam)
 
 Mitglieder verknüpfen im Profil → Socials ihr Discord-, Twitch- oder Steam-Konto per Anmeldung
@@ -195,3 +213,8 @@ Konto-Verknüpfung läuft unabhängig vom Bot weiter.
   `send_event` senden, und ein Test, dass es mit privater Sichtbarkeit nicht an ein
   öffentliches Ziel geht. Tests stellen den Bot mit `monkeypatch.setattr(discord_bot.bot,
   "send_embed", …)` nach.
+- `backend/services/discord_widget.py` (#581): `refresh` (Job `discord_widget`, jede Minute),
+  `summarize` (nur Zahlen), `public_view` (in `/api/home/state` als `discord`), `member_view`
+  (`GET /api/membership/discord-voice`), `admin_view` (`GET /api/settings/discord/bot/widget`,
+  `POST …/widget/refresh`). Stand in `settings` mit `id: discord_widget`; die Server-ID merkt sich
+  der Bot beim Verbinden (`discord_bot_state.guild_id`).

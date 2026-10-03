@@ -28,6 +28,16 @@ type Membership = { member_number?: string | null; member_since?: string | null;
 type SteamPlayer = { user_id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; state: "playing" | "online"; state_text: string; game?: string | null };
 type SteamPresence = { available: boolean; stale?: boolean; online_count: number; players: SteamPlayer[]; me?: { linked?: boolean; opted_in?: boolean } };
 
+// „Discord jetzt“ (#581): aus dem Server-Widget nur Zahlen - online und je belegtem Sprachkanal, nie Namen.
+type DiscordVoice = { available: boolean; online?: number; in_voice?: number; voice?: { name: string; count: number }[]; invite?: string | null };
+
+export function discordSummary(discord: DiscordVoice | null): string {
+  if (!discord?.available) return "";
+  const online = Number(discord.online) || 0;
+  const voice = Number(discord.in_voice) || 0;
+  return voice > 0 ? `${online} online · ${voice} im Voice` : `${online} online`;
+}
+
 export function steamSummary(presence: SteamPresence | null): string {
   if (!presence) return "";
   if (presence.stale) return "Stand veraltet – Steam wurde länger nicht abgefragt.";
@@ -46,11 +56,12 @@ export function MemberAreaScreen({ navigation }: Props) {
   const [contacts, setContacts] = useState<BoardContact[]>([]);
   const [discordUrl, setDiscordUrl] = useState("");
   const [steam, setSteam] = useState<SteamPresence | null>(null);
+  const [discordVoice, setDiscordVoice] = useState<DiscordVoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings, presence] = await Promise.allSettled([
+    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings, presence, voice] = await Promise.allSettled([
       api.get<{ membership?: Membership }>("/membership/me"),
       api.get<ClubEvent[]>("/events", { params: { upcoming: true, compact: true, limit: 48 } }),
       api.get<NewsPost[]>("/news"),
@@ -59,6 +70,7 @@ export function MemberAreaScreen({ navigation }: Props) {
       api.get<any[]>("/board", { params: { active_only: true } }),
       api.get<{ discord_invite_url?: string }>("/settings/public"),
       api.get<SteamPresence>("/membership/steam-presence"),
+      api.get<DiscordVoice>("/membership/discord-voice"),
     ]);
     if (my.status === "fulfilled") setMembership(my.value.data?.membership || null);
     if (liveEvents.status === "fulfilled") setEvents(memberEvents(Array.isArray(liveEvents.value.data) ? liveEvents.value.data : []));
@@ -68,6 +80,7 @@ export function MemberAreaScreen({ navigation }: Props) {
     if (board.status === "fulfilled") setContacts(boardContacts(Array.isArray(board.value.data) ? board.value.data : []));
     if (settings.status === "fulfilled") setDiscordUrl(String(settings.value.data?.discord_invite_url || ""));
     if (presence.status === "fulfilled") setSteam(presence.value.data?.available ? presence.value.data : null);
+    if (voice.status === "fulfilled") setDiscordVoice(voice.value.data?.available ? voice.value.data : null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -135,6 +148,25 @@ export function MemberAreaScreen({ navigation }: Props) {
                 <Body style={styles.lineTitle}>{post.title}</Body>
               </Pressable>
             ))}
+          </Section>
+        ) : null}
+
+        {discordVoice ? (
+          <Section title="Discord jetzt" testID="member-area-discord-now">
+            <Muted testID="member-area-discord-summary">{discordSummary(discordVoice)}</Muted>
+            {(discordVoice.voice || []).map((channel) => (
+              <View key={channel.name} style={styles.voiceRow} testID={`member-area-discord-voice-${channel.name}`}>
+                <Ionicons name="volume-high" color="#5865F2" size={16} />
+                <Body style={styles.voiceName} numberOfLines={1}>{channel.name}</Body>
+                <Body style={styles.lineTitle}>{channel.count}</Body>
+              </View>
+            ))}
+            {!(discordVoice.voice || []).length ? <Muted>Gerade ist niemand in einem Sprachkanal.</Muted> : null}
+            {discordVoice.invite || discordUrl ? (
+              <Pressable onPress={() => Linking.openURL(String(discordVoice.invite || discordUrl))} accessibilityRole="link" testID="member-area-discord-open">
+                <Body style={styles.discordLink}>Discord öffnen →</Body>
+              </Pressable>
+            ) : null}
           </Section>
         ) : null}
 
@@ -235,6 +267,26 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 18,
     paddingBottom: 32,
+  },
+  voiceRow: {
+    alignItems: "center",
+    borderLeftColor: "rgba(88, 101, 242, 0.5)",
+    borderLeftWidth: 2,
+    flexDirection: "row",
+    gap: 8,
+    paddingLeft: 10,
+    paddingVertical: 4,
+  },
+  voiceName: {
+    flex: 1,
+  },
+  discordLink: {
+    // Helleres Discord-Blau: das kräftige #5865F2 hätte auf der dunklen Karte zu wenig Kontrast für kleine Schrift.
+    color: "#B8C0FF",
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
   },
   hero: {
     backgroundColor: "rgba(255, 215, 0, 0.06)",
