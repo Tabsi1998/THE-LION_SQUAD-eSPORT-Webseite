@@ -746,7 +746,6 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
-    # ------------------------------------------------ Eigenes Website-Profil (#260, Vereine ab 1.2), über die Bindung
     # ------------------------------------------------ Konten in der Akte (#846), Fähigkeit accounts
     async def my_accounts(self, who: dict) -> list[dict]:
         """Die Konten der Person: jedes Netzwerk, das der Verein abfragt (`asked`), und jedes mit einem Namen."""
@@ -769,6 +768,7 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
+    # ------------------------------------------------ Eigenes Website-Profil (#260, Vereine ab 1.2), über die Bindung
     async def my_website_profile(self, who: dict) -> dict:
         """Gamertag, Kurztext, Spiele und Plattformen, wie die Person sie selbst pflegt - plus die Einwilligung."""
         data = await self._get("/vereine/me/website-profile", dict(who))
