@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { useReduceMotion } from "../../components/FadeIn";
 import { useAuth } from "../../auth/AuthContext";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
@@ -50,9 +51,26 @@ export function phaseText(page: Pick<HuntPage, "phase" | "starts_at" | "ends_at"
   }
 }
 
+/** Ein Ei im Korb: rollt sanft hinein (je Ei etwas später) - ohne Bewegung liegt es gleich da. */
+function BasketEgg({ pattern, index, still }: { pattern: Parameters<typeof EggArt>[0]["pattern"]; index: number; still: boolean }) {
+  const drop = useRef(new Animated.Value(still ? 1 : 0)).current;
+  useEffect(() => {
+    if (still) return;
+    Animated.timing(drop, { toValue: 1, duration: 450, delay: Math.min(index, 12) * 70, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+  }, [drop, index, still]);
+  const translateY = drop.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] });
+  const rotate = drop.interpolate({ inputRange: [0, 1], outputRange: ["-12deg", "0deg"] });
+  return (
+    <Animated.View style={{ opacity: drop, transform: [{ translateY }, { rotate }] }}>
+      <EggArt pattern={pattern} size={30} />
+    </Animated.View>
+  );
+}
+
 /** Der Korb: gefundene Eier mit Muster, leere Mulden für die fehlenden - nie mehr verraten als die Zahl. */
 function Basket({ me, total }: { me: HuntMe; total: number }) {
   const found = me.eggs || [];
+  const still = useReduceMotion();
   return (
     <Card style={styles.basket} testID="hunt-basket">
       <View style={styles.basketHead}>
@@ -60,7 +78,7 @@ function Basket({ me, total }: { me: HuntMe; total: number }) {
         <Body style={styles.basketCount} testID="hunt-basket-count">{found.length} von {total}</Body>
       </View>
       <View style={styles.eggs}>
-        {found.map((egg) => <View key={egg.egg_no} style={styles.slot} testID={`hunt-basket-egg-${egg.egg_no}`}><EggArt pattern={egg.pattern} size={30} /></View>)}
+        {found.map((egg, index) => <View key={egg.egg_no} style={styles.slot} testID={`hunt-basket-egg-${egg.egg_no}`}><BasketEgg pattern={egg.pattern} index={index} still={still} /></View>)}
         {Array.from({ length: Math.max(0, total - found.length) }, (_, index) => <View key={`hole-${index}`} style={[styles.slot, styles.hole]} accessibilityLabel="Noch nicht gefunden" testID="hunt-basket-hole" />)}
       </View>
       {me.completed_at ? <Body style={styles.done} testID="hunt-basket-done">Korb voll – Platz {me.rank}! Du bist in der Verlosung.</Body> : <Muted>Die Eier liegen auf der Website und in der App – an Karten, beim Löwen, oben und unten. Antippen sammelt ein.</Muted>}
