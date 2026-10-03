@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import { Alert, Image, Linking, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
+import { Alert, Image, Linking, type NativeScrollEvent, type NativeSyntheticEvent, Pressable, RefreshControl, ScrollView, Share, StyleSheet, Switch, TextInput, View } from "react-native";
 import { ActionRow, ActionTile } from "../../components/ActionRow";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
@@ -18,12 +18,12 @@ import { availabilityText } from "../../lib/appLock";
 import { useAppLock } from "../../lock/AppLockProvider";
 import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { missingLabels } from "../../lib/profileCompleteness";
-import { AchievementGroupCard } from "../../components/AchievementGroupCard";
-import { FadeIn, staggerDelay } from "../../components/FadeIn";
-import { type AchievementGroup, STATUS_FILTERS, type StatusFilter, applyStatusFilter } from "../../lib/achievements";
-import { useProgressiveCount } from "../../lib/progressive";
-import { SegmentedTabs } from "../../components/SegmentedTabs";
+import { FadeIn } from "../../components/FadeIn";
 import { Badge } from "../../achievements/Badge";
+import { AchievementsTab } from "../../achievements/profile/AchievementsTab";
+import type { AchievementsMe } from "../../achievements/profile/model";
+import { navigateToUrl, targetFromUrl } from "../../navigation/rootNavigation";
+import { onAchievementUnlocked } from "../../lib/achievements";
 import { sortAwards, type Award } from "../../lib/awards";
 import { API_BASE_URL } from "../../config";
 
@@ -38,11 +38,9 @@ import { displayName, formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
 import { colors } from "../../theme";
 import { prizeKindLabel, prizeKindMark, prizePlaceText, prizeSourceLabel, prizeTarget } from "../../lib/prizes";
-import { SeasonFindsCard } from "../../seasons/SeasonFinds";
 import type { PersonalReferenceData, PersonalReferenceItem, PrizePickup } from "../../types";
 
 type TabKey = "overview" | "references" | "awards" | "prizes" | "edit" | "achievements" | "privacy" | "notifications";
-type AchievementData = { groups?: AchievementGroup[]; awards?: any[] };
 
 // Reiter nur für Inhalt. Bearbeiten erreicht man über die Aktionszeile,
 // Privatsphäre und Benachrichtigungen über das Zahnrad (#213). Vorher standen
@@ -127,7 +125,8 @@ export function ProfileScreen() {
   };
   const appLock = useAppLock();
   const [tab, setTab] = useState<TabKey>("overview");
-  const [achievements, setAchievements] = useState<AchievementData>({ groups: [], awards: [] });
+  const [achievements, setAchievements] = useState<AchievementsMe>({ groups: [], awards: [] });
+  const [evaluating, setEvaluating] = useState(false);
   const [references, setReferences] = useState<PersonalReferenceData>({ items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } });
   // Auszeichnungen (#230): eigene Banner und Trophäen, eine davon als Profilbanner - der Server prüft, dass sie die eigene ist.
   const [awards, setAwards] = useState<{ awards: Award[]; featured_award_id?: string | null }>({ awards: [] });
@@ -154,11 +153,6 @@ export function ProfileScreen() {
   const [linkAvailable, setLinkAvailable] = useState<Record<string, boolean>>({});
   // Abgehakt vom Verein (#558): weder Zeile noch Textfeld.
   const [linkDisabled, setLinkDisabled] = useState<string[]>([]);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  // Stabil, damit die Erfolgskarten (memo) beim Aufklappen einer Karte nicht alle neu zeichnen.
-  const toggleGroup = useCallback((code: string) => setOpenGroups((current) => ({ ...current, [code]: !current[code] })), []);
-  // Filter wie im Web-Profil (E13, #623); die Liste baut sich schrittweise auf statt ~150 Abzeichen in einem Bild.
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
   const manualSocialKeys = useMemo(() => {
@@ -248,6 +242,7 @@ export function ProfileScreen() {
       bluesky_handle: u.bluesky_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
+      privacy_achievements_public: u.privacy_achievements_public ?? true,
       newsletter_consent: Boolean(u.newsletter_consent),
       show_twitch_embed: Boolean(u.show_twitch_embed),
       dm_privacy: u.dm_privacy || "everyone",
@@ -265,7 +260,7 @@ export function ProfileScreen() {
     }
     try {
       const [achievementResult, completenessResult, preferenceResult, referenceResult, prizeResult, standingResult, linksResult] = await Promise.all([
-        api.get<AchievementData>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } })),
+        api.get<AchievementsMe>("/achievements/me").catch(() => ({ data: { groups: [], awards: [] } as AchievementsMe })),
         api.get<{ score?: number; missing?: string[] }>("/users/me/profile-completeness").catch(() => ({ data: {} })),
         api.get<{ preferences?: Record<string, boolean>; discord?: DiscordDmState } | Record<string, boolean>>("/users/me/notification-preferences").catch(() => ({ data: {} })),
         api.get<PersonalReferenceData>("/mobile/profile/references").catch(() => ({ data: { items: [], stats: { total: 0, tournaments: 0, fastlaps: 0, wins: 0, podiums: 0 } } })),
@@ -316,10 +311,6 @@ export function ProfileScreen() {
     }
   }, [route.params?.tab]);
 
-  useEffect(() => {
-    if (tab !== "achievements") setOpenGroups({});
-  }, [tab]);
-
   const insights = useMemo(() => {
     const tiers = (achievements.groups || []).flatMap((group) => (group.tiers || []).map((tier) => ({ ...tier, group })));
     const earned = tiers.filter((tier) => tier.earned);
@@ -329,10 +320,6 @@ export function ProfileScreen() {
       .sort((a, b) => Number(b.percent || 0) - Number(a.percent || 0))[0];
     return { tiers, earned, points, next };
   }, [achievements]);
-
-  const shownGroups = useMemo(() => applyStatusFilter(achievements.groups || [], statusFilter), [achievements, statusFilter]);
-  // Erst zehn, dann je sechs: jeder Schritt bleibt kurz genug, dass Wischen und Tippen dazwischen durchkommen.
-  const shownCount = useProgressiveCount(shownGroups.length, `${activeTab}:${statusFilter}`, 10, 6);
 
   const prizeStats = useMemo(() => {
     const open = prizes.filter((item) => ["pending", "ready"].includes(String(item.status || "pending")));
@@ -385,14 +372,50 @@ export function ProfileScreen() {
   const evaluateAchievements = useCallback(async () => {
     if (guest) return;
     setMessage("");
+    setEvaluating(true);
     try {
       const { data } = await api.post<{ newly_awarded?: number }>("/achievements/evaluate");
       await loadProfileData();
       setMessage(data.newly_awarded ? `${data.newly_awarded} neue Erfolge freigeschaltet.` : "Erfolge sind aktuell.");
     } catch (err) {
       setMessage(errorMessage(err, "Erfolge konnten nicht aktualisiert werden."));
+    } finally {
+      setEvaluating(false);
     }
   }, [guest, loadProfileData]);
+
+  // „Als Nächstes“ verlinkt Adressen der Website: das eigene Profil heißt hier „Bearbeiten“, alles andere öffnet den
+  // passenden Screen - Ziele ohne Screen in der App (Community, Saison) bekommen keinen Link.
+  const canOpenAchievementLink = useCallback((link: string) => link.startsWith("/profile") || Boolean(targetFromUrl(link)), []);
+  const openAchievementLink = useCallback((link: string) => {
+    if (link.startsWith("/profile")) {
+      setView("profile");
+      setTab("edit");
+      return;
+    }
+    navigateToUrl(link);
+  }, []);
+  const updateAchievements = useCallback((update: (current: AchievementsMe) => AchievementsMe) => setAchievements(update), []);
+  // Ein neuer Erfolg oder ein neues Level (die Benachrichtigung startet die Zeremonie): den Erfolge-Stand nachladen,
+  // damit Kopf, Zahlen und Liste zu dem passen, was die Zeremonie gerade gefeiert hat.
+  useEffect(() => {
+    if (guest) return undefined;
+    return onAchievementUnlocked(() => {
+      api.get<AchievementsMe>("/achievements/me").then(({ data }) => { if (data) setAchievements(data); }).catch(() => {});
+    });
+  }, [guest]);
+  // Wer in der Liste anheftet, behält die Stufe unter dem Finger: wächst „Angeheftet“ darüber, rückt die Ansicht mit.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  const seasonScroll = seasonScrollProps("Profile");
+  const onProfileScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    scrollY.current = event.nativeEvent.contentOffset.y;
+    seasonScroll.onScroll(event);
+  }, [seasonScroll]);
+  const keepListPosition = useCallback((delta: number) => {
+    scrollRef.current?.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: false });
+  }, []);
+  const openPrivacy = useCallback(() => setView("settings"), []);
 
   const openReference = useCallback((item: PersonalReferenceItem) => {
     if (!item.target_id) return;
@@ -421,7 +444,6 @@ export function ProfileScreen() {
 
   const refreshProfile = useCallback(async () => {
     setRefreshing(true);
-    setOpenGroups({});
     if (!guest) {
       await refreshMe().catch(() => {});
     }
@@ -465,7 +487,9 @@ export function ProfileScreen() {
   return (
     <Screen padded={false}>
       <ScrollView
-        {...seasonScrollProps("Profile")}
+        ref={scrollRef}
+        onScroll={onProfileScroll}
+        scrollEventThrottle={seasonScroll.scrollEventThrottle}
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshProfile} tintColor={colors.cyan} />}
       >
@@ -689,39 +713,20 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
+        {/* Erfolge (E13, #623): derselbe Reiter wie im Web - Level, Prestige, „Als Nächstes“, Angeheftete, Vitrinen, Filter. */}
         {!profileLoading && activeTab === "achievements" ? (
-          <>
-            <Card style={styles.card}>
-              <View style={styles.cardTop}>
-                <Heading>Erfolge</Heading>
-                <Pressable onPress={evaluateAchievements} disabled={guest} style={styles.smallAction} accessibilityRole="button">
-                  <Muted style={styles.smallActionText}>Neu berechnen</Muted>
-                </Pressable>
-              </View>
-              <Muted>{insights.earned.length} von {insights.tiers.length} Stufen freigeschaltet · {insights.points} Punkte</Muted>
-            </Card>
-            {/* Saison-Fundstücke (#678) wie im Web unter den Erfolgen - nur für die angemeldete Person selbst. */}
-            {!guest ? <SeasonFindsCard /> : null}
-            {(achievements.groups || []).length ? (
-              <>
-                <SegmentedTabs items={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} style={styles.filterTabs} />
-                {shownGroups.slice(0, shownCount).map((group, index) => (
-                  <FadeIn key={group.code} delay={staggerDelay(index)}>
-                    <AchievementGroupCard
-                      group={group}
-                      open={Boolean(openGroups[group.code])}
-                      onToggle={toggleGroup}
-                    />
-                  </FadeIn>
-                ))}
-                {!shownGroups.length ? <Muted style={styles.filterEmpty}>Keine Stufe passt zu diesem Filter.</Muted> : null}
-              </>
-            ) : (
-              <Card style={styles.card}>
-                <EmptyState icon="trophy-outline" title="Noch keine Erfolge" detail="Sobald automatische oder manuelle Erfolge freigeschaltet sind, erscheinen sie hier." tone="gold" />
-              </Card>
-            )}
-          </>
+          <AchievementsTab
+            data={achievements}
+            onDataChange={updateAchievements}
+            guest={guest}
+            profileScore={Number(completeness.score || 0)}
+            evaluating={evaluating}
+            onEvaluate={evaluateAchievements}
+            onOpenPrivacy={openPrivacy}
+            canOpenLink={canOpenAchievementLink}
+            onOpenLink={openAchievementLink}
+            onShiftAbove={keepListPosition}
+          />
         ) : null}
 
         {!profileLoading && view === "settings" ? (
@@ -738,6 +743,13 @@ export function ProfileScreen() {
             <Heading>Privatsphäre</Heading>
             <Muted>Änderungen werden von selbst gespeichert.</Muted>
             <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => { setField(setForm, "privacy_public_profile", v); scheduleSave(); }} />
+            {/* Wie im Web (#619): eigene Erfolge öffentlich oder privat - privat heißt auch keine Ranglisten. */}
+            <Toggle
+              label="Erfolge öffentlich"
+              detail={`Angeheftete und erreichte Erfolge stehen in deinem Profil, und du stehst in den Ranglisten und im Erfolg der Woche. Die Verein-Kategorie sehen nur Mitglieder.${form.privacy_public_profile ? "" : " Wirkt erst, sobald das Profil öffentlich ist."}`}
+              value={form.privacy_achievements_public !== false}
+              onValueChange={(v) => { setField(setForm, "privacy_achievements_public", v); setAchievements((current) => ({ ...current, privacy_achievements_public: v })); scheduleSave(); }}
+            />
             <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => { setField(setForm, "show_twitch_embed", v); scheduleSave(); }} />
             <Muted>Direktnachrichten</Muted>
             <View style={styles.optionGrid}>
@@ -1324,8 +1336,6 @@ const styles = StyleSheet.create({
   },
   tabContent: { gap: 16 },
   nextAchievement: { flexDirection: "row", alignItems: "center", gap: 8 },
-  filterTabs: { paddingVertical: 2 },
-  filterEmpty: { textAlign: "center", marginVertical: 12 },
   referenceCard: {
     gap: 10,
   },

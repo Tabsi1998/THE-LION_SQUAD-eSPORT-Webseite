@@ -18,6 +18,7 @@ class FakeIntersectionObserver {
 globalThis.IntersectionObserver = FakeIntersectionObserver;
 
 const { AchievementsTab } = await import("./AchievementsTab");
+const { ConfirmDialogProvider } = await import("@/components/tls/ConfirmDialog");
 const { achievementInsights } = await import("./form");
 
 function tier(code, rank, name, extra = {}) {
@@ -53,7 +54,9 @@ function renderTab(overrides = {}, props = {}) {
   const onAchDataChange = vi.fn();
   const utils = render(
     <MemoryRouter>
-      <AchievementsTab achData={data} achInsights={achievementInsights(data)} completeness={{ score: 55 }} evaluateAchievements={() => {}} evaluatingAchievements={false} onAchDataChange={onAchDataChange} {...props} />
+      <ConfirmDialogProvider>
+        <AchievementsTab achData={data} achInsights={achievementInsights(data)} completeness={{ score: 55 }} evaluateAchievements={() => {}} evaluatingAchievements={false} onAchDataChange={onAchDataChange} {...props} />
+      </ConfirmDialogProvider>
     </MemoryRouter>,
   );
   return { ...utils, onAchDataChange };
@@ -61,7 +64,9 @@ function renderTab(overrides = {}, props = {}) {
 
 beforeEach(() => {
   apiMock.put.mockReset();
+  apiMock.post.mockReset();
   toastMock.error.mockReset();
+  toastMock.success.mockReset();
 });
 
 describe("AchievementsTab (#619)", () => {
@@ -71,7 +76,8 @@ describe("AchievementsTab (#619)", () => {
     expect(within(header).getByTestId("achievement-level-title")).toHaveTextContent("Level 7 · Anwärter");
     expect(within(header).getByTestId("achievement-prestige")).toBeInTheDocument();
     expect(header).toHaveTextContent("Nächster Titel ab Level 10");
-    expect(within(header).getByTestId("account-level-progress")).toBeInTheDocument();
+    expect(within(header).getByTestId("account-level-progress")).toHaveTextContent("/ 1500 XP");
+    expect(within(header).getByTestId("account-level-title")).toHaveTextContent("Bis Level 8");
     expect(screen.getByTestId("achievement-stat-hidden")).toHaveTextContent("1/13");
     const next = screen.getByTestId("next-achievement-matches_played_3");
     expect(next).toHaveTextContent("Spielmacher III");
@@ -79,6 +85,39 @@ describe("AchievementsTab (#619)", () => {
     expect(next).toHaveTextContent("60/75");
     expect(within(next).getByTestId("next-achievement-link-matches_played_3")).toHaveAttribute("href", "/tournaments");
     expect(screen.getByTestId("achievement-visibility-note")).toHaveTextContent("öffentlich");
+  });
+
+  it("Prestige ab Level 60: erst nach Bestätigung, dann ersetzt der neue Stand den alten", async () => {
+    const after = { level: 1, prestige: 1, title: "Rookie", prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00", xp: 0, next_level_xp: 125, progress: 0 };
+    apiMock.post.mockResolvedValueOnce({ data: after });
+    const { onAchDataChange } = renderTab({ level: { ...DATA.level, level: 60, title: "Legende", prestige: 0, prestige_available: true } });
+    expect(screen.getByTestId("achievement-prestige-panel")).toHaveTextContent("Level 60 erreicht");
+    fireEvent.click(screen.getByTestId("achievement-prestige-start"));
+    expect(await screen.findByTestId("confirm-dialog")).toHaveTextContent("1. Prestige-Stern?");
+    expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Alle Erfolge und Punkte bleiben");
+    fireEvent.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(apiMock.post).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("achievement-prestige-start"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/users/me/prestige"));
+    await waitFor(() => expect(onAchDataChange).toHaveBeenCalled());
+    const update = onAchDataChange.mock.calls.at(-1)[0];
+    expect(update({ groups: [], level: {} }).level).toEqual(after);
+  });
+
+  it("zeigt die Rücknahme, solange die Frist läuft - danach keinen Knopf mehr", async () => {
+    apiMock.post.mockResolvedValueOnce({ data: { level: 60, prestige: 0, prestige_available: true, prestige_undo_until: null } });
+    const { unmount } = renderTab({ level: { ...DATA.level, level: 1, prestige: 1, prestige_available: false, prestige_undo_until: "2099-01-01T12:00:00+00:00" } });
+    expect(screen.getByTestId("achievement-prestige-panel")).toHaveTextContent("1. Prestige-Stern – bis");
+    fireEvent.click(screen.getByTestId("achievement-prestige-undo"));
+    fireEvent.click(await screen.findByTestId("confirm-dialog-confirm"));
+    await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/users/me/prestige/undo"));
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Prestige zurückgenommen."));
+    unmount();
+
+    renderTab({ level: { ...DATA.level, prestige_undo_until: "2000-01-01T00:00:00+00:00" } });
+    expect(screen.queryByTestId("achievement-prestige-panel")).toBeNull();
   });
 
   it("zeigt Angeheftete, löst eines und heftet über die Stufe ein weiteres an", async () => {

@@ -1,8 +1,16 @@
-import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, groupTier, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
+import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, groupTier, levelTexts, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
 
 // Auswahl-Logik (E8): welcher Ablauf für welches Paket, welche Bewegung für welche Kategorie.
 
 const tier = (code, material, rank, category, extra = {}) => ({ code, name: code, material, rank, category, points: rank * 10, ...extra });
+
+describe("levelTexts", () => {
+  it("ein Aufstieg nennt das Level und darunter den Titel, ein Prestige den Stern statt „Level 1 erreicht“", () => {
+    expect(levelTexts({ level: 12, previous: 11, title: "Kämpfer" })).toEqual({ heading: "Level 12 erreicht", sub: "Level-Aufstieg", phaseSub: "Level 12 erreicht", phaseHeading: "Kämpfer" });
+    expect(levelTexts({ level: 1, previous: 60, title: "Rookie", prestige: 2, prestigeGained: true })).toEqual({ heading: "Prestige", sub: "2. Stern · Neustart bei Level 1", phaseSub: "2. Stern · Neustart bei Level 1", phaseHeading: "Prestige" });
+    expect(levelTexts({ level: 14, prestige: 2, prestigeGained: false }).heading).toBe("Level 14 erreicht");
+  });
+});
 
 describe("planCeremony", () => {
   it("nimmt Material und Bewegung von der höchsten Stufe", () => {

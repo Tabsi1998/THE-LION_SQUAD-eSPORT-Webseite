@@ -1,19 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
-import { API_BASE_URL } from "../../config";
 import { navigationRef } from "../../navigation/rootNavigation";
 import { useSeasonOverlay } from "../../seasons/anchors";
 import { colors, radius } from "../../theme";
 import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../badgeArt.generated";
 import { lookFor, materialName } from "../badgeArt";
+import { shareAchievement } from "../share";
 import { playHaptics } from "./haptics";
 import { playCeremonySound, readCeremonySoundPrefs, writeCeremonyMuted } from "./sounds";
 import { Motion } from "./motions";
 import { CeremonyParticles } from "./particles";
-import { type CeremonyPlan, type CeremonyTier, groupTier, particleKind } from "./select";
+import { type CeremonyPlan, type CeremonyTier, groupTier, levelTexts, particleKind } from "./select";
 
 // Erfolge II (E13, #623): die Zeremonie in der App - dieselbe Bühne wie im Web (Ceremony.jsx): das Abzeichen kommt
 // je Kategorie anders herein, Material bestimmt Look, Partikel und Haptik, Sonderabläufe für die großen Momente
@@ -22,7 +22,6 @@ import { type CeremonyPlan, type CeremonyTier, groupTier, particleKind } from ".
 // Einblenden übrig. Schließen per Antippen daneben, Zurück-Taste oder Kreuz.
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII"];
-const WEB_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
 const PARTICLE_MS = 4500;
 
 function useEnter(from: number, run: (value: { value: number }) => void) {
@@ -202,7 +201,7 @@ export function ceremonyTexts(plan: CeremonyPlan, count: number) {
   const isLevelOnly = plan.sequence === "levelup";
   let heading: string;
   if (plan.heading) heading = plan.heading;
-  else if (isLevelOnly) heading = `Level ${plan.levelUp?.level} erreicht`;
+  else if (isLevelOnly) heading = levelTexts(plan.levelUp).heading;
   else if (plan.sequence === "first") heading = "Dein erster Erfolg";
   else if (plan.sequence === "group") heading = `${groupTier(plan)?.group_name || "Gruppe"} vollständig`;
   else if (plan.sequence === "category") heading = "Kategorie abgeschlossen";
@@ -210,7 +209,7 @@ export function ceremonyTexts(plan: CeremonyPlan, count: number) {
   else if (plan.sequence === "diamond") heading = "Diamant";
   else heading = count === 1 ? "Neues Achievement!" : `${count} neue Achievements!`;
   const rank = Number(plan.top?.rank || 0);
-  const sub = plan.sub || (isLevelOnly ? "Level-Aufstieg" : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${rank && rank <= 7 ? ` ${ROMAN[rank]}` : ""} freigeschaltet`);
+  const sub = plan.sub || (isLevelOnly ? levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${rank && rank <= 7 ? ` ${ROMAN[rank]}` : ""} freigeschaltet`);
   return { heading, sub };
 }
 
@@ -279,7 +278,7 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
   const showBadge = phase === "badge" && !isLevelOnly;
   const share = () => {
     if (!plan.shareId) return;
-    Share.share({ message: `${plan.top?.name || "Erfolg"} – ${WEB_BASE_URL}/achievements/a/${encodeURIComponent(plan.shareId)}` }).catch(() => {});
+    void shareAchievement({ awardId: plan.shareId, name: String(plan.top?.name || "Erfolg"), materialName: plan.top ? materialName(plan.top) : null });
   };
   const toAchievements = () => {
     onClose();
@@ -296,8 +295,8 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
         accessibilityViewIsModal
       >
         {!reduced ? <SpecialLight plan={plan} /> : null}
-        {showBadge && particles && !reduced ? (
-          <CeremonyParticles kind={particleKind(plan.material)} count={plan.particles} width={width} height={height} origin={{ x: width / 2, y: height * 0.38 }} />
+        {(showBadge || isLevelOnly) && particles && !reduced ? (
+          <CeremonyParticles kind={isLevelOnly ? "glint" : particleKind(plan.material)} count={plan.particles} width={width} height={height} origin={{ x: width / 2, y: height * 0.38 }} />
         ) : null}
         <Animated.View style={[styles.card, { borderColor: plan.accent, shadowColor: plan.accent }, cardStyle]} onStartShouldSetResponder={() => true} testID="ceremony-card">
           {plan.sequence === "legendary" ? <LegendaryBanner reduced={reduced} /> : null}
@@ -327,8 +326,8 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true, use
           </View>
 
           <View style={styles.texts}>
-            <Text style={[styles.sub, { color: plan.accent }]} testID="ceremony-sub">{levelPhase ? `Level ${plan.levelUp?.level} erreicht` : sub}</Text>
-            <Text style={styles.heading} testID="ceremony-heading">{levelPhase ? plan.levelUp?.title || "Aufstieg" : heading}</Text>
+            <Text style={[styles.sub, { color: plan.accent }]} testID="ceremony-sub">{levelPhase ? levelTexts(plan.levelUp).phaseSub : sub}</Text>
+            <Text style={styles.heading} testID="ceremony-heading">{levelPhase ? levelTexts(plan.levelUp).phaseHeading : heading}</Text>
             {plan.sequence === "first" && showBadge ? (
               <Text style={styles.firstText} testID="ceremony-first-text">
                 Das war dein erster Erfolg. Jeder Erfolg bringt Punkte und Erfahrung, hebt dein Level und schmückt dein Profil – alle Ziele und wie du sie schaffst stehen bei deinen Erfolgen.

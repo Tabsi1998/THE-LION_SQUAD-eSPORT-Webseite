@@ -142,6 +142,8 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
   // Adressen ohne Kennung (aus Inhalten wie dem Adventkalender, #641): die passende Liste der App.
   if (!second) {
     if (first === "events" || first === "tournaments") return { area: "tournaments", screen: "TournamentList" };
+    // „Als Nächstes“ bei den Team-Erfolgen (E13, #623) verlinkt die Teams.
+    if (first === "teams") return { area: "teams", screen: "TeamList" };
     if (first === "news") return { area: "more", screen: "NewsList" };
     if (first === "gallery" || first === "galerie") return { area: "more", screen: "Gallery" };
     if (first === "fastlap" || first === "fastlaps" || first === "f1") return { area: "more", screen: "FastLapList" };

@@ -584,7 +584,7 @@ export default function PublicProfilePage() {
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
             <div data-testid="profile-level-progress">
-              <AccountLevelProgress level={level.level} points={level.points} nextLevelPoints={level.next_level_points} progress={level.progress} />
+              <AccountLevelProgress level={level.level} points={level.xp ?? level.points} nextLevelPoints={level.next_level_xp ?? level.next_level_points} progress={level.progress} title={level.title} unit={level.xp != null ? "XP" : "Punkte"} />
             </div>
             {accounts.verifiedCount > 0 && (
               <a href="#konten" onClick={() => setTab("overview")} data-testid="profile-accounts-count"

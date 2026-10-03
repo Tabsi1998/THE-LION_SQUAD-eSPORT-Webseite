@@ -7,7 +7,7 @@ import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../materials";
 import { Motion, StageBadge } from "./motions";
 import { runParticles } from "./particles";
-import { groupTier, particleKind } from "./select";
+import { groupTier, levelTexts, particleKind } from "./select";
 import { playCeremonySound, readSoundPrefs, writeSoundPrefs } from "./sounds";
 import "./ceremony.css";
 
@@ -170,7 +170,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
 
   const heading = useMemo(() => {
     if (plan.heading) return plan.heading;
-    if (isLevelOnly) return `Level ${plan.levelUp?.level} erreicht`;
+    if (isLevelOnly) return levelTexts(plan.levelUp).heading;
     if (plan.sequence === "first") return "Dein erster Erfolg";
     if (plan.sequence === "group") return `${groupTier(plan)?.group_name || "Gruppe"} vollständig`;
     if (plan.sequence === "category") return "Kategorie abgeschlossen";
@@ -178,7 +178,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
     if (plan.sequence === "diamond") return "Diamant";
     return tiers.length === 1 ? "Neues Achievement!" : `${tiers.length} neue Achievements!`;
   }, [plan, tiers.length, isLevelOnly]);
-  const sub = plan.sub || (isLevelOnly ? "Level-Aufstieg" : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
+  const sub = plan.sub || (isLevelOnly ? levelTexts(plan.levelUp).sub : plan.catchUp ? "Nachgeholte Erfolge" : `${look.name}${plan.top?.rank && plan.top.rank <= 7 ? ` ${ROMAN[plan.top.rank]}` : ""} freigeschaltet`);
   const liveText = `${heading}. ${tiers.map((t) => `${t.name}, ${t.material_name || look.name}, plus ${t.points} Punkte`).join(". ")}${plan.levelUp ? `. Level ${plan.levelUp.level}` : ""}`;
   const showBadge = phase === "badge" && !isLevelOnly;
   const shareTo = plan.shareId ? `/achievements/a/${encodeURIComponent(plan.shareId)}` : "/profile?tab=achievements";
@@ -204,7 +204,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
       {plan.sequence === "diamond" && !reduced && <span className="tls-ceremony__prism" data-testid="ceremony-prism" aria-hidden="true" />}
       {plan.sequence === "category" && !reduced && <span className="tls-ceremony__flood" data-testid="ceremony-flood" aria-hidden="true" />}
       {(plan.sequence === "diamond" || plan.sequence === "legendary" || plan.sequence === "category") && !reduced && <span className="tls-ceremony__flash" aria-hidden="true" />}
-      {showBadge && <Particles plan={plan} reduced={reduced} />}
+      {(showBadge || isLevelOnly) && <Particles plan={plan} reduced={reduced} />}
       <span className="tls-ceremony__live-text" aria-live="polite" data-testid="ceremony-live">{liveText}</span>
 
       <motion.div
@@ -249,10 +249,10 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
 
         <div className="relative px-6 pb-3 text-center">
           <motion.div className="text-[11px] font-bold uppercase tracking-[0.4em]" style={{ color: plan.accent, textShadow: `0 0 12px ${plan.accent}66` }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.5 }} data-testid="ceremony-sub">
-            {phase === "level" && !isLevelOnly ? `Level ${plan.levelUp?.level} erreicht` : sub}
+            {phase === "level" && !isLevelOnly ? levelTexts(plan.levelUp).phaseSub : sub}
           </motion.div>
           <motion.h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.58 }} data-testid="ceremony-heading">
-            {phase === "level" && !isLevelOnly ? (plan.levelUp?.title || "Aufstieg") : heading}
+            {phase === "level" && !isLevelOnly ? levelTexts(plan.levelUp).phaseHeading : heading}
           </motion.h2>
           {plan.sequence === "first" && showBadge && (
             <motion.p className="mt-2 text-sm text-white/65 max-w-md mx-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: reduced ? 0 : 0.9 }} data-testid="ceremony-first-text">

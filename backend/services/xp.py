@@ -84,6 +84,14 @@ async def view(user_id: str) -> dict:
     return {**levels.level_view(doc.get("total", 0), doc.get("prestige", 0), member=await _is_member(user_id)), "login_streak": int(doc.get("login_streak") or 0)}
 
 
+async def own_view(user_id: str) -> dict:
+    """Der eigene Level-Stand - dazu, bis wann sich ein Prestige zurücknehmen lässt (sonst None). Nur für die Person
+    selbst: das öffentliche Profil nutzt `view` und verrät nicht, wann jemand Prestige gemacht hat."""
+    doc = await state(user_id)
+    undo_until = str((doc.get("prestige_undo") or {}).get("until") or "")
+    return {**await view(user_id), "prestige_undo_until": undo_until if undo_until and undo_until >= now_utc().isoformat() else None}
+
+
 async def grant(user_id: str, source: str, ref: str, *, amount: int | None = None, count: int = 1, note: str | None = None) -> dict | None:
     """XP gutschreiben. None, wenn die Quelle unbekannt ist, der Bezug schon gezählt wurde oder der Tagesdeckel voll ist."""
     if source not in SOURCES or not user_id:
@@ -281,7 +289,7 @@ async def prestige(user_id: str) -> dict:
     stamp = now_utc().isoformat()
     await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": stars + 1, "total": 0, "level": 1, "prestige_at": stamp, "prestige_undo": {"total": int(doc.get("total") or 0), "prestige": stars, "until": (now_utc() + timedelta(hours=PRESTIGE_UNDO_HOURS)).isoformat()}}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "xp.prestige", "actor_id": user_id, "target_id": user_id, "data": {"stars": stars + 1}, "created_at": stamp})
-    return await view(user_id)
+    return await own_view(user_id)
 
 
 async def undo_prestige(user_id: str) -> dict:
@@ -290,8 +298,10 @@ async def undo_prestige(user_id: str) -> dict:
     undo = doc.get("prestige_undo") or {}
     if not undo or str(undo.get("until") or "") < now_utc().isoformat():
         raise ValueError("Die Rücknahme war nur 24 Stunden lang möglich.")
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": int(undo["prestige"]), "total": int(undo["total"]), "level": levels.level_for_xp(int(undo["total"]), int(undo["prestige"]))}, "$unset": {"prestige_undo": "", "prestige_at": ""}})
-    return await view(user_id)
+    # Was seit dem Prestige dazukam, bleibt: zurück kommt der alte Stand plus die XP der letzten Stunden.
+    restored = int(undo["total"]) + int(doc.get("total") or 0)
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": int(undo["prestige"]), "total": restored, "level": levels.level_for_xp(restored, int(undo["prestige"]))}, "$unset": {"prestige_undo": "", "prestige_at": ""}})
+    return await own_view(user_id)
 
 
 # ------------------------------------------------------------------ Erstberechnung

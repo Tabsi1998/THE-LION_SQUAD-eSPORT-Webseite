@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Reorder } from "framer-motion";
-import { ArrowRight, Filter, GripVertical, Medal, Pin, Sparkles, Star, Target, User, X } from "lucide-react";
+import { ArrowRight, Filter, GripVertical, Medal, Pin, Sparkles, Star, Target, Undo2, User, X } from "lucide-react";
+import { toast } from "sonner";
+import { api, formatRequestError } from "@/lib/api";
+import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { CATEGORY_META, STATUS_FILTERS, formatPercent } from "@/components/tls/AchievementGroups";
@@ -41,7 +44,7 @@ export function AchievementStatsRow({ insights, profileScore, hidden }) {
 }
 
 // Kopf: Level-Stand aus dem XP-System (#617) - Level 1–60, Titel, Sterne für Prestige, XP bis zum nächsten Level.
-export function AchievementLevelHeader({ level, earnedPercent, children }) {
+export function AchievementLevelHeader({ level, earnedPercent, onLevelChange, children }) {
   const lvl = level || {};
   const prestige = Number(lvl.prestige || 0);
   return (
@@ -75,8 +78,77 @@ export function AchievementLevelHeader({ level, earnedPercent, children }) {
       </div>
       {lvl.level && (
         <div className="mt-5">
-          <AccountLevelProgress level={lvl.level} points={lvl.xp ?? lvl.points ?? 0} nextLevelPoints={lvl.next_level_xp ?? lvl.next_level_points ?? 100} progress={lvl.progress ?? 0} />
+          <AccountLevelProgress level={lvl.level} points={lvl.xp ?? lvl.points ?? 0} nextLevelPoints={lvl.next_level_xp ?? lvl.next_level_points ?? 100} progress={lvl.progress ?? 0} title={lvl.level >= (lvl.max_level || 60) ? "Höchstes Level" : `Bis Level ${lvl.level + 1}`} unit="XP" />
         </div>
+      )}
+      {onLevelChange && <PrestigePanel level={lvl} onLevelChange={onLevelChange} />}
+    </div>
+  );
+}
+
+/** Bis wann sich ein Prestige zurücknehmen lässt - oder null, wenn die Frist vorbei ist. */
+export function prestigeUndoUntil(level, now = Date.now()) {
+  const until = level?.prestige_undo_until ? new Date(level.prestige_undo_until) : null;
+  return until && !Number.isNaN(+until) && +until > now ? until : null;
+}
+
+// Prestige (#617): ab Level 60 freiwillig - ein Stern, Level zurück auf 1, Erfolge und Punkte bleiben, jeder Stern
+// macht den Weg zu Level 60 ein Viertel länger. Nie ohne Bestätigung; 24 Stunden lang lässt es sich zurücknehmen
+// (XP aus dieser Zeit bleiben). Die Zeremonie dazu startet LevelUpCelebration, sobald der neue Stand da ist.
+export function PrestigePanel({ level, onLevelChange }) {
+  const confirm = useConfirm();
+  const [busy, setBusy] = useState(false);
+  const stars = Number(level?.prestige || 0);
+  const undoUntil = prestigeUndoUntil(level);
+  if (!level?.prestige_available && !undoUntil) return null;
+
+  const run = async (path, doneText) => {
+    setBusy(true);
+    try {
+      const { data } = await api.post(path);
+      onLevelChange(data);
+      if (doneText) toast.success(doneText);
+    } catch (err) {
+      toast.error(formatRequestError(err, "Das hat nicht geklappt."));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const start = async () => {
+    const ok = await confirm({
+      title: `${stars + 1}. Prestige-Stern?`,
+      description: `Dein Level geht zurück auf 1, dafür bekommst du einen Stern (höchstens fünf). Alle Erfolge und Punkte bleiben. Jeder Stern macht den Weg zu Level 60 ein Viertel länger. 24 Stunden lang kannst du es zurücknehmen.`,
+      confirmLabel: "Prestige starten",
+      tone: "info",
+    });
+    if (ok) await run("/users/me/prestige", null);
+  };
+  const undo = async () => {
+    const ok = await confirm({
+      title: "Prestige zurücknehmen?",
+      description: "Der letzte Stern geht wieder weg, Level und XP kommen zurück – samt allem, was du seitdem gesammelt hast.",
+      confirmLabel: "Zurücknehmen",
+      tone: "info",
+    });
+    if (ok) await run("/users/me/prestige/undo", "Prestige zurückgenommen.");
+  };
+  const untilText = undoUntil?.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
+      <Star className="w-4 h-4 text-[#FFD700] fill-current shrink-0" aria-hidden="true" />
+      <p className="flex-1 min-w-[12rem] text-xs text-white/70">
+        {undoUntil
+          ? `${stars}. Prestige-Stern – bis ${untilText} Uhr kannst du ihn zurücknehmen.`
+          : "Level 60 erreicht. Mit Prestige startest du bei Level 1 neu und bekommst einen Stern – alle Erfolge bleiben."}
+      </p>
+      {undoUntil ? (
+        <button type="button" onClick={undo} disabled={busy} data-testid="achievement-prestige-undo" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/20 text-white/75 rounded-sm text-[10px] font-bold uppercase tracking-widest hover:text-white hover:border-white/40 disabled:opacity-50">
+          <Undo2 className="w-3.5 h-3.5" /> Zurücknehmen
+        </button>
+      ) : (
+        <button type="button" onClick={start} disabled={busy} data-testid="achievement-prestige-start" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm text-[10px] font-black uppercase tracking-widest hover:bg-[#ffe34d] disabled:opacity-50">
+          <Star className="w-3.5 h-3.5 fill-current" /> Prestige starten
+        </button>
       )}
     </div>
   );

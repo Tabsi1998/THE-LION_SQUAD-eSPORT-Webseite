@@ -28,6 +28,32 @@ export type CeremonyTier = {
 };
 
 export type LevelUp = { level: number; previous?: number; title?: string; titleChanged?: boolean; prestige?: number; prestigeGained?: boolean };
+
+/**
+ * Texte für den Level-Teil einer Zeremonie (wie im Web): ein Aufstieg („Level 12 erreicht“, darunter der Titel) oder
+ * ein Prestige („Prestige“, n. Stern, Neustart bei Level 1). `heading`/`sub` gelten für eine reine Level-Zeremonie,
+ * `phaseSub`/`phaseHeading` für die Level-Phase nach den Abzeichen.
+ */
+export function levelTexts(levelUp?: LevelUp | null) {
+  const level = Number(levelUp?.level || 1);
+  const stars = Number(levelUp?.prestige || 0);
+  if (levelUp?.prestigeGained && stars > 0) {
+    const line = `${stars}. Stern · Neustart bei Level 1`;
+    return { heading: "Prestige", sub: line, phaseSub: line, phaseHeading: "Prestige" };
+  }
+  return { heading: `Level ${level} erreicht`, sub: "Level-Aufstieg", phaseSub: `Level ${level} erreicht`, phaseHeading: levelUp?.title || "Aufstieg" };
+}
+
+/**
+ * Ein Aufstieg: mehr Prestige-Sterne, oder gleich viele Sterne und ein höheres Level. Wer ein Prestige zurücknimmt,
+ * hat einen Stern weniger und wieder Level 60 - das ist nichts zum Feiern.
+ */
+export function isLevelGain(prev?: { level?: number; prestige?: number } | null, next?: { level?: number; prestige?: number } | null): boolean {
+  const prevStars = Number(prev?.prestige || 0);
+  const nextStars = Number(next?.prestige || 0);
+  if (nextStars !== prevStars) return nextStars > prevStars;
+  return Number(next?.level || 0) > Number(prev?.level || 0);
+}
 export type CeremonyContext = { firstEver?: boolean; groupCompleted?: string | null; categoryCompleted?: string | null; catchUp?: boolean; heading?: string | null; sub?: string | null };
 export type CeremonyPackage = { id?: string; tiers?: CeremonyTier[]; context?: CeremonyContext; levelUp?: LevelUp | null };
 

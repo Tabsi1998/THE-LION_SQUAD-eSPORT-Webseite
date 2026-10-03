@@ -75,7 +75,7 @@ async def my_achievements(user: dict = Depends(get_current_user)):
         "pinned": visibility.pinned_awards(stored, awards),
         "pinned_codes": list(stored.get("pinned_achievements") or []),
         "privacy_achievements_public": visibility.achievements_public(stored),
-        "level": await xp.view(user["id"]),
+        "level": await xp.own_view(user["id"]),
     }
 
 

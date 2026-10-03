@@ -115,14 +115,25 @@ test("ein Stapel blättert alle 2,5 Sekunden weiter und lässt sich von Hand dur
   expect(screen.getByTestId("ceremony-stack-index")).toHaveTextContent("3 / 3");
 });
 
-test("Level-Aufstieg: erst bricht die alte Zahl, dann fällt die neue; Titel und Prestige-Sterne", async () => {
-  await show({ tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 2, prestigeGained: true } });
+test("Level-Aufstieg: erst bricht die alte Zahl, dann fällt die neue; dazu der Titel", async () => {
+  await show({ tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 2, prestigeGained: false } });
   expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 10 erreicht");
   expect(screen.getByTestId("ceremony-level-old")).toBeTruthy();
   await act(async () => { jest.advanceTimersByTime(950); });
   expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("10");
   expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Kämpfer");
+  expect(screen.queryByTestId("ceremony-prestige-stars")).toBeNull();
+});
+
+test("Prestige: von 60 auf 1, die Überschrift nennt das Prestige und die Sterne fallen ein", async () => {
+  await show({ tiers: [], levelUp: { level: 1, previous: 60, title: "Rookie", titleChanged: true, prestige: 2, prestigeGained: true } });
+  expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Prestige");
+  expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("2. Stern · Neustart bei Level 1");
+  await act(async () => { jest.advanceTimersByTime(950); });
+  expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("1");
   expect(screen.getByTestId("ceremony-prestige-stars").props.accessibilityLabel).toBe("Prestige 2");
+  // Level-Zeremonien glitzern wie im Web.
+  expect(screen.getByTestId("ceremony-particles")).toBeTruthy();
 });
 
 test("ein Level-up hinter Erfolgen bekommt nach den Abzeichen seine eigene Phase", async () => {

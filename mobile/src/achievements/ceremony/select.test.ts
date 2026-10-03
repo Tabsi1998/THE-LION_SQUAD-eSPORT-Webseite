@@ -1,9 +1,28 @@
-import { MOTIONS, MOTION_KEYS, PHONE_PARTICLE_CAP, SEQUENCE_KEYS, describePackage, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
+import { MOTIONS, MOTION_KEYS, PHONE_PARTICLE_CAP, SEQUENCE_KEYS, describePackage, isLevelGain, levelTexts, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
 
 // Auswahl-Logik der App (E13, #623): dieselben Fälle wie im Web (select.test.js) - welcher Ablauf für welches
 // Paket, welche Bewegung für welche Kategorie. Nur das Partikelbudget ist am Handy kleiner.
 
 const tier = (code: string, material: string, rank: number, category: string, extra: Record<string, unknown> = {}) => ({ code, name: code, material, rank, category, points: rank * 10, ...extra });
+
+describe("levelTexts", () => {
+  it("ein Aufstieg nennt das Level und darunter den Titel, ein Prestige den Stern statt „Level 1 erreicht“", () => {
+    expect(levelTexts({ level: 12, previous: 11, title: "Kämpfer" })).toEqual({ heading: "Level 12 erreicht", sub: "Level-Aufstieg", phaseSub: "Level 12 erreicht", phaseHeading: "Kämpfer" });
+    expect(levelTexts({ level: 1, previous: 60, title: "Rookie", prestige: 2, prestigeGained: true })).toEqual({ heading: "Prestige", sub: "2. Stern · Neustart bei Level 1", phaseSub: "2. Stern · Neustart bei Level 1", phaseHeading: "Prestige" });
+    expect(levelTexts({ level: 14, prestige: 2, prestigeGained: false }).heading).toBe("Level 14 erreicht");
+  });
+});
+
+describe("isLevelGain", () => {
+  it("feiert ein höheres Level und einen neuen Stern, nicht die Rücknahme", () => {
+    expect(isLevelGain({ level: 11, prestige: 0 }, { level: 12, prestige: 0 })).toBe(true);
+    expect(isLevelGain({ level: 12, prestige: 0 }, { level: 12, prestige: 0 })).toBe(false);
+    expect(isLevelGain({ level: 60, prestige: 0 }, { level: 1, prestige: 1 })).toBe(true);
+    expect(isLevelGain({ level: 1, prestige: 1 }, { level: 60, prestige: 0 })).toBe(false);
+    expect(isLevelGain({ level: 3, prestige: 2 }, { level: 40, prestige: 1 })).toBe(false);
+    expect(isLevelGain({ level: 5 }, { level: 6 })).toBe(true);
+  });
+});
 
 describe("planCeremony", () => {
   it("nimmt Material und Bewegung von der höchsten Stufe", () => {

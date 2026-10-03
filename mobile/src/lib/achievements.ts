@@ -18,6 +18,8 @@ export type AchievementTier = {
   target?: number;
   percent?: number;
   manual_only?: boolean;
+  /** Nur für Vereinsmitglieder sichtbar - lässt sich deshalb nicht öffentlich teilen. */
+  member_only?: boolean;
   condition_status?: string;
   earned_at?: string;
   /** Vom Admin „ohne Zeremonie“ vergeben – zählt, wird aber nicht gefeiert. */
@@ -238,5 +240,19 @@ export function onAchievementUnlocked(listener: Listener): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+
+const levelListeners = new Set<Listener>();
+
+/** Das Level hat sich gerade geändert (Prestige im Profil) - die Level-Erkennung soll gleich nachsehen. */
+export function announceLevelChanged(): void {
+  levelListeners.forEach((listener) => listener());
+}
+
+export function onLevelChanged(listener: Listener): () => void {
+  levelListeners.add(listener);
+  return () => {
+    levelListeners.delete(listener);
   };
 }

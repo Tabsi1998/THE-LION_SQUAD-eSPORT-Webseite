@@ -1,6 +1,6 @@
 import React from "react";
 import { act, render, screen, waitFor } from "@testing-library/react-native";
-import { announceAchievementUnlocked } from "../lib/achievements";
+import { announceAchievementUnlocked, announceLevelChanged } from "../lib/achievements";
 import { ceremonyQueue } from "../achievements/ceremony/queue";
 import { AchievementCatchUpOverlay } from "./AchievementCatchUpOverlay";
 
@@ -68,6 +68,28 @@ test("beim allerersten Start gibt es keinen Rückblick über alles je Erreichte"
   route(groups("2026-01-01T00:00:00.000Z"));
   await render(<AchievementCatchUpOverlay />);
   await waitFor(() => expect(mockStore["tls_ach_seen_user-1"]).toBeTruthy());
+  expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
+});
+
+test("Prestige im Profil wird sofort gefeiert, seine Rücknahme nicht", async () => {
+  mockStore["tls_ach_seen_user-1"] = "2026-09-21T10:00:00.000Z";
+  mockStore["tls_level_seen_user-1"] = JSON.stringify({ level: 60, title: "Legende", prestige: 0 });
+  level = { level: 60, title: "Legende", prestige: 0 };
+  route(groups(null));
+  await render(<AchievementCatchUpOverlay />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalledWith("/users/me/level"));
+  expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
+
+  level = { level: 1, title: "Rookie", prestige: 1 };
+  await act(async () => { announceLevelChanged(); });
+  await waitFor(() => expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Prestige"));
+  expect(screen.queryByTestId("ceremony-title-banner")).toBeNull();
+  await act(async () => { ceremonyQueue.advance(); });
+  await waitFor(() => expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull());
+
+  level = { level: 60, title: "Legende", prestige: 0 };
+  await act(async () => { announceLevelChanged(); });
+  await waitFor(() => expect(JSON.parse(mockStore["tls_level_seen_user-1"])).toEqual({ level: 60, title: "Legende", prestige: 0 }));
   expect(screen.queryByTestId("achievement-unlock-overlay")).toBeNull();
 });
 

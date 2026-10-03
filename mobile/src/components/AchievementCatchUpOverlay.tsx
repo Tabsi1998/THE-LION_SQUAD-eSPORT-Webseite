@@ -3,8 +3,8 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { CeremonyHost } from "../achievements/ceremony/CeremonyHost";
 import { enqueueCeremony, enqueueLevelUp } from "../achievements/ceremony/queue";
-import { describePackage } from "../achievements/ceremony/select";
-import { type AchievementGroup, freshTiers, onAchievementUnlocked } from "../lib/achievements";
+import { describePackage, isLevelGain } from "../achievements/ceremony/select";
+import { type AchievementGroup, freshTiers, onAchievementUnlocked, onLevelChanged } from "../lib/achievements";
 import { api } from "../lib/api";
 
 // SecureStore keys must be alphanumeric + ".-_"; hash the user id into a safe key.
@@ -42,12 +42,12 @@ export function AchievementCatchUpOverlay() {
       } catch {
         prev = null;
       }
-      if (prev && Number(prev.level) && (next.level > Number(prev.level) || next.prestige > Number(prev.prestige || 0))) {
+      if (prev && Number(prev.level) && isLevelGain(prev, next)) {
         enqueueLevelUp({
           level: next.level,
           previous: Number(prev.level),
           title: next.title,
-          titleChanged: Boolean(next.title) && next.title !== String(prev.title || ""),
+          titleChanged: Boolean(next.title) && next.title !== String(prev.title || "") && next.prestige <= Number(prev.prestige || 0),
           prestige: next.prestige,
           prestigeGained: next.prestige > Number(prev.prestige || 0),
         });
@@ -95,6 +95,14 @@ export function AchievementCatchUpOverlay() {
       check(true).then(() => checkLevel());
     });
   }, [check, checkLevel, userId]);
+
+  // Prestige (oder seine Rücknahme) im Profil: gleich nachsehen - ein neuer Stern wird gefeiert, eine Rücknahme nicht.
+  useEffect(() => {
+    if (!userId) return undefined;
+    return onLevelChanged(() => {
+      void checkLevel();
+    });
+  }, [checkLevel, userId]);
 
   return <CeremonyHost />;
 }

@@ -869,7 +869,7 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
 async def get_my_level(me: dict = Depends(get_current_user)):
     """Der eigene Level-Stand (#617): XP, Level 1–60, Titel, Prestige - für Profil, Dashboard und Level-up."""
     await xp.rebuild(me["id"])
-    return await xp.view(me["id"])
+    return await xp.own_view(me["id"])
 
 
 @router.post("/me/prestige")

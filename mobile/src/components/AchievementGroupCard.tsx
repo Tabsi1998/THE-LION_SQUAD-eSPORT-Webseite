@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AchievementGroup, AchievementTier, groupProgress } from "../lib/achievements";
+import { formatDate } from "../lib/format";
 import { Badge } from "../achievements/Badge";
 import { materialColor, materialName } from "../achievements/badgeArt";
 import { colors, radius } from "../theme";
@@ -12,8 +13,13 @@ import { Card } from "./Card";
 // Fortschrittsring -, der Fortschritt schon in der zugeklappten Zeile und aufgeklappt jede Stufe mit
 // ihrem Abzeichen.
 
+/** Anheften im eigenen Profil (bis zu sechs, wie im Web). */
+export type TierPins = { codes: string[]; max: number; onToggle: (code: string) => void };
+/** Teilen je erreichter Stufe: die Vergabe-Kennung je Stufen-Code. */
+export type TierShare = { ids: Record<string, string>; onShare: (awardId: string, tier: AchievementTier) => void };
+
 // memo: Auf- und Zuklappen einer Karte zeichnet nur diese neu, nicht alle ~150 Abzeichen der Liste.
-export const AchievementGroupCard = React.memo(function AchievementGroupCard({ group, open, onToggle }: { group: AchievementGroup; open: boolean; onToggle: (code: string) => void }) {
+export const AchievementGroupCard = React.memo(function AchievementGroupCard({ group, open, onToggle, pins = null, share = null }: { group: AchievementGroup; open: boolean; onToggle: (code: string) => void; pins?: TierPins | null; share?: TierShare | null }) {
   const tiers = group.tiers || [];
   const progress = groupProgress(group);
   const accent = group.accent_color || colors.cyan;
@@ -59,18 +65,22 @@ export const AchievementGroupCard = React.memo(function AchievementGroupCard({ g
       {open ? (
         <View style={styles.tiers}>
           {group.description ? <Text style={styles.muted}>{group.description}</Text> : null}
-          {tiers.map((tier) => <TierRow key={tier.code} tier={tier} group={group} accent={accent} />)}
+          {tiers.map((tier) => <TierRow key={tier.code} tier={tier} group={group} accent={accent} pins={pins} share={share} />)}
         </View>
       ) : null}
     </Card>
   );
 });
 
-function TierRow({ tier, group, accent }: { tier: AchievementTier; group: AchievementGroup; accent: string }) {
+function TierRow({ tier, group, accent, pins, share }: { tier: AchievementTier; group: AchievementGroup; accent: string; pins: TierPins | null; share: TierShare | null }) {
   const color = materialColor(tier);
   const trackable = !tier.earned && Number(tier.target || 0) > 0 && tier.condition_status !== "planned";
-  const status = tier.earned ? "Freigeschaltet" : tier.condition_status === "planned" ? "Geplant" : "Gesperrt";
+  const status = tier.earned ? `Freigeschaltet${tier.earned_at ? ` am ${formatDate(tier.earned_at)}` : ""}` : tier.condition_status === "planned" ? "Geplant" : "Gesperrt";
   const percent = Math.max(0, Math.min(100, Math.round(Number(tier.percent || 0))));
+  const pinned = Boolean(pins && pins.codes.includes(tier.code));
+  const pinFull = Boolean(pins && !pinned && pins.codes.length >= pins.max);
+  const canPin = Boolean(pins && tier.earned && !group.is_negative);
+  const shareId = share && tier.earned && !tier.member_only && !group.is_negative ? share.ids[tier.code] : undefined;
   return (
     <View style={[styles.tierRow, tier.earned && { borderColor: `${color}66`, backgroundColor: `${color}10` }]} testID={`achievement-tier-${tier.code}`}>
       <Badge
@@ -85,7 +95,7 @@ function TierRow({ tier, group, accent }: { tier: AchievementTier; group: Achiev
         size={36}
       />
       <View style={styles.tierText}>
-        <Text style={[styles.tierLevel, { color: tier.earned ? color : colors.muted }]}>{materialName(tier)} · {status}</Text>
+        <Text style={[styles.tierLevel, { color: tier.earned ? color : colors.muted }]}>{materialName(tier)} · {status}{tier.member_only ? " · Verein" : ""}</Text>
         <Text style={styles.name}>{tier.name}</Text>
         {tier.description ? <Text style={styles.muted}>{tier.description}</Text> : null}
         {!tier.earned && tier.how_to ? <Text style={styles.muted}>So schaffst du es: {tier.how_to}</Text> : null}
@@ -96,6 +106,31 @@ function TierRow({ tier, group, accent }: { tier: AchievementTier; group: Achiev
             </View>
             <Text style={styles.muted}>{Number(tier.current || 0).toLocaleString("de-DE")} von {Number(tier.target || 0).toLocaleString("de-DE")}</Text>
           </>
+        ) : null}
+        {canPin || shareId ? (
+          <View style={styles.actions}>
+            {canPin ? (
+              <Pressable
+                onPress={() => pins?.onToggle(tier.code)}
+                disabled={pinFull}
+                hitSlop={6}
+                style={[styles.action, pinned && styles.actionOn, pinFull && styles.actionOff]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: pinned, disabled: pinFull }}
+                accessibilityLabel={pinned ? `${tier.name} lösen` : pinFull ? `Höchstens ${pins?.max} angeheftet` : `${tier.name} anheften`}
+                testID={`achievement-pin-${tier.code}`}
+              >
+                <Ionicons name={pinned ? "pin" : "pin-outline"} size={12} color={pinned ? colors.gold : colors.muted} />
+                <Text style={[styles.actionText, pinned && { color: colors.gold }]}>{pinned ? "Angeheftet" : "Anheften"}</Text>
+              </Pressable>
+            ) : null}
+            {shareId ? (
+              <Pressable onPress={() => share?.onShare(shareId, tier)} hitSlop={6} style={styles.action} accessibilityRole="button" accessibilityLabel={`${tier.name} teilen`} testID={`achievement-share-${tier.code}`}>
+                <Ionicons name="share-social-outline" size={12} color={colors.muted} />
+                <Text style={styles.actionText}>Teilen</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </View>
       <Text style={styles.points}>+{tier.points || 0}</Text>
@@ -118,4 +153,9 @@ const styles = StyleSheet.create({
   tierText: { flex: 1, minWidth: 0, gap: 3 },
   tierLevel: { fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.8 },
   points: { color: colors.muted, fontSize: 12, fontWeight: "800" },
+  actions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  action: { flexDirection: "row", alignItems: "center", gap: 4, borderWidth: 1, borderColor: "rgba(255,255,255,0.15)", borderRadius: radius.sm, paddingHorizontal: 8, paddingVertical: 5 },
+  actionOn: { borderColor: "rgba(255,215,0,0.6)", backgroundColor: "rgba(255,215,0,0.1)" },
+  actionOff: { opacity: 0.35 },
+  actionText: { color: colors.muted, fontSize: 10, fontWeight: "900", textTransform: "uppercase", letterSpacing: 0.8 },
 });
