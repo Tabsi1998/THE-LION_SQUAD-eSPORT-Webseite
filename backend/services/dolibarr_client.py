@@ -366,14 +366,34 @@ class DolibarrClient:
             raise
         return [row for row in data if isinstance(row, dict) and str(row.get("type")) == "2"] if isinstance(data, list) else []
 
-    async def invoice_document(self, ref: str) -> dict:
-        """Das PDF eines Belegs über Dolibarrs Dokument-API (#320) - für Belege ohne Mitglied.
-
-        Ob der Beleg der Person gehört, hat der Aufrufer vorher entschieden; hier zählt nur die Nummer."""
+    @staticmethod
+    def _invoice_file(ref: str) -> str:
+        """`<Nummer>/<Nummer>.pdf` - so legt Dolibarr das Hauptdokument eines Belegs ab. Nur Zeichen einer Belegnummer."""
         clean = "".join(ch for ch in str(ref or "") if ch.isalnum() or ch in "._-")
         if not clean:
             raise DolibarrError("not_found", 404)
-        data = await self._get("/documents", {"modulepart": "facture", "original_file": f"{clean}/{clean}.pdf"})
+        return f"{clean}/{clean}.pdf"
+
+    async def invoice_document(self, ref: str) -> dict:
+        """Das PDF eines Belegs über Dolibarrs Dokument-API (#320) - für Belege ohne Mitglied.
+
+        Der Download liegt unter `GET /documents/download` (#840): `GET /documents` ist die Dateiliste eines Objekts und
+        verlangt `id` oder `ref` - ohne antwortet Dolibarr mit 400. Fehlt die Datei, kommt 404.
+        Ob der Beleg der Person gehört, hat der Aufrufer vorher entschieden; hier zählt nur die Nummer."""
+        data = await self._get("/documents/download", {"modulepart": "facture", "original_file": self._invoice_file(ref)})
+        if not isinstance(data, dict) or "content" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def build_invoice_pdf(self, ref: str, *, template: str = "", lang: str = "") -> dict:
+        """Das PDF eines Belegs in Dolibarr erzeugen (#840): `PUT /documents/builddoc`.
+
+        Die Oberfläche baut es beim Freigeben selbst, die Schnittstelle nicht. Leere Vorlage = die des Belegs (sonst die
+        Vorgabe für Rechnungen), leere Sprache = die des Website-Benutzers in Dolibarr. Braucht „Rechnungen
+        erstellen/bearbeiten“. Erneut aufgerufen, baut Dolibarr dieselbe Datei neu - kein zweiter Beleg. Die Antwort
+        enthält das erzeugte PDF wie der Download."""
+        payload = {"modulepart": "facture", "original_file": self._invoice_file(ref), "doctemplate": str(template or ""), "langcode": str(lang or "")}
+        data = await self._send("PUT", "/documents/builddoc", payload)
         if not isinstance(data, dict) or "content" not in data:
             raise DolibarrError("invalid_response", 200)
         return data

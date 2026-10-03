@@ -184,7 +184,7 @@ test("Konditionen kommen als Listen aus Dolibarr, der Vorschlag füllt sie, und 
   // Konten darf der Website-Benutzer nicht lesen: die Nummer wird getippt.
   await user.type(screen.getByTestId("invoice-terms-bank_account_id"), "1");
   await user.click(screen.getByTestId("invoice-terms-save"));
-  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { invoice_payment_term_id: 2, invoice_payment_mode_id: 2, invoice_bank_account_id: 1 }));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/dolibarr/settings", { invoice_payment_term_id: 2, invoice_payment_mode_id: 2, invoice_bank_account_id: 1, invoice_pdf_lang: "de_AT" }));
 });
 
 // Wunsch des Betreibers: an einer Stelle sehen, was Dolibarr auf der Website übernimmt und wo der Schalter liegt.

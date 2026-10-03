@@ -132,3 +132,30 @@ test("Filter gehen als Abfrage an den Server, „Alles abgleichen“ ruft den Ab
   await user.click(screen.getByTestId("finance-reconcile"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/finance/reconcile"));
 });
+
+test("Rechnungs-PDF (#840): Belege ohne bestätigtes PDF werden nachgezogen, der Grund steht am Auftrag", async () => {
+  const { toast } = await import("sonner");
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/admin/finance/overview") return { data: { ...OVERVIEW, pdfs: { unconfirmed: 3, failed: 1 } } };
+    if (url === "/admin/finance/orders/o2") return { data: { ...DETAIL, order: { ...DETAIL.order, pdf_missing: true, pdf_error_text: "Dem Website-Benutzer fehlt in Dolibarr das Recht „Rechnungen erstellen/bearbeiten“." } } };
+    throw new Error(url);
+  });
+  apiMock.post.mockResolvedValue({ data: { summary: "2 PDFs erzeugt, 1 hatte schon eins." } });
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const row = await screen.findByTestId("finance-pdfs");
+  expect(row).toHaveTextContent("3 freigegebene Belege ohne bestätigtes PDF – bei 1 ist das Erzeugen gescheitert");
+  await user.click(screen.getByTestId("finance-pdfs-build"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/finance/pdfs/build-missing"));
+  await waitFor(() => expect(toast.success).toHaveBeenCalledWith("2 PDFs erzeugt, 1 hatte schon eins."));
+
+  await user.click(await screen.findByTestId("finance-detail-o2"));
+  expect(await screen.findByTestId("finance-detail-pdf-missing")).toHaveTextContent("PDF fehlt: Dem Website-Benutzer fehlt in Dolibarr das Recht „Rechnungen erstellen/bearbeiten“.");
+});
+
+test("ohne offene PDFs gibt es keinen Knopf", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/finance/overview" ? { data: { ...OVERVIEW, pdfs: { unconfirmed: 0, failed: 0 } } } : { data: DETAIL }));
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  await screen.findByTestId("finance-order-o1");
+  expect(screen.queryByTestId("finance-pdfs")).toBeNull();
+});

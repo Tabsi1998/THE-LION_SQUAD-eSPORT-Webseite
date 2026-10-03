@@ -179,6 +179,11 @@ class FakeDolibarr:
         self.core_members: dict[int, dict] = {}
         self.products: dict[int, dict] = {}
         self.core_invoices: dict[int, dict] = {}
+        # Rechnungs-PDFs (#840): wie in Dolibarr gibt es die Datei erst, wenn jemand sie erzeugt - die Oberfläche beim
+        # Freigeben, die Schnittstelle nur über `PUT /documents/builddoc`. `builddoc_status` lässt das Erzeugen scheitern.
+        self.core_pdfs: set[int] = set()
+        self.builddocs: list[dict] = []
+        self.builddoc_status: int | None = None
         self.next_id = 100
         self.write_key = API_KEY
         self.posts: list[tuple[str, dict]] = []
@@ -626,6 +631,8 @@ class FakeDolibarr:
         if method == "POST":
             self.posts.append((path, body))
             assert request.headers.get("DOLAPIKEY") == self.write_key, "Schreiben nur mit dem Schreib-Schlüssel"
+        if method == "PUT" and path.startswith("/documents"):
+            assert request.headers.get("DOLAPIKEY") == self.write_key, "Dokumente erzeugen nur mit dem Schreib-Schlüssel"
         if path == "/categories" and method == "GET":
             wanted = {"customer": "2", "supplier": "1", "member": "3"}.get(params.get("type", "customer"), "2")
             rows = [c for c in self.categories if c["type"] == wanted]
@@ -713,16 +720,54 @@ class FakeDolibarr:
             row = self.core_invoices.get(int(match.group(1)))
             return httpx.Response(200, json=row) if row else httpx.Response(404, json={"error": {"code": 404, "message": "x"}})
         if path == "/documents" and method == "GET":
-            # Dokument-API des Kerns (#320): das PDF eines freigegebenen Belegs unter <ref>/<ref>.pdf.
-            assert params.get("modulepart") == "facture", "nur Rechnungsdokumente"
-            match = re.fullmatch(r"([^/]+)/([^/]+)\.pdf", params.get("original_file", ""))
-            row = next((r for r in self.core_invoices.values() if match and match.group(1) == match.group(2) and r.get("ref") == match.group(1) and int(r.get("statut") or 0) >= 1), None)
-            if not row or row["id"] in self.pdf_failures:
-                return httpx.Response(404 if not row else 500, json={"error": {"code": 404 if not row else 500, "message": "x"}})
-            content = self.pdf_bytes(row["id"])
-            return httpx.Response(200, json={"filename": f"{row['ref']}.pdf", "content-type": "application/pdf", "filesize": len(content),
-                                             "content": __import__("base64").b64encode(content).decode(), "encoding": "base64"})
+            # Wie Dolibarr: `GET /documents` ist die Dateiliste eines Objekts - ohne id oder ref 400 (#840).
+            if not params.get("id") and not params.get("ref"):
+                return httpx.Response(400, json={"error": {"code": 400, "message": "bad value for parameter id or ref"}})
+            return httpx.Response(404, json={"error": {"code": 404, "message": "Search Documents: No document found"}})
+        if path == "/documents/download" and method == "GET":
+            # Dokument-API des Kerns (#320): das PDF eines Belegs unter <ref>/<ref>.pdf - nur, wenn es erzeugt wurde.
+            assert params.get("modulepart") in ("facture", "invoice"), "nur Rechnungsdokumente"
+            row = self._invoice_by_file(params.get("original_file", ""))
+            if row and row["id"] in self.pdf_failures:
+                return httpx.Response(500, json={"error": {"code": 500, "message": "x"}})
+            if not row or row["id"] not in self.core_pdfs:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "File not found"}})
+            return self._core_pdf(row)
+        if path == "/documents/builddoc" and method == "PUT":
+            # Dokument erzeugen (#840): Dolibarr holt den Beleg über die Nummer im Dateinamen und baut das PDF mit der
+            # Vorlage des Belegs (oder `doctemplate`) in `langcode`; danach steht es als Hauptdokument am Beleg.
+            assert body.get("modulepart") in ("facture", "invoice"), "nur Rechnungsdokumente"
+            self.builddocs.append({"original_file": body.get("original_file"), "doctemplate": body.get("doctemplate"), "langcode": body.get("langcode")})
+            row = self._invoice_by_file(str(body.get("original_file") or ""), drafts=True)
+            if not row:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Invoice not found"}})
+            if self.builddoc_status:
+                return httpx.Response(self.builddoc_status, json={"error": {"code": self.builddoc_status, "message": "Error generating document"}})
+            self.core_pdfs.add(row["id"])
+            row["last_main_doc"] = f"facture/{row['ref']}/{row['ref']}.pdf"
+            return self._core_pdf(row)
         return None
+
+    def _invoice_by_file(self, original_file: str, *, drafts: bool = False) -> dict | None:
+        match = re.fullmatch(r"([^/]+)/([^/]+)\.pdf", original_file)
+        if not match or match.group(1) != match.group(2):
+            return None
+        return next((r for r in self.core_invoices.values() if r.get("ref") == match.group(1) and (drafts or int(r.get("statut") or 0) >= 1)), None)
+
+    def _core_pdf(self, row: dict) -> httpx.Response:
+        content = self.pdf_bytes(row["id"])
+        return httpx.Response(200, json={"filename": f"{row['ref']}.pdf", "content-type": "application/pdf", "filesize": len(content),
+                                         "content": base64.b64encode(content).decode(), "encoding": "base64"})
+
+    def hand_validate(self, invoice_id: int, *, with_pdf: bool = True) -> dict:
+        """Jemand gibt den Entwurf in Dolibarrs Oberfläche frei - die baut dabei das PDF (außer MAIN_DISABLE_PDF_AUTOUPDATE)."""
+        row = self.core_invoices[invoice_id]
+        row["statut"] = 1
+        row["ref"] = f"FA2609-{row['id']:04d}"
+        if with_pdf:
+            self.core_pdfs.add(invoice_id)
+            row["last_main_doc"] = f"facture/{row['ref']}/{row['ref']}.pdf"
+        return row
 
     def pay(self, invoice_id: int, amount: float | None = None, on: str = "2026-09-23", kind: str = "VIR") -> None:
         """Der Kassier bucht in Dolibarr eine Zahlung - die Website liest es nur. Ohne Betrag den

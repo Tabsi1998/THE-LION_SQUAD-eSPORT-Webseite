@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Download, RefreshCw, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, FileText, RefreshCw, Wallet } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
@@ -132,6 +132,18 @@ export default function AdminFinancePage() {
                 : !data.dolibarr?.connected
                   ? <>Dolibarr ist nicht angebunden – Aufträge bleiben hier stehen. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Zur Anbindung</Link></>
                   : <>Für Rechnungen fehlt der Schreibzugriff (eigener Schlüssel unter <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Dolibarr → Schreibzugriff</Link>). Aufträge bleiben bis dahin hier stehen.</>}
+              {data.dolibarr?.write_capable && data.pdfs?.unconfirmed > 0 && (
+                // Rechnungs-PDF (#840): Belege von vor der Umstellung einmal nachziehen - danach macht es der Abgleich.
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" data-testid="finance-pdfs">
+                  <span className={data.pdfs.failed ? "text-[#FFD700]" : "text-white/60"}>
+                    {data.pdfs.unconfirmed === 1 ? "1 freigegebener Beleg" : `${data.pdfs.unconfirmed} freigegebene Belege`} ohne bestätigtes PDF
+                    {data.pdfs.failed ? ` – bei ${data.pdfs.failed} ist das Erzeugen gescheitert, der Grund steht am Auftrag` : ""}.
+                  </span>
+                  <button type="button" disabled={!!busy} onClick={() => run("pdfs", () => api.post("/admin/finance/pdfs/build-missing"), (r) => r?.data?.summary || "Erledigt.")} className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-[11px] disabled:opacity-40" data-testid="finance-pdfs-build">
+                    <FileText className="w-3.5 h-3.5" /> Fehlende PDFs nachziehen
+                  </button>
+                </div>
+              )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
                 <div className="mt-1 text-xs text-[#FFD700]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Unter Dolibarr → Schreibzugriff eintragen</Link>.</div>
               )}
@@ -360,6 +372,11 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
             {order.invoice_ref ? `Beleg ${order.invoice_ref} · ` : ""}{paymentLabels[order.payment_state] || order.status_label}
             {registration ? ` · Anmeldung ${registration.status}${registration.seat_count ? `, ${registration.seat_count} Personen` : ""}` : ""}
           </div>
+          {order.pdf_missing && (
+            <div className="mt-2 text-xs text-[#FFD700]" data-testid="finance-detail-pdf-missing">
+              PDF fehlt: {order.pdf_error_text || order.pdf_error} Der Abgleich versucht es stündlich wieder, „Fehlende PDFs nachziehen“ sofort.
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           {order.status === "invoiced" && (
