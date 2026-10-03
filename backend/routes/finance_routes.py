@@ -104,13 +104,35 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         **data,
         "summary": summary,
         "dolibarr": {"connected": settings.get("mode") != "off", "mode": settings.get("mode"), "write_capable": write_capable(settings),
-                     "terms_complete": terms_complete(settings), "invoice_auto_validate": bool(settings.get("invoice_auto_validate"))},
+                     "terms_complete": terms_complete(settings), "invoice_auto_validate": bool(settings.get("invoice_auto_validate")),
+                     "credit_note_draft_on_cancel": bool(settings.get("credit_note_draft_on_cancel"))},
         # Rechnungs-PDF (#840): freigegebene Belege ohne bestätigtes PDF, davon gescheiterte (Grund am Auftrag).
         "pdfs": {"unconfirmed": await db.billing_orders.count_documents(missing_pdf_query()),
                  "failed": await db.billing_orders.count_documents({"status": "invoiced", "pdf_missing": True})},
         "tax_profiles": pricing.TAX_PROFILES,
         "price_bases": pricing.PRICE_BASE_LABELS,
     }
+
+
+class FinanceSettingsBody(BaseModel):
+    credit_note_draft_on_cancel: bool
+
+
+@router.put("/settings")
+async def finance_settings(body: FinanceSettingsBody, me: dict = Depends(require_area("finance"))):
+    """Schalter der Finanzen (#843): „Gutschrift-Entwurf bei Abmeldung anlegen“. Aus heißt wie bisher - vorgemerkte,
+    noch nicht angelegte Entwürfe fallen dann weg, damit ein späteres Einschalten keine alten Abmeldungen nachholt."""
+    db = get_db()
+    on = bool(body.credit_note_draft_on_cancel)
+    await db.settings.update_one({"id": "dolibarr"}, {"$set": {"id": "dolibarr", "credit_note_draft_on_cancel": on}}, upsert=True)
+    dropped = 0
+    if not on:
+        result = await db.billing_orders.update_many({"credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
+                                                     {"$unset": {"credit_note_due_at": "", "credit_note_claim_at": ""}})
+        dropped = int(result.modified_count)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.settings.credit_note_draft", "actor_id": me["id"], "target_id": "dolibarr",
+                                    "data": {"on": on, "dropped": dropped}, "created_at": now_utc().isoformat()})
+    return {"credit_note_draft_on_cancel": on, "dropped": dropped}
 
 
 @router.get("/sources/{kind}/{source_id}")

@@ -124,6 +124,31 @@ test("im Detail stehen Verlauf und Summen, eine Erstattung geht nur bis zum Beza
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/finance/orders/o2/resync"));
 });
 
+test("Gutschrift-Entwurf bei Abmeldung (#843): Schalter in Finanzen, der Prüffall nennt den Entwurf", async () => {
+  const user = userEvent.setup();
+  const withDraft = {
+    ...OVERVIEW,
+    dolibarr: { ...OVERVIEW.dolibarr, credit_note_draft_on_cancel: false },
+    cases: [{ ...OVERVIEW.cases[0], detail: { ...OVERVIEW.cases[0].detail, credit_note: "Gutschrift-Entwurf (PROV12) über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", credit_note_ref: "(PROV12)" } }],
+  };
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/finance/overview" ? { data: withDraft } : { data: DETAIL }));
+  apiMock.put.mockResolvedValue({ data: { credit_note_draft_on_cancel: true, dropped: 0 } });
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const toggle = await screen.findByTestId("finance-credit-draft-toggle");
+  expect(toggle).not.toBeChecked();
+  expect(screen.getByTestId("finance-credit-draft")).toHaveTextContent("die Website gibt nie frei");
+  await user.click(toggle);
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/finance/settings", { credit_note_draft_on_cancel: true }));
+  expect(screen.getByTestId("finance-case-facts-c1")).toHaveTextContent("Gutschrift-Entwurf (PROV12) über den ganzen Betrag liegt in Dolibarr bereit");
+});
+
+test("ohne Schreibzugriff kein Schalter für Gutschrift-Entwürfe", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/finance/overview" ? { data: { ...OVERVIEW, dolibarr: { ...OVERVIEW.dolibarr, write_capable: false } } } : { data: DETAIL }));
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  await screen.findByTestId("finance-dolibarr");
+  expect(screen.queryByTestId("finance-credit-draft")).toBeNull();
+});
+
 test("Filter gehen als Abfrage an den Server, „Alles abgleichen“ ruft den Abgleich", async () => {
   const user = userEvent.setup();
   render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);

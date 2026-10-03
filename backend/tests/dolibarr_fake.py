@@ -189,6 +189,7 @@ class FakeDolibarr:
         self.posts: list[tuple[str, dict]] = []
         # Konditionen (#370): Wörterbücher wie in einem frischen Dolibarr, Bankkonten nur mit Recht.
         self.payment_terms = [{"id": 1, "code": "RECEP", "label": "Sofort"}, {"id": 2, "code": "30D", "label": "30 Tage"}, {"id": 3, "code": "30DENDMONTH", "label": "30 Tage Monatsende"}]
+        self.credit_posts: list[dict] = []
         self.payment_types = [{"id": 2, "code": "VIR", "label": "Banküberweisung"}, {"id": 4, "code": "LIQ", "label": "Bar"}, {"id": 6, "code": "CB", "label": "Kreditkarte"}]
         self.bank_accounts: list[dict] = [{"id": 1, "ref": "GIRO", "label": "Girokonto", "bank": "Raiffeisen"}]
         self.bank_readable = True
@@ -691,7 +692,13 @@ class FakeDolibarr:
                 assert isinstance(line["subprice"], (int, float)) and int(line["qty"]) >= 1 and "tva_tx" in line
             self.next_id += 1
             total = round(sum(float(l["subprice"]) * int(l["qty"]) * (1 + float(l["tva_tx"]) / 100) for l in body["lines"]), 2)
+            # Gutschrift (#843): Art 2 mit Bezug auf das Original (`fk_facture_source`), Zeilen mit negativem Preis.
+            if int(body.get("type") or 0) == 2:
+                assert int(body.get("fk_facture_source") or 0) in self.core_invoices, "Gutschrift braucht den Beleg, auf den sie sich bezieht"
+                assert all(float(line["subprice"]) < 0 for line in body["lines"]), "Gutschriften speichert Dolibarr mit negativem Preis"
+                self.credit_posts.append(body)
             row = {"id": self.next_id, "ref": f"(PROV{self.next_id})", "ref_ext": body.get("ref_ext"), "socid": int(body["socid"]), "type": int(body.get("type") or 0),
+                   "fk_facture_source": body.get("fk_facture_source"),
                    "statut": 0, "paye": 0, "total_ttc": total, "remaintopay": total, "lines": body["lines"], "note_public": body.get("note_public", ""),
                    # Zahlungsziel (#321): 30 Tage nach dem Belegdatum, als Unix-Sekunden wie Dolibarr.
                    "date_lim_reglement": int(body.get("date") or 0) + 30 * 86400, "payments": [],

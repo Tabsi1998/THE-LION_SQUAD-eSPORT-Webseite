@@ -176,6 +176,18 @@ export default function AdminFinancePage() {
                   </button>
                 </div>
               )}
+              {data.dolibarr?.write_capable && (
+                // Gutschrift-Entwurf bei Abmeldung (#843): Vorgabe aus; freigeben tut immer der Kassier in Dolibarr.
+                <label className="mt-2 flex items-start gap-2 text-xs text-white/70 cursor-pointer" data-testid="finance-credit-draft">
+                  <input type="checkbox" className="mt-0.5" checked={!!data.dolibarr?.credit_note_draft_on_cancel} disabled={!!busy}
+                    onChange={(ev) => run("credit-draft", () => api.put("/admin/finance/settings", { credit_note_draft_on_cancel: ev.target.checked }),
+                      (r) => (r?.data?.credit_note_draft_on_cancel ? "Gutschrift-Entwürfe bei Abmeldung an." : "Gutschrift-Entwürfe bei Abmeldung aus."))}
+                    data-testid="finance-credit-draft-toggle" />
+                  <span>
+                    <span className="font-bold text-white/85">Gutschrift-Entwurf bei Abmeldung anlegen</span> – meldet sich jemand nach der Freigabe ab, legt die Website in Dolibarr einen Gutschrift-Entwurf über den ganzen Betrag mit Bezug auf den Beleg an. Ihr prüft (Teilbetrag?) und gebt ihn frei – die Website gibt nie frei.
+                  </span>
+                </label>
+              )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
                 <div className="mt-1 text-xs text-[#FFD700]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <Link to="/admin/dolibarr" className="text-[#29B6E8] hover:underline">Unter Dolibarr → Schreibzugriff eintragen</Link>.</div>
               )}
@@ -393,6 +405,8 @@ function CaseFacts({ item }) {
   if (d.remote_cents != null) bits.push(`in Dolibarr ${formatCents(d.remote_cents)}`);
   if (d.over_cents != null) bits.push(`zu viel ${formatCents(d.over_cents)}`);
   if (d.reason) bits.push(d.reason);
+  // Gutschrift-Entwurf bei Abmeldung (#843): was die Website angelegt oder gefunden hat - oder warum nicht.
+  if (d.credit_note) bits.push(d.credit_note);
   if (!bits.length) return null;
   return <div className="mt-1 text-[11px] text-white/50" data-testid={`finance-case-facts-${item.id}`}>{bits.join(" · ")}</div>;
 }

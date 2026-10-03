@@ -19,7 +19,8 @@ Ablauf je Auftrag (``billing_orders``, Status ``pending``/``ready``/``waiting_*`
 4. **„Deine Rechnung ist da“** (#841, ``services/invoice_notice``): beim Übergang zur Freigabe - gleich beim Anlegen
    oder später im Abgleich - einmal je Beleg an die Person, die angemeldet hat.
 
-Kein Löschen, keine Zahlungen buchen, keine zweite Rechnung für denselben Auftrag.
+Kein Löschen, keine Zahlungen buchen, keine zweite Rechnung für denselben Auftrag. Eine Gutschrift legt die Website nur
+als Entwurf an (#843, mit Schalter) - freigegeben wird sie in Dolibarr.
 
 **Konditionen und Texte (#370):** Jeder Beleg trägt Zahlungsziel, Zahlungsart und Bankkonto aus den
 Dolibarr-Einstellungen (``invoice_terms``) - ohne die drei bleibt er Entwurf, auch wenn „gleich
@@ -697,3 +698,113 @@ async def sync_invoiced(db, settings: dict, client: DolibarrClient, limit: int =
     for order in rows:
         await sync_one(db, settings, client, order, counts)
     return counts
+
+
+# ---------------------------------------------------------------- Gutschrift-Entwurf bei Abmeldung (#843)
+
+CREDIT_SETTING = "credit_note_draft_on_cancel"
+CREDIT_MAX_ATTEMPTS = 3
+
+
+def credit_ref_ext(order: dict) -> str:
+    """Die Kennung des Gutschrift-Entwurfs - findet ihn nach einem Abbruch wieder, statt einen zweiten anzulegen."""
+    return f"credit-{ref_ext_for(order)}"
+
+
+def credit_note_payload(invoice: dict, *, ref_ext: str, note: str) -> dict:
+    """Ein Gutschrift-Entwurf zum Beleg: Art 2 mit Bezug (`fk_facture_source`), dieselben Zeilen mit negativem Preis -
+    so speichert Dolibarr Gutschriften. Ohne lesbare Zeilen keiner (der Kassier legt ihn dann von Hand an)."""
+    lines = []
+    for line in invoice.get("lines") or []:
+        try:
+            price = abs(float(line.get("subprice") or 0))
+            qty = max(1, int(float(line.get("qty") or 1)))
+            rate = float(line.get("tva_tx") or 0)
+        except (TypeError, ValueError):
+            continue
+        if price == 0:
+            continue
+        entry = {"desc": str(line.get("desc") or line.get("description") or line.get("label") or "Gutschrift")[:MAX_DESC],
+                 "subprice": -price, "qty": qty, "tva_tx": rate, "product_type": int(line.get("product_type") or 1)}
+        if line.get("fk_product"):
+            entry["fk_product"] = int(line["fk_product"])
+        lines.append(entry)
+    if not lines:
+        raise DolibarrError("bad_request", 400, {"message": "Der Beleg hat keine lesbaren Zeilen."})
+    return {"socid": int(invoice.get("socid") or 0), "type": 2, "fk_facture_source": int(invoice["id"]), "date": int(time.time()),
+            "ref_ext": ref_ext, "note_public": note[:MAX_EXTRA_TEXT], "lines": lines}
+
+
+async def _credit_case(db, order: dict, text: str, ref: str = "") -> None:
+    from services import billing_cases
+
+    await billing_cases.open_case(db, order, "cancelled_after_invoice", {"credit_note": text, **({"credit_note_ref": ref} if ref else {})})
+
+
+async def draft_credit_note(db, settings: dict, client: DolibarrClient, order: dict) -> str:
+    """Den vorgemerkten Gutschrift-Entwurf anlegen: „created“, „linked“ (in Dolibarr gibt es schon eine Gutschrift),
+    „draft_invoice“ (der Beleg ist noch Entwurf - löschen statt gutschreiben), „skipped“ oder „failed“."""
+    now = now_utc().isoformat()
+    # Der Merker vor allem anderen: ein zweiter Lauf zur selben Zeit legt nichts doppelt an.
+    claimed = await db.billing_orders.update_one(
+        {"id": order["id"], "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}, "credit_note_claim_at": {"$exists": False}},
+        {"$set": {"credit_note_claim_at": now}},
+    )
+    if claimed.modified_count != 1:
+        return "skipped"
+
+    async def finish(fields: dict) -> None:
+        await db.billing_orders.update_one({"id": order["id"]}, {"$set": {**fields, "updated_at": now_utc().isoformat()},
+                                                                 "$unset": {"credit_note_due_at": "", "credit_note_claim_at": "", "credit_note_error": ""}})
+
+    try:
+        invoice = await client.invoice(int(order["invoice_id"]))
+        state = _invoice_state(invoice)
+        if state["invoice_status"] == "draft":
+            await finish({"credit_note_note": "draft_invoice"})
+            await _credit_case(db, order, "Der Beleg ist noch Entwurf – in Dolibarr löschen, eine Gutschrift braucht es nicht.")
+            return "draft_invoice"
+        if state["invoice_status"] == "abandoned":
+            await finish({"credit_note_note": "abandoned"})
+            return "skipped"
+        existing = await client.credit_notes_of(int(order["invoice_id"])) or await client.invoices_by_ref_ext(credit_ref_ext(order))
+        if existing:
+            found = existing[0]
+            ref = str(found.get("ref") or "")
+            await finish({"credit_note_id": int(found["id"]), "credit_note_ref": ref, "credit_note_source": "dolibarr"})
+            await _credit_case(db, order, f"In Dolibarr gibt es schon eine Gutschrift ({ref}) – keine zweite angelegt.", ref)
+            return "linked"
+        note = f"Gutschrift zu {state['invoice_ref']} – Abmeldung" + (f": {order['cancel_reason']}" if order.get("cancel_reason") else "")
+        credit_id = await client.create_invoice(credit_note_payload(invoice, ref_ext=credit_ref_ext(order), note=note))
+        try:
+            ref = str((await client.invoice(credit_id)).get("ref") or "")
+        except DolibarrError:
+            ref = ""
+        ref = ref or f"(PROV{credit_id})"
+        await finish({"credit_note_id": credit_id, "credit_note_ref": ref, "credit_note_source": "website", "credit_note_created_at": now})
+        await _credit_case(db, order, f"Gutschrift-Entwurf {ref} über den ganzen Betrag liegt in Dolibarr bereit – prüfen (Teilbetrag?) und freigeben.", ref)
+        logger.info("[billing] Gutschrift-Entwurf %s zu Beleg %s", ref, state["invoice_ref"])
+        return "created"
+    except DolibarrError as exc:
+        attempts = int(order.get("credit_note_attempts") or 0) + 1
+        update: dict = {"$set": {"credit_note_error": exc.text, "credit_note_attempts": attempts}, "$unset": {"credit_note_claim_at": ""}}
+        if attempts >= CREDIT_MAX_ATTEMPTS:
+            update["$unset"]["credit_note_due_at"] = ""
+        await db.billing_orders.update_one({"id": order["id"]}, update)
+        message = (exc.detail or {}).get("message") or exc.text
+        await _credit_case(db, order, f"Gutschrift-Entwurf nicht angelegt: {message}" + ("" if attempts < CREDIT_MAX_ATTEMPTS else " – bitte von Hand in Dolibarr anlegen."))
+        logger.warning("[billing] Gutschrift-Entwurf zu Auftrag %s gescheitert: %s (%s)", order["id"], exc.kind, attempts)
+        return "failed"
+
+
+async def draft_credit_notes_due(db, settings: dict, client: DolibarrClient, limit: int = 20) -> int:
+    """Vorgemerkte Gutschrift-Entwürfe anlegen - nur mit Schalter und Schreibzugriff. Gibt die Zahl der neuen zurück."""
+    if not settings.get(CREDIT_SETTING) or not write_capable(settings):
+        return 0
+    rows = await db.billing_orders.find({"status": "invoiced", "credit_note_due_at": {"$exists": True}, "credit_note_id": {"$exists": False}},
+                                        {"_id": 0}).sort("credit_note_due_at", 1).to_list(limit)
+    created = 0
+    for order in rows:
+        if await draft_credit_note(db, settings, client, order) == "created":
+            created += 1
+    return created
