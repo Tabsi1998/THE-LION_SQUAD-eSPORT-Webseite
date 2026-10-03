@@ -5,6 +5,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, TextI
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { SkeletonList } from "../../components/ListState";
+import { MemberFileAccounts } from "../../components/MemberFileAccounts";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
@@ -369,6 +370,9 @@ export function MyMembershipScreen({ navigation }: Props) {
             )}
           </Card>
         ) : null}
+
+        {/* Konten in der Mitgliederakte (#846): geprüfte Konten nur auf Wunsch in die Akte; verknüpft wird im Profil unter „Bearbeiten“. */}
+        <MemberFileAccounts onLink={() => navigation.getParent()?.navigate("Profile", { tab: "edit" })} />
 
         {website ? (
           <Card style={styles.card} testID="membership-website">
