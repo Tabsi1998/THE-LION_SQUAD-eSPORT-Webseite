@@ -129,7 +129,7 @@ function Banner({ badge }) {
   return (
     <motion.div className="absolute top-0 left-0 right-0 flex justify-center" initial={{ rotateX: -95, opacity: 0 }} animate={{ rotateX: [-95, 12, -6, 0], opacity: 1 }} transition={{ duration: 1.1, times: [0, 0.5, 0.8, 1], ease: "easeOut" }} style={{ transformOrigin: "top center", perspective: 800 }}>
       <div className="relative">
-        <span className="tls-ceremony__flag" style={{ left: 0, transform: "translateX(-50%)" }} aria-hidden="true" />
+        <span className="tls-ceremony__flag" data-testid="ceremony-flag" aria-hidden="true" />
         <div className="relative z-[2] pt-6 flex justify-center">{badge}</div>
       </div>
     </motion.div>
