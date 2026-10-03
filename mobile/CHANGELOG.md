@@ -1,7 +1,20 @@
 # Changelog
 
-## 1.0.6 - 2026-10-02
+## 1.1.0 - 2026-10-03
 
+- Mobile: Erfolge in der App wie auf der Website: jede Gruppe mit ihrem Abzeichen von Holz bis Diamant (dazu Legendär und Geheim), ein Fortschrittsring zur nächsten Stufe und „So schaffst du es“. Neue Erfolge und Level-Aufstiege kommen mit einer Zeremonie – elf Auftritte mit Partikeln, Klang und Vibration je Material (#623).
+- Mobile: Neuer Reiter „Erfolge“ im Profil: Level und Prestige-Sterne (24 Stunden zurücknehmbar), „Als Nächstes“ mit den drei nächsten Zielen und dem Weg dorthin, bis zu sechs angeheftete Erfolge, Teilen über das Handy (#623).
+- Mobile: Schaukasten unter Mehr: Bestenliste, Erfolg der Woche und wie selten ein Erfolg ist; im Profil anderer die angehefteten Erfolge und alle erreichten Stufen (#623).
+- Mobile: Ostern: Hasenohren im Dashboard-Kopf, eine Eier-Reihe an der Begrüßungskarte, das Osterei am Tab „Mehr“, Frühlingslicht, ein paar Blütenblätter, bei „voll“ ein Zitronenfalter und ab und zu ein Feldhase hinter einer Karte (#645).
+- Mobile: Ostereiersuche: Eier an den Karten der Screens finden, der Korb unter Mehr mit Stand und Hinweisen, das goldene Löwenei mit dem Stand im Dashboard-Kopf – wer alle findet, wird Eierkönig (#646, #647).
+- Mobile: Vereinsgeburtstag am Gründungstag: eine Karte mit Torte und so vielen Kerzen, wie der Verein Jahre hat, Konfetti in Vereinsfarben aus der Torte, eine Wimpelkette an der Begrüßungskarte und ein Jahres-Sticker (#644).
+- Mobile: Fasching: einmal am Tag Konfetti mit eigener Physik, der Partyhut im Dashboard-Kopf und am Tab „Mehr“ – antippen lässt ihn knallen –, Luftschlangen an der Kopfzeile und der Gruß des Vereins (#643).
+- Mobile: Schneeflocken fangen nach dem Wetter: bei Frost zerbricht die Flocke in Kristallsplitter, bei Tauwetter schmilzt sie leise; selten zieht eine Spur durch den Schnee (#731).
+- Mobile: Mitgliederbereich: „Discord jetzt“ zeigt, wie viele online sind und wie viele in welchem Sprachkanal – nur Zahlen, nie Namen –, dazu alle Discord-Server des Vereins mit „Du bist dabei“ oder „Beitreten“ (#581, #626).
+- Mobile: Saison-Fundstücke auf Wunsch im öffentlichen Profil – Schalter unter Profil → Privatsphäre, Vorgabe aus (#678).
+- Mobile: Nach einem beendeten Match „GG geben“ auf der Matchseite, wie auf der Website.
+- Mobile: Den Wochenrückblick per Mail lässt man in den Benachrichtigungs-Einstellungen abbestellen (#622).
+- Mobile: Unter der Kopfzeile der Unterseiten (z. B. Jahreswertung) steht keine leere Fläche mehr.
 - Mobile: Silvester in der App wie auf der Website – dieselben Raketen zur selben Sekunde: ab dem 29. Dezember abends ein paar, am 31. mehr, ab 23 Uhr „noch 42 Min.“ im Dashboard-Kopf, ab 23:59 der Countdown, um Mitternacht „Frohes neues Jahr“ mit einem Vibrieren und drei großen Salven. Sechs Feuerwerksarten mit eigener Physik, jedes Jahr eine eigene Choreografie. Ton nur nach Einschalten (Lautsprecher-Knopf im Kopf), „dezent“ ohne Raketen (#642, #739–#743).
 - Mobile: Winterhimmel hinter dem Inhalt: nachts ein leiser Blauschein und wenige Sterne, um Sonnenauf- und -untergang ein warmes Glühen auf der Seite der Sonne – nach dem echten Licht und Wetter am Vereinsort (#730).
 - Mobile: Töne der Saison-Deko kommen auf Android jetzt nach der Medienlautstärke – vorher blieben sie stumm, solange das Handy auf Vibration stand. Auf dem iPhone gilt weiter der Stummschalter.
