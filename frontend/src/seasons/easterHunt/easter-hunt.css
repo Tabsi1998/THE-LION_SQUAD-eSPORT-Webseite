@@ -1,0 +1,89 @@
+/* Ostereiersuche (#646, #754, #755): Eier in Ecken echter Kanten, ein Hinweis daneben, das Widget im Kopf. */
+
+/* In Seitenkoordinaten über dem Inhalt, aber unter Kopfzeile (z 50), ihren Menüs und der Leiste unten am Handy (z 40). */
+.tls-eggs { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 39; }
+.tls-eggs__live { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.tls-egg {
+  position: absolute; margin: 0; padding: 0; border: 0; background: transparent; line-height: 0; cursor: pointer;
+  pointer-events: auto; border-radius: 45%; transform: translate(-50%, -55%) rotate(var(--egg-tilt, 0deg));
+  transition: filter 0.2s ease-out;
+}
+.tls-egg svg { max-width: none; }
+.tls-egg__svg { display: block; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); transform-origin: 50% 90%; }
+.tls-egg:focus-visible { outline: 2px solid #ffd700; outline-offset: 3px; }
+.tls-egg:hover .tls-egg__svg, .tls-egg:focus-visible .tls-egg__svg { animation: tls-egg-wobble 0.9s ease-in-out; }
+/* Neugierige Eier wackeln kurz, wenn die Maus näher kommt (EasterEggs setzt die Klasse). */
+.tls-egg--near .tls-egg__svg { animation: tls-egg-wobble 0.9s ease-in-out; }
+/* Lebhafte Eier wippen ab und zu von selbst - kurz, dann lange Ruhe. */
+.tls-egg--lively .tls-egg__svg { animation: tls-egg-nudge 9s ease-in-out var(--egg-delay, 4s) infinite; }
+.tls-egg--lively .tls-egg__glint { animation: tls-egg-glint 9s ease-in-out var(--egg-delay, 4s) infinite; }
+.tls-egg--still .tls-egg__svg, .tls-egg--still .tls-egg__glint { animation: none !important; }
+
+/* Unter der Kopfzeile hängt das Ei an einem goldenen Bändchen wie am Osterstrauch und pendelt sacht. */
+.tls-egg__hang { position: relative; display: block; transform-origin: 50% -12px; animation: tls-egg-sway 7s ease-in-out var(--egg-delay, 4s) infinite; }
+.tls-egg__ribbon { position: absolute; left: 50%; bottom: calc(100% - 2px); width: 1.5px; height: 14px; margin-left: -0.75px; background: linear-gradient(180deg, rgba(233, 196, 106, 0.35), #e9c46a); }
+.tls-egg__ribbon::before { content: ""; position: absolute; top: -1px; left: 50%; width: 8px; height: 5px; transform: translateX(-50%); border: 1.5px solid #e9c46a; border-bottom-color: transparent; border-radius: 50%; }
+.tls-egg.tls-egg--hanging .tls-egg__svg, .tls-egg--hanging:hover .tls-egg__svg, .tls-egg--hanging:focus-visible .tls-egg__svg { animation: none; }
+.tls-egg--hanging:hover .tls-egg__hang, .tls-egg--hanging:focus-visible .tls-egg__hang, .tls-egg--hanging.tls-egg--near .tls-egg__hang { animation: tls-egg-swing 1.4s ease-in-out; }
+.tls-egg--still .tls-egg__hang { animation: none !important; }
+@keyframes tls-egg-sway { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes tls-egg-swing { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(-11deg); } 45% { transform: rotate(8deg); } 70% { transform: rotate(-4deg); } 88% { transform: rotate(1.5deg); } }
+
+@keyframes tls-egg-wobble { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-8deg); } 60% { transform: rotate(6deg); } 85% { transform: rotate(-2deg); } }
+@keyframes tls-egg-nudge { 0%, 90%, 100% { transform: rotate(0deg); } 92% { transform: rotate(-6deg); } 95% { transform: rotate(4deg); } 97.5% { transform: rotate(-1.5deg); } }
+@keyframes tls-egg-glint { 0%, 88%, 100% { opacity: 0.42; } 93% { opacity: 0.85; } }
+
+/* Fund: das Ei hebt sich und verschwindet - das goldene Löwenei dreht sich dabei einmal. */
+.tls-egg--pop { pointer-events: none; }
+.tls-egg--pop-lift { animation: tls-egg-pop-lift 0.7s ease-out forwards; }
+.tls-egg--pop-spin { animation: tls-egg-pop-spin 0.7s ease-out forwards; }
+@keyframes tls-egg-pop-lift {
+  0% { transform: translate(-50%, -55%) rotate(var(--egg-tilt, 0deg)) scale(1); opacity: 1; }
+  35% { transform: translate(-50%, -95%) rotate(0deg) scale(1.25); opacity: 1; }
+  100% { transform: translate(-50%, -140%) rotate(0deg) scale(0.6); opacity: 0; }
+}
+@keyframes tls-egg-pop-spin {
+  0% { transform: translate(-50%, -55%) rotate(var(--egg-tilt, 0deg)) scale(1); opacity: 1; filter: drop-shadow(0 0 0 rgba(255, 215, 0, 0)); }
+  40% { transform: translate(-50%, -95%) rotate(200deg) scale(1.3); opacity: 1; filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.9)); }
+  100% { transform: translate(-50%, -140%) rotate(360deg) scale(0.6); opacity: 0; filter: drop-shadow(0 0 0 rgba(255, 215, 0, 0)); }
+}
+
+/* Über dem Ei, ganz im Fenster (die linke Kante setzt EasterEggs); unter dem Ei, wenn oben die Kopfzeile liegt. So
+   breit wie sein Text, am schmalen Handy umbrechend statt über den Rand. */
+.tls-egg-note {
+  position: absolute; transform: translateY(calc(-100% - 30px)); display: inline-flex; align-items: center; gap: 8px;
+  width: max-content; max-width: calc(100vw - 16px); pointer-events: auto; padding: 6px 10px; border-radius: 2px; font-size: 12px; font-weight: 700;
+  color: #fffaf0; background: rgba(18, 18, 18, 0.95); border: 1px solid rgba(233, 196, 106, 0.55);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5); animation: tls-egg-note-in 0.25s ease-out;
+}
+.tls-egg-note--below { transform: translateY(26px); }
+.tls-egg-note--found, .tls-egg-note--done { border-color: rgba(111, 158, 79, 0.75); }
+.tls-egg-note--done { color: #ffd700; }
+.tls-egg-note--error { border-color: rgba(255, 59, 48, 0.6); }
+.tls-egg-note__link { color: #e9c46a; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; text-decoration: underline; }
+.tls-egg-note__close { color: rgba(255, 255, 255, 0.6); background: transparent; border: 0; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+@keyframes tls-egg-note-in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+
+/* Das Widget neben dem Logo: ein kleines Löwenei mit dem Stand. */
+.tls-egg-widget {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 2px; border: 1px solid rgba(233, 196, 106, 0.4);
+  color: #e9c46a; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; background: rgba(233, 196, 106, 0.08);
+}
+.tls-egg-widget:hover { background: rgba(233, 196, 106, 0.16); }
+.tls-egg-widget .tls-egg__svg { filter: none; }
+/* Im vollen Kopf (angemeldet, PC) schrumpft sonst das Ei auf null Breite. */
+.tls-egg-widget, .tls-egg-widget .tls-egg__svg { flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-egg:hover .tls-egg__svg, .tls-egg:focus-visible .tls-egg__svg, .tls-egg--near .tls-egg__svg, .tls-egg--lively .tls-egg__svg, .tls-egg--lively .tls-egg__glint, .tls-egg__hang, .tls-egg--hanging:hover .tls-egg__hang { animation: none; }
+  .tls-egg--pop-lift, .tls-egg--pop-spin { animation: none; opacity: 0; }
+  .tls-egg-note { animation: none; }
+}
+
+/* Der Korb auf /ostern (#758): gefundene Eier rollen nacheinander hinein, leere Mulden für die fehlenden. */
+.tls-basket-egg { line-height: 0; }
+.tls-basket-egg--in { animation: tls-basket-in 0.45s ease-out both; }
+.tls-basket-hole { width: 36px; height: 45px; border-radius: 50% 50% 46% 46% / 58% 58% 42% 42%; border: 1.5px dashed rgba(233, 196, 106, 0.35); background: rgba(233, 196, 106, 0.04); }
+@keyframes tls-basket-in { from { opacity: 0; transform: translateY(-10px) rotate(-12deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tls-basket-egg--in { animation: none; } }

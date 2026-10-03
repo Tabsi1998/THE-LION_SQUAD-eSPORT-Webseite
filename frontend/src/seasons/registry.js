@@ -12,6 +12,8 @@ export const SEASON_MODULES = {
   christmas: () => import("./christmas/index.jsx"),
   nikolaus: () => import("./nikolaus/index.jsx"),
   advent_calendar: () => import("./adventCalendar/index.jsx"),
+  // Ostereiersuche (#646): Eier auf den Seiten, das Löwenei mit dem Korb-Stand neben dem Logo.
+  easter_hunt: () => import("./easterHunt/index.jsx"),
 };
 
 export function hasModule(key) {
