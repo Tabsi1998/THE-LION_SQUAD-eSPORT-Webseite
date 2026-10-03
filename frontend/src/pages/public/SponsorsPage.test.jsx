@@ -43,3 +43,15 @@ test("ohne Ehemalige kein Abschnitt", async () => {
   await screen.findByTestId("sponsor-a");
   expect(screen.queryByTestId("sponsors-former")).toBeNull();
 });
+
+test("Banner aus dem Vereinsmodul oben in der Karte, das Logo darunter - nur wo es einen gibt (#880)", async () => {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/sponsors") return { data: [{ ...ACTIVE[0], banner_url: "/api/static/uploads/dolibarr-partner-7-banner-dark-abc.jpg" }, ACTIVE[1]] };
+    return { data: [] };
+  });
+  render(<MemoryRouter><SponsorsPage /></MemoryRouter>);
+  const banner = await screen.findByTestId("sponsor-banner-a");
+  expect(banner.querySelector("img")).toHaveAttribute("src", "/api/static/uploads/dolibarr-partner-7-banner-dark-abc.jpg");
+  expect(screen.getByTestId("sponsor-a")).toContainElement(banner);
+  expect(screen.queryByTestId("sponsor-banner-b")).toBeNull();
+});

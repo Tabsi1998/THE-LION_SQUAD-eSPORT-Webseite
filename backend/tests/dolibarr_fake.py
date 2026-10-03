@@ -165,6 +165,11 @@ class FakeDolibarr:
         self.pdf_failures: set[int] = set()
         self.calls: list[tuple[str, dict]] = []
         self.file_requests: list[dict] = []
+        # Partner mit Bildern (#880, Vereine 1.9.0): {(id, kind, variant): (bytes, content_type)}.
+        self.partners: dict[int, dict] = {}
+        self.partner_files: dict[tuple[int, str, str], tuple[bytes, str]] = {}
+        self.tampered_partner_images: set[tuple[int, str, str]] = set()
+        self.image_requests: list[dict] = []
         self.fail_with: int | None = None
         self.fail_paths: set[str] = set()
         self.break_after_pages: int | None = None
@@ -518,6 +523,43 @@ class FakeDolibarr:
         content = b"%PDF-1.7\n%corrupt\n%%EOF\n" if document_id in self.tampered_document_ids else document_pdf_bytes(document_id, row["revision"])
         return self._json(template, {"filename": f"{row['code']}.pdf", "content_type": "application/pdf", "filesize": len(content),
                                      "sha256": row["sha256"], "content": base64.b64encode(content).decode()})
+
+    # ---------- Partner und Sponsoren mit Bildern (#880, Vereine 1.9.0)
+    def add_partner(self, partner_id: int, name: str, *, url: str = "", categories=((7, "Sponsor"),), images: dict | None = None) -> dict:
+        """Ein Geschäftspartner für die Website; ``images`` = {(kind, variant): (bytes, content_type)}."""
+        self.partners[int(partner_id)] = {"id": int(partner_id), "name": name, "url": url,
+                                          "categories": [{"id": int(cid), "label": label} for cid, label in categories]}
+        for (kind, variant), (content, content_type) in (images or {}).items():
+            self.set_partner_image(partner_id, kind, variant, content, content_type)
+        return self.partners[int(partner_id)]
+
+    def set_partner_image(self, partner_id: int, kind: str, variant: str, content: bytes | None, content_type: str = "image/png") -> None:
+        if content is None:
+            self.partner_files.pop((int(partner_id), kind, variant), None)
+        else:
+            self.partner_files[(int(partner_id), kind, variant)] = (content, content_type)
+
+    def _partner_row(self, partner_id: int) -> dict:
+        """Wie das Modul ihn liefert: genau die hinterlegten Bilder, je mit Prüfsumme (die ETag der Datei)."""
+        images = [
+            {"kind": kind, "variant": variant, "source": "vereine", "content_type": content_type, "size": len(content),
+             "width": 400, "height": 100 if kind == "logo" else 200, "sha256": hashlib.sha256(content).hexdigest(), "updated_at": "2026-10-03T10:00:00Z"}
+            for (pid, kind, variant), (content, content_type) in sorted(self.partner_files.items()) if pid == partner_id
+        ]
+        return {**self.partners[partner_id], "images": images}
+
+    def _partner_image(self, request: httpx.Request, key: tuple[int, str, str]) -> httpx.Response:
+        """`…/partners/{id}/images/{kind}/{variant}`: Datei mit ETag = Prüfsumme, If-None-Match → 304, Unbekanntes 404."""
+        self.image_requests.append({"partner": key[0], "kind": key[1], "variant": key[2], "if_none_match": request.headers.get("If-None-Match")})
+        stored = self.partner_files.get(key) if key[0] in self.partners else None
+        if stored is None:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "No such image"}})
+        content, content_type = stored
+        etag = '"' + hashlib.sha256(content).hexdigest() + '"'
+        if request.headers.get("If-None-Match") == etag:
+            return httpx.Response(304, headers={"ETag": etag})
+        body = content + b"verfaelscht" if key in self.tampered_partner_images else content
+        return httpx.Response(200, content=body, headers={"ETag": etag, "Content-Type": content_type, "Content-Length": str(len(body))})
 
     def _document_file(self, request: httpx.Request, rows: list[dict], document_id: int) -> httpx.Response:
         """`…/documents/{id}/file` (Vereine 1.3.0, #244) nach den Regeln des Moduls (VereineFileRules): ETag ist die
@@ -1186,6 +1228,11 @@ class FakeDolibarr:
             content = b"%PDF-1.7\n%tampered\n%%EOF\n" if version_id in self.tampered_pdf_ids else statute_pdf_bytes(version_id)
             return self._json("/vereine/statutes/{id}/pdf", {"filename": f"Statuten-{row['version']}.pdf", "content_type": "application/pdf", "filesize": len(content),
                                                             "sha256": hashlib.sha256(content).hexdigest(), "content": base64.b64encode(content).decode()})
+        if path == "/vereine/partners":
+            return self._json("/vereine/partners", [self._partner_row(pid) for pid in sorted(self.partners)])
+        match = re.fullmatch(r"/vereine/partners/(\d+)/images/(logo|banner)/(light|dark)", path)
+        if match:
+            return self._partner_image(request, (int(match.group(1)), match.group(2), match.group(3)))
         if path == "/vereine/organization":
             # Der Verein fürs Impressum (#326); die Form ist der Vertrag des Moduls.
             return self._json("/vereine/organization", self.organization)

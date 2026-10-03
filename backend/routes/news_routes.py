@@ -9,7 +9,7 @@ from auth import require_admin, get_optional_user, require_area
 from services.visibility import user_can_see, filter_visible
 from services.content_embed_service import resolve_content_embeds
 from services.sponsor_utils import dedupe_public_sponsors, public_sponsor_view
-from services import partner_pages
+from services import partner_pages, sponsor_images
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.user_notifications import create_user_notification
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
@@ -719,7 +719,8 @@ async def list_former_sponsors():
     """Ehemalige Unterstützer (#405): abgelaufene Sponsoren mit Logo bleiben auf der Sponsorenseite
     sichtbar - mit den Jahren, statt still zu verschwinden."""
     db = get_db()
-    rows = await db.sponsors.find({"is_active": {"$ne": False}, "logo_url": {"$nin": [None, ""]}}, {"_id": 0}).to_list(500)
+    rows = await db.sponsors.find({"is_active": {"$ne": False}, "$or": [{"logo_url": {"$nin": [None, ""]}}, {"dolibarr_images.logo": {"$exists": True}}]},
+                                  {"_id": 0}).to_list(500)
     former = [row for row in (_sponsor_defaults(r) for r in rows) if row["effective_status"] == "expired"]
     former.sort(key=lambda s: (s.get("contract_end") or "", s.get("name") or ""), reverse=True)
     return dedupe_public_sponsors(former)
@@ -731,6 +732,8 @@ async def admin_list_sponsors(me: dict = Depends(require_area("content"))):
     sp = await db.sponsors.find({}, {"_id": 0}).to_list(500)
     for s in sp:
         _sponsor_defaults(s)
+        # Bilder aus Dolibarr (#880): welche Fassungen da sind und was die Website zeigt - der Upload bleibt der Rückfall.
+        s["dolibarr_image_summary"] = sponsor_images.admin_summary(s)
     sp.sort(key=lambda s: (_TIER_ORDER.get(s["tier"], 99), s.get("order_index") or 0, s.get("name") or ""))
     return sp
 
@@ -1281,7 +1284,10 @@ async def admin_list_partners(me: dict = Depends(require_area("content"))):
     db = get_db()
     partners = await db.partners.find({}, {"_id": 0}).to_list(500)
     partners.sort(key=lambda p: (p.get("order_index") or 0, p.get("name") or ""))
-    return [await _ensure_partner_slug(db, p) for p in partners]
+    rows = [await _ensure_partner_slug(db, p) for p in partners]
+    for row in rows:
+        row["dolibarr_image_summary"] = sponsor_images.admin_summary(row)
+    return rows
 
 
 @router.post("/partners")

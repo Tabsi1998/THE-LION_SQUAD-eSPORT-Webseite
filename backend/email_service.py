@@ -109,8 +109,11 @@ async def _email_sponsor_block() -> str:
     db = get_db()
     sponsors = await db.sponsors.find(
         {"is_active": {"$ne": False}},
-        {"_id": 0, "name": 1, "logo_url": 1, "link": 1, "tier": 1, "order_index": 1, "show_in_emails": 1},
+        {"_id": 0, "name": 1, "logo_url": 1, "dolibarr_images": 1, "link": 1, "tier": 1, "order_index": 1, "show_in_emails": 1},
     ).sort([("order_index", 1), ("name", 1)]).to_list(50)
+    # Mails haben hellen Grund: die Fassung für hellen Hintergrund aus Dolibarr, sonst der Upload (#880).
+    from services import sponsor_images
+    sponsors = [{**s, "logo_url": sponsor_images.pick(s, "logo", "light")[0]} for s in sponsors]
     sponsors = [
         s for s in sponsors
         if s.get("logo_url") and (s.get("show_in_emails") is True or (s.get("show_in_emails") is None and s.get("tier") == "main"))

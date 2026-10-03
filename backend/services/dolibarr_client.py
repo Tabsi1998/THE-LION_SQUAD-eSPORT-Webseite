@@ -586,9 +586,14 @@ class DolibarrClient:
         params: dict = dict(who or {})
         if revision:
             params["revision"] = int(revision)
+        return await self._file_get(path, params, conditional, accept="application/pdf, application/json")
+
+    async def _file_get(self, path: str, params: dict | None, conditional: dict | None, *, accept: str) -> dict:
+        """Eine Datei holen (Dokumente #849, Partnerbilder #880): Status 200, 206, 304 oder 416 mit Bytes und Kopfzeilen;
+        Fehler wie immer als DolibarrError, mit denselben Wiederholungen wie die JSON-Wege."""
         forward = {name: str(value) for name, value in (conditional or {}).items() if name in self.FORWARD_HEADERS and value}
         url = f"{self.base_url}/api/index.php{path}"
-        headers = {"DOLAPIKEY": self._key, "Accept": "application/pdf, application/json", **forward}
+        headers = {"DOLAPIKEY": self._key, "Accept": accept, **forward}
         attempts = len(RETRY_PAUSES) + 1
         last_kind, last_status = "unavailable", None
         for attempt in range(attempts):
@@ -615,6 +620,21 @@ class DolibarrClient:
             if attempt < attempts - 1:
                 await asyncio.sleep(RETRY_PAUSES[min(attempt, len(RETRY_PAUSES) - 1)])
         raise DolibarrError(last_kind, last_status)
+
+    async def partners(self) -> list[dict]:
+        """Partner und Sponsoren für die Website mit ihren Bildern (#880, Vereine 1.9.0) - nie Kontaktdaten."""
+        data = await self._get("/vereine/partners")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def partner_image(self, partner_id: int, kind: str, variant: str, *, etag: str | None = None) -> dict:
+        """Ein Bild eines Partners als Datei (#880): Logo oder Banner, hell oder dunkel; ETag = Prüfsumme."""
+        if kind not in ("logo", "banner") or variant not in ("light", "dark"):
+            raise DolibarrError("bad_request", 400)
+        conditional = {"If-None-Match": f'"{etag}"'} if etag else None
+        return await self._file_get(f"/vereine/partners/{int(partner_id)}/images/{kind}/{variant}", None, conditional,
+                                    accept="image/png, image/jpeg, image/webp, application/json")
 
     async def public_documents(self) -> list[dict]:
         """Was der Verein für die Öffentlichkeit veröffentlicht hat - ohne Bindung."""

@@ -72,9 +72,12 @@ def _sponsor_active_for_pdf(sponsor: dict) -> bool:
 async def _pdf_sponsors(db):
     rows = await db.sponsors.find(
         {"is_active": {"$ne": False}, "show_on_pdf": True},
-        {"_id": 0, "name": 1, "logo_url": 1, "link": 1, "tier": 1, "order_index": 1,
+        {"_id": 0, "name": 1, "logo_url": 1, "dolibarr_images": 1, "link": 1, "tier": 1, "order_index": 1,
          "is_active": 1, "contract_status": 1, "contract_start": 1, "contract_end": 1, "show_on_pdf": 1},
     ).to_list(50)
+    # PDFs sind hell: die Fassung für hellen Hintergrund aus Dolibarr, sonst der Upload (#880).
+    from services import sponsor_images
+    rows = [{**s, "logo_url": sponsor_images.pick(s, "logo", "light")[0]} for s in rows]
     rows = [s for s in rows if _sponsor_active_for_pdf(s)]
     rows.sort(key=lambda s: (_PDF_SPONSOR_TIER_ORDER.get(s.get("tier"), 99), s.get("order_index") or 0, s.get("name") or ""))
     return rows

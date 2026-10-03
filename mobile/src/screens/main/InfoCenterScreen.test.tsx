@@ -46,7 +46,7 @@ beforeEach(() => {
     }
     if (path === "/sponsors") {
       return Promise.resolve({ data: [
-        { id: "s1", name: "Raiffeisen", tier: "main", logo_url: null },
+        { id: "s1", name: "Raiffeisen", tier: "main", logo_url: null, banner_url: "https://lionsquad.at/api/static/uploads/dolibarr-partner-7-banner-dark-abc.jpg" },
         { id: "s2", name: "Föger", tier: "bronze", logo_url: null },
         { id: "s3", name: "Omni FM", tier: "gold", logo_url: null },
       ] });
@@ -112,6 +112,9 @@ test("aus Mehr geöffnet ist der Bereich eine eigene Seite: Titel gesetzt, keine
   expect(screen.getByText("Gold")).toBeTruthy();
   expect(screen.getByText("Bronze")).toBeTruthy();
   expect(screen.queryByText("Silber")).toBeNull();
+  // Banner aus dem Vereinsmodul (#880) nur, wo es einen gibt.
+  expect(screen.getByTestId("sponsor-banner-s1")).toBeTruthy();
+  expect(screen.queryByTestId("sponsor-banner-s2")).toBeNull();
 });
 
 test("Erfolge nur, wenn es welche gibt", () => {

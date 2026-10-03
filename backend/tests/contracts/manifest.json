@@ -48,7 +48,9 @@
       "/vereine/me/ballots",
       "/vereine/me/ballots/{id}/votes",
       "/vereine/me/events",
-      "/vereine/me/events/{id}/shifts/{shift}"
+      "/vereine/me/events/{id}/shifts/{shift}",
+      "/vereine/partners",
+      "/vereine/partners/{id}/images/{kind}/{variant}"
     ],
     "core_paths": [
       "/status"

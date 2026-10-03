@@ -1,5 +1,8 @@
+from services import sponsor_images
+
+
 def sponsor_public_key(sponsor: dict) -> str:
-    logo = str(sponsor.get("logo_url") or "").strip().lower()
+    logo = str(sponsor_images.pick(sponsor, "logo")[0] or "").strip().lower()
     if logo:
         return f"logo:{logo}"
     sid = str(sponsor.get("id") or "").strip().lower()
@@ -17,7 +20,8 @@ PRIVATE_SPONSOR_FIELDS = frozenset({
 
 
 def public_sponsor_view(sponsor: dict) -> dict:
-    view = {key: value for key, value in sponsor.items() if key not in PRIVATE_SPONSOR_FIELDS}
+    """Öffentliche Sicht: Logo und Banner sind die für dunklen Hintergrund (#880) - die Rohdaten aus Dolibarr bleiben intern."""
+    view = {key: value for key, value in sponsor_images.apply(sponsor, "dark").items() if key not in PRIVATE_SPONSOR_FIELDS}
     start = str(sponsor.get("contract_start") or "")[:4]
     end = str(sponsor.get("contract_end") or "")[:4]
     view["since_year"] = int(start) if start.isdigit() else None

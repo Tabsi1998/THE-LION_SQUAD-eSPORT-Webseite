@@ -61,7 +61,9 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   }, [load]);
   useApiInvalidation(load, ["sponsors"]);
   const logoSponsors = uniqueLogoSponsors(sponsors);
-  if (!logoSponsors.length) return null;
+  // Hauptsponsor mit Banner aus dem Vereinsmodul (#880): auf der Startseite groß über dem Laufband.
+  const mainBanner = spotlight ? sponsors.find((s) => s.tier === "main" && s.banner_url) : null;
+  if (!logoSponsors.length && !mainBanner) return null;
   const shouldMarquee = logoSponsors.length >= (compact ? 3 : spotlight ? 2 : 3);
   const loopItems = shouldMarquee ? repeatForLoop(logoSponsors, compact ? 14 : spotlight ? 8 : 10) : logoSponsors;
   const speed = compact
@@ -104,6 +106,14 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
           </span>
         </div>
       )}
+      {mainBanner ? (
+        <div className="max-w-5xl mx-auto px-4 pt-3 pb-1" data-testid="sponsor-main-banner">
+          <a href={mainBanner.link || undefined} target={mainBanner.link ? "_blank" : undefined} rel="noreferrer" aria-label={mainBanner.name}
+            className="block rounded-sm overflow-hidden border border-[#29B6E8]/20 hover:border-[#29B6E8]/50 transition">
+            <img src={resolveMediaUrl(mainBanner.banner_url)} alt={mainBanner.name} loading="lazy" className="block w-full h-auto max-h-60 object-contain bg-[#071114]" />
+          </a>
+        </div>
+      ) : null}
       <div
         className="relative max-w-full overflow-hidden group"
         style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}

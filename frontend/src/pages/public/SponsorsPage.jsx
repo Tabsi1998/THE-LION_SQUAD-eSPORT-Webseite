@@ -30,6 +30,10 @@ const tierLogo = {
   silver: "h-28",
   bronze: "h-24",
 };
+// Banner aus dem Vereinsmodul (#880): im eigenen Seitenverhältnis, nur in der Höhe begrenzt - nichts wird abgeschnitten.
+// Mit Banner rückt das Logo darunter kleiner zusammen.
+const tierBanner = { main: "max-h-64", platinum: "max-h-48", gold: "max-h-36", silver: "max-h-28", bronze: "max-h-24" };
+const tierLogoWithBanner = { main: "h-24 md:h-28", platinum: "h-20", gold: "h-16", silver: "h-14", bronze: "h-12" };
 
 export default function SponsorsPage() {
   useDocumentTitle("Sponsoren", "Sponsoren, Hauptsponsoren und Unterstützer von THE LION SQUAD eSports, Turnieren, Events und Vereinsarbeit in Tirol.");
@@ -97,7 +101,12 @@ export default function SponsorsPage() {
                     data-testid={`sponsor-${s.id}`}
                     className={`border border-white/10 hover:border-[#FFD700]/40 rounded-sm bg-[#101010] transition group flex flex-col items-center justify-center gap-2 ${tierCard[t] || tierCard.bronze}`}
                   >
-                    <div className={`${tierLogo[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
+                    {s.banner_url ? (
+                      <div className="w-full flex items-center justify-center overflow-hidden rounded-sm" data-testid={`sponsor-banner-${s.id}`}>
+                        <img src={resolveMediaUrl(s.banner_url)} alt="" loading="lazy" className={`block w-full h-auto object-contain ${tierBanner[t] || tierBanner.bronze}`} />
+                      </div>
+                    ) : null}
+                    <div className={`${(s.banner_url ? tierLogoWithBanner : tierLogo)[t] || tierLogo.bronze} w-full flex items-center justify-center overflow-hidden`}>
                       {s.logo_url ? (
                         <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                       ) : (
