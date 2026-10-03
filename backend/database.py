@@ -231,6 +231,8 @@ async def init_indexes():
     await db.events.create_index("status")
     # Documents
     await db.documents.create_index("id", unique=True)
+    # Papierkram (#615): das erste Öffnen je Person und Dokument.
+    await db.document_opens.create_index([("user_id", 1), ("doc_id", 1)], unique=True)
     await db.documents.create_index("category")
     await db.documents.create_index([("pinned", -1), ("order_index", 1)])
     # Season points (Phase 7)

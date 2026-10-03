@@ -395,7 +395,8 @@ async def test_awards_are_bundled_into_one_notification_and_never_into_a_channel
     assert result == {"users": 1, "notified": 1}
     assert posted == [], "seit #566 erfährt der Kanal nichts mehr - die Gratulation geht an die Person (#568)"
     notes = await flow.db.notifications.find({"user_id": paula["id"], "kind": "achievement"}).to_list(10)
-    assert len(notes) == 1 and notes[0]["title"] == "2 Erfolge freigeschaltet"
+    # Ein Paket, das Wertvollste vorne (#622): „2 neue Erfolge“, darunter das höchste Material.
+    assert len(notes) == 1 and notes[0]["title"] == "2 neue Erfolge" and notes[0]["body"].startswith("darunter Seriensieger")
     assert await flow.db.achievement_outbox.count_documents({}) == 0
 
 

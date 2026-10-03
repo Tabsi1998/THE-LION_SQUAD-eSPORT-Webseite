@@ -35,9 +35,24 @@ def dm_buttons(kind: str, url: str | None) -> list[dict]:
     return [{"label": BUTTON_LABELS.get(kind, "Öffnen"), "url": url}] if url else []
 
 
+# Ein Satz je Material (#622) - das Wertvollste eines Pakets bestimmt ihn und die Farbe.
+MATERIAL_LINES = {
+    "wood": "Ein solider Anfang – Holz hält.",
+    "iron": "Eisern drangeblieben.",
+    "bronze": "Bronze – du bleibst dran.",
+    "silver": "Silber glänzt – Respekt.",
+    "gold": "Gold! Das schaffen nicht viele.",
+    "platinum": "Platin – da gehören nur wenige im Verein dazu.",
+    "diamond": "Diamant. Viel mehr geht nicht.",
+    "legendary": "Legendär – so etwas gibt es im Verein ganz selten.",
+    "hidden": "Ein Geheimnis gelüftet.",
+}
+
+
 def achievement_content(notification: dict, name: str = "") -> dict:
-    """Die Gratulation (#568): persönlich, kurz, mit Erfolgsnamen, Punkten, Stufe (Farbe) und Weg zum Profil."""
-    from services.achievement_queue import LEVEL_COLORS
+    """Die Gratulation (#568): persönlich, kurz, mit Erfolgsnamen, Punkten, einem Satz und der Farbe des wertvollsten
+    Materials (#622) und Weg zum Profil; bei „Legendär“ die Teilen-Karte als Bild, wenn sie geteilt werden darf."""
+    from services.achievement_queue import LEVEL_COLORS, MATERIAL_COLORS
 
     meta = notification.get("meta") or {}
     awards = [award for award in (meta.get("awards") or []) if award.get("name")]
@@ -49,9 +64,15 @@ def achievement_content(notification: dict, name: str = "") -> dict:
         lines = [str(notification.get("body") or "")]
     if count > 1 and meta.get("points"):
         lines.append(f"\nInsgesamt **+{int(meta['points'])} Punkte**.")
+    top_material = (meta.get("top") or {}).get("material")
+    if MATERIAL_LINES.get(top_material):
+        lines.append(f"\n{MATERIAL_LINES[top_material]}")
     lines.append("Alle deine Erfolge stehen im Profil unter „Erfolge“.")
-    return {"title": title[:256], "description": "\n".join(lines)[:1000], "url": str(notification.get("url") or "/profile?tab=achievements"),
-            "color": LEVEL_COLORS.get(int(meta.get("level") or 1), 0xFFD700)}
+    color = MATERIAL_COLORS.get(top_material) or LEVEL_COLORS.get(int(meta.get("level") or 1), 0xFFD700)
+    content = {"title": title[:256], "description": "\n".join(lines)[:1000], "url": str(notification.get("url") or "/profile?tab=achievements"), "color": color}
+    if meta.get("share_award_id"):
+        content["image_path"] = f"/api/achievements/share/{meta['share_award_id']}.png"
+    return content
 
 
 def dm_content(notification: dict, category: str | None, name: str = "") -> dict:
@@ -104,7 +125,12 @@ async def send_discord_dm_for_notification(notification: dict, category: str | N
         log["reason"], log["error"] = "bot_off", REASON_TEXTS["bot_off"]
         await db.email_logs.insert_one(log)
         return 0
-    embed = await build_embed(content["title"], content["description"], color=content["color"], url=content["url"] or None)
+    image_url = None
+    if content.get("image_path"):
+        from discord_service import _public_base_url
+        image_base = await _public_base_url()
+        image_url = f"{image_base}{content['image_path']}" if image_base else None
+    embed = await build_embed(content["title"], content["description"], color=content["color"], url=content["url"] or None, image_url=image_url)
     buttons = await resolve_buttons(dm_buttons(kind, content["url"]))
     try:
         result = await bot.send_dm(discord_id, embed, buttons=buttons)

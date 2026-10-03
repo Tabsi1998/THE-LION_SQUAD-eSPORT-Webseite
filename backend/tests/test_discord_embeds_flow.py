@@ -106,7 +106,7 @@ async def test_settings_validate_and_expose_the_embeds(flow, bot):
     assert saved.status_code == 200 and saved.json()["changed"] is True
     data = (await flow.get("/api/settings/discord")).json()
     assert data["embeds"]["events"]["enabled"] is True and data["embeds"]["events"]["channel_id"] == CHANNEL and data["embeds"]["events"]["label"] == "Nächste Events"
-    assert data["embeds"]["ranking"]["enabled"] is False and set(data["embeds"]) == {"ranking", "events", "live"}
+    assert data["embeds"]["ranking"]["enabled"] is False and set(data["embeds"]) == {"ranking", "events", "live", "achievement_week"}
     assert "embeds" not in data.get("bot", {})
 
 

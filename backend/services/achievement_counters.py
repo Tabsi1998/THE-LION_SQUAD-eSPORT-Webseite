@@ -303,6 +303,42 @@ async def _member_card(ctx):
     return 1 if _signal_count(await ctx.signals(), "member_card_added") else 0
 
 
+@counter("member_documents_opened", "club")
+async def _documents_opened(ctx):
+    """Papierkram (#615): verschiedene Vereinsdokumente, die die Person geöffnet hat - jedes einmal."""
+    return await ctx.db.document_opens.count_documents({"user_id": ctx.user_id})
+
+
+@counter("board_days", "club")
+async def _board_days(ctx):
+    """Vorstandsarbeit (#615): Tage im längsten laufenden Vorstandsamt - aus Dolibarr (Funktion mit „seit“, nur
+    Vorstandsfunktionen) oder von Hand (Zuweisung im Admin mit Datum). Wer nicht mehr im Amt ist, zählt nicht weiter."""
+    from services import club_facts
+
+    today = now_utc().date()
+    starts = []
+    state = await club_facts.snapshot(ctx.db)
+    codes = {row.get("code") for row in club_facts.board_public(state.get("board")) if row.get("code")} if state.get("board") else set()
+    if codes:
+        membership = await ctx.db.memberships.find_one({"user_id": ctx.user_id, "member_status": {"$in": ["active", "honorary"]}}, {"_id": 0, "dolibarr.functions": 1}) or {}
+        for fn in (membership.get("dolibarr") or {}).get("functions") or []:
+            if fn.get("code") in codes and _parse(fn.get("since")):
+                starts.append(_parse(fn.get("since")).date())
+    async for seat in ctx.db.board_positions.find({"$or": [{"user_id": ctx.user_id}, {"deputy_user_id": ctx.user_id}], "is_active": {"$ne": False}}, {"_id": 0, "user_id": 1, "deputy_user_id": 1, "user_since": 1, "deputy_since": 1}):
+        since = seat.get("user_since") if seat.get("user_id") == ctx.user_id else seat.get("deputy_since")
+        if _parse(since):
+            starts.append(_parse(since).date())
+    return max(((today - start).days for start in starts), default=0)
+
+
+@counter("profile_completed_fast", "profile")
+async def _profile_sprint(ctx):
+    """Sprinter (#615): das Profil binnen zehn Minuten nach der Registrierung vollständig."""
+    user = await ctx.user()
+    created, completed = _parse(user.get("created_at")), _parse(user.get("profile_completed_at"))
+    return 1 if created and completed and timedelta(0) <= completed - created <= timedelta(minutes=10) else 0
+
+
 @counter("app_days", "signal")
 async def _app_days(ctx):
     return _signal_days(await ctx.signals(), "app_open")

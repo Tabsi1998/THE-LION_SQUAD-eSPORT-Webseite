@@ -210,7 +210,22 @@ async def revoke_with_reason(db, actor: dict, user_id: str, tier_code: str, *, n
     if res.deleted_count == 0:
         raise LookupError("Nicht vergeben.")
     await log_event(db, "revoke", actor, user_id=user_id, tier_code=tier_code, note=note)
+    await _tell_revoked(db, user_id, tier_code)
     return {"ok": True}
+
+
+async def _tell_revoked(db, user_id: str, tier_code: str) -> None:
+    """Die Person erfährt es im Postfach (#622) - ohne Push, ohne Discord und ohne die interne Notiz des Admins."""
+    try:
+        from services.user_notifications import create_user_notification
+        tier = await db.achievements.find_one({"code": tier_code}, {"_id": 0, "name": 1}) or {}
+        await create_user_notification(
+            user_id, "Erfolg zurückgenommen", f"„{tier.get('name') or tier_code}“ wurde vom Verein zurückgenommen. Fragen? Schreib dem Vorstand.",
+            url="/profile?tab=achievements", kind="achievement_revoked",
+            meta={"tier_code": tier_code, "in_app_only": True, "dedupe_key": f"revoked:{user_id}:{tier_code}:{now_utc().isoformat()}"},
+        )
+    except Exception:  # noqa: BLE001 - die Rücknahme selbst ist schon geschehen
+        logger.warning("[achievements] revoke notification failed", exc_info=True)
 
 
 async def resolve_recipients(db, selection: dict) -> list[str]:

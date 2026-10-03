@@ -1328,6 +1328,9 @@ async def link_account(db, user_id: str, platform: str, identity: dict) -> dict:
     if platform == "discord":
         profile["discord_id"] = identity["external_id"]
     await db.users.update_one({"id": user_id}, {"$set": profile})
+    # Ein verknüpftes Konto füllt ein Profilfeld - vielleicht das letzte fehlende (Sprinter, #615).
+    from services.member_activity import note_profile_completion
+    await note_profile_completion(db, user_id)
     return link
 
 
