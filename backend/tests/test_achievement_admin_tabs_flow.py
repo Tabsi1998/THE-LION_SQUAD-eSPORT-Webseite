@@ -62,6 +62,8 @@ async def test_massenvergabe_500_personen_aus_einer_csv_unter_zehn_sekunden(flow
     people = [{"id": new_id(), "username": f"spieler{i:03d}", "display_name": f"Spieler {i}", "email": f"s{i:03d}@example.test", "role": "user", "is_active": True} for i in range(500)]
     await flow.db.users.insert_many([dict(p) for p in people])
     # Halb Benutzernamen (Groß/Klein egal, mit @), halb E-Mails - dazu ein Doppelter und zwei Unbekannte.
+    people[1]["username"] = "SpIeLeR001"
+    await flow.db.users.update_one({"id": people[1]["id"]}, {"$set": {"username": "SpIeLeR001"}})
     names = [f"@Spieler{i:03d}" for i in range(250)] + [f"S{i:03d}@EXAMPLE.test" for i in range(250, 500)] + ["spieler000", "niemand"]
     for early in people[:3]:
         assert await badges.award_achievement(early["id"], "matches_played_1")

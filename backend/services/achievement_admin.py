@@ -244,16 +244,35 @@ async def resolve_names(db, names: list[str]) -> tuple[list[str], list[str]]:
     Liefert (gefundene IDs in Reihenfolge, nicht gefundene Namen)."""
     import re
 
+    wanted = [name for name in (str(raw or "").strip().lstrip("@") for raw in names or []) if name]
+    if not wanted:
+        return [], []
+    lowered = sorted({name.lower() for name in wanted})
+    projection = {"_id": 0, "id": 1, "username": 1, "email": 1}
+    index: dict[str, str] = {}
+
+    def remember(row: dict) -> None:
+        index.setdefault(row["id"], row["id"])
+        for field in ("username", "email"):
+            if row.get(field):
+                index.setdefault(str(row[field]).lower(), row["id"])
+
+    # Ein Zug über die Indizes: Konto-ID, Benutzername wie getippt oder klein, E-Mail (immer klein gespeichert).
+    query = {"$or": [{"id": {"$in": sorted(set(wanted))}}, {"username": {"$in": sorted(set(wanted) | set(lowered))}}, {"email": {"$in": lowered}}]}
+    async for row in db.users.find(query, projection):
+        remember(row)
+    # Übrig (z. B. „Paula“ für das Konto „pAuLa“): eine einzige Suche ohne Groß/Klein-Unterschied.
+    rest = sorted({name for name in wanted if name not in index and name.lower() not in index})
+    if rest:
+        pattern = "^(?:" + "|".join(re.escape(name) for name in rest) + ")$"
+        async for row in db.users.find({"$or": [{"username": {"$regex": pattern, "$options": "i"}}, {"email": {"$regex": pattern, "$options": "i"}}]}, projection):
+            remember(row)
     found: list[str] = []
     unknown: list[str] = []
-    for raw in names or []:
-        name = str(raw or "").strip().lstrip("@")
-        if not name:
-            continue
-        exact = {"$regex": f"^{re.escape(name)}$", "$options": "i"}
-        user = await db.users.find_one({"$or": [{"id": name}, {"username": exact}, {"email": exact}]}, {"_id": 0, "id": 1})
-        if user:
-            found.append(user["id"])
+    for name in wanted:
+        user_id = index.get(name) or index.get(name.lower())
+        if user_id:
+            found.append(user_id)
         else:
             unknown.append(name)
     return found, unknown
@@ -264,7 +283,7 @@ async def bulk_award(db, actor: dict, tier_code: str, selection: dict, *, note: 
     prüfen und in einem Zug schreiben - höchstens 500 auf einmal. XP, Schlange und Meldung folgen wie bei der
     Einzelvergabe (``badges.after_award``); die Auswertung danach (Sammler und Co.) läuft über die Warteschlange.
     ``dry_run`` schreibt nichts und zeigt je Person, ob sie es bekäme, schon hat oder nicht darf."""
-    from badges import after_award, award_doc, can_award_tier_to_user
+    from badges import after_award, award_doc
     from pymongo.errors import BulkWriteError
 
     named, unknown = await resolve_names(db, selection.get("names") or [])
@@ -288,9 +307,13 @@ async def bulk_award(db, actor: dict, tier_code: str, selection: dict, *, note: 
     if len(recipients) > BULK_LIMIT:
         raise ValueError(f"Höchstens {BULK_LIMIT} Personen auf einmal - es wären {len(recipients)}.")
     holders = set(await db.user_achievements.distinct("user_id", {"tier_code": tier_code, "user_id": {"$in": recipients}}))
+    members: set[str] | None = None
+    if tier.get("member_only"):
+        from services.membership_service import is_active_member
+        members = {m["user_id"] async for m in db.memberships.find({"user_id": {"$in": recipients}}, {"_id": 0, "user_id": 1, "member_status": 1}) if is_active_member(m)}
     states: dict[str, str] = {}
     for user_id in recipients:
-        if tier.get("member_only") and not await can_award_tier_to_user(user_id, tier):
+        if members is not None and user_id not in members:
             states[user_id] = "skipped"
         elif user_id in holders:
             states[user_id] = "already"

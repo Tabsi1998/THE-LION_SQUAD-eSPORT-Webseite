@@ -148,12 +148,15 @@ async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: b
     lässt nur die Meldung weg. Negative Gruppen bringen nichts davon."""
     if group.get("is_negative") or not user_ids:
         return
-    # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code.
-    for user_id in user_ids:
-        try:
-            await xp.grant_achievement(user_id, tier)
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"xp for achievement failed: {e}")
+    # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code. Viele auf
+    # einmal (Massenvergabe) gebündelt in wenigen Schreibzügen.
+    try:
+        if len(user_ids) == 1:
+            await xp.grant_achievement(user_ids[0], tier)
+        else:
+            await xp.grant_achievement_many(user_ids, tier)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"xp for achievement failed: {e}")
     # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf.
     try:
         from services.achievement_queue import request_evaluation
@@ -170,9 +173,8 @@ async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: b
     # Gemeldet wird gebündelt und nur, was öffentlich sein darf (#301):
     # services/achievement_queue.py schickt eine Meldung je Person und Minute.
     try:
-        from services.achievement_queue import note_award
-        for user_id in user_ids:
-            await note_award(user_id, tier, group)
+        from services.achievement_queue import note_awards
+        await note_awards(user_ids, tier, group)
     except Exception as e:
         logger.debug(f"achievement announcement queue failed: {e}")
 
