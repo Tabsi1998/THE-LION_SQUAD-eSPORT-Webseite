@@ -10,12 +10,19 @@ const render = (ui) => renderRaw(<MemoryRouter>{ui}</MemoryRouter>);
 // der aktive als aktuelle Seite markiert.
 
 test("jeder Reiter steht genau einmal und der aktive ist markiert", () => {
-  render(<ProfileNav tab="socials" onSelect={() => {}} />);
+  render(<ProfileNav tab="socials" onSelect={() => {}} isClubMember />);
   for (const item of TABS) {
     expect(screen.getAllByTestId(`profile-tab-${item.k}`)).toHaveLength(1);
   }
   expect(screen.getByTestId("profile-tab-socials")).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("profile-tab-basic")).not.toHaveAttribute("aria-current");
+});
+
+// Ehrungen (#848) kommen aus der Mitgliederakte - ohne Mitgliedschaft gibt es den Reiter nicht.
+test("Ehrungen nur für Vereinsmitglieder", () => {
+  render(<ProfileNav tab="basic" onSelect={() => {}} />);
+  expect(screen.queryByTestId("profile-tab-honours")).toBeNull();
+  expect(screen.getByTestId("profile-tab-achievements")).toBeInTheDocument();
 });
 
 test("ein Klick meldet den Reiter", async () => {
