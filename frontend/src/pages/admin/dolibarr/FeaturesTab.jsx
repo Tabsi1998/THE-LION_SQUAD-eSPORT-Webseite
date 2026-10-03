@@ -12,6 +12,40 @@ import { Empty, Panel } from "./parts";
 
 const FIELD_COLUMNS = [["gamertag", "Gamertag"], ["bio", "Kurztext"], ["games", "Spiele"], ["platforms", "Plattformen"]];
 
+const germanDay = (day) => (day ? day.split("-").reverse().join(".") : "");
+const shortMoment = (iso) => (iso ? new Date(iso).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : "");
+
+// Teilnahmen in die Mitgliederakte (#847): letzter Abgleich, laufender Nachzug, Abgelehntes mit Grund, Knopf für zwölf Monate.
+function ParticipationsDetails({ info, busy, onBackfill }) {
+  const last = info?.last_run;
+  return (
+    <div className="ml-6 space-y-2 text-xs" data-testid="dolibarr-participations">
+      {last?.at ? (
+        <p className="text-white/60" data-testid="dolibarr-participations-last">
+          Letzter Abgleich {shortMoment(last.at)}:{" "}
+          {last.skipped ? <span className="text-[#FFD700]">{last.text}</span>
+            : `${last.sent || 0} gemeldet, ${last.replaced || 0} ersetzt, ${last.retracted || 0} zurückgenommen${last.failed ? `, ${last.failed} abgelehnt` : ""}${last.pending ? `, ${last.pending} folgen` : ""}.`}
+          {last.error ? <span className="block text-[#FF3B30]">{last.text}</span> : null}
+        </p>
+      ) : <p className="text-white/45">Noch kein Abgleich – er läuft alle zehn Minuten.</p>}
+      {info?.backfill_from ? <p className="text-[#FFD700]">Nachzug ab {germanDay(info.backfill_from)} läuft – der Rest folgt mit den nächsten Abgleichen.</p> : null}
+      {info?.failed?.length ? (
+        <div data-testid="dolibarr-participations-failed">
+          <div className="text-white/60">Abgelehnt ({info.failed_total}) – neuer Versuch nach sechs Stunden oder mit dem Nachzug:</div>
+          <ul className="mt-1 space-y-0.5">
+            {info.failed.map((row) => (
+              <li key={`${row.day}-${row.kind}-${row.title}`} className="text-white/55">{germanDay(row.day)} · {row.kind} „{row.title}“: <span className="text-[#FFD700]">{row.text}</span></li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <button type="button" onClick={onBackfill} disabled={!!busy} data-testid="dolibarr-participations-backfill" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1 disabled:opacity-40">
+        <RefreshCw className={`w-3 h-3 ${busy === "participations" ? "animate-spin" : ""}`} /> Letzte 12 Monate nachtragen
+      </button>
+    </div>
+  );
+}
+
 function FeatureTitle({ feature }) {
   return (
     <span>
@@ -41,6 +75,9 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], canSystem = 
     const result = await setFeature("sponsors", { options: draft }, "Kategorien gespeichert.");
     if (result) { setCategories(null); reloadSource(); }
   };
+  const backfillParticipations = () => run("participations", () => api.post("/admin/dolibarr/participations/backfill"), ({ data }) => (
+    data.ok ? `Nachgetragen: ${data.sent} gemeldet${data.pending ? ` – ${data.pending} folgen mit den nächsten Abgleichen` : ""}.` : `Nicht nachgetragen: ${data.text || data.skipped || data.error}`
+  ));
   const toggle = async (feature, on) => {
     const result = await setFeature(feature.key, { on }, on ? `${feature.label}: an.` : `${feature.label}: aus.`);
     if (result && feature.key === "sponsors") reloadSource();
@@ -162,6 +199,10 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], canSystem = 
                     {!known.length && <div className="text-xs text-white/40 mt-1">Noch keine Felder aus dem Modul gelesen – sie erscheinen nach dem nächsten Abgleich (Vereine ab 1.2).</div>}
                   </div>
                 </div>
+              )}
+
+              {feature.key === "participations" && feature.switch?.on && (
+                <ParticipationsDetails info={feature.participations} busy={busy} onBackfill={backfillParticipations} />
               )}
 
               {feature.key === "invoices" && canSystem && (

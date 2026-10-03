@@ -76,7 +76,9 @@ async def test_connection_is_system_only_and_the_key_never_comes_back(flow, fake
     assert API_KEY not in status.text
     # Die Übersicht „was läuft, wo es steht“: jede Funktion mit Schalterort - hier ist noch nichts an.
     features = {row["key"]: row for row in status.json()["features"]}
-    assert set(features) == {"members", "club_facts", "channels", "sponsors", "applications", "consents", "member_access", "directory", "invoices", "webhook"}
+    assert set(features) == {"members", "club_facts", "channels", "sponsors", "applications", "consents", "member_access", "directory", "participations",
+                             "invoices", "webhook"}
+    assert features["participations"]["state"] == "aus" and features["participations"]["switch"] == {"on": False}
     # Alle Schalter an einem Ort (#510): jede schaltbare Funktion zeigt auf den Reiter Funktionen.
     assert features["club_facts"]["enabled"] is False and features["club_facts"]["where"] == "/admin/dolibarr?tab=features"
     assert features["members"]["state"].startswith("Modus Vorschau") and features["sponsors"]["where"] == "/admin/dolibarr?tab=features"

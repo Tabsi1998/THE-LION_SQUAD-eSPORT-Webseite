@@ -308,6 +308,47 @@ freigegeben hat – gespeichert wird in der Vereinsakte, der Vorstand sieht es a
 und die Website liest das Mitglied gleich nach, damit das Verzeichnis den neuen Stand zeigt. Sichtbar
 wird das Profil weiterhin nur mit der Einwilligung zur Nennung; der Kasten sagt, ob sie erteilt ist.
 
+## Teilnahmen in der Mitgliederakte (Vereine ab 1.8.0, #847)
+
+Wer bei einem Vereinsevent eingecheckt wurde oder ein Turnier gespielt hat, steht damit beim Mitglied
+in Dolibarr (Mitgliedskarte → Teilnahmen) – für Ehrungen, den Jahresbericht und „aktive Mitglieder“.
+Helferdienste trägt das Vereinsmodul selbst ein, sobald der Vorstand sie bestätigt hat; die meldet die
+Website nicht noch einmal.
+
+**Einrichten:**
+
+1. In Dolibarr dem API-Benutzer der Website das Recht **„Teilnahmen von Mitgliedern erfassen und
+   lesen“** geben (Benutzer → Rechte → Vereine).
+2. Im Wörterbuch *Vereine: Arten von Teilnahmen* müssen `event` (Vereinsevent) und `competition`
+   (Wettbewerb) eingeschaltet sein – so sind sie vorbelegt.
+3. Auf der Website unter *Dolibarr → Funktionen* den Schalter **„Teilnahmen in die Mitgliederakte“**
+   einschalten.
+
+**Was gemeldet wird:**
+
+- Ein **Check-in** bei einem Event (Admin → Events → Event-Anmeldungen, Status „Eingecheckt“) – mit
+  dem Tag des Events.
+- Ein **Turnier**, sobald es abgeschlossen ist – egal ob von Hand oder automatisch zum Ende. Bei
+  Teamturnieren zählt, wer zum Turniertag im Team war; wer erst danach dazukam, nicht.
+- Nur für Konten mit **bestätigter Zuordnung** zu einem Mitglied. Gäste und Konten ohne Zuordnung
+  bleiben außen vor.
+
+Der Abgleich läuft alle zehn Minuten und schaut auf die letzten 30 Tage, frühestens ab dem Tag, an
+dem der Schalter eingeschaltet wurde. Ältere Teilnahmen holt der Knopf **„Letzte 12 Monate
+nachtragen“** in derselben Zeile – in Portionen, der Rest folgt mit den nächsten Abgleichen.
+
+**Doppelt gibt es nicht:** Jede Meldung hat eine feste Kennung je Event oder Turnier und Mitglied;
+dieselbe Meldung noch einmal ist in Dolibarr derselbe Eintrag. Wird ein Event umbenannt, ersetzt die
+Website ihre Meldung. Wird ein Check-in aufgehoben, eine Anmeldung abgelehnt oder ein Turnier wieder
+geöffnet, nimmt sie die Meldung zurück. Ein gelöschtes Event oder ein Teamwechsel nimmt dagegen nichts
+aus der Akte. Was der Vorstand in Dolibarr selbst einträgt, fasst die Website nie an.
+
+**Wenn etwas nicht klappt**, steht es in der Zeile unter *Funktionen*: Fehlt das Recht, hört der
+Abgleich auf und nennt es. Lehnt Dolibarr eine einzelne Meldung ab (etwa weil die Art im Wörterbuch
+ausgeschaltet ist), steht sie mit Grund in der Liste und wird nach sechs Stunden oder mit dem Nachzug
+erneut versucht. Ist das Modul älter als 1.8.0, steht „braucht Vereine 1.8.0“ da, und es geht nichts
+hinaus.
+
 ## Vereinsakte ohne Einladungscode (Vereine ab 1.4.0, #531)
 
 Seit Vereinsmodul **1.4.0** braucht ein Mitglied keinen Einladungscode mehr: Ist sein Website-Konto
