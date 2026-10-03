@@ -1,19 +1,8 @@
 /* Fasching (S12 #643, F1–F3): Partyhut auf dem Löwen (antippbar, sonst nichts), Luftschlangen am oberen Rand des
    Inhalts (gehören zur Seite), der Gruß als Karte. Konfetti zeichnet die gemeinsame Himmelsfläche. */
-.tls-party-hat { position: absolute; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; line-height: 0; transform: rotate(-12deg); transform-origin: 50% 90%; z-index: 62; }
-.tls-party-hat:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; border-radius: 4px; }
-.tls-party-hat svg { max-width: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
-.tls-party-hat--hero { position: relative; transform: rotate(-8deg); }
-.tls-party-hat--still { display: inline-block; cursor: default; pointer-events: none; }
-.tls-party-hat--wiggle { animation: tls-hat-wiggle 0.7s cubic-bezier(0.3, 1.6, 0.5, 1); }
-@keyframes tls-hat-wiggle {
-  0% { transform: rotate(-12deg) translateY(0); }
-  25% { transform: rotate(-24deg) translateY(-6px); }
-  55% { transform: rotate(4deg) translateY(-2px); }
-  80% { transform: rotate(-16deg) translateY(0); }
-  100% { transform: rotate(-12deg) translateY(0); }
-}
-.tls-party-hat-page { position: absolute; z-index: 40; pointer-events: none; }
+/* Partyhut (#855): Platz und Knopf aus seasons/mascot; im Kopf weniger geneigt, damit er gerade auf dem Kopf sitzt. */
+.tls-party-hat--header { --hat-tilt: -5deg; }
+.tls-party-hat--hero { --hat-tilt: -8deg; }
 
 .tls-streamers { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; pointer-events: none; }
 .tls-streamer { position: absolute; max-width: none; overflow: visible; transform-origin: 50% 0; }

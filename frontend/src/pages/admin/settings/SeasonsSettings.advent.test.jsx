@@ -32,3 +32,15 @@ test("nur die Karte des Adventkalenders führt zur Pflege der Türchen", async (
   expect(screen.queryByTestId("season-halloween-doors")).toBeNull();
   expect(screen.getAllByRole("link", { name: "Türchen pflegen" })).toHaveLength(1);
 });
+
+test("die Ostereiersuche führt mit „Ostereier verstecken“ zur Verwaltung der Eier (#858)", async () => {
+  apiMock.get.mockResolvedValue({ data: {
+    enabled: true, now: "2026-09-30T12:00:00+02:00", founded_on: null, calendar: [], intensities: ["subtle", "normal", "full"], channels: ["web", "app"],
+    seasons: [season(), season({ key: "easter_hunt", label: "Ostereiersuche", description: "Versteckte Eier von Karfreitag bis Ostermontag.", next_start: "2027-03-26T00:00:00+01:00", next_end: "2027-03-29T23:59:59+02:00" })],
+  } });
+  render(<MemoryRouter><SeasonsSettings /></MemoryRouter>);
+  const link = await screen.findByTestId("season-easter_hunt-eggs");
+  expect(link).toHaveAttribute("href", "/admin/ostern");
+  expect(link).toHaveTextContent("Ostereier verstecken");
+  expect(screen.queryByTestId("season-halloween-eggs")).toBeNull();
+});

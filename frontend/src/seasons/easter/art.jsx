@@ -1,25 +1,5 @@
-// Die Bilder der Osterzeit (#645, #753, #756): Hasenohren auf einem Haarreif in Vereinsblau (im Format 40 × 52 wie
-// der Partyhut - sie sitzen mit derselben Rechnung auf dem Löwen), ein Feldhasen-Ohrenpaar für die seltenen Momente
-// hinter einer Kante, ein Zitronenfalter, Blumen und Gras. Alles SVG, keine Bilder; Farben gedeckt, nicht kindlich.
-
-/** Hasenohren auf einem Haarreif: das linke steht, das rechte knickt an der Spitze um. `size` ist die Breite. */
-export function BunnyEarsArt({ size = 24 }) {
-  return (
-    <svg className="tls-ears__svg" width={size} height={size * 1.3} viewBox="0 0 40 52" aria-hidden="true">
-      <g className="tls-ears__left">
-        <path d="M11 46 C7 34 5 18 9.5 7 C11 3.5 14.5 4 15.5 8 C17.5 18 18 33 17 46 Z" fill="#f4efe8" stroke="rgba(0,0,0,0.28)" strokeWidth="0.8" />
-        <path d="M12.3 42 C10.2 32 9.2 20 11.3 11 C12.2 8.8 13.7 9.1 14.2 11.5 C15.5 20 15.7 32 15.2 42 Z" fill="#f2b3c2" />
-      </g>
-      <g className="tls-ears__right">
-        <path d="M23 46 C23 34 24 22 27.5 12 C29 8 33 7.5 34 10.5 C35 13 34.5 15.5 33 17 C31.5 24 29.5 35 29 46 Z" fill="#f4efe8" stroke="rgba(0,0,0,0.28)" strokeWidth="0.8" />
-        <path d="M24.8 42 C25 33 25.8 23 28.4 15 C29.4 12.6 31.2 12.4 31.6 14.4 C30.4 22 28.4 33 27.6 42 Z" fill="#f2b3c2" />
-        <path d="M31.4 10.2 C33.6 9.6 35.8 11.8 35.2 15.6 C34 14.2 32.7 13.5 31.2 13.7 Z" fill="#e2dbd0" />
-      </g>
-      <path d="M5.5 47.5 Q20 40.5 34.5 47.5" stroke="#29B6E8" strokeWidth="3.6" fill="none" strokeLinecap="round" />
-      <path d="M8 46.2 Q20 41 32 46.2" stroke="#7fd6f5" strokeWidth="1" fill="none" strokeLinecap="round" opacity="0.7" />
-    </svg>
-  );
-}
+// Die Bilder der Osterzeit (#645, #753, #756): ein Feldhasen-Ohrenpaar für die seltenen Momente hinter einer Kante,
+// ein Zitronenfalter, Blumen und Gras (Hasenohren auf dem Löwen gibt es nicht mehr, #857). Alles SVG, keine Bilder; Farben gedeckt, nicht kindlich.
 
 /** Die Ohren eines Feldhasen (graubraun) - für den kurzen Blick hinter einer Kante hervor. */
 export function HareEarsArt({ width = 26 }) {

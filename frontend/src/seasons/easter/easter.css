@@ -1,17 +1,7 @@
-/* Ostern (S14 #645, E1 #753, E4 #756): Hasenohren auf dem Löwen, Eier-Reihe unter der Kopfzeile, Wiese über der
-   Fußzeile, Frühlingslicht hinter dem Inhalt, selten ein Zitronenfalter und ein Feldhase. Alle Ebenen gehören zur
-   Seite und liegen unter Kopfzeile, Menüs und Leiste unten (z 39); nichts davon ist klickbar außer den Ohren. */
+/* Ostern (S14 #645, E1 #753, E4 #756): Eier-Reihe unter der Kopfzeile, Wiese über der Fußzeile, Frühlingslicht
+   hinter dem Inhalt, selten ein Zitronenfalter und ein Feldhase - Hasenohren trägt der Löwe nicht mehr (#857). Alle
+   Ebenen gehören zur Seite und liegen unter Kopfzeile, Menüs und Leiste unten (z 39); nichts davon ist klickbar. */
 .tls-easter-layer { position: absolute; z-index: 39; pointer-events: none; }
-
-/* Hasenohren: fast aufrecht auf dem Haarreif; ab und zu zuckt das rechte von selbst, antippen lässt beide zucken. */
-.tls-ears { --hat-tilt: -4deg; }
-.tls-ears__left, .tls-ears__right { transform-box: fill-box; transform-origin: 50% 100%; }
-.tls-ears--alive .tls-ears__right { animation: tls-ears-flick 17s ease-in-out 7s infinite; }
-.tls-mascot-hat--twitch .tls-ears__right { animation: tls-ears-twitch 0.8s ease-in-out; }
-.tls-mascot-hat--twitch .tls-ears__left { animation: tls-ears-twitch-left 0.8s ease-in-out 0.08s; }
-@keyframes tls-ears-flick { 0%, 94%, 100% { transform: rotate(0deg); } 95.5% { transform: rotate(11deg); } 97% { transform: rotate(-3deg); } 98.5% { transform: rotate(2deg); } }
-@keyframes tls-ears-twitch { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(14deg); } 45% { transform: rotate(-6deg); } 70% { transform: rotate(5deg); } }
-@keyframes tls-ears-twitch-left { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-8deg); } 60% { transform: rotate(3deg); } }
 
 /* Die Reihe unter der Kopfzeile: Eier (oder Blumen) stehen im Gras, das Gras liegt davor. */
 .tls-easter-row__item { position: absolute; bottom: 3px; line-height: 0; transform-origin: 50% 100%; }
@@ -65,7 +55,6 @@
 .tls-easter-toast__close { margin-left: 0.4rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.1rem; cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
-  .tls-ears--alive .tls-ears__right, .tls-mascot-hat--twitch .tls-ears__right, .tls-mascot-hat--twitch .tls-ears__left,
   .tls-easter-row--sway .tls-easter-row__item, .tls-meadow--sway .tls-meadow__item--flower, .tls-easter-light,
   .tls-butterfly-flight, .tls-butterfly-bob, .tls-butterfly__wing, .tls-hare-peek__ears, .tls-hare__right { animation: none; }
 }

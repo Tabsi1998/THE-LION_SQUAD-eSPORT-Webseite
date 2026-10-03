@@ -12,7 +12,7 @@ jest.mock("../SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
 jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {} } }));
 
-const { EARS_COOLDOWN_MS, EasterBackdrop, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon, GREETING_KEY, TOAST_DELAY_MS, TOAST_MS } = require("./index");
+const { EasterBackdrop, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon, GREETING_KEY, TOAST_DELAY_MS, TOAST_MS } = require("./index");
 const { SEASON_MODULES, appNamesSeason } = require("../SeasonStage");
 
 const SUNDAY = "2027-03-28";
@@ -46,34 +46,9 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("im Register: Ohren, Kante, Gruß, Himmel, Tab-Symbol - und die App nennt Ostern als laufend", () => {
-  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Backdrop", "Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
+test("im Register: Kante, Gruß, Himmel, Tab-Symbol - keine Hasenohren mehr (#857) - und die App nennt Ostern als laufend", () => {
+  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Backdrop", "Edge", "Greeting", "Sky", "TabIcon"]);
   expect(appNamesSeason({ key: "easter" })).toBe(true);
-});
-
-test("die Ohren zucken auf Antippen - ein leichtes Tippen, höchstens alle vier Sekunden", async () => {
-  await render(<EasterEarsWidget season={easter()} screen="Dashboard" />);
-  const ears = screen.getByTestId("easter-ears-widget");
-  expect(ears.props.accessibilityLabel).toBe("Hasenohren – zucken lassen");
-  await fireEvent.press(ears);
-  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
-  await fireEvent.press(ears);
-  expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
-  jest.setSystemTime(Date.now() + EARS_COOLDOWN_MS);
-  await fireEvent.press(ears);
-  expect(Haptics.impactAsync).toHaveBeenCalledTimes(2);
-});
-
-test("still (dezent, ohne Bewegung, Karfreitag): die Ohren sind nur ein Bild, nichts zum Antippen", async () => {
-  await render(<EasterEarsWidget season={easter({ effective: "subtle" })} screen="Dashboard" />);
-  expect(screen.getByTestId("easter-ears-widget", { includeHiddenElements: true }).props.accessibilityRole).toBeUndefined();
-  await screen.unmount();
-  await render(<EasterEarsWidget season={easter({}, { quiet: true })} screen="Dashboard" />);
-  expect(screen.getByTestId("easter-ears-widget", { includeHiddenElements: true }).props.accessibilityRole).toBeUndefined();
-  await screen.unmount();
-  mockSeasonState.reducedMotion = true;
-  await render(<EasterEarsWidget season={easter()} screen="Dashboard" />);
-  expect(screen.getByTestId("easter-ears-widget", { includeHiddenElements: true }).props.accessibilityRole).toBeUndefined();
 });
 
 test("die Eier-Reihe an der Begrüßungskarte: verschiedene Muster, nicht auf stillen Screens; das Osterei am Tab", async () => {
