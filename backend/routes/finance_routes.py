@@ -18,7 +18,7 @@ from database import get_db
 from models import new_id, now_utc
 from services import billing_cases, billing_orders, pricing
 from services.dolibarr_billing import MAX_EXTRA_TEXT, assign_thirdparty, booking_facts, build_missing_pdfs, invoice_text_preview, missing_pdf_query, service_view, sync_one, terms_complete
-from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings, write_capable
+from services.dolibarr_client import DolibarrClient, DolibarrError, clean_base_url, load_settings, write_capable
 
 router = APIRouter(prefix="/api/admin/finance", tags=["finance"])
 
@@ -55,6 +55,17 @@ def _decorate(row: dict, names: dict, people: dict) -> dict:
     return row
 
 
+def dolibarr_invoice_url(settings: dict, invoice_id) -> str | None:
+    """Der Beleg in Dolibarrs Oberfläche (#842) - ein Klick aus der Übersicht; ohne gültige Anbindung keiner."""
+    if not invoice_id:
+        return None
+    try:
+        base = clean_base_url(settings.get("base_url"), environment=settings.get("environment") or "production")
+    except DolibarrError:
+        return None
+    return f"{base}/compta/facture/card.php?facid={int(invoice_id)}"
+
+
 async def _user_ids_matching(db, q: str) -> list[str]:
     pattern = re.compile(re.escape(q.strip()), re.IGNORECASE)
     ids = []
@@ -65,14 +76,16 @@ async def _user_ids_matching(db, q: str) -> list[str]:
 
 @router.get("/overview")
 async def finance_overview(kind: str | None = Query(None), source: str | None = Query(None, max_length=80), q: str | None = Query(None, max_length=80),
-                           me: dict = Depends(require_area("finance"))):
+                           attention: str | None = Query(None, max_length=20), me: dict = Depends(require_area("finance"))):
     db = get_db()
     settings = await load_settings(db)
     user_ids = await _user_ids_matching(db, q) if q and q.strip() else None
-    data = await billing_orders.overview(db, kind=kind, source_id=source or None, user_ids=user_ids)
+    data = await billing_orders.overview(db, kind=kind, source_id=source or None, user_ids=user_ids, attention=attention)
     names, people = await _names(db, data["open"] + data["invoiced"] + data["cases"])
     for row in data["open"] + data["invoiced"]:
         _decorate(row, names, people)
+    for row in data["invoiced"]:
+        row["dolibarr_url"] = dolibarr_invoice_url(settings, row.get("invoice_id"))
     for case in data["cases"]:
         case["source"] = names.get(case.get("source_id"))
         case["person"] = people.get(case.get("user_id"))

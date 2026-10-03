@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import timedelta
 
 from database import get_db
 from models import new_id, now_utc
@@ -251,6 +252,36 @@ async def add_refund(db, order: dict, actor_id: str, *, amount_cents: int, paid_
     return refund
 
 
+# Wo Belege hängen (#842): drei Blicke für den Kassier - mit Zahl in Finanzen und in der Tageszentrale.
+ATTENTION = {"pdf_missing": "PDF fehlt", "draft_old": "Entwurf seit mehr als 7 Tagen", "overdue": "überfällig"}
+DRAFT_DAYS = 7
+# Was nicht mehr offen ist, ist nie überfällig - auch wenn das Zahlungsziel vorbei ist.
+NOT_OPEN_STATES = ("paid", "credited", "abandoned", "overpaid")
+
+
+def attention_query(name: str, now=None) -> dict:
+    """Die Abfrage je Blick: „PDF fehlt“ (freigegeben, PDF nicht bestätigt - #840), „Entwurf seit mehr als 7 Tagen“
+    (noch nicht freigegeben), „überfällig“ (Zahlungsziel vor heute, Rest offen - nach dem Wiener Tag, frisch gerechnet,
+    auch wenn der Abgleich den Stand noch nicht neu geschrieben hat)."""
+    moment = now or now_utc()
+    if name == "pdf_missing":
+        from services.dolibarr_billing import missing_pdf_query
+        return missing_pdf_query()
+    if name == "draft_old":
+        return {"status": "invoiced", "invoice_status": "draft", "invoiced_at": {"$lt": (moment - timedelta(days=DRAFT_DAYS)).isoformat()}}
+    if name == "overdue":
+        from services.dolibarr_policy import CLUB_TZ
+        today = moment.astimezone(CLUB_TZ).strftime("%Y-%m-%d")
+        return {"status": "invoiced", "invoice_status": "validated", "due_on": {"$gt": "", "$lt": today},
+                "payment_state": {"$nin": list(NOT_OPEN_STATES)}, "$or": [{"remaining_cents": {"$gt": 0}}, {"remaining_cents": None}]}
+    raise ValueError(f"unbekannter Blick: {name}")
+
+
+async def attention_counts(db, base: dict | None = None, now=None) -> dict:
+    """Wie viele Belege je Blick hängen - in der Auswahl `base` (Art, Veranstaltung, Person)."""
+    return {name: int(await db.billing_orders.count_documents({**(base or {}), **attention_query(name, now)})) for name in ATTENTION}
+
+
 def _row_query(*, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None) -> dict:
     query: dict = {}
     if kind in ("event", "tournament"):
@@ -262,9 +293,9 @@ def _row_query(*, kind: str | None = None, source_id: str | None = None, user_id
     return query
 
 
-async def overview(db, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None) -> dict:
+async def overview(db, *, kind: str | None = None, source_id: str | None = None, user_ids: list[str] | None = None, attention: str | None = None) -> dict:
     """Für die Finanzübersicht (#322): Zahlen je Status, die offenen Aufträge, die angelegten Belege
-    mit Zahlungsstand, die offenen Prüffälle."""
+    mit Zahlungsstand, die offenen Prüffälle. `attention` (#842) zeigt nur die Belege eines Blicks."""
     from services import billing_cases
 
     base = _row_query(kind=kind, source_id=source_id, user_ids=user_ids)
@@ -272,13 +303,15 @@ async def overview(db, *, kind: str | None = None, source_id: str | None = None,
     async for row in db.billing_orders.aggregate([{"$match": base}, {"$group": {"_id": "$status", "n": {"$sum": 1}, "cents": {"$sum": "$total_cents"}}}]):
         by_status[row["_id"]] = {"count": int(row["n"]), "total_cents": int(row.get("cents") or 0)}
     open_orders = await db.billing_orders.find({**base, "status": {"$in": list(OPEN_STATUSES) + ["held", "failed"]}}, {"_id": 0, "snapshot": 0}).sort("created_at", 1).to_list(200)
-    invoiced = await db.billing_orders.find({**base, "status": "invoiced"}, {"_id": 0, "snapshot": 0, "payments": 0}).sort("updated_at", -1).to_list(250)
+    invoiced_query = {**base, **attention_query(attention)} if attention in ATTENTION else {**base, "status": "invoiced"}
+    invoiced = await db.billing_orders.find(invoiced_query, {"_id": 0, "snapshot": 0, "payments": 0}).sort("updated_at", -1).to_list(250)
     cases = await billing_cases.list_cases(db, "open")
     if base:
         cases = [case for case in cases if (not source_id or case.get("source_id") == source_id) and (kind not in ("event", "tournament") or case.get("source_kind") == kind)
                  and (user_ids is None or case.get("user_id") in user_ids)]
     return {"by_status": by_status, "labels": STATUS_LABELS, "payment_labels": PAYMENT_STATE_LABELS, "open": open_orders, "invoiced": invoiced,
-            "cases": cases, "cases_open": await billing_cases.open_count(db)}
+            "cases": cases, "cases_open": await billing_cases.open_count(db),
+            "attention": await attention_counts(db, base), "attention_labels": ATTENTION, "attention_active": attention if attention in ATTENTION else ""}
 
 
 async def source_summary(db, kind: str, source_id: str) -> dict:

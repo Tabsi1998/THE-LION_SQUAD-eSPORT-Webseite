@@ -74,9 +74,27 @@ export function toCsv(rows) {
   return `${BOM}${lines.join("\r\n")}\r\n`;
 }
 
-export function csvFilename(now = new Date()) {
+// Wo Belege hängen (#842): die drei Blicke - im Dateinamen des Exports, in der Tageszentrale in Worten.
+export const ATTENTION_ORDER = ["overdue", "pdf_missing", "draft_old"];
+const ATTENTION_FILE = { overdue: "überfällig", pdf_missing: "pdf-fehlt", draft_old: "entwurf-alt" };
+
+export function csvFilename(now = new Date(), attention = "") {
   const day = now.toISOString().slice(0, 10);
-  return `abrechnung-${day}.csv`;
+  return ATTENTION_FILE[attention] ? `abrechnung-${ATTENTION_FILE[attention]}-${day}.csv` : `abrechnung-${day}.csv`;
+}
+
+// „3 überfällig · 1 ohne PDF · 2 Entwürfe älter als 7 Tage“ - oder „alles in Ordnung“.
+export function attentionLine(counts) {
+  const parts = [];
+  if (counts?.overdue) parts.push(`${counts.overdue} überfällig`);
+  if (counts?.pdf_missing) parts.push(`${counts.pdf_missing} ohne PDF`);
+  if (counts?.draft_old) parts.push(`${counts.draft_old} ${counts.draft_old === 1 ? "Entwurf" : "Entwürfe"} älter als 7 Tage`);
+  return parts.length ? parts.join(" · ") : "alles in Ordnung";
+}
+
+// Der dringendste Blick mit Treffern - Ziel des Links aus der Tageszentrale.
+export function firstAttention(counts) {
+  return ATTENTION_ORDER.find((key) => Number(counts?.[key] || 0) > 0) || "";
 }
 
 // „Stand von Dolibarr: 23.09., 11:40“ - oder der Fehler, wenn der letzte Abgleich nicht lesen konnte.

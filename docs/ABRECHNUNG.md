@@ -205,6 +205,20 @@ Normalsatz 20 %, ermäßigt 10 %), steht unter Admin → Dolibarr → Schreibzug
 Konditionen – Voraussetzung für „Rechnungen gleich freigeben“. Ohne ihn bleibt jeder Beleg
 Entwurf; wird er zurückgenommen, geht das automatische Freigeben mit aus.
 
+## Was hängt: drei Blicke für den Kassier (#842)
+
+In **Finanzen** stehen über den angelegten Rechnungen drei Knöpfe mit Zahl. Ein Klick zeigt nur
+diese Belege, der **CSV-Export** folgt der Auswahl (Dateiname mit dem Blick), und jeder Beleg hat den
+Link **„In Dolibarr“** zur Rechnungskarte. Ohne Treffer steht dort „Alles in Ordnung“.
+
+- **PDF fehlt:** freigegeben, aber kein bestätigtes PDF (siehe oben, „Fehlende PDFs nachziehen“).
+- **Entwurf seit mehr als 7 Tagen:** angelegt, aber noch nicht freigegeben.
+- **Überfällig:** Zahlungsziel vor heute (Wiener Tag), Rest offen – auch teilweise bezahlte. Gerechnet
+  wird mit dem Datum, nicht erst nach dem nächsten Abgleich. Bezahlt, gutgeschrieben oder
+  aufgegeben ist nie überfällig.
+- **Tageszentrale:** „Belege prüfen – 3 überfällig · 1 ohne PDF“ führt direkt zum dringendsten
+  Blick. Die Zahlen bekommt nur, wer den Bereich Finanzen hat.
+
 ## Wenn etwas schiefgeht
 
 - **Dolibarr antwortet nicht** (Ausfall, Netz): Aufträge bleiben „neu“ und werden weiter versucht,

@@ -173,6 +173,15 @@ async def dashboard(me: dict = Depends(require_any_admin())):
     except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
         logger.warning("ops summary failed", exc_info=True)
         ops = None
+    # Wo Belege hängen (#842): PDF fehlt, Entwurf älter als 7 Tage, überfällig - nur für den Bereich Finanzen.
+    finance_attention = None
+    try:
+        from services.permissions import user_has_area
+        if await user_has_area(me, "finance"):
+            from services.billing_orders import attention_counts
+            finance_attention = await attention_counts(db)
+    except Exception:  # noqa: BLE001 - die Tageszentrale darf daran nicht scheitern
+        logger.warning("finance attention failed", exc_info=True)
     # Discord-Kanal ohne Recht oder gelöscht (#303, #566): nur für den, der es in den Einstellungen beheben kann.
     discord_broken = []
     try:
@@ -201,6 +210,7 @@ async def dashboard(me: dict = Depends(require_any_admin())):
         "prize_pickups": prize_pickups,
         "tournament_registrations": tournament_registrations,
         "daily_tasks": daily_tasks,
+        "finance_attention": finance_attention,
         "today": today,
         "recent_audit_logs": await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20),
     }

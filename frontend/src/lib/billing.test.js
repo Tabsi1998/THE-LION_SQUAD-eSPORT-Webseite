@@ -1,4 +1,4 @@
-import { csvCell, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "./billing";
+import { attentionLine, csvCell, csvFilename, firstAttention, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "./billing";
 
 // Finanzübersicht (#321, #322): Beträge, Eingaben, Quellen und der CSV-Export ohne Formel-Injektion.
 
@@ -46,4 +46,16 @@ test("Quellen werden einmal gelistet, die Summenzeile hat sechs getrennte Zahlen
   expect(syncLine({ sync_error: "not_found", sync_error_text: "Nicht gefunden (404)" }).text).toContain("Nicht gefunden");
   expect(syncLine({}).text).toBe("noch nicht nachgelesen");
   expect(syncLine({ synced_at: "2026-09-23T10:00:00+00:00" }).text.startsWith("Stand ")).toBe(true);
+});
+
+test("wo Belege hängen (#842): Export mit Blick im Namen, die Tageszentrale in Worten, der dringendste Blick zuerst", () => {
+  const day = new Date("2026-10-03T12:00:00Z");
+  expect(csvFilename(day, "overdue")).toBe("abrechnung-überfällig-2026-10-03.csv");
+  expect(csvFilename(day, "pdf_missing")).toBe("abrechnung-pdf-fehlt-2026-10-03.csv");
+  expect(csvFilename(day, "irgendwas")).toBe("abrechnung-2026-10-03.csv");
+  expect(attentionLine({ overdue: 3, pdf_missing: 1, draft_old: 2 })).toBe("3 überfällig · 1 ohne PDF · 2 Entwürfe älter als 7 Tage");
+  expect(attentionLine({ overdue: 0, pdf_missing: 0, draft_old: 1 })).toBe("1 Entwurf älter als 7 Tage");
+  expect(attentionLine({ overdue: 0, pdf_missing: 0, draft_old: 0 })).toBe("alles in Ordnung");
+  expect(firstAttention({ overdue: 0, pdf_missing: 2, draft_old: 1 })).toBe("pdf_missing");
+  expect(firstAttention(null)).toBe("");
 });

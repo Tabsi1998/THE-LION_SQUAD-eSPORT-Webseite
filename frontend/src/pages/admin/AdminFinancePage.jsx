@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2, Download, FileText, RefreshCw, Wallet } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, RefreshCw, Wallet } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
+import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
 
 // Finanzübersicht (#322): Rechnungsaufträge nach Status - was fehlt, was wartet, was frei zu
 // geben ist; angelegte Belege mit ihrem Zahlungsstand aus Dolibarr (#321); Prüffälle, die nur die
 // Finanzverwaltung auflöst; Erstattungen, die außerhalb passiert sind und hier festgehalten werden.
-// Kein Rechnungsdienst: Belege legt der Dolibarr-Adapter an, Zahlungen bucht Dolibarr.
+// Kein Rechnungsdienst: Belege legt der Dolibarr-Adapter an, Zahlungen bucht Dolibarr. Wo Belege hängen (#842):
+// „PDF fehlt“, „Entwurf seit mehr als 7 Tagen“, „überfällig“ mit Zahl - ein Klick zeigt nur diese, der Export folgt
+// der Auswahl, jeder Beleg öffnet sich in Dolibarr. Die Tageszentrale verlinkt mit `?attention=`.
 
 const STATUS_TONE = {
   pending: "text-white/70", ready: "text-[#00FF88]", invoiced: "text-[#00FF88]",
@@ -20,6 +22,34 @@ const STATUS_TONE = {
 };
 
 const INVOICE_STATUS = { draft: "Entwurf", validated: "freigegeben", paid: "bezahlt", abandoned: "aufgegeben" };
+const ATTENTION_TONE = { overdue: "border-[#FF3B30]/50 text-[#FF3B30]", pdf_missing: "border-[#FFD700]/50 text-[#FFD700]", draft_old: "border-[#FFD700]/50 text-[#FFD700]" };
+
+function capitalize(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
+}
+
+// Wo Belege hängen (#842): drei Knöpfe mit Zahl - ohne Treffer „alles in Ordnung“.
+function AttentionBar({ counts, labels, active, onPick }) {
+  if (!counts || !labels) return null;
+  const total = ATTENTION_ORDER.reduce((sum, key) => sum + Number(counts[key] || 0), 0);
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs" data-testid="finance-attention">
+      <span className="uppercase tracking-wider text-white/45 font-bold mr-1">Was hängt</span>
+      {ATTENTION_ORDER.map((key) => {
+        const count = Number(counts[key] || 0);
+        const on = active === key;
+        return (
+          <button key={key} type="button" aria-pressed={on} onClick={() => onPick(on ? "" : key)}
+            className={`px-3 py-1.5 border rounded-sm font-bold uppercase tracking-wider ${on ? "bg-white/10 " : ""}${count ? ATTENTION_TONE[key] : "border-white/15 text-white/40"}`}
+            data-testid={`finance-attention-${key}`}>
+            {capitalize(labels[key] || key)} · {count}
+          </button>
+        );
+      })}
+      {total === 0 && <span className="text-[#00FF88]" data-testid="finance-attention-ok">Alles in Ordnung – kein Beleg hängt.</span>}
+    </div>
+  );
+}
 const KIND_LABELS = { "": "Events und Turniere", event: "Events", tournament: "Turniere" };
 
 export default function AdminFinancePage() {
@@ -27,7 +57,8 @@ export default function AdminFinancePage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [thirdpartyInput, setThirdpartyInput] = useState({});
-  const [filters, setFilters] = useState({ kind: "", source: "", q: "" });
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => ({ kind: "", source: "", q: "", attention: ATTENTION_ORDER.includes(searchParams.get("attention")) ? searchParams.get("attention") : "" }));
   const [knownSources, setKnownSources] = useState([]);
   const [detail, setDetail] = useState(null);
   const [caseReason, setCaseReason] = useState({});
@@ -37,6 +68,7 @@ export default function AdminFinancePage() {
     if (filters.kind) params.kind = filters.kind;
     if (filters.source) params.source = filters.source;
     if (filters.q.trim()) params.q = filters.q.trim();
+    if (filters.attention) params.attention = filters.attention;
     api.get("/admin/finance/overview", { params }).then(({ data: next }) => {
       setData(next);
       setError("");
@@ -77,7 +109,7 @@ export default function AdminFinancePage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = csvFilename();
+    link.download = csvFilename(new Date(), filters.attention);
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -169,10 +201,12 @@ export default function AdminFinancePage() {
               <span className="uppercase tracking-wider text-white/45 font-bold">Person</span>
               <input value={filters.q} onChange={(ev) => setFilters((f) => ({ ...f, q: ev.target.value }))} placeholder="Name suchen" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="finance-filter-q" />
             </label>
-            {(filters.kind || filters.source || filters.q) && (
-              <button type="button" onClick={() => setFilters({ kind: "", source: "", q: "" })} className="px-3 py-1.5 border border-white/20 text-white/70 rounded-sm uppercase tracking-wider font-bold" data-testid="finance-filter-clear">Filter löschen</button>
+            {(filters.kind || filters.source || filters.q || filters.attention) && (
+              <button type="button" onClick={() => setFilters({ kind: "", source: "", q: "", attention: "" })} className="px-3 py-1.5 border border-white/20 text-white/70 rounded-sm uppercase tracking-wider font-bold" data-testid="finance-filter-clear">Filter löschen</button>
             )}
           </div>
+
+          <AttentionBar counts={data.attention} labels={data.attention_labels} active={filters.attention} onPick={(attention) => setFilters((f) => ({ ...f, attention }))} />
 
           {data.summary && (
             <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="finance-source-summary">
@@ -278,9 +312,12 @@ export default function AdminFinancePage() {
             </table>
           </div>
 
+          {filters.attention && !data.invoiced?.length && (
+            <div className="mt-8 text-sm text-white/50" data-testid="finance-attention-empty">Kein Beleg in dieser Auswahl.</div>
+          )}
           {!!data.invoiced?.length && (
             <div className="mt-8">
-              <h2 className="font-heading text-xl font-black uppercase">Angelegte Rechnungen</h2>
+              <h2 className="font-heading text-xl font-black uppercase">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
               <p className="mt-1 text-xs text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
               <div className="mt-3 border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                 <table className="w-full text-sm">
@@ -318,7 +355,14 @@ export default function AdminFinancePage() {
                             <div className={`text-[11px] ${sync.tone}`}>{sync.text}</div>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <button type="button" onClick={() => openDetail(row.id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
+                            <div className="flex flex-col items-end gap-1.5">
+                              <button type="button" onClick={() => openDetail(row.id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
+                              {row.dolibarr_url && (
+                                <a href={row.dolibarr_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold text-white/60 hover:text-white" data-testid={`finance-dolibarr-${row.id}`}>
+                                  In Dolibarr <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                                </a>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
