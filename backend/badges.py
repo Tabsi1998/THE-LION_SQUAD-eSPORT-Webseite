@@ -115,49 +115,68 @@ async def award_achievement(user_id: str, tier_code: str, context: dict | None =
     existing = await db.user_achievements.find_one({"user_id": user_id, "tier_code": tier_code})
     if existing:
         return False
-    annotated = annotate_tier(tier, group)
-    doc = {
-        "id": new_id(),
-        "user_id": user_id,
-        "tier_code": tier_code,
-        "group_code": tier["group_code"],
-        "level": annotated["level"],
-        "material": annotated["material"],
-        "rank": annotated["rank"],
-        "earned_at": now_utc().isoformat(),
-        "context": context or {},
-        "awarded_by": awarded_by,
-    }
+    doc = award_doc(user_id, tier, group, context=context, awarded_by=awarded_by)
     try:
         await db.user_achievements.insert_one(doc)
     except DuplicateKeyError:
         # concurrent evaluation already awarded this tier — not an error
         return False
-    if not group.get("is_negative"):
-        # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code.
-        try:
-            await xp.grant_achievement(user_id, tier)
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"xp for achievement failed: {e}")
-        # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf.
-        try:
-            from services.achievement_queue import request_evaluation
-            await request_evaluation([user_id], "award", sources={"achievement"})
-        except Exception as e:  # noqa: BLE001
-            logger.debug(f"queue after award failed: {e}")
-        try:
-            from services.crown_events import schedule_crown_sync
-            schedule_crown_sync()
-        except Exception as e:
-            logger.debug(f"crown sync scheduling failed: {e}")
-        # Gemeldet wird gebündelt und nur, was öffentlich sein darf (#301):
-        # services/achievement_queue.py schickt eine Meldung je Person und Minute.
-        try:
-            from services.achievement_queue import note_award
-            await note_award(user_id, tier, group)
-        except Exception as e:
-            logger.debug(f"achievement announcement queue failed: {e}")
+    await after_award([user_id], tier, group, notify=(context or {}).get("notify") is not False)
     return True
+
+
+def award_doc(user_id: str, tier: dict, group: dict, *, context: dict | None = None, awarded_by: str | None = None, earned_at: str | None = None) -> dict:
+    """Eine Vergabe, wie sie in ``user_achievements`` steht - für die Einzelvergabe und die Massenvergabe (E10)."""
+    annotated = annotate_tier(tier, group)
+    return {
+        "id": new_id(),
+        "user_id": user_id,
+        "tier_code": tier["code"],
+        "group_code": tier["group_code"],
+        "level": annotated["level"],
+        "material": annotated["material"],
+        "rank": annotated["rank"],
+        "earned_at": earned_at or now_utc().isoformat(),
+        "context": context or {},
+        "awarded_by": awarded_by,
+    }
+
+
+async def after_award(user_ids: list[str], tier: dict, group: dict, *, notify: bool = True) -> None:
+    """Was auf eine neue Vergabe folgt - für eine Person oder viele (Massenvergabe, E10): XP, die Schlange für
+    Sammler und Co., die Kronen und die gebündelte Meldung. ``notify`` aus (Admin: „ohne Benachrichtigung“)
+    lässt nur die Meldung weg. Negative Gruppen bringen nichts davon."""
+    if group.get("is_negative") or not user_ids:
+        return
+    # XP (#617): jeder Erfolg bringt Punkte × 10 - einmal je Stufe, der Bezug ist der Stufen-Code. Viele auf
+    # einmal (Massenvergabe) gebündelt in wenigen Schreibzügen.
+    try:
+        if len(user_ids) == 1:
+            await xp.grant_achievement(user_ids[0], tier)
+        else:
+            await xp.grant_achievement_many(user_ids, tier)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"xp for achievement failed: {e}")
+    # Sammler, Kategorie-Meister, Geheimnisträger (#616): über die Schlange, nicht im selben Lauf.
+    try:
+        from services.achievement_queue import request_evaluation
+        await request_evaluation(user_ids, "award", sources={"achievement"})
+    except Exception as e:  # noqa: BLE001
+        logger.debug(f"queue after award failed: {e}")
+    try:
+        from services.crown_events import schedule_crown_sync
+        schedule_crown_sync()
+    except Exception as e:
+        logger.debug(f"crown sync scheduling failed: {e}")
+    if not notify:
+        return
+    # Gemeldet wird gebündelt und nur, was öffentlich sein darf (#301):
+    # services/achievement_queue.py schickt eine Meldung je Person und Minute.
+    try:
+        from services.achievement_queue import note_awards
+        await note_awards(user_ids, tier, group)
+    except Exception as e:
+        logger.debug(f"achievement announcement queue failed: {e}")
 
 
 # Legacy alias used by older code/tests

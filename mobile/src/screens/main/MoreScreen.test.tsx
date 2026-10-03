@@ -56,7 +56,7 @@ test("Zeilen statt Karten: jedes Ziel einmal; Mitglieder sehen die goldene Karte
   await render(<MoreScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(mockGet).toHaveBeenCalled());
 
-  for (const title of ["Nachrichten", "Benachrichtigungen", "Meine Mitgliedschaft", "Meine Rechnungen", "Öffentliches Profil", "Jahreswertung", "Spielerprofile", "News", "Sponsoren", "Partner"]) {
+  for (const title of ["Nachrichten", "Benachrichtigungen", "Meine Mitgliedschaft", "Meine Rechnungen", "Öffentliches Profil", "Jahreswertung", "Achievements", "Spielerprofile", "News", "Sponsoren", "Partner"]) {
     expect(screen.getAllByText(title)).toHaveLength(1);
   }
   // Dieselbe Reihenfolge wie im Web-Benutzermenü (#516): Mitgliedschaft vor den Rechnungen.
@@ -104,8 +104,8 @@ test("Adventkalender: die Zeile steht nur da, solange der Kalender läuft - als 
   expect(navigate).toHaveBeenCalledWith("AdventCalendar");
 
   const titles = (advent: boolean) => moreGroups(advent).map((group) => [group.title, group.entries.map((entry) => entry.title)]);
-  expect(titles(true)).toEqual([["Gaming", ["Jahreswertung", "Spielerprofile"]], ["Verein", ["Adventkalender", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
-  expect(titles(false)).toEqual([["Gaming", ["Jahreswertung", "Spielerprofile"]], ["Verein", ["News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
+  expect(titles(true)).toEqual([["Gaming", ["Jahreswertung", "Achievements", "Spielerprofile"]], ["Verein", ["Adventkalender", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
+  expect(titles(false)).toEqual([["Gaming", ["Jahreswertung", "Achievements", "Spielerprofile"]], ["Verein", ["News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
 });
 
 test("Symbole je Kanal, Unbekanntes als Link", () => {

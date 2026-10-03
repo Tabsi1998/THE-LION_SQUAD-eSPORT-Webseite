@@ -38,29 +38,36 @@ def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: di
             errors.append(_finding("tier_code_duplicate", f"Stufen-Code „{code}“ kommt {count}-mal vor.", tier=code))
 
     by_code = {g.get("code"): g for g in groups}
+
+    def gname(g: dict) -> str:
+        return str(g.get("name") or "").strip() or str(g.get("code"))
+
+    def tname(t: dict) -> str:
+        return str(t.get("name") or "").strip() or str(t.get("code"))
+
     names: Counter = Counter()
     for g in groups:
         if g.get("public") and not g.get("is_negative"):
             names[(category_v2(g.get("category")), str(g.get("name") or "").strip().lower())] += 1
     for (cat, name), count in names.items():
         if count > 1 and name:
-            errors.append(_finding("group_name_duplicate", f"Der Name „{name}“ steht {count}-mal in der Kategorie {cat}."))
+            errors.append(_finding("group_name_duplicate", f"Der Name „{name}“ steht {count}-mal in der Kategorie {CATEGORIES.get(cat, {}).get('label', cat)}."))
 
     for g in groups:
         code = g.get("code")
         cat = category_v2(g.get("category"))
         if cat not in CATEGORIES:
-            errors.append(_finding("group_category_unknown", f"Gruppe „{code}“ hat die unbekannte Kategorie „{g.get('category')}“.", group=code))
+            errors.append(_finding("group_category_unknown", f"Gruppe „{gname(g)}“ hat die unbekannte Kategorie „{g.get('category')}“.", group=code))
         if not str(g.get("name") or "").strip():
             errors.append(_finding("group_name_missing", f"Gruppe „{code}“ hat keinen Namen.", group=code))
         if not g.get("is_negative") and not str(g.get("description") or "").strip():
-            errors.append(_finding("group_description_missing", f"Gruppe „{code}“ hat keine Beschreibung.", group=code))
+            errors.append(_finding("group_description_missing", f"Gruppe „{gname(g)}“ hat keine Beschreibung.", group=code))
         if not g.get("is_negative") and not str(g.get("how_to") or "").strip():
-            warnings.append(_finding("group_how_to_missing", f"Gruppe „{code}“ sagt nicht, wie man sie schafft.", group=code))
+            warnings.append(_finding("group_how_to_missing", f"Gruppe „{gname(g)}“ sagt nicht, wie man sie schafft.", group=code))
         if not g.get("is_negative") and not str(g.get("art") or "").strip():
-            warnings.append(_finding("group_art_missing", f"Gruppe „{code}“ hat kein Motiv (art).", group=code))
+            warnings.append(_finding("group_art_missing", f"Gruppe „{gname(g)}“ hat kein Motiv.", group=code))
         if cat == "hidden" and not g.get("hidden"):
-            warnings.append(_finding("group_hidden_flag", f"Gruppe „{code}“ steht in „Geheim“, ist aber nicht als versteckt markiert.", group=code))
+            warnings.append(_finding("group_hidden_flag", f"Gruppe „{gname(g)}“ steht in „Geheim“, ist aber nicht als versteckt markiert.", group=code))
 
     per_group: dict[str, list[dict]] = defaultdict(list)
     for t in tiers:
@@ -68,31 +75,31 @@ def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: di
         code = t.get("code")
         group = by_code.get(t.get("group_code"))
         if group is None:
-            errors.append(_finding("tier_group_missing", f"Stufe „{code}“ zeigt auf die Gruppe „{t.get('group_code')}“, die es nicht gibt.", tier=code))
+            errors.append(_finding("tier_group_missing", f"Stufe „{tname(t)}“ zeigt auf eine Gruppe, die es nicht gibt.", tier=code))
             continue
         negative = bool(group.get("is_negative"))
         if not str(t.get("name") or "").strip():
-            errors.append(_finding("tier_name_missing", f"Stufe „{code}“ hat keinen Namen.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_name_missing", f"Eine Stufe in „{gname(group)}“ hat keinen Namen.", tier=code, group=group.get("code")))
         if not negative and not str(t.get("description") or "").strip():
-            errors.append(_finding("tier_description_missing", f"Stufe „{code}“ hat keine Beschreibung.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_description_missing", f"Stufe „{tname(t)}“ hat keine Beschreibung.", tier=code, group=group.get("code")))
         if int(t.get("points") or 0) <= 0:
-            errors.append(_finding("tier_points", f"Stufe „{code}“ bringt keine Punkte.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_points", f"Stufe „{tname(t)}“ bringt keine Punkte.", tier=code, group=group.get("code")))
         material = t.get("material")
         if material and material not in MATERIALS:
-            errors.append(_finding("tier_material_unknown", f"Stufe „{code}“ hat das unbekannte Material „{material}“.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_material_unknown", f"Stufe „{tname(t)}“ hat ein unbekanntes Material.", tier=code, group=group.get("code")))
         elif material and t.get("rank") is not None and int(t.get("rank") or 0) != MATERIALS[material]["rank"]:
-            errors.append(_finding("tier_rank_material", f"Stufe „{code}“: Rang {t.get('rank')} passt nicht zu {MATERIALS[material]['name']}.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_rank_material", f"Stufe „{tname(t)}“: Rang {t.get('rank')} passt nicht zu {MATERIALS[material]['name']}.", tier=code, group=group.get("code")))
         key = t.get("condition_key")
         if key and condition_status is not None and key not in condition_status:
-            errors.append(_finding("tier_condition_unknown", f"Stufe „{code}“ nutzt den unbekannten Schlüssel „{key}“.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_condition_unknown", f"Stufe „{tname(t)}“ nutzt eine Automatik, die es nicht gibt.", tier=code, group=group.get("code")))
         if key and condition_status is not None and condition_status.get(key) == "planned" and group.get("public") and not t.get("manual_only"):
-            errors.append(_finding("tier_planned_public", f"Stufe „{code}“ ist öffentlich, ihre Automatik „{key}“ aber nur geplant.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_planned_public", f"Stufe „{tname(t)}“ ist öffentlich, ihre Automatik aber erst geplant.", tier=code, group=group.get("code")))
         if not negative and not key and not t.get("manual_only"):
-            errors.append(_finding("tier_no_condition", f"Stufe „{code}“ hat weder Schlüssel noch „von Hand“.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_no_condition", f"Stufe „{tname(t)}“ hat weder eine Automatik noch „von Hand“.", tier=code, group=group.get("code")))
         if category_v2(group.get("category")) == "club" and not t.get("member_only"):
-            errors.append(_finding("tier_club_member_only", f"Stufe „{code}“ liegt im Verein, ist aber nicht nur für Mitglieder.", tier=code, group=group.get("code")))
+            errors.append(_finding("tier_club_member_only", f"Stufe „{tname(t)}“ liegt im Verein, ist aber nicht nur für Mitglieder.", tier=code, group=group.get("code")))
         if not negative and not str(t.get("how_to") or "").strip():
-            warnings.append(_finding("tier_how_to_missing", f"Stufe „{code}“ sagt nicht, wie man sie schafft.", tier=code, group=group.get("code")))
+            warnings.append(_finding("tier_how_to_missing", f"Stufe „{tname(t)}“ sagt nicht, wie man sie schafft.", tier=code, group=group.get("code")))
 
     for gcode, rows in per_group.items():
         group = by_code.get(gcode)
@@ -106,17 +113,18 @@ def validate_catalog(groups: list[dict], tiers: list[dict], condition_status: di
             ordered = sorted(items, key=lambda t: (int(t.get("rank") or 0), int(t.get("level") or 0)))
             targets = [int(t.get("progress_target") or 0) for t in ordered]
             if targets != sorted(targets) or len(set(targets)) != len(targets):
-                errors.append(_finding("tier_targets_not_monotonic", f"Gruppe „{gcode}“, Schlüssel „{key}“: die Ziele steigen nicht ({', '.join(map(str, targets))}).", group=gcode))
+                errors.append(_finding("tier_targets_not_monotonic", f"Gruppe „{gname(group)}“: die Ziele steigen nicht ({', '.join(map(str, targets))}).", group=gcode))
         materials = [t.get("material") for t in sorted(rows, key=lambda t: int(t.get("rank") or 0)) if t.get("material")]
         if materials and len(materials) == len(rows) and not group.get("is_negative") and materials not in LADDERS.values() and len(set(materials)) == len(materials) and len(materials) > 1:
             ranks = [MATERIALS[m]["rank"] for m in materials if m in MATERIALS]
+            names_in_order = ", ".join(MATERIALS[m]["name"] for m in materials if m in MATERIALS)
             if ranks != sorted(ranks):
-                errors.append(_finding("tier_ladder_order", f"Gruppe „{gcode}“: die Materialien steigen nicht ({', '.join(materials)}).", group=gcode))
+                errors.append(_finding("tier_ladder_order", f"Gruppe „{gname(group)}“: die Materialien steigen nicht ({names_in_order}).", group=gcode))
             elif all(r <= 7 for r in ranks):
-                warnings.append(_finding("tier_ladder_gap", f"Gruppe „{gcode}“ nutzt eine Leiter mit Lücken ({', '.join(materials)}).", group=gcode))
+                warnings.append(_finding("tier_ladder_gap", f"Gruppe „{gname(group)}“ nutzt eine Leiter mit Lücken ({names_in_order}).", group=gcode))
     for g in groups:
         if not per_group.get(str(g.get("code"))):
-            warnings.append(_finding("group_without_tiers", f"Gruppe „{g.get('code')}“ hat keine Stufen.", group=g.get("code")))
+            warnings.append(_finding("group_without_tiers", f"Gruppe „{gname(g)}“ hat keine Stufen.", group=g.get("code")))
 
     return {
         "ok": not errors,

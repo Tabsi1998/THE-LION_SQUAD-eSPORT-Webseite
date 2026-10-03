@@ -43,6 +43,11 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
     return savePins([...pinnedCodes, code]);
   }, [pinnedCodes, savePins]);
 
+  // Prestige (#617) liefert den neuen Level-Stand zurück - er ersetzt den alten im Kopf.
+  const onLevelChange = useCallback((level) => {
+    onAchDataChange?.((current) => (current ? { ...current, level } : current));
+  }, [onAchDataChange]);
+
   const publicSwitch = achData && achData.privacy_achievements_public === false;
   // Teilen (#619): je erreichter Stufe die Vergabe-Kennung; private Erfolge lassen sich nicht teilen.
   const shareIds = useMemo(() => Object.fromEntries((achData?.awards || []).filter((a) => a.award_id && !a.is_negative).map((a) => [a.code, a.award_id])), [achData]);
@@ -58,7 +63,7 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
 
   return (
     <div className="space-y-6" data-testid="profile-achievements-tab">
-      <AchievementLevelHeader level={achData?.level} earnedPercent={achInsights?.earnedPercent ?? completeness?.score ?? 0}>
+      <AchievementLevelHeader level={achData?.level} earnedPercent={achInsights?.earnedPercent ?? completeness?.score ?? 0} onLevelChange={onLevelChange}>
         <button type="button" onClick={evaluateAchievements} disabled={evaluatingAchievements} data-testid="profile-achievements-evaluate" className="inline-flex items-center gap-2 px-4 py-2 border border-[#A855F7]/50 text-[#c084fc] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#A855F7]/10 disabled:opacity-50">
           <RefreshCw className={`w-3.5 h-3.5 ${evaluatingAchievements ? "animate-spin" : ""}`} /> Aktualisieren
         </button>

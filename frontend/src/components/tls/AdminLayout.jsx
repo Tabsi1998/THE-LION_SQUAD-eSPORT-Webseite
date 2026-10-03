@@ -155,7 +155,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/media": ["uploads", "dateien", "bilder"],
   "/admin/email-templates": ["email", "e-mail", "vorlagen", "templates", "betreff", "mail-text", "testmail"],
   "/admin/nav": ["menue", "navigation"],
-  "/admin/achievements": ["badges", "punkte", "level"],
+  "/admin/achievements": ["badges", "punkte", "level", "erfolge", "xp", "massenvergabe", "saison-mvp", "zeremonie", "prestige"],
   "/admin/stickers": ["chat", "emoji", "fluent"],
   "/admin/advent": ["advent", "adventkalender", "türchen", "tuerchen", "weihnachten", "verlosung", "gewinnspiel", "ziehung", "quiz", "kalender"],
   "/admin/sponsors": ["unterstuetzer", "partner", "dolibarr", "kategorie", "stufe", "laufzeit", "ehemalige"],

@@ -97,7 +97,7 @@ jest.mock("expo-haptics", () => ({
 // Nachbildung deckt ab, was die Saison-Ebenen nutzen; `__frameCallbacks` lässt Tests Bilder von Hand weiterschalten.
 jest.mock("react-native-reanimated", () => {
   const React = require("react");
-  const { View } = require("react-native");
+  const { View, Text, ScrollView } = require("react-native");
   const frameCallbacks = new Set();
   const mutable = (initial) => {
     const holder = {
@@ -112,7 +112,8 @@ jest.mock("react-native-reanimated", () => {
     };
     return holder;
   };
-  const Animated = { View, createAnimatedComponent: (component) => component };
+  // Text und ScrollView braucht die Erfolgs-Zeremonie (E13, #623).
+  const Animated = { View, Text, ScrollView, createAnimatedComponent: (component) => component };
   return {
     __esModule: true,
     default: Animated,
@@ -140,6 +141,7 @@ jest.mock("react-native-reanimated", () => {
     },
     runOnJS: (fn) => fn,
     withTiming: (toValue) => toValue,
+    withSpring: (toValue) => toValue,
     withSequence: (...steps) => steps[steps.length - 1],
     withDelay: (_ms, value) => value,
     withRepeat: (value) => value,

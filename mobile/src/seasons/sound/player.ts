@@ -127,21 +127,28 @@ export async function playSeasonSound(name: SeasonSound, { rng = Math.random, no
   if (!(await readSoundsOn())) return false;
   if (now - lastPlayed < MIN_GAP_MS) return false;
   lastPlayed = now;
+  if (name === "cat_meow") {
+    const kind = pickMeow(rng());
+    return playGeneratedSound(`meow-${kind}`, MEOWS[kind].seconds + 0.05, () => renderMeow(MEOWS[kind]));
+  }
+  return false;
+}
+
+/**
+ * Einen vorab gerechneten Klang abspielen (Saison-Deko, Erfolgs-Zeremonie): einmal rechnen und als WAV in den Cache
+ * legen, danach nur noch abspielen - leise neben anderer Musik, Lautstärke 0 bis 1. Fehler bleiben still.
+ */
+export async function playGeneratedSound(name: string, seconds: number, render: () => Float32Array, { volume = 1 }: { volume?: number } = {}): Promise<boolean> {
   const modules = loadModules();
   if (!modules) return false;
   const { fs, audio } = modules;
   try {
-    let uri: string | null = null;
-    let seconds = 1;
-    if (name === "cat_meow") {
-      const kind = pickMeow(rng());
-      seconds = MEOWS[kind].seconds + 0.05;
-      uri = await soundFile(fs, `meow-${kind}`, () => renderMeow(MEOWS[kind]));
-    }
+    const uri = await soundFile(fs, name, render);
     if (!uri) return false;
     audioReady = audioReady || audio.setAudioModeAsync(seasonAudioMode()).catch(() => undefined);
     await audioReady;
     const player = audio.createAudioPlayer({ uri });
+    if (volume < 1) player.volume = Math.max(0, Math.min(1, volume));
     player.play();
     // Der Spieler gibt sich nicht selbst frei - nach dem Laut aufräumen. `remove()` nimmt ihn nur aus der Liste des
     // Moduls; erst `release()` gibt ihn samt seiner Media-Session sofort frei (sonst lebt sie bis zur nächsten
