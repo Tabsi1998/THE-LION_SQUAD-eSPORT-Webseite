@@ -38,6 +38,7 @@ RIGHT_REASON_TEXTS = {
 }
 OUTCOME_LABELS = {"passed": "angenommen", "rejected": "abgelehnt", "no_quorum": "nicht beschlussfähig", "no_majority": "keine Mehrheit – eine Stichwahl folgt als neue Abstimmung"}
 VOTE_CONFLICTS = {
+    "secret": "Das ist eine geheime Wahl auf Papier – abgestimmt wird im Saal auf Stimmzetteln, nicht über die Website.",
     "not_open": "Die Abstimmung ist noch nicht offen.",
     "closed": "Die Abstimmung ist schon geschlossen.",
     "channel": "Diese Abstimmung läuft nicht über die Website.",
@@ -142,13 +143,15 @@ def meeting_view(row: dict, today: date | None = None) -> dict:
     }
 
 
-def _right_view(row: dict, labels: dict) -> dict:
+def _right_view(row: dict, labels: dict, secret: bool = False) -> dict:
+    """Bei einer geheimen Wahl auf Papier (Vereine 1.7) heißt ``used`` „Stimmzettel erhalten“, ohne Antwort - und genutzt
+    wird das Recht nie über die Website."""
     state, reason, option = str(row.get("state") or ""), str(row.get("reason") or ""), str(row.get("option") or "")
     return {
         "right_id": int(row.get("right_id") or 0), "for": row.get("for") or "self", "name": row.get("name") or "",
         "state": state, "reason": reason, "reason_text": RIGHT_REASON_TEXTS.get(reason, reason),
         "option": option, "option_label": labels.get(option, option),
-        "can_use": state == "open" and int(row.get("right_id") or 0) > 0,
+        "can_use": not secret and state == "open" and int(row.get("right_id") or 0) > 0,
     }
 
 
@@ -168,14 +171,15 @@ def _result_view(result: dict | None, options: list[dict], labels: dict) -> dict
 def ballot_view(row: dict) -> dict:
     options = [{"code": str(o.get("code") or ""), "label": str(o.get("label") or "")} for o in (row.get("options") or []) if isinstance(o, dict)]
     labels = {o["code"]: o["label"] for o in options}
-    rights = [_right_view(r, labels) for r in (row.get("rights") or []) if isinstance(r, dict)]
+    secret = bool(row.get("secret"))
+    rights = [_right_view(r, labels, secret) for r in (row.get("rights") or []) if isinstance(r, dict)]
     kind, status = str(row.get("kind") or ""), str(row.get("status") or "")
     return {
         "id": int(row.get("id") or 0), "meeting_id": int(row.get("meeting_id") or 0), "meeting": row.get("meeting") or "",
         "day": row.get("day") or "", "item": int(row.get("item") or 0), "kind": kind, "kind_label": BALLOT_KIND_LABELS.get(kind, kind),
         "question": row.get("question") or "", "status": status, "status_label": BALLOT_STATUS_LABELS.get(status, status),
         "closes": row.get("closes") or "", "timezone": row.get("timezone") or "", "options": options, "rights": rights,
-        "can_vote": status == "open" and any(right["can_use"] for right in rights),
+        "secret": secret, "can_vote": not secret and status == "open" and any(right["can_use"] for right in rights),
         "result": _result_view(row.get("result"), options, labels),
     }
 
@@ -277,7 +281,7 @@ async def submit_motion(db, user: dict, meeting_id: int, title: str, text: str) 
 
 
 def _conflict_text(exc: DolibarrError) -> str:
-    """Das Modul nennt im 409 den Grund (not_open, closed, channel, used, not_present, external_id)."""
+    """Das Modul nennt im 409 den Grund (not_open, closed, channel, used, not_present, external_id, secret)."""
     text = str((exc.detail or {}).get("message") or "").lower()
     for code, sentence in VOTE_CONFLICTS.items():
         if code in text:

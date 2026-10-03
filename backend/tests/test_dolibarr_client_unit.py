@@ -2,6 +2,7 @@
 nur https, maskierte Fehler, begrenztes Wiederholen - und Testantworten, die dem
 echten API-Schema des Vereinsmoduls entsprechen müssen."""
 import pathlib
+import re
 import sys
 
 import httpx
@@ -47,11 +48,21 @@ def test_fixture_follows_the_contract_and_a_drift_is_caught():
         validate(broken, response_schema("/vereine/members/{id}/summary"))
 
 
-def test_capabilities_never_claim_what_the_module_does_not_ship():
+def test_manifest_lists_every_vereine_path_the_backend_calls():
+    """Jeder Pfad des Vereinsmoduls, den der Code aufruft, steht in used_paths - das Manifest zeigt, worauf die Website baut."""
+    backend = pathlib.Path(__file__).resolve().parents[1]
+    listed = {re.sub(r"\{[^}]+\}", "{}", path) for path in MANIFEST["vereine"]["used_paths"]}
+    called = set()
+    for source in [*(backend / "services").glob("*.py"), *(backend / "routes").glob("*.py")]:
+        called.update(re.sub(r"\{[^}]+\}", "{}", found) for found in re.findall(r'f?"(/vereine/[^"]*)"', source.read_text(encoding="utf-8")))
+    assert called and not called - listed, sorted(called - listed)
+
+
+def test_capabilities_only_claim_what_the_website_uses():
     caps = capabilities_for({"api_version": 1})
     assert caps["member_summary"] and caps["members_changed_since"] and caps["member_functions"]
-    for waiting in MANIFEST["vereine"]["waiting_for"]:
-        assert caps[waiting] is False
+    for unused in MANIFEST["vereine"]["not_used_yet"]:
+        assert caps[unused] is False
     assert not any(capabilities_for(None).values())
 
 

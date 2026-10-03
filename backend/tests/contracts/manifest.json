@@ -2,8 +2,8 @@
   "comment": "Festgehaltener API-Vertrag der Dolibarr-Module, gegen den die Website-Tests pruefen (#330). Die Module pruefen ihre echten Antworten in Dolibarr 22, 23 und 24 selbst gegen dieselbe Datei.",
   "vereine": {
     "repository": "Tabsi1998/dolibarr-vereine",
-    "module_version": "1.4.0",
-    "commit": "a249918",
+    "module_version": "1.9.0",
+    "commit": "0d5fe4d",
     "api_version": 2,
     "openapi": "vereine-openapi.json",
     "used_paths": [
@@ -39,14 +39,23 @@
       "/vereine/me/profile/changes",
       "/vereine/me/exit",
       "/vereine/me/statutes",
-      "/vereine/me/statutes/{id}/pdf"
+      "/vereine/me/statutes/{id}/pdf",
+      "/vereine/me/documents/{id}/file",
+      "/vereine/documents/{id}/file",
+      "/vereine/me/meetings",
+      "/vereine/me/meetings/{id}/response",
+      "/vereine/me/meetings/{id}/motions",
+      "/vereine/me/ballots",
+      "/vereine/me/ballots/{id}/votes",
+      "/vereine/me/events",
+      "/vereine/me/events/{id}/shifts/{shift}"
     ],
     "core_paths": [
       "/status"
     ],
-    "waiting_for": {
-      "change_feed": "dolibarr-vereine#154",
-      "signed_webhooks": "dolibarr-vereine#155"
+    "not_used_yet": {
+      "change_feed": "Modul seit 0.8.0-beta (dolibarr-vereine#154), meldet seit 1.7.0 auch Versammlungen und Abstimmungen - die Website nutzt ihn mit #844",
+      "signed_webhooks": "Modul seit 0.8.0-beta (dolibarr-vereine#155) - die Website hat keinen Empfaenger"
     }
   }
 }

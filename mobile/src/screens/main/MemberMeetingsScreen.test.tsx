@@ -69,6 +69,17 @@ test("Stimme nur nach Bestätigung; abgelehnt schickt nichts", async () => {
   expect(yes.mock.calls[0][1]).toContain("Nein");
 });
 
+test("Geheime Wahl auf Papier: keine Knöpfe, ein ausgegebener Stimmzettel statt einer Antwort", async () => {
+  const proxy = { right_id: 2020, for: "proxy", name: "Anna Muster", state: "used", reason: "proxy", reason_text: "Vollmacht", option: "", option_label: "", can_use: false };
+  const secret = { ...ballot, secret: true, can_vote: false, rights: [{ ...ballot.rights[0], can_use: false }, proxy] };
+  mockGet.mockResolvedValue({ data: { ...view, ballots: [secret] } });
+  await render(<MemberMeetingsScreen navigation={navigation} route={route} confirmVote={async () => true} />);
+  await waitFor(() => expect(screen.getByTestId("ballot-3-secret")).toBeTruthy());
+  expect(screen.queryByTestId("ballot-3-vote-1012-yes")).toBeNull();
+  expect(screen.getByText("Den Stimmzettel bekommst du im Saal.")).toBeTruthy();
+  expect(screen.getByTestId("ballot-3-right-2020-used")).toHaveTextContent("Stimmzettel erhalten");
+});
+
 test("ohne Weg zur Akte steht der Grund", async () => {
   mockGet.mockResolvedValue({ data: { available: false, reason: "not_bound", text: "Dafür muss dein Konto verbunden sein.", meetings: [], ballots: [] } });
   await render(<MemberMeetingsScreen navigation={navigation} route={route} confirmVote={async () => true} />);

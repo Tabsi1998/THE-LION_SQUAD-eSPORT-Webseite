@@ -369,7 +369,7 @@ class FakeDolibarr:
                 "member_id": member_id, "ref": str(member_id), "firstname": summary.get("firstname") or "Paula", "lastname": summary.get("lastname") or "Beispiel",
                 "birth": "1990-05-04", "address": "Teststraße 1", "zip": "6410", "town": "Testdorf", "country_code": "AT", "phone": "", "phone_mobile": "+43 660 0000000",
                 "email": email, "member_type": (summary.get("type") or {}).get("label") or "Ordentliches Mitglied", "status": "active",
-                "version": "v1", "direct": list(self.direct_fields), "exit": None,
+                "version": "v1", "direct": list(self.direct_fields), "direct_once": False, "exit": None,
             }
         return self.profiles[member_id]
 
@@ -387,9 +387,11 @@ class FakeDolibarr:
         return self.meetings[meeting_id]
 
     def add_ballot(self, ballot_id: int, meeting_id: int, *, item: int = 3, kind: str = "resolution", question: str = "Entlastung des Vorstands",
-                   status: str = "released", closes: str = "", options: list[dict] | None = None, rights: dict[int, list[dict]] | None = None) -> dict:
+                   status: str = "released", closes: str = "", options: list[dict] | None = None, rights: dict[int, list[dict]] | None = None,
+                   secret: bool = False) -> dict:
+        """``secret``: geheime Wahl auf Papier (seit Vereine 1.7.0) - abgestimmt wird im Saal, nie über die API."""
         self.ballots[ballot_id] = {
-            "id": ballot_id, "meeting_id": meeting_id, "item": item, "kind": kind, "question": question, "status": status, "closes": closes,
+            "id": ballot_id, "meeting_id": meeting_id, "item": item, "kind": kind, "question": question, "status": status, "closes": closes, "secret": secret,
             "options": options or [{"code": "yes", "label": "Ja"}, {"code": "no", "label": "Nein"}, {"code": "abstain", "label": "Enthaltung"}],
             "result": None,
         }
@@ -423,7 +425,7 @@ class FakeDolibarr:
         return {
             "id": ballot_id, "meeting_id": ballot["meeting_id"], "meeting": meeting["title"], "day": meeting["day"], "item": ballot["item"], "kind": ballot["kind"],
             "question": ballot["question"], "status": ballot["status"], "closes": ballot["closes"], "timezone": meeting["timezone"], "options": ballot["options"],
-            "rights": self._rights_for(ballot_id, member_id), "result": ballot["result"],
+            "rights": self._rights_for(ballot_id, member_id), "result": ballot["result"], "secret": bool(ballot.get("secret")),
         }
 
     def _json_method(self, template: str, method: str, payload) -> httpx.Response:
@@ -1082,6 +1084,8 @@ class FakeDolibarr:
                 return httpx.Response(404, json={"error": {"code": 404, "message": "Voting right not found"}})
             if body["option"] not in {option["code"] for option in ballot["options"]}:
                 return httpx.Response(400, json={"error": {"code": 400, "message": "unknown option", "field": "option"}})
+            if ballot.get("secret"):
+                return httpx.Response(409, json={"error": {"code": 409, "message": "secret"}})
             if ballot["status"] == "released":
                 return httpx.Response(409, json={"error": {"code": 409, "message": "not_open"}})
             if ballot["status"] != "open":

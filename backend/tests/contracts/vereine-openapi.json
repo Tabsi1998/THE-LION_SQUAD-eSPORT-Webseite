@@ -1049,7 +1049,7 @@
             "name": "types",
             "in": "query",
             "required": false,
-            "description": "Objektarten mit Komma getrennt; leer für alle",
+            "description": "Objektarten mit Komma: membership, function, fee, application, consent, document, ballot, meeting",
             "schema": {
               "type": "string"
             }
@@ -1108,7 +1108,9 @@
                 "fee",
                 "application",
                 "consent",
-                "document"
+                "document",
+                "ballot",
+                "meeting"
               ]
             }
           },
@@ -3977,6 +3979,762 @@
           ]
         ]
       }
+    },
+    "/vereine/meetings/{id}/attendance/{member}": {
+      "put": {
+        "operationId": "putAttendance",
+        "summary": "Mitglied bei einer Generalversammlung einlassen",
+        "description": "Setzt das Mitglied auf anwesend, im Namen eines Vorstandsmitglieds – nur am Tag einer eingeladenen, offenen Generalversammlung und nur für eingeladene Mitglieder. Dieselbe external_id noch einmal ändert nichts. Die Antwort nennt das Stimmrecht und die Beschlussfähigkeit.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Generalversammlung",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "description": "Mitglied, das eingelassen wird (die Anwendung löst den Ausweis selbst auf)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Kennung des Vorstandsmitglieds bei dieser Anwendung (Bindung mit der Fähigkeit attendance). Oder statt dessen member_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "query",
+            "required": false,
+            "description": "Statt subject: die Mitglieds-ID des Vorstandsmitglieds, in dessen Namen eingelassen wird – mit dem Recht, Mitglieder einzulassen",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "external_id"
+                ],
+                "properties": {
+                  "external_id": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^[A-Za-z0-9._:-]+$",
+                    "description": "Kennung dieser Anfrage bei der Anwendung"
+                  },
+                  "arrived": {
+                    "type": "string",
+                    "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "description": "Ankunft HH:MM; ohne Angabe jetzt"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stand des Mitglieds und der Versammlung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckIn"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use",
+            "vereine:attendance:write"
+          ]
+        ]
+      },
+      "delete": {
+        "operationId": "deleteAttendance",
+        "summary": "Einlass zurücknehmen",
+        "description": "Nimmt den Einlass mit Grund zurück; das Mitglied gilt wieder als abwesend. Sonst wie PUT.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Generalversammlung",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "description": "Mitglied, das eingelassen wird (die Anwendung löst den Ausweis selbst auf)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Kennung des Vorstandsmitglieds bei dieser Anwendung (Bindung mit der Fähigkeit attendance). Oder statt dessen member_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "query",
+            "required": false,
+            "description": "Statt subject: die Mitglieds-ID des Vorstandsmitglieds, in dessen Namen eingelassen wird – mit dem Recht, Mitglieder einzulassen",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "external_id",
+            "in": "query",
+            "required": true,
+            "description": "Kennung dieser Anfrage bei der Anwendung",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "reason",
+            "in": "query",
+            "required": true,
+            "description": "Warum der Einlass zurückgenommen wird",
+            "schema": {
+              "type": "string",
+              "maxLength": 255
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stand des Mitglieds und der Versammlung",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckIn"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use",
+            "vereine:attendance:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/honours": {
+      "get": {
+        "operationId": "getMemberHonours",
+        "summary": "Ehrungen eines Mitglieds, die veröffentlicht werden dürfen",
+        "description": "Nur Ehrungen mit „darf veröffentlicht werden“, neueste zuerst, nie die interne Notiz. Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ehrungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Honour"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/participations": {
+      "get": {
+        "operationId": "getMemberParticipations",
+        "summary": "Teilnahmen eines Mitglieds",
+        "description": "Woran das Mitglied teilgenommen hat, neueste zuerst: in Dolibarr festgehalten, von einer Anwendung gemeldet und bestätigte Helferdienste, deren Tag schon war. Die eigenen Kennungen der fragenden Anwendung kommen mit. Braucht das Recht, den Verein zu lesen, und das Recht, Teilnahmen zu erfassen (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Teilnahmen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Participation"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:participation:write"
+          ]
+        ]
+      },
+      "post": {
+        "operationId": "postMemberParticipation",
+        "summary": "Teilnahme eines Mitglieds melden",
+        "description": "Mit der eigenen external_id der Anwendung: dieselbe Meldung noch einmal ist derselbe Eintrag, eine andere unter derselben Kennung wird mit 409 abgelehnt. Ein abgelehntes Feld steht mit seinem Code in error.field (external_id, kind, title, day, hours). Braucht das Recht, den Verein zu lesen, und das Recht, Teilnahmen zu erfassen (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipationEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Die Teilnahme",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Participation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:participation:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/members/{id}/participations/{external_id}": {
+      "delete": {
+        "operationId": "deleteMemberParticipation",
+        "summary": "Selbst gemeldete Teilnahme zurücknehmen",
+        "description": "Nur eine Teilnahme, die dieselbe Anwendung für dieses Mitglied unter der Kennung gemeldet hat; sonst 404. Braucht das Recht, den Verein zu lesen, und das Recht, Teilnahmen zu erfassen (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Mitglieds-ID",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "external_id",
+            "in": "path",
+            "required": true,
+            "description": "Kennung der Meldung bei der Anwendung",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Zurückgenommen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParticipationDeleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:participation:write"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/honours": {
+      "get": {
+        "operationId": "getMyHonours",
+        "summary": "Eigene Ehrungen der gebundenen Person",
+        "description": "Alle Ehrungen der Person, neueste zuerst, mit „darf veröffentlicht werden“; nie die interne Notiz. Braucht die Fähigkeit record (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Kennung der Person bei dieser Anwendung (gebundene Identität); stabil, nie eine E-Mail-Adresse allein. Oder statt dessen member_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "query",
+            "required": false,
+            "description": "Statt subject: die Mitglieds-ID, für eine Anwendung mit dem Recht, im Namen von Mitgliedern zu handeln. Die Anwendung verbürgt sich selbst dafür, wer die Person ist",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ehrungen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Honour"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use",
+            "vereine:members:act"
+          ]
+        ]
+      }
+    },
+    "/vereine/me/participations": {
+      "get": {
+        "operationId": "getMyParticipations",
+        "summary": "Eigene Teilnahmen der gebundenen Person",
+        "description": "Woran die Person teilgenommen hat, neueste zuerst, mit den bestätigten Helferdiensten. Braucht die Fähigkeit record (seit 1.8.0).",
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "query",
+            "required": false,
+            "description": "Kennung der Person bei dieser Anwendung (gebundene Identität); stabil, nie eine E-Mail-Adresse allein. Oder statt dessen member_id",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "member_id",
+            "in": "query",
+            "required": false,
+            "description": "Statt subject: die Mitglieds-ID, für eine Anwendung mit dem Recht, im Namen von Mitgliedern zu handeln. Die Anwendung verbürgt sich selbst dafür, wer die Person ist",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Teilnahmen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Participation"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:identity:use",
+            "vereine:members:act"
+          ]
+        ]
+      }
+    },
+    "/vereine/partners": {
+      "get": {
+        "operationId": "getPartners",
+        "summary": "Partner und Sponsoren für die Website, mit ihren Bildern",
+        "description": "Die aktiven Geschäftspartner der Kategorien, die der Verein gewählt hat, in der Reihenfolge dieser Kategorien und dann nach Namen. Name, Website, Kategorien und die hinterlegten Bilder – Logo und Banner, je für hellen und dunklen Hintergrund –, nie Kontaktdaten. Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen (seit 1.9.0).",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Partner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Partner"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
+    },
+    "/vereine/partners/{id}/images/{kind}/{variant}": {
+      "get": {
+        "operationId": "getPartnerImage",
+        "summary": "Ein Bild eines Partners als Datei",
+        "description": "Logo oder Banner für hellen oder dunklen Hintergrund, unverändert. ETag ist die Prüfsumme sha256 aus GET /vereine/partners in Anführungszeichen; If-None-Match bekommt 304, Range einen Teil (206). Nur von Partnern, die an die Website gehen. Braucht das Recht, den Verein zu lesen, und das Recht, die Mitglieds-Zusammenfassung für die Website zu lesen (seit 1.9.0).",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Geschäftspartner",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "description": "logo oder banner",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "logo",
+                "banner"
+              ]
+            }
+          },
+          {
+            "name": "variant",
+            "in": "path",
+            "required": true,
+            "description": "light (für hellen Hintergrund) oder dark (für dunklen)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "light",
+                "dark"
+              ]
+            }
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "required": false,
+            "description": "ETag einer früheren Antwort: dann 304 ohne Inhalt, wenn sich nichts geändert hat",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Das ganze Bild",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Der erbetene Teil; Content-Range nennt ihn",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "description": "Die Bytes des Bildes, unverändert"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Unverändert seit dem ETag aus If-None-Match; kein Inhalt"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "501": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "x-vereine-rights": [
+          [
+            "vereine:association:read"
+          ],
+          [
+            "vereine:website:read"
+          ]
+        ]
+      }
     }
   },
   "components": {
@@ -5265,7 +6023,9 @@
               "fee",
               "application",
               "consent",
-              "document"
+              "document",
+              "ballot",
+              "meeting"
             ]
           },
           "object_id": {
@@ -5284,6 +6044,20 @@
               "unlinked",
               "revoked"
             ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "released",
+              "opened",
+              "closed",
+              "confirmed",
+              "cancelled",
+              "invited",
+              "started",
+              "ended"
+            ],
+            "description": "Nur bei ballot und meeting: der erreichte Zustand. ballot: released, opened, closed, confirmed, cancelled; meeting: invited, started, ended, cancelled"
           },
           "occurred_at": {
             "$ref": "#/components/schemas/Moment"
@@ -5405,7 +6179,9 @@
                 "meetings",
                 "profile",
                 "events",
-                "invoices"
+                "invoices",
+                "attendance",
+                "record"
               ]
             }
           },
@@ -6078,6 +6854,7 @@
           "status",
           "version",
           "direct",
+          "direct_once",
           "exit"
         ],
         "properties": {
@@ -6138,6 +6915,10 @@
               "type": "string"
             },
             "description": "Felder, die sofort übernommen werden"
+          },
+          "direct_once": {
+            "type": "boolean",
+            "description": "Der Vorstand hat erlaubt, dass die nächste Änderung ohne Prüfung gilt – für alle Felder, auch die E-Mail-Adresse; danach wieder false (seit 1.8.0)"
           },
           "exit": {
             "type": "object",
@@ -6487,6 +7268,7 @@
           "item",
           "kind",
           "question",
+          "secret",
           "status",
           "closes",
           "timezone",
@@ -6522,6 +7304,10 @@
           },
           "question": {
             "type": "string"
+          },
+          "secret": {
+            "type": "boolean",
+            "description": "Geheime Wahl auf Papier: abgestimmt wird auf Stimmzetteln im Saal, hier nie (seit 1.7.0)"
           },
           "status": {
             "type": "string",
@@ -6799,6 +7585,335 @@
                   "type": "string"
                 }
               }
+            }
+          }
+        }
+      },
+      "CheckIn": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "member_id",
+          "state",
+          "arrived",
+          "voting",
+          "reason",
+          "present",
+          "eligible",
+          "quorum_from",
+          "quorum_reached"
+        ],
+        "properties": {
+          "member_id": {
+            "type": "integer"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "present",
+              "absent",
+              "excused",
+              "represented"
+            ],
+            "description": "Anwesenheit des Mitglieds jetzt"
+          },
+          "arrived": {
+            "type": "string",
+            "description": "Ankunft HH:MM, leer wenn nicht anwesend"
+          },
+          "voting": {
+            "type": "boolean",
+            "description": "Darf das Mitglied jetzt abstimmen?"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "own",
+              "proxy",
+              "no_voting_right",
+              "not_member",
+              "absent"
+            ],
+            "description": "own eigenes Stimmrecht; no_voting_right ohne Stimmrecht eingeladen; not_member kein Mitglied mehr am Tag; absent nicht anwesend"
+          },
+          "present": {
+            "type": "integer",
+            "description": "Anwesende jetzt"
+          },
+          "eligible": {
+            "type": "integer",
+            "description": "Stimmberechtigte der Versammlung"
+          },
+          "quorum_from": {
+            "type": "integer",
+            "description": "Beschlussfähig ab so vielen Stimmen (laut Statuten)"
+          },
+          "quorum_reached": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Participation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "kind_label",
+          "title",
+          "day",
+          "hours",
+          "source",
+          "external_id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Code der Art aus dem Wörterbuch des Vereins, vorbelegt event, competition, shift"
+          },
+          "kind_label": {
+            "type": "string",
+            "description": "Name der Art, wie ihn der Verein im Wörterbuch führt"
+          },
+          "title": {
+            "type": "string",
+            "description": "Woran teilgenommen wurde; bei einem Helferdienst Veranstaltung – Schicht"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "hours": {
+            "type": "number",
+            "nullable": true,
+            "description": "Stunden, wenn erfasst; bei einem Helferdienst die notierten Stunden oder die Länge der Schicht"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "dolibarr",
+              "api",
+              "shift"
+            ],
+            "description": "dolibarr: in Dolibarr festgehalten; api: von einer Anwendung gemeldet; shift: bestätigter Helferdienst"
+          },
+          "external_id": {
+            "type": "string",
+            "description": "Die eigene Kennung der fragenden Anwendung, sonst leer"
+          }
+        }
+      },
+      "ParticipationEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "title",
+          "day",
+          "external_id"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Code einer eingeschalteten Art aus dem Wörterbuch"
+          },
+          "title": {
+            "type": "string",
+            "description": "Woran teilgenommen wurde, höchstens 255 Zeichen"
+          },
+          "day": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Tag der Teilnahme, nicht in der Zukunft"
+          },
+          "hours": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 0,
+            "maximum": 9999,
+            "description": "Stunden, freiwillig, höchstens zwei Nachkommastellen"
+          },
+          "external_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]{1,64}$",
+            "description": "Kennung der Meldung bei der Anwendung; dieselbe Meldung zweimal ergibt einen Eintrag"
+          }
+        }
+      },
+      "ParticipationDeleted": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "external_id",
+          "deleted"
+        ],
+        "properties": {
+          "external_id": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Honour": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "kind_label",
+          "title",
+          "years",
+          "label",
+          "given_on",
+          "publishable"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "Code der Art aus dem Wörterbuch: jubilee, honorary, award, merit oder eine eigene"
+          },
+          "kind_label": {
+            "type": "string",
+            "description": "Name der Art im Wörterbuch des Vereins"
+          },
+          "title": {
+            "type": "string",
+            "description": "Die Ehrung in Worten, etwa „10 Jahre Mitgliedschaft“ oder „Goldenes Ehrenzeichen – 30 Jahre Jugendarbeit“"
+          },
+          "years": {
+            "type": "integer",
+            "description": "Jahre der Mitgliedschaft bei einem Jubiläum, sonst 0"
+          },
+          "label": {
+            "type": "string",
+            "description": "Wofür geehrt wurde"
+          },
+          "given_on": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "publishable": {
+            "type": "boolean",
+            "description": "Darf veröffentlicht werden"
+          }
+        }
+      },
+      "PartnerImage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "variant",
+          "source",
+          "content_type",
+          "size",
+          "width",
+          "height",
+          "sha256",
+          "updated_at"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "logo",
+              "banner"
+            ]
+          },
+          "variant": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "description": "light: für hellen Hintergrund; dark: für dunklen Hintergrund"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "vereine",
+              "dolibarr"
+            ],
+            "description": "dolibarr: das Logo der Dolibarr-Karte, solange kein eigenes Logo für hellen Hintergrund hinterlegt ist"
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "description": "Bytes"
+          },
+          "width": {
+            "type": "integer",
+            "description": "Breite in Pixeln"
+          },
+          "height": {
+            "type": "integer",
+            "description": "Höhe in Pixeln"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Prüfsumme; dieselbe steht als ETag beim Abruf der Datei"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "Stand, UTC"
+          }
+        }
+      },
+      "Partner": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "url",
+          "categories",
+          "images"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "Geschäftspartner in Dolibarr"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "description": "Website des Partners, leer wenn keine"
+          },
+          "categories": {
+            "type": "array",
+            "description": "Die gewählten Kategorien des Partners, in der Reihenfolge der Einstellungen",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "label"
+              ],
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "images": {
+            "type": "array",
+            "description": "Genau die hinterlegten Bilder; ein fehlender Platz fehlt hier",
+            "items": {
+              "$ref": "#/components/schemas/PartnerImage"
             }
           }
         }

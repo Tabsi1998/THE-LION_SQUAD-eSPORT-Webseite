@@ -76,8 +76,8 @@ CAPABILITIES_V1 = {
     "membership_fees": True,
     "webhook_member_changed": True,
     "verified_identities": True,    # dolibarr-vereine#153 - seit Vereine 0.11: identities/claim, me/*
-    "change_feed": False,           # dolibarr-vereine#154
-    "signed_webhooks": False,       # dolibarr-vereine#155
+    "change_feed": False,           # dolibarr-vereine#154 - kann das Modul seit 0.8.0-beta; die Website liest ihn mit #844
+    "signed_webhooks": False,       # dolibarr-vereine#155 - kann das Modul; die Website hat keinen Empfänger
     "documents": True,              # dolibarr-vereine#157 - seit Vereine 0.11: me/documents, documents
 }
 

@@ -27,6 +27,7 @@ export type BallotResult = { outcome: string; outcome_label: string; passed: boo
 export type Ballot = {
   id: number; meeting_id: number; meeting: string; day: string; item: number; kind: string; kind_label: string; question: string; status: string; status_label: string;
   closes: string; timezone: string; options: { code: string; label: string }[]; rights: BallotRight[]; can_vote: boolean; result: BallotResult | null;
+  secret?: boolean;
 };
 export type MeetingsView = {
   available: boolean; reason?: string | null; text?: string; meetings: Meeting[]; ballots: Ballot[];
@@ -143,12 +144,17 @@ export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote }: Props
                 <Muted style={styles.eyebrow}>{ballot.kind_label} · {ballot.meeting}{ballot.item ? ` · TOP ${ballot.item}` : ""}</Muted>
                 <Heading>{ballot.question}</Heading>
                 <Muted testID={`ballot-${ballot.id}-status`}>{ballot.status_label}{ballot.closes ? ` · offen bis ${ballot.closes} Uhr` : ""} · {formatDate(ballot.day)}</Muted>
+                {ballot.secret ? (
+                  <Muted testID={`ballot-${ballot.id}-secret`}>Geheime Wahl auf Papier: abgestimmt wird im Saal auf Stimmzetteln, nicht hier.</Muted>
+                ) : null}
                 {ballot.rights.map((right) => (
                   <View key={`${right.right_id}-${right.for}-${right.name}`} style={styles.right} testID={`ballot-${ballot.id}-right-${right.right_id}`}>
                     <Body>{right.for === "proxy" ? `Vollmacht von ${right.name}` : "Dein Stimmrecht"} <Muted>· {right.reason_text}</Muted></Body>
                     {right.state === "used" ? (
-                      <Body style={styles.used} testID={`ballot-${ballot.id}-right-${right.right_id}-used`}>abgestimmt: {right.option_label || right.option}</Body>
-                    ) : ballot.status === "open" && right.can_use ? (
+                      <Body style={styles.used} testID={`ballot-${ballot.id}-right-${right.right_id}-used`}>
+                        {ballot.secret ? "Stimmzettel erhalten" : `abgestimmt: ${right.option_label || right.option}`}
+                      </Body>
+                    ) : ballot.status === "open" && right.can_use && !ballot.secret ? (
                       <View style={styles.options}>
                         {ballot.options.map((option) => (
                           <Pressable
@@ -164,7 +170,10 @@ export function MemberMeetingsScreen({ confirmVote = defaultConfirmVote }: Props
                         ))}
                       </View>
                     ) : (
-                      <Muted>{right.state === "none" ? "Mit diesem Stimmrecht kannst du hier nicht abstimmen." : ballot.status === "open" ? "" : "Abstimmen geht nur, solange die Abstimmung offen ist."}</Muted>
+                      <Muted>
+                        {right.state === "none" ? "Mit diesem Stimmrecht kannst du hier nicht abstimmen." : ballot.secret ? "Den Stimmzettel bekommst du im Saal."
+                          : ballot.status === "open" ? "" : "Abstimmen geht nur, solange die Abstimmung offen ist."}
+                      </Muted>
                     )}
                   </View>
                 ))}
