@@ -16,7 +16,12 @@ async def list_discord_guilds(me: dict = Depends(require_club_admin())):
 
     db = get_db()
     state = await read_state(db)
-    return {"guilds": await discord_guilds.list_guilds(db), "connected": bot.connected_guild_ids() is not None,
+    guilds = await discord_guilds.list_guilds(db)
+    # Umgekehrte Sicht (#626): welche Spiele auf diesem Server zu Hause sind - eigene und geerbte.
+    games = await discord_guilds.games_by_guild(db)
+    for row in guilds:
+        row["games"] = games.get(row["guild_id"], [])
+    return {"guilds": guilds, "connected": bot.connected_guild_ids() is not None,
             "bot_invite_url": discord_guilds.bot_invite_url(state.get("application_id"))}
 
 

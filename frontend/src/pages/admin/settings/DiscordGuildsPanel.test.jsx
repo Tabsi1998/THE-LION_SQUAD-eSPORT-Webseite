@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
 
 // Server-Verzeichnis (#624): Hauptserver mit Krone und ohne Aus-Schalter, Unterserver an/aus und „Zum Hauptserver“
@@ -12,13 +13,14 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 
 const { DiscordGuildsPanel, guildStatusText } = await import("./DiscordGuildsPanel");
 
-const MAIN = { guild_id: "1", name: "THE LION SQUAD", role: "main", enabled: true, member_count: 120, missing_permissions: [], invite_url: "https://discord.gg/lions", note: "" };
+const MAIN = { guild_id: "1", name: "THE LION SQUAD", role: "main", enabled: true, member_count: 120, missing_permissions: [], invite_url: "https://discord.gg/lions", note: "", games: [] };
 const SUB = { guild_id: "2", name: "Rocket League", role: "sub", enabled: false, member_count: 30, invite_url: null, note: "",
-  missing_permissions: [{ key: "manage_roles", label: "Rollen verwalten", why: "Rollen" }] };
+  missing_permissions: [{ key: "manage_roles", label: "Rollen verwalten", why: "Rollen" }],
+  games: [{ id: "g1", name: "Rocket League", inherited: false }, { id: "g2", name: "RL Classic", inherited: true }] };
 const GONE = { guild_id: "3", name: "Alter Server", role: "sub", enabled: false, left_at: "2026-10-01T10:00:00Z", missing_permissions: [] };
 
 function renderPanel() {
-  return render(<ConfirmDialogProvider><DiscordGuildsPanel /></ConfirmDialogProvider>);
+  return render(<MemoryRouter><ConfirmDialogProvider><DiscordGuildsPanel /></ConfirmDialogProvider></MemoryRouter>);
 }
 
 beforeEach(() => {
@@ -30,6 +32,14 @@ beforeEach(() => {
     if (url.endsWith("/invite")) return { data: { ok: true, url: "https://discord.gg/rl" } };
     return { data: { ok: true } };
   });
+});
+
+test("Spiele auf diesem Server (#626): eigene und geerbte; der Hauptserver nimmt alle ohne eigenen", async () => {
+  renderPanel();
+  expect(await screen.findByTestId("discord-guild-2-games")).toHaveTextContent("Rocket League, RL Classic (vom Hauptspiel)");
+  expect(screen.getByTestId("discord-guild-2-games").querySelector("a")).toHaveAttribute("href", "/admin/games");
+  expect(screen.getByTestId("discord-guild-1-games")).toHaveTextContent("alle Spiele ohne eigenen Server");
+  expect(screen.queryByTestId("discord-guild-3-games")).toBeNull();
 });
 
 test("Stand in Worten", () => {

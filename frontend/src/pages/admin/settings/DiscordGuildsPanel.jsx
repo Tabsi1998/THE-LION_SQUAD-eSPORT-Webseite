@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, Crown, ExternalLink, Link2, RefreshCw, Send, Server, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
@@ -51,6 +52,25 @@ function GuildChannels({ guild, onSave, busy }) {
           data-testid={`discord-guild-${guild.guild_id}-channels-save`} className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
           Kanäle speichern
         </button>
+      )}
+    </div>
+  );
+}
+
+/** Umgekehrte Sicht (#626): welche Spiele auf diesem Server zu Hause sind - zugeordnet wird im Spielformular. */
+function GuildGames({ guild }) {
+  const games = Array.isArray(guild.games) ? guild.games : [];
+  return (
+    <div className="text-xs" data-testid={`discord-guild-${guild.guild_id}-games`}>
+      <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 mr-2">Spiele auf diesem Server</span>
+      {games.length ? games.map((game, index) => (
+        <span key={game.id}>
+          {index ? ", " : ""}
+          <Link to="/admin/games" className="text-white/75 hover:text-[#29B6E8]">{game.name}</Link>
+          {game.inherited ? <span className="text-white/35"> (vom Hauptspiel)</span> : null}
+        </span>
+      )) : (
+        <span className="text-white/40">{guild.role === "main" ? "alle Spiele ohne eigenen Server" : "noch keines – zuordnen unter Spiele → Spiel bearbeiten"}</span>
       )}
     </div>
   );
@@ -226,6 +246,7 @@ export function DiscordGuildsPanel() {
                     )}
                   </div>
                 </div>
+                {!guild.left_at && <GuildGames guild={guild} />}
                 {guild.role !== "main" && !guild.left_at && (
                   <GuildChannels guild={guild} busy={!!busy} onSave={(channels) => patch(guild, { channels }, "Kanäle gespeichert.")} />
                 )}

@@ -15,10 +15,16 @@ Die Kanäle des Hauptservers stehen weiter unter „Kanäle je Zweck“ (``setti
 seinen Eintrag gespiegelt - so funktionieren alle bisherigen Aufrufer unverändert. Wird ein anderer Server
 Hauptserver, wandern die Kanäle mit: seine öffentlichen werden die „Kanäle je Zweck“, die privaten sind neu zu
 wählen (sie lagen auf dem alten Server); der alte Hauptserver behält seine öffentlichen.
+
+**Spiel → Server (#626):** das Spiel trägt ``discord_guild_id``; ``guild_for_game`` löst auf: eigenes Feld →
+Hauptspiel → Hauptserver, ausgeschaltete und verlassene Server überspringt sie. Öffentlich steht nur, was
+``public_server`` herausgibt - nie ein ausgeschalteter Server. „Du bist dabei“ (``own_status``) gibt es nur für die
+eigene Person: der Bot prüft, das Ergebnis gilt fünf Minuten in ``discord_memberships``; Beitritt und Austritt meldet
+er sofort (``note_membership``) - daraus zählt der Erfolg „Überall dabei“ (``discord_guilds_joined``).
 """
 from __future__ import annotations
 
-from models import now_utc
+from models import new_id, now_utc
 
 COLLECTION = "discord_guilds"
 ROLES = ("main", "sub")
@@ -93,7 +99,7 @@ async def reconcile(db, seen: list[dict], *, configured_main: str = "", now=None
         else:
             added += 1
             await db[COLLECTION].insert_one({"guild_id": guild_id, **_row(guild, stamp), "role": "sub", "enabled": False, "joined_at": stamp,
-                                             "invite_url": None, "note": "", "games": [], "channels": {}})
+                                             "invite_url": None, "note": "", "channels": {}})
     left = 0
     for guild_id, row in existing.items():
         if guild_id not in seen_ids and not row.get("left_at"):
@@ -290,3 +296,186 @@ async def send_test(db, guild_id: str, *, confirmed: bool = False) -> dict:
     log = _new_log("test.guild", title, "guild", test=True)
     log["guild_id"] = row["guild_id"]
     return await _send_embed(channel_id, title=title, description=text, color=0x29B6E8, url=None, fields=None, image_url=None, log=log)
+
+
+
+# ---------------------------------------------------------------- Spiel → Server (#626)
+
+MEMBERSHIP_TTL_SECONDS = 300
+GAME_FIELDS = {"_id": 0, "id": 1, "name": 1, "display_name": 1, "short_name": 1, "slug": 1, "discord_guild_id": 1, "parent_game_id": 1, "kind": 1}
+
+
+def _usable(row: dict | None) -> bool:
+    return bool(row) and bool(row.get("enabled")) and not row.get("left_at")
+
+
+async def guild_for_game(db, game: dict | None) -> dict | None:
+    """Der Server eines Spiels (#626): eigenes Feld → Hauptspiel → Hauptserver. Ausgeschaltete oder verlassene Server
+    zählen nicht - dann gilt die nächste Stufe. ``inherited_from``: None (eigenes Feld), die ID des Hauptspiels oder „main“."""
+    visited: set = set()
+    current = game
+    while current and current.get("id") not in visited:
+        visited.add(current.get("id"))
+        guild_id = str(current.get("discord_guild_id") or "")
+        if guild_id:
+            row = await db[COLLECTION].find_one({"guild_id": guild_id}, {"_id": 0, "channel_list": 0})
+            if _usable(row):
+                return {**row, "inherited_from": None if current is game else current.get("id")}
+        parent_id = current.get("parent_game_id")
+        current = await db.games.find_one({"id": parent_id}, GAME_FIELDS) if parent_id else None
+    main = await db[COLLECTION].find_one({"role": "main"}, {"_id": 0, "channel_list": 0})
+    return {**main, "inherited_from": "main"} if main else None
+
+
+async def public_server(db, row: dict | None) -> dict:
+    """Was öffentlich über einen Server stehen darf: Name, Symbol, Mitglieder, Einladung - nie ein ausgeschalteter."""
+    if not _usable(row):
+        return {"available": False}
+    invite = row.get("invite_url")
+    if not invite and row.get("role") == "main":
+        branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "discord_invite_url": 1}) or {}
+        invite = str(branding.get("discord_invite_url") or "").strip() or None
+    return {"available": True, "guild_id": row["guild_id"], "name": row.get("name"), "icon_url": row.get("icon_url"),
+            "member_count": row.get("member_count"), "invite_url": invite, "main": row.get("role") == "main"}
+
+
+async def games_by_guild(db) -> dict[str, list[dict]]:
+    """Die umgekehrte Sicht für den Reiter „Server“: je Server die Spiele - eigene und geerbte (Editionen)."""
+    games = await db.games.find({}, GAME_FIELDS).to_list(500)
+    by_id = {game["id"]: game for game in games}
+    out: dict[str, list[dict]] = {}
+    for game in games:
+        own = str(game.get("discord_guild_id") or "")
+        inherited = False
+        if not own and game.get("parent_game_id"):
+            own = str((by_id.get(game["parent_game_id"]) or {}).get("discord_guild_id") or "")
+            inherited = bool(own)
+        if own:
+            out.setdefault(own, []).append({"id": game["id"], "name": game.get("display_name") or game.get("name"), "slug": game.get("slug"), "inherited": inherited})
+    for rows in out.values():
+        rows.sort(key=lambda row: (row["inherited"], str(row["name"] or "").lower()))
+    return out
+
+
+def _fresh(entry: dict | None, current) -> bool:
+    from datetime import datetime, timedelta
+
+    try:
+        checked = datetime.fromisoformat(str((entry or {}).get("checked_at") or ""))
+    except ValueError:
+        return False
+    return current - checked < timedelta(seconds=MEMBERSHIP_TTL_SECONDS)
+
+
+async def own_status(db, user_id: str, guild_ids: list[str], *, now=None) -> dict:
+    """„Du bist dabei“ - immer nur für die eigene Person (#626). Der Bot prüft, das Ergebnis gilt fünf Minuten;
+    Beitritt und Austritt meldet der Bot sofort (``note_membership``). Unbekannt (Bot offline) bleibt None und wird
+    nicht gemerkt. Ohne verknüpftes Discord gibt es keinen Status."""
+    from services.discord_bot import bot
+    from services.discord_dm import discord_link_id
+
+    discord_id = await discord_link_id(db, user_id)
+    if not discord_id or not guild_ids:
+        return {"linked": bool(discord_id), "statuses": {}}
+    current = now or now_utc()
+    cached = {row["guild_id"]: row for row in await db.discord_memberships.find({"user_id": user_id, "guild_id": {"$in": list(guild_ids)}}, {"_id": 0}).to_list(500)}
+    statuses: dict[str, bool | None] = {}
+    stale = []
+    for guild_id in guild_ids:
+        if _fresh(cached.get(guild_id), current):
+            statuses[guild_id] = bool(cached[guild_id].get("member"))
+        else:
+            stale.append(guild_id)
+    if stale:
+        for guild_id, member in (await bot.member_status(stale, discord_id)).items():
+            statuses[guild_id] = member
+            if member is not None:
+                await db.discord_memberships.update_one({"user_id": user_id, "guild_id": guild_id},
+                                                        {"$set": {"member": bool(member), "checked_at": current.isoformat()}}, upsert=True)
+    return {"linked": True, "statuses": statuses}
+
+
+async def member_servers(db, user: dict, *, now=None) -> dict:
+    """Mitgliederbereich (#626): alle eingeschalteten Server mit „du bist dabei“ - nur für die eigene Person.
+    Ohne verknüpftes Discord nur die Einladungen. Ausgeschaltete und verlassene Server fehlen."""
+    rows = [row for row in await list_guilds(db) if _usable(row)]
+    status = await own_status(db, user["id"], [row["guild_id"] for row in rows], now=now)
+    servers = []
+    for row in rows:
+        servers.append({**await public_server(db, row), "member": status["statuses"].get(row["guild_id"]) if status["linked"] else None})
+    return {"linked": status["linked"], "servers": servers}
+
+
+async def note_membership(db, guild_id: str, discord_id: str, member: bool) -> str | None:
+    """Beitritt oder Austritt, wie der Bot ihn sieht (#626) - nur für verknüpfte Konten; der Zähler für
+    „Überall dabei“ rechnet sofort neu."""
+    link = await db.platform_links.find_one({"platform": "discord", "external_id": str(discord_id)}, {"_id": 0, "user_id": 1})
+    if not link:
+        return None
+    await db.discord_memberships.update_one({"user_id": link["user_id"], "guild_id": str(guild_id)},
+                                            {"$set": {"member": bool(member), "checked_at": now_utc().isoformat()}}, upsert=True)
+    from services.achievement_queue import request_evaluation
+
+    await request_evaluation([link["user_id"]], "discord_guild", sources={"discord"})
+    return link["user_id"]
+
+
+async def matching_servers(db, user_id: str) -> list[dict]:
+    """Server, die zu den eigenen Spielen passen (Lieblingsspiele und Turnier-Anmeldungen) - nur eigene Server, nicht der Hauptserver."""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "favorite_games": 1}) or {}
+    wanted = {str(value).strip().casefold() for value in user.get("favorite_games") or [] if str(value).strip()}
+    game_ids = set()
+    async for registration in db.tournament_registrations.find({"user_id": user_id}, {"_id": 0, "tournament_id": 1}):
+        tournament = await db.tournaments.find_one({"id": registration.get("tournament_id")}, {"_id": 0, "game_id": 1})
+        if (tournament or {}).get("game_id"):
+            game_ids.add(tournament["game_id"])
+    servers: dict[str, dict] = {}
+    for game in await db.games.find({}, GAME_FIELDS).to_list(500):
+        names = {str(game.get(key) or "").strip().casefold() for key in ("name", "display_name", "short_name")} - {""}
+        if game["id"] not in game_ids and not names & wanted:
+            continue
+        row = await guild_for_game(db, game)
+        if row and row.get("role") != "main":
+            entry = servers.setdefault(row["guild_id"], {**await public_server(db, row), "games": []})
+            entry["games"].append(game.get("display_name") or game.get("name"))
+    return [server for server in servers.values() if server.get("available")]
+
+
+async def greet_linked(db, user_id: str, discord_id: str) -> dict:
+    """Nach dem Verknüpfen (#626): eine Direktnachricht mit den Servern zu den eigenen Spielen - nur DM, nie ein Kanal;
+    einmal je Discord-Konto. Steht wie jede Direktnachricht im Discord-Log (ohne Inhalt zum erneuten Senden)."""
+    from discord_service import REASON_TEXTS, build_embed, resolve_buttons
+    from services.discord_bot import bot, bot_settings
+    from services.discord_dm import DM_TARGET
+
+    person = await db.users.find_one({"id": user_id}, {"_id": 0, "discord_servers_greeted_for": 1}) or {}
+    if str(person.get("discord_servers_greeted_for") or "") == str(discord_id):
+        return {"ok": False, "reason": "already_greeted"}
+    servers = [server for server in await matching_servers(db, user_id) if server.get("invite_url")][:5]
+    if not servers:
+        return {"ok": False, "reason": "nothing_to_suggest"}
+    lines = [f"• **{server['name']}** – für {', '.join(server['games'][:3])}" for server in servers]
+    embed = await build_embed("Passend zu deinen Spielen", "Dein Discord-Konto ist verknüpft. Diese Server des Vereins passen zu deinen Spielen:\n"
+                              + "\n".join(lines), color=0x5865F2, url="/members/area")
+    log = {"id": new_id(), "channel": "discord", "target": DM_TARGET, "user_id": user_id, "event_key": "discord.servers_for_games",
+           "title": embed["title"], "status": "skipped", "error": None, "reason": None, "created_at": now_utc().isoformat()}
+    settings = await db.settings.find_one({"id": "discord"}, {"_id": 0, "bot_enabled": 1, "bot_token": 1}) or {}
+    if not bot_settings(settings)["enabled"]:
+        log["reason"], log["error"] = "bot_off", REASON_TEXTS["bot_off"]
+        await db.email_logs.insert_one(log)
+        return {"ok": False, "reason": "bot_off"}
+    buttons = await resolve_buttons([{"label": str(server["name"])[:80], "url": server["invite_url"]} for server in servers])
+    try:
+        result = await bot.send_dm(str(discord_id), embed, buttons=buttons)
+    except Exception as exc:  # noqa: BLE001 - das Verknüpfen darf nie an Discord scheitern
+        result = {"ok": False, "reason": "error", "error": type(exc).__name__}
+    if result.get("ok"):
+        log["status"], log["message_id"] = "sent", result.get("message_id")
+        await db.users.update_one({"id": user_id}, {"$set": {"discord_servers_greeted_for": str(discord_id)}})
+    else:
+        reason = result.get("reason") or "error"
+        log["status"] = "skipped" if reason == "bot_offline" else "failed"
+        log["reason"] = "dm_forbidden" if reason == "forbidden" else reason
+        log["error"] = result.get("error") or REASON_TEXTS.get(log["reason"]) or reason
+    await db.email_logs.insert_one(log)
+    return result

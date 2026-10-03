@@ -1,7 +1,7 @@
 import React from "react";
 import { Linking } from "react-native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { MemberAreaScreen } from "./MemberAreaScreen";
+import { MemberAreaScreen, discordServerLine } from "./MemberAreaScreen";
 
 // Mitgliederbereich in der App (#340): zeigt, was der Server für diese Person freigibt, und
 // verweist auf Mitgliedschaft, Karte, Dokumente, Vorteile. Ein Ausfall einer Quelle nimmt die
@@ -76,6 +76,40 @@ test("zeigt nur Internes, mit Kacheln zu Mitgliedschaft, Karte, Dokumenten und V
   const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
   await fireEvent.press(screen.getByTestId("member-area-discord"));
   expect(openUrl).toHaveBeenCalledWith("https://discord.gg/lions");
+});
+
+test("Discord-Server (#626): alle eingeschalteten mit eigenem Status; Beitreten öffnet die Einladung", async () => {
+  responses["/membership/discord-servers"] = { linked: true, servers: [
+    { available: true, guild_id: "1", name: "LION", member_count: 120, invite_url: "https://discord.gg/lions", main: true, member: true },
+    { available: true, guild_id: "2", name: "Rocket League", member_count: 1, invite_url: "https://discord.gg/rocket", main: false, member: false },
+  ] };
+  try {
+    await render(<MemberAreaScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("member-area-discord-servers")).toBeTruthy());
+    expect(screen.getByTestId("member-area-discord-server-1-joined")).toHaveTextContent("Du bist dabei");
+    expect(screen.getByText("Hauptserver · 120 Mitglieder")).toBeTruthy();
+    expect(screen.queryByTestId("member-area-discord-link-hint")).toBeNull();
+    expect(screen.queryByTestId("member-area-discord")).toBeNull();
+    const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
+    await fireEvent.press(screen.getByTestId("member-area-discord-server-2-join"));
+    expect(openUrl).toHaveBeenCalledWith("https://discord.gg/rocket");
+  } finally {
+    delete responses["/membership/discord-servers"];
+  }
+});
+
+test("Discord-Server ohne Verknüpfung: nur Einladungen und der Weg zum Verknüpfen", async () => {
+  responses["/membership/discord-servers"] = { linked: false, servers: [{ available: true, guild_id: "1", name: "LION", invite_url: "https://discord.gg/lions", main: true, member: null }] };
+  try {
+    await render(<MemberAreaScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(screen.getByTestId("member-area-discord-link-hint")).toBeTruthy());
+    expect(screen.getByTestId("member-area-discord-server-1-join")).toBeTruthy();
+    expect(screen.queryByTestId("member-area-discord-server-1-joined")).toBeNull();
+  } finally {
+    delete responses["/membership/discord-servers"];
+  }
+  expect(discordServerLine({ available: true, guild_id: "9", member_count: 0 })).toBe("");
+  expect(discordServerLine({ available: true, guild_id: "9", member_count: 1 })).toBe("1 Mitglied");
 });
 
 test("ohne Inhalte ein ruhiger Hinweis; eine kaputte Quelle reißt die anderen nicht mit", async () => {

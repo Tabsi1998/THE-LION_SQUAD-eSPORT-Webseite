@@ -10,6 +10,8 @@ vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) =
 vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: ({ alt }) => <img alt={alt} /> }));
 vi.mock("@/hooks/useCountUp", () => ({ useCountUp: (value) => [value, { current: null }] }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
+let authState = null;
+vi.mock("@/context/AuthContext", () => ({ useOptionalAuth: () => authState }));
 
 const { default: AboutPage, organizationFacts, gameLine } = await import("./AboutPage");
 
@@ -23,13 +25,19 @@ const ABOUT = {
 };
 const BOARD = [{ id: "b1", is_active: true, display_title: "Obmann", user: { display_name: "Otto", avatar_url: "", slug: "otto" } }];
 
-function mockApi(about, board = BOARD) {
+function mockApi(about, board = BOARD, servers = { linked: true, servers: [] }) {
   apiMock.get.mockImplementation(async (url) => {
     if (url === "/home/about") return { data: about };
     if (url.startsWith("/board")) return { data: board };
+    if (url === "/membership/discord-servers") return { data: servers };
     return { data: [] };
   });
 }
+
+beforeEach(() => {
+  authState = null;
+  apiMock.get.mockReset();
+});
 
 test("Fakten, Zahlen, Spiele, Vorstand und Treffen aus den Daten", async () => {
   mockApi(ABOUT);
@@ -72,6 +80,25 @@ test("leere Blöcke bleiben weg; Fakten ohne Gründung sagen nur „eingetragen�
   expect(screen.queryByTestId("about-offline-items")).toBeNull();
   expect(screen.queryByTestId("about-pillars")).toBeNull();
   expect(screen.queryByTestId("about-purpose")).toBeNull();
+});
+
+test("Spielkarten mit eigenem Discord-Server (#626): Einladung für alle, „Du bist dabei“ nur angemeldet - kein Link im Link", async () => {
+  const rl = { available: true, guild_id: "2", name: "Rocket League DE", member_count: 40, invite_url: "https://discord.gg/rocket", main: false };
+  const withServer = { ...ABOUT, games: [ABOUT.games[0], { ...ABOUT.games[1], discord: rl }] };
+  mockApi(withServer);
+  const { unmount } = render(<MemoryRouter><AboutPage /></MemoryRouter>);
+  expect(await screen.findByTestId("about-game-rl-discord")).toHaveTextContent("Rocket League DE");
+  expect(screen.getByTestId("about-game-rl-discord-join")).toHaveAttribute("href", "https://discord.gg/rocket");
+  expect(screen.queryByTestId("about-game-cod-discord")).toBeNull();
+  expect(screen.getByTestId("about-game-rl").querySelector("a")).toBeNull();
+  expect(screen.getByTestId("about-game-rl").contains(screen.getByTestId("about-game-rl-discord"))).toBe(false);
+  expect(apiMock.get).not.toHaveBeenCalledWith("/membership/discord-servers");
+  unmount();
+
+  authState = { user: { id: "u1" } };
+  mockApi(withServer, BOARD, { linked: true, servers: [{ ...rl, member: true }] });
+  render(<MemoryRouter><AboutPage /></MemoryRouter>);
+  expect(await screen.findByTestId("about-game-rl-discord-joined")).toHaveTextContent("Du bist dabei");
 });
 
 test("Hilfsfunktionen", () => {

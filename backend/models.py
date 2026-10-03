@@ -286,6 +286,8 @@ class GameCreate(BaseModel):
     default_team_size: int = 1
     default_format: str = "single_elim"
     player_id_fields: List[dict] = []
+    # Discord-Server dieses Spiels (#626) - leer: der des Hauptspiels, sonst der Hauptserver.
+    discord_guild_id: Optional[str] = None
 
 
 class GameUpdate(BaseModel):
@@ -308,6 +310,7 @@ class GameUpdate(BaseModel):
     default_team_size: Optional[int] = None
     default_format: Optional[str] = None
     player_id_fields: Optional[List[dict]] = None
+    discord_guild_id: Optional[str] = None
 
 
 # ---------- Events ----------

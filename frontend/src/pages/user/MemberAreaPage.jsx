@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
 import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2 } from "lucide-react";
 import { SteamPresence } from "@/components/tls/SteamPresence";
+import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -31,6 +32,8 @@ export default function MemberAreaPage() {
   const [helping, setHelping] = useState({ my_count: 0, open_places: 0 });
   // „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
   const [steam, setSteam] = useState(null);
+  // Discord-Server des Vereins (#626): alle eingeschalteten, mit „Du bist dabei“ für mich.
+  const [discordServers, setDiscordServers] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -45,7 +48,8 @@ export default function MemberAreaPage() {
       api.get("/membership/me/meetings"),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
-    ]).then(([b, m, d, n, e, p, s, mt, hs, sp]) => {
+      api.get("/membership/discord-servers"),
+    ]).then(([b, m, d, n, e, p, s, mt, hs, sp, ds]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -56,6 +60,7 @@ export default function MemberAreaPage() {
       if (mt.status === "fulfilled" && mt.value.data?.available) setMeetings({ meetings: mt.value.data.meetings || [], ballots: mt.value.data.ballots || [] });
       if (hs.status === "fulfilled" && hs.value.data?.available) setHelping({ my_count: hs.value.data.my_count || 0, open_places: hs.value.data.open_places || 0 });
       if (sp.status === "fulfilled" && sp.value.data?.available) setSteam(sp.value.data);
+      if (ds.status === "fulfilled") setDiscordServers(ds.value.data);
       setLoaded(true);
     });
   }, []);
@@ -198,6 +203,12 @@ export default function MemberAreaPage() {
           </div>
 
           <div className="space-y-6">
+            {discordServers?.servers?.length ? (
+              <Section title="Discord-Server" icon={MessageCircle} testId="member-area-discord-servers">
+                <DiscordServerList data={discordServers} testId="member-area-discord-server" />
+              </Section>
+            ) : null}
+
             {steam ? (
               <Section title="Gerade in Steam" icon={Gamepad2} testId="member-area-steam">
                 <SteamPresence data={steam} />

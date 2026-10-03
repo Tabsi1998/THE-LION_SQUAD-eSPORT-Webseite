@@ -194,6 +194,29 @@ wird ein anderer Server Hauptserver, wandern seine öffentlichen Kanäle dorthin
 zu wählen. Die Vorschau unter „Meldungen“ zeigt je Server, wohin jede Meldung ginge. Jeder Aufrufer von
 `send_to` sagt, welchen Server er meint (`guild_id`, sonst der Hauptserver) – ein Test zählt sie.
 
+**Spiel → Server (#626).** Im Spielformular (Admin → Spiele) wählst du den Discord-Server eines
+Spiels; leer heißt **erben**: eine Spielversion nimmt den Server ihres Hauptspiels, ohne alles gilt
+der Hauptserver. Ein ausgeschalteter oder verlassener Server zählt nicht – dann gilt die nächste Stufe.
+Der Reiter „Server“ zeigt umgekehrt je Server die **Spiele auf diesem Server** (eigene und geerbte).
+
+- **Spielkarten unter „Über uns“** zeigen den eigenen Server eines Spiels mit „Beitreten“; der
+  Hauptserver steht schon im Footer. **Turnierseite:** Kachel „Discord-Server für …“ mit dem Spielnamen (oder
+  „Unser Discord-Server“) mit Name, Symbol, Mitgliederzahl und Einladung.
+- **„Du bist dabei“** sieht nur die angemeldete Person selbst, und nur mit verknüpftem Discord – sonst
+  steht nur die Einladung da. Der Bot prüft die Mitgliedschaft (Zwischenspeicher fünf Minuten, Beitritt
+  und Austritt meldet er sofort); ist er offline, bleibt der Status offen statt „nein“.
+- **Mitgliederbereich** (Web und App): alle eingeschalteten Server mit eigenem Status.
+- **Nach dem Verknüpfen** schickt der Bot einmal je Discord-Konto eine Direktnachricht mit den Servern,
+  die zu den eigenen Spielen passen (Lieblingsspiele und Turnier-Anmeldungen) – nur als DM, nie in einen
+  Kanal; sie steht im Log und lässt sich nicht „erneut senden“.
+- Ausgeschaltete Server erscheinen nirgends öffentlich. Footer und Kontaktseite behalten die Einladung
+  des Hauptservers (`discord_invite_url`); ohne eigene Einladung nimmt der Hauptserver diese.
+- Erfolge: der Zähler `discord_guilds_joined` (auf wie vielen eingeschalteten Servern jemand ist).
+- Code: `services/discord_guilds.py` (`guild_for_game`, `public_server`, `own_status`, `member_servers`,
+  `note_membership`, `greet_linked`), Sammlung `discord_memberships`, Routen `GET /api/games/{spiel}/discord`,
+  `GET /api/games/discord-servers` (Auswahl im Formular), `GET /api/membership/discord-servers`, Bot
+  `member_status`, `on_member_join`/`on_member_remove`.
+
 Versand je Spiel, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
 
 ## Konten verknüpfen (Discord, Twitch, Steam)

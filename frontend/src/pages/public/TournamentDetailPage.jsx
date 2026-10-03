@@ -32,6 +32,7 @@ import { MyStandCard } from "@/components/tls/tournament/MyStandCard";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { GameDiscordTile } from "@/components/tls/DiscordServerTile";
 
 export default function TournamentDetailPage() {
   const { slug } = useParams();
@@ -350,6 +351,8 @@ export default function TournamentDetailPage() {
           {t.location && <InfoRow icon={MapPin} label="Ort" value={t.location} />}
           {t.best_of > 1 && <InfoRow icon={Trophy} label="Best of" value={t.best_of} />}
           <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />
+          {/* Der Discord-Server zum Spiel (#626): eigener, der des Hauptspiels oder der Hauptserver. */}
+          <GameDiscordTile gameId={t.game?.id || t.game_id} gameName={gameLabel(t.game)} />
           {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="block px-4 py-3 border border-white/10 rounded-sm text-center text-sm font-bold uppercase tracking-wider hover:border-[#29B6E8]/60 hover:text-[#29B6E8]">Discord</a>}
         </aside>
       </div>

@@ -345,6 +345,15 @@ async def _discord_linked(ctx):
     return 1 if "discord" in await ctx.links() else 0
 
 
+@counter("discord_guilds_joined", "discord")
+async def _discord_guilds_joined(ctx):
+    """Auf wie vielen eingeschalteten Servern des Vereins die Person ist (#626) - wie der Bot es zuletzt gesehen hat."""
+    enabled = [row["guild_id"] async for row in ctx.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
+    if not enabled:
+        return 0
+    return await ctx.db.discord_memberships.count_documents({"user_id": ctx.user_id, "member": True, "guild_id": {"$in": enabled}})
+
+
 @counter("twitch_linked", "profile")
 async def _twitch_linked(ctx):
     return 1 if "twitch" in await ctx.links() else 0

@@ -434,6 +434,12 @@ class BotRunner:
 
         @client.event
         async def on_member_join(member):
+            # „Du bist dabei“ (#626): Beitritt merken - nur für verknüpfte Konten.
+            from services import discord_guilds
+            try:
+                await discord_guilds.note_membership(db, str(member.guild.id), str(member.id), True)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[discord-bot] Mitgliedschaft: %s", type(exc).__name__)
             # Willkommensnachricht (#574): einmal je Person, nur wenn eingeschaltet - ohne Erlaubnis still.
             from services.discord_welcome import greet
             try:
@@ -443,6 +449,15 @@ class BotRunner:
                 return
             if result.get("ok"):
                 runner.last_action = f"Willkommensnachricht gesendet ({now_utc().strftime('%H:%M')} UTC)"
+
+        @client.event
+        async def on_member_remove(member):
+            # Austritt (#626): der Status im Mitgliederbereich und der Zähler „Überall dabei“ stimmen sofort.
+            from services import discord_guilds
+            try:
+                await discord_guilds.note_membership(db, str(member.guild.id), str(member.id), False)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[discord-bot] Mitgliedschaft: %s", type(exc).__name__)
 
         @client.event
         async def on_message(message):
@@ -600,6 +615,32 @@ class BotRunner:
         except discord.HTTPException as exc:
             return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
         return {"ok": True, "url": str(invite.url)}
+
+    async def member_status(self, guild_ids: list[str], discord_user_id: str) -> dict[str, bool | None]:
+        """Ist dieses Konto auf diesen Servern (#626)? True/False je Server; None, wenn es niemand weiß (Bot offline,
+        Bot nicht auf dem Server, Discord antwortet nicht). Erst der Zwischenspeicher, dann eine Abfrage bei Discord -
+        die braucht kein Recht und keinen zusätzlichen Intent."""
+        client = self._client
+        if client is None or not self.connected or not str(discord_user_id).isdigit():
+            return {str(guild_id): None for guild_id in guild_ids}
+        import discord
+
+        out: dict[str, bool | None] = {}
+        for guild_id in guild_ids:
+            guild = client.get_guild(int(guild_id)) if str(guild_id).isdigit() else None
+            if guild is None:
+                out[str(guild_id)] = None
+            elif guild.get_member(int(discord_user_id)) is not None:
+                out[str(guild_id)] = True
+            else:
+                try:
+                    await guild.fetch_member(int(discord_user_id))
+                    out[str(guild_id)] = True
+                except discord.NotFound:
+                    out[str(guild_id)] = False
+                except Exception:  # noqa: BLE001 - Discord antwortet nicht: unbekannt, nicht „nein“
+                    out[str(guild_id)] = None
+        return out
 
     def _guild(self, view: dict | None = None):
         client = self._client
