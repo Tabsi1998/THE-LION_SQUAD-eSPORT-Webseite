@@ -112,7 +112,10 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
         ["leader", "co_leader"].includes(String(myRegTeam?.my_role || ""))),
   );
   const clubMemberBlocked = Boolean(user?.is_club_member && tournament?.block_club_member_registration);
-  const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked);
+  // Turnier nur mit Event-Anmeldung (#875): einzeln geht es zuerst zum Event; bei Teams prüft der Server die Mitglieder.
+  const eventGate = tournament?.event_gate || null;
+  const eventBlocked = Boolean(eventGate && !isTeamTournament && !eventGate.registered);
+  const canSelfRegister = Boolean(!guest && !registered && registration.canRegister && !clubMemberBlocked && !eventBlocked);
   const canCheckIn = Boolean(canManageOwnRegistration && ownRegistration?.status === "approved" && tournament?.status === "check_in");
   const canSelfUnregister = Boolean(
     registered &&
@@ -286,6 +289,15 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 {clubMemberBlocked && !registered ? (
                   <Muted style={styles.warning}>Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</Muted>
                 ) : null}
+                {eventGate && !registered ? (
+                  <Muted style={styles.gate} testID="tournament-event-gate">
+                    {isTeamTournament
+                      ? `Anmeldung nur mit Event-Anmeldung: Mindestens ${eventGate.team_need} Spieler deines Teams müssen beim Event „${eventGate.event.name || "Event"}“ angemeldet sein.`
+                      : eventGate.registered
+                        ? `Du bist beim Event „${eventGate.event.name || "Event"}“ angemeldet – die Turnieranmeldung ist frei.`
+                        : `Anmeldung nur mit Event-Anmeldung: Melde dich zuerst beim Event „${eventGate.event.name || "Event"}“ an.`}
+                  </Muted>
+                ) : null}
                 {isTeamTournament && canSelfRegister && !manageableTeams.length ? (
                   <Muted style={styles.errorText}>Für dieses Team-Turnier brauchst du ein Team, das du als Leader oder Co-Leader verwalten darfst.</Muted>
                 ) : null}
@@ -312,6 +324,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                       <Muted>Abmeldung ist für diese Anmeldung aktuell nicht möglich.</Muted>
                     )}
                   </>
+                ) : eventBlocked && eventGate && registration.canRegister && !clubMemberBlocked ? (
+                  <Button label="Zuerst beim Event anmelden" onPress={() => navigation.navigate("EventDetail", { id: eventGate.event.slug || eventGate.event.id })} testID="tournament-event-first" />
                 ) : canSelfRegister ? (
                   <>
                     <Muted>Mit der Anmeldung akzeptierst du Regeln und Datenschutz für dieses Turnier.</Muted>
@@ -980,6 +994,10 @@ const styles = StyleSheet.create({
   warning: {
     color: colors.gold,
     fontWeight: "800",
+  },
+  gate: {
+    color: colors.cyan,
+    fontWeight: "700",
   },
   errorText: {
     color: colors.live,

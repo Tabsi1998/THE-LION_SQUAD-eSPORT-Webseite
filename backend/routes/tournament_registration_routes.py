@@ -16,7 +16,7 @@ from services.custom_bracket import BracketSchemaError, build_matches_v2_from_sc
 from services.competition_versions import persist_competition_versions
 from services.mutation_lock import MutationLockBusy, mutation_lock, tournament_write_resource
 from models import RegistrationCreate, RegistrationUpdate, RegistrationAdminCreate, now_utc, new_id
-from services import tournament_fees
+from services import tournament_event_gate, tournament_fees
 from services.query_filters import safe_regex
 from routes.tournament_common import (
     STAFF_ROLES,
@@ -318,6 +318,7 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
             if user and (r.get("user_id") == user.get("id") or r.get("team_id") in user_team_ids)
         ]
     regs = [_public_registration(r, user, is_staff) for r in regs]
+    marks: dict = {}
     # enrich user + team
     user_ids = list({r["user_id"] for r in regs if r.get("user_id")})
     team_ids = list({r["team_id"] for r in regs if r.get("team_id")})
@@ -325,7 +326,12 @@ async def list_registrations(tid: str, access: str | None = None, user=Depends(g
         {"id": {"$in": user_ids}}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0}).to_list(500)}
     teams = {t["id"]: t for t in await db.teams.find(
         {"id": {"$in": team_ids}}, {"_id": 0}).to_list(500)}
+    # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung sieht, wer (noch) beim Event angemeldet ist.
+    if is_staff:
+        marks = await tournament_event_gate.staff_marks(db, t_doc, regs, teams)
     for r in regs:
+        if r.get("id") in marks:
+            r["event_gate"] = marks[r["id"]]
         if r.get("user_id"):
             u = users.get(r["user_id"]) or {}
             r["user"] = {"id": u.get("id"), "username": u.get("username"),
@@ -378,6 +384,10 @@ async def _create_self_registration(db, tid: str, tournament: dict, body: Regist
         if existing_team:
             existing_team.pop("identity_key", None)
             return {**existing_team, "auto_bracket_update": None, "idempotent_replay": True}
+    # Turnier nur mit Event-Anmeldung (#875) - auch über einen Zugangslink; das Team mit genug Leuten beim Event.
+    gate = await tournament_event_gate.check(db, tournament, user=None if team else me, team=team)
+    if gate and not gate["ok"]:
+        raise HTTPException(status_code=403, detail=gate["text"])
     # Startgeld (#319): kostet die Teilnahme etwas, muss die anmeldende Person die Kosten ausdrücklich übernehmen.
     fee_offer = tournament.get("billing") or {}
     if tournament_fees.charges(tournament, fee_offer) and not body.accept_costs:
@@ -613,12 +623,16 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     if not old_reg_id and reg["status"] in {"approved", "checked_in"}:
         auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
 
+    # Turnier nur mit Event-Anmeldung (#875): die Turnierleitung darf übergehen - mit Hinweis und im Audit.
+    gate = await tournament_event_gate.check(db, tournament, user=user if user and not team else None, team=team) if (user or team) else None
+    overridden = bool(gate and not gate["ok"])
     await _audit_tournament_action(
         db,
         "tournament.registration.staff_add",
         me.get("id"),
         tid,
-        {"registration_id": reg["id"], "user_id": reg.get("user_id"), "is_guest": reg["is_guest"], "replace_registration_id": old_reg_id},
+        {"registration_id": reg["id"], "user_id": reg.get("user_id"), "is_guest": reg["is_guest"], "replace_registration_id": old_reg_id,
+         **({"event_gate_overridden": True} if overridden else {})},
     )
     reg.pop("_id", None)
     reg.pop("identity_key", None)
@@ -627,6 +641,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
         "replacement": replacement,
         "auto_bracket_update": auto_bracket_update,
         "idempotent_replay": False,
+        "event_gate_warning": (gate["text"] + " Trotzdem eingetragen.") if overridden else None,
     }
 
 

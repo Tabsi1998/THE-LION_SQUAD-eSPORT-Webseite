@@ -158,8 +158,13 @@ export default function TournamentDetailPage() {
   const staffOnlyCheckIn = (t.event_mode || "online") === "local";
   const canCheckIn = !staffOnlyCheckIn && !!myReg && (!myReg.team_id || myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role));
   const clubMemberBlocked = !!user?.is_club_member && !!t.block_club_member_registration;
+  // Turnier nur mit Event-Anmeldung (#875): wer einzeln antritt, sieht den Weg über das Event, bevor er scheitert. Bei
+  // Teams prüft der Server die Mitglieder und nennt, wer fehlt.
+  const eventGate = t.event_gate || null;
+  const eventHref = eventGate?.event ? `/events/${eventGate.event.slug || eventGate.event.id}` : "";
+  const eventBlocked = !!eventGate && !isTeamTournament && !eventGate.registered;
   const hasRegisterAccess = t.access_link?.grants?.includes("register");
-  const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked;
+  const canSelfRegister = (registration.canRegister || hasRegisterAccess) && !clubMemberBlocked && !eventBlocked;
   const canSelfUnregister = !!myReg && (myReg.user_id === user?.id || myRegTeam?.can_manage || ["leader", "co_leader"].includes(myRegTeam?.my_role)) && !["checked_in", "no_show", "rejected"].includes(myReg.status) && !["live", "paused", "completed", "results_published", "archived"].includes(t.status);
   const podiumRows = standings
     .filter((row) => Number(row.rank) >= 1 && Number(row.rank) <= 3)
@@ -176,6 +181,9 @@ export default function TournamentDetailPage() {
   if (canSelfRegister && !myReg) {
     primaryKey = "register";
     primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
+  } else if (eventBlocked && !myReg && (registration.canRegister || hasRegisterAccess)) {
+    primaryKey = "event_first";
+    primaryAction = <Link to={eventHref} data-testid="tournament-event-first" className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>Zuerst beim Event anmelden</Link>;
   } else if (clubMemberBlocked && !myReg) {
     primaryKey = "blocked";
     primaryAction = <button type="button" disabled data-testid="tournament-blocked-btn" className={`${primaryClass} border border-[#FFD700]/30 text-[#FFD700]/70 cursor-not-allowed`}>Externe Anmeldung</button>;
@@ -249,6 +257,16 @@ export default function TournamentDetailPage() {
             {nextStep && <div className="mt-1 text-white/55">{nextStep.label} {countdownText(nextStep.ms)} – alle Termine unten in der Zeitleiste.</div>}
             {!nextStep && !t.registration_open_from && !t.registration_open_until && <div className="mt-1 text-white/55">Status wird vom Admin gesteuert.</div>}
             {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
+            {eventGate && !myReg && (
+              <div className="mt-1 text-[#29B6E8]/90" data-testid="tournament-event-gate">
+                {isTeamTournament
+                  ? `Anmeldung nur mit Event-Anmeldung: Mindestens ${eventGate.team_need} Spieler deines Teams müssen beim Event „${eventGate.event.name}“ angemeldet sein.`
+                  : eventGate.registered
+                    ? `Du bist beim Event „${eventGate.event.name}“ angemeldet – die Turnieranmeldung ist frei.`
+                    : `Anmeldung nur mit Event-Anmeldung: Melde dich zuerst beim Event „${eventGate.event.name}“ an.`}
+                {" "}<Link to={eventHref} className="underline hover:text-white">Zum Event</Link>
+              </div>
+            )}
           </div>
 
           {t.offer && (

@@ -95,6 +95,9 @@ export type Tournament = {
   check_in_until?: string | null;
   is_invite_only?: boolean;
   block_club_member_registration?: boolean;
+  /** Turnier nur mit Event-Anmeldung (#875) - `event_gate` sagt, zu welchem Event und ob die ansehende Person dort angemeldet ist. */
+  requires_event_registration?: boolean;
+  event_gate?: { required: boolean; event: { id: string; name?: string | null; slug?: string | null }; registered: boolean; team_need: number } | null;
   team_mode?: string;
   team_size?: number;
   offer?: TournamentOffer | null;

@@ -238,6 +238,9 @@ async def get_tournament(slug_or_id: str, include_draft: bool = False, access: s
             for c in t["related_f1_challenges"]:
                 c["public_phase"] = derive_public_phase(c, "f1")
     _expose_offer(t, bool(user) and await user_has_area(user, "finance"))
+    # Turnier nur mit Event-Anmeldung (#875): die Seite zeigt den Weg über das Event, bevor jemand scheitert.
+    from services import tournament_event_gate
+    t["event_gate"] = await tournament_event_gate.viewer_state(db, t, user)
     return t
 
 
