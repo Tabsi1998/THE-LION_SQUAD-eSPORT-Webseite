@@ -326,6 +326,13 @@ async def _eggs(ctx):
     return _signal_count(await ctx.signals(), "easter_egg")
 
 
+@counter("easter_hunts_completed", "signal")
+async def _egg_king(ctx):
+    """Wie oft jemand bei der Ostereiersuche (#646) alle Eier gefunden hat - aus den Körben, nicht aus dem Signal."""
+    from services.easter_hunt import hunts_completed
+    return await hunts_completed(ctx.db, ctx.user_id)
+
+
 @counter("halloween_bats_scared", "signal")
 async def _bats(ctx):
     return _signal_count(await ctx.signals(), "halloween_bats_scared")

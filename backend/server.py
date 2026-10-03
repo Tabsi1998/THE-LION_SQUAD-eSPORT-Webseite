@@ -67,6 +67,7 @@ from routes.home_routes import router as home_router
 from routes.calendar_routes import router as calendar_router
 from routes.seasons_routes import router as seasons_router
 from routes.advent_routes import router as advent_router
+from routes.easter_routes import router as easter_router
 from routes.achievement_signal_routes import router as achievement_signal_router
 from services import discord_embeds
 from routes.prize_routes import router as prize_router
@@ -283,6 +284,7 @@ app.include_router(home_router)
 app.include_router(calendar_router)
 app.include_router(seasons_router)
 app.include_router(advent_router)
+app.include_router(easter_router)
 app.include_router(achievement_signal_router)
 app.include_router(prize_router)
 app.include_router(setup_router)
