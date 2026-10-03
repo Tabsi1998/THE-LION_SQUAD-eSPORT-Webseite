@@ -916,6 +916,104 @@
           "height": 256
         }
       ]
+    },
+    {
+      "id": "fluent-vereinsgeburtstag",
+      "name": "Zum Vereinsgeburtstag",
+      "seasonal": "club_birthday",
+      "stickers": [
+        {
+          "id": "fluent-birthday-cake",
+          "name": "Geburtstagstorte",
+          "keywords": [
+            "torte",
+            "geburtstag",
+            "verein"
+          ],
+          "url": "/api/stickers/files/fluent/birthday-cake.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-balloon",
+          "name": "Luftballon",
+          "keywords": [
+            "ballon",
+            "feier"
+          ],
+          "url": "/api/stickers/files/fluent/balloon.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-confetti-ball",
+          "name": "Konfetti",
+          "keywords": [
+            "konfetti",
+            "feier"
+          ],
+          "url": "/api/stickers/files/fluent/confetti-ball.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-clinking-glasses",
+          "name": "Anstoßen",
+          "keywords": [
+            "prost",
+            "anstoßen",
+            "feier"
+          ],
+          "url": "/api/stickers/files/fluent/clinking-glasses.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-bottle-with-popping-cork",
+          "name": "Sektkorken",
+          "keywords": [
+            "sekt",
+            "korken",
+            "feier"
+          ],
+          "url": "/api/stickers/files/fluent/bottle-with-popping-cork.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-candle",
+          "name": "Kerze",
+          "keywords": [
+            "kerze",
+            "geburtstag"
+          ],
+          "url": "/api/stickers/files/fluent/candle.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-shortcake",
+          "name": "Tortenstück",
+          "keywords": [
+            "torte",
+            "kuchen"
+          ],
+          "url": "/api/stickers/files/fluent/shortcake.png",
+          "width": 256,
+          "height": 256
+        },
+        {
+          "id": "fluent-ribbon",
+          "name": "Schleife",
+          "keywords": [
+            "geschenk",
+            "schleife"
+          ],
+          "url": "/api/stickers/files/fluent/ribbon.png",
+          "width": 256,
+          "height": 256
+        }
+      ]
     }
   ]
 }

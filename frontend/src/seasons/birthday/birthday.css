@@ -1,0 +1,50 @@
+/* Vereinsgeburtstag (S13 #644, B1–B3): die Karte mit der Torte (Platz und Breite kommen von .tls-season-toast), der
+   Jahres-Sticker, die Wimpelketten unter der Kopfzeile. Die Flammen kommen aus advent/flame.jsx. */
+.tls-birthday-card { display: flex; align-items: center; gap: 0.9rem; padding: 0.75rem 2.1rem 0.75rem 0.6rem; background: #0e1220; border: 1px solid rgba(255, 215, 0, 0.35); border-radius: 0.75rem; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); color: #fff6e0; }
+.tls-birthday-card__cake { flex: none; }
+.tls-birthday-card__body { min-width: 0; }
+.tls-birthday-card__eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 0.25em; text-transform: uppercase; color: #29b6e8; }
+.tls-birthday-card__years { font-weight: 900; font-size: 1.7rem; line-height: 1.05; text-transform: uppercase; color: #ffd700; letter-spacing: 0.01em; }
+.tls-birthday-card__text { margin: 0.3rem 0 0.55rem; font-size: 0.9rem; line-height: 1.35; color: rgba(255, 246, 224, 0.86); }
+.tls-birthday-card__close { position: absolute; top: 0.35rem; right: 0.5rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+.tls-birthday-card__close:focus-visible, .tls-birthday-claim:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; }
+
+.tls-birthday-cake { position: relative; }
+.tls-birthday-cake svg { display: block; max-width: none; overflow: visible; }
+.tls-birthday-cake__plate { position: absolute; display: block; pointer-events: none; }
+
+.tls-birthday-claim { display: inline-flex; align-items: center; padding: 0.4rem 0.75rem; border: 0; border-radius: 0.4rem; background: #29b6e8; color: #04121a; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; cursor: pointer; }
+.tls-birthday-claim:disabled { opacity: 0.7; cursor: progress; }
+.tls-birthday-sticker { display: flex; align-items: center; gap: 0.6rem; }
+.tls-birthday-sticker img { flex: none; width: 48px; height: 48px; object-fit: contain; }
+.tls-birthday-sticker span { display: flex; flex-direction: column; min-width: 0; }
+.tls-birthday-sticker strong { font-size: 0.85rem; color: #ffd700; }
+.tls-birthday-sticker small { font-size: 0.75rem; color: rgba(255, 246, 224, 0.7); }
+.tls-birthday-sticker--fresh img { animation: tls-birthday-pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes tls-birthday-pop {
+  from { transform: scale(0.2) rotate(-25deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.tls-garlands { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; pointer-events: none; }
+.tls-garland { position: absolute; max-width: none; overflow: visible; pointer-events: none; }
+.tls-garland__pennant { transform-box: fill-box; transform-origin: 50% 0; }
+.tls-garland--sway .tls-garland__pennant { animation: tls-pennant-sway var(--sway, 6s) ease-in-out calc(var(--i, 0) * -0.7s) infinite alternate; }
+.tls-garland--unfold .tls-garland__string { stroke-dasharray: var(--length) var(--length); stroke-dashoffset: var(--length); animation: tls-garland-draw 0.9s ease-out forwards; animation-delay: inherit; }
+.tls-garland--unfold .tls-garland__pennant { animation: tls-garland-drop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) calc(0.45s + var(--i, 0) * 90ms) both; }
+.tls-garland--unfold.tls-garland--sway .tls-garland__pennant {
+  animation: tls-garland-drop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) calc(0.45s + var(--i, 0) * 90ms) both, tls-pennant-sway var(--sway, 6s) ease-in-out calc(1.6s + var(--i, 0) * 0.7s) infinite alternate;
+}
+@keyframes tls-garland-draw { to { stroke-dashoffset: 0; } }
+@keyframes tls-garland-drop {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+@keyframes tls-pennant-sway {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-garland__pennant, .tls-garland__string, .tls-birthday-sticker--fresh img { animation: none !important; stroke-dashoffset: 0; opacity: 1; transform: none; }
+}

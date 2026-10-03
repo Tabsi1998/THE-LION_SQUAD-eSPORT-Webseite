@@ -12,11 +12,12 @@ import re
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from typing import List, Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_optional_user, require_area
 from models import now_utc
+from services import founding
 from services.visibility import user_can_see
 from services.public_phase import derive_public_phase
 
@@ -332,6 +333,7 @@ ABOUT_DEFAULTS = {
     "cta_text": "Registriere dich jetzt, lerne uns kennen und bewirb dich auf eine offizielle Vereinsmitgliedschaft.",
     # Handfelder für die Vereinsdaten - Dolibarr gewinnt, sobald der Schalter „Vereinsdaten aus Dolibarr“ an ist.
     "founded_year": None,
+    "founded_on": None,
     "purpose": "",
     "nonprofit": None,
     # Der Verein in Zahlen (#621): welche Zähler die Seite zeigt, in dieser Reihenfolge.
@@ -360,6 +362,8 @@ class AboutTexts(BaseModel):
     cta_title: Optional[str] = Field(None, max_length=120)
     cta_text: Optional[str] = Field(None, max_length=1000)
     founded_year: Optional[int] = Field(None, ge=1900, le=2100)
+    # Der Gründungstag (#644): ohne ihn kein Vereinsgeburtstag. Leer löscht ihn.
+    founded_on: Optional[str] = Field(None, max_length=10)
     purpose: Optional[str] = Field(None, max_length=1000)
     nonprofit: Optional[bool] = None
     numbers_shown: Optional[List[str]] = None
@@ -404,7 +408,7 @@ async def _about_texts(db) -> dict:
             texts[key] = _clean_lines(value) or ABOUT_DEFAULTS[key]
         elif key == "numbers_shown":
             texts[key] = _clean_number_keys(value) or list(ABOUT_DEFAULTS[key])
-        elif key in ("founded_year", "nonprofit"):
+        elif key in ("founded_year", "founded_on", "nonprofit"):
             texts[key] = value
         elif key in ABOUT_DEFAULTS and value not in (None, ""):
             texts[key] = str(value)
@@ -446,12 +450,15 @@ async def _about_organization(db) -> dict:
     texts = await _about_texts(db)
     overlay, legal_source = await club_facts.public_legal_source(db, branding)
     legal = build_public_legal_settings(branding, overlay)
+    # Gründung (Jahr und Tag): eine Rechnung für Über uns, den Vereinsgeburtstag und die Erfolge (#644).
+    founded = await founding.founding(db)
     organization = {
         "name": branding.get("club_name") or "THE LION SQUAD",
         "legal_name": legal.get("legal_name") or "",
         "zvr_number": legal.get("zvr_number") or "",
         "registered_seat": legal.get("registered_seat") or legal.get("city") or "",
-        "founded_year": texts.get("founded_year"),
+        "founded_year": founded["founded_year"],
+        "founded_on": founded["founded_on"],
         "purpose": texts.get("purpose") or "",
         "nonprofit": texts.get("nonprofit"),
         "source": "manual",
@@ -460,9 +467,7 @@ async def _about_organization(db) -> dict:
         state = await club_facts.snapshot(db)
         public = club_facts.organization_public(state.get("organization")) if state.get("organization") else None
         if public:
-            founded = str(public.get("founded") or "")[:4]
             organization.update({
-                "founded_year": int(founded) if founded.isdigit() else organization["founded_year"],
                 "purpose": public.get("purpose") or organization["purpose"],
                 "nonprofit": bool(public.get("nonprofit")) if public.get("nonprofit") is not None else organization["nonprofit"],
                 "source": "dolibarr",
@@ -519,7 +524,7 @@ async def about_page():
     now = datetime.now(timezone.utc)
     texts = await _about_texts(db)
     return {
-        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "purpose", "nonprofit", "numbers_shown")},
+        "texts": {key: texts[key] for key in texts if key not in ("founded_year", "founded_on", "purpose", "nonprofit", "numbers_shown")},
         "organization": await _about_organization(db),
         "numbers": await _club_numbers(db),
         "numbers_shown": texts.get("numbers_shown") or list(ABOUT_DEFAULTS["numbers_shown"]),
@@ -546,10 +551,19 @@ async def about_admin_save(body: AboutTexts, me: dict = Depends(require_area("co
             updates[key] = _clean_lines(value)
         elif key == "numbers_shown":
             updates[key] = _clean_number_keys(value)
+        elif key == "founded_on":
+            # Ein gültiger Tag, nicht in der Zukunft - oder leer (löscht ihn).
+            day = founding.parse_day(value) if value else None
+            if value and (not day or day > now_utc().date().isoformat()):
+                raise HTTPException(422, "Das Gründungsdatum ist kein gültiger Tag (JJJJ-MM-TT, nicht in der Zukunft).")
+            updates[key] = day
         elif key in ("founded_year", "nonprofit"):
             updates[key] = value
         elif isinstance(value, str):
             updates[key] = value.strip()
+    # Steht ein Gründungstag, ist sein Jahr das Gründungsjahr - zwei verschiedene Angaben gäbe es sonst nebeneinander.
+    if updates.get("founded_on"):
+        updates["founded_year"] = int(updates["founded_on"][:4])
     if updates:
         updates["updated_at"] = now_utc().isoformat()
         updates["updated_by"] = me.get("id")

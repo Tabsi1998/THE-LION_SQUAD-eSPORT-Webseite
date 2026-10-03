@@ -4,6 +4,7 @@ import { useSeason } from "../SeasonContext";
 import { adventSundays, candlesLit, daysToChristmas, todayIso } from "./calendar";
 import { BERRY_TRIAD, CANDLE_WIDTH, RING, VIEW, adventLabel, candleBurn, daysLitFor, ringPoint, wreathLayout } from "./wreath";
 import { CALM_MS, LIGHTING_MS, dueIgnitions, markIgnited } from "./ignition";
+import { Flame, FlameDefs } from "./flame";
 import "./advent.css";
 
 // Adventkranz (Jahreszeiten II S6, #637; Advent & Winter W1, #727): vier Kerzen auf einem Ring aus Tannenzweigen
@@ -82,7 +83,6 @@ function Candle({ candle, lit, daysLit, lighting, calm, ids }) {
   const top = candle.y - height;
   const { x } = candle;
   const half = CANDLE_WIDTH / 2;
-  const fireClass = `tls-advent__fire${lighting ? " tls-advent__fire--lighting" : ""}${calm ? " tls-advent__fire--calm" : ""}`;
   return (
     <g className={`tls-advent__candle${lit ? " tls-advent__candle--lit" : ""}`} transform={`rotate(${candle.lean} ${x} ${candle.y})`} data-testid="advent-candle" data-lit={lit ? "1" : "0"} data-index={candle.index + 1}>
       <ellipse cx={x} cy={candle.y + 0.5} rx={half + 1.4} ry="1.2" fill="#0f2a15" opacity="0.5" />
@@ -93,19 +93,7 @@ function Candle({ candle, lit, daysLit, lighting, calm, ids }) {
       {drip > 0 && <path d={dripPath(x + candle.dripSide * (half - 0.6), top + 0.7, drip, candle.dripSide)} fill="#f4e8d0" opacity="0.95" />}
       <text x={x} y={candle.y - 1.5} textAnchor="middle" fontSize="3.2" fill="#8a7457" opacity="0.85" fontFamily="system-ui, sans-serif">{candle.index + 1}</text>
       <line x1={x} y1={top} x2={x} y2={top - 1.7} stroke={lit ? "#4a2f1a" : "#5f5a54"} strokeWidth="0.7" strokeLinecap="round" />
-      {lit && (
-        <g className={fireClass} style={{ "--flame-dur": `${candle.flameDuration}s`, "--flame-delay": `${candle.flameDelay}s`, "--flame-amp": candle.flameAmp, "--glow-dur": `${candle.glowDuration}s`, "--wick-glow": candle.wickGlow }} data-testid="advent-flame">
-          <circle className="tls-advent__glow" cx={x} cy={top - 4.4} r="8.5" fill={`url(#${ids}-glow)`} />
-          <circle className="tls-advent__ember" cx={x} cy={top - 1.6} r="0.55" fill="#ff9a3c" />
-          <g className="tls-advent__flame" style={{ transformOrigin: `${x}px ${top - 1.4}px` }}>
-            <ellipse cx={x} cy={top - 5} rx="1.9" ry="4.6" fill={`url(#${ids}-flame)`} />
-            <ellipse cx={x} cy={top - 4.5} rx="1.15" ry="3.2" fill="#ffd27a" opacity="0.95" />
-            <ellipse cx={x} cy={top - 3.8} rx="0.55" ry="1.8" fill="#fff8e6" />
-            <ellipse cx={x} cy={top - 2.1} rx="0.95" ry="0.75" fill="#7fb2ff" opacity="0.55" />
-          </g>
-          {lighting && <circle className="tls-advent__match" cx={x} cy={top - 2} r="6" fill={`url(#${ids}-match)`} data-testid="advent-match" />}
-        </g>
-      )}
+      {lit && <Flame x={x} top={top} ids={ids} look={candle} lighting={lighting} calm={calm} />}
     </g>
   );
 }
@@ -125,20 +113,7 @@ export function Wreath({ layout, candles, daysLit = [], lighting = [], calm = []
             <stop offset="1" stopColor="#cdb48c" />
           </linearGradient>
         ))}
-        <radialGradient id={`${ids}-flame`} cx="50%" cy="68%" r="60%">
-          <stop offset="0" stopColor="#fff1c2" />
-          <stop offset="0.55" stopColor="#ffb13b" />
-          <stop offset="1" stopColor="#ff7a1a" stopOpacity="0.85" />
-        </radialGradient>
-        <radialGradient id={`${ids}-glow`} cx="50%" cy="50%" r="50%">
-          <stop offset="0" stopColor="rgba(255, 184, 96, 0.55)" />
-          <stop offset="0.6" stopColor="rgba(255, 170, 80, 0.16)" />
-          <stop offset="1" stopColor="rgba(255, 160, 70, 0)" />
-        </radialGradient>
-        <radialGradient id={`${ids}-match`} cx="50%" cy="50%" r="50%">
-          <stop offset="0" stopColor="rgba(255, 225, 160, 0.95)" />
-          <stop offset="1" stopColor="rgba(255, 190, 110, 0)" />
-        </radialGradient>
+        <FlameDefs ids={ids} />
       </defs>
       <ellipse cx={RING.cx} cy={RING.cy + 0.8} rx={RING.rx} ry={RING.ry} fill="none" stroke="#12331a" strokeWidth="7" opacity="0.95" />
       <ellipse cx={RING.cx} cy={RING.cy} rx={RING.rx} ry={RING.ry} fill="none" stroke="#24552d" strokeWidth="4.5" />

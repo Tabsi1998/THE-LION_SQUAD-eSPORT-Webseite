@@ -9,7 +9,8 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ArrowRight, Heart, Users, Trophy, Gamepad2, Mountain, Landmark, Medal, CalendarDays, Star } from "lucide-react";
+import { useSeason } from "@/seasons/SeasonContext";
+import { ArrowRight, Heart, Users, Trophy, Gamepad2, Mountain, Landmark, Medal, CalendarDays, Star, Cake } from "lucide-react";
 
 // Über den Verein (#406): keine Seite mehr aus festem Text. Gründung, Zweck und gemeinnützig
 // kommen aus Dolibarr (über den Schalter der Vereinsdaten) oder aus den Handfeldern, die Zahlen
@@ -49,6 +50,7 @@ export default function AboutPage() {
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{texts.hero_eyebrow || "Der Verein"}</span>
           <h1 className="mt-3 font-heading text-5xl md:text-7xl font-black uppercase leading-[0.95] whitespace-pre-line">{texts.hero_title || organization.name || "THE LION SQUAD"}</h1>
           <Paragraphs text={texts.hero_text} className="mt-6 text-white/70 max-w-3xl text-lg" />
+          <BirthdayLine />
           {facts.length > 0 && (
             <ul className="mt-8 flex flex-wrap gap-2" data-testid="about-facts">
               {facts.map((fact) => (
@@ -255,5 +257,19 @@ function Pillar({ icon: Icon, label }) {
       {Icon ? <Icon className="w-6 h-6 text-[#29B6E8] mb-3" /> : <Star className="w-6 h-6 text-[#29B6E8] mb-3" />}
       <div className="font-heading font-black uppercase text-sm">{label}</div>
     </div>
+  );
+}
+
+/** Am Vereinsgeburtstag (#644): „Heute vor X Jahren gegründet“ - eine Zeile im Kopf, solange die Saison läuft. */
+export function BirthdayLine() {
+  const { seasons } = useSeason();
+  const birthday = (seasons || []).find((season) => season.key === "club_birthday");
+  if (!birthday) return null;
+  const years = Number(birthday.data?.years);
+  return (
+    <p className="mt-6 inline-flex items-center gap-2 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm px-3 py-2 text-sm font-bold text-[#FFD700]" data-testid="about-birthday">
+      <Cake className="w-4 h-4 shrink-0" aria-hidden="true" />
+      {years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} gegründet – danke, dass ihr dabei seid!` : "Heute hat der Verein Geburtstag – danke, dass ihr dabei seid!"}
+    </p>
   );
 }

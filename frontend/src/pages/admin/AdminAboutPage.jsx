@@ -23,6 +23,7 @@ export function textsToForm(texts) {
   form.pillars = (texts?.pillars || []).join("\n");
   form.offline_items = (texts?.offline_items || []).join("\n");
   form.founded_year = texts?.founded_year ? String(texts.founded_year) : "";
+  form.founded_on = texts?.founded_on || "";
   form.nonprofit = texts?.nonprofit === true;
   form.numbers_shown = Array.isArray(texts?.numbers_shown) && texts.numbers_shown.length ? texts.numbers_shown.filter((key) => NUMBER_LABELS[key]) : [...DEFAULT_SHOWN];
   return form;
@@ -34,12 +35,20 @@ export function formToPayload(form) {
   payload.pillars = String(form.pillars || "").split("\n").map((line) => line.trim()).filter(Boolean);
   payload.offline_items = String(form.offline_items || "").split("\n").map((line) => line.trim()).filter(Boolean);
   payload.founded_year = /^\d{4}$/.test(String(form.founded_year || "").trim()) ? Number(form.founded_year) : null;
+  // Leer löscht den Gründungstag; steht einer da, folgt das Jahr daraus (Server).
+  payload.founded_on = /^\d{4}-\d{2}-\d{2}$/.test(String(form.founded_on || "")) ? form.founded_on : "";
   payload.nonprofit = Boolean(form.nonprofit);
   payload.numbers_shown = (form.numbers_shown || []).filter((key) => NUMBER_LABELS[key]);
   return payload;
 }
 
 // Der Verein in Zahlen (#621): Häkchen je Zähler mit dem echten Stand, Reihenfolge per Pfeil.
+/** Ein Gründungstag zum Lesen: „1. März 2019“. */
+export function foundedLabel(day) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
+  return new Date(`${day}T12:00:00`).toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" });
+}
+
 export function numberValueText(key, numbers) {
   const value = Number(numbers?.[key] || 0);
   if (key === "prizes" && Number(numbers?.prize_money_eur || 0) > 0) return `${value} (${Number(numbers.prize_money_eur).toLocaleString("de-AT")} € Preisgeld)`;
@@ -120,11 +129,12 @@ export default function AdminAboutPage() {
             <FormSection title="Vereinsdaten" accent={ACCENT} hint={fromDolibarr ? "Gründung, Zweck und gemeinnützig kommen aus Dolibarr (Schalter „Vereinsdaten aus Dolibarr“ in den Einstellungen). Die Felder hier sind nur der Rückfall." : "Solange die Vereinsdaten nicht aus Dolibarr kommen, gelten diese Felder."} testId="about-organization">
               {fromDolibarr && (
                 <p className="text-xs text-[#29B6E8]" data-testid="about-organization-dolibarr">
-                  Aus Dolibarr: {data.organization.founded_year ? `gegründet ${data.organization.founded_year}` : "kein Gründungsdatum"}{data.organization.nonprofit ? ", gemeinnützig" : ""}{data.organization.purpose ? ` – „${data.organization.purpose}“` : ""}
+                  Aus Dolibarr: {data.organization.founded_on ? `gegründet am ${foundedLabel(data.organization.founded_on)}` : data.organization.founded_year ? `gegründet ${data.organization.founded_year}` : "kein Gründungsdatum"}{data.organization.nonprofit ? ", gemeinnützig" : ""}{data.organization.purpose ? ` – „${data.organization.purpose}“` : ""}
                 </p>
               )}
               <FormGrid>
-                <TextField label="Gründungsjahr" value={form.founded_year} onChange={(v) => set("founded_year", v)} placeholder="2019" maxLength={4} testId="about-founded-year" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr" : undefined} />
+                <TextField label="Gründungsdatum" type="date" value={form.founded_on} onChange={(v) => set("founded_on", v)} max={new Date().toISOString().slice(0, 10)} testId="about-founded-on" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr" : "An diesem Tag feiern Web und App jedes Jahr Vereinsgeburtstag – Torte mit Kerzen nach Jahren."} />
+                <TextField label="Gründungsjahr" value={form.founded_on ? form.founded_on.slice(0, 4) : form.founded_year} onChange={(v) => set("founded_year", v)} placeholder="2019" maxLength={4} testId="about-founded-year" disabled={fromDolibarr || Boolean(form.founded_on)} hint={fromDolibarr ? "aus Dolibarr" : form.founded_on ? "aus dem Gründungsdatum" : "Reicht für „Jahre aktiv“ – für den Vereinsgeburtstag braucht es den Tag."} />
                 <CheckField label="Gemeinnützig" checked={form.nonprofit} onChange={(v) => set("nonprofit", v)} testId="about-nonprofit" disabled={fromDolibarr} hint={fromDolibarr ? "aus Dolibarr" : undefined} className="mt-6" />
               </FormGrid>
               <TextAreaField label="Vereinszweck" value={form.purpose} onChange={(v) => set("purpose", v)} rows={3} testId="about-purpose" hint={fromDolibarr ? "aus Dolibarr – wird dort gepflegt" : "Ein Satz, wie er in den Statuten steht."} />

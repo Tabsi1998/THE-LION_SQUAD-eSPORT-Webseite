@@ -6,7 +6,7 @@ import { blocksPoint } from "../glyphs";
 import { hashString, seasonYear } from "../rng";
 import { readPreviewToken } from "../preview";
 import { markToastShown, toastShownToday } from "../SeasonStage";
-import { pointFree } from "../snow/WinterSky";
+import { openSpot } from "../space";
 import { confettiWind } from "./confetti";
 import { HEAD_FALLBACK, headTop, streamerPath, streamerPlan } from "./geometry";
 import { createConfettiLayer, requestBurst } from "./layer";
@@ -61,16 +61,8 @@ export function streamerLength(streamer, x, top, free) {
   return streamer.length;
 }
 
-/**
- * Frei für eine Luftschlange: keine Schrift, kein Bild, kein Bedienelement - und auch kein Kasten (Chip, Karte,
- * Rahmen). Was dort liegt, muss fast so breit sein wie die Seite (Abschnitt, Hintergrund).
- */
-export function openSpot(doc, x, y, pageWidth) {
-  if (!pointFree(doc, x, y)) return false;
-  const node = typeof doc.elementFromPoint === "function" ? doc.elementFromPoint(x, y) : null;
-  if (!node || node === doc.body || node === doc.documentElement) return true;
-  return node.getBoundingClientRect().width >= pageWidth * 0.85;
-}
+/** Frei für eine Luftschlange - die gemeinsame Probe für Deko an Kanten (space.js). */
+export { openSpot };
 
 /**
  * Frei für den großen Hut: keine Schrift (mit ihrem ganzen Kasten), kein Bild, kein Bedienelement - die Hüte selbst
