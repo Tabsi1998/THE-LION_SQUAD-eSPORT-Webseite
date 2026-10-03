@@ -153,6 +153,7 @@ export const MOTIFS: Record<string, MotifPart[]> = {
   "leap-day": [["rect",{"x":"10","y":"14","width":"44","height":"40","rx":"4"}],["path",{"d":"M10 26 H54 M20 8 V18 M44 8 V18"}],["path",{"d":"M22 44 V34 C22 30 30 30 30 34 C30 38 22 40 22 44 H30","strokeWidth":"3.5"}],["path",{"d":"M36 32 L40 30 V44 M36 44 H44","strokeWidth":"3.5"}]],
   "snow-king": [["path",{"d":"M32 8 V56 M14 20 L50 44 M50 20 L14 44","strokeWidth":"4"}],["path",{"d":"M26 12 L32 18 L38 12 M26 52 L32 46 L38 52 M12 26 L18 28 L16 22 M52 26 L46 28 L48 22 M12 38 L18 36 L16 42 M52 38 L46 36 L48 42","strokeWidth":"3"}]],
   "first-egg": [["path",{"d":"M32 6 C42 6 50 20 50 34 C50 46 42 56 32 56 C22 56 14 46 14 34 C14 20 22 6 32 6 Z","fill":"currentColor","stroke":"none"}],["path",{"d":"M18 30 C24 26 30 34 36 30 S46 26 48 30","stroke":"#000","strokeOpacity":"0.45"}],["path",{"d":"M20 42 C26 38 30 46 36 42 S44 38 46 42","stroke":"#000","strokeOpacity":"0.45"}]],
+  "egg-king": [["path",{"d":"M32 18 C41 18 48 30 48 41 C48 51 41 58 32 58 C23 58 16 51 16 41 C16 30 23 18 32 18 Z","fill":"currentColor","stroke":"none"}],["path",{"d":"M20 40 C25 36 29 44 34 40 S43 36 45 40","stroke":"#000","strokeOpacity":"0.45"}],["path",{"d":"M22 6 L26 14 L32 7 L38 14 L42 6 L41 16 H23 Z","fill":"currentColor","stroke":"none"}]],
   "negative": [["path",{"d":"M32 8 L58 54 H6 Z","fill":"currentColor","stroke":"none"}],["path",{"d":"M32 24 V38","stroke":"#000","strokeOpacity":"0.6","strokeWidth":"5"}],["circle",{"cx":"32","cy":"46","r":"3","fill":"#000","fillOpacity":"0.6","stroke":"none"}]],
 };
 
