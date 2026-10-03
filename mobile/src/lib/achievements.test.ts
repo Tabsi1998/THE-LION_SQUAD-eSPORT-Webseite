@@ -1,5 +1,5 @@
 import {
-  achievementIcon, announceAchievementUnlocked, freshTiers, groupProgress, knownIconNames, onAchievementUnlocked,
+  achievementIcon, announceAchievementUnlocked, applyStatusFilter, freshTiers, groupProgress, knownIconNames, onAchievementUnlocked, tierStatus,
   type AchievementGroup,
 } from "./achievements";
 
@@ -98,4 +98,27 @@ test("der Freischalt-Moment lässt sich abonnieren und wieder abbestellen", () =
   stop();
   announceAchievementUnlocked();
   expect(listener).toHaveBeenCalledTimes(1);
+});
+
+test("Filter wie im Web: erreicht, in Arbeit, gesperrt, geheim – Gruppen ohne passende Stufe fallen weg", () => {
+  const groups: AchievementGroup[] = [
+    group([
+      { code: "a", name: "A", earned: true },
+      { code: "b", name: "B", earned: false, current: 3, target: 10 },
+      { code: "c", name: "C", earned: false, current: 0, target: 10 },
+      { code: "d", name: "D", earned: false, manual_only: true },
+    ], { code: "g1" }),
+    group([{ code: "s", name: "S", earned: true }], { code: "g2", hidden: true }),
+  ];
+  expect(tierStatus(groups[0].tiers![1], groups[0])).toBe("progress");
+  expect(tierStatus(groups[0].tiers![3], groups[0])).toBe("locked");
+  expect(tierStatus(groups[1].tiers![0], groups[1])).toBe("secret");
+  expect(applyStatusFilter(groups, "all")).toBe(groups);
+  expect(applyStatusFilter(groups, "earned").map((g) => g.tiers!.map((t) => t.code))).toEqual([["a"]]);
+  expect(applyStatusFilter(groups, "locked").map((g) => g.tiers!.map((t) => t.code))).toEqual([["c", "d"]]);
+  expect(applyStatusFilter(groups, "secret").map((g) => g.code)).toEqual(["g2"]);
+  // Der Fortschritt rechnet mit allen Stufen, nicht nur den gefilterten.
+  const earnedOnly = applyStatusFilter(groups, "earned")[0];
+  expect(groupProgress(earnedOnly).done).toBe(false);
+  expect(groupProgress(earnedOnly).label).toBe("3 von 10");
 });

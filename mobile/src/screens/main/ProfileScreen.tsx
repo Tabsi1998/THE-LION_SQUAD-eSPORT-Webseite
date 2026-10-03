@@ -20,7 +20,10 @@ import { api, errorMessage, resolveMediaUrl } from "../../lib/api";
 import { missingLabels } from "../../lib/profileCompleteness";
 import { AchievementGroupCard } from "../../components/AchievementGroupCard";
 import { FadeIn, staggerDelay } from "../../components/FadeIn";
-import { type AchievementGroup, achievementIcon } from "../../lib/achievements";
+import { type AchievementGroup, STATUS_FILTERS, type StatusFilter, applyStatusFilter } from "../../lib/achievements";
+import { useProgressiveCount } from "../../lib/progressive";
+import { SegmentedTabs } from "../../components/SegmentedTabs";
+import { Badge } from "../../achievements/Badge";
 import { sortAwards, type Award } from "../../lib/awards";
 import { API_BASE_URL } from "../../config";
 
@@ -152,6 +155,10 @@ export function ProfileScreen() {
   // Abgehakt vom Verein (#558): weder Zeile noch Textfeld.
   const [linkDisabled, setLinkDisabled] = useState<string[]>([]);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  // Stabil, damit die Erfolgskarten (memo) beim Aufklappen einer Karte nicht alle neu zeichnen.
+  const toggleGroup = useCallback((code: string) => setOpenGroups((current) => ({ ...current, [code]: !current[code] })), []);
+  // Filter wie im Web-Profil (E13, #623); die Liste baut sich schrittweise auf statt ~150 Abzeichen in einem Bild.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const linkedPlatforms = useMemo(() => new Set(links.map((row) => String(row.platform || "").toLowerCase())), [links]);
   // Getippt wird nur, was keine Anmeldung bietet oder was die Website nicht eingerichtet hat (#521).
   const manualSocialKeys = useMemo(() => {
@@ -322,6 +329,10 @@ export function ProfileScreen() {
       .sort((a, b) => Number(b.percent || 0) - Number(a.percent || 0))[0];
     return { tiers, earned, points, next };
   }, [achievements]);
+
+  const shownGroups = useMemo(() => applyStatusFilter(achievements.groups || [], statusFilter), [achievements, statusFilter]);
+  // Erst zehn, dann je sechs: jeder Schritt bleibt kurz genug, dass Wischen und Tippen dazwischen durchkommen.
+  const shownCount = useProgressiveCount(shownGroups.length, `${activeTab}:${statusFilter}`, 10, 6);
 
   const prizeStats = useMemo(() => {
     const open = prizes.filter((item) => ["pending", "ready"].includes(String(item.status || "pending")));
@@ -555,7 +566,7 @@ export function ProfileScreen() {
               {insights.next ? (
                 <>
                   <View style={styles.nextAchievement}>
-                    <Ionicons name={achievementIcon(insights.next.group)} size={20} color={insights.next.group.accent_color || colors.cyan} />
+                    <Badge material={insights.next.material} level={insights.next.level} rank={insights.next.rank} art={insights.next.art || insights.next.group.art} icon={insights.next.group.icon} earned={false} percent={Number(insights.next.percent || 0)} size={36} testID="profile-next-badge" />
                     <Body style={styles.strong}>{insights.next.name}</Body>
                   </View>
                   <Muted>{insights.next.group.name}</Muted>
@@ -692,15 +703,19 @@ export function ProfileScreen() {
             {/* Saison-Fundstücke (#678) wie im Web unter den Erfolgen - nur für die angemeldete Person selbst. */}
             {!guest ? <SeasonFindsCard /> : null}
             {(achievements.groups || []).length ? (
-              (achievements.groups || []).map((group, index) => (
-                <FadeIn key={group.code} delay={staggerDelay(index)}>
-                  <AchievementGroupCard
-                    group={group}
-                    open={Boolean(openGroups[group.code])}
-                    onToggle={() => setOpenGroups((current) => ({ ...current, [group.code]: !current[group.code] }))}
-                  />
-                </FadeIn>
-              ))
+              <>
+                <SegmentedTabs items={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} style={styles.filterTabs} />
+                {shownGroups.slice(0, shownCount).map((group, index) => (
+                  <FadeIn key={group.code} delay={staggerDelay(index)}>
+                    <AchievementGroupCard
+                      group={group}
+                      open={Boolean(openGroups[group.code])}
+                      onToggle={toggleGroup}
+                    />
+                  </FadeIn>
+                ))}
+                {!shownGroups.length ? <Muted style={styles.filterEmpty}>Keine Stufe passt zu diesem Filter.</Muted> : null}
+              </>
             ) : (
               <Card style={styles.card}>
                 <EmptyState icon="trophy-outline" title="Noch keine Erfolge" detail="Sobald automatische oder manuelle Erfolge freigeschaltet sind, erscheinen sie hier." tone="gold" />
@@ -1309,6 +1324,8 @@ const styles = StyleSheet.create({
   },
   tabContent: { gap: 16 },
   nextAchievement: { flexDirection: "row", alignItems: "center", gap: 8 },
+  filterTabs: { paddingVertical: 2 },
+  filterEmpty: { textAlign: "center", marginVertical: 12 },
   referenceCard: {
     gap: 10,
   },

@@ -20,6 +20,9 @@ import sys
 
 AREAS = ("backend", "frontend", "mobile", "container")
 
+BADGE_ART = "frontend/src/components/achievements/motifs/"
+BADGE_ART_FILES = {"frontend/src/components/achievements/badgeArt.jsx", "frontend/src/components/achievements/materials.js"}
+
 # Dateien, die keinen Job brauchen. Der Geheimnis-Scan läuft trotzdem.
 NO_JOB = {".gitignore", "LICENSE", ".editorconfig"}
 
@@ -43,6 +46,10 @@ def areas_for(path: str) -> set[str]:
             or path in {"scripts/check-public-routes.sh", "scripts/compose-backup-target.py"}):
         hits.add("frontend")
     if path.startswith("mobile/"):
+        hits.add("mobile")
+    # Die Abzeichen-Kunst der App wird aus dem Web erzeugt (E13, #623): ändert sich dort ein Motiv oder ein
+    # Material, prüft der App-Job, ob die erzeugten Daten der App noch passen.
+    if path.startswith(BADGE_ART) or path in BADGE_ART_FILES:
         hits.add("mobile")
     if (path.startswith(("backend/", "frontend/")) or compose or env_example
             or name.startswith("Dockerfile") or name == ".dockerignore"

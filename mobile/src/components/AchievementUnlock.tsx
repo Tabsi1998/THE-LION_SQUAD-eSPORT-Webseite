@@ -5,6 +5,8 @@ import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View 
 import { colors, radius } from "../theme";
 import { useReduceMotion } from "./FadeIn";
 import { useSeasonOverlay } from "../seasons/anchors";
+import { Badge } from "../achievements/Badge";
+import { type Look, lookFor } from "../achievements/badgeArt";
 
 export type UnlockTier = {
   code?: string;
@@ -13,32 +15,46 @@ export type UnlockTier = {
   level?: number;
   level_name?: string;
   points?: number;
+  /** Erfolge II (E13, #623): Material, Rang und Motiv – fehlen sie (alte Meldungen), gilt das Level. */
+  material?: string | null;
+  rank?: number | null;
+  art?: string | null;
+  icon?: string | null;
+  group_art?: string | null;
+  group_icon?: string | null;
+  group_name?: string;
 };
 
-const RARITY: Record<number, { name: string; color: string; secondary?: string; confetti: boolean }> = {
-  1: { name: "Bronze", color: "#CD7F32", confetti: false },
-  2: { name: "Silber", color: "#C0C0C0", confetti: false },
-  3: { name: "Gold", color: "#FFD700", confetti: true },
-  4: { name: "Platin", color: "#29B6E8", confetti: true },
-  5: { name: "Legendär", color: "#FF3B30", secondary: "#FFD700", confetti: true },
-};
+/** Das Material einer Stufe als Look (Farben, Name, Rang 1–9). */
+export function unlockLook(tier: UnlockTier): Look {
+  return lookFor(tier.material, tier.level);
+}
 
-const LEVEL_META: Record<number, { name: string; color: string }> = {
-  1: { name: "Bronze", color: "#CD7F32" },
-  2: { name: "Silber", color: "#C0C0C0" },
-  3: { name: "Gold", color: "#FFD700" },
-  4: { name: "Platin", color: "#29B6E8" },
-  5: { name: "Legendär", color: "#FF3B30" },
-};
+/** Die Stufe, die das Fenster trägt: das höchste Material. */
+export function topTier(tiers: UnlockTier[]): UnlockTier | null {
+  return tiers.reduce<UnlockTier | null>((best, tier) => (!best || unlockLook(tier).rank > unlockLook(best).rank ? tier : best), null);
+}
 
-async function playHaptics(level: number) {
+/** Haptik je Material: Holz bis Bronze leicht, Silber und Gold mittel, Platin und Diamant schwer, Legendär als Muster. */
+export function hapticKind(look: Look): "light" | "medium" | "heavy" | "pattern" {
+  if (look.key === "legendary") return "pattern";
+  if (look.rank >= 6 && look.rank <= 7) return "heavy";
+  if (look.rank >= 4) return "medium";
+  return "light";
+}
+
+async function playHaptics(look: Look) {
   try {
-    if (level >= 5) {
+    const kind = hapticKind(look);
+    if (kind === "pattern") {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       for (let i = 0; i < 3; i++) {
-        setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {}), 180 + i * 150);
+        // Promise.resolve: auch wenn ein Gerät (oder ein Test) kein Versprechen zurückgibt, bleibt es still.
+        setTimeout(() => { Promise.resolve(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy)).catch(() => {}); }, 180 + i * 150);
       }
-    } else if (level >= 3) {
+    } else if (kind === "heavy") {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    } else if (kind === "medium") {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -95,11 +111,10 @@ export function AchievementUnlockModal({
 }) {
   const open = Array.isArray(tiers) && tiers.length > 0;
   useSeasonOverlay("achievement-unlock", open);
-  const maxLevel = useMemo(
-    () => (open ? Math.min(5, Math.max(1, tiers.reduce((m, t) => Math.max(m, Number(t.level) || 1), 1))) : 1),
-    [tiers, open],
-  );
-  const R = RARITY[maxLevel];
+  const top = useMemo(() => (open ? topTier(tiers) : null), [tiers, open]);
+  const look = useMemo(() => unlockLook(top || {}), [top]);
+  // Konfetti ab Gold; Legendär mit Gold als zweiter Farbe.
+  const R = { name: look.name, color: look.rim, secondary: look.key === "legendary" ? look.accent || "#FFD700" : undefined, confetti: look.rank >= 5 };
   const totalPoints = useMemo(() => tiers.reduce((s, t) => s + (Number(t.points) || 0), 0), [tiers]);
 
   const scale = useRef(new Animated.Value(0.7)).current;
@@ -109,7 +124,7 @@ export function AchievementUnlockModal({
 
   useEffect(() => {
     if (!open) return;
-    playHaptics(maxLevel);
+    playHaptics(look);
     if (reduceMotion) {
       scale.setValue(1);
       opacity.setValue(1);
@@ -123,11 +138,11 @@ export function AchievementUnlockModal({
     }
     const timer = setTimeout(onClose, 8000);
     return () => clearTimeout(timer);
-  }, [open, maxLevel, scale, opacity, onClose, reduceMotion]);
+  }, [open, look, scale, opacity, onClose, reduceMotion]);
 
   if (!open) return null;
 
-  const confettiColors = maxLevel >= 5 ? [R.color, R.secondary || "#fff", "#fff"] : ["#29B6E8", "#FFD700", "#00FF88", "#FF3B30"];
+  const confettiColors = look.key === "legendary" ? [R.color, R.secondary || "#fff", "#fff"] : ["#29B6E8", "#FFD700", "#00FF88", "#FF3B30"];
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -147,8 +162,8 @@ export function AchievementUnlockModal({
             <Ionicons name="close" size={22} color="rgba(255,255,255,0.5)" />
           </Pressable>
 
-          <View style={[styles.medal, { borderColor: R.color, backgroundColor: `${R.color}18` }]}>
-            <Ionicons name="trophy" size={40} color={maxLevel >= 5 ? R.secondary : R.color} />
+          <View style={styles.medal} testID="achievement-unlock-badge">
+            <Badge material={look.key} rank={top?.rank} art={top?.art || top?.group_art} icon={top?.group_icon || top?.icon} size={104} />
           </View>
 
           <Text style={[styles.sub, { color: R.color }]}>{sub || `${R.name} freigeschaltet`}</Text>
@@ -158,21 +173,21 @@ export function AchievementUnlockModal({
 
           <ScrollView style={styles.list} contentContainerStyle={{ gap: 8 }}>
             {tiers.map((tier, index) => {
-              const lvl = LEVEL_META[Number(tier.level) || 1] || LEVEL_META[1];
+              const own = unlockLook(tier);
               return (
                 <View
                   key={tier.code || index}
-                  style={[styles.tierRow, { borderLeftColor: lvl.color }]}
+                  style={[styles.tierRow, { borderLeftColor: own.rim }]}
                   testID={`unlock-tier-${tier.code || index}`}
                 >
-                  <Ionicons name="ribbon" size={22} color={lvl.color} />
+                  <Badge material={own.key} rank={tier.rank} art={tier.art || tier.group_art} icon={tier.group_icon || tier.icon} size={36} />
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.tierLevel, { color: lvl.color }]}>{tier.level_name || lvl.name}</Text>
+                    <Text style={[styles.tierLevel, { color: own.rim }]}>{own.name}{tier.group_name ? ` · ${tier.group_name}` : ""}</Text>
                     <Text style={styles.tierName} numberOfLines={1}>
                       {tier.name}
                     </Text>
                   </View>
-                  <Text style={[styles.points, { color: lvl.color }]}>+{tier.points || 0}</Text>
+                  <Text style={[styles.points, { color: own.rim }]}>+{tier.points || 0}</Text>
                 </View>
               );
             })}
@@ -214,13 +229,9 @@ const styles = StyleSheet.create({
   },
   close: { position: "absolute", top: 12, right: 12, zIndex: 2 },
   medal: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sub: { fontSize: 11, fontWeight: "800", letterSpacing: 3, textTransform: "uppercase" },
   heading: { color: colors.white, fontSize: 24, fontWeight: "900", textTransform: "uppercase", marginTop: 4, textAlign: "center" },

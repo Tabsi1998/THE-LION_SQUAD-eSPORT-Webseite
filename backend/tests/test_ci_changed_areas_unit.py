@@ -22,6 +22,10 @@ ALL = set(areas.AREAS)
         ("frontend/nginx.conf", {"backend", "frontend", "container"}),
         ("frontend/Dockerfile", {"frontend", "container"}),
         ("mobile/app/index.tsx", {"mobile"}),
+        # Aus der Web-Abzeichenkunst erzeugt die App ihre Motive - der App-Job prüft den Abgleich.
+        ("frontend/src/components/achievements/motifs/play.jsx", {"frontend", "mobile", "container"}),
+        ("frontend/src/components/achievements/materials.js", {"frontend", "mobile", "container"}),
+        ("frontend/src/components/achievements/Badge.jsx", {"frontend", "container"}),
         ("scripts/check-secrets.py", {"backend"}),
         # Beide Skripte ruft der Frontend-Job auf.
         ("scripts/check-public-routes.sh", {"backend", "frontend"}),
