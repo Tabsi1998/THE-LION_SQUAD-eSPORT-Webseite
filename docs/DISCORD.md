@@ -179,7 +179,22 @@ Verbindungen → Discord → Reiter **„Server“** stehen alle Server, auf den
   `send_test`), Sammlung `discord_guilds`, Routen `routes/discord_guild_routes.py`
   (`/api/settings/discord/guilds…`), Bot `_sync_guilds`/`create_invite`.
 
-Kanalziele, Versand, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
+**Kanalziele je Server (#625).** Jeder Server hat seine Kanäle; wer was bekommt, regelt eine
+Stelle (`discord_service.resolve_target` mit dem Server):
+
+| Ziel | Hauptserver | Unterserver |
+| --- | --- | --- |
+| Community | „Kanäle je Zweck“ | eigener Kanal (Reiter „Server“); ohne ihn kommt dort nichts an |
+| News, Events und Turniere | eigener Kanal, sonst Community | eigener Kanal, sonst Community **desselben** Servers |
+| Vorstand, Betrieb, Test, Mitglieder | „Kanäle je Zweck“, nie ein Rückfall | **gibt es nicht** – Versuch = Fehler mit Protokoll, keine Nachricht |
+
+Nie fällt etwas auf einen anderen Server zurück. Ein ausgeschalteter oder verlassener Server bekommt
+nichts. Die „Kanäle je Zweck“ sind die des Hauptservers (sie werden in seinen Eintrag gespiegelt);
+wird ein anderer Server Hauptserver, wandern seine öffentlichen Kanäle dorthin, die privaten sind neu
+zu wählen. Die Vorschau unter „Meldungen“ zeigt je Server, wohin jede Meldung ginge. Jeder Aufrufer von
+`send_to` sagt, welchen Server er meint (`guild_id`, sonst der Hauptserver) – ein Test zählt sie.
+
+Versand je Spiel, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
 
 ## Konten verknüpfen (Discord, Twitch, Steam)
 

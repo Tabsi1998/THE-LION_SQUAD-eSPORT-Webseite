@@ -84,3 +84,21 @@ test("ohne bekannte Server ein ruhiger Satz", async () => {
   expect(await screen.findByTestId("discord-guilds-empty")).toHaveTextContent("Noch kein Server bekannt");
   expect(screen.getByTestId("discord-guilds")).toHaveTextContent("nicht verbunden");
 });
+
+// Kanäle je Server (#625): ein Unterserver wählt Community, News und Events aus seiner eigenen Kanalliste.
+test("Unterserver: Kanäle aus seiner Liste wählen und speichern; der Hauptserver hat hier keine Kanalwahl", async () => {
+  const user = userEvent.setup();
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/settings/discord/guilds/2/channels") return { data: { ok: true, channels: [{ id: "200000000000000001", name: "allgemein", can_send: true }, { id: "200000000000000002", name: "regeln", can_send: false }] } };
+    return { data: { guilds: [MAIN, { ...SUB, channels: {} }], connected: true, bot_invite_url: null } };
+  });
+  renderPanel();
+  const select = await screen.findByTestId("discord-guild-2-channel-community");
+  await waitFor(() => expect(select.querySelectorAll("option")).toHaveLength(3));
+  expect(select.querySelector("option[value='200000000000000002']").disabled).toBe(true);
+  expect(screen.queryByTestId("discord-guild-1-channels")).toBeNull();
+  expect(screen.getByTestId("discord-guild-2-channels")).toHaveTextContent("nur am Hauptserver");
+  await user.selectOptions(select, "200000000000000001");
+  await user.click(screen.getByTestId("discord-guild-2-channels-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/settings/discord/guilds/2", { channels: { community: "200000000000000001", news: "", events: "" } }));
+});

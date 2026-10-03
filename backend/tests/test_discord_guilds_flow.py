@@ -112,7 +112,7 @@ async def test_one_main_never_switched_off_and_validated_fields(flow):
     with pytest.raises(discord_guilds.GuildError, match="discord.gg"):
         await discord_guilds.update_guild(db, SUB, {"invite_url": "https://example.com/x"})
     with pytest.raises(discord_guilds.GuildError, match="Unbekannte"):
-        await discord_guilds.update_guild(db, SUB, {"channels": {}})
+        await discord_guilds.update_guild(db, SUB, {"secret": 1})
     switched = await discord_guilds.update_guild(db, SUB, {"role": "main"})
     assert switched["role"] == "main" and switched["enabled"] is True
     assert (await db.discord_guilds.find_one({"guild_id": MAIN}))["role"] == "sub"

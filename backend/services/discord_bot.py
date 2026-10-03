@@ -614,18 +614,28 @@ class BotRunner:
         await record_state(get_db(), channels=rows, channels_at=now_utc().isoformat())
         return rows
 
-    async def list_channels(self) -> dict:
-        """Die Textkanäle des Servers mit dem, was der Bot dort darf - für die Kanalwahl je Ziel (#566).
-        Offline kommt die zuletzt gesehene Liste mit dem Hinweis, dass die Kanal-ID auch geht."""
+    async def list_channels(self, guild_id: str = "") -> dict:
+        """Die Textkanäle des Servers mit dem, was der Bot dort darf - für die Kanalwahl je Ziel (#566); mit ``guild_id``
+        die eines bestimmten Servers (#625). Offline kommt die zuletzt gesehene Liste mit dem Hinweis, dass die
+        Kanal-ID auch geht."""
         db = get_db()
-        cached = (await read_state(db)).get("channels") or []
+        guild_id = str(guild_id or "")
+        if guild_id:
+            cached = ((await db.discord_guilds.find_one({"guild_id": guild_id}, {"_id": 0, "channel_list": 1})) or {}).get("channel_list") or []
+        else:
+            cached = (await read_state(db)).get("channels") or []
         if self._client is None or not self.connected:
             return {"ok": False, "reason": "offline", "text": CHANNEL_TEXTS["offline"], "channels": cached}
-        guild = self._guild()
+        guild = self._client.get_guild(int(guild_id)) if guild_id.isdigit() else (None if guild_id else self._guild())
         if guild is None:
-            return {"ok": False, "reason": "no_guild", "text": no_guild_text(self._view, self._client), "channels": cached}
+            text = "Der Bot ist nicht auf diesem Server." if guild_id else no_guild_text(self._view, self._client)
+            return {"ok": False, "reason": "no_guild", "text": text, "channels": cached}
         try:
-            return {"ok": True, "channels": await self._cache_channels(guild)}
+            if not guild_id:
+                return {"ok": True, "channels": await self._cache_channels(guild)}
+            rows = sorted_channels([channel_row(channel, channel.permissions_for(guild.me)) for channel in guild.text_channels])
+            await db.discord_guilds.update_one({"guild_id": guild_id}, {"$set": {"channel_list": rows}})
+            return {"ok": True, "channels": rows}
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
 

@@ -69,6 +69,11 @@ REASON_TEXTS = {
     "unknown_user": "Discord kennt dieses Konto nicht mehr – im Profil unter Socials neu verknüpfen.",
     # Vorschau und Testkanal (#583)
     "test_channel_missing": "Kein Testkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Test) – ein Test geht nie in einen anderen Kanal.",
+    # Mehrere Server (#625)
+    "private_on_sub": "Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – auf einem anderen Server wird nichts gesendet.",
+    "guild_disabled": "Dieser Server ist ausgeschaltet (Verbindungen → Discord → Server) – dorthin geht nichts.",
+    "guild_left": "Der Bot ist nicht mehr auf diesem Server – dorthin geht nichts.",
+    "unknown_guild": "Diesen Server kennt die Website nicht.",
     # Mitgliederkanal (#605)
     "members_channel_missing": ("Kein Mitgliederkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Mitglieder) – "
                                 "was nur Mitglieder sehen dürfen, geht nie in einen anderen Kanal."),
@@ -202,10 +207,20 @@ def event_enabled(cfg: dict, event_key: str) -> bool:
     return bool(spec["default"] if value is None else value)
 
 
-def resolve_target(cfg: dict, target: str) -> dict:
-    """Kanal und tatsächliches Ziel. Privat fällt nie zurück - auch nicht auf ein anderes privates Ziel."""
+def resolve_target(cfg: dict, target: str, guild: dict | None = None) -> dict:
+    """Kanal und tatsächliches Ziel. Privat fällt nie zurück - auch nicht auf ein anderes privates Ziel.
+    Mit ``guild`` (ein Unterserver, #625): nur öffentliche Ziele, der Rückfall bleibt auf diesem Server - nie auf einen
+    anderen; ein privates Ziel ist dort ein Fehler. Ohne ``guild`` (oder mit dem Hauptserver): wie bisher."""
     if target not in TARGETS:
         target = "community"
+    if guild is not None and guild.get("role") != "main":
+        guild_id = str(guild.get("guild_id") or "")
+        if target in PRIVATE_TARGETS:
+            return {"target": target, "channel_id": "", "fallback": False, "guild_id": guild_id, "error": "private_on_sub"}
+        own = guild.get("channels") or {}
+        if target != "community" and own.get(target):
+            return {"target": target, "channel_id": own[target], "fallback": False, "guild_id": guild_id}
+        return {"target": "community", "channel_id": own.get("community") or "", "fallback": target != "community", "guild_id": guild_id}
     channels = cfg.get("channels") or {}
     if target in PRIVATE_TARGETS:
         return {"target": target, "channel_id": channels.get(target) or "", "fallback": False}
@@ -298,12 +313,19 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
                   footer: str | None = None, test: bool = False, thread_id: str | None = None,
-                  buttons: list | None = None) -> dict:
+                  buttons: list | None = None, guild_id: str | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
-    ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst."""
+    ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst.
+    ``guild_id`` (#625): an diesen Server - ohne ist der Hauptserver gemeint. Ein Unterserver muss eingeschaltet sein
+    und kennt nur öffentliche Ziele; nie fällt etwas auf einen anderen Server zurück."""
     cfg = await _get_discord_config()
-    resolved = resolve_target(cfg, target)
+    guild = None
+    if guild_id:
+        guild = await get_db().discord_guilds.find_one({"guild_id": str(guild_id)}, {"_id": 0})
+    resolved = resolve_target(cfg, target, guild)
     log = _new_log(event_key, title, resolved["target"], test=test)
+    if guild_id:
+        log["guild_id"] = str(guild_id)
     if resolved["fallback"]:
         log["wanted_target"] = target
     log["payload"] = _payload(title, description, color, url, fields, image_url, buttons)
@@ -311,6 +333,15 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
         return await _skip(log, "disabled", REASON_TEXTS["disabled"])
     if not cfg["bot"]["enabled"]:
         return await _skip(log, "bot_off", REASON_TEXTS["bot_off"])
+    if guild_id and guild is None:
+        return await _skip(log, "unknown_guild", REASON_TEXTS["unknown_guild"])
+    if guild is not None and guild.get("role") != "main":
+        if guild.get("left_at"):
+            return await _skip(log, "guild_left", REASON_TEXTS["guild_left"])
+        if not guild.get("enabled"):
+            return await _skip(log, "guild_disabled", REASON_TEXTS["guild_disabled"])
+        if resolved.get("error") == "private_on_sub":
+            return await _skip(log, "private_on_sub", REASON_TEXTS["private_on_sub"])
     if not resolved["channel_id"]:
         private = resolved["target"] in PRIVATE_TARGETS
         reason = f"{resolved['target']}_channel_missing" if private else "channel_missing"
@@ -323,7 +354,7 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
                      color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
-                     thread_id: str | None = None, buttons: list | None = None) -> dict:
+                     thread_id: str | None = None, buttons: list | None = None, guild_id: str | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if not allowed_in_target(item, spec["target"]):
@@ -332,7 +363,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key, thread_id=thread_id, buttons=buttons)
+                         image_url=image_url, event_key=event_key, thread_id=thread_id, buttons=buttons, guild_id=guild_id)
 
 
 async def send_discord(title: str, description: str = "", *,

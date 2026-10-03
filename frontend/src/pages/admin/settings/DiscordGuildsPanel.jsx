@@ -8,6 +8,54 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 // weitere Server (etwa je Spiel) erscheinen, sobald der Bot dort ist - ausgeschaltet, bis du sie einschaltest. Je
 // Server: Rolle, Ein/Aus, Einladungslink, Notiz, Gesundheitsprüfung in Worten und eine Testnachricht.
 
+// Ziele, die es auf jedem Server gibt (#625); Vorstand, Betrieb, Test und Mitglieder nur am Hauptserver.
+export const SUB_TARGETS = [
+  { key: "community", label: "Community" },
+  { key: "news", label: "News" },
+  { key: "events", label: "Events und Turniere" },
+];
+
+/** Kanalwahl eines Unterservers - die Liste kommt vom Bot (offline der zuletzt gesehene Stand). */
+function GuildChannels({ guild, onSave, busy }) {
+  const [list, setList] = useState(null);
+  const [draft, setDraft] = useState(() => ({ ...(guild.channels || {}) }));
+  useEffect(() => {
+    let alive = true;
+    api.get(`/settings/discord/guilds/${guild.guild_id}/channels`).then(({ data }) => alive && setList(data || { channels: [] })).catch(() => alive && setList({ channels: [] }));
+    return () => { alive = false; };
+  }, [guild.guild_id]);
+  const channels = list?.channels || [];
+  const changed = SUB_TARGETS.some((target) => (draft[target.key] || "") !== ((guild.channels || {})[target.key] || ""));
+  return (
+    <div className="space-y-2" data-testid={`discord-guild-${guild.guild_id}-channels`}>
+      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">Kanäle auf diesem Server</div>
+      <div className="grid sm:grid-cols-3 gap-2">
+        {SUB_TARGETS.map((target) => (
+          <label key={target.key} className="text-xs text-white/60 space-y-1">
+            <span>{target.label}</span>
+            <select value={draft[target.key] || ""} onChange={(event) => setDraft((current) => ({ ...current, [target.key]: event.target.value }))}
+              data-testid={`discord-guild-${guild.guild_id}-channel-${target.key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-sm">
+              <option value="">{target.key === "community" ? "– kein Kanal (nichts kommt an) –" : "– kein eigener (geht an Community) –"}</option>
+              {(draft[target.key] && !channels.some((channel) => channel.id === draft[target.key]) ? [{ id: draft[target.key], name: `Kanal-ID ${draft[target.key]}`, can_send: true }] : [])
+                .concat(channels).map((channel) => (
+                  <option key={channel.id} value={channel.id} disabled={!channel.can_send}>#{channel.name}{channel.can_send ? "" : " – Bot darf hier nicht schreiben"}</option>
+                ))}
+            </select>
+          </label>
+        ))}
+      </div>
+      {list && !list.ok && list.text ? <div className="text-xs text-white/40">{list.text}</div> : null}
+      <p className="text-[11px] text-white/40">Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – hier kommt nie etwas Privates an.</p>
+      {changed && (
+        <button type="button" onClick={() => onSave(Object.fromEntries(SUB_TARGETS.map((target) => [target.key, draft[target.key] || ""])))} disabled={busy}
+          data-testid={`discord-guild-${guild.guild_id}-channels-save`} className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
+          Kanäle speichern
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function guildStatusText(guild) {
   if (guild.left_at) return "Bot nicht mehr auf dem Server";
   if (guild.role === "main") return "Hauptserver · an";
@@ -56,8 +104,8 @@ export function DiscordGuildsPanel() {
   });
   const makeMain = async (guild) => {
     const ok = await confirm({ title: "Zum Hauptserver machen?", tone: "info", confirmLabel: "Hauptserver",
-      description: `„${guild.name}“ wird der Hauptserver; der bisherige wird ein Unterserver. Meldungen gehen weiter in die gewählten Kanäle.` });
-    if (ok) await patch(guild, { role: "main" }, `„${guild.name}“ ist jetzt der Hauptserver.`);
+      description: `„${guild.name}“ wird der Hauptserver; der bisherige wird ein Unterserver. Seine Kanäle für Community, News und Events werden die „Kanäle je Zweck“; Vorstand, Betrieb, Test und Mitglieder wählst du danach neu.` });
+    if (ok) await patch(guild, { role: "main" }, `„${guild.name}“ ist jetzt der Hauptserver – Vorstand, Betrieb, Test und Mitglieder unter „Kanäle je Zweck“ neu wählen.`);
   };
   const check = (guild) => run(`health-${guild.guild_id}`, async () => {
     const { data: result } = await api.post(`/settings/discord/guilds/${guild.guild_id}/health`);
@@ -178,6 +226,9 @@ export function DiscordGuildsPanel() {
                     )}
                   </div>
                 </div>
+                {guild.role !== "main" && !guild.left_at && (
+                  <GuildChannels guild={guild} busy={!!busy} onSave={(channels) => patch(guild, { channels }, "Kanäle gespeichert.")} />
+                )}
                 {report && (
                   <ul className="space-y-1 text-xs" data-testid={`discord-guild-${guild.guild_id}-report`}>
                     {report.checks.map((entry) => (

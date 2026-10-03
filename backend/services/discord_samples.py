@@ -86,8 +86,9 @@ async def _latest_public(collection, query: dict, sort: list) -> dict | None:
     return None
 
 
-async def sample_catalog(db=None) -> list[dict]:
-    """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist."""
+async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
+    """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist. Mit ``guild_id``
+    (#625): wohin sie auf diesem Server ginge - auf einem Unterserver nur öffentliche Ziele."""
     from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
     from services.discord_announcements import (EVENT_PUBLIC_STATUSES, TOURNAMENT_STATUS, board_message, event_message, fast_lap_message,
                                                 news_message, stream_live_message, tournament_message)
@@ -97,6 +98,7 @@ async def sample_catalog(db=None) -> list[dict]:
 
     db = db if db is not None else get_db()
     cfg = await _get_discord_config()
+    guild = await db.discord_guilds.find_one({"guild_id": str(guild_id)}, {"_id": 0}) if guild_id else None
     entries: list[dict] = []
 
     async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example", place: str | None = None):
@@ -107,8 +109,10 @@ async def sample_catalog(db=None) -> list[dict]:
         if place:
             entry["place"] = place
         if target != "dm":
-            resolved = resolve_target(cfg, target)
+            resolved = resolve_target(cfg, target, guild)
             entry["delivers_to"] = resolved["target"] if resolved["channel_id"] else None
+            if resolved.get("error") == "private_on_sub":
+                entry["only_main"] = True
             event_key = message.get("event_key")
             entry["enabled"] = event_enabled(cfg, event_key) if event_key in EVENTS else True
         entries.append(entry)

@@ -7,8 +7,14 @@ verlassene bleiben mit ``left_at`` sichtbar. **Genau ein Hauptserver:** fehlt er
 eingetragene (``bot_guild_id``) oder der erste - nach dem Deploy bleibt also alles, wie es war. Der Hauptserver
 lässt sich nicht ausschalten (erst einen anderen zum Hauptserver machen).
 
-Die Gesundheitsprüfung nennt je Server in Worten, was dem Bot fehlt, mit Klickweg; Kanalziele und Versand je
-Server folgen, Server für Server (Discord VI).
+Die Gesundheitsprüfung nennt je Server in Worten, was dem Bot fehlt, mit Klickweg.
+
+**Kanalziele je Server (#625):** jeder Server-Eintrag trägt ``channels``. Unterserver kennen nur die öffentlichen
+Ziele (Community, News, Events und Turniere); Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver.
+Die Kanäle des Hauptservers stehen weiter unter „Kanäle je Zweck“ (``settings.discord.channels``) und werden in
+seinen Eintrag gespiegelt - so funktionieren alle bisherigen Aufrufer unverändert. Wird ein anderer Server
+Hauptserver, wandern die Kanäle mit: seine öffentlichen werden die „Kanäle je Zweck“, die privaten sind neu zu
+wählen (sie lagen auf dem alten Server); der alte Hauptserver behält seine öffentlichen.
 """
 from __future__ import annotations
 
@@ -57,6 +63,20 @@ def _row(seen: dict, now: str) -> dict:
             "last_seen_at": now, "left_at": None}
 
 
+def public_channels(channels: dict | None) -> dict:
+    """Nur die öffentlichen Ziele - mehr darf ein Unterserver nicht haben."""
+    from discord_service import PUBLIC_TARGETS
+
+    return {target: str(value) for target, value in (channels or {}).items() if target in PUBLIC_TARGETS and value}
+
+
+async def mirror_main_channels(db) -> None:
+    """Die „Kanäle je Zweck“ in den Eintrag des Hauptservers spiegeln (nach jedem Speichern dort)."""
+    settings = await db.settings.find_one({"id": "discord"}, {"_id": 0, "channels": 1}) or {}
+    channels = {target: str(value) for target, value in (settings.get("channels") or {}).items() if value}
+    await db[COLLECTION].update_one({"role": "main"}, {"$set": {"channels": channels}})
+
+
 async def reconcile(db, seen: list[dict], *, configured_main: str = "", now=None) -> dict:
     """Abgleich mit den Servern des Bots: neue als ausgeschaltete Unterserver, verlassene markiert, genau ein Hauptserver."""
     stamp = (now or now_utc()).isoformat()
@@ -82,11 +102,13 @@ async def reconcile(db, seen: list[dict], *, configured_main: str = "", now=None
     if seen_ids and not await db[COLLECTION].find_one({"role": "main"}, {"_id": 0, "guild_id": 1}):
         pick = configured_main if configured_main in seen_ids else seen_ids[0]
         await db[COLLECTION].update_one({"guild_id": pick}, {"$set": {"role": "main", "enabled": True}})
+        # Die heutigen „Kanäle je Zweck“ gehören dem Hauptserver (#625).
+        await mirror_main_channels(db)
     return {"seen": len(seen_ids), "added": added, "left": left}
 
 
 async def list_guilds(db) -> list[dict]:
-    rows = await db[COLLECTION].find({}, {"_id": 0}).to_list(500)
+    rows = await db[COLLECTION].find({}, {"_id": 0, "channel_list": 0}).to_list(500)
     for row in rows:
         row["missing_permissions"] = missing_permissions(row.get("bot_permissions"))
     # Hauptserver zuerst, dann eingeschaltete, dann nach Name; verlassene zuletzt.
@@ -107,9 +129,11 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
     row = await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0})
     if not row:
         raise LookupError(guild_id)
-    unknown = set(patch) - {"role", "enabled", "invite_url", "note"}
+    unknown = set(patch) - {"role", "enabled", "invite_url", "note", "channels"}
     if unknown:
         raise GuildError(f"Unbekannte Einstellung: {', '.join(sorted(unknown))}")
+    if "channels" in patch and patch.get("role") == "main":
+        raise GuildError("Erst zum Hauptserver machen, dann die Kanäle unter „Kanäle je Zweck“ wählen.")
     updates: dict = {}
     if "role" in patch:
         if patch["role"] not in ROLES:
@@ -119,7 +143,7 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
         if patch["role"] == "main":
             if row.get("left_at"):
                 raise GuildError("Der Bot ist nicht mehr auf diesem Server – er kann kein Hauptserver sein.")
-            await db[COLLECTION].update_many({"role": "main", "guild_id": {"$ne": row["guild_id"]}}, {"$set": {"role": "sub"}})
+            await _switch_main(db, row)
             updates["role"] = "main"
             updates["enabled"] = True
     if "enabled" in patch:
@@ -134,10 +158,49 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
         updates["invite_url"] = url or None
     if "note" in patch:
         updates["note"] = str(patch["note"] or "").strip()[:300]
+    if "channels" in patch:
+        updates["channels"] = _checked_channels(row, patch["channels"])
     if updates:
         updates["updated_at"] = now_utc().isoformat()
         await db[COLLECTION].update_one({"guild_id": row["guild_id"]}, {"$set": updates})
     return await db[COLLECTION].find_one({"guild_id": row["guild_id"]}, {"_id": 0})
+
+
+def _checked_channels(row: dict, incoming) -> dict:
+    """Kanäle eines Unterservers: nur öffentliche Ziele, gültige Kanal-IDs; leer entfernt das Ziel."""
+    from discord_service import PUBLIC_TARGETS, TARGETS, channel_id_valid
+
+    if row.get("role") == "main":
+        raise GuildError("Die Kanäle des Hauptservers stehen im Reiter „Meldungen“ unter „Kanäle je Zweck“.")
+    if not isinstance(incoming, dict):
+        raise GuildError("Kanäle kommen als Ziel → Kanal-ID.")
+    channels = dict(row.get("channels") or {})
+    for target, value in incoming.items():
+        if target not in TARGETS:
+            raise GuildError(f"Unbekanntes Ziel: {target}")
+        if target not in PUBLIC_TARGETS:
+            raise GuildError("Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver.")
+        channel_id = str(value or "").strip()
+        if channel_id and not channel_id_valid(channel_id):
+            raise GuildError("Eine Kanal-ID ist eine Zahl mit 17 bis 20 Stellen (Rechtsklick auf den Kanal → „Kanal-ID kopieren“).")
+        if channel_id:
+            channels[target] = channel_id
+        else:
+            channels.pop(target, None)
+    return channels
+
+
+async def _switch_main(db, new_main: dict) -> None:
+    """Ein anderer Server wird Hauptserver: die Kanäle wandern mit (#625). Seine öffentlichen werden die „Kanäle je
+    Zweck“, private sind neu zu wählen; der alte Hauptserver behält seine öffentlichen als Unterserver."""
+    settings = await db.settings.find_one({"id": "discord"}, {"_id": 0, "channels": 1}) or {}
+    old_main = await db[COLLECTION].find_one({"role": "main", "guild_id": {"$ne": new_main["guild_id"]}}, {"_id": 0, "guild_id": 1})
+    if old_main:
+        await db[COLLECTION].update_one({"guild_id": old_main["guild_id"]},
+                                        {"$set": {"role": "sub", "channels": public_channels(settings.get("channels"))}})
+    channels = public_channels(new_main.get("channels"))
+    await db.settings.update_one({"id": "discord"}, {"$set": {"channels": channels}, "$setOnInsert": {"id": "discord"}}, upsert=True)
+    await db[COLLECTION].update_one({"guild_id": new_main["guild_id"]}, {"$set": {"channels": channels}})
 
 
 async def health(db, guild_id: str, *, connected_ids: set[str] | None = None) -> dict:
@@ -171,6 +234,20 @@ async def health(db, guild_id: str, *, connected_ids: set[str] | None = None) ->
                 verdict = "zuletzt gesendet" if last.get("status") == "sent" else "zuletzt fehlgeschlagen" if last.get("status") == "failed" else "noch nichts gesendet"
                 checks.append({"key": f"target.{target}", "ok": last.get("status") != "failed",
                                "text": f"{TARGET_LABELS[target]}: #{entry.get('channel_name') or entry.get('channel_id')} – {verdict}" + (f" ({when})" if when else "") + "."})
+    else:
+        # Unterserver: seine öffentlichen Ziele - ohne Community geht dorthin nichts.
+        from discord_service import PUBLIC_TARGETS
+
+        own = row.get("channels") or {}
+        for target in PUBLIC_TARGETS:
+            if own.get(target):
+                last = await db.email_logs.find_one({"channel": "discord", "guild_id": row["guild_id"], "target": target, "status": {"$in": ["sent", "failed"]}},
+                                                    {"_id": 0, "status": 1, "created_at": 1}, sort=[("created_at", -1)])
+                verdict = "zuletzt gesendet" if (last or {}).get("status") == "sent" else "zuletzt fehlgeschlagen" if last else "noch nichts gesendet"
+                checks.append({"key": f"target.{target}", "ok": (last or {}).get("status") != "failed", "text": f"{TARGET_LABELS[target]}: Kanal {own[target]} – {verdict}."})
+            else:
+                checks.append({"key": f"target.{target}", "ok": target != "community",
+                               "text": f"{TARGET_LABELS[target]}: kein Kanal" + (" – auf diesem Server kommt nichts an." if target == "community" else " – geht an Community.")})
     await db[COLLECTION].update_one({"guild_id": row["guild_id"]}, {"$set": {"health_checked_at": now_utc().isoformat()}})
     return {"guild_id": row["guild_id"], "ok": all(check["ok"] for check in checks), "checks": checks}
 

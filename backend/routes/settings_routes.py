@@ -1667,6 +1667,10 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         {"id": "discord"}, op, upsert=True,
     )
     await _audit_settings_change(db, "settings.discord.update", "discord", me["id"], changed_fields)
+    # Mehrere Server (#625): die „Kanäle je Zweck“ sind die des Hauptservers - in seinen Eintrag spiegeln.
+    if any(field.startswith("channels.") for field in changed_fields):
+        from services.discord_guilds import mirror_main_channels
+        await mirror_main_channels(db)
     # Bot-Einstellungen geändert (#302): neu verbinden oder anhalten - ohne Neustart des Servers.
     if any(field.startswith("bot_") for field in changed_fields):
         try:
@@ -1926,7 +1930,7 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
     result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
                            color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
                            image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
-                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"))
+                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"))
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
     return result
@@ -1949,16 +1953,20 @@ async def discord_test(target: str = Query(default="community", pattern="^(commu
 
 
 @settings_router.get("/discord/samples")
-async def discord_samples(me: dict = Depends(require_club_admin())):
-    """Vorschau jeder Meldungsart (#583): Embeds wie im Betrieb, dazu Testkanal und ob „an mich“ geht."""
+async def discord_samples(guild: Optional[str] = Query(default=None), me: dict = Depends(require_club_admin())):
+    """Vorschau jeder Meldungsart (#583): Embeds wie im Betrieb, dazu Testkanal und ob „an mich“ geht; mit ``guild`` je
+    Server (#625) - die Liste der Server kommt für die Auswahl mit."""
     from discord_service import target_status
     from services.discord_dm import discord_link_id
     from services.discord_samples import GROUPS, public_entries, sample_catalog
     db = get_db()
     test_channel = (await target_status(db)).get("test") or {}
+    servers = await db.discord_guilds.find({"left_at": None}, {"_id": 0, "guild_id": 1, "name": 1, "role": 1, "enabled": 1}).to_list(100)
     return {
         "groups": list(GROUPS),
-        "entries": public_entries(await sample_catalog(db)),
+        "guilds": sorted(servers, key=lambda row: (row.get("role") != "main", str(row.get("name") or "").lower())),
+        "guild": guild or None,
+        "entries": public_entries(await sample_catalog(db, guild)),
         "test_channel": {"configured": bool(test_channel.get("configured")), "channel_name": test_channel.get("channel_name"), "channel_id": test_channel.get("channel_id") or ""},
         "dm": {"linked": bool(await discord_link_id(db, me["id"]))},
     }

@@ -80,3 +80,18 @@ test("ohne Antwort vom Server steht der Fehler, nicht eine leere Seite", async (
   render(<DiscordSamplesPanel />);
   expect(await screen.findByTestId("discord-samples-error")).toHaveTextContent("Nicht erlaubt");
 });
+
+// Mehrere Server (#625): die Vorschau je Server - auf einem Unterserver gibt es nichts Privates.
+test("Server-Auswahl lädt die Vorschau je Server; Privates steht als „nur am Hauptserver“", async () => {
+  const user = userEvent.setup();
+  const guilds = [{ guild_id: "1", name: "THE LION SQUAD", role: "main" }, { guild_id: "2", name: "Rocket League", role: "sub" }];
+  apiMock.get.mockImplementation(async (url) => ({ data: url.includes("guild=2")
+    ? { ...DATA, guilds, guild: "2", entries: [{ ...DATA.entries[2], only_main: true }] }
+    : { ...DATA, guilds } }));
+  render(<DiscordSamplesPanel />);
+  const select = await screen.findByTestId("discord-samples-guild");
+  expect(select).toHaveTextContent("THE LION SQUAD (Hauptserver)");
+  await user.selectOptions(select, "2");
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/settings/discord/samples?guild=2"));
+  expect(await screen.findByTestId("discord-sample-membership.application-only-main")).toHaveTextContent("nur am Hauptserver");
+});

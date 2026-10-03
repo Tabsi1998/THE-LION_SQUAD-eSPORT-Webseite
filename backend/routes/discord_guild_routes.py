@@ -35,6 +35,16 @@ async def update_discord_guild(guild_id: str, body: dict = Body(...), me: dict =
     return row
 
 
+@router.get("/{guild_id}/channels")
+async def discord_guild_channels(guild_id: str, me: dict = Depends(require_club_admin())):
+    """Die Textkanäle dieses Servers für die Kanalwahl je Ziel (#625) - offline die zuletzt gesehene Liste."""
+    from services.discord_bot import bot
+
+    if not await get_db()[discord_guilds.COLLECTION].find_one({"guild_id": guild_id}, {"_id": 0, "guild_id": 1}):
+        raise HTTPException(404, "Diesen Server kennt die Website nicht.")
+    return await bot.list_channels(guild_id)
+
+
 @router.post("/{guild_id}/invite")
 async def create_discord_guild_invite(guild_id: str, me: dict = Depends(require_club_admin())):
     """Einladungslink vom Bot erzeugen lassen (unbegrenzt gültig) und am Server merken."""
