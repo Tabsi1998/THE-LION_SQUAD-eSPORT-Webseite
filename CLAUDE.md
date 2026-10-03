@@ -3248,6 +3248,51 @@ Seit dem 15. September gilt:
   Entwürfe hatten nie CI (6.4). Beim Zusammenführen: Abzeichen-Kunst mit `egg-king` neu erzeugt,
   fehlender `HTTPException`-Import in `easter_routes` (F821), Zählung im Adminmenü auf 82,
   Frontend-Job 40 Minuten.
+- Saison-Feinschliff (#855, #857, #858; PR #860): der Faschingshut nutzt `seasons/mascot` (die eigenen
+  Kopien `hatSpot`, `heroHatSpot`, `hatRoom`, `useImageSpot`, `headTop` sind weg); `crownTop` setzt ihn
+  mittig auf den Kopf (Mitte von hinten bis zur Schnauze), Neigung im Kopf −5°. Keine Hasenohren in Web
+  und App (der Ostergruß zeigt eine Blume). Einstellungen → Jahreszeiten: „Ostereier verstecken“ führt
+  zu `/admin/ostern`.
+- Discord in „Dabei sein“, Vereinsplatzierungen (#854, #859; PR #862): `GET /api/home/discord` (eigene
+  Abfrage, 60 s `Cache-Control`, steht in der no-store-Ausnahme von `server.py`; `home/state` trägt kein
+  `discord` mehr). `components/tls/DiscordNow.jsx` (`useDiscordNow`, `DiscordLiveLine` im Footer-Block
+  „Dabei sein“ jeder Seite; die eigene Leiste der Startseite ist weg). Referenzen mit Filter je Mitglied
+  (`hasMember`, `memberEntryOf` in `references/referenceParts.jsx`); die Vereinsplatzierungen im Profil
+  im Referenzen-Design.
+- Rechnungs-PDF (#840; PR #863): die REST-Freigabe einer Rechnung baut kein PDF, und `invoice_document`
+  las `GET /documents` (eine Liste) statt `GET /documents/download` – beides behoben.
+  `dolibarr_client.build_invoice_pdf` (`PUT /documents/builddoc`, braucht `facture->creer`), Sprache
+  `invoice_pdf_lang` in den Dolibarr-Einstellungen (ohne Angabe nimmt Dolibarr über die Schnittstelle
+  `en_US`), `dolibarr_billing` baut beim Freigeben, der Gäste-Download baut nach.
+  `POST /api/admin/finance/pdfs/build-missing` (Knopf „Fehlende PDFs nachziehen“ in Finanzen), Übersicht
+  mit PDF-Stand. Doku `docs/ABRECHNUNG.md`, Attrappe `tests/dolibarr_fake.py`.
+- Erfolge-Feinschliff (#864; PR #867): die Fahne der Zeremonie hängt mittig hinter der Medaille
+  (`.tls-ceremony__flag`, `left: 50%`); keine doppelte Einheit mehr („90 Tage Tage“) – die Vorlagen in
+  `catalog_b`–`catalog_d` ohne Einheitswort, `catalog_a.SINGULAR_UNITS` für „1 Tag“.
+- Handbuch für Betreiber (#865; PR #868): `docs/handbuch/README.md` (Inhalt) und
+  `docs/handbuch/discord.md` (Hauptserver, Unterserver, Rechte, Rollen, was wo einzustellen ist).
+  Weitere Kapitel folgen.
+- Discord-Gestaltung Teil 1 (#866; PR #869): `services/discord_design.py` – Vorlagen je Art
+  (`stream_live`, `stream_ended`, `live`, `events`, `ranking`, `achievement_week`) mit Platzhaltern
+  `{…}` und optionalen Zeilen `[[…]]` (fallen weg, wenn ein Platzhalter darin leer ist), `render`,
+  `validate` (Grenzen von Discord: Titel 256, Text 4096, 25 Felder, zusammen 6000) und `sample` (feste
+  Beispielwerte). `services/discord_streams.py`: eine Meldung je Stream wie bei Stream-Bots (Titel,
+  Spiel, Vorschaubild, Zuschauer; alle 10 min aktualisiert, höchstens 5 je Lauf, am Ende „war live“),
+  Sammlung `discord_stream_posts`; ein Rollen-Ping nur an eine in Discord „erwähnbare“ Rolle
+  (`allowed_mentions` nur mit dieser Rolle). Routen `routes/discord_design_routes.py`
+  (`/api/settings/discord/design…` mit Vorschau und Test, `/api/settings/discord/streams`). Admin-Reiter
+  „Gestaltung“ (`DiscordDesignPanel`, `DiscordMessagePreview` wie in Discord mit APP-Abzeichen) und
+  `DiscordStreamsPanel`. Teil 2 (News, Events, Turniere) wartet auf die Entscheidung zu D4 (#627).
+- Vereinsgeburtstag festlicher (#856; PR #870): Geburtstagsmütze mit der Zahl der Jahre auf dem Löwen
+  (Web `seasons/birthday/hat.jsx` im Kopf und auf der Startseite, App `hat.tsx` im Dashboard-Kopf und als
+  Tab-Symbol; Antippen wippt und wirft Konfetti), Luftballon-Wellen (Web `balloons.js` auf dem Himmel
+  hinter dem Inhalt, in Seitenkoordinaten; App `balloons.tsx` am Rand), Konfetti alle drei bis fünf
+  Minuten, die Torte zeigt die Zahl der Jahre als Kerzen-Zahl (`CAKE_PARITY` neu).
+- Advent im Kopf (#852; PR #871): Web `SeasonMenuSlot` (ganz oben im Handy-Menü: Adventkalender mit
+  Stand, Nikolaus), am 6.12. ein kleiner Stiefel neben Kranz und Türchen (Klick → Stiefel im Footer,
+  öffnet nach 0,7 s; am Handy nicht im Kopf). App: kompakte Widgets (`compactWidget`) in einer Reihe
+  unter dem Kranz – das Türchen öffnet den Kalender, der Stiefel führt zu „Mehr“ und öffnet sich dort
+  (`requestBootOpen`).
 
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
@@ -3572,6 +3617,17 @@ npx expo install --check
 - **Neues Motiv im Web → App-Kunst nachziehen:** `npm run sync:badge-art` in `mobile/`, sonst schlägt
   `badgeArt.test.ts` an.
 - **Neuer Eintrag im Adminmenü:** `e2e/admin-navigation.spec.js` zählt mit (82 seit „Ostereiersuche“).
+- **Dolibarr-Dokumente über REST (#840):** die Freigabe (`validate`) baut kein PDF – erst
+  `PUT /documents/builddoc` (`modulepart`, `original_file` = `REF/REF.pdf`, `doctemplate`, `langcode`;
+  braucht das Recht `facture->creer`). `GET /documents` ist die **Liste** (braucht `id` oder `ref`), die
+  Datei kommt über `GET /documents/download`. Ohne `langcode` baut Dolibarr in `MAIN_LANG_DEFAULT` – steht
+  das auf „auto“, wird es über die Schnittstelle `en_US`.
+- **Discord-Rollen erwähnen:** `allowed_mentions` lässt nur die gewählte Rolle zu, und Discord pingt eine
+  Rolle nur, wenn sie in den Servereinstellungen „erwähnbar“ ist (sonst steht der Name ohne Ping da).
+- **Paralleles Einfügen an derselben Stelle:** zwei PRs, die je eine Zeile an dieselbe Stelle einfügen
+  (etwa einen Import unter denselben Nachbarn), kollidieren beim zweiten Merge. Vor dem Push mit
+  `git merge-tree --write-tree a b` gegen die offenen PRs prüfen und im zweiten PR eine andere Stelle
+  nehmen (#870/#871).
 
 ---
 
@@ -3657,6 +3713,14 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (3. Oktober 2026)
+
+### Gemergt 3. Oktober (Nachmittag)
+#860 (Saison-Feinschliff, schließt #855, #857, #858), #862 (Discord-Zahl in „Dabei sein“ und
+Vereinsplatzierungen, schließt #854, #859), #863 (Rechnungs-PDF, schließt #840), #867 (Erfolge-Feinschliff,
+schließt #864), #868 (Handbuch Discord, schließt #865), #869 (Discord-Gestaltung Teil 1 zu #866 – das
+Issue bleibt für Teil 2 offen), #870 (Vereinsgeburtstag festlicher, schließt #856) und #871 (Advent im
+Kopf, schließt #852). Die Website braucht `update.sh`; danach in Finanzen einmal „Fehlende PDFs
+nachziehen“ und in Discord den Reiter „Gestaltung“ ansehen.
 
 ### Gemergt 3. Oktober
 Der Betreiber hat alles Offene gemergt: #807 (Release-PR 1.0.6 – nie gebaut, geht in 1.1.0 auf),
@@ -3850,7 +3914,13 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (3.10. Nachmittag): #860 Saison-Feinschliff (Faschingshut über `seasons/mascot` mit `crownTop`,
+- Offen (3.10. Abend): #872 Silvester – Kaliber im Feuerwerk (klein, groß, sehr groß; Knall nie lauter
+  als bisher) und um 00:00 die Jahreszahl aus Funken, bei „dezent“ ruhig (schließt #853; Web und App,
+  neuer Paritäts-Fingerabdruck). Wartet auf den Betreiber: D4 (#627, lokaler WIP-Commit, siehe unten),
+  danach #866 Teil 2. Wenn der Betreiber meldet, dass das Vereinsmodul Logos für dunklen und hellen
+  Hintergrund liefert: Website und App nehmen das Logo für dunklen Hintergrund (Rückfall auf das
+  einzige Logo). Als Nächstes: Abrechnung III (#841, #842, #843), dann Vereinsmodul 1.5 (#844–#850).
+- Stand 3.10. Nachmittag (inzwischen gemergt, siehe oben): #860 Saison-Feinschliff (Faschingshut über `seasons/mascot` mit `crownTop`,
   keine Hasenohren in Web und App, „Ostereier verstecken“ – schließt #855, #857, #858). Aus der Sichtprobe
   des Betreibers vom 3.10. offen: #852 Adventkalender und Nikolaus neben dem Kranz, #853 Silvester mit
   Jahreszahl um 0 Uhr, #854 Discord-Zahl in „Dabei sein“, #856 Geburtstag festlicher, #859
