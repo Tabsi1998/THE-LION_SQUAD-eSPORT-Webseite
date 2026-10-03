@@ -1,6 +1,7 @@
 """Discord auf der Website (#581) durch die echte Anwendung: aus dem Server-Widget nur Zahlen - online und je
 öffentlichem Sprachkanal die Belegung, nie Namen; Startseite nur Zahlen und Einladung, Mitglieder dazu die
-Kanäle; Widget aus → nichts kaputt, der Bot-Kasten sagt warum; Discord bremst → letzter Stand bleibt kurz."""
+Kanäle; Widget aus → nichts kaputt, der Bot-Kasten sagt warum; Discord bremst → letzter Stand bleibt kurz.
+Seit #854 steht die Zahl im Block „Dabei sein“ im Footer jeder Seite: eigener Abruf `/api/home/discord`."""
 import pathlib
 import sys
 from datetime import timedelta
@@ -70,10 +71,12 @@ async def test_widget_feeds_home_and_member_area_and_goes_away_when_switched_off
     await discord_bot.record_state(flow.db, guild_id=GUILD, guild_name="THE LION SQUAD")
 
     assert (await discord_widget.refresh(flow.db))["ok"] is True and discord.urls == [f"https://discord.com/api/guilds/{GUILD}/widget.json"]
-    home = (await flow.get("/api/home/state")).json()["discord"]
-    assert home == {"available": True, "online": 42, "in_voice": 3, "invite": "https://discord.com/invite/abc123"}, "öffentlich nur Zahlen"
+    response = await flow.get("/api/home/discord")
+    assert response.json() == {"available": True, "online": 42, "in_voice": 3, "invite": "https://discord.com/invite/abc123"}, "öffentlich nur Zahlen"
+    assert response.headers["cache-control"] == "public, max-age=60", "jede Seite fragt - kurz zwischenspeichern"
+    assert "discord" not in (await flow.get("/api/home/state")).json(), "nur noch an einer Stelle"
     await flow.db.settings.update_one({"id": "branding"}, {"$set": {"id": "branding", "discord_invite_url": "https://discord.gg/lions"}}, upsert=True)
-    assert (await flow.get("/api/home/state")).json()["discord"]["invite"] == "https://discord.gg/lions", "die Einladung des Vereins geht vor"
+    assert (await flow.get("/api/home/discord")).json()["invite"] == "https://discord.gg/lions", "die Einladung des Vereins geht vor"
 
     player = await flow.add_user(role="player", name="gast")
     flow.act_as(player)
@@ -88,14 +91,14 @@ async def test_widget_feeds_home_and_member_area_and_goes_away_when_switched_off
     # Discord bremst: der letzte Stand bleibt - aber höchstens fünf Minuten.
     discord.answer = (429, {"message": "You are being rate limited."})
     assert (await discord_widget.refresh(flow.db))["reason"] == "rate_limited"
-    assert (await flow.get("/api/home/state")).json()["discord"]["online"] == 42
+    assert (await flow.get("/api/home/discord")).json()["online"] == 42
     later = now_utc() + timedelta(minutes=6)
     assert (await discord_widget.public_view(flow.db, later)) == {"available": False}, "veralteter Stand wird nicht gezeigt"
 
     # Widget aus: die Anzeige verschwindet, der Bot-Kasten sagt, wo man es einschaltet.
     discord.answer = (403, {"code": 50004, "message": "Widget Disabled"})
     assert (await discord_widget.refresh(flow.db))["reason"] == "widget_disabled"
-    assert (await flow.get("/api/home/state")).json()["discord"] == {"available": False}
+    assert (await flow.get("/api/home/discord")).json() == {"available": False}
     assert (await flow.get("/api/membership/discord-voice")).json() == {"available": False}
 
     admin = await flow.add_user(role="club_admin", name="admin")
@@ -120,10 +123,10 @@ async def test_unknown_server_and_network_errors_never_break_the_home_page(flow,
         raise TimeoutError("zu langsam")
 
     assert (await discord_widget.refresh(flow.db, fetch=broken))["reason"] == "error"
-    response = await flow.get("/api/home/state")
-    assert response.status_code == 200 and response.json()["discord"] == {"available": False}
+    assert (await flow.get("/api/home/state")).status_code == 200
+    assert (await flow.get("/api/home/discord")).json() == {"available": False}
 
     # Niemand online: keine Kachel mit „0 online“.
     discord.answer = (200, {**WIDGET, "presence_count": 0, "members": []})
     await discord_widget.refresh(flow.db)
-    assert (await flow.get("/api/home/state")).json()["discord"] == {"available": False}
+    assert (await flow.get("/api/home/discord")).json() == {"available": False}

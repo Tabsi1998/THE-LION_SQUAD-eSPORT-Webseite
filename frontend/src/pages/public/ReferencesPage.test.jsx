@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Referenzen als Erfolgswand (#409): Medaillenbilanz oben, Trophäenwand mit den Podestplätzen,
@@ -109,4 +109,21 @@ test("Partner II (#469): eine Referenz nennt ihren Partner mit Link auf die Part
   apiMock.get.mockResolvedValue({ data: { items: [{ ...ITEMS[0], partners: [{ id: "p1", slug: "pineapps-esports", name: "PineApps eSports" }] }, ITEMS[1]], summary: SUMMARY } });
   render(<MemoryRouter><ReferencesPage /></MemoryRouter>);
   expect(await screen.findByTestId("reference-partner-pineapps-esports")).toHaveAttribute("href", "/partners/pineapps-esports");
+});
+
+test("aus dem Mitgliederprofil (#859): nur die Teilnahmen dieser Person, Chip mit Namen hebt den Filter auf", async () => {
+  const onlyBennyInR2 = { ...ITEMS[1], entries: [{ ...ITEMS[1].entries[0], lineup_members: [{ profile_id: "p2", display_name: "Benny" }] }] };
+  apiMock.get.mockResolvedValue({ data: { items: [ITEMS[0], onlyBennyInR2], summary: SUMMARY } });
+  render(<MemoryRouter initialEntries={["/references?member=p1&name=Anni"]}><ReferencesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("reference-card-r1")).toBeInTheDocument();
+  expect(screen.queryByTestId("reference-card-r2")).toBeNull();
+  expect(screen.getByTestId("references-member")).toHaveTextContent("Nur Anni");
+  expect(screen.getByTestId("references-timeline")).toHaveTextContent("1 von 2");
+  // Die Karte zeigt den eigenen Eintrag dieser Person - wie im Profil -, nicht die ganze Teilnahme.
+  const own = screen.getByTestId("reference-card-r1");
+  expect(within(own).getByTestId("reference-entry-e1")).toBeInTheDocument();
+  expect(within(own).queryByTestId("reference-entry-e2")).toBeNull();
+  fireEvent.click(screen.getByTestId("references-member"));
+  expect(await screen.findByTestId("reference-card-r2")).toBeInTheDocument();
+  expect(screen.queryByTestId("references-member")).toBeNull();
 });

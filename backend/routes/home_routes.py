@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 from database import get_db
 from auth import get_optional_user, require_area
@@ -289,9 +289,7 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
 
     await _attach_live_counts(db, live, today, soon, upcoming)
     has_live = any(len(v) > 0 for v in live.values())
-    # Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget.
-    from services.discord_widget import public_view as discord_view
-    discord = await discord_view(db)
+    # Discord (#581) steht seit #854 im Block „Dabei sein“ im Footer jeder Seite - eigener Abruf `/api/home/discord`.
     return {
         "has_live": has_live,
         "live": live,
@@ -303,7 +301,6 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         "stats": stats,
         "club_numbers": club_numbers,
         "club_numbers_shown": club_numbers_shown,
-        "discord": discord,
     }
 
 
@@ -535,6 +532,16 @@ async def _about_offline_events(db, now: datetime, limit: int = 6) -> list[dict]
     past.sort(key=lambda r: _parse_dt(r.get("start_date")) or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return [{**r, "start_date": r["start_date"].isoformat() if isinstance(r.get("start_date"), datetime) else r.get("start_date"),
              "end_date": r["end_date"].isoformat() if isinstance(r.get("end_date"), datetime) else r.get("end_date")} for r in past[:limit]]
+
+
+@router.get("/discord")
+async def home_discord(response: Response):
+    """„Discord jetzt“ für den Block „Dabei sein“ im Footer jeder Seite (#854): nur Zahlen und die Einladung -
+    aus dem Stand, den der Job jede Minute ablegt; ohne Widget `available: false`."""
+    from services.discord_widget import public_view
+
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return await public_view(get_db())
 
 
 @router.get("/about")
