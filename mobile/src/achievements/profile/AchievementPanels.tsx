@@ -8,7 +8,7 @@ import { api, errorMessage } from "../../lib/api";
 import { colors, radius } from "../../theme";
 import { Badge } from "../Badge";
 import { materialColor, materialName } from "../badgeArt";
-import { type AchievementLevel, type CategoryRow, MATERIAL_OPTIONS, MAX_PINS, type NextUpItem, type PinnedAward, prestigeUndoUntil } from "./model";
+import { type AchievementLevel, type CategoryRow, MATERIAL_OPTIONS, MAX_PINS, type NextUpItem, type PinnedAward, movePin, prestigeUndoUntil } from "./model";
 
 // Die Bausteine des Erfolge-Reiters im App-Profil (E13, #623) - wie im Web (#619): Kopf mit Level, Titel, Sternen und
 // XP-Leiste samt Prestige, Zahlen, „Als Nächstes“, Angeheftete, Vitrinen je Kategorie, Material-Filter und die
@@ -288,12 +288,8 @@ export function PinnedPanel({ pinned, codes, busy, onChange }: { pinned: PinnedA
   const items = codes.filter((code) => byCode[code]);
   const free = Math.max(MAX_PINS - items.length, 0);
   const move = (code: string, delta: -1 | 1) => {
-    const index = items.indexOf(code);
-    const target = index + delta;
-    if (index < 0 || target < 0 || target >= items.length) return;
-    const next = [...items];
-    [next[index], next[target]] = [next[target], next[index]];
-    onChange(next);
+    const next = movePin(items, code, delta);
+    if (next !== items) onChange(next);
   };
   return (
     <Card style={styles.card} testID="achievement-pinned">
