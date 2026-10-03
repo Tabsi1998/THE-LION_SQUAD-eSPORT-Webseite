@@ -572,6 +572,50 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # Dokumente als Datei (#849, Vereine ab 1.3.0): dieselben Bytes wie `…/pdf`, ohne base64.
+    FILE_STATUSES = (200, 206, 304, 416)
+    FILE_HEADERS = ("ETag", "Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "Content-Disposition")
+    FORWARD_HEADERS = ("If-None-Match", "Range", "If-Range")
+
+    async def document_file(self, document_id: int, who: dict | None = None, *, revision: int | None = None, conditional: dict | None = None) -> dict:
+        """Ein Dokument als Datei: `me/documents/{id}/file` mit `who`, sonst das öffentliche. Reicht `If-None-Match`,
+        `Range` und `If-Range` durch; Antwort mit Status (200, 206, 304, 416), Bytes und den Kopfzeilen der Datei
+        (ETag = Prüfsumme aus dem Katalog). Wer die Datei bekommen darf, prüft das Modul vor jedem Byte und vor einem
+        304 - Fehler kommen wie immer als DolibarrError."""
+        path = f"/vereine/me/documents/{int(document_id)}/file" if who else f"/vereine/documents/{int(document_id)}/file"
+        params: dict = dict(who or {})
+        if revision:
+            params["revision"] = int(revision)
+        forward = {name: str(value) for name, value in (conditional or {}).items() if name in self.FORWARD_HEADERS and value}
+        url = f"{self.base_url}/api/index.php{path}"
+        headers = {"DOLAPIKEY": self._key, "Accept": "application/pdf, application/json", **forward}
+        attempts = len(RETRY_PAUSES) + 1
+        last_kind, last_status = "unavailable", None
+        for attempt in range(attempts):
+            try:
+                async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, follow_redirects=False, transport=_transport) as cli:
+                    response = await cli.get(url, params=params or None, headers=headers)
+            except httpx.HTTPError as exc:
+                last_kind, last_status = network_error_kind(exc), None
+                logger.warning("[dolibarr] %s nicht erreichbar: %s (%s)", path, type(exc).__name__, last_kind)
+                if last_kind in NO_RETRY_KINDS:
+                    break
+            else:
+                if response.status_code in self.FILE_STATUSES:
+                    return {"status": response.status_code, "content": response.content if response.status_code in (200, 206) else b"",
+                            "headers": {name: response.headers.get(name) for name in self.FILE_HEADERS if response.headers.get(name)}}
+                if response.status_code in STATUS_KINDS:
+                    raise DolibarrError(STATUS_KINDS[response.status_code], response.status_code, _error_detail(response))
+                if 300 <= response.status_code < 400:
+                    raise DolibarrError("redirect", response.status_code)
+                logger.warning("[dolibarr] %s antwortet mit %s", path, response.status_code)
+                last_kind, last_status = "unavailable", response.status_code
+                if response.status_code not in RETRY_STATUS:
+                    break
+            if attempt < attempts - 1:
+                await asyncio.sleep(RETRY_PAUSES[min(attempt, len(RETRY_PAUSES) - 1)])
+        raise DolibarrError(last_kind, last_status)
+
     async def public_documents(self) -> list[dict]:
         """Was der Verein für die Öffentlichkeit veröffentlicht hat - ohne Bindung."""
         data = await self._get("/vereine/documents")

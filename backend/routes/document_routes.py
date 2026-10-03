@@ -1,10 +1,11 @@
 """Document routes for the member portal."""
 import logging
 import pathlib
+import re
 from typing import Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from auth import get_optional_user, require_club_admin, require_area
@@ -146,11 +147,48 @@ async def list_documents(
     return out
 
 
-async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, *, statute: bool = False) -> Response:
+def _module_filename(disposition_header: str | None, fallback: str) -> str:
+    """Der Dateiname aus der Antwort des Moduls (`filename="…"`) - nur harmlose Zeichen, sonst der Ersatz."""
+    match = re.search(r'filename="?([^";]+)"?', str(disposition_header or ""))
+    name = (match.group(1) if match else "").replace("\\", "/").rsplit("/", 1)[-1]
+    name = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip()
+    return name or fallback
+
+
+async def _dolibarr_file_response(dolibarr_id: int, user: dict, disposition: str, request: Request) -> Response | None:
+    """Ein Dokument der Vereinsakte als Datei (#849): ETag (Prüfsumme), 304 auf `If-None-Match`, Teilabruf mit `Range`
+    (206, 416) - so lädt die App nur Geändertes und setzt abgebrochene Downloads fort. None, wenn das Modul `…/file`
+    noch nicht kennt."""
+    conditional = {name: request.headers.get(name) for name in ("If-None-Match", "Range", "If-Range") if request.headers.get(name)}
+    answer = await dolibarr_identity.document_file(get_db(), user, dolibarr_id, conditional)
+    if answer is None:
+        return None
+    module = answer["headers"]
+    headers = {"Cache-Control": "private, no-store", "Accept-Ranges": "bytes"}
+    if module.get("ETag"):
+        headers["ETag"] = module["ETag"]
+    if answer["status"] == 304:
+        return Response(status_code=304, headers=headers)
+    if answer["status"] == 416:
+        return Response(status_code=416, headers={**headers, "Content-Range": module.get("Content-Range") or "bytes */*"})
+    filename = _module_filename(module.get("Content-Disposition"), f"dokument-{dolibarr_id}.pdf")
+    headers["Content-Disposition"] = f'{disposition}; filename="{filename}"'
+    headers["X-Content-Type-Options"] = "nosniff"
+    if answer["status"] == 206 and module.get("Content-Range"):
+        headers["Content-Range"] = module["Content-Range"]
+    media_type = str(module.get("Content-Type") or "application/pdf").split(";")[0].strip() or "application/pdf"
+    return Response(content=answer["content"], status_code=answer["status"], media_type=media_type, headers=headers)
+
+
+async def _dolibarr_file(dolibarr_id: int, user: dict | None, disposition: str, *, statute: bool = False, request: Request | None = None) -> Response:
     """Ein PDF aus der Vereinsakte über denselben Weg wie die eigenen Dateien - Web und App kennen nur den."""
     if not user or not (user.get("is_club_member") or _is_admin(user)):
         raise HTTPException(403, "Nur für Mitglieder.")
     try:
+        if not statute and request is not None:
+            response = await _dolibarr_file_response(dolibarr_id, user, disposition, request)
+            if response is not None:
+                return response
         if statute:
             content, data = await dolibarr_identity.statute_pdf(get_db(), user, dolibarr_id)
         else:
@@ -223,12 +261,12 @@ async def delete_document(doc_id: str, me: dict = Depends(require_area("club")))
 
 
 @router.get("/{doc_id}/view")
-async def view_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
+async def view_document(doc_id: str, request: Request, user: dict | None = Depends(get_optional_user)):
     """Inline stream a document after membership/internal checks."""
     db = get_db()
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
-        response = await _dolibarr_file(dolibarr_id, user, "inline")
+        response = await _dolibarr_file(dolibarr_id, user, "inline", request=request)
         await note_document_open(db, user, doc_id)
         return response
     statute_id = dolibarr_identity.parse_statute_id(doc_id)
@@ -244,12 +282,12 @@ async def view_document(doc_id: str, user: dict | None = Depends(get_optional_us
 
 
 @router.get("/{doc_id}/download")
-async def download_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
+async def download_document(doc_id: str, request: Request, user: dict | None = Depends(get_optional_user)):
     """Download only when explicitly enabled. Admins can always download."""
     db = get_db()
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
-        response = await _dolibarr_file(dolibarr_id, user, "attachment")
+        response = await _dolibarr_file(dolibarr_id, user, "attachment", request=request)
         await note_document_open(db, user, doc_id)
         return response
     statute_id = dolibarr_identity.parse_statute_id(doc_id)

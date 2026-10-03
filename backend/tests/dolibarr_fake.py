@@ -164,6 +164,7 @@ class FakeDolibarr:
         self.invoices: dict[int, list[dict]] = {}
         self.pdf_failures: set[int] = set()
         self.calls: list[tuple[str, dict]] = []
+        self.file_requests: list[dict] = []
         self.fail_with: int | None = None
         self.fail_paths: set[str] = set()
         self.break_after_pages: int | None = None
@@ -515,6 +516,47 @@ class FakeDolibarr:
         content = b"%PDF-1.7\n%corrupt\n%%EOF\n" if document_id in self.tampered_document_ids else document_pdf_bytes(document_id, row["revision"])
         return self._json(template, {"filename": f"{row['code']}.pdf", "content_type": "application/pdf", "filesize": len(content),
                                      "sha256": row["sha256"], "content": base64.b64encode(content).decode()})
+
+    def _document_file(self, request: httpx.Request, rows: list[dict], document_id: int) -> httpx.Response:
+        """`…/documents/{id}/file` (Vereine 1.3.0, #244) nach den Regeln des Moduls (VereineFileRules): ETag ist die
+        Prüfsumme aus dem Katalog in Anführungszeichen, `If-None-Match` → 304, `Range` → 206 (mit `If-Range` nur bei
+        gleicher Fassung), hinter dem Ende 416. Wer die Datei nicht sehen darf, bekommt 404 - auch nie ein 304."""
+        row = next((r for r in rows if r["document_id"] == document_id), None)
+        if row is None:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "No such document for the caller"}})
+        content = b"%PDF-1.7\n%corrupt\n%%EOF\n" if document_id in self.tampered_document_ids else document_pdf_bytes(document_id, row["revision"])
+        size = len(content)
+        etag = '"' + row["sha256"] + '"'
+        headers = {"ETag": etag, "Accept-Ranges": "bytes", "Cache-Control": "private, no-cache"}
+        self.file_requests.append({"document_id": document_id, "if_none_match": request.headers.get("If-None-Match"), "range": request.headers.get("Range"),
+                                   "if_range": request.headers.get("If-Range")})
+        wanted_tags = [tag.strip().removeprefix("W/") for tag in str(request.headers.get("If-None-Match") or "").split(",") if tag.strip()]
+        if "*" in wanted_tags or etag in wanted_tags:
+            return httpx.Response(304, headers=headers)
+        range_header = str(request.headers.get("Range") or "").strip()
+        if_range = str(request.headers.get("If-Range") or "").strip()
+        wanted = None
+        if range_header and (not if_range or if_range == etag):
+            match = re.fullmatch(r"bytes\s*=\s*(\d*)\s*-\s*(\d*)", range_header, re.IGNORECASE)
+            if match and (match.group(1) or match.group(2)):
+                if not match.group(1):
+                    suffix = int(match.group(2))
+                    wanted = (max(0, size - suffix), size - 1) if suffix > 0 and size > 0 else False
+                else:
+                    start = int(match.group(1))
+                    if match.group(2) and int(match.group(2)) < start:
+                        wanted = None
+                    elif start >= size:
+                        wanted = False
+                    else:
+                        wanted = (start, size - 1 if not match.group(2) else min(int(match.group(2)), size - 1))
+        if wanted is False:
+            return httpx.Response(416, headers={**headers, "Content-Range": f"bytes */{size}"})
+        file_headers = {**headers, "Content-Type": "application/pdf", "Content-Disposition": f'attachment; filename="{row["code"]}.pdf"'}
+        if wanted is None:
+            return httpx.Response(200, content=content, headers={**file_headers, "Content-Length": str(size)})
+        part = content[wanted[0]:wanted[1] + 1]
+        return httpx.Response(206, content=part, headers={**file_headers, "Content-Range": f"bytes {wanted[0]}-{wanted[1]}/{size}", "Content-Length": str(len(part))})
 
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self._handle)
@@ -903,6 +945,12 @@ class FakeDolibarr:
             if denied:
                 return denied
             return self._document_pdf("/vereine/me/documents/{id}/pdf", self._visible_documents(ident["member_id"]), int(match.group(1)))
+        match = re.fullmatch(r"/vereine/me/documents/(\d+)/file", path)
+        if match:
+            ident, denied = self._person(params, "documents")
+            if denied:
+                return denied
+            return self._document_file(request, self._visible_documents(ident["member_id"]), int(match.group(1)))
         if path == "/vereine/me/website-profile":
             ident, denied = self._person(params, "profile")
             if denied:
@@ -1108,6 +1156,9 @@ class FakeDolibarr:
         match = re.fullmatch(r"/vereine/documents/(\d+)/pdf", path)
         if match:
             return self._document_pdf("/vereine/documents/{id}/pdf", self._visible_documents(None), int(match.group(1)))
+        match = re.fullmatch(r"/vereine/documents/(\d+)/file", path)
+        if match:
+            return self._document_file(request, self._visible_documents(None), int(match.group(1)))
         if path == "/vereine/me/statutes":
             ident, denied = self._person(params, "documents")
             if denied:
