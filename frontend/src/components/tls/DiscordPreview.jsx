@@ -19,7 +19,7 @@ export const SKIP_REASONS = {
   no_channel: "Für dieses Ziel ist kein Kanal gewählt (Verbindungen → Discord → Kanäle je Zweck).",
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
 };
-const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere" };
+const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere", members: "Mitglieder (privat)", board: "Vorstand (privat)" };
 // Discord-Termin (#570): warum keiner entsteht - Texte vom Server, hier nur der Rückfall.
 export function scheduledEventText(entry) {
   if (!entry) return "";

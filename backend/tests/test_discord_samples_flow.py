@@ -79,7 +79,7 @@ async def test_catalog_covers_every_event_and_uses_latest_real_data(flow):
     keys = {entry["key"] for entry in data["entries"]}
     assert set(EVENTS) <= keys, "jedes Ereignis hat eine Vorschau"
     assert {"ops.check_red", "ops.error_group", "notify.achievement", "notify.direct_message"} <= keys
-    assert [group["key"] for group in data["groups"]] == ["public", "board", "ops", "dm"]
+    assert [group["key"] for group in data["groups"]] == ["public", "members", "board", "ops", "dm"]
     assert data["test_channel"]["configured"] is False and data["dm"]["linked"] is False
     by_key = {entry["key"]: entry for entry in data["entries"]}
     assert by_key["news.published"]["source"] == "example" and by_key["news.published"]["embed"]["title"].startswith("📰 ")

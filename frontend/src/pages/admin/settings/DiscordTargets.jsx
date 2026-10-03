@@ -7,15 +7,24 @@ import { api, formatApiError } from "@/lib/api";
 // fallen ohne eigenen Kanal auf „Community“ zurück; Vorstand und Betrieb sind privat und fallen nie
 // zurück - fehlt ihr Kanal, wird nichts gesendet. Bot aus = keine Meldung, kein Webhook-Rückfall.
 
-const TARGET_ORDER = ["community", "news", "events", "board", "ops", "test"];
+const TARGET_ORDER = ["community", "news", "events", "members", "board", "ops", "test"];
 const TARGET_HINTS = {
   community: "Standard für alles Öffentliche: Turnier-Meldungen (je Turnier ein Thread), Fast-Lap-Bestzeiten – und News und Events ohne eigenen Kanal.",
   news: "Veröffentlichte News.",
   events: "Angekündigte Events, Fast-Lap-Bestzeiten und Turnier-Meldungen: je Turnier eine Meldung im Kanal, alles Weitere im Thread darunter – Check-in, live, Bracket, Endstand.",
-  board: "Privat: neue Mitgliedsanträge und Kontaktanfragen – ohne Namen. Ohne eigenen Kanal wird nichts gesendet.",
+  board: "Privat: neue Mitgliedsanträge und Kontaktanfragen – ohne Namen – und, wenn eingeschaltet, interne News und Events (nur Titel, Zeit und Ort). Ohne eigenen Kanal wird nichts gesendet.",
   ops: "Privat: rote Auto-Checks und neue Serverfehler (Betrieb & Logs → Alarme). Ohne eigenen Kanal wird nichts gesendet.",
   test: "Privat: Probe-Meldungen aus der Vorschau unten, mit Vermerk „Test“ (etwa #bot-test). Ohne eigenen Kanal wird nichts gesendet – nie in einen anderen Kanal.",
 };
+
+/** Mitgliederkanal (#605): mit dem Namen der Rolle, die der Bot vergibt - nur sie soll den Kanal sehen. */
+export function targetHint(target, memberRole) {
+  if (target === "members") {
+    return `Privat: News und Events nur für Mitglieder (eigene Schalter unten). Im Discord den Kanal so einstellen, dass nur die Rolle „${memberRole || "Mitglied"}“ ihn sieht `
+      + "(Kanal → Bearbeiten → Berechtigungen: @everyone „Kanal ansehen“ aus, die Rolle an). Ohne eigenen Kanal wird nichts gesendet – nie in einen anderen.";
+  }
+  return TARGET_HINTS[target] || "";
+}
 
 export function deliveryText(target, status) {
   const entry = status?.[target];
@@ -138,7 +147,7 @@ export function DiscordTargets() {
                   {deliveryText(target, status)}
                 </span>
               </div>
-              <p className="text-xs text-white/45">{TARGET_HINTS[target]}</p>
+              <p className="text-xs text-white/45" data-testid={`discord-target-${target}-hint`}>{targetHint(target, data.bot?.roles?.member)}</p>
               <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">
                 {channels.ok ? (
                   <select aria-label={`Kanal für ${entry.label || target}`} value={current} onChange={(e) => setDraft(target, e.target.value)}

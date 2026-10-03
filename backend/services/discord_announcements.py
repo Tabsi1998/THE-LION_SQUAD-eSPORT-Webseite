@@ -5,10 +5,12 @@ Damit gilt dieselbe Stelle für „sofort veröffentlicht“ und „geplant für
 und jede News, jedes Event wird genau einmal geprüft (`discord_checked_at`) -
 ob gesendet oder aus gutem Grund nicht.
 
-Nie gesendet wird: was nur Mitglieder oder der Vorstand sehen (entscheidet
-`send_event` noch einmal selbst), was der Autor mit „Ohne Discord“ markiert hat,
-Entwürfe, und Altes: Wer den Schalter heute einschaltet, bekommt nicht das
-Archiv der letzten Jahre in den Kanal.
+Wohin, entscheidet die Sichtbarkeit (#605): Öffentliches in den News- bzw.
+Events-Kanal, „nur Mitglieder“ in den privaten Mitgliederkanal, Internes in den
+Vorstandskanal - dort ohne Text, nur Titel, Zeit, Ort und Link. Jede Art hat ihren
+eigenen Schalter; `send_event` prüft die Grenze noch einmal selbst. Nie gesendet
+wird, was der Autor mit „Ohne Discord“ markiert hat, Entwürfe, und Altes: Wer den
+Schalter heute einschaltet, bekommt nicht das Archiv der letzten Jahre in den Kanal.
 """
 from __future__ import annotations
 
@@ -58,15 +60,27 @@ def plain_text(value: str | None, limit: int = 300) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def audience(item: dict) -> str:
+    """Für wen (#605): öffentlich (auch „Community“), nur Mitglieder oder intern."""
+    visibility = item.get("visibility") or "public"
+    return visibility if visibility in ("members", "internal") else "public"
+
+
+AUDIENCE_KEYS = {"news": {"public": "news.published", "members": "news.members", "internal": "news.internal"},
+                 "event": {"public": "event.announced", "members": "event.members", "internal": "event.internal"}}
+
+
 def news_message(post: dict) -> dict:
     url = f"/news/{post.get('slug') or post.get('id')}"
+    who = audience(post)
     return {
-        "event_key": "news.published",
+        "event_key": AUDIENCE_KEYS["news"][who],
         "title": f"📰 {post.get('title') or 'News'}",
-        "description": plain_text(post.get("excerpt") or post.get("content"), 400),
+        # Intern: kein Text in einem fremden Dienst - der Vorstand liest ihn auf der Website.
+        "description": "" if who == "internal" else plain_text(post.get("excerpt") or post.get("content"), 400),
         "color": NEWS_COLOR,
         "url": url,
-        "image_url": post.get("banner_url") or post.get("cover_url"),
+        "image_url": None if who == "internal" else post.get("banner_url") or post.get("cover_url"),
         "fields": [],
         "buttons": [{"label": "Weiterlesen", "url": url}],
     }
@@ -90,26 +104,25 @@ def event_message(event: dict) -> dict:
         if event.get("max_participants"):
             fields.append({"name": "Plätze", "value": str(event["max_participants"]), "inline": True})
     url = f"/events/{event.get('slug') or event.get('id')}"
+    who = audience(event)
     return {
-        "event_key": "event.announced",
+        "event_key": AUDIENCE_KEYS["event"][who],
         "title": f"📅 {event.get('name') or event.get('title') or 'Event'}",
-        "description": plain_text(event.get("short_description") or event.get("description"), 400),
+        # Mitglieder-Events mit Zeit und Ort (Discord-Termine sind serverweit sichtbar); intern ohne Text.
+        "description": "" if who == "internal" else plain_text(event.get("short_description") or event.get("description"), 400),
         "color": EVENT_COLOR,
         "url": url,
-        "image_url": event.get("banner_url") or event.get("poster_url"),
+        "image_url": None if who == "internal" else event.get("banner_url") or event.get("poster_url"),
         "fields": fields,
         "buttons": [{"label": "Event ansehen", "url": url}],
     }
 
 
 def skip_reason(item: dict, *, published_at, now: datetime | None = None) -> str | None:
-    """Warum diese News / dieses Event nicht gemeldet wird - oder None."""
-    from discord_service import should_post_to_public_discord
-
+    """Warum diese News / dieses Event nicht gemeldet wird - oder None. Wohin es nach seiner Sichtbarkeit
+    darf, entscheidet send_event (#605)."""
     if item.get("discord_skip"):
         return "author_opt_out"
-    if not should_post_to_public_discord(item):
-        return "private_visibility"
     when = _parse(published_at)
     if when and (now or now_utc()) - when > timedelta(hours=MAX_AGE_HOURS):
         return "too_old"
@@ -120,10 +133,14 @@ async def preview(kind: str, item: dict) -> dict:
     """Dasselbe Embed wie beim Senden - mit den Knöpfen darunter (#573) -, plus ob und wohin es ginge."""
     from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
 
+    from discord_service import allowed_in_target
+
     message = news_message(item) if kind == "news" else event_message(item)
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, EVENTS[message["event_key"]]["target"])
     reason = skip_reason(item, published_at=None)
+    if not reason and not allowed_in_target(item, resolved["target"]):
+        reason = "private_visibility"
     if not reason and not event_enabled(cfg, message["event_key"]):
         reason = "event_disabled"
     if not reason and not cfg["master"]:

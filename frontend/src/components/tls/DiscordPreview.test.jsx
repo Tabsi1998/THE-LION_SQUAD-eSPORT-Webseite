@@ -35,6 +35,15 @@ test("die Vorschau zeigt Titel, Felder und Bild und sagt, wohin es geht", async 
   expect(button).toHaveAttribute("href", "https://lionsquad.at/events/lan");
 });
 
+// Mitgliederkanal (#605): die Vorschau nennt das private Ziel beim Namen.
+test("ein Mitglieder-Event geht an den Mitgliederkanal - so steht es in der Vorschau", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { would_send: true, reason: null, target: "members", embed: { title: "📅 Stammtisch", color: 1 }, buttons: [] } });
+  render(<DiscordPreview kind="event" item={{ name: "Stammtisch", visibility: "members" }} skip={false} onSkipChange={() => {}} />);
+  await user.click(screen.getByTestId("discord-preview-load"));
+  await waitFor(() => expect(screen.getByTestId("discord-preview-verdict")).toHaveTextContent("Geht beim Veröffentlichen an: Mitglieder (privat)."));
+});
+
 // Discord-Termin (#570): die Vorschau sagt, ob und wie das Event als Termin erscheint.
 test("Discord-Termin in der Vorschau: Zeit, Ort und Rückfall-Text", async () => {
   const user = userEvent.setup();

@@ -1933,7 +1933,7 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
 
 
 @settings_router.post("/discord/test")
-async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops|test)$"), me: dict = Depends(require_club_admin())):
+async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops|test|members)$"), me: dict = Depends(require_club_admin())):
     """Testmeldung über den Bot in den Kanal des Ziels - privat bleibt privat, ohne Kanal kommt der Grund zurück (#566)."""
     from discord_service import TARGET_LABELS, send_to
     texts = {
@@ -1941,6 +1941,8 @@ async def discord_test(target: str = Query(default="community", pattern="^(commu
         "ops": "Diese Nachricht bestätigt, dass der Bot im Betriebskanal schreiben darf. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
         "board": "Diese Nachricht bestätigt, dass der Bot im Vorstandskanal schreiben darf. Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen.",
         "test": "Diese Nachricht bestätigt, dass der Bot im Testkanal schreiben darf. Hierher kommen Probe-Meldungen aus der Vorschau – nie an die Community.",
+        "members": ("Diese Nachricht bestätigt, dass der Bot im Mitgliederkanal schreiben darf. Hierher kommen News und Events nur für Mitglieder – "
+                    "der Kanal sollte nur für die Rolle „Mitglied“ sichtbar sein."),
     }
     title = "THE LION SQUAD · Testnachricht" if target == "community" else f"{TARGET_LABELS[target]} · Testnachricht"
     return await send_to(target, title, texts.get(target, "Diese Nachricht bestätigt, dass der Bot in diesem Kanal schreiben darf."), event_key="test")

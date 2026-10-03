@@ -8,9 +8,11 @@ alles – Webhook-Adressen gibt es nicht mehr.
 
 **Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen
 öffentlichen Kanal – und ein privater Kanal fällt nie auf einen öffentlichen
-zurück.** Das entscheidet eine Stelle im Code (`discord_service.send_event`),
+zurück.** Internes geht auch nie in den Mitgliederkanal (#605). Das entscheidet
+eine Stelle im Code (`discord_service.send_event` mit `allowed_in_target`),
 egal welcher Schalter an ist. Discord ist ein fremder Dienst: Auch in den
-privaten Vorstands-Kanal gehen keine Namen, Adressen oder Nachrichtentexte.
+privaten Vorstands-Kanal gehen keine Namen, Adressen oder Nachrichtentexte –
+interne News und Events dort nur mit Titel, Zeit, Ort und Link.
 
 Und die zweite, seit #566: **Bot aus = keine Meldung.** Ist der Bot aus oder
 nicht verbunden, wird nichts gesendet – kein Rückfall auf einen anderen Weg.
@@ -24,7 +26,8 @@ zeigt es.
 | **Community** | Standard für alles Öffentliche | – (ohne ihn geht nichts Öffentliches hinaus) |
 | **News** | veröffentlichte News | geht an Community |
 | **Events und Turniere** | angekündigte Events, Fast-Lap-Bestzeiten, Turnier-Meldungen – je Turnier eine im Kanal, alles Weitere im Thread darunter | geht an Community |
-| **Vorstand** (privat) | neuer Mitgliedsantrag, neue Kontaktanfrage – nur der Hinweis | **es wird nichts gesendet** |
+| **Mitglieder** (privat, #605) | News und Events nur für Mitglieder – der Kanal ist im Discord nur für die Rolle „Mitglied“ sichtbar | **es wird nichts gesendet** |
+| **Vorstand** (privat) | neuer Mitgliedsantrag, neue Kontaktanfrage – nur der Hinweis; interne News und Events nur mit Titel, Zeit, Ort | **es wird nichts gesendet** |
 | **Betrieb** (privat) | rote Auto-Checks, neue Serverfehler | **es wird nichts gesendet** |
 
 Je Ziel wählt man einen Kanal aus der Liste des Servers – die Liste zeigt die
@@ -48,7 +51,8 @@ Gratulation (Discord III Teil 3, #568).
 ## Schalter je Ereignis
 
 Neue Ereignisse sind **aus**, bis man sie einschaltet: *News veröffentlicht*,
-*Event angekündigt*, *Neuer Mitgliedsantrag*, *Neue Kontaktanfrage*. An sind
+*Event angekündigt*, *Neuer Mitgliedsantrag*, *Neue Kontaktanfrage* und die
+Gegenstücke für Mitglieder und intern (#605, Abschnitt „News und Events“). An sind
 die Turnier-Meldungen (Anmeldung offen, Check-in offen, live, Teilnehmer
 streamt, beendet, Ergebnisse) – sie stehen im Thread des Turniers – und die
 Fast-Lap-Bestzeit.
@@ -68,7 +72,14 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   dasselbe Embed und sagt, ob und wohin es ginge – oder warum nicht (Bot aus,
   kein Kanal, privat, Schalter aus). Der Haken **„Ohne Discord
   veröffentlichen“** gilt für genau diesen Eintrag.
-- Nie gemeldet: Entwürfe, Vergangenes, Inhalte für Mitglieder oder intern.
+- **Wohin nach Sichtbarkeit (#605):** öffentlich (auch „Community“) in News bzw. Events und
+  Turniere, „nur Mitglieder“ in den **Mitgliederkanal** (mit Text, Bild, Zeit und Ort – Discord-Termine
+  sind serverweit sichtbar, darum steht beides in der Meldung), „intern“ an den **Vorstand** – dort
+  nur Titel, Zeit, Ort und Link, nie der Text. Jede Art hat ihren eigenen Schalter (*News für
+  Mitglieder*, *Event für Mitglieder*, *News intern (Vorstand)*, *Event intern (Vorstand)*, alle
+  Standard aus). Im Discord den Mitgliederkanal so einstellen, dass nur die Rolle „Mitglied“ ihn
+  sieht (Kanal → Bearbeiten → Berechtigungen: @everyone „Kanal ansehen“ aus, die Rolle an).
+- Nie gemeldet: Entwürfe und Vergangenes.
 
 ## Turniere: ein Thread je Turnier (#572)
 

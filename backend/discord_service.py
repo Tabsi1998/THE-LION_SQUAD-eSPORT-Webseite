@@ -3,9 +3,11 @@
 Seit Discord III schickt die Website alles über den Vereins-Bot: je Ziel ein Kanal aus
 ``settings.discord.channels`` statt einer Webhook-Adresse. Öffentliche Ziele - ``news``,
 ``events`` - fallen ohne eigenen Kanal auf ``community`` zurück. Private Ziele - ``board``
-(Vorstand) und ``ops`` (Betrieb, #265) - fallen **nie** zurück: fehlt ihr Kanal, wird nichts
-gesendet. Und was nur Mitglieder oder der Vorstand sehen dürfen, geht nie an ein öffentliches
-Ziel, egal welcher Schalter an ist. Beides entscheidet ``send_event`` an einer Stelle.
+(Vorstand), ``ops`` (Betrieb, #265) und seit #605 ``members`` (ein Kanal, den nur die Rolle
+„Mitglied“ sieht) - fallen **nie** zurück: fehlt ihr Kanal, wird nichts gesendet. Und was nur
+Mitglieder oder der Vorstand sehen dürfen, geht nie an ein öffentliches Ziel, Internes nie an die
+Mitglieder, egal welcher Schalter an ist. Das entscheidet ``send_event`` an einer Stelle
+(``allowed_in_target``).
 
 Ist der Bot aus oder nicht verbunden, wird nichts gesendet - kein Rückfall auf einen Webhook
 (Entscheidung des Betreibers, 25.09.). Das Versand-Log (``email_logs``, channel ``discord``)
@@ -24,11 +26,11 @@ PRIVATE_DISCORD_VISIBILITIES = {"members", "internal"}
 
 PUBLIC_TARGETS = ("community", "news", "events")
 # „test“ (#583): der Testkanal für die Vorschau - privat, fällt nie zurück.
-PRIVATE_TARGETS = ("board", "ops", "test")
+PRIVATE_TARGETS = ("board", "ops", "test", "members")
 TARGETS = PUBLIC_TARGETS + PRIVATE_TARGETS
 TARGET_LABELS = {
     "community": "Community (Standard)", "news": "News", "events": "Events und Turniere",
-    "board": "Vorstand (privat)", "ops": "Betrieb (privat)", "test": "Test (privat)",
+    "board": "Vorstand (privat)", "ops": "Betrieb (privat)", "test": "Test (privat)", "members": "Mitglieder (privat)",
 }
 # Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der Betreiber sie
 # einschaltet; was es vor #300 schon gab, bleibt an. Turnier-Meldungen sind an - seit #572 stehen
@@ -37,6 +39,11 @@ TARGET_LABELS = {
 EVENTS = {
     "news.published": {"target": "news", "label": "News veröffentlicht", "default": False},
     "event.announced": {"target": "events", "label": "Event angekündigt", "default": False},
+    # Nur für Mitglieder (#605): in den Mitgliederkanal; Internes an den Vorstand - ohne Text, nur Titel, Zeit, Ort.
+    "news.members": {"target": "members", "label": "News für Mitglieder", "default": False},
+    "event.members": {"target": "members", "label": "Event für Mitglieder", "default": False},
+    "news.internal": {"target": "board", "label": "News intern (Vorstand)", "default": False},
+    "event.internal": {"target": "board", "label": "Event intern (Vorstand)", "default": False},
     "tournament.registration_open": {"target": "events", "label": "Turnier: Anmeldung offen", "default": True},
     "tournament.check_in": {"target": "events", "label": "Turnier: Check-in offen", "default": True},
     "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True},
@@ -62,6 +69,9 @@ REASON_TEXTS = {
     "unknown_user": "Discord kennt dieses Konto nicht mehr – im Profil unter Socials neu verknüpfen.",
     # Vorschau und Testkanal (#583)
     "test_channel_missing": "Kein Testkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Test) – ein Test geht nie in einen anderen Kanal.",
+    # Mitgliederkanal (#605)
+    "members_channel_missing": ("Kein Mitgliederkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Mitglieder) – "
+                                "was nur Mitglieder sehen dürfen, geht nie in einen anderen Kanal."),
     "not_linked": "Dein Discord-Konto ist nicht verknüpft (Profil → Socials → Discord verknüpfen).",
     # Turnier-Threads (#572)
     "thread_forbidden": ("Der Bot darf keine Threads öffnen oder darin schreiben – Turnier-Meldungen gehen bis dahin einzeln in den Kanal. "
@@ -88,6 +98,18 @@ def should_post_to_public_discord(item: dict | None) -> bool:
     if item.get("is_public") is False:
         return False
     return (item.get("visibility") or "public") not in PRIVATE_DISCORD_VISIBILITIES
+
+
+def allowed_in_target(item: dict | None, target: str) -> bool:
+    """Darf dieser Inhalt in dieses Ziel (#605)? Öffentliche Ziele nur Öffentliches, der Mitgliederkanal nichts
+    Internes; Vorstand, Betrieb und Test sind ohnehin nur für den Vorstand."""
+    if item is None:
+        return True
+    if target in PUBLIC_TARGETS:
+        return should_post_to_public_discord(item)
+    if target == "members":
+        return (item.get("visibility") or "public") != "internal"
+    return True
 
 
 def _normalize_base_url(value: str | None) -> str:
@@ -304,7 +326,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
                      thread_id: str | None = None, buttons: list | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
-    if spec["target"] in PUBLIC_TARGETS and item is not None and not should_post_to_public_discord(item):
+    if not allowed_in_target(item, spec["target"]):
         return {"ok": False, "reason": "private_visibility"}
     cfg = await _get_discord_config()
     if not event_enabled(cfg, event_key):

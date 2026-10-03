@@ -21,6 +21,7 @@ from models import new_id, now_utc
 
 GROUPS = (
     {"key": "public", "label": "Öffentliche Kanäle"},
+    {"key": "members", "label": "Mitglieder (privat)"},
     {"key": "board", "label": "Vorstand (privat)"},
     {"key": "ops", "label": "Betrieb (privat)"},
     {"key": "dm", "label": "Direktnachrichten"},
@@ -140,7 +141,21 @@ async def sample_catalog(db=None) -> list[dict]:
                                                                          "viewer_count": 12, "stream_url": "https://www.twitch.tv/paula", "thumbnail_url": None}),
               target="events", source_text=SOURCE_EXAMPLE, place=PLACE_IN_THREAD)
 
-    # Vorstand: nie Namen oder Texte - die stehen im Admin.
+    # Nur für Mitglieder (#605): in den Mitgliederkanal - die letzte Mitglieder-News, das nächste Mitglieder-Event.
+    members_post = await db.news_posts.find_one({"published": True, "visibility": "members"}, {"_id": 0}, sort=[("published_at", -1)])
+    await add("news.members", EVENTS["news.members"]["label"], "members", news_message(members_post or {**_example_news(), "visibility": "members"}),
+              target="members", source="latest" if members_post else "example",
+              source_text=f"aus der Mitglieder-News „{members_post.get('title')}“" if members_post else SOURCE_EXAMPLE)
+    members_event = await db.events.find_one({"visibility": "members", "start_date": {"$gte": now_utc().isoformat()}}, {"_id": 0}, sort=[("start_date", 1)])
+    await add("event.members", EVENTS["event.members"]["label"], "members", event_message(members_event or {**_example_event(), "visibility": "members"}),
+              target="members", source="latest" if members_event else "example",
+              source_text=f"aus dem Mitglieder-Event „{members_event.get('name') or members_event.get('title')}“" if members_event else SOURCE_EXAMPLE)
+
+    # Vorstand: nie Namen oder Texte - die stehen im Admin. Interne News und Events nur mit Titel, Zeit, Ort (#605).
+    await add("news.internal", EVENTS["news.internal"]["label"], "board", news_message({**_example_news(), "title": "Vorstandssitzung: Protokoll online", "visibility": "internal"}),
+              target="board", source_text=SOURCE_EXAMPLE)
+    await add("event.internal", EVENTS["event.internal"]["label"], "board", event_message({**_example_event(), "name": "Vorstandssitzung", "visibility": "internal"}),
+              target="board", source_text=SOURCE_EXAMPLE)
     await add("membership.application", EVENTS["membership.application"]["label"], "board",
               board_message("membership.application", "Ein neuer Antrag wartet auf die Entscheidung des Vorstands."), target="board", source_text=SOURCE_EXAMPLE)
     await add("contact.request", EVENTS["contact.request"]["label"], "board", board_message("contact.request", "Thema: Turniere"), target="board", source_text=SOURCE_EXAMPLE)

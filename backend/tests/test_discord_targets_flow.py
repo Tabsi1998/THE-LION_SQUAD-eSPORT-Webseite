@@ -161,7 +161,7 @@ async def test_settings_are_admin_only_validated_and_never_carry_the_token(flow,
     shown = await flow.get("/api/settings/discord")
     assert TOKEN not in shown.text and "bot_token" not in shown.text
     data = shown.json()
-    assert data["channels"] == {"community": COMMUNITY, "news": NEWS, "events": "", "board": "", "ops": "", "test": ""}
+    assert data["channels"] == {"community": COMMUNITY, "news": NEWS, "events": "", "board": "", "ops": "", "test": "", "members": ""}
     assert data["configured"] is True
     assert data["target_status"]["news"]["delivers_to"] == "news" and data["target_status"]["news"]["configured"] is True
     assert data["target_status"]["events"]["delivers_to"] == "community" and data["target_status"]["events"]["configured"] is False
@@ -227,7 +227,8 @@ async def test_news_is_announced_once_with_image_and_link(flow, posted):
     await add_news(flow, id="n6", slug="entwurf", published=False)
 
     result = await discord_announcements.announce_due()
-    assert result["outcomes"] == {"sent": 1, "private_visibility": 1, "author_opt_out": 1, "too_old": 1}
+    # Die Mitglieder-News hat seit #605 ihren eigenen Schalter (Mitgliederkanal) - aus, also nicht gesendet.
+    assert result["outcomes"] == {"sent": 1, "event_disabled": 1, "author_opt_out": 1, "too_old": 1}
     assert len(posted) == 1
     message = posted[0]
     assert message["title"] == "📰 Saisonstart" and message["description"] == "Es geht los."
@@ -262,7 +263,8 @@ async def test_event_announcement_names_time_in_vienna_place_and_deadline(flow, 
     await flow.db.events.insert_one({**base, "id": "e4", "name": "Vorbei", "start_date": (now_utc() - timedelta(days=1)).isoformat()})
 
     result = await discord_announcements.announce_due()
-    assert result["outcomes"] == {"sent": 1, "private_visibility": 1, "past_event": 1}
+    # Das interne Event hat seit #605 seinen eigenen Schalter (Vorstandskanal) - aus, also nicht gesendet.
+    assert result["outcomes"] == {"sent": 1, "event_disabled": 1, "past_event": 1}
     message = posted[0]
     assert message["title"] == "📅 LAN-Party" and message["url"].endswith("/events/lan") and message["image"].endswith("/uploads/public/lan.webp")
     fields = {field["name"]: field["value"] for field in message["fields"]}
@@ -288,8 +290,9 @@ async def test_preview_shows_the_same_embed_and_the_honest_verdict(flow, posted)
     assert preview["embed"]["title"] == "📰 Saisonstart" and preview["embed"]["url"].endswith("/news/saisonstart")
     assert preview["embed"]["image"]["url"].endswith("/api/static/uploads/public/banner.webp")
 
+    # Nur für Mitglieder (#605): eigenes privates Ziel mit eigenem Schalter - nie der öffentliche Kanal.
     private = (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": {**item, "visibility": "members"}})).json()
-    assert private["would_send"] is False and private["reason"] == "private_visibility"
+    assert private["would_send"] is False and private["target"] == "members" and private["reason"] == "event_disabled"
     skipped = (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": {**item, "discord_skip": True}})).json()
     assert skipped["reason"] == "author_opt_out"
     # Ohne Bot und ohne Kanal sagt die Vorschau genau das.
