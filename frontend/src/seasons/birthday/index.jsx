@@ -10,8 +10,10 @@ import { openSpot } from "../space";
 import { hashString, seasonYear } from "../rng";
 import { useSeason } from "../SeasonContext";
 import { markToastShown, toastShownToday } from "../SeasonStage";
+import { createBalloonLayer, nextCelebration, requestBalloons } from "./balloons";
 import { BOTTOM, CAKE_VIEW, CLUB, PLATE, TOP, cakePlan, ignitionOrder } from "./cake";
 import { GARLAND_PAD, SAGS, garlandPlan, garlandSpan, pennants, probePoints, stringPath } from "./garland";
+import { BirthdayHats } from "./hat";
 import { StickerClaim } from "./StickerClaim";
 import "./birthday.css";
 
@@ -19,7 +21,10 @@ import "./birthday.css";
 // Tag kommt die Karte mit der Torte - Kerzen nach Jahren, die eine nach der anderen angehen, vorne das Maskottchen auf
 // der Zuckerplatte; sind alle an, fliegt Konfetti in Vereinsfarben aus der Torte. Mitglieder holen sich dort ihren
 // Jahres-Sticker. Unter der Kopfzeile hängen Wimpelketten, die sich beim ersten Aufruf des Tages entfalten und danach
-// kaum bewegen. „dezent“ und „Bewegung reduzieren“: die Kerzen brennen gleich, kein Konfetti, die Ketten hängen still.
+// kaum bewegen. Seit #856 mehr Feier: die Geburtstagsmütze mit der Zahl der Jahre auf dem Löwen (antippen = Konfetti),
+// alle ein, zwei Minuten eine kleine Welle Luftballons an den Rändern, alle paar Minuten ein Konfetti-Schub, die Torte
+// größer und mit den Jahren als Zahlkerzen. „dezent“ und „Bewegung reduzieren“: die Kerzen brennen gleich, kein
+// Konfetti, keine Ballons, die Ketten hängen still, die Mütze ist nur ein Bild.
 
 export const GREETING_KEY = "club-birthday-greeting";
 export const UNFOLD_KEY = "tls-birthday-unfold";
@@ -29,7 +34,8 @@ export const IGNITE_DELAY_MS = 700;
 export const IGNITE_STEP_MS = 220;
 export const LIGHTING_MS = 1500;
 const BURST = 34;
-const CARD_CAKE_WIDTH = 172;
+const CARD_CAKE_WIDTH = 208;
+const NARROW_CAKE_WIDTH = 150;
 
 /**
  * Der Text unter „8 Jahre“: der Gruß aus dem Admin - beginnt er selbst mit den Jahren („8 Jahre THE LION SQUAD –
@@ -53,10 +59,41 @@ export function yearsOf(season) {
   return Number.isFinite(years) && years > 0 ? Math.round(years) : null;
 }
 
-/** Konfetti nur aus der Torte (kein Regen), in Vereinsfarben - und nur mit Bewegung und Budget. */
+/** Konfetti (aus der Torte, der Mütze, ab und zu ein Schub - kein Regen) und Luftballons - nur mit Bewegung und Budget. */
 export function skyLayers({ season, budget = 0, reducedMotion = false }) {
   if (reducedMotion || season.effective === "subtle" || !budget) return [];
-  return [createConfettiLayer({ budget, effective: season.effective, seed: hashString(`birthday:${yearOf(season)}`), palette: CLUB_PALETTE, burst: BURST })];
+  const seed = hashString(`birthday:${yearOf(season)}`);
+  return [
+    createConfettiLayer({ budget, effective: season.effective, seed, palette: CLUB_PALETTE, burst: BURST }),
+    createBalloonLayer({ budget, effective: season.effective, seed: seed + 1 }),
+  ];
+}
+
+/**
+ * Der Feier-Takt (#856): kurz nach dem Laden die erste Welle Luftballons, danach alle 70 bis 120 Sekunden eine; alle drei
+ * bis fünf Minuten ein Konfetti-Schub oben im Fenster. Im Hintergrund-Tab passiert nichts.
+ */
+export function Celebration({ moving, random = Math.random }) {
+  useEffect(() => {
+    if (!moving || typeof window === "undefined") return undefined;
+    const timers = new Set();
+    const visible = () => typeof document === "undefined" || document.visibilityState !== "hidden";
+    const later = (kind, first = false) => {
+      const id = window.setTimeout(() => {
+        timers.delete(id);
+        if (visible()) {
+          if (kind === "balloons") requestBalloons();
+          else requestBurst({ x: Math.round(window.innerWidth * (0.15 + random() * 0.7)), y: Math.round(window.innerHeight * (0.08 + random() * 0.14)) });
+        }
+        later(kind);
+      }, nextCelebration(kind, random, first));
+      timers.add(id);
+    };
+    later("balloons", true);
+    later("confetti", true);
+    return () => timers.forEach((id) => window.clearTimeout(id));
+  }, [moving, random]);
+  return null;
 }
 
 /** Einmal am Tag je Gerät (das Entfalten) - in der Vorschau jedes Mal, ohne den Tag zu verbrauchen. */
@@ -216,7 +253,7 @@ export function Toast({ season }) {
   const cakeRef = useRef(null);
   const years = yearsOf(season);
   const plan = useMemo(() => cakePlan(years, yearOf(season)), [years, season]);
-  const [cakeWidth] = useState(() => (typeof window !== "undefined" && window.innerWidth < 420 ? 124 : CARD_CAKE_WIDTH));
+  const [cakeWidth] = useState(() => (typeof window !== "undefined" && window.innerWidth < 420 ? NARROW_CAKE_WIDTH : CARD_CAKE_WIDTH));
   const greeting = season.texts?.greeting || (years ? `${years} Jahre THE LION SQUAD – danke, dass ihr dabei seid` : "Der Verein hat Geburtstag – danke, dass ihr dabei seid");
   useEffect(() => {
     if (typeof window === "undefined" || toastShownToday(GREETING_KEY)) return undefined;
@@ -279,11 +316,24 @@ function Garland({ chain, span, top, sag, unfold, moving }) {
   );
 }
 
+/** Was am Geburtstag auf jeder Seite ist: die Mütze auf dem Löwen, der Feier-Takt und die Wimpelketten. */
+export function Corners({ season }) {
+  const { reducedMotion } = useSeason();
+  const moving = season.effective !== "subtle" && !reducedMotion;
+  return (
+    <>
+      <BirthdayHats moving={moving} years={yearsOf(season)} />
+      <Celebration moving={moving} />
+      <Garlands season={season} />
+    </>
+  );
+}
+
 /**
  * Wimpelketten unter der Kopfzeile (Seitenkoordinaten - sie scrollen mit): je Seite eine, so tief wie möglich, aber nie
  * über Schrift, Bildern, Bedienelementen oder Kästen (dieselbe Probe wie die Luftschlangen am Fasching).
  */
-export function Corners({ season }) {
+export function Garlands({ season }) {
   const location = useLocation();
   const { reducedMotion } = useSeason();
   const moving = season.effective !== "subtle" && !reducedMotion;

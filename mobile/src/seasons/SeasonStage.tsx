@@ -7,6 +7,7 @@ import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
+import { BirthdayHatTabIcon, BirthdayHatWidget } from "./birthday/hat";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { EasterBackdrop, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
@@ -61,9 +62,10 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Fasching (S12 #643, F1–F3 #745–#747, wie im Web): Konfetti beim ersten Start des Tages (Skia), der Partyhut im
   // Dashboard-Kopf und am Tab „Mehr“, Luftschlangen oben in den Rändern, der Gruß einmal am Tag.
   carnival: { Sky: ConfettiSky, Corners: CarnivalCorners, Widget: PartyHatWidget, TabIcon: PartyHatTabIcon, Greeting: CarnivalGreeting },
-  // Vereinsgeburtstag (S13 #644, B1–B3 wie im Web): die Karte mit der Torte, Konfetti in Vereinsfarben aus der Torte,
-  // die Wimpelkette an der Begrüßungskarte.
-  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge },
+  // Vereinsgeburtstag (S13 #644, B1–B3, #856 wie im Web): die Karte mit der Torte, Konfetti in Vereinsfarben aus der
+  // Torte und ab und zu, Luftballons am Rand, die Mütze mit der Zahl der Jahre im Dashboard-Kopf und am Tab „Mehr“, die
+  // Wimpelkette an der Begrüßungskarte.
+  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge, Widget: BirthdayHatWidget, TabIcon: BirthdayHatTabIcon },
   // Ostern (S14 #645, E1 #753, E4 #756, wie im Web): Hasenohren im Dashboard-Kopf, Eier-Reihe an der Begrüßungskarte,
   // das Osterei am Tab „Mehr“, Frühlingslicht, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
   easter: { Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },

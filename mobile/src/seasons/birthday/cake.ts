@@ -1,14 +1,13 @@
 // Die Geburtstagstorte in der App (Vereinsgeburtstag B1 #749), dieselbe Rechnung wie im Web
 // (frontend/src/seasons/birthday/cake.js; Abgleich im Test): zwei Stöcke in Vereinsfarben, vorne die Zuckerplatte mit
-// dem Maskottchen, Kerzen nach Jahren - bis zwölf einzeln im Kreis, darüber Zahlkerzen. Was je Jahr anders ist, kommt
-// aus dem Jahres-Seed (Ort „cake“, wie im Web). Reine Rechnung - das Bild baut BirthdayCake.tsx.
+// dem Maskottchen, seit #856 die Jahre als Zahlkerzen - eine „7“ statt sieben einzelner Kerzen. Was je Jahr anders ist,
+// kommt aus dem Jahres-Seed (Ort „cake“, wie im Web). Reine Rechnung - das Bild baut BirthdayCake.tsx.
 import { seasonRng } from "../rng";
 
 export const CAKE_VIEW = { width: 120, height: 104 };
 export const TOP = { cx: 60, y: 40, rx: 28, ry: 5, height: 22 };
 export const BOTTOM = { cx: 60, y: 62, rx: 42, ry: 7, height: 30 };
 export const PLATE = { cx: 60, cy: 78, r: 12 };
-export const MAX_CANDLES = 12;
 export const CLUB = { cyan: "#29B6E8", gold: "#FFD700", white: "#f7f4ee" };
 
 type Rng = () => number;
@@ -34,16 +33,6 @@ function flameLook(rng: Rng): FlameLook {
     glowDuration: round(1.6 + rng() * 1.2),
     wickGlow: round(0.55 + rng() * 0.35),
   };
-}
-
-export function candleRing(count: number, rng: Rng): CakeCandle[] {
-  const n = Math.max(1, Math.min(MAX_CANDLES, Math.round(count)));
-  const ring = { rx: n === 1 ? 0 : Math.min(21, 7 + n * 1.4), ry: n === 1 ? 0 : Math.min(3.2, 1.4 + n * 0.18) };
-  const start = rng() * 360;
-  return Array.from({ length: n }, (_, index): CakeCandle => {
-    const at = onEllipse(TOP.cx, TOP.y, ring.rx, ring.ry, start + (index * 360) / n);
-    return { index, x: at.x, base: at.y, height: round(9 + rng() * 2.4), lean: round((rng() - 0.5) * 6), stripe: index % 2 === 0 ? "cyan" : "gold", ...flameLook(rng) };
-  }).sort((a, b) => a.base - b.base || a.x - b.x);
 }
 
 export function numberCandles(years: number, rng: Rng): DigitCandle[] {
@@ -79,16 +68,15 @@ export function sprinkles(rng: Rng, count = 22): Sprinkle[] {
   }).filter((dot) => Math.hypot(dot.x - PLATE.cx, dot.y - PLATE.cy) > PLATE.r + 2);
 }
 
-/** Die Torte eines Jahres - `years` Jahre des Vereins, `year` das Kalenderjahr (Seed). Ohne Jahre eine Kerze. */
+/** Die Torte eines Jahres - `years` Jahre des Vereins, `year` das Kalenderjahr (Seed). Ohne Jahre eine „1“. */
 export function cakePlan(years: number | null | undefined, year: number): CakePlan {
   const rng = seasonRng({ season: "club_birthday", year, screen: "cake" }, "cake");
   const count = Number.isFinite(Number(years)) && Number(years) > 0 ? Math.round(Number(years)) : 1;
-  const numbers = count > MAX_CANDLES;
   return {
     years: count,
-    numbers,
-    candles: numbers ? [] : candleRing(count, rng),
-    digits: numbers ? numberCandles(count, rng) : [],
+    numbers: true,
+    candles: [],
+    digits: numberCandles(count, rng),
     topDrips: dripPath(TOP, rng, 8),
     bottomDrips: dripPath(BOTTOM, rng, 11),
     sprinkles: sprinkles(rng),

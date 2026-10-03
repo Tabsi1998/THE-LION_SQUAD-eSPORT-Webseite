@@ -4,7 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 // Vereinsgeburtstag im Web (S13 #644, B1–B3): Konfetti nur aus der Torte (kein Regen) und nur mit Bewegung; die Karte
 // einmal am Tag, die Kerzen gehen nacheinander an, dann fliegt Konfetti - bei „dezent“ brennen sie gleich und es fliegt
 // nichts. Die Wimpelketten hängen so tief wie möglich, aber nie über Inhalt; ohne Platz bleiben sie weg. Mitglieder
-// holen sich den Jahres-Sticker, andere sehen dafür nichts.
+// holen sich den Jahres-Sticker, andere sehen dafür nichts. Seit #856: Zahlkerzen, Luftballons, Konfetti im Takt, die
+// Mütze auf dem Löwen.
 
 const contextState = { reducedMotion: false, seasons: [] };
 const burst = vi.fn();
@@ -18,7 +19,8 @@ vi.mock("@/components/tls/Logo", () => ({ MascotBadge: () => <img alt="Maskottch
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (url) => url }));
 
-const { Corners, StickerClaimForTest, Toast, cardText, season, skyLayers, yearsOf } = await import("./index.jsx").then(async (module) => ({ ...module, StickerClaimForTest: (await import("./StickerClaim")).StickerClaim }));
+const { Celebration, Corners, StickerClaimForTest, Toast, cardText, season, skyLayers, yearsOf } = await import("./index.jsx").then(async (module) => ({ ...module, StickerClaimForTest: (await import("./StickerClaim")).StickerClaim }));
+const { createBalloonLayer } = await import("./balloons");
 const { CARD_DELAY_MS, IGNITE_DELAY_MS, IGNITE_STEP_MS } = await import("./index.jsx");
 
 function birthday(overrides = {}) {
@@ -42,16 +44,17 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-test("das Modul: Ecken, Karte und Konfetti-Ebene - Konfetti nur mit Bewegung und Budget, ohne Regen", () => {
+test("das Modul: Ecken, Karte, Konfetti- und Ballon-Ebene - nur mit Bewegung und Budget, ohne Regen", () => {
   expect(season.key).toBe("club_birthday");
   expect(Object.keys(season).sort()).toEqual(["Corners", "Toast", "key", "skyLayers"]);
   expect(skyLayers({ season: birthday({ effective: "subtle" }), budget: 120 })).toEqual([]);
   expect(skyLayers({ season: birthday(), budget: 120, reducedMotion: true })).toEqual([]);
   expect(skyLayers({ season: birthday(), budget: 0 })).toEqual([]);
-  const [layer] = skyLayers({ season: birthday(), budget: 120 });
-  expect(layer.kind).toBe("confetti");
-  expect(layer.snapshot().flying).toBe(0);
-  layer.dispose();
+  const layers = skyLayers({ season: birthday(), budget: 120 });
+  expect(layers.map((layer) => layer.kind)).toEqual(["confetti", "balloons"]);
+  expect(layers[0].snapshot().flying).toBe(0);
+  expect(layers[1].snapshot()).toEqual({ flying: 0, wave: 3 });
+  layers.forEach((layer) => layer.dispose());
   expect(yearsOf(birthday())).toBe(8);
   expect(yearsOf(birthday({ data: {} }))).toBeNull();
 });
@@ -64,27 +67,29 @@ test("der Text unter „8 Jahre“: der Gruß ohne die Wiederholung - ein eigene
   expect(cardText("Danke!", null)).toBe("Danke!");
 });
 
-test("die Karte einmal am Tag: Kerzen nacheinander an, dann Konfetti aus der Torte", async () => {
+test("die Karte einmal am Tag: Zahlkerzen nacheinander an, dann Konfetti aus der Torte", async () => {
   vi.useFakeTimers();
-  const first = render(<Toast season={birthday()} />);
+  const first = render(<Toast season={birthday({ data: { years: 12 }, texts: { greeting: "12 Jahre THE LION SQUAD – danke, dass ihr dabei seid" } })} />);
   expect(screen.queryByTestId("birthday-card")).toBeNull();
   await act(async () => {
     vi.advanceTimersByTime(CARD_DELAY_MS);
   });
-  expect(screen.getByTestId("birthday-card")).toHaveTextContent("8 Jahre");
+  expect(screen.getByTestId("birthday-card")).toHaveTextContent("12 Jahre");
   expect(screen.getByTestId("birthday-card")).toHaveTextContent("Danke, dass ihr dabei seid");
-  expect(screen.getAllByTestId("birthday-candle")).toHaveLength(8);
-  expect(screen.getAllByTestId("birthday-candle").filter((candle) => candle.dataset.lit === "1")).toHaveLength(0);
+  const candles = screen.getAllByTestId("birthday-candle");
+  expect(candles.map((candle) => candle.dataset.digit)).toEqual(["1", "2"]);
+  expect(candles.filter((candle) => candle.dataset.lit === "1")).toHaveLength(0);
   await act(async () => {
-    vi.advanceTimersByTime(IGNITE_DELAY_MS + IGNITE_STEP_MS * 2 + 10);
+    vi.advanceTimersByTime(IGNITE_DELAY_MS + 10);
   });
-  expect(screen.getAllByTestId("birthday-candle").filter((candle) => candle.dataset.lit === "1")).toHaveLength(3);
+  expect(screen.getAllByTestId("birthday-candle").filter((candle) => candle.dataset.lit === "1")).toHaveLength(1);
   expect(burst).not.toHaveBeenCalled();
   await act(async () => {
-    vi.advanceTimersByTime(IGNITE_STEP_MS * 6 + 600);
+    vi.advanceTimersByTime(IGNITE_STEP_MS + 600);
   });
-  expect(screen.getAllByTestId("birthday-candle").filter((candle) => candle.dataset.lit === "1")).toHaveLength(8);
+  expect(screen.getAllByTestId("birthday-candle").filter((candle) => candle.dataset.lit === "1")).toHaveLength(2);
   expect(burst).toHaveBeenCalledTimes(2);
+  expect(screen.getByTestId("birthday-cake").getAttribute("style")).toContain("width: 208px");
   expect(screen.getByTestId("mascot")).toBeTruthy();
   first.unmount();
   render(<Toast season={birthday()} />);
@@ -222,4 +227,44 @@ test("ein Mitglied mit offenem Sticker: die Karte bleibt, bis er abgeholt ist - 
     vi.advanceTimersByTime(CARD_MS + 10);
   });
   expect(screen.queryByTestId("birthday-card")).toBeNull();
+});
+
+test("der Feier-Takt (#856): Ballons kurz nach dem Laden und dann immer wieder, Konfetti alle paar Minuten - nicht im Hintergrund", async () => {
+  vi.useFakeTimers();
+  const layer = createBalloonLayer({ budget: 120, clock: () => Date.now() });
+  const random = () => 0.5;
+  const view = render(<Celebration moving random={random} />);
+  expect(layer.snapshot().flying).toBe(0);
+  await act(async () => {
+    vi.advanceTimersByTime(2600);
+  });
+  expect(layer.snapshot().flying).toBe(3);
+  expect(burst).not.toHaveBeenCalled();
+  await act(async () => {
+    vi.advanceTimersByTime(180000);
+  });
+  expect(burst).toHaveBeenCalledTimes(1);
+  const [point] = burst.mock.calls[0];
+  expect(point.x).toBe(Math.round(window.innerWidth * 0.5));
+  // Unsichtbarer Tab: der Takt läuft weiter, aber es fliegt nichts.
+  Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+  await act(async () => {
+    vi.advanceTimersByTime(600000);
+  });
+  expect(burst).toHaveBeenCalledTimes(1);
+  Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+  view.unmount();
+  layer.dispose();
+});
+
+test("ohne Bewegung kein Takt", async () => {
+  vi.useFakeTimers();
+  const layer = createBalloonLayer({ budget: 120, clock: () => Date.now() });
+  render(<Celebration moving={false} />);
+  await act(async () => {
+    vi.advanceTimersByTime(600000);
+  });
+  expect(layer.snapshot().flying).toBe(0);
+  expect(burst).not.toHaveBeenCalled();
+  layer.dispose();
 });

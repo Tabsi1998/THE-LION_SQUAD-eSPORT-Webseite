@@ -19,13 +19,16 @@ import { screenClass } from "../intensity";
 import { anyOverlayOpen, subscribeQuiet } from "../quiet";
 import { seasonRng, seasonYear } from "../rng";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
+import { BirthdayCelebration } from "./balloons";
 import { BOTTOM, CAKE_VIEW, CLUB, PLATE, TOP, cakePlan, ignitionOrder, type CakeCandle, type CakePlan, type DigitCandle } from "./cake";
 
 // Vereinsgeburtstag in der App (S13 #644, B1–B3 #749–#751), wie im Web (frontend/src/seasons/birthday): einmal am Tag
 // die Karte mit der Torte über der Tab-Leiste - Kerzen nach Jahren gehen nacheinander an, dann ein leichtes Tippen und
 // Konfetti in Vereinsfarben aus der Torte; Mitglieder holen sich dort ihren Jahres-Sticker. An der Unterkante der
-// Begrüßungskarte hängt eine Wimpelkette, die sich beim ersten Mal entfaltet und dann kaum weht. „dezent“ und
-// „Bewegung reduzieren“: die Kerzen brennen gleich, kein Konfetti, die Wimpel hängen still.
+// Begrüßungskarte hängt eine Wimpelkette, die sich beim ersten Mal entfaltet und dann kaum weht. Seit #856: die Jahre als
+// Zahlkerzen auf einer größeren Torte, die Geburtstagsmütze im Dashboard-Kopf und am Tab „Mehr“ (birthday/hat.tsx), ab
+// und zu eine Welle Luftballons am Rand und ein Konfetti-Schub (birthday/balloons.tsx). „dezent“ und „Bewegung
+// reduzieren“: die Kerzen brennen gleich, kein Konfetti, keine Ballons, die Wimpel hängen still.
 
 export const GREETING_KEY = "club-birthday-greeting";
 export const CARD_DELAY_MS = 1200;
@@ -33,6 +36,7 @@ export const CARD_MS = 20000;
 export const IGNITE_DELAY_MS = 700;
 export const IGNITE_STEP_MS = 220;
 const BURST = 30;
+const CARD_CAKE_WIDTH = 132;
 const CANDLE_WIDTH = 3.2;
 const EDGE_BAND = 16;
 const PENNANT_STEP = 18;
@@ -64,9 +68,16 @@ export function cardText(greeting: string, years: number | null): string {
   return rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : text;
 }
 
-/** Konfetti nur aus der Torte (kein Regen), in Vereinsfarben. */
+/** Konfetti (aus der Torte, der Mütze, ab und zu ein Schub - kein Regen) in Vereinsfarben, dazu die Luftballons. */
 export function BirthdaySky({ season, screen, reducedMotion }: { season: ActiveSeason; screen: string; reducedMotion: boolean }) {
-  return <ConfettiField cap={reducedMotion ? 0 : capForApp(season.effective)} screen={screen} palette={CLUB_PALETTE} burstSize={BURST} seedKey="birthday" />;
+  const cap = reducedMotion ? 0 : capForApp(season.effective);
+  const moving = cap > 0 && season.effective !== "subtle";
+  return (
+    <>
+      <ConfettiField cap={cap} screen={screen} palette={CLUB_PALETTE} burstSize={BURST} seedKey="birthday" />
+      <BirthdayCelebration moving={moving} count={season.effective === "full" ? 4 : 3} />
+    </>
+  );
 }
 
 /** Kerzen nacheinander anzünden; `onDone`, wenn alle brennen. Ohne Bewegung brennen alle sofort, ohne Feier. */
@@ -318,7 +329,7 @@ function IgnitedCake({ plan, moving }: { plan: CakePlan; moving: boolean }) {
   const { lit, lighting } = useIgnition(plan, moving, celebrate);
   return (
     <View ref={ref} collapsable={false}>
-      <BirthdayCake plan={plan} lit={lit} lighting={lighting} still={!moving} width={112} />
+      <BirthdayCake plan={plan} lit={lit} lighting={lighting} still={!moving} width={CARD_CAKE_WIDTH} />
     </View>
   );
 }

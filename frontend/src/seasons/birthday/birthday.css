@@ -26,6 +26,10 @@
   to { transform: scale(1) rotate(0); opacity: 1; }
 }
 
+/* Die Geburtstagsmütze (#856): Platz und Knopf kommen aus seasons/mascot - hier nur die Neigung. */
+.tls-birthday-hat--header { --hat-tilt: -6deg; }
+.tls-birthday-hat--hero { --hat-tilt: -9deg; }
+
 .tls-garlands { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; pointer-events: none; }
 .tls-garland { position: absolute; max-width: none; overflow: visible; pointer-events: none; }
 .tls-garland__pennant { transform-box: fill-box; transform-origin: 50% 0; }
