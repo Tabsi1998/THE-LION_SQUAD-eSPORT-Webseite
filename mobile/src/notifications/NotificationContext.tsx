@@ -10,9 +10,12 @@ import { navigateToNotification, navigationRef } from "../navigation/rootNavigat
 import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
 import { announceAchievementUnlocked } from "../lib/achievements";
 
-/** Erfolge und Level-Aufstiege feiert die Zeremonie - sie kommen nicht zusätzlich als Banner. */
+/**
+ * Erfolge, Level-Aufstiege und Prestige feiert die Zeremonie - sie kommen nicht zusätzlich als Banner. (Prestige legt
+ * einen Postfach-Eintrag an; wer es in der App auslöst, sieht schon die Zeremonie.)
+ */
 export function isCeremonyKind(kind?: string): boolean {
-  return kind === "achievement" || kind === "level";
+  return kind === "achievement" || kind === "level" || kind === "prestige";
 }
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
