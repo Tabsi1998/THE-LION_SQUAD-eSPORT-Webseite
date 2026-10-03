@@ -25,6 +25,8 @@ export const EFFECTS = {
   jumpscare: { slots: 2, cooldownMs: 0, priority: 6, ttlMs: 3000 },
   // Wetterleuchten (Saison „Wetter“): braucht keinen Platz, hält aber Abstand zu sich selbst.
   lightning: { slots: 0, cooldownMs: 8000, priority: 1, ttlMs: 600 },
+  // Die Spur im Schnee (W5 #731): selten - einmal am Tag je Gerät, dazu eine lange Abklingzeit.
+  snow_tracks: { slots: 1, cooldownMs: 600000, priority: 1, ttlMs: 40000 },
 };
 
 export function createMotionScheduler({ now = () => Date.now(), slots = DEFAULT_SLOTS, initialDelayMs = INITIAL_DELAY_MS, minGapMs = MIN_GAP_MS, doc = typeof document === "undefined" ? null : document, unlimited = false } = {}) {

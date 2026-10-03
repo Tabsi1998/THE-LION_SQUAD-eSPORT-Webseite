@@ -165,8 +165,21 @@ async def _safe_achievement_of_week():
         doc = await achievement_of_week(get_db(), force=True)
         award = doc.get("award") or {}
         logger.info(f"[scheduler] achievement_of_week week={doc.get('week_key')} tier={award.get('tier_code')}")
+        # Die angeheftete Einbettung auf Discord (#622) zeigt ab jetzt die neue Woche.
+        from services.discord_embeds import request_refresh
+        request_refresh("achievement_week")
     except Exception as exc:
         _log_task_failure("achievement_of_week", exc)
+
+
+async def _safe_achievement_recap():
+    """Erfolge II (#622): montags 09:00 der Wochenrückblick per Mail - nur bei Aktivität, nur an die Person selbst."""
+    try:
+        from services.achievement_recap import queue_weekly_recaps
+        res = await queue_weekly_recaps()
+        logger.info(f"[scheduler] achievement_recap {res}")
+    except Exception as exc:
+        _log_task_failure("achievement_recap", exc)
 
 
 async def _safe_prize_expiry():
@@ -687,6 +700,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   id="season_rank_snapshots", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("achievement_of_week", _safe_achievement_of_week), CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="Europe/Vienna"),
                   id="achievement_of_week", replace_existing=True)
+    sched.add_job(_single_replica("achievement_recap", _safe_achievement_recap, lease_seconds=900.0), CronTrigger(day_of_week="mon", hour=9, minute=0, timezone="Europe/Vienna"),
+                  id="achievement_recap", replace_existing=True)
     sched.add_job(_single_replica("f1_prize_reminders", _safe_f1_prize_reminders), IntervalTrigger(minutes=5), id="f1_prize_reminders",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",

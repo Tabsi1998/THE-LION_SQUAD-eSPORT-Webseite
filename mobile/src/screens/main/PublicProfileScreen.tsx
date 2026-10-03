@@ -14,6 +14,7 @@ import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { PublicSeasonFindsCard } from "../../seasons/SeasonFinds";
 import { api, errorMessage } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
@@ -290,6 +291,9 @@ export function PublicProfileScreen({ navigation, route }: Props) {
                 {sortAwards(profile.awards).slice(0, 6).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
               </Card>
             ) : null}
+
+            {/* Saison-Fundstücke (#678): nur mit dem Schalter der Person - und nur die Summen. */}
+            <PublicSeasonFindsCard userId={profile.id} own={me?.id === profile.id} />
 
             <InfoGrid
               title="Öffentliche Infos"

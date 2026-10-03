@@ -70,6 +70,8 @@ const notificationLabels: Array<{ key: string; label: string; detail: string; ch
   { key: "prize_updates", label: "Gewinne", detail: "Gewinn bereit, Übergabe und Fristen." },
   // Erfolge (#568): In-App, Push und Discord - eine Mail dafür gibt es nicht.
   { key: "achievements", label: "Erfolge", detail: "Freigeschaltete Erfolge – als Gratulation.", channels: ["in_app", "push", "discord"] },
+  // Wochenrückblick (#622): nur per E-Mail, montags, nur bei Aktivität.
+  { key: "achievement_recap", label: "Wochenrückblick", detail: "Montags eine Mail mit XP, Level und neuen Erfolgen.", channels: ["email"] },
   { key: "membership_updates", label: "Mitgliedschaft", detail: "Bewerbung, Status und Vereinsvorteile." },
   { key: "birthday_greetings", label: "Geburtstag", detail: "Geburtstagsgruß vom Verein." },
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },
@@ -241,6 +243,8 @@ export function ProfileScreen() {
       bluesky_handle: u.bluesky_handle || "",
       website: u.website || "",
       privacy_public_profile: u.privacy_public_profile ?? true,
+      // Saison-Fundstücke (#678): Standard aus - erst mit dem Schalter sehen andere die Summen.
+      privacy_season_finds_public: u.privacy_season_finds_public ?? false,
       newsletter_consent: Boolean(u.newsletter_consent),
       show_twitch_embed: Boolean(u.show_twitch_embed),
       dm_privacy: u.dm_privacy || "everyone",
@@ -724,6 +728,7 @@ export function ProfileScreen() {
             <Muted>Änderungen werden von selbst gespeichert.</Muted>
             <Toggle label="Öffentliches Profil" detail="Profil ist in der Community-Suche sichtbar." value={Boolean(form.privacy_public_profile)} onValueChange={(v) => { setField(setForm, "privacy_public_profile", v); scheduleSave(); }} />
             <Toggle label="Twitch im Profil anzeigen" detail="Live-Embed darf auf deinem öffentlichen Profil erscheinen." value={Boolean(form.show_twitch_embed)} onValueChange={(v) => { setField(setForm, "show_twitch_embed", v); scheduleSave(); }} />
+            <Toggle label="Saison-Fundstücke öffentlich" detail="Dein öffentliches Profil zeigt, was du über die Jahreszeiten gesammelt hast – nur die Summen, nie wann." value={form.privacy_season_finds_public === true} onValueChange={(v) => { setField(setForm, "privacy_season_finds_public", v); scheduleSave(); }} />
             <Muted>Direktnachrichten</Muted>
             <View style={styles.optionGrid}>
               {dmOptions.map(([value, label]) => (

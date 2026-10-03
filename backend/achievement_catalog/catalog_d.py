@@ -1,12 +1,12 @@
-"""Erfolge II, Katalog D (#615): Verein, Besonders, Geheim - 33 Gruppen als Daten der Stufenleiter v2.
+"""Erfolge II, Katalog D (#615): Verein, Besonders, Geheim - 36 Gruppen als Daten der Stufenleiter v2.
 
 Verein (nur Mitglieder, mit dem XP-Bonus aus E7), Besonders (Legendär, je eine Stufe), Geheim (versteckt bis zur
-Freischaltung, 40 Punkte). Die sieben Negativ-Gruppen bleiben unverändert im alten Block. Zwölf Gruppen aus #615
-fehlen hier bewusst, weil es ihre Daten (noch) nicht gibt: Versammlungen, Helferdienste, Helferstunden, LAN-Crew,
-Mitgliederstimme und Förderer liegen nur live in Dolibarr; Pünktlicher Beitrag braucht das Zahldatum (der
-Rechnungs-Zwischenspeicher kennt nur Status und Fälligkeit); Papierkram braucht ein Öffnen-Protokoll; Vorstandsarbeit
-ein Datum je Besetzung; Mitglieder werben braucht Einladungslinks; Eierkönig die Eiersuche (Jahreszeiten III);
-Sprinter den Zeitpunkt, an dem das Profil vollständig wurde. Sie stehen als Nachtrag im Issue.
+Freischaltung, 40 Punkte). Die sieben Negativ-Gruppen bleiben unverändert im alten Block. Papierkram (Öffnen-Spur in
+``document_opens``), Vorstandsarbeit (Datum je Funktion aus Dolibarr bzw. je Zuweisung von Hand) und Sprinter
+(``profile_completed_at``) sind seit dem Nachtrag messbar. Neun Gruppen aus #615 fehlen hier weiter, weil es ihre
+Daten (noch) nicht gibt: Versammlungen, Helferdienste, Helferstunden, LAN-Crew, Mitgliederstimme und Förderer liegen
+nur live in Dolibarr; Pünktlicher Beitrag braucht das Zahldatum (der Rechnungs-Zwischenspeicher kennt nur Status und
+Fälligkeit); Mitglieder werben braucht Einladungslinks; Eierkönig die Eiersuche (Jahreszeiten III).
 """
 from __future__ import annotations
 
@@ -42,6 +42,10 @@ CLUB = [
        "heart-handshake", "volunteer", None, [1, 3, 7, 15, 30], "{n}-mal ehrenamtlich dabei.", sort_order=913, manual=True),
     _d("founding_member", "Gründungsmitglied", "club", "Von Anfang an dabei.", "Mitglied seit dem Gründungsjahr des Vereins - das lässt sich nicht nachholen.",
        "flag", "founding-flag", "member_since_founding_year", [1], "Seit dem Gründungsjahr dabei.", sort_order=914, materials=["gold"]),
+    _d("documents_read", "Papierkram", "club", "Lies, was der Verein beschließt.", "Dokumente im Mitgliederbereich öffnen - jedes zählt einmal.",
+       "file-text", "clipboard", "member_documents_opened", [1, 5, 15], "{n} Vereinsdokumente gelesen.", sort_order=915),
+    _d("board_service", "Vorstandsarbeit", "club", "Übernimm Verantwortung im Vorstand.", "Tage in einem Vorstandsamt - die Zeit läuft von selbst, solange du im Amt bist.",
+       "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} Tage im Vorstand.", sort_order=916, unit=" Tage"),
 ]
 
 SPECIAL = [
@@ -76,6 +80,7 @@ HIDDEN = [
     _hidden("leap_day", "Zeitreisender", "Am 29. Februar angemeldet gewesen.", "An einem Schalttag vorbeischauen.", "calendar-clock", "leap-day", "leap_day_logins", sort_order=1120),
     _hidden("snow_king", "Schneekönig", "Fünfzig Schneeflocken gefangen.", "Im Winter fünfzig Schneeflocken anklicken.", "snowflake", "snow-king", "snowflakes_clicked", sort_order=1121, target=50),
     _hidden("first_egg", "Erstes Ei", "Das erste Osterei der Saison gefunden.", "Zu Ostern ein Ei entdecken.", "egg", "first-egg", "easter_eggs_found", sort_order=1122),
+    _hidden("sprinter", "Sprinter", "Das Profil in Rekordzeit vollständig.", "Binnen zehn Minuten nach der Registrierung das Profil ganz ausfüllen.", "zap", "lightning", "profile_completed_fast", sort_order=1123),
 ]
 
 for _club_group, _club_tiers in CLUB:

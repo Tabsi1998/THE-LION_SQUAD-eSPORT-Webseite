@@ -31,6 +31,15 @@ describe("PrivacyTab – Erfolge öffentlich", () => {
   it("zeigt den gespeicherten Wert und den Hinweis bei privatem Profil", () => {
     renderTab({ privacy_achievements_public: false, privacy_public_profile: false });
     expect(screen.getByTestId("profile-privacy-achievements")).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText("Wirkt erst, sobald das Profil öffentlich ist.")).toBeInTheDocument();
+    // Der Hinweis steht an beiden Schaltern, die am öffentlichen Profil hängen (Erfolge, Saison-Fundstücke).
+    expect(screen.getAllByText("Wirkt erst, sobald das Profil öffentlich ist.")).toHaveLength(2);
+  });
+
+  it("Saison-Fundstücke öffentlich (#678): Vorgabe aus, Umschalten speichert", () => {
+    const set = renderTab({ privacy_public_profile: true });
+    const toggle = screen.getByTestId("profile-privacy-season-finds");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    expect(set).toHaveBeenCalledWith("privacy_season_finds_public", true);
   });
 });

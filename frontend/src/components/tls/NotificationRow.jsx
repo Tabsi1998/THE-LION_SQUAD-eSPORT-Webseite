@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
+import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
 
 // Eine Benachrichtigung (oder ein Bündel) als anklickbare Zeile (#255):
@@ -15,10 +16,18 @@ export function notificationDate(value) {
   }
 }
 
+/** Das Abzeichen eines Erfolgs-Pakets (#622): das wertvollste Material mit seinem Motiv - sonst nichts. */
+export function notificationBadge(bundle) {
+  const top = bundle?.kind === "achievement" ? bundle?.meta?.top : null;
+  return top?.material ? top : null;
+}
+
 export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row" }) {
+  const badge = notificationBadge(bundle);
   const content = (
     <div className="flex items-start gap-2 min-w-0">
       {!bundle.read ? <span className="mt-1.5 w-2 h-2 rounded-full bg-[#29B6E8] shrink-0" aria-hidden="true" /> : null}
+      {badge ? <Badge material={badge.material} level={badge.level} rank={badge.rank} art={badge.art} icon={badge.icon} size={compact ? "xs" : "sm"} className="shrink-0" title={badge.name} testId={`${testIdPrefix}-badge-${bundle.id}`} /> : null}
       <div className="min-w-0 flex-1">
         <div className={`font-bold text-sm text-white ${compact ? "line-clamp-1" : "line-clamp-2"}`}>{bundle.title}</div>
         {bundle.body ? (

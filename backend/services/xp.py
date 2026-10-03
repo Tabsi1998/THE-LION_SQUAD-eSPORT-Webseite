@@ -201,7 +201,21 @@ async def prestige(user_id: str) -> dict:
     stamp = now_utc().isoformat()
     await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": stars + 1, "total": 0, "level": 1, "prestige_at": stamp, "prestige_undo": {"total": int(doc.get("total") or 0), "prestige": stars, "until": (now_utc() + timedelta(hours=PRESTIGE_UNDO_HOURS)).isoformat()}}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "xp.prestige", "actor_id": user_id, "target_id": user_id, "data": {"stars": stars + 1}, "created_at": stamp})
+    await _announce_prestige(user_id, stars + 1, stamp)
     return await view(user_id)
+
+
+async def _announce_prestige(user_id: str, stars: int, stamp: str) -> None:
+    """Ein Eintrag im Postfach (#622) - die Person hat es selbst ausgelöst, also kein Push."""
+    try:
+        from services.user_notifications import create_user_notification
+        await create_user_notification(
+            user_id, f"Prestige {'★' * stars}", "Level zurück auf 1, deine Erfolge bleiben. 24 Stunden lang kannst du es rückgängig machen.",
+            url="/profile?tab=achievements", kind="prestige",
+            meta={"prestige": stars, "in_app_only": True, "dedupe_key": f"prestige:{user_id}:{stars}:{stamp}"},
+        )
+    except Exception:  # noqa: BLE001 - ein Fehler hier darf den Prestige nicht verhindern
+        logger.warning("[xp] prestige notification failed", exc_info=True)
 
 
 async def undo_prestige(user_id: str) -> dict:

@@ -49,7 +49,7 @@ COUNTER_KEYS_V2 = (
     # Katalog D (#615): Verein, Besonders, Geheim
     "member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
     "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",
-    "leap_day_logins",
+    "leap_day_logins", "member_documents_opened", "board_days", "profile_completed_fast",
     # Katalog E (#678): Saison-Fundstücke
     "halloween_bats_scared", "season_collectibles_total",
 )

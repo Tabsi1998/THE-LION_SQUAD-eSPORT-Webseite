@@ -161,6 +161,68 @@ export function SeasonFindsCard() {
   );
 }
 
+export type PublicFinds = { hidden: boolean; public?: boolean; total: number; seasons: Array<{ key: string; label: string; count: number; items: Array<{ signal: string; label: string; icon: string; count: number }> }> };
+
+/**
+ * Saison-Fundstücke auf einem fremden Profil (#678, wie `PublicSeasonFinds.jsx` im Web): nur wenn die Person ihren
+ * Schalter „Saison-Fundstücke öffentlich“ gesetzt hat (Vorgabe aus) - und dann nur Summen, nie „heute“ oder ein Datum.
+ * Auf dem eigenen Profil mit dem Hinweis, ob andere sie sehen.
+ */
+export function PublicSeasonFindsCard({ userId, own = false }: { userId: string; own?: boolean }) {
+  const [data, setData] = useState<PublicFinds | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!userId) return undefined;
+    api.get<PublicFinds>(`/achievements/collectibles/user/${userId}`)
+      .then(({ data: result }) => {
+        if (alive) setData(result || null);
+      })
+      .catch(() => {
+        if (alive) setData(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId]);
+  if (!data || data.hidden || !data.total) return null;
+  return (
+    <Card style={styles.card} testID="public-season-finds">
+      <View style={styles.head}>
+        <View style={styles.headText}>
+          <Text style={styles.eyebrow}>Saison-Fundstücke</Text>
+          <Text style={styles.title}>Über das Jahr gesammelt</Text>
+        </View>
+        <View style={styles.total}>
+          <Text style={styles.totalNumber} testID="public-season-finds-total">{number(data.total)}</Text>
+          <View style={styles.totalLabel}>
+            <Ionicons name="sparkles-outline" size={11} color={colors.muted} />
+            <Text style={styles.small}>insgesamt</Text>
+          </View>
+        </View>
+      </View>
+      <View style={styles.seasons}>
+        {data.seasons.map((season) => (
+          <View key={season.key} style={styles.season} testID={`public-season-finds-${season.key}`}>
+            <View style={styles.seasonHead}>
+              <Text style={styles.seasonLabel}>{season.label}</Text>
+            </View>
+            {season.items.map((item) => (
+              <View key={item.signal} style={styles.find} testID={`public-season-find-${item.signal}`}>
+                <FindFigure icon={item.icon} />
+                <Text style={styles.count}>{number(item.count)}</Text>
+                <View style={styles.findText}>
+                  <Text style={styles.label}>{item.label}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+      {own ? <Text style={styles.footnote} testID="public-season-finds-note">{data.public ? "Andere sehen hier nur die Summen." : "Nur du siehst diese Karte – unter Profil → Privatsphäre kannst du sie zeigen."}</Text> : null}
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   card: { gap: 12 },
   head: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 },

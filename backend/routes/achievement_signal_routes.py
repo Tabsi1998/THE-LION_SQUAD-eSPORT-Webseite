@@ -9,7 +9,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
-from auth import get_current_user
+from auth import get_current_user, get_optional_user
 from database import get_db
 from models import new_id, now_utc
 from services import achievement_counters as counters
@@ -77,6 +77,32 @@ async def my_collectibles(me: dict = Depends(get_current_user)):
     db = get_db()
     stored, founded = await load_context(db)
     return await collectibles.overview(db, me["id"], stored, founded)
+
+
+# Wer fremde Fundstücke immer sieht - dieselben Rollen wie bei den Erfolgen (badge_routes.py).
+STAFF_ROLES = {"moderator", "tournament_admin", "club_admin", "superadmin"}
+
+
+@router.get("/api/achievements/collectibles/user/{user_id}")
+async def public_collectibles(user_id: str, viewer: dict | None = Depends(get_optional_user)):
+    """Die Saison-Fundstücke einer anderen Person (#678): nur mit öffentlichem Profil UND dem eigenen Schalter
+    „Saison-Fundstücke öffentlich“ (Vorgabe aus) - und dann nur die Summen. Die Person selbst und das Admin-Team sehen
+    sie immer (ebenfalls nur die Summen, wie andere sie sehen würden)."""
+    from routes.seasons_routes import load_context
+    from services import collectibles
+    db = get_db()
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "privacy_public_profile": 1, "privacy_season_finds_public": 1})
+    if not user:
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    viewer_is_owner = bool(viewer and viewer.get("id") == user_id)
+    viewer_is_staff = bool(viewer and viewer.get("role") in STAFF_ROLES)
+    if not user.get("privacy_public_profile") and not (viewer_is_owner or viewer_is_staff):
+        raise HTTPException(404, "Nutzer nicht gefunden.")
+    if user.get("privacy_season_finds_public") is not True and not (viewer_is_owner or viewer_is_staff):
+        return {"hidden": True, "total": 0, "seasons": []}
+    stored, founded = await load_context(db)
+    view = collectibles.public_view(await collectibles.overview(db, user_id, stored, founded))
+    return {**view, "hidden": False, "public": user.get("privacy_season_finds_public") is True}
 
 
 # ------------------------------------------------------------------ GG-Lob

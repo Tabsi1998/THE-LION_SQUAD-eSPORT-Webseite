@@ -226,8 +226,9 @@ def test_katalog_c_ziele_material_texte_und_schluessel():
 from achievement_catalog import GROUPS_D, REDEFINED_D, REPLACED_D, TIERS_D  # noqa: E402
 
 
-def test_katalog_d_hat_33_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
-    assert len(GROUPS_D) == 33 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1) + 15 + 13  # Verein 19, Besonders 15, Geheim 13
+def test_katalog_d_hat_36_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
+    # Nachtrag #615: Papierkram (3 Stufen), Vorstandsarbeit (5) und Sprinter (geheim) sind messbar geworden.
+    assert len(GROUPS_D) == 36 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1 + 3 + 5) + 15 + 14  # Verein 27, Besonders 15, Geheim 14
     codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D]
     assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
     tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C + TIERS_D]

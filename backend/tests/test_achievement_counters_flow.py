@@ -471,3 +471,40 @@ async def test_fundstuecke_zaehler_und_uebersicht_fuer_das_eigene_profil(flow, m
     halloween = later["seasons"][0]
     assert halloween["active"] is False and halloween["next_start"].startswith("2027-10-25") and halloween["ends_at"] is None
     assert {item["signal"]: (item["count"], item["season_count"], item["today"]) for item in halloween["items"]}["halloween_bats_scared"] == (32, 12, 0)
+
+
+@pytest.mark.asyncio
+async def test_fundstuecke_auf_dem_oeffentlichen_profil_nur_mit_schalter_und_nur_die_summen(flow, monkeypatch):
+    """#678 (Rest): andere sehen die Saison-Fundstücke nur, wenn das Profil öffentlich ist UND der eigene Schalter
+    „Saison-Fundstücke öffentlich“ an ist (Vorgabe aus) - und dann nur Summen je Saison und Fundstück, kein „heute“,
+    kein Datum, keine Saison ohne Fund. Die Person selbst und das Admin-Team sehen sie immer."""
+    set_clock(monkeypatch, HALLOWEEN_EVE)
+    owner = await flow.add_user(name="Sammlerin")
+    viewer = await flow.add_user(name="Gast")
+    await flow.db[counters.SIGNALS].insert_one({"user_id": owner["id"], "name": "halloween_bats_scared", "count": 12, "days": {"2026-10-30": 5, "2025-10-31": 7}, "first_at": "2025-10-31T19:00:00+00:00", "last_at": "2026-10-30T19:30:00+00:00"})
+    url = f"/api/achievements/collectibles/user/{owner['id']}"
+    # Profil nicht öffentlich: für andere gibt es die Person nicht.
+    await flow.db.users.update_one({"id": owner["id"]}, {"$set": {"privacy_public_profile": False}})
+    flow.act_as(viewer)
+    assert (await flow.get(url)).status_code == 404
+    # Öffentlich, Schalter noch nicht gesetzt (Vorgabe aus): versteckt.
+    await flow.db.users.update_one({"id": owner["id"]}, {"$set": {"privacy_public_profile": True}})
+    assert (await flow.get(url)).json() == {"hidden": True, "total": 0, "seasons": []}
+    # Die Person selbst sieht ihre Summen auch ohne Schalter - so, wie andere sie sehen würden.
+    flow.act_as(owner)
+    mine = (await flow.get(url)).json()
+    assert mine["hidden"] is False and mine["public"] is False and mine["total"] == 12
+    # Schalter an (über das eigene Profil gespeichert): andere sehen nur die Summen.
+    assert (await flow.patch("/api/users/me", json={"privacy_season_finds_public": True})).status_code == 200
+    flow.act_as(viewer)
+    seen = (await flow.get(url)).json()
+    assert seen["hidden"] is False and seen["public"] is True and seen["total"] == 12
+    assert [season["key"] for season in seen["seasons"]] == ["halloween"]
+    assert seen["seasons"][0]["items"] == [{"signal": "halloween_bats_scared", "label": seen["seasons"][0]["items"][0]["label"], "icon": "bat", "count": 12}]
+    flat = str(seen)
+    for private in ("today", "first_at", "last_at", "per_day", "season_count", "next_start", "ends_at"):
+        assert private not in flat
+    # Ohne Anmeldung genauso (öffentliches Profil).
+    flow.act_as(None)
+    assert (await flow.get(url)).json()["total"] == 12
+    assert (await flow.get("/api/achievements/collectibles/user/gibt-es-nicht")).status_code == 404

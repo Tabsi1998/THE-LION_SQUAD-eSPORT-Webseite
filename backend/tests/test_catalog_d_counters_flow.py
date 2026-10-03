@@ -158,14 +158,14 @@ def test_katalog_d_form():
     club = [g for g in catalog.GROUPS_D if g["category"] == "club"]
     special = [g for g in catalog.GROUPS_D if g["category"] == "special"]
     hidden = [g for g in catalog.GROUPS_D if g["category"] == "hidden"]
-    assert (len(club), len(special), len(hidden)) == (5, 15, 13)
+    assert (len(club), len(special), len(hidden)) == (7, 15, 14)
     assert all(g["member_only"] for g in club)
     club_tiers = [t for t in catalog.TIERS_D if t["group_code"] in {g["code"] for g in club}]
     assert all(t["member_only"] for t in club_tiers)
     special_tiers = [t for t in catalog.TIERS_D if t["group_code"] in {g["code"] for g in special}]
     assert len(special_tiers) == 15 and all(t["material"] == "legendary" and t["level"] == 5 for t in special_tiers)
     hidden_tiers = [t for t in catalog.TIERS_D if t["group_code"] in {g["code"] for g in hidden}]
-    assert len(hidden_tiers) == 13 and all(t["material"] == "hidden" and t["points"] == 40 for t in hidden_tiers)
+    assert len(hidden_tiers) == 14 and all(t["material"] == "hidden" and t["points"] == 40 for t in hidden_tiers)
     assert all(catalog.annotate_group(g).get("hidden") for g in hidden), "Geheim ist versteckt (Kennzeichen kommt aus der Kategorie beim Seed)"
     assert not any(catalog.annotate_group(g).get("hidden") for g in club + special)
     manual = {g["code"] for g in catalog.GROUPS_D if g["manual_only"]}

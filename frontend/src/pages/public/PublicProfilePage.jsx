@@ -8,6 +8,7 @@ import { PlatformIcon as SocialIcon, platformMeta as socialMeta } from "@/lib/pl
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { AchievementGroupsView } from "@/components/tls/AchievementGroups";
+import { PublicSeasonFinds } from "@/components/tls/PublicSeasonFinds";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { categoryProgress } from "@/pages/user/profile/AchievementPanels";
@@ -742,6 +743,8 @@ export default function PublicProfilePage() {
                 <AchievementGroupsView groups={achievementsData?.groups || []} earnedOnly emptyText="Noch keine Achievements freigeschaltet." />
               </>
             )}
+            {/* Saison-Fundstücke (#678): eigener Schalter der Person, unabhängig von „Erfolge öffentlich“ - nur die Summen. */}
+            <PublicSeasonFinds userId={profile.id} own={isOwnProfile} />
           </div>
         )}
 

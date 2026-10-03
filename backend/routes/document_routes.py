@@ -12,6 +12,7 @@ from database import get_db
 from models import DocumentCreate, DocumentUpdate, new_id, now_utc
 from services import dolibarr_identity
 from services.dolibarr_client import DolibarrError
+from services.member_activity import note_document_open
 from services.visibility import user_can_see
 from storage import PRIVATE_DOC_DIR, UPLOAD_DIR
 
@@ -224,32 +225,43 @@ async def delete_document(doc_id: str, me: dict = Depends(require_area("club")))
 @router.get("/{doc_id}/view")
 async def view_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
     """Inline stream a document after membership/internal checks."""
+    db = get_db()
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
-        return await _dolibarr_file(dolibarr_id, user, "inline")
+        response = await _dolibarr_file(dolibarr_id, user, "inline")
+        await note_document_open(db, user, doc_id)
+        return response
     statute_id = dolibarr_identity.parse_statute_id(doc_id)
     if statute_id is not None:
-        return await _dolibarr_file(statute_id, user, "inline", statute=True)
-    db = get_db()
+        response = await _dolibarr_file(statute_id, user, "inline", statute=True)
+        await note_document_open(db, user, doc_id)
+        return response
     doc, path = await _load_authorized_doc(doc_id, user)
     await db.documents.update_one({"id": doc_id}, {"$inc": {"view_count": 1}})
+    # Papierkram (#615): das erste Öffnen je Person und Dokument zählt - nach der Rechteprüfung.
+    await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "inline")
 
 
 @router.get("/{doc_id}/download")
 async def download_document(doc_id: str, user: dict | None = Depends(get_optional_user)):
     """Download only when explicitly enabled. Admins can always download."""
+    db = get_db()
     dolibarr_id = dolibarr_identity.parse_doc_id(doc_id)
     if dolibarr_id is not None:
-        return await _dolibarr_file(dolibarr_id, user, "attachment")
+        response = await _dolibarr_file(dolibarr_id, user, "attachment")
+        await note_document_open(db, user, doc_id)
+        return response
     statute_id = dolibarr_identity.parse_statute_id(doc_id)
     if statute_id is not None:
-        return await _dolibarr_file(statute_id, user, "attachment", statute=True)
-    db = get_db()
+        response = await _dolibarr_file(statute_id, user, "attachment", statute=True)
+        await note_document_open(db, user, doc_id)
+        return response
     doc, path = await _load_authorized_doc(doc_id, user)
     if not doc.get("allow_download") and not _is_admin(user):
         raise HTTPException(403, "Download ist für dieses Dokument deaktiviert.")
     await db.documents.update_one({"id": doc_id}, {"$inc": {"download_count": 1}})
+    await note_document_open(db, user, doc_id)
     return _file_response(doc, path, "attachment")
 
 
