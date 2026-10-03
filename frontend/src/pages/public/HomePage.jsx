@@ -95,7 +95,7 @@ export default function HomePage() {
             </div>
             <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative" data-season-anchor="lion">
-                <div ref={glowRef} className="absolute inset-0 bg-[#29B6E8] blur-[80px] opacity-20 tls-hero-glow" data-testid="home-hero-glow" />
+                <div ref={glowRef} aria-hidden="true" className="absolute -inset-20 pointer-events-none opacity-20 tls-hero-glow" data-testid="home-hero-glow" />
                 <MascotBadge className="relative w-64 h-64 md:w-80 md:h-80 drop-shadow-[0_0_40px_rgba(41,182,232,0.3)]" />
               </div>
             </div>

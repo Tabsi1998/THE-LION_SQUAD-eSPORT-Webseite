@@ -1068,12 +1068,15 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   animation: tls-tick-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Das Licht hinter dem Löwen atmet und folgt dem Zeiger ein wenig (die Werte setzt HomePage). */
+/* Das Licht hinter dem Löwen atmet und folgt dem Zeiger ein wenig (die Werte setzt HomePage). Ein weicher Verlauf
+   statt eines Unschärfe-Filters: ohne Grafikkarte müsste der Filter bei jedem Atemzug jedes Bild neu gerechnet werden
+   (die Schnee-Messung im CI fiel so von 60 auf 30 Bilder je Sekunde). */
 @keyframes tls-glow-breathe {
   0%, 100% { opacity: 0.16; }
   50% { opacity: 0.27; }
 }
 .tls-hero-glow {
+  background: radial-gradient(closest-side, rgba(41, 182, 232, 1) 0%, rgba(41, 182, 232, 0.92) 38%, rgba(41, 182, 232, 0.45) 68%, rgba(41, 182, 232, 0) 100%);
   transform: translate3d(var(--tls-glow-x, 0px), var(--tls-glow-y, 0px), 0);
   transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
   animation: tls-glow-breathe 7s ease-in-out infinite;
