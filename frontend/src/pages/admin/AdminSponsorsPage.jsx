@@ -6,6 +6,7 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -191,8 +192,8 @@ export default function AdminSponsorsPage() {
           <div key={s.id} className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid={`sponsor-card-${s.id}`}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-3 min-w-0">
-                {s.logo_url ? (
-                  <img src={resolveMediaUrl(s.logo_url)} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
+                {shownLogo(s) ? (
+                  <img src={resolveMediaUrl(shownLogo(s))} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
                 ) : (
                   <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center font-display font-bold text-[#29B6E8]">
                     {s.name.slice(0, 2).toUpperCase()}
@@ -213,6 +214,7 @@ export default function AdminSponsorsPage() {
                     {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
                     {s.is_active === false && <span className="text-[9px] px-1.5 py-0.5 bg-[#FF3B30]/15 text-[#FF3B30] rounded-sm font-bold uppercase tracking-widest">Inaktiv</span>}
                     {s.source === "dolibarr" && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
+                    {imageSourceText(s.dolibarr_image_summary) && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/10 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest" title={imageSourceText(s.dolibarr_image_summary)} data-testid={`sponsor-images-${s.id}`}>Bilder: Dolibarr</span>}
                   </div>
                 </div>
               </div>
@@ -311,7 +313,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
     <AdminSheet title={sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"} eyebrow="Verein" size="lg" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sponsor-save" testId="sponsor-sheet">
       {locked.size > 0 && (
         <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="sponsor-locked-hint">
-          Dieser Sponsor kommt aus Dolibarr: Name, Stufe, Laufzeit, E-Mail und Telefon werden dort gepflegt. Logo, Link, Platzierungen, Reihenfolge, Ansprechpartner und Texte bleiben hier.
+          Dieser Sponsor kommt aus Dolibarr: Name, Stufe, Laufzeit, E-Mail und Telefon werden dort gepflegt. Link, Platzierungen, Reihenfolge, Ansprechpartner und Texte bleiben hier. Logo und Banner kommen ab Vereinsmodul 1.9 aus Dolibarr; das Logo hier gilt nur, wo Dolibarr keines liefert.
         </p>
       )}
       <FormSection title="Sponsor">
@@ -320,6 +322,12 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           <TextField label="Link (URL)" value={form.link} onChange={(v) => set("link", v)} testId="sponsor-link" placeholder="https://…" />
         </FormGrid>
         <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary />
+        {imageSourceText(sponsor?.dolibarr_image_summary) && (
+          <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="sponsor-images-hint">
+            {imageSourceText(sponsor.dolibarr_image_summary)}. Die Website und die App zeigen die Fassung für dunklen Hintergrund, Mails und PDFs die helle;
+            das Logo hier springt nur ein, wo Dolibarr keines liefert.
+          </p>
+        )}
         <FormGrid>
           <SelectField label="Tier" value={form.tier} onChange={setTier} options={TIERS.map((t) => [t, TIER_LABELS[t]])} testId="sponsor-tier" {...lock("tier")} />
           <TextField label="Reihenfolge" type="number" value={form.order_index ?? 0} onChange={(v) => set("order_index", parseInt(v, 10) || 0)} testId="sponsor-order" />

@@ -254,7 +254,9 @@ async def discord_widget(guild_id) -> dict | None:
 # ---------- Partner an Events und Turnieren (#469 Teil 2) ----------
 
 def partner_badge(doc: dict) -> dict:
-    return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": doc.get("logo_url"), "kind": doc.get("kind")}
+    from services import sponsor_images
+
+    return {"id": doc.get("id"), "slug": doc.get("slug"), "name": doc.get("name"), "logo_url": sponsor_images.pick(doc, "logo")[0], "kind": doc.get("kind")}
 
 
 async def clean_partner_ids(db, ids) -> list[str]:
@@ -272,7 +274,8 @@ async def attach_partners(db, item: dict) -> None:
     if not ids:
         item["partners"] = []
         return
-    rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "kind": 1}).to_list(len(ids))
+    rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}},
+                                  {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "dolibarr_images": 1, "kind": 1}).to_list(len(ids))
     by_id = {row["id"]: partner_badge(row) for row in rows}
     item["partners"] = [by_id[item_id] for item_id in ids if item_id in by_id]
 
@@ -282,7 +285,8 @@ async def attach_partners_many(db, items: list[dict]) -> None:
     ids = list({item_id for item in items for item_id in (item.get("partner_ids") or []) if item_id})
     by_id: dict[str, dict] = {}
     if ids:
-        rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}}, {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "kind": 1}).to_list(len(ids))
+        rows = await db.partners.find({"id": {"$in": ids}, "is_active": {"$ne": False}},
+                                      {"_id": 0, "id": 1, "slug": 1, "name": 1, "logo_url": 1, "dolibarr_images": 1, "kind": 1}).to_list(len(ids))
         by_id = {row["id"]: partner_badge(row) for row in rows}
     for item in items:
         item["partners"] = [by_id[item_id] for item_id in (item.get("partner_ids") or []) if item_id in by_id]

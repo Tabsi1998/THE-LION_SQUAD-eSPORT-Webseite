@@ -5,6 +5,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
+import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -84,8 +85,8 @@ export default function AdminPartnersPage() {
           <div key={p.id} className="border border-white/10 rounded-sm bg-[#121212] p-5">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                {p.logo_url ? (
-                  <img src={resolveMediaUrl(p.logo_url)} alt={p.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
+                {shownLogo(p) ? (
+                  <img src={resolveMediaUrl(shownLogo(p))} alt={p.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
                 ) : (
                   <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center text-[#29B6E8]">
                     <Handshake className="w-6 h-6" />
@@ -150,6 +151,12 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary />
+      {imageSourceText(partner?.dolibarr_image_summary) && (
+        <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="partner-images-hint">
+          {imageSourceText(partner.dolibarr_image_summary)}. Die Website zeigt die Fassung für dunklen Hintergrund; das Logo hier springt nur ein, wo
+          Dolibarr keines liefert.
+        </p>
+      )}
       <TextField label="Website" value={form.link} onChange={(v) => set("link", v)} placeholder="https://…" testId="partner-link" />
       <FormGrid>
         <TextField label="Typ" value={form.kind} onChange={(v) => set("kind", v)} placeholder="Verein, Messe, Community" testId="partner-kind" {...lock("kind")} />

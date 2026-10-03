@@ -22,7 +22,10 @@ const AdminSponsorsPage = (await import("./AdminSponsorsPage")).default;
 const SOURCE_OFF = { from_dolibarr: false, connected: true, sponsor_category: "Sponsor", partner_category: "Partner", categories: {}, counts: { sponsors: 0, partners: 0 }, locked: { sponsors: ["name", "tier", "contract_start", "contract_end", "contact_email", "contact_phone"], partners: ["name", "kind"] } };
 const SOURCE_ON = { ...SOURCE_OFF, from_dolibarr: true, fetched_at: "2026-09-23T10:00:00Z", counts: { sponsors: 2, partners: 1 }, categories: { sponsor: { label: "Sponsor", found: true, sub: ["Gold"] }, partner: { label: "Partner", found: true, sub: [] } } };
 const SPONSORS = [
-  { id: "s1", name: "Alpha Energy", tier: "gold", source: "dolibarr", contract_start: "2024-01-01", contract_end: "2026-12-31", contact_email: "office@alpha.test", description: "Handtext", is_active: true, effective_status: "active" },
+  { id: "s1", name: "Alpha Energy", tier: "gold", source: "dolibarr", contract_start: "2024-01-01", contract_end: "2026-12-31", contact_email: "office@alpha.test", description: "Handtext", is_active: true, effective_status: "active",
+    // Bilder aus dem Vereinsmodul (#880): das Vorschaubild ist das, was die Website zeigt - nicht das Upload.
+    logo_url: "/uploads/alpha.png", dolibarr_images: { logo: { dark: { url: "/api/static/uploads/dolibarr-partner-7-logo-dark-abc.png" } } },
+    dolibarr_image_summary: { logo: { variants: ["dark"], shown: "dolibarr-dark" }, banner: { variants: [], shown: null } } },
   { id: "s2", name: "Handfirma", tier: "bronze", is_active: true, effective_status: "active" },
 ];
 
@@ -66,9 +69,13 @@ test("Sponsor aus Dolibarr: Dolibarr-Felder gesperrt, Website-Felder frei; Hande
   render(<MemoryRouter><AdminSponsorsPage /></MemoryRouter>);
   expect(await screen.findByTestId("sponsor-dolibarr-s1")).toBeInTheDocument();
   expect(screen.queryByTestId("sponsor-dolibarr-s2")).toBeNull();
+  expect(screen.getByTestId("sponsor-images-s1")).toHaveAttribute("title", "Logo aus Dolibarr (dunkel)");
+  expect(screen.queryByTestId("sponsor-images-s2")).toBeNull();
+  expect(screen.getByTestId("sponsor-card-s1").querySelector("img")).toHaveAttribute("src", "/api/static/uploads/dolibarr-partner-7-logo-dark-abc.png");
 
   fireEvent.click(screen.getByTestId("sponsor-card-s1").querySelector("button"));
   expect(screen.getByTestId("sponsor-locked-hint")).toBeInTheDocument();
+  expect(screen.getByTestId("sponsor-images-hint")).toHaveTextContent("Logo aus Dolibarr (dunkel). Die Website und die App zeigen die Fassung für dunklen Hintergrund");
   expect(screen.getByTestId("sponsor-name")).toBeDisabled();
   expect(screen.getByTestId("sponsor-tier")).toBeDisabled();
   expect(screen.getByTestId("sponsor-contract-end")).toBeDisabled();

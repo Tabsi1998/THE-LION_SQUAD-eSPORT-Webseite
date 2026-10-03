@@ -364,25 +364,60 @@ die Person lädt neu. Der Austritt geht mit heutigem Eingang ein; den letzten Ta
 ergibt eure Kündigungsregel im Modul – ein früheres Wunschdatum wird nicht übernommen, ein späteres
 schon. Einmal erklärt, lässt er sich auf der Website nicht zurücknehmen (das macht der Vorstand).
 
+## Sponsoren und Partner: Logo und Banner aus Dolibarr (Vereine ab 1.9.0, #880)
+
+Sind Sponsoren und Partner aus Dolibarr eingeschaltet (*Dolibarr → Funktionen*, #405), holt die Website
+ab Vereinsmodul 1.9.0 auch ihre **Bilder** aus Dolibarr – je Partner bis zu vier:
+
+1. In Dolibarr unter *Einstellungen > Vereine > Kanäle, Konten und Partner* die Kategorien der
+   Geschäftspartner wählen, die an die Website gehen – dieselben wie auf der Website („Sponsor“,
+   „Partner“ samt Unterkategorien). Nur deren Partner liefert das Modul.
+2. Am Geschäftspartner, Reiter *Verein*: **Logo** und **Banner**, je **für hellen** und **für dunklen**
+   Hintergrund. Jeder Platz ist freiwillig; ohne eigenes helles Logo nimmt das Modul das Logo der
+   Dolibarr-Karte.
+
+Was die Website zeigt:
+
+| Wo | Hintergrund | Reihenfolge |
+| --- | --- | --- |
+| Website, App, TV-Anzeige | dunkel | Dolibarr dunkel → Dolibarr hell → Logo, das auf der Website hochgeladen ist |
+| Mails, PDFs | hell | Dolibarr hell → Upload → Dolibarr dunkel |
+
+Ein Logo für dunklen Grund ist oft weiß – auf einer Mail oder einem PDF wäre es unsichtbar, darum dort
+die helle Fassung. **Banner** erscheinen auf der Sponsorenseite oben in der Karte, für den
+**Hauptsponsor** groß auf der Startseite und in der App unter *Info → Sponsoren* – im eigenen
+Seitenverhältnis, nichts wird abgeschnitten.
+
+- **Wann:** beim stündlichen Abgleich und auf Knopfdruck („Jetzt nachlesen“). Geladen wird nur, was
+  eine neue Prüfsumme hat; ein in Dolibarr entferntes Bild verschwindet auch auf der Website.
+- **Sicher:** Gespeichert wird nur ein Bild, das zur Prüfsumme aus Dolibarr passt (PNG, JPEG, WebP,
+  höchstens 8 MB) – sonst bleibt die bisherige Fassung stehen.
+- **Im Admin** (*Inhalte → Sponsoren* bzw. *Partner*): Das Vorschaubild ist das, was die Website zeigt;
+  „Bilder: Dolibarr“ und ein Satz im Formular sagen, welche Fassungen da sind. Euer hochgeladenes Logo
+  bleibt gespeichert und springt ein, wo Dolibarr nichts liefert.
+- Ältere Module (vor 1.9.0) fragt die Website nicht; dort bleibt alles wie bisher.
+
 ## Was das Modul heute kann – und worauf gewartet wird
 
 Die Seite *Dolibarr* zeigt es unter *Stand*. Die Website setzt nur voraus, was
 das Modul ausliefert (festgehalten in `backend/tests/contracts/manifest.json`):
 
-| Vorhanden (Vereine ab 0.5, API-Version 1) | Noch offen im Modul |
+| Vorhanden und genutzt | Im Modul vorhanden, auf der Website noch nicht genutzt |
 | --- | --- |
-| Zusammenfassung je Mitglied mit Beitragsstand und Funktionen | Änderungsfeed mit Revisionen und Löschhinweisen (#154) |
-| Suche über E-Mail oder Nummer | signierte Webhooks (#155) |
-| nur geänderte Mitglieder (`changed_since`) | |
+| Zusammenfassung je Mitglied mit Beitragsstand und Funktionen | Änderungsfeed mit Revisionen und Löschhinweisen (dolibarr-vereine#154, seit 0.8.0-beta; kommt mit #844) |
+| Suche über E-Mail oder Nummer | signierte Webhooks (dolibarr-vereine#155, seit 0.8.0-beta) |
+| nur geänderte Mitglieder (`changed_since`) | Einlass über eine App (ab Vereine 1.7.0), Teilnahmen und Ehrungen (ab 1.8.0) – kommen mit Vereinsmodul 1.5 |
 | Benachrichtigung bei Änderung (ohne Personendaten) | |
 | Rechnungen mit PDF (Dolibarr II) | |
 | Vereinsdaten, Vorstand, Statuten (Rechtliches II, ab Vereine 0.11) | |
 | persönlicher Zugriff und Dokumente aus der Vereinsakte (ab Vereine 0.11) | |
 | Vereinsakte über die Mitgliedsnummer statt Einladungscode, eigene Rechnungen über die Bindung, PDF-Prüfsummen (ab Vereine 1.4.0) | |
+| Dokumente als Datei mit ETag und Fortsetzen (ab Vereine 1.3.0, #849) | |
+| geheime Wahl auf Papier (ab Vereine 1.7.0, #882) | |
+| Partner mit Logo und Banner für hellen und dunklen Hintergrund (ab Vereine 1.9.0, #880) | |
 
-Bis #154 da ist, bemerkt die Website ein **gelöschtes** Mitglied erst beim
-täglichen vollständigen Lauf – und liest vor dem Austragen jedes fehlende
-Mitglied einzeln nach.
+Solange die Website den Änderungsfeed nicht liest, bemerkt sie ein **gelöschtes** Mitglied erst beim
+täglichen vollständigen Lauf – und liest vor dem Austragen jedes fehlende Mitglied einzeln nach.
 
 ## Für die Entwicklung
 

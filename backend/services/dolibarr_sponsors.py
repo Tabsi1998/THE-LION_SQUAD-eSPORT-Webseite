@@ -14,6 +14,9 @@ Was von Dolibarr kommt (und im Admin gesperrt ist, solange der Schalter an ist):
 Art, Laufzeit, E-Mail und Telefon der Firma. Was auf der Website bleibt: Logo, Link (Dolibarr füllt
 ihn nur, wenn er leer ist), Platzierungen, Reihenfolge, Beschreibung, Ansprechpartner, Notizen.
 
+Ab Vereine 1.9.0 kommen auch Logo und Banner je für hellen und dunklen Hintergrund aus dem Vereinsmodul
+(#880, ``sponsor_images``); das hochgeladene Logo bleibt der Rückfall.
+
 Ein Ausfall ändert nichts: der letzte Stand bleibt, der Fehler steht daneben. Verschwindet eine
 Firma aus der Kategorie oder wird sie in Dolibarr geschlossen, endet ihr Sponsoring zum Stichtag
 und sie rutscht zu den ehemaligen Unterstützern statt zu verschwinden. Schalter aus: alle Einträge
@@ -273,12 +276,26 @@ async def refresh(db, client: DolibarrClient, *, source: dict | None = None) -> 
     planned = plan(categories, rows_by_category, source)
     sponsors = await apply_sponsors(db, planned["sponsors"])
     partners = await apply_partners(db, planned["partners"])
+    images = await _sync_images(db, client)
     await db[COLLECTION].update_one({"id": STATE_ID}, {
-        "$set": {"fetched_at": now, "categories": planned["categories"], "sponsors": sponsors, "partners": partners},
+        "$set": {"fetched_at": now, "categories": planned["categories"], "sponsors": sponsors, "partners": partners, "images": images},
         "$unset": {"error": "", "error_text": "", "error_at": ""},
         "$setOnInsert": {"id": STATE_ID},
     }, upsert=True)
-    return {"ok": True, "fetched_at": now, "sponsors": sponsors, "partners": partners, "categories": planned["categories"]}
+    return {"ok": True, "fetched_at": now, "sponsors": sponsors, "partners": partners, "categories": planned["categories"], "images": images}
+
+
+async def _sync_images(db, client: DolibarrClient) -> dict:
+    """Logo und Banner aus dem Vereinsmodul (#880) - erst ab Vereine 1.9.0. Ein Fehler lässt die Bilder stehen."""
+    from services import dolibarr_identity, sponsor_images
+
+    state = await db.settings.find_one({"id": dolibarr_identity.STATE_ID}, {"_id": 0, "module_version": 1}) or {}
+    if dolibarr_identity.parse_version(state.get("module_version")) < sponsor_images.MIN_VERSION:
+        return {"skipped": "module_version"}
+    try:
+        return await sponsor_images.sync(db, client)
+    except DolibarrError as exc:
+        return {"error": exc.kind}
 
 
 async def refresh_due() -> dict:
@@ -328,6 +345,6 @@ async def admin_view(db) -> dict:
             "sponsors": await db.sponsors.count_documents({"source": SOURCE}),
             "partners": await db.partners.count_documents({"source": SOURCE}),
         },
-        "last_run": {"sponsors": state.get("sponsors"), "partners": state.get("partners")},
+        "last_run": {"sponsors": state.get("sponsors"), "partners": state.get("partners"), "images": state.get("images")},
         "locked": {"sponsors": list(SPONSOR_LOCKED_FIELDS), "partners": list(PARTNER_LOCKED_FIELDS)},
     }

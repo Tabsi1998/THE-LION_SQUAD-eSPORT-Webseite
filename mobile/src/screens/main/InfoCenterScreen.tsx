@@ -168,10 +168,15 @@ function Sponsors({ items }: { items: any[] }) {
                   accessibilityLabel={href ? `${sponsor.name} – Website öffnen` : sponsor.name}
                   accessibilityRole={href ? "link" : "image"}
                 >
+                  {sponsor.banner_url ? (
+                    <View style={[styles.sponsorBanner, { height: tier.bannerHeight }]} testID={`sponsor-banner-${sponsor.id}`}>
+                      <MediaImage uri={sponsor.banner_url} resizeMode="contain" style={styles.sponsorBannerImage} />
+                    </View>
+                  ) : null}
                   <MediaImage
                     uri={sponsor.logo_url}
                     resizeMode="contain"
-                    style={[styles.sponsorLogo, { height: tier.logoHeight }]}
+                    style={[styles.sponsorLogo, { height: sponsor.banner_url ? Math.round(tier.logoHeight * 0.6) : tier.logoHeight }]}
                     fallback={
                       <Body style={styles.sponsorFallback} numberOfLines={2}>
                         {sponsor.name || "?"}
@@ -636,6 +641,18 @@ const styles = StyleSheet.create({
   sponsorLogo: {
     backgroundColor: "transparent",
     borderWidth: 0,
+    width: "100%",
+  },
+  sponsorBanner: {
+    borderRadius: 4,
+    marginBottom: 6,
+    overflow: "hidden",
+    width: "100%",
+  },
+  sponsorBannerImage: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    height: "100%",
     width: "100%",
   },
   sponsorFallback: {
