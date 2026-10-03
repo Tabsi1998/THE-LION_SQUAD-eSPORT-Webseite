@@ -476,7 +476,7 @@ export default function AdminDolibarrPage() {
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>
                   <ul className="list-disc pl-5 mt-2 space-y-1">
                     <li>Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner erweitern“.</li>
-                    <li>Rechnungen: einsehen, erstellen/bearbeiten. Keine Zahlungen, kein Löschen.</li>
+                    <li>Rechnungen: einsehen, erstellen/bearbeiten – das braucht Dolibarr auch, um das PDF zu erzeugen. Keine Zahlungen, kein Löschen.</li>
                     <li>Produkte und Leistungen: einsehen. Mitglieder: einsehen. Vereine: „Mitglieder und Geschäftspartner verknüpfen“.</li>
                   </ul>
                 </details>

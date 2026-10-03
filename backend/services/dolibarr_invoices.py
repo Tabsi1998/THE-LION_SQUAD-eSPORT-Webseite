@@ -32,8 +32,8 @@ from urllib.parse import urlsplit
 
 from database import get_db
 from models import now_utc
-from services.dolibarr_billing import booking_facts, source_label
-from services.dolibarr_client import DolibarrClient, DolibarrError, PAGE_LIMIT, load_settings
+from services.dolibarr_billing import booking_facts, pdf_done, pdf_lang, source_label
+from services.dolibarr_client import DolibarrClient, DolibarrError, PAGE_LIMIT, load_settings, write_capable
 from services.dolibarr_identity import binding_for
 from services.dolibarr_links import verified_link
 from services.dolibarr_policy import CLUB_TZ
@@ -306,7 +306,15 @@ async def invoice_pdf(user: dict, key: str, db=None) -> dict:
         core = await client.invoice(invoice_id)
         if view_core_invoice(core, settings) is None:
             raise InvoiceAccessError()   # Entwurf: nach außen nicht vorhanden
-        payload = await client.invoice_document(str(core.get("ref") or ""))
+        ref = str(core.get("ref") or "")
+        try:
+            payload = await client.invoice_document(ref)
+        except DolibarrError as exc:
+            # Noch kein PDF in Dolibarr (#840, Belege von vor der Umstellung): einmal bauen - die Antwort ist das PDF.
+            if exc.kind != "not_found" or not write_capable(settings):
+                raise
+            payload = await client.build_invoice_pdf(ref, lang=pdf_lang(settings))
+            await pdf_done(db, {"invoice_id": invoice_id, "user_id": user["id"]}, "website")
     except DolibarrError as exc:
         if exc.kind == "not_found":
             raise InvoiceAccessError() from exc

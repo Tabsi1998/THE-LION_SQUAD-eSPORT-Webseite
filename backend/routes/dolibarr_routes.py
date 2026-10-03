@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, require_area, require_super
 from database import get_db
 from models import new_id, now_utc
-from services.dolibarr_billing import DEFAULT_MODE_CODE, DEFAULT_TAX_RATES, DEFAULT_TERM_CODE, TERM_FIELDS, tax_confirmed, tax_rate_for, terms_complete
+from services.dolibarr_billing import DEFAULT_MODE_CODE, DEFAULT_PDF_LANG, DEFAULT_TAX_RATES, DEFAULT_TERM_CODE, PDF_LANGS, TERM_FIELDS, pdf_lang, tax_confirmed, tax_rate_for, terms_complete
 from services.dolibarr_client import (
     ENVIRONMENTS, MODES, SETTINGS_ID, DolibarrClient, DolibarrError, capabilities_for, clean_base_url, load_settings,
     write_capable,
@@ -157,6 +157,9 @@ async def dolibarr_status(me: dict = Depends(require_area("club", "system"))):
             "payment_mode_id": settings.get("invoice_payment_mode_id") or None,
             "bank_account_id": settings.get("invoice_bank_account_id") or None,
             "complete": terms_complete(settings),
+            # Sprache der Rechnungs-PDFs (#840) - ohne Angabe käme bei „automatisch“ in Dolibarr ein englisches PDF.
+            "pdf_lang": pdf_lang(settings),
+            "pdf_langs": [{"code": code, "label": label} for code, label in PDF_LANGS.items()],
         },
         "webhook_configured": secret_is_configured(settings.get("webhook_token")),
         "auto_link_verified_email": bool(settings.get("auto_link_verified_email")),
@@ -296,6 +299,8 @@ class DolibarrSettingsUpdate(BaseModel):
     invoice_payment_term_id: int | None = Field(None, ge=0, le=999999)
     invoice_payment_mode_id: int | None = Field(None, ge=0, le=999999)
     invoice_bank_account_id: int | None = Field(None, ge=0, le=999999)
+    # Sprache der Rechnungs-PDFs (#840): ein Code aus PDF_LANGS, "" = wie in Dolibarr eingestellt.
+    invoice_pdf_lang: str | None = Field(None, max_length=10)
     instance: str | None = Field(None, max_length=60)
     entity: int | None = Field(None, ge=1, le=9999)
     auto_link_verified_email: bool | None = None
@@ -353,6 +358,11 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
     for key in TERM_FIELDS:
         if key in data:
             updates[key] = int(data[key]) if data[key] else None
+    if "invoice_pdf_lang" in data:
+        value = DEFAULT_PDF_LANG if data["invoice_pdf_lang"] is None else data["invoice_pdf_lang"]
+        if value not in PDF_LANGS:
+            raise HTTPException(400, "Diese Sprache gibt es für Rechnungs-PDFs nicht.")
+        updates["invoice_pdf_lang"] = value
     if "tax_confirmed" in data:
         if data["tax_confirmed"]:
             updates["tax_confirmed_at"] = now_utc().isoformat()

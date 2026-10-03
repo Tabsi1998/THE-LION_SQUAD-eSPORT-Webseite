@@ -4,7 +4,11 @@ import { api } from "@/lib/api";
 // Rechnungskonditionen (#370): Zahlungsziel, Zahlungsart und Bankkonto für jeden Beleg aus der
 // Website. Die Listen kommen aus Dolibarr; darf der Website-Benutzer eine nicht lesen, wird die
 // Nummer getippt (sie steht in Dolibarr in der Adresszeile des Eintrags, „id=…“). Ohne alle drei
-// bleibt jeder Beleg Entwurf - auch wenn „gleich freigeben“ an ist.
+// bleibt jeder Beleg Entwurf - auch wenn „gleich freigeben“ an ist. Dazu die Sprache der Rechnungs-PDFs (#840): ohne
+// Angabe nähme Dolibarr die Vorgabe des Website-Benutzers, bei „automatisch“ käme ein englisches PDF heraus.
+
+const DEFAULT_LANG = "de_AT";
+const FALLBACK_LANGS = [{ code: DEFAULT_LANG, label: "Deutsch (Österreich)" }];
 
 const FIELDS = [
   { key: "payment_term_id", setting: "invoice_payment_term_id", list: "terms", label: "Zahlungsziel", hint: "Vorgabe des Vereins: 30 Tage" },
@@ -15,17 +19,21 @@ const FIELDS = [
 export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
   const [options, setOptions] = useState(null);
   const [draft, setDraft] = useState(() => valuesOf(terms));
+  const savedLang = terms?.pdf_lang ?? DEFAULT_LANG;
+  const [lang, setLang] = useState(savedLang);
   useEffect(() => { setDraft(valuesOf(terms)); }, [terms?.payment_term_id, terms?.payment_mode_id, terms?.bank_account_id]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setLang(savedLang); }, [savedLang]);
   useEffect(() => {
     if (!connected) { setOptions(null); return; }
     api.get("/admin/dolibarr/invoice-options").then(({ data }) => setOptions(data)).catch(() => setOptions({ available: false, terms: null, modes: null, accounts: null, suggested: {} }));
   }, [connected]);
 
-  const dirty = FIELDS.some((field) => String(draft[field.key] || "") !== String(terms?.[field.key] || ""));
+  const termsDirty = FIELDS.some((field) => String(draft[field.key] || "") !== String(terms?.[field.key] || ""));
+  const dirty = termsDirty || lang !== savedLang;
   const suggested = options?.suggested || {};
   const canSuggest = FIELDS.some((field) => suggested[field.key] && !draft[field.key]);
   const complete = FIELDS.every((field) => Number(draft[field.key]) > 0);
-  const save = () => onSave(Object.fromEntries(FIELDS.map((field) => [field.setting, Number(draft[field.key]) > 0 ? Number(draft[field.key]) : 0])));
+  const save = () => onSave({ ...Object.fromEntries(FIELDS.map((field) => [field.setting, Number(draft[field.key]) > 0 ? Number(draft[field.key]) : 0])), invoice_pdf_lang: lang });
 
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-3" data-testid="invoice-terms">
@@ -62,6 +70,13 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
           );
         })}
       </div>
+      <label className="block text-xs max-w-xs">
+        <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Sprache der Rechnungs-PDFs</div>
+        <select value={lang} onChange={(ev) => setLang(ev.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="invoice-terms-pdf-lang">
+          {(terms?.pdf_langs?.length ? terms.pdf_langs : FALLBACK_LANGS).map((option) => <option key={option.code || "dolibarr"} value={option.code}>{option.label}</option>)}
+        </select>
+        <div className="mt-1 text-white/40">Dolibarr erzeugt jedes Rechnungs-PDF gleich beim Freigeben – in dieser Sprache.</div>
+      </label>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!!busy || !dirty} onClick={save} data-testid="invoice-terms-save" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Konditionen speichern</button>
         {canSuggest && (
@@ -69,7 +84,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave }) {
             Vorschlag übernehmen (30 Tage, Überweisung{suggested.bank_account_id ? ", Konto" : ""})
           </button>
         )}
-        {dirty && !complete && <span className="text-xs text-[#FFD700] self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
+        {termsDirty && !complete && <span className="text-xs text-[#FFD700] self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
       </div>
     </div>
   );

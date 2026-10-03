@@ -163,7 +163,8 @@ async def test_settings_offer_the_dolibarr_lists_and_refuse_auto_validate_withou
     ok = await flow.put("/api/admin/dolibarr/settings", json={"invoice_auto_validate": True, "tax_confirmed": True, **TERMS})
     assert ok.status_code == 200, ok.text
     status = (await flow.get("/api/admin/dolibarr/status")).json()
-    assert status["invoice_terms"] == {"payment_term_id": 2, "payment_mode_id": 2, "bank_account_id": 1, "complete": True}
+    terms = status["invoice_terms"]
+    assert {key: terms[key] for key in ("payment_term_id", "payment_mode_id", "bank_account_id", "complete")} == {"payment_term_id": 2, "payment_mode_id": 2, "bank_account_id": 1, "complete": True}
     assert status["invoice_auto_validate"] is True
     assert status["tax_confirmed"]["at"] and status["tax_rates"] == {"none": 0.0, "standard": 20.0, "reduced": 10.0}
     # Bestätigung zurückgenommen: das automatische Freigeben geht mit aus.
