@@ -33,8 +33,9 @@ export const SETUP_GUIDES = {
       { text: "Server-ID: in Discord unter Einstellungen → Erweitert den „Entwicklermodus“ einschalten, dann Rechtsklick auf den Server → „Server-ID kopieren“ – hier eintragen (leer = der Server, auf dem der Bot ist)." },
       { text: "Rollen: die Rollennamen für Mitglieder und Vorstand hier eintragen; die Bot-Rolle muss in Discord über diesen Rollen stehen (Server-Einstellungen → Rollen → Reihenfolge), sonst darf er sie nicht vergeben." },
       { text: "„Bot einschalten“ und speichern. Der Stand (online, Server, letzter Rollenabgleich) steht direkt darunter." },
+      { text: "Weitere Server (etwa je Spiel): im Reiter „Server“ auf „Bot auf einen weiteren Server holen“ klicken – der Link bringt dieselben Rechte mit. Der neue Server erscheint binnen einer Minute als ausgeschalteter Unterserver; „Prüfen“ sagt, was dem Bot dort fehlt." },
     ],
-    notes: ["Rollen bekommen nur Konten mit bestätigter Discord-Verknüpfung (siehe Konten verknüpfen)."],
+    notes: ["Rollen bekommen nur Konten mit bestätigter Discord-Verknüpfung (siehe Konten verknüpfen).", "Es gibt immer genau einen Hauptserver – er bekommt alle Meldungen wie bisher und lässt sich nicht ausschalten."],
   },
   discord_channels: {
     key: "discord_channels",

@@ -160,6 +160,27 @@ gelten wie bei Push. Ohne Verknüpfung gibt es den Kanal nicht.
   `notification_preferences.discord_allowed`, `BotRunner.send_dm`; der Fan-out sitzt in
   `user_notifications.create_user_notification` neben Push.
 
+## Mehrere Server (Discord VI, #624)
+
+Ein Bot-Token kann auf beliebig vielen Servern sein – es braucht keinen zweiten Bot. Unter
+Verbindungen → Discord → Reiter **„Server“** stehen alle Server, auf denen der Bot ist:
+
+- **Genau ein Hauptserver.** Nach dem Deploy ist es der heutige (die eingetragene Server-ID, sonst
+  der erste); er bekommt alle Meldungen wie bisher und lässt sich nicht ausschalten. „Zum
+  Hauptserver“ macht einen anderen zum Hauptserver, der bisherige wird Unterserver.
+- **Neue Server** erscheinen von selbst (Bot beitreten, verlassen, umbenennen) – als
+  **ausgeschalteter Unterserver**, bis du sie einschaltest. Verlassene bleiben mit Hinweis sichtbar.
+- **„Bot auf einen weiteren Server holen“:** der Einladungslink mit denselben Rechten.
+- **Prüfen** je Server: Bot anwesend, fehlende Rechte in Worten mit Klickweg, beim Hauptserver die
+  Kanäle je Zweck mit dem letzten Versand. **Test:** am Hauptserver in den privaten Testkanal, am
+  Unterserver in dessen Systemkanal – öffentlich, darum erst nach Bestätigung.
+- **Einladungslink** je Server: eintragen oder vom Bot erzeugen lassen (unbegrenzt gültig); **Notiz**.
+- Code: `services/discord_guilds.py` (`reconcile`, `update_guild` mit der Ein-Haupt-Regel, `health`,
+  `send_test`), Sammlung `discord_guilds`, Routen `routes/discord_guild_routes.py`
+  (`/api/settings/discord/guilds…`), Bot `_sync_guilds`/`create_invite`.
+
+Kanalziele, Versand, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
+
 ## Konten verknüpfen (Discord, Twitch, Steam)
 
 Mitglieder verknüpfen im Profil → Socials ihr Discord-, Twitch- oder Steam-Konto per Anmeldung

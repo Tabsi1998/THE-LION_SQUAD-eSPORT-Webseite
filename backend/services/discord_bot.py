@@ -127,6 +127,17 @@ async def answer_kwargs(answer: dict) -> dict:
     return kwargs
 
 
+def guild_row(guild) -> dict:
+    """Ein Server für das Verzeichnis (#624) - Name, Symbol, Mitgliederzahl und was der Bot dort darf."""
+    from services.discord_guilds import permission_snapshot
+
+    me = getattr(guild, "me", None)
+    icon = getattr(guild, "icon", None)
+    return {"guild_id": str(guild.id), "name": str(getattr(guild, "name", "") or ""), "icon_url": str(icon.url) if icon else None,
+            "member_count": getattr(guild, "member_count", None),
+            "bot_permissions": permission_snapshot(me.guild_permissions) if me is not None else {}}
+
+
 def counted_user(author_id: str, author_is_bot: bool, links: dict[str, str]) -> str | None:
     """Der Nutzer, dem eine Nachricht zählt - oder None (Bot, nicht verknüpft)."""
     if author_is_bot:
@@ -406,6 +417,20 @@ class BotRunner:
             except Exception as exc:
                 runner.last_error = f"Befehle: {exc}"
             await record_state(db, connected=True, guild_name=runner.guild_name, last_error=runner.last_error, last_action=runner.last_action, started_at=now_utc().isoformat())
+            await runner._sync_guilds(client, view)
+
+        # Server-Verzeichnis (#624): beitreten, verlassen, umbenennen - das Verzeichnis zieht nach.
+        @client.event
+        async def on_guild_join(guild):
+            await runner._sync_guilds(client, view)
+
+        @client.event
+        async def on_guild_remove(guild):
+            await runner._sync_guilds(client, view)
+
+        @client.event
+        async def on_guild_update(before, after):
+            await runner._sync_guilds(client, view)
 
         @client.event
         async def on_member_join(member):
@@ -526,6 +551,55 @@ class BotRunner:
             logger.warning("[discord-bot] Befehl: %s", type(exc).__name__)
             kwargs = {"content": "Das hat gerade nicht geklappt – versuch es gleich noch einmal.", "ephemeral": True}
         await interaction.followup.send(**kwargs)
+
+    async def _sync_guilds(self, client, view: dict) -> None:
+        """Die Server des Bots ins Verzeichnis (#624) - ein Fehler hier hält den Bot nie auf."""
+        from services import discord_guilds
+
+        try:
+            await record_state(get_db(), application_id=str(getattr(client, "application_id", "") or ""))
+            await discord_guilds.reconcile(get_db(), [guild_row(guild) for guild in client.guilds], configured_main=str(view.get("guild_id") or ""))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[discord-bot] Server-Verzeichnis: %s", type(exc).__name__)
+
+    def connected_guild_ids(self) -> set[str] | None:
+        """Auf welchen Servern der Bot gerade ist - None, wenn er nicht verbunden ist (dann weiß es niemand)."""
+        client = self._client
+        if client is None or not self.connected:
+            return None
+        return {str(guild.id) for guild in client.guilds}
+
+    def system_channel_id(self, guild_id: str) -> str:
+        """Der Systemkanal eines Servers (dort grüßt Discord neue Mitglieder) - für den Test auf einem Unterserver."""
+        client = self._client
+        guild = client.get_guild(int(guild_id)) if client is not None and str(guild_id).isdigit() else None
+        channel = getattr(guild, "system_channel", None) if guild is not None else None
+        return str(channel.id) if channel is not None else ""
+
+    async def create_invite(self, guild_id: str, channel_id: str = "") -> dict:
+        """Einen unbegrenzt gültigen Einladungslink erzeugen (#624) - im angegebenen Kanal, sonst im Systemkanal oder im
+        ersten Kanal, in dem der Bot einladen darf. Braucht „Einladung erstellen“."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        guild = client.get_guild(int(guild_id)) if str(guild_id).isdigit() else None
+        if guild is None:
+            return {"ok": False, "reason": "unknown_guild"}
+        channel = guild.get_channel(int(channel_id)) if str(channel_id).isdigit() else None
+        if channel is None:
+            candidates = [guild.system_channel, *guild.text_channels]
+            channel = next((entry for entry in candidates if entry is not None and entry.permissions_for(guild.me).create_instant_invite), None)
+        if channel is None:
+            return {"ok": False, "reason": "forbidden"}
+        try:
+            invite = await channel.create_invite(max_age=0, max_uses=0, unique=False, reason="LION Website: Einladungslink")
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        return {"ok": True, "url": str(invite.url)}
 
     def _guild(self, view: dict | None = None):
         client = self._client
