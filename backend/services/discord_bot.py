@@ -658,7 +658,9 @@ class BotRunner:
         guild = self._guild() if self._client is not None and self.connected else None
         if guild is None:
             return {"ok": False, "reason": "offline", "roles": []}
-        rows = [{"id": str(role.id), "name": role.name, "color": int(getattr(role.colour, "value", 0) or 0)}
+        # „mentionable“: Discord pingt eine Rolle nur, wenn jeder sie erwähnen darf (oder der Bot @everyone erwähnen darf -
+        # das bekommt er bewusst nicht).
+        rows = [{"id": str(role.id), "name": role.name, "color": int(getattr(role.colour, "value", 0) or 0), "mentionable": bool(getattr(role, "mentionable", False))}
                 for role in sorted(guild.roles, key=lambda role: role.position, reverse=True)
                 if not role.is_default() and not getattr(role, "managed", False)]
         return {"ok": True, "roles": rows}

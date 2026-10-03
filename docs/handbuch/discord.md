@@ -5,8 +5,8 @@ Discord selbst einrichtet: Hauptserver, Unterserver, Kanäle, Rollen und die Rec
 
 **Wo im Admin:**
 
-- **Admin → Verbindungen → Discord** (`/admin/integrations/discord`) mit fünf Reitern:
-  **Meldungen** · **Einbettungen & Termine** · **Willkommen** · **Bot & Aktivität** · **Server**
+- **Admin → Verbindungen → Discord** (`/admin/integrations/discord`) mit sechs Reitern:
+  **Meldungen** · **Einbettungen & Termine** · **Gestaltung** · **Willkommen** · **Bot & Aktivität** · **Server**
 - **Admin → Verbindungen → Konten verknüpfen** – die Discord-Anmeldung für Mitglieder
 - **Admin → Spiele → Spiel bearbeiten → Discord-Server** – welcher Server zu welchem Spiel gehört
 
@@ -38,6 +38,8 @@ es gibt keinen eigenen Container und nichts in der `.env`.
 | **Turnier-Thread** | Je Turnier eine Meldung im Kanal, alles Weitere (Check-in, live, Streams, Bracket, Endstand) im Thread darunter | Reiter „Meldungen“ | an |
 | **Bracket im Discord** | Das Bracket eines laufenden Turniers, angeheftet und nach jedem Ergebnis aktualisiert | automatisch im Turnier-Thread | an |
 | **Einbettungen, die sich aktualisieren** | Je eine angeheftete Nachricht: Rangliste, Nächste Events, Live jetzt, Erfolg der Woche | Reiter „Einbettungen & Termine“ | aus |
+| **Stream-Meldungen** | Je Stream eine Meldung mit Vorschaubild, sobald jemand aus dem Verein live geht; am Ende „war live“ | Reiter „Einbettungen & Termine“ | aus |
+| **Gestaltung** | Aussehen der Stream-Meldungen und Einbettungen frei gestalten – mit Live-Vorschau | Reiter „Gestaltung“ | Standard-Design |
 | **Discord-Termine** | Jedes öffentliche Event und Turnier als Discord-Event mit „Interessiert“-Knopf | Reiter „Einbettungen & Termine“ | aus |
 | **Willkommensnachricht** | Wer neu auf den Server kommt, bekommt eine Direktnachricht mit „Anmelden“ und „Konto verknüpfen“ | Reiter „Willkommen“ | aus |
 | **Rollen** | Mitglied, Vorstand, Turnierleitung werden automatisch vergeben und entzogen | Reiter „Bot & Aktivität“ | an, sobald der Bot verbunden ist |
@@ -238,11 +240,26 @@ Je Einbettung: Kanal wählen, einschalten, speichern. Aktualisiert wird bei Änd
 einmal pro Minute), die Fußzeile „Stand: …“ alle zehn Minuten. Wird die Nachricht gelöscht, postet
 der Bot sie neu.
 
-*Gestaltung:* Aussehen und Texte dieser Einbettungen lassen sich heute noch nicht ändern. Ein neues
-Design und ein Editor mit Vorschau sind geplant (Issue #866) – dazu Stream-Meldungen je Stream wie
-bei Stream-Bots.
+Aussehen und Texte gestaltet ihr im Reiter „Gestaltung“ ([4.12](#412-gestaltung-der-meldungen)).
 
-### 4.4 Discord-Termine
+### 4.4 Stream-Meldungen je Stream
+
+**Reiter „Einbettungen & Termine“ → „Stream-Meldungen“.** Sobald jemand aus dem Verein live geht, postet der
+Bot eine Meldung – wie Stream-Bots: Text über dem Kasten („🔴 Paula ist jetzt live auf Twitch!“), Autor mit
+Bild aus dem Mitgliederprofil, Titel des Streams als Link, Spiel und Zuschauer, Logo rechts, großes
+Vorschaubild, Fußzeile mit Uhrzeit, Knopf „Zuschauen“.
+
+- **Kanal** wählen, **„an“**, Speichern.
+- **Rolle erwähnen** (optional, z. B. `@Stream-Ping`): pingt einmal beim Start – nie @everyone. Discord pingt
+  eine Rolle nur, wenn sie erwähnt werden darf: Servereinstellungen → Rollen → die Rolle → „Jedem erlauben,
+  diese Rolle zu @erwähnen“. Das Panel sagt es, wenn das fehlt.
+- **Alle zehn Minuten** aktualisiert: Zuschauer, Titel, Spiel, neues Vorschaubild.
+- **Wenn der Stream endet:** die Meldung wird zu „war live“ mit Dauer und Höchstzahl – oder gelöscht.
+- Gemeldet wird, wer auch auf der Startseite erscheint: aktive Mitgliedschaft und Mitgliederprofil mit
+  verknüpftem Twitch. Höchstens fünf neue Meldungen auf einmal (etwa nach einem Ausfall).
+- Rechte im Kanal: wie bei allen Meldungen, dazu „Nachrichtenverlauf anzeigen“ zum Aktualisieren.
+
+### 4.5 Discord-Termine
 
 **Reiter „Einbettungen & Termine“ → „Discord-Termine“ → „Termine anlegen“.** Jedes öffentliche Event
 und Turnier mit Beginn in der Zukunft bekommt **einen** Discord-Termin (Name, Beschreibung,
@@ -252,7 +269,7 @@ oder auf „Ohne Discord“ gesetzt, wird er abgesagt. Abgleich alle fünf Minut
 „Auch interne Events“ nur einschalten, wenn der Server selbst intern ist – Discord-Termine sieht
 jeder auf dem Server.
 
-### 4.5 Willkommensnachricht
+### 4.6 Willkommensnachricht
 
 **Reiter „Willkommen“.** Wer neu auf den Server kommt, bekommt **einmal** eine Direktnachricht vom
 Bot mit den Knöpfen „Auf der Website anmelden“ und „Konto verknüpfen“ – egal, über welchen eurer
@@ -262,7 +279,7 @@ Server er beitritt.
 - „Vorschau“ und „An mich senden“ zum Prüfen; **aus**, bis ihr den Text geprüft habt.
 - Lässt jemand keine Direktnachrichten zu, passiert nichts.
 
-### 4.6 Befehle
+### 4.7 Befehle
 
 Tippt man `/` im Hauptserver, erscheinen die Befehle des Bots. **Jede Antwort sieht nur, wer
 fragt.**
@@ -279,38 +296,55 @@ fragt.**
 | `/mitglied` | eigener Stand im Verein (Art, seit wann – nie Beitrag oder Zahlungsdaten) | verknüpfte Konten |
 | `/status` | Stand des Bots | Vorstand |
 
-### 4.7 Aktivität zählen
+### 4.8 Aktivität zählen
 
 **Reiter „Bot & Aktivität“ → „Nachrichten zählen“.** Jede Nachricht eines verknüpften Kontos zählt
 eins hoch – auf allen Servern, auf denen der Bot ist. Gezählt wird die **Zahl**, nie der Inhalt.
 Die Zähler stehen darunter und lassen sich je Person korrigieren. Sie zählen für die Erfolge
 „Discord-Aktiv“.
 
-### 4.8 Persönliche Benachrichtigungen per Direktnachricht
+### 4.9 Persönliche Benachrichtigungen per Direktnachricht
 
 Jedes Mitglied entscheidet selbst: **Profil → Benachrichtigungen → Kanal „Discord“**. Dann kommen
 dieselben Benachrichtigungen wie in der App als Direktnachricht vom Bot. Voraussetzungen: Konto
 verknüpft, mit dem Bot auf einem Server, und in Discord „Direktnachrichten von Servermitgliedern“
 erlaubt. Nie in einer Direktnachricht: Texte anderer Personen, Moderation, Zahlungsdaten.
 
-### 4.9 Konto verknüpfen (für Mitglieder)
+### 4.10 Konto verknüpfen (für Mitglieder)
 
 **Profil → Socials → Discord verknüpfen** – Anmeldung bei Discord, fertig. Erst damit gibt es
 Rollen, `/meine-erfolge`, `/mitglied`, Direktnachrichten und das Zählen. Die Website bekommt nur
 Kennung und Name des Kontos – keine Passwörter, Freundeslisten oder Nachrichten. Trennen geht
 jederzeit im Profil.
 
-### 4.10 Discord auf der Website
+### 4.11 Discord auf der Website
 
 Damit die Website zeigen kann, dass im Discord etwas los ist: Discord → **Servereinstellungen →
 Widget → „Server-Widget aktivieren“**.
 
-- **Jede Seite, unten im Block „Dabei sein“:** „42 online · 5 im Voice“ neben „Discord beitreten“
-  (bis zum Update mit PR #862 als eigene Leiste auf der Startseite).
+- **Jede Seite, unten im Block „Dabei sein“:** „42 online · 5 im Voice“ neben „Discord beitreten“.
 - **Mitgliederbereich (Web und App):** „Discord jetzt“ mit den belegten Sprachkanälen.
 - **Nie Namen von Personen** – nur Zahlen. Private Sprachkanäle bleiben unsichtbar.
 
 Den Stand zeigt **Reiter „Bot & Aktivität“ → „Discord auf der Website“** mit „Jetzt prüfen“.
+
+### 4.12 Gestaltung der Meldungen
+
+**Reiter „Gestaltung“.** Jede Meldungsart ist eine Vorlage – heute: *Stream gestartet*, *Stream beendet*,
+*Live jetzt*, *Nächste Events und Turniere*, *Rangliste*, *Erfolg der Woche* (News, Events und Turniere folgen).
+
+- **Formular** (Farbe, Text über dem Kasten, Autorzeile mit Bild, Titel mit Link, Text, Felder, Bild rechts,
+  großes Bild, Fußzeile mit Symbol, Uhrzeit) oder **JSON** im Discord-Format.
+- **Platzhalter** wie `{streamer}`, `{title}`, `{viewers}` anklicken – sie landen im zuletzt gewählten Feld.
+  Was in `[[ … ]]` steht, erscheint nur, wenn jeder Platzhalter darin einen Wert hat:
+  `🎮 {game}[[ · seit {started}]]`.
+- **Listen** (Live jetzt, Nächste Events, Rangliste): je Eintrag ein Feld oder eine Zeile im Text.
+- **Vorschau** rechts – mit Beispieldaten oder den **echten Daten von jetzt**. So sieht es im Discord aus.
+- **Speichern** geht nur, wenn die Vorlage passt; was nicht passt, steht in Worten unter der Vorschau.
+  **Testnachricht** schickt den Entwurf in den Testkanal (ohne jemanden zu erwähnen),
+  **Standard wiederherstellen** holt das eingebaute Design zurück.
+- Formatierung wie im Discord: `**fett**`, `*kursiv*`, `__unterstrichen__`, `[Text](https://…)`. Bilder
+  brauchen eine volle Adresse mit https:// oder einen Platzhalter.
 
 ---
 
@@ -402,6 +436,7 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 - **Privates geht nie in einen öffentlichen Kanal**, und ein privater Kanal fällt nie auf einen
   öffentlichen zurück. Fehlt der Mitglieder- oder Vorstandskanal, wird nichts gesendet.
 - **Bot aus = keine Meldung.** Es gibt keinen Umweg über andere Wege.
+- **Nie @everyone oder @here.** Erwähnt wird höchstens die eine Rolle, die ihr bei den Stream-Meldungen wählt.
 - **Der Bot liest keine Nachrichten.** Er zählt nur, dass jemand geschrieben hat.
 - **Keine Namen aus dem Widget:** Die Website verwirft sie beim Abruf; gezeigt werden nur Zahlen.
 - **In Direktnachrichten keine Texte anderer Personen**, keine Moderation, keine Zahlungsdaten.
@@ -416,9 +451,9 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 Nein. Ein Bot, beliebig viele Server – einladen über den Reiter „Server“.
 
 **Kann der Vereins-Bot andere Bots ersetzen?**
-Für Meldungen, Rollen (die drei Vereinsrollen), Termine, Willkommensnachricht und die Befehle: ja.
-Stream-Meldungen je Stream (wie bei Twitch-Bots) und frei gestaltbare Meldungen mit Vorschau sind
-geplant (Issue #866). Musik, Moderation, Reaktionsrollen, Tickets kann er nicht.
+Für Meldungen, Stream-Meldungen je Stream (wie bei Twitch-Bots), Rollen (die drei Vereinsrollen), Termine,
+Willkommensnachricht und die Befehle: ja – das Aussehen gestaltet ihr im Reiter „Gestaltung“. Musik,
+Moderation, Reaktionsrollen, Tickets kann er nicht.
 
 **Wo ändere ich Name und Bild des Bots?**
 Developer Portal → eure Anwendung → Bot → Username und Icon. Einen anderen Namen nur auf einem

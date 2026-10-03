@@ -41,6 +41,7 @@ export function DiscordStreamsPanel({ onDesign }) {
   }, [load]);
 
   if (!state) return null;
+  const chosenRole = (state.roles || []).find((role) => role.id === draft.role_id);
   const dirty = draft.enabled !== !!state.enabled || draft.channel_id !== (state.channel_id || "") || draft.on_end !== (state.on_end || "edit") || draft.role_id !== (state.role_id || "");
   const save = async () => {
     setBusy(true);
@@ -103,6 +104,11 @@ export function DiscordStreamsPanel({ onDesign }) {
             <input value={draft.role_id} onChange={(event) => setDraft((current) => ({ ...current, role_id: event.target.value.replace(/\D/g, "") }))} placeholder="Rollen-ID (optional)" className={INPUT} data-testid="discord-streams-role" />
           )}
           <div className="mt-1 text-white/40">Pingt einmal beim Start – nie @everyone.</div>
+          {chosenRole && chosenRole.mentionable === false && (
+            <div className="mt-1 text-[#FFD700]" data-testid="discord-streams-role-hint">
+              Discord pingt diese Rolle nicht: Servereinstellungen → Rollen → @{chosenRole.name} → „Jedem erlauben, diese Rolle zu @erwähnen“ einschalten.
+            </div>
+          )}
         </label>
       </div>
       <div className={`text-xs ${state.last_error || state.reason ? "text-[#FFD700]" : "text-white/50"}`} data-testid="discord-streams-state">{streamStateText(state)}</div>

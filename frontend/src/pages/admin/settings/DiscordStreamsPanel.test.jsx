@@ -11,7 +11,8 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 const { DiscordStreamsPanel, streamStateText } = await import("./DiscordStreamsPanel");
 
 const STATE = { enabled: false, channel_id: "", on_end: "edit", role_id: "", open: 0, last_run_at: null, last_error: null,
-  reason: "disabled", reason_text: "Stream-Meldungen sind aus.", roles: [{ id: "300000000000000001", name: "Stream-Ping" }], roles_available: true };
+  reason: "disabled", reason_text: "Stream-Meldungen sind aus.", roles_available: true,
+  roles: [{ id: "300000000000000001", name: "Stream-Ping", mentionable: true }, { id: "300000000000000002", name: "Mitglied", mentionable: false }] };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -36,7 +37,10 @@ test("Schalter, Kanal, Ende und Rolle gehen gemeinsam an den Server", async () =
   expect(screen.getByRole("option", { name: "#regeln – Bot darf hier nicht schreiben" })).toBeDisabled();
   fireEvent.change(screen.getByTestId("discord-streams-channel"), { target: { value: "100000000000000011" } });
   fireEvent.change(screen.getByTestId("discord-streams-end"), { target: { value: "delete" } });
+  fireEvent.change(screen.getByTestId("discord-streams-role"), { target: { value: "300000000000000002" } });
+  expect(screen.getByTestId("discord-streams-role-hint")).toHaveTextContent("„Jedem erlauben, diese Rolle zu @erwähnen“ einschalten");
   fireEvent.change(screen.getByTestId("discord-streams-role"), { target: { value: "300000000000000001" } });
+  expect(screen.queryByTestId("discord-streams-role-hint")).toBeNull();
   fireEvent.click(screen.getByTestId("discord-streams-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord/streams", { enabled: true, channel_id: "100000000000000011", on_end: "delete", role_id: "300000000000000001" }));
   expect(toastMock.success).toHaveBeenCalledWith("Stream-Meldungen gespeichert – der nächste Stream wird gemeldet.");
