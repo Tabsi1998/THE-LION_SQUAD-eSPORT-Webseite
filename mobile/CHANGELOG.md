@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.6 - 2026-10-02
+
+- Mobile: Silvester in der App wie auf der Website – dieselben Raketen zur selben Sekunde: ab dem 29. Dezember abends ein paar, am 31. mehr, ab 23 Uhr „noch 42 Min.“ im Dashboard-Kopf, ab 23:59 der Countdown, um Mitternacht „Frohes neues Jahr“ mit einem Vibrieren und drei großen Salven. Sechs Feuerwerksarten mit eigener Physik, jedes Jahr eine eigene Choreografie. Ton nur nach Einschalten (Lautsprecher-Knopf im Kopf), „dezent“ ohne Raketen (#642, #739–#743).
+- Mobile: Winterhimmel hinter dem Inhalt: nachts ein leiser Blauschein und wenige Sterne, um Sonnenauf- und -untergang ein warmes Glühen auf der Seite der Sonne – nach dem echten Licht und Wetter am Vereinsort (#730).
+- Mobile: Töne der Saison-Deko kommen auf Android jetzt nach der Medienlautstärke – vorher blieben sie stumm, solange das Handy auf Vibration stand. Auf dem iPhone gilt weiter der Stummschalter.
+- Mobile: Die Halloween-Katze ist auf dunklem Grund besser zu sehen: heller Saum im Mondlicht, leiser Schein.
+
 ## 1.0.5 - 2026-10-02
 
 - Mobile: Schnee in der App ab dem 1. Advent bis Dreikönig: Flocken in drei Tiefen, hinten klein und weich, vorne groß als Kristall, mit Wind und Böen aus dem echten Wetter am Vereinsort – schneit es draußen, wird es dichter. Die Flocken gehören zum Screen und ziehen beim Scrollen mit. Im Dashboard-Kopf schwebt eine Schneeflocke zum Fangen; fünfzig gefangene ergeben den Schneekönig (#642, #678).
