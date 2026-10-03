@@ -1,7 +1,10 @@
-import { MessageCircle, Volume2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Volume2 } from "lucide-react";
+import { api } from "@/lib/api";
 
-// Discord auf der Website (#581): aus dem Server-Widget nur Zahlen. Die Startseite zeigt eine schmale Leiste
-// („42 online · 5 im Voice“ und „Beitreten“), der Mitgliederbereich je belegtem Sprachkanal Name und Zahl.
+// Discord auf der Website (#581): aus dem Server-Widget nur Zahlen. Der Block „Dabei sein“ im Footer jeder Seite zeigt
+// „42 online · 5 im Voice“ neben „Discord beitreten“ (#854 - vorher eine eigene Leiste auf der Startseite), der
+// Mitgliederbereich je belegtem Sprachkanal Name und Zahl.
 // Namen von Personen gibt es hier nie - der Server verwirft sie schon beim Abruf.
 
 export function discordSummary(discord) {
@@ -11,27 +14,53 @@ export function discordSummary(discord) {
   return voice > 0 ? `${online} online · ${voice} im Voice` : `${online} online`;
 }
 
-/** Die Leiste auf der Startseite - ohne Widget gar nichts. */
-export function DiscordPulse({ discord }) {
+// Einmal je Seitenaufruf-Sitzung geholt und zwei Minuten gemerkt - jede Seite hat den Footer, Discord ändert sich langsam.
+const FRESH_MS = 120000;
+let cache = { data: null, at: 0, pending: null };
+
+/** Für Tests: den gemerkten Stand vergessen. */
+export function resetDiscordNow() {
+  cache = { data: null, at: 0, pending: null };
+}
+
+/** „Discord jetzt“ aus `/api/home/discord` - null, solange nichts da ist oder bei einem Fehler. */
+export function useDiscordNow() {
+  const [data, setData] = useState(() => cache.data);
+  useEffect(() => {
+    let alive = true;
+    if (cache.data && Date.now() - cache.at < FRESH_MS) {
+      setData(cache.data);
+      return undefined;
+    }
+    if (!cache.pending) {
+      cache.pending = api.get("/home/discord")
+        .then((response) => {
+          cache = { data: response?.data || null, at: Date.now(), pending: null };
+          return cache.data;
+        })
+        .catch(() => {
+          cache.pending = null;
+          return null;
+        });
+    }
+    cache.pending.then((value) => {
+      if (alive) setData(value);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return data;
+}
+
+/** Die Zeile neben „Discord beitreten“: grüner Punkt und die Zahlen - ohne Widget gar nichts. */
+export function DiscordLiveLine({ discord, testId = "footer-discord-live" }) {
   if (!discord?.available) return null;
   return (
-    <section className="border-b border-white/10 bg-[#5865F2]/[0.06]" data-testid="home-discord">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap items-center gap-x-6 gap-y-2">
-        <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.25em] text-[#b8c0ff]">
-          <MessageCircle className="w-4 h-4" aria-hidden="true" /> Discord
-        </span>
-        <span className="inline-flex items-center gap-2 text-sm text-white/80" data-testid="home-discord-summary">
-          <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" aria-hidden="true" />
-          {discordSummary(discord)}
-        </span>
-        {discord.invite ? (
-          <a href={discord.invite} target="_blank" rel="noreferrer" data-testid="home-discord-join"
-            className="sm:ml-auto inline-flex items-center gap-2 px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white text-[11px] font-bold uppercase tracking-wider rounded-sm transition">
-            Beitreten
-          </a>
-        ) : null}
-      </div>
-    </section>
+    <span className="inline-flex items-center gap-2 text-sm text-white/75 whitespace-nowrap" data-testid={testId}>
+      <span className="w-2 h-2 rounded-full bg-[#23A55A] animate-pulse" aria-hidden="true" />
+      {discordSummary(discord)}
+    </span>
   );
 }
 

@@ -14,6 +14,7 @@ import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { SeasonFooterSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
+import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
 import { DecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
 import { getCachedBranding, onBrandingUpdated, setCachedBranding } from "@/lib/brandingEvents";
@@ -68,6 +69,10 @@ export function PublicLayout({ children }) {
   const tagline = branding?.tagline || "eSports";
   const footerContact = contactLines(branding);
   const footerCta = footerButtons(branding);
+  // „Discord jetzt“ im Block „Dabei sein“ (#854): die Zahlen neben dem Knopf; ohne eigene Einladung die des Widgets.
+  const discordNow = useDiscordNow();
+  const widgetInvite = /^https:\/\//i.test(String(discordNow?.invite || "")) ? discordNow.invite : "";
+  const discordHref = footerCta.discord || widgetInvite;
   const twitchUrl = getTwitchUrl(branding?.twitch_channel);
   const socialLinks = getFooterSocialLinks(branding, twitchUrl);
 
@@ -199,8 +204,9 @@ export function PublicLayout({ children }) {
             </div>
             {/* Knopfleiste (#425): Discord als offizieller Knopf, Google Play als offizieller Badge (erst mit Link). */}
             <div className="flex flex-wrap items-center gap-3 shrink-0" data-testid="footer-buttons">
-              {footerCta.discord && (
-                <a href={footerCta.discord} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
+              <DiscordLiveLine discord={discordNow} />
+              {discordHref && (
+                <a href={discordHref} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
                 </a>
               )}
