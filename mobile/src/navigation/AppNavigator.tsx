@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { UnderHeaderContext } from "../components/Screen";
 import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
@@ -191,6 +192,11 @@ function MainTabs() {
   );
 }
 
+// Unterseiten mit Kopfzeile: der Screen darunter hält keinen zweiten Abstand zur Statusleiste (sonst leere Fläche).
+function stackScreenLayout({ options, children }: { options: { headerShown?: boolean }; children: React.ReactElement }) {
+  return <UnderHeaderContext.Provider value={options.headerShown !== false}>{children}</UnderHeaderContext.Provider>;
+}
+
 const stackOptions = {
   headerStyle: { backgroundColor: colors.black },
   headerTintColor: colors.cyan,
@@ -200,7 +206,7 @@ const stackOptions = {
 
 function TournamentStackScreen() {
   return (
-    <TournamentStack.Navigator screenOptions={stackOptions}>
+    <TournamentStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
       <TournamentStack.Screen name="TournamentList" component={TournamentsScreen} options={{ headerShown: false }} />
       <TournamentStack.Screen name="TournamentDetail" component={TournamentDetailScreen} options={{ title: "Turnier" }} />
       <TournamentStack.Screen name="EventDetail" component={EventDetailScreen} options={{ title: "Event" }} />
@@ -213,7 +219,7 @@ function TournamentStackScreen() {
 
 function TeamStackScreen() {
   return (
-    <TeamStack.Navigator screenOptions={stackOptions}>
+    <TeamStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
       <TeamStack.Screen name="TeamList" component={TeamsScreen} options={{ headerShown: false }} />
       <TeamStack.Screen name="TeamDetail" component={TeamDetailScreen} options={{ title: "Team" }} />
       <TeamStack.Screen name="TeamChat" component={TeamChatScreen} options={({ route }) => ({ title: route.params.title || "Team-Chat" })} />
@@ -223,7 +229,7 @@ function TeamStackScreen() {
 
 function MoreStackScreen() {
   return (
-    <MoreStack.Navigator screenOptions={stackOptions}>
+    <MoreStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
       <MoreStack.Screen name="MoreHub" component={MoreScreen} options={{ headerShown: false }} />
       <MoreStack.Screen name="InfoCenter" component={InfoCenterScreen} options={{ title: "Info Center" }} />
       <MoreStack.Screen name="PublicProfile" component={PublicProfileScreen} options={{ title: "Profil" }} />

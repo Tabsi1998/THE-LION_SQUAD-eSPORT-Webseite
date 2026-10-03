@@ -145,6 +145,11 @@ export const BRACKET_SECTION_LABELS = {
   loser: "Loser Bracket",
   grand_final: "Grand Final",
   bronze: "Spiel um Platz 3",
+  // Eigene Bäume (#833): „TP“ heißt in den Vorlagen das Spiel um Platz 3.
+  TP: "Spiel um Platz 3",
+  tp: "Spiel um Platz 3",
+  third_place: "Spiel um Platz 3",
+  THIRD_PLACE: "Spiel um Platz 3",
   round_robin: "Spieltage",
   LIGA: "Spieltage",
   swiss: "Schweizer Runden",
@@ -228,7 +233,7 @@ export function formatRoundName(value, number) {
     .replace(/^Round\b/i, "Runde")
     .replace(/^Winner Final$/i, "Winner Final")
     .replace(/^Loser Final$/i, "Loser Final")
-    .replace(/^Bronze Match$/i, "Spiel um Platz 3");
+    .replace(/^(Bronze Match|Platz 3 Match|Third Place( Match)?|3rd Place( Match)?)$/i, "Spiel um Platz 3");
 }
 
 export function isLeagueSchedule(tournamentOrFormat, matchOrStage = {}) {

@@ -19,7 +19,7 @@ vi.mock("@/components/tls/LazyImg", () => ({ LazyImg: () => null }));
 const authState = { user: null, isClubMember: false };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 
-const HomePage = (await import("./HomePage")).default;
+const { default: HomePage, glowOffset, newsCardSpan } = await import("./HomePage");
 
 const NEWS = [
   { id: "n1", slug: "cup-abgesagt", title: "Cup abgesagt", category: "announcement", excerpt: "Zu wenige Anmeldungen.", published_at: "2026-09-20T10:00:00Z" },
@@ -126,4 +126,21 @@ test("Mitglieder sehen im Hero keine Zeile - der Mitgliederbereich steht im Benu
   await screen.findByTestId("home-next-tournament-cup");
   expect(screen.queryByTestId("hero-join")).toBeNull();
   expect(screen.queryByText("Zum Mitgliederbereich")).toBeNull();
+});
+
+// Startseite I (#832): wie die große News im Raster steht, und wie weit das Licht dem Zeiger folgt.
+test("News-Raster: allein ganze Breite, zu zweit 2:1, zu dritt links über zwei Zeilen", () => {
+  expect(newsCardSpan(true, 1)).toBe("lg:col-span-3");
+  expect(newsCardSpan(true, 2)).toBe("lg:col-span-2");
+  expect(newsCardSpan(true, 3)).toBe("lg:col-span-2 lg:row-span-2");
+  expect(newsCardSpan(false, 3)).toBe("");
+});
+
+test("das Licht folgt dem Zeiger höchstens 28 × 20 Pixel und kehrt zur Mitte zurück", () => {
+  const center = { x: 1000, y: 400 };
+  const viewport = { width: 1440, height: 900 };
+  expect(glowOffset({ x: 1000, y: 400 }, center, viewport)).toEqual({ x: 0, y: 0 });
+  expect(glowOffset({ x: 1720, y: 850 }, center, viewport)).toEqual({ x: 28, y: 20 });
+  expect(glowOffset({ x: 0, y: 0 }, center, viewport)).toEqual({ x: -28, y: -18 });
+  expect(glowOffset({ x: 1360, y: 400 }, center, viewport)).toEqual({ x: 14, y: 0 });
 });

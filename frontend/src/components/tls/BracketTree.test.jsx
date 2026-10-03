@@ -105,11 +105,109 @@ describe("BracketTree", () => {
       ],
     };
     render(<BracketTree data={data} />);
-    expect(screen.getByTestId("bracket-heat-title-h1")).toHaveTextContent("Durchgang A · 4 Spieler · 2 kommen weiter");
+    // Zweizeilig statt abgeschnitten (#833): der Name oben, Spielerzahl und Weiterkommer darunter.
+    expect(screen.getByTestId("bracket-heat-title-h1")).toHaveTextContent("Durchgang A");
+    expect(screen.getByTestId("bracket-heat-meta-h1")).toHaveTextContent("4 Spieler · 2 kommen weiter");
     expect(screen.getByTestId("bracket-heat-h1")).not.toHaveTextContent("Platz");
     expect(screen.getByTestId("bracket-heat-h1")).not.toHaveTextContent("#");
     const played = screen.getByTestId("bracket-heat-h2").textContent;
     expect(played.indexOf("Ben")).toBeLessThan(played.indexOf("Anna"));
     expect(played).toContain("#1");
+  });
+});
+
+// Turniere I (#833): Kürzel statt leerer Quadrate, der Weg eines Spielers, „nicht gespielt“ nach dem Ende,
+// „Spiel um Platz 3“ statt „TP“, atmende Live-Partien.
+const { initials, pathState, roundTitle } = await import("./BracketTree");
+const { formatBracketSection, formatRoundName } = await import("@/lib/tournamentLabels");
+
+describe("Turniere I", () => {
+  it("rechnet Kürzel, Weg und Runden-Kopf", () => {
+    expect(initials("Joey Jo-Jo Junior")).toBe("JJ");
+    expect(initials("MrBelt")).toBe("M");
+    expect(initials("c1resa")).toBe("C");
+    expect(initials("  ")).toBe("");
+    expect(pathState(null, ["a"])).toBe("");
+    expect(pathState(new Set(["a"]), ["a", "b"])).toBe("on");
+    expect(pathState(new Set(["a"]), ["b", null])).toBe("off");
+    expect(formatBracketSection("TP")).toBe("Spiel um Platz 3");
+    expect(formatRoundName("Platz 3 Match", 1)).toBe("Spiel um Platz 3");
+    expect(roundTitle({ round_name: "Platz 3 Match" }, 1, "Spiel um Platz 3")).toBe("");
+    expect(roundTitle({ round_name: "Round 2" }, 2, "Winner Bracket")).toBe("Runde 2");
+  });
+
+  it("zeigt Kürzel statt leerer Quadrate - leere Plätze bleiben gestrichelt", () => {
+    render(<BracketTree data={knockout()} />);
+    const node = screen.getByTestId("bracket-match-v2-m1");
+    expect(node.querySelector("[data-testid='bracket-initials']")).toHaveTextContent("K");
+    const open = screen.getByTestId("bracket-match-v2-m3");
+    expect(open.querySelectorAll("[data-testid='bracket-initials']")).toHaveLength(1);
+  });
+
+  it("Fahren über einen Namen hebt den Weg hervor, Fokus auf einer Partie die Wege ihrer Spieler", async () => {
+    const original = window.matchMedia;
+    window.matchMedia = (query) => ({ matches: query === "(hover: hover)", addEventListener() {}, removeEventListener() {} });
+    try {
+      render(<BracketTree data={knockout()} layout="tree" />);
+      await userEvent.hover(screen.getAllByText("Koblauchgeist")[0]);
+      expect(screen.getByTestId("bracket-match-v2-m1")).toHaveAttribute("data-path", "on");
+      expect(screen.getByTestId("bracket-match-v2-m3")).toHaveAttribute("data-path", "on");
+      expect(screen.getByTestId("bracket-match-v2-m2")).toHaveAttribute("data-path", "off");
+      await userEvent.unhover(screen.getAllByText("Koblauchgeist")[0]);
+      expect(screen.getByTestId("bracket-match-v2-m2")).not.toHaveAttribute("data-path");
+
+      // Fokus wie nach einem Tippen (nicht „focus-visible“): kein Weg - die Partie öffnet sich ja.
+      act(() => screen.getByTestId("bracket-match-v2-m2").focus());
+      expect(screen.getByTestId("bracket-match-v2-m1")).not.toHaveAttribute("data-path");
+      act(() => screen.getByTestId("bracket-match-v2-m2").blur());
+      // Tastatur-Fokus: die Wege der Spieler dieser Partie.
+      const realMatches = window.Element.prototype.matches;
+      window.Element.prototype.matches = function matches(selector) { return selector === ":focus-visible" ? true : realMatches.call(this, selector); };
+      try {
+        act(() => screen.getByTestId("bracket-match-v2-m2").focus());
+        expect(screen.getByTestId("bracket-match-v2-m2")).toHaveAttribute("data-path", "on");
+        expect(screen.getByTestId("bracket-match-v2-m1")).toHaveAttribute("data-path", "off");
+        act(() => screen.getByTestId("bracket-match-v2-m2").blur());
+        expect(screen.getByTestId("bracket-match-v2-m1")).not.toHaveAttribute("data-path");
+      } finally {
+        window.Element.prototype.matches = realMatches;
+      }
+    } finally {
+      window.matchMedia = original;
+    }
+  });
+
+  it("nach dem Ende heißt Ungespieltes „nicht gespielt“, und es gibt kein „Dein nächstes Spiel“", () => {
+    render(<BracketTree data={{ ...knockout(), tournament: { status: "archived" } }} mineId="r3" />);
+    expect(screen.getAllByTestId("bracket-not-played")).toHaveLength(2);
+    expect(screen.queryByTestId("bracket-next-match")).toBeNull();
+  });
+
+  it("eine laufende Partie atmet - nach dem Ende nicht mehr", () => {
+    const data = knockout();
+    data.matches_v2[1].status = "in_progress";
+    const { unmount } = render(<BracketTree data={data} />);
+    expect(screen.getByTestId("bracket-match-v2-m2").className).toContain("tls-bracket-live");
+    unmount();
+    render(<BracketTree data={{ ...data, tournament: { status: "completed" } }} />);
+    expect(screen.getByTestId("bracket-match-v2-m2").className).not.toContain("tls-bracket-live");
+  });
+});
+
+describe("Podium bei mehreren Phasen (#833)", () => {
+  it("nur die letzte Phase vergibt Plätze - Vorrunden-Sieger stehen nicht auf dem Podest", async () => {
+    const { buildPodiumMap, lastStageId } = await import("./BracketTree");
+    const heat = (id, a, b) => ({ id, stage_id: "s0", section: "MAIN", round: 1, status: "completed", slots: [{ registration_id: a }, { registration_id: b }],
+      results: [{ registration_id: a, rank: 1 }, { registration_id: b, rank: 2 }] });
+    const final = { id: "f", stage_id: "s1", section: "WB", round: 1, status: "completed", slots: [{ registration_id: "c" }, { registration_id: "a" }],
+      results: [{ registration_id: "c", rank: 1 }, { registration_id: "a", rank: 2 }] };
+    const stages = [{ id: "s0", number: 1 }, { id: "s1", number: 2 }];
+    expect(lastStageId([heat("h1", "a", "b"), final], stages)).toBe("s1");
+    expect(lastStageId([final], stages)).toBeNull();
+    const podium = buildPodiumMap([heat("h1", "a", "b"), heat("h2", "c", "d"), final], stages);
+    expect(podium.get("c")).toBe(1);
+    expect(podium.get("a")).toBe(2);
+    expect(podium.has("b")).toBe(false);
+    expect(podium.has("d")).toBe(false);
   });
 });

@@ -12,6 +12,8 @@ import { RichText } from "../../components/RichText";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { CommendButton } from "../../components/CommendButton";
+import { isGuestUser } from "../../live";
 import { api, errorMessage } from "../../lib/api";
 import { invalidateCache } from "../../lib/cache";
 import {
@@ -438,6 +440,8 @@ export function MatchDetailScreen({ navigation, route }: Props) {
             {stationLabel(match) ? <Pill label={`Station ${stationLabel(match)}`} accent="cyan" /> : null}
             {match.duration_minutes ? <Pill label={`${match.duration_minutes} Min.`} /> : null}
           </View>
+          {/* GG (#616): nach dem Ende lobt eine Seite die andere - wie auf der Matchseite im Web. */}
+          {isV2 ? <CommendButton matchId={route.params.id} completed={String(match.status) === "completed"} enabled={Boolean(user) && !isGuestUser(user)} /> : null}
         </View>
 
         {error ? <Muted style={styles.error}>{error}</Muted> : null}

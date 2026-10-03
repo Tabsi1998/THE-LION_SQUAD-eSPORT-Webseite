@@ -131,6 +131,36 @@ img, video, canvas, svg {
 
 .tls-bracket-node.is-winner::before { background: #29B6E8; box-shadow: 0 0 8px rgba(41,182,232,0.5); }
 
+/* Turniere I (#833): der Weg eines Spielers - seine Partien leuchten, der Rest tritt zurück; Linien ziehen mit. */
+.tls-bracket-node { transition: opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+.tls-bracket-node[data-path="off"] { opacity: 0.38; }
+.tls-bracket-node[data-path="on"] {
+  border-color: rgba(41, 182, 232, 0.75);
+  box-shadow: 0 0 0 1px rgba(41, 182, 232, 0.35), 0 12px 28px -18px rgba(41, 182, 232, 0.85);
+}
+.tls-bracket-line { transition: opacity 0.25s ease, stroke 0.25s ease; }
+.tls-bracket-line[data-path="off"] { opacity: 0.35; }
+
+/* Laufende Partien atmen leise (grün wie „live“). */
+@keyframes tls-bracket-live {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.55), 0 0 20px -6px rgba(0, 255, 136, 0.45); }
+}
+.tls-bracket-live { animation: tls-bracket-live 2.4s ease-in-out infinite; }
+
+/* Ein neues Ergebnis gleitet ein (der Schlüssel ist der Wert). */
+@keyframes tls-score-tick {
+  from { opacity: 0.3; transform: translateY(-0.25em); }
+  to { opacity: 1; transform: none; }
+}
+.tls-score-tick { display: inline-block; animation: tls-score-tick 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-bracket-node, .tls-bracket-line { transition: none; }
+  .tls-bracket-live { animation: none; box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.45); }
+  .tls-score-tick { animation: none; }
+}
+
 /* TV mode */
 .tv-bg {
   background: radial-gradient(ellipse at top, #001a26 0%, #000 60%);
@@ -1045,11 +1075,62 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   animation: tls-fade-slide-up 0.42s ease-out both;
 }
 
+/* Startseite I (#832): Inhalte blenden beim Hereinscrollen und nach dem Laden weich ein - nur die Deckkraft.
+   Rahmen bleiben stehen, weil Saison-Deko an ihnen hängt; gestaffelt über --tls-i (siehe Reveal.jsx). */
+.tls-reveal-item > *,
+.tls-reveal-text {
+  transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--tls-i, 0) * 70ms);
+}
+[data-reveal="hidden"] .tls-reveal-item > *,
+[data-reveal="hidden"] .tls-reveal-text {
+  opacity: 0;
+  transition: none;
+}
+
+/* Der Countdown tickt weich: der neue Wert gleitet ein (der Schlüssel ist der Text). */
+@keyframes tls-tick-in {
+  from { opacity: 0.35; transform: translateY(-0.18em); }
+  to { opacity: 1; transform: none; }
+}
+.tls-tick {
+  display: inline-block;
+  animation: tls-tick-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Das Licht hinter dem Löwen atmet und folgt dem Zeiger ein wenig (die Werte setzt HomePage). Ein weicher Verlauf
+   statt eines Unschärfe-Filters: ohne Grafikkarte müsste der Filter bei jedem Atemzug jedes Bild neu gerechnet werden
+   (die Schnee-Messung im CI fiel so von 60 auf 30 Bilder je Sekunde). */
+@keyframes tls-glow-breathe {
+  0%, 100% { opacity: 0.16; }
+  50% { opacity: 0.27; }
+}
+.tls-hero-glow {
+  background: radial-gradient(closest-side, rgba(41, 182, 232, 1) 0%, rgba(41, 182, 232, 0.92) 38%, rgba(41, 182, 232, 0.45) 68%, rgba(41, 182, 232, 0) 100%);
+  transform: translate3d(var(--tls-glow-x, 0px), var(--tls-glow-y, 0px), 0);
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: tls-glow-breathe 7s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tls-hero-enter,
   .tls-hero-enter-delay,
-  .tls-spotlight-enter {
+  .tls-spotlight-enter,
+  .tls-tick,
+  .tls-hero-glow {
     animation: none;
+  }
+  .tls-reveal-item > *,
+  .tls-reveal-text,
+  .tls-hero-glow {
+    transition: none;
+  }
+}
+
+@media print {
+  [data-reveal="hidden"] .tls-reveal-item > *,
+  [data-reveal="hidden"] .tls-reveal-text {
+    opacity: 1;
   }
 }
 
