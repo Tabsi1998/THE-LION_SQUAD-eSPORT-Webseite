@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
@@ -40,6 +40,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/membership-applications", label: "Bewerbungen", icon: Inbox, areas: ["club"] },
       { to: "/admin/benefits", label: "Mitgliedervorteile", icon: Gift, areas: ["club"] },
       { to: "/admin/documents", label: "Dokumente", icon: FileText, areas: ["club"] },
+      // Einlass bei der Generalversammlung (#845): Mitgliedskarte scannen, Anwesenheit landet in Dolibarr.
+      { to: "/admin/einlass", label: "Einlass (Versammlung)", icon: ScanLine, areas: ["club"] },
       { to: "/admin/users", label: "Alle Benutzer", icon: UsersIcon, areas: ["club"] },
       // Dolibarr ist Mitgliederverwaltung, nicht Finanzen (#512) - die Rechnungen hängen nur mit dran.
       { to: "/admin/dolibarr", label: "Dolibarr", icon: Link2, areas: ["club", "system"] },
@@ -140,6 +142,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/documents": ["dateien", "downloads"],
   "/admin/users": ["accounts", "rollen", "user"],
   "/admin/board": ["vorstand", "rollen"],
+  "/admin/einlass": ["einlass", "anwesenheit", "präsenz", "praesenz", "generalversammlung", "versammlung", "scannen", "mitgliedskarte"],
   "/admin/about": ["über uns", "verein", "leitbild", "werte", "texte", "about", "gruendung", "gründung", "zweck", "gemeinnuetzig", "gemeinnützig", "zahlen", "dolibarr"],
   "/admin/tournaments": ["bracket", "turnierbaum", "matches", "anmeldungen", "registrierungen"],
   "/admin/tournament-guide": ["leitfaden", "anleitung", "voreinstellung", "format", "check-in", "best of"],

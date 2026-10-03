@@ -158,6 +158,35 @@ und landet auf `lionsquad.at/karte/pruefen/…` – ohne Anmeldung.
   Apple-Entwicklerkonto mit Pass-Zertifikat bzw. ein Google-Wallet-Issuer-Konto.
   Ohne diese Konten gibt es die Karte in App und Web – das reicht zum Vorzeigen.
 
+## Einlass bei der Generalversammlung (Vereine ab 1.7.0, #845)
+
+Am Eingang scannt ein Vorstandsmitglied mit dem Handy die Mitgliedskarte (App oder Web) – unter
+*Admin → Mitglieder → Einlass (Versammlung)*. Die Anwesenheit steht sofort in Dolibarr auf der
+Anwesenheitsliste. Damit gelten Stimmrecht und Beschlussfähigkeit, und Anwesende können online abstimmen.
+
+**Einrichten:** In Dolibarr braucht der API-Benutzer der Website das Recht **„Mitglieder bei einer
+Generalversammlung einlassen“** (Benutzer → Rechte → Vereine). Wer scannt, braucht auf der Website den
+Bereich „Verein“ und ein Konto mit bestätigter Zuordnung. Bei einer Bindung per Einladungscode braucht die
+Bindung die Fähigkeit „Einlass bei der Generalversammlung“.
+
+**Wer einlassen darf, entscheidet das Vereinsmodul:** nur wer am Versammlungstag eine Funktion im Vorstand
+hat. Jeder Einlass steht in Dolibarr auf der Sitzung unter *Einlass über Anwendungen* – wann, wer, im
+Namen von wem.
+
+**Am Eingang:**
+
+- Die Seite zeigt nur Generalversammlungen von **heute**, zu denen das scannende Vorstandsmitglied
+  eingeladen ist.
+- Nach dem Scan steht groß da, was passiert ist: „Anwesend: Paula B. – stimmberechtigt“, „ohne Stimmrecht
+  (laut Einladung)“ oder der Grund, warum nicht (Karte abgelaufen, nicht eingeladen, kein Vorstand heute …).
+- Darüber die Zahlen: anwesend, stimmberechtigt eingeladen, beschlussfähig ab – und ob die Versammlung
+  beschlussfähig ist.
+- **Doppelt scannen ändert nichts.** Ohne Karte geht die **Mitgliedsnummer**.
+- **Rücknahme** („war ein Versehen“) nur mit Grund; der Grund steht in Dolibarr bei der Sitzung.
+- Der QR-Code der Karte gilt fünf Minuten – ein abfotografierter Code ist danach wertlos.
+- Der Scanner läuft im Browser des Handys (Kamera erlauben). Klappt die Kamera nicht, die
+  Mitgliedsnummer eintippen.
+
 ## Im Betrieb
 
 - **Abgleich:** alle 10 Minuten das Geänderte, einmal am Tag alles. *Jetzt

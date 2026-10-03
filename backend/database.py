@@ -310,6 +310,9 @@ async def init_indexes():
     # Prüfcodes der Mitgliedskarte (#346): fünf Minuten, dann weg.
     await db.member_card_tokens.create_index("token", unique=True)
     await db.member_card_tokens.create_index("expires_at", expireAfterSeconds=0)
+    # Einlass bei der Generalversammlung (#845): je Versammlung und Mitglied ein Stand, die letzten Zahlen je Versammlung.
+    await db.meeting_admissions.create_index([("meeting_id", 1), ("member_id", 1)], unique=True)
+    await db.meeting_admission_counts.create_index("meeting_id", unique=True)
     # Letzter verlässlicher Stand der eigenen Rechnungen (#296) - für den Ausfall, nie für PDFs.
     await db.dolibarr_invoice_cache.create_index("user_id", unique=True)
     await db.dolibarr_invoice_cache.create_index("expires_at", expireAfterSeconds=0)

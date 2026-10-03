@@ -51,6 +51,7 @@
       "/vereine/me/meetings",
       "/vereine/me/meetings/{id}/response",
       "/vereine/me/meetings/{id}/motions",
+      "/vereine/meetings/{id}/attendance/{member}",
       "/vereine/me/ballots",
       "/vereine/me/ballots/{id}/votes",
       "/vereine/me/events",
