@@ -20,8 +20,10 @@ export function emitHuntProgress(progress) {
   });
 }
 
-export async function fetchEggs(route) {
-  const { data } = await api.get("/seasonal/easter/eggs", { params: { route, channel: "web" }, skipInvalidation: true });
+/** Die Eier einer Seite; mit `preview` (Token aus dem Admin) die Vorschau: Eier des Jahres zum Ansehen, ohne Schlüssel. */
+export async function fetchEggs(route, preview = null) {
+  const params = preview ? { route, channel: "web", preview } : { route, channel: "web" };
+  const { data } = await api.get("/seasonal/easter/eggs", { params, skipInvalidation: true });
   return data || { active: false, eggs: [] };
 }
 

@@ -145,6 +145,42 @@ async def test_eier_nur_waehrend_der_suche_und_nur_die_der_seite(flow, monkeypat
     assert (await flow.get("/api/seasonal/easter/eggs", params={"route": web_egg["route"]})).json()["active"] is False
 
 
+@pytest.mark.asyncio
+async def test_vorschau_zeigt_die_eier_der_seite_auch_im_entwurf_aber_ohne_schluessel(flow, monkeypatch):
+    clock = Clock(monkeypatch, vienna(2027, 3, 10))
+    staff = await flow.add_staff("Redaktion")
+    eggs = await setup_hunt(flow, staff, status="draft")
+    web_egg = next(egg for egg in eggs if egg["channel"] == "web")
+    flow.act_as(None)
+    params = {"route": web_egg["route"], "channel": "web"}
+    assert (await flow.get("/api/seasonal/easter/eggs", params=params)).json()["active"] is False, "ohne Vorschau: Entwurf, vor Karfreitag"
+
+    # Das Token aus dem Admin (Vorschau 60 Sekunden), auch mit simulierter Zeit am Karsamstag.
+    for at_time in (None, vienna(2027, 3, 27, 11)):
+        token = seasons.preview_token(easter.SEASON, at_time=at_time)
+        body = (await flow.get("/api/seasonal/easter/eggs", params={**params, "preview": token})).json()
+        assert body["preview"] is True and body["active"] is True and body["year"] == 2027
+        expected = sorted(egg["egg_no"] for egg in eggs if egg["route"] == web_egg["route"] and egg["channel"] == "web")
+        assert [row["egg_no"] for row in body["eggs"]] == expected, "nur die Eier dieser Seite"
+        assert all(row["token"] == "" and row["hint"] for row in body["eggs"]), "Hinweis zum Prüfen, aber kein Schlüssel"
+
+    # Ein Token einer anderen Saison oder ein gefälschtes zählt nicht.
+    other = seasons.preview_token("easter")
+    assert (await flow.get("/api/seasonal/easter/eggs", params={**params, "preview": other})).json()["active"] is False
+    assert (await flow.get("/api/seasonal/easter/eggs", params={**params, "preview": "easter_hunt.1.2.x"})).json()["active"] is False
+    # Nach Ostermontag zeigt die Vorschau das nächste Jahr.
+    clock.set(vienna(2027, 4, 2))
+    assert easter.preview_year() == 2028
+
+    # Das Token für die Verwaltung (Redaktion oder Verein): Karsamstag mittags, nur mit Rechten.
+    flow.act_as(staff)
+    res = await flow.post("/api/seasonal/easter/admin/2027/preview")
+    assert res.status_code == 200, res.text
+    assert res.json()["at"].startswith("2027-03-27T12:00") and seasons.read_preview_token(res.json()["token"])[0] == easter.SEASON
+    flow.act_as(None)
+    assert (await flow.post("/api/seasonal/easter/admin/2027/preview")).status_code == 401
+
+
 # ------------------------------------------------------------------ Fund
 
 @pytest.mark.asyncio

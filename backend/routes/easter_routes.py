@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from auth import get_current_user, get_optional_user, require_area
 from database import get_db
 from services import easter_hunt as easter
+from services import seasons
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/seasonal/easter", tags=["seasonal"])
@@ -45,9 +46,14 @@ class ProposePayload(BaseModel):
 
 @router.get("/eggs")
 async def eggs(request: Request, response: Response, route: str = Query("/", max_length=120), channel: str = Query("web", max_length=10),
-               viewer: dict | None = Depends(get_optional_user)):
+               preview: str | None = Query(None, max_length=200), viewer: dict | None = Depends(get_optional_user)):
     _private(response)
     await enforce_rate_limit(request, "easter_eggs", 30, 60, subject=(viewer or {}).get("id"))
+    # Vorschau (#757): nur mit einem gültigen Token genau dieser Saison aus dem Admin - dann die Eier des Jahres zum
+    # Ansehen, ohne Schlüssel.
+    token = seasons.read_preview_token(preview)
+    if token and token[0] == easter.SEASON:
+        return await easter.preview_eggs(get_db(), route, channel, token[1])
     return await easter.eggs_for(get_db(), viewer, route, channel)
 
 
@@ -81,6 +87,14 @@ async def admin_year(year: int, response: Response, me: dict = Depends(require_e
 @router.put("/admin/{year}")
 async def admin_save_year(year: int, payload: HuntPayload, me: dict = Depends(require_editor)):
     return await easter.save_hunt(get_db(), year, payload.model_dump(exclude_none=True), me)
+
+
+@router.post("/admin/{year}/preview")
+async def admin_preview(year: int, me: dict = Depends(require_editor)):
+    """Vorschau (#757): die Eier dieses Jahres auf den echten Seiten ansehen - auch im Entwurf, ohne dass etwas zählt."""
+    if not 2025 <= int(year) <= 2100:
+        raise HTTPException(400, "Dieses Jahr gibt es nicht.")
+    return easter.preview_for(year)
 
 
 @router.put("/admin/{year}/eggs")

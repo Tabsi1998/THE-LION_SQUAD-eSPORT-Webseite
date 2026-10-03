@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
+import { previewTokenFor } from "../preview";
+import { useSeason } from "../SeasonContext";
 import { hashString } from "../rng";
 import { EggShape } from "./EggShape";
 import { emitHuntProgress, fetchEggs, findEgg } from "./api";
@@ -12,7 +14,9 @@ import "./easter-hunt.css";
 // Die Eier einer Seite (#646, #754, #755): der Server gibt nur die Eier dieser Seite (mit einem Schlüssel für diese
 // Person); placement.js legt sie in Ecken echter Kanten. Jedes Ei ist ein Knopf („Osterei einsammeln“) - mit Maus,
 // Finger und Tastatur erreichbar. Manche liegen ruhig, manche wackeln, wenn die Maus näher kommt, manche wippen ab
-// und zu von selbst; ein Fund hebt das Ei kurz an und sagt, wie viele es jetzt sind. Gäste sehen die Eier und werden zum Anmelden eingeladen - gezählt wird nichts.
+// und zu von selbst; ein Fund hebt das Ei kurz an und sagt, wie viele es jetzt sind. Gäste sehen die Eier und werden
+// zum Anmelden eingeladen - gezählt wird nichts. In der Vorschau aus dem Admin (#757) liegen die Eier des Jahres auch
+// im Entwurf; antippen zeigt Nummer und Hinweis.
 // Die Eier liegen in Seitenkoordinaten unter der Kopfzeile, ihren Menüs und der Leiste unten: wer scrollt, sieht
 // sie darunter verschwinden.
 
@@ -71,7 +75,7 @@ function EggNote({ note, spot, route, onClose }) {
     setFit({ left: next.left + scroll.x, below: next.below });
   }, [spot.x, spot.y]);
   const classes = ["tls-egg-note", `tls-egg-note--${note.kind}`, fit?.below ? "tls-egg-note--below" : ""].filter(Boolean).join(" ");
-  const sticky = note.kind === "guest" || note.kind === "done";
+  const sticky = note.kind === "guest" || note.kind === "done" || note.kind === "preview";
   const style = fit ? { left: fit.left, top: spot.y } : { left: 0, top: spot.y, visibility: "hidden" };
   return (
     <div ref={ref} className={classes} style={style} role={note.kind === "error" ? "alert" : undefined} data-testid="easter-egg-note">
@@ -97,10 +101,14 @@ export function EasterEggs({ season }) {
   const placedRef = useRef({});
   const noteTimer = useRef(null);
   const route = location.pathname;
+  const { preview: previewOn } = useSeason();
+  const previewToken = previewOn ? previewTokenFor("easter_hunt") : null;
+  const [previewing, setPreviewing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchEggs(route);
+      const data = await fetchEggs(route, previewToken);
+      setPreviewing(Boolean(data?.preview));
       const fresh = data?.active ? (data.eggs || []).filter((egg) => !egg.found) : [];
       eggsRef.current = fresh;
       setEggs(fresh);
@@ -110,7 +118,7 @@ export function EasterEggs({ season }) {
       setEggs([]);
       return [];
     }
-  }, [route]);
+  }, [route, previewToken]);
 
   useEffect(() => {
     setPlaced({});
@@ -216,6 +224,10 @@ export function EasterEggs({ season }) {
   };
 
   const collect = async (egg, retried = false) => {
+    if (previewing) {
+      showNote(egg, "preview", `Vorschau: Ei ${egg.egg_no}${egg.hint ? ` – ${egg.hint}` : ""}`);
+      return;
+    }
     if (!user) {
       showNote(egg, "guest", "Anmelden, um Eier zu sammeln");
       return;

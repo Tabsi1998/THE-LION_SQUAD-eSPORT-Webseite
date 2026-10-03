@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Download, Egg, ExternalLink, Shuffle, Trophy } from "lucide-react";
+import { Download, Egg, Eye, ExternalLink, Shuffle, Trophy } from "lucide-react";
 import { API, api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
+import { rememberPreview } from "@/pages/admin/settings/SeasonsSettings";
 import { EggShape, PATTERN_LABELS } from "@/seasons/easterHunt/EggShape";
 
 // Ostereiersuche pflegen (#646, #757): je Jahr ein Vorschlag mit Saat aus dem Jahr (jedes Jahr andere Seiten, Kanten
@@ -46,7 +47,7 @@ const FIELD_LABEL = "mb-1 block text-[10px] font-bold uppercase tracking-widest 
 const FIELD_INPUT = `${INPUT_CLASS} !py-1.5 !text-xs`;
 
 /** Eine Karte je Ei - bearbeitbar, solange niemand gefunden hat. Am Handy untereinander, am PC zwei nebeneinander. */
-function EggCard({ egg, index, view, locked, onChange }) {
+function EggCard({ egg, index, view, locked, onChange, onPreview }) {
   const routes = view.routes?.[egg.channel] || {};
   const kinds = view.spot_kinds?.[egg.channel] || [];
   const set = (patch) => onChange(index, { ...egg, ...patch });
@@ -59,6 +60,11 @@ function EggCard({ egg, index, view, locked, onChange }) {
         <span className="font-bold">Ei {egg.egg_no ?? index + 1}</span>
         <span className="min-w-0 flex-1 truncate text-xs text-white/50">{egg.channel === "app" ? "App" : "Website"} · {routes[egg.route] || egg.route}</span>
         <span className="text-xs tabular-nums text-white/60">{egg.found ? `${egg.found}× gefunden` : "noch nicht gefunden"}</span>
+        {egg.channel === "web" && onPreview ? (
+          <button type="button" onClick={() => onPreview(egg)} className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 hover:border-white/30" title="Das Ei auf der Seite ansehen (Vorschau, zählt nicht)" data-testid={`easter-admin-view-${egg.egg_no ?? index + 1}`}>
+            <Eye className="h-3 w-3" /> Ansehen
+          </button>
+        ) : null}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <label className="block min-w-0">
@@ -182,6 +188,18 @@ export default function AdminEasterHuntPage() {
     setDraft(base.map((row, i) => (i === index ? egg : row)));
   };
   const setPrize = (kind, patch) => setPrizes((current) => ({ ...current, [kind]: { ...(current[kind] || { kind }), ...patch } }));
+  // Vorschau (#757): die Eier dieses Jahres auf der echten Seite ansehen - auch im Entwurf, gezählt wird nichts.
+  const navigate = useNavigate();
+  const previewEgg = async (egg) => {
+    try {
+      const { data } = await api.post(`/seasonal/easter/admin/${year}/preview`);
+      rememberPreview(data.token, data.seconds || 60);
+      toast.success(`Vorschau ${data.seconds || 60} Sekunden – die Eier liegen auf den Seiten, antippen zeigt Nummer und Hinweis.`);
+      navigate(egg.route);
+    } catch (err) {
+      toast.error(errorText(err, "Die Vorschau hat nicht geklappt."));
+    }
+  };
 
   return (
     <AdminLayout>
@@ -239,7 +257,7 @@ export default function AdminEasterHuntPage() {
               {draft && <p className="mb-3 text-xs text-white/55">Noch nicht gespeichert.</p>}
               {rows.length ? (
                 <ul className="grid gap-3 lg:grid-cols-2">
-                  {rows.map((egg, index) => <EggCard key={`${egg.egg_no ?? "n"}-${index}`} egg={egg} index={index} view={view} locked={locked} onChange={changeRow} />)}
+                  {rows.map((egg, index) => <EggCard key={`${egg.egg_no ?? "n"}-${index}`} egg={egg} index={index} view={view} locked={locked} onChange={changeRow} onPreview={draft ? null : previewEgg} />)}
                 </ul>
               ) : (
                 <p className="text-sm text-white/55">Noch keine Verstecke – „Vorschlag“ verteilt die Eier für {year}.</p>

@@ -13,6 +13,8 @@ vi.mock("./api", () => ({
 }));
 const authState = { user: null };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
+const seasonState = { preview: false };
+vi.mock("../SeasonContext", () => ({ useSeason: () => seasonState }));
 const motion = { reduced: true };
 vi.mock("@/hooks/useLiveChanges", () => ({ useReducedMotion: () => motion.reduced }));
 
@@ -47,6 +49,8 @@ beforeEach(() => {
   apiMock.fetchEggs.mockResolvedValue(EGGS);
   authState.user = null;
   motion.reduced = true;
+  seasonState.preview = false;
+  sessionStorage.clear();
   mountPage();
 });
 
@@ -99,7 +103,7 @@ test("der Hinweis bleibt im Fenster und weicht unter die Kopfzeile aus", () => {
 test("nur ungefundene Eier der Seite, als Knopf in der Ecke der Karte", async () => {
   renderEggs();
   await settle();
-  expect(apiMock.fetchEggs).toHaveBeenCalledWith("/news");
+  expect(apiMock.fetchEggs).toHaveBeenCalledWith("/news", null);
   const egg = await screen.findByTestId("easter-egg-1");
   expect(egg).toHaveAttribute("aria-label", "Osterei einsammeln");
   expect(egg.style.left).toBe(`${400 - 6 - 15}px`);
@@ -161,6 +165,19 @@ test("zu schnell: freundlicher Hinweis; abgelaufener Schlüssel: neu holen und e
   apiMock.findEgg.mockRejectedValueOnce({ response: { status: 410 } }).mockResolvedValueOnce({ found: 1, total: 3, already: false, completed_now: false });
   fireEvent.click(screen.getByTestId("easter-egg-1"));
   await waitFor(() => expect(apiMock.findEgg).toHaveBeenLastCalledWith("1.1000.cccccccccccccccccccccccccccccccc"));
+});
+
+test("Vorschau aus dem Admin: mit dem Token geladen, antippen zeigt Nummer und Hinweis - gezählt wird nichts", async () => {
+  seasonState.preview = true;
+  sessionStorage.setItem("tls-season-preview", JSON.stringify({ token: "easter_hunt.9999999999..sig", expires: Date.now() + 60000 }));
+  authState.user = { id: "u1" };
+  apiMock.fetchEggs.mockResolvedValue({ active: true, preview: true, total: 3, eggs: [{ ...EGGS.eggs[0], token: "", hint: "Schau bei den News." }] });
+  renderEggs();
+  await settle();
+  expect(apiMock.fetchEggs).toHaveBeenCalledWith("/news", "easter_hunt.9999999999..sig");
+  fireEvent.click(await screen.findByTestId("easter-egg-1"));
+  expect(await screen.findByTestId("easter-egg-note")).toHaveTextContent("Vorschau: Ei 1 – Schau bei den News.");
+  expect(apiMock.findEgg).not.toHaveBeenCalled();
 });
 
 test("läuft die Suche nicht, liegt nichts", async () => {

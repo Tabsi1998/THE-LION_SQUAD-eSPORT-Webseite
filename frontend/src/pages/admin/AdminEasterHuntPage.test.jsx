@@ -8,6 +8,10 @@ const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", formatApiError: (value) => value }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/components/tls/AdminLayout", () => ({ AdminLayout: ({ children }) => <div>{children}</div> }));
+const previewMock = vi.fn();
+vi.mock("@/pages/admin/settings/SeasonsSettings", () => ({ rememberPreview: (...args) => previewMock(...args) }));
+const navigateMock = vi.fn();
+vi.mock("react-router-dom", async (importOriginal) => ({ ...(await importOriginal()), useNavigate: () => navigateMock }));
 
 const { default: AdminEasterHuntPage, easterYear } = await import("./AdminEasterHuntPage");
 const { ConfirmDialogProvider } = await import("@/components/tls/ConfirmDialog");
@@ -34,6 +38,17 @@ beforeEach(() => {
   apiMock.get.mockReset();
   apiMock.put.mockReset();
   apiMock.post.mockReset();
+});
+
+test("Ansehen: Vorschau-Token holen, merken und zur Seite des Eis - nur für Eier der Website", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BASE, eggs: PROPOSAL.map((egg) => ({ ...egg, found: 0 })) } });
+  apiMock.post.mockResolvedValue({ data: { token: "easter_hunt.1.2.sig", seconds: 60 } });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("easter-admin-view-1"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(expect.stringMatching(/\/admin\/\d{4}\/preview$/)));
+  expect(previewMock).toHaveBeenCalledWith("easter_hunt.1.2.sig", 60);
+  expect(navigateMock).toHaveBeenCalledWith("/news");
+  expect(screen.queryByTestId("easter-admin-view-2")).toBeNull();
 });
 
 test("Ostern liegt im Frühling - ab Mai geht es um das nächste Jahr", () => {

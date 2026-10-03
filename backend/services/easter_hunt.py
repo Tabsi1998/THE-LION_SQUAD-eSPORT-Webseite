@@ -192,6 +192,33 @@ async def eggs_for(db, viewer: dict | None, route: str, channel: str, now: datet
     }
 
 
+def preview_year(at: datetime | None = None) -> int:
+    """Das Jahr einer Vorschau: das Ostern der simulierten Zeit - nach Ostermontag schon das nächste."""
+    moment = seasons.to_vienna(at)
+    return moment.year if moment.date() <= seasons.easter_monday(moment.year) else moment.year + 1
+
+
+def preview_for(year: int) -> dict:
+    """Ein Vorschau-Token für die Suche eines Jahres - simuliert ist Karsamstag mittags (die Suche läuft, Hinweise
+    sind offen). Wirkt nur bei der Person, die es mitschickt, 60 Sekunden lang."""
+    at = datetime.combine(seasons.good_friday(int(year)) + timedelta(days=1), datetime.min.time().replace(hour=12), tzinfo=seasons.VIENNA)
+    return {"token": seasons.preview_token(SEASON, at_time=at), "seconds": seasons.PREVIEW_SECONDS, "at": at.isoformat()}
+
+
+async def preview_eggs(db, route: str, channel: str, at: datetime | None = None) -> dict:
+    """Vorschau für die Verwaltung (#757, Token „Vorschau 60 Sekunden“): die Eier dieser Seite aus dem Jahr der
+    Vorschau - auch im Entwurf und vor Karfreitag, mit Hinweis, damit sich Versteck und Hinweis prüfen lassen. Ohne
+    Schlüssel: gefunden wird in der Vorschau nichts."""
+    channel = channel if channel in CHANNELS else "web"
+    year = preview_year(at)
+    rows = await db[EGGS].find({"year": year, "route": normalize_route(route), "channel": channel}, {"_id": 0}).sort("egg_no", 1).to_list(MAX_EGGS)
+    total = await db[EGGS].count_documents({"year": year})
+    return {
+        "active": bool(rows), "preview": True, "year": year, "total": total, "guest": False,
+        "eggs": [{**egg_view(egg), "token": "", "found": False, "hint": egg.get("hint") or default_hint(egg)} for egg in rows],
+    }
+
+
 # ------------------------------------------------------------------ Fund
 
 async def find(db, user: dict, token: str, now: datetime | None = None) -> dict:
