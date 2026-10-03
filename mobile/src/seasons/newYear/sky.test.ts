@@ -1,5 +1,6 @@
 import { launchDuration, SMOKE_SECONDS, type Launch } from "./fireworks";
 import { APP_CAPS, LATE_MS, LOOKAHEAD_MS, capFor, countParticles, drawFire, emptyFire, fireIdle, nextLaunchAt, stepFire, type DrawKit } from "./sky";
+import { YEAR_FORM, YEAR_RISE, YEAR_STAGGER_MS, glyphSpot, yearLaunches, yearStarCount } from "./yearDigits";
 
 // Feuerwerks-Ebene der App (S11, N1, N5): startet zur Serverzeit, holt nach dem Hintergrund nichts nach, hält das
 // Budget (200/400), räumt Fertiges weg, schiebt alles mit dem Scrollen und darf schlafen, wenn nichts ansteht.
@@ -70,4 +71,28 @@ test("Zeichnen: Rauch, Funken, Rakete, Sterne - je Leuchtpunkt Schein und Kern",
   state = stepFire(state, plan, 2_600, SIZE, 0, 200);
   drawFire(canvas, state, 2_600, SIZE, 0, kit);
   expect(circles.length).toBeGreaterThan(40);
+});
+
+test("Jahreszahl (#853): die Funken der Ziffer-Raketen stehen als Zahl am Himmel - lesbar auch bei vollem Budget", () => {
+  const T = 5_000;
+  const crowd = Array.from({ length: 12 }, (_, i) => rocket(`c${i}`, T - 200));
+  const plan = [...crowd, ...yearLaunches(2027, T)];
+  let state = emptyFire();
+  for (let now = T - 200; now <= T + 3 * YEAR_STAGGER_MS + (YEAR_RISE + 0.1) * 1000; now += 50) state = stepFire(state, plan, now, SIZE, 0, 200);
+  // Die vielen Raketen davor haben das Budget aufgebraucht - die Zahl bekommt trotzdem ihren festen Anteil.
+  const digits = state.live.filter((item) => item.digits).reduce((sum, item) => sum + (item.digits?.length || 0), 0);
+  expect(digits).toBeGreaterThanOrEqual(yearStarCount(200) - 2);
+  const at = T + 3 * YEAR_STAGGER_MS + (YEAR_RISE + YEAR_FORM + 1) * 1000;
+  state = stepFire(state, plan, at, SIZE, 0, 200);
+  const dots: Array<{ x: number; y: number; r: number }> = [];
+  const canvas = { drawCircle: (x: number, y: number, r: number) => dots.push({ x, y, r }) } as never;
+  const paint = { setColor() {}, setAlphaf() {} };
+  const kit = { paint, smokePaint: paint, colors: { blue: 1, gold: 2, white: 3 }, ember: 4, smoke: 5 } as unknown as DrawKit;
+  drawFire(canvas, state, at, SIZE, 0, kit);
+  const cores = dots.filter((dot) => dot.r < 4);
+  expect(cores.length).toBeGreaterThanOrEqual(yearStarCount(200) - 2);
+  const spots = [0, 1, 2, 3].map((slot) => glyphSpot(slot, 4, SIZE));
+  const height = spots[0].height;
+  cores.forEach((dot) => expect(spots.some((spot) => Math.abs(dot.x - spot.x) <= height * 0.32 + 4 && Math.abs(dot.y - spot.y) <= height * 0.5 + 8)).toBe(true));
+  spots.forEach((spot) => expect(cores.filter((dot) => Math.abs(dot.x - spot.x) <= height * 0.32 + 4).length).toBeGreaterThan(20));
 });

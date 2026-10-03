@@ -1,6 +1,7 @@
 import { hashString, mulberry32 } from "../rng";
-import { handwriting, planHour, salvoLaunches } from "./choreography";
-import { COLORS, GRAVITY, SHELLS, SHELL_TYPES, SMOKE_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, distanceScale, launchDuration, rocketAt, smokeAt, soundDelay, starAt, starLight, trailRate, windDrift } from "./fireworks";
+import { handwriting, planHour, salvoLaunches, showLaunches } from "./choreography";
+import { CALIBERS, CALIBER_TYPES, COLORS, GRAVITY, SHELLS, SHELL_TYPES, SMOKE_SECONDS, burstPoint, burstStars, caliberOf, crackleFlashes, distanceLight, distanceScale, launchDuration, maxStars, rocketAt, smokeAt, soundDelay, starAt, starLight, trailRate, windDrift } from "./fireworks";
+import { DIGIT_STROKES, calmYearDots, glyphPoints, glyphSpot, yearLaunches, yearStarAt, yearStarCount, yearStarLight, yearStars } from "./yearDigits";
 
 // Feuerwerksrechnung (N1, #739): jede Art eigen, Bahnen geschlossen gerechnet (Luftwiderstand, Schwerkraft, Wind),
 // Nachglühen, Rauch, Entfernung - und das Budget hält.
@@ -8,14 +9,17 @@ import { COLORS, GRAVITY, SHELLS, SHELL_TYPES, SMOKE_SECONDS, burstPoint, burstS
 const SIZE = { width: 1440, height: 900 };
 
 // Die App rechnet dasselbe Feuerwerk (mobile/src/seasons/newYear/fireworks.ts, #642) - dieselben Fingerabdrücke
-// stehen dort im Test: weicht eine Seite ab, wird die andere rot.
-const FIRE_PARITY = 2787607397;
-const CHOREO_PARITY = 681797588;
+// stehen dort im Test: weicht eine Seite ab, wird die andere rot. Seit #853 mit Kalibern und der Jahreszahl.
+const FIRE_PARITY = 3025438839;
+const CHOREO_PARITY = 1292175831;
+const YEAR_PARITY = 2834516894;
 const PARITY_LAUNCH = { id: "p", at: 0, type: "peony", x: 0.5, distance: 0.3, colors: ["blue", "gold"], burstY: 0.3, rise: 1.4, drift: 12 };
 
 test("Parität mit der App: dieselbe Feuerwerksrechnung und dieselbe Choreografie", () => {
   const fire = hashString(JSON.stringify({
     stars: SHELL_TYPES.map((type, i) => burstStars({ ...PARITY_LAUNCH, type }, mulberry32(1000 + i), 1, 1.1)),
+    calibers: CALIBER_TYPES.map((caliber, i) => burstStars({ ...PARITY_LAUNCH, type: "chrysanthemum", caliber }, mulberry32(2000 + i), 0.8, 1.1)),
+    durations: CALIBER_TYPES.map((caliber) => launchDuration({ ...PARITY_LAUNCH, caliber })),
     path: [0, 0.4, 1.2, 2.5].map((age) => starAt({ vx: 120, vy: -80 }, age, SHELLS.willow, { x: 300, y: 200 }, 8, 0.4)),
     light: [0, 0.3, 1.1, 1.9].map((age) => starLight({ life: 2, glitter: 1.1, crackleAt: null }, age)),
     smoke: [0.5, 4, 8.9].map((age) => smokeAt({ x: 100, y: 200 }, age, 6, 0.3)),
@@ -28,6 +32,25 @@ test("Parität mit der App: dieselbe Feuerwerksrechnung und dieselbe Choreografi
     salvos: [0, 1, 2].map((index) => salvoLaunches(handwriting(2027), index, 1767222000000)),
   }));
   expect(choreo).toBe(CHOREO_PARITY);
+});
+
+test("Parität mit der App: dieselbe Jahreszahl um 00:00", () => {
+  const desk = { width: 1440, height: 900 };
+  const launches = yearLaunches(2027, 1767222000000);
+  const year = hashString(JSON.stringify({
+    glyphs: Object.keys(DIGIT_STROKES).map((digit) => glyphPoints(digit, 33)),
+    spots: [desk, { width: 390, height: 844 }, { width: 844, height: 390 }].map((size) => [0, 1, 2, 3].map((slot) => glyphSpot(slot, 4, size))),
+    launches,
+    stars: launches.map((launch, i) => yearStars(launch, mulberry32(77 + i), desk, yearStarCount(200))),
+    path: [0, 0.3, 0.7, 2, 3.4, 4.5, 6].map((age) => yearStarAt({ tx: 30, ty: -20, fall: 0.4, vx: 6 }, age, { x: 700, y: 380 }, 7)),
+    light: [0, 0.05, 0.5, 1.5, 3.4, 4.5, 6].map((age) => yearStarLight({ fall: 0.4, glitter: 2.1 }, age)),
+    calm: calmYearDots(2028, { width: 390, height: 844 }),
+    show: showLaunches(handwriting(2026), [1767222000000, 1767222300000], 2027),
+    burst: burstPoint(launches[2], desk, 6),
+    rocket: rocketAt(launches[1], 0.6, desk, 6),
+    duration: launchDuration(launches[0]),
+  }));
+  expect(year).toBe(YEAR_PARITY);
 });
 
 function launch(overrides = {}) {
@@ -80,6 +103,27 @@ test("Explosion: Kugel rund, Ring geneigt, Herz in Herzform; Farben aus dem Paar
   expect(crackle.every((star) => star.crackleAt >= 0.55 && star.crackleAt <= 0.78)).toBe(true);
   expect(burstStars(launch(), mulberry32(1), 0)).toHaveLength(12);
   expect(burstStars(launch(), mulberry32(1), 0.5).length).toBeLessThan(burstStars(launch(), mulberry32(1), 1).length);
+});
+
+test("Kaliber (#853): klein, groß, sehr groß - Kugel, Sterne, Sterngröße und Lebensdauer wachsen; ohne Angabe wie bisher", () => {
+  expect(CALIBER_TYPES).toEqual(["small", "large", "giant"]);
+  expect(caliberOf({})).toBe(CALIBERS.large);
+  expect(caliberOf({ caliber: "giant" })).toBe(CALIBERS.giant);
+  // Ohne Kaliber genau das Feuerwerk von bisher.
+  expect(burstStars(launch(), mulberry32(4))).toEqual(burstStars(launch({ caliber: "large" }), mulberry32(4)));
+  const reach = (caliber) => {
+    const stars = burstStars(launch({ caliber }), mulberry32(4));
+    return { count: stars.length, speed: Math.max(...stars.map((star) => Math.hypot(star.vx, star.vy))), size: stars.reduce((sum, star) => sum + star.size, 0) / stars.length, life: Math.max(...stars.map((star) => star.life)) };
+  };
+  const [small, large, giant] = CALIBER_TYPES.map(reach);
+  expect(small.count).toBeLessThan(large.count);
+  expect(giant.count).toBeGreaterThan(large.count);
+  expect(small.speed).toBeLessThan(large.speed * 0.75);
+  expect(giant.speed).toBeGreaterThan(large.speed * 1.25);
+  expect(small.size).toBeLessThan(large.size);
+  expect(giant.life).toBeGreaterThan(large.life);
+  expect([maxStars(launch({ caliber: "small" })), maxStars(launch()), maxStars(launch({ caliber: "giant" }))]).toEqual([50, 80, 112]);
+  expect(launchDuration(launch({ caliber: "giant", rise: 1.4 }))).toBeGreaterThan(launchDuration(launch({ rise: 1.4 })));
 });
 
 test("Bahn eines Sterns: am Anfang am Zerplatzpunkt, Bremse und Schwerkraft geschlossen, Wind treibt, ferne fallen langsamer", () => {

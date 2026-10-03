@@ -1,10 +1,12 @@
 // Die Feuerwerks-Ebene in der App (S11 #642, N1 #739, N5 #743): wie layer.js im Web, aber als Worklets auf dem
 // UI-Thread - `stepFire` startet Raketen zu ihrer Zeit (Serveruhr), lässt sie zerplatzen, räumt fertige weg und
 // schiebt alles mit dem Scrollen (die Teilchen gehören zum Screen); `drawFire` zeichnet mit Skia: Rauch dahinter, die
-// Funkenspur, je Stern ein Schein und ein Kern in additiver Mischung. Kein Nachholen nach dem Hintergrund.
+// Funkenspur, je Stern ein Schein und ein Kern in additiver Mischung. Kein Nachholen nach dem Hintergrund. Um 00:00
+// formen die Funken der Ziffer-Raketen die neue Jahreszahl (#853, yearDigits.ts).
 
 import type { SkCanvas, SkColor, SkPaint } from "@shopify/react-native-skia";
-import { CRACKLE_SECONDS, SHELLS, SMOKE_SECONDS, SPARK_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, hashText, launchDuration, rocketAt, seededRandom, smokeAt, spreadFor, starAt, starLight, trailRate, type Launch, type Point, type Size, type Star } from "./fireworks";
+import { CRACKLE_SECONDS, SHELLS, SMOKE_SECONDS, SPARK_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, hashText, launchDuration, maxStars, rocketAt, seededRandom, smokeAt, spreadFor, starAt, starLight, trailRate, type Launch, type Point, type Size, type Star } from "./fireworks";
+import { YEAR_FORM, isGlyph, yearStarAt, yearStarCount, yearStarLight, yearStars, type YearStar } from "./yearDigits";
 
 /** Teilchen je Show in der App (#642: 200/400) - „normal“ und „kräftig“. */
 export const APP_CAPS = { normal: 200, full: 400 } as const;
@@ -15,7 +17,7 @@ const MAX_SMOKE = 10;
 
 export type Spark = { x: number; y: number; born: number; vx: number; vy: number };
 export type Flash = { dx: number; dy: number; size: number };
-export type FireItem = { launch: Launch; t0: number; stars: Star[] | null; origin: Point | null; sparks: Spark[]; lastSpark: number; flashes: Flash[][] | null; shift: number; seed: number };
+export type FireItem = { launch: Launch; t0: number; stars: Star[] | null; digits: YearStar[] | null; origin: Point | null; sparks: Spark[]; lastSpark: number; flashes: Flash[][] | null; shift: number; seed: number };
 export type Puff = { origin: Point; t0: number; distance: number; shift: number };
 export type FireState = { live: FireItem[]; smoke: Puff[]; started: Record<string, number>; startedCount: number };
 
@@ -31,7 +33,7 @@ export function capFor(effective: string): number {
 export function countParticles(state: FireState): number {
   "worklet";
   let sum = 0;
-  for (const item of state.live) sum += (item.stars ? item.stars.length : 0) + item.sparks.length;
+  for (const item of state.live) sum += (item.stars ? item.stars.length : 0) + (item.digits ? item.digits.length : 0) + item.sparks.length;
   return sum;
 }
 
@@ -56,7 +58,7 @@ export function stepFire(state: FireState, plan: Launch[], now: number, size: Si
     } else if (launch.at <= now) {
       state.started[launch.id] = 1;
       state.startedCount += 1;
-      state.live.push({ launch, t0: launch.at, stars: null, origin: null, sparks: [], lastSpark: launch.at, flashes: null, shift: 0, seed: hashText(`burst:${launch.id}`) });
+      state.live.push({ launch, t0: launch.at, stars: null, digits: null, origin: null, sparks: [], lastSpark: launch.at, flashes: null, shift: 0, seed: hashText(`burst:${launch.id}`) });
     }
   }
   // Ausklang (N5): Merker vergangener Stunden nicht ansammeln.
@@ -87,12 +89,18 @@ export function stepFire(state: FireState, plan: Launch[], now: number, size: Si
         particles += 1;
       }
     } else if (!item.stars) {
-      const shell = SHELLS[launch.type] || SHELLS.peony;
+      // Zerplatzen: so viele Sterne, wie das Budget erlaubt - die Jahreszahl bekommt ihren festen Anteil (lesbar).
       const room = Math.max(0, cap - particles);
       item.origin = burstPoint(launch, size, wind);
       const rng = seededRandom(item.seed);
-      item.stars = burstStars(launch, rng, Math.min(1, room / shell.stars[1]), spreadFor(size));
-      particles += item.stars.length;
+      if (isGlyph(launch)) {
+        item.digits = yearStars(launch, rng, size, yearStarCount(cap));
+        item.stars = [];
+        particles += item.digits.length;
+      } else {
+        item.stars = burstStars(launch, rng, Math.min(1, room / maxStars(launch)), spreadFor(size));
+        particles += item.stars.length;
+      }
       if (state.smoke.length < MAX_SMOKE) state.smoke.push({ origin: item.origin, t0: item.t0 + launch.rise * 1000, distance: launch.distance, shift: item.shift });
       if (launch.type === "crackle") {
         const flashes: Flash[][] = [];
@@ -145,7 +153,25 @@ function glow(canvas: SkCanvas, kit: DrawKit, color: SkColor, x: number, y: numb
   canvas.drawCircle(x, y, radius, kit.paint);
 }
 
-/** Das Bild der Ebene: Rauch, Funkenspuren, Raketen, Sterne (mit Spuren, Glut und Knister-Blitzen). */
+/** Die Funken einer Ziffer: im Flug in die Form mit kurzer Spur, dann stehend, beim Rieseln mit Glut - wie im Web. */
+function drawYear(canvas: SkCanvas, kit: DrawKit, stars: YearStar[], age: number, origin: Point, wind: number, light: number) {
+  "worklet";
+  for (const star of stars) {
+    const lit = yearStarLight(star, age);
+    if (lit.alpha <= 0) continue;
+    const pos = yearStarAt(star, age, origin, wind);
+    const color = lit.ember > 0.6 ? kit.ember : kit.colors[star.color];
+    if (age < YEAR_FORM) {
+      for (let k = 1; k <= 2; k += 1) {
+        const prev = yearStarAt(star, Math.max(0, age - 0.05 * k), origin, wind);
+        glow(canvas, kit, color, prev.x, prev.y, star.size * (1 - k * 0.25), lit.alpha * light * (0.4 - k * 0.12));
+      }
+    }
+    glow(canvas, kit, color, pos.x, pos.y, star.size, lit.alpha * light);
+  }
+}
+
+/** Das Bild der Ebene: Rauch, Funkenspuren, Raketen, Sterne (mit Spuren, Glut und Knister-Blitzen), die Jahreszahl. */
 export function drawFire(canvas: SkCanvas, state: FireState, now: number, size: Size, wind: number, kit: DrawKit) {
   "worklet";
   // Rauch deckt ab statt zu leuchten (eigener Pinsel ohne „Plus“) und hat keinen harten Rand: gestapelte Ringe, jeder
@@ -175,6 +201,10 @@ export function drawFire(canvas: SkCanvas, state: FireState, now: number, size: 
     if (!item.stars || !item.origin) continue;
     const age = t - launch.rise;
     const origin = { x: item.origin.x, y: item.origin.y + item.shift };
+    if (item.digits) {
+      drawYear(canvas, kit, item.digits, age, origin, wind, light);
+      continue;
+    }
     for (let index = 0; index < item.stars.length; index += 1) {
       const star = item.stars[index];
       const lit = starLight(star, age);

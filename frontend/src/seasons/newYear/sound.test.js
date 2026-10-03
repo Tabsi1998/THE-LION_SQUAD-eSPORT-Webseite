@@ -1,4 +1,4 @@
-import { BURST_VOICES, MAX_VOICES, NEW_YEAR_SOUND_EVENT, NEW_YEAR_SOUND_KEY, createNewYearSound, readNewYearSound, volumeFor, writeNewYearSound } from "./sound";
+import { BURST_LEVEL, BURST_VOICES, CALIBER_VOICES, MAX_VOICES, NEW_YEAR_SOUND_EVENT, NEW_YEAR_SOUND_KEY, burstLevel, burstShape, createNewYearSound, readNewYearSound, volumeFor, writeNewYearSound } from "./sound";
 
 // Silvester-Klang (N4, #742): Vorgabe aus, eigener Schalter je Gerät; aus bleibt wirklich still (keine Audio-Fläche);
 // ferne Raketen leiser und später; höchstens sechs Stimmen; jede Art klingt anders.
@@ -61,4 +61,25 @@ test("Entfernung: fern leiser; jede Art klingt anders", () => {
   expect(volumeFor(0)).toBe(1);
   expect(volumeFor(1)).toBeCloseTo(0.35, 2);
   expect(new Set(Object.values(BURST_VOICES).map((voice) => JSON.stringify(voice))).size).toBe(Object.keys(BURST_VOICES).length);
+});
+
+test("Kaliber (#853): leise knisternd bis kräftiger Knall - nie lauter als der lauteste Knall bisher", () => {
+  expect(BURST_LEVEL).toBe(0.9);
+  for (const caliber of Object.keys(CALIBER_VOICES)) {
+    for (const distance of [0, 0.3, 1]) expect(burstLevel(caliber, distance)).toBeLessThanOrEqual(BURST_LEVEL);
+  }
+  expect(burstLevel("giant", 0)).toBe(BURST_LEVEL);
+  expect(burstLevel("small", 0)).toBeLessThan(burstLevel("large", 0) * 0.6);
+  expect(burstLevel(undefined, 0)).toBe(burstLevel("large", 0));
+  // Die kleine knistert hell und kurz, die sehr große klingt tief und lang.
+  expect(burstShape("peony", "small").crackle).toBeGreaterThan(0);
+  expect(burstShape("peony", "small").cutoff).toBeGreaterThan(burstShape("peony", "large").cutoff);
+  expect(burstShape("peony", "giant").cutoff).toBeLessThan(burstShape("peony", "large").cutoff);
+  expect(burstShape("peony", "giant").seconds).toBeGreaterThan(burstShape("peony", "large").seconds);
+  expect(burstShape("willow", "large")).toEqual(BURST_VOICES.willow);
+  const { Ctx } = fakeAudio();
+  const sound = createNewYearSound({ win: window, AudioContextImpl: Ctx, enabled: true });
+  expect(sound.burst("peony", 0.2, "giant")).toBe(true);
+  expect(sound.whistle(0.2, 1.3, "small")).toBe(true);
+  sound.dispose();
 });

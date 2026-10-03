@@ -2,20 +2,21 @@ import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import { seasonAudioMode } from "../sound/player";
 import { SAMPLE_RATE, encodeWav, toBase64 } from "../sound/synth";
-import type { ShellType } from "./fireworks";
+import type { Caliber, ShellType } from "./fireworks";
 
 // Silvester-Klang in der App (N4 #742, wie newYear/sound.js im Web): Zischen beim Aufstieg, Knall je Art, Knistern -
 // einmal als Zahlenreihe gerechnet, als WAV in den Cache gelegt und von dort gespielt. Nur nach ausdrücklichem
 // Einschalten (eigener Schalter, Vorgabe aus, je Gerät), ohne andere Apps zu unterbrechen; wie laut, sagt das Handy
 // (`seasonAudioMode`: iPhone mit Stummschalter, Android nach Medienlautstärke); ferne Raketen leiser, höchstens drei
-// Klänge zugleich.
+// Klänge zugleich. Seit #853 klingt jedes Kaliber anders: klein leise knisternd, sehr groß tief und kräftig - nie
+// lauter als der lauteste Knall bisher.
 
 export const NEW_YEAR_SOUND_KEY = "newyear_sounds";
 export const MAX_VOICES = 3;
 export const MIN_GAP_MS = 120;
-export const SOUND_VERSION = 1;
+export const SOUND_VERSION = 2;
 
-export type FireSound = "whistle" | `boom-${ShellType}`;
+export type FireSound = "whistle" | `boom-${ShellType}` | `boom-${ShellType}-${Caliber}`;
 
 /** Wie ein Knall je Art klingt - wie BURST_VOICES im Web: Länge, Tiefe, Knistern danach. */
 export const BURST_VOICES: Record<ShellType, { seconds: number; cutoff: number; crackle: number }> = {
@@ -29,6 +30,28 @@ export const BURST_VOICES: Record<ShellType, { seconds: number; cutoff: number; 
 
 export function volumeFor(distance: number): number {
   return Math.round((1 - 0.65 * Math.max(0, Math.min(1, Number(distance) || 0))) * 100) / 100;
+}
+
+/** Das Kaliber im Klang - wie CALIBER_VOICES im Web: Lautstärke, Länge, Tiefe, Knistern, Zischen. */
+export const CALIBER_VOICES: Record<Caliber, { gain: number; seconds: number; cutoff: number; crackle: number; whistle: number }> = {
+  small: { gain: 0.42, seconds: 0.75, cutoff: 1.5, crackle: 0.5, whistle: 0.6 },
+  large: { gain: 0.8, seconds: 1, cutoff: 1, crackle: 0, whistle: 0.85 },
+  giant: { gain: 1, seconds: 1.3, cutoff: 0.75, crackle: 0, whistle: 1 },
+};
+
+/** Länge, Tiefe und Knistern eines Knalls nach Art und Kaliber - wie `burstShape` im Web. */
+export function burstShape(type: ShellType, caliber: Caliber = "large"): { seconds: number; cutoff: number; crackle: number } {
+  const shape = BURST_VOICES[type] || BURST_VOICES.peony;
+  const voice = CALIBER_VOICES[caliber] || CALIBER_VOICES.large;
+  return { seconds: Math.round(shape.seconds * voice.seconds * 100) / 100, cutoff: Math.round(shape.cutoff * voice.cutoff), crackle: Math.max(shape.crackle, voice.crackle) };
+}
+
+/** Wie laut ein Klang spielt (0–1): Entfernung und Kaliber - der lauteste ist die sehr große nahe, so laut wie bisher. */
+export function soundLevel(name: FireSound, distance: number): number {
+  const caliber = (name === "whistle" ? "large" : (name.split("-")[2] as Caliber)) || "large";
+  const voice = CALIBER_VOICES[caliber] || CALIBER_VOICES.large;
+  const share = name === "whistle" ? 1 : voice.gain;
+  return Math.round(Math.min(1, volumeFor(distance) * share) * 100) / 100;
 }
 
 /** Fester Zufall für das Rauschen - derselbe Laut bei jedem Rechnen. */
@@ -71,9 +94,9 @@ export function renderWhistle(seconds = 1.3, sampleRate = SAMPLE_RATE): Float32A
   return out;
 }
 
-/** Der Knall: ein tiefer Schlag und gefiltertes Rauschen mit schnellem Abklingen; je Art anders lang und dumpf. */
-export function renderBoom(type: ShellType, sampleRate = SAMPLE_RATE): Float32Array {
-  const voice = BURST_VOICES[type] || BURST_VOICES.peony;
+/** Der Knall: ein tiefer Schlag und gefiltertes Rauschen mit schnellem Abklingen; je Art und Kaliber anders lang und dumpf. */
+export function renderBoom(type: ShellType, sampleRate = SAMPLE_RATE, caliber: Caliber = "large"): Float32Array {
+  const voice = burstShape(type, caliber);
   const total = Math.floor((voice.seconds + (voice.crackle > 0 ? 0.9 : 0)) * sampleRate);
   const out = new Float32Array(total);
   const noise = noiseSource(7 + type.length);
@@ -83,7 +106,8 @@ export function renderBoom(type: ShellType, sampleRate = SAMPLE_RATE): Float32Ar
     const t = n / sampleRate;
     low = (1 - a) * noise() + a * low;
     const body = t < voice.seconds ? Math.exp((-5 * t) / voice.seconds) : 0;
-    const thump = t < 0.25 ? Math.sin(2 * Math.PI * 58 * t) * Math.exp(-14 * t) : 0;
+    // Die sehr große schlägt tiefer, die kleine kaum.
+    const thump = t < 0.25 ? Math.sin(2 * Math.PI * (caliber === "giant" ? 46 : 58) * t) * Math.exp(-14 * t) * (caliber === "small" ? 0.3 : 1) : 0;
     out[n] = low * body * 2.4 + thump * 0.55;
   }
   if (voice.crackle > 0) {
@@ -187,7 +211,8 @@ function soundFile(fs: FileSystemLike, name: FireSound): Promise<string | null> 
       const info = await fs.getInfoAsync(uri);
       if (!info.exists) {
         await fs.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
-        const samples = name === "whistle" ? renderWhistle() : renderBoom(name.slice(5) as ShellType);
+        const [, type, caliber] = name.split("-");
+        const samples = name === "whistle" ? renderWhistle() : renderBoom(type as ShellType, SAMPLE_RATE, (caliber || "large") as Caliber);
         await fs.writeAsStringAsync(uri, toBase64(encodeWav(samples, SAMPLE_RATE)), { encoding: fs.EncodingType.Base64 });
       }
       return uri;
@@ -218,9 +243,10 @@ export async function playFireSound(name: FireSound, distance = 0.5, now = Date.
     audioReady = audioReady || audio.setAudioModeAsync(seasonAudioMode()).catch(() => undefined);
     await audioReady;
     const player = audio.createAudioPlayer({ uri });
-    player.volume = volumeFor(distance);
+    player.volume = soundLevel(name, distance);
     player.play();
-    const seconds = name === "whistle" ? 1.3 : (BURST_VOICES[name.slice(5) as ShellType]?.seconds || 1) + 0.9;
+    const [, type, caliber] = name.split("-");
+    const seconds = name === "whistle" ? 1.3 : burstShape(type as ShellType, (caliber || "large") as Caliber).seconds + 0.9;
     setTimeout(() => {
       voices = Math.max(0, voices - 1);
       try {

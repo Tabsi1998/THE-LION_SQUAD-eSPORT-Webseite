@@ -2,6 +2,8 @@
 // Aufstieg, Explosion je Art, Nachglühen, Rauch, Wind, Entfernung. Was je Bild läuft, trägt "worklet": es läuft auf
 // dem UI-Thread (Reanimated), gezeichnet wird mit Skia. Ein Fingerabdruck in beiden Tests hält die Rechnungen gleich.
 
+import { glyphSpot, isGlyph, yearDuration } from "./yearDigits";
+
 export const GRAVITY = 46;
 
 export type ShellType = "peony" | "chrysanthemum" | "willow" | "crackle" | "ring" | "heart";
@@ -17,14 +19,55 @@ export const SHELLS: Record<ShellType, Shell> = {
 };
 export const SHELL_TYPES = Object.keys(SHELLS) as ShellType[];
 
+/** Kaliber (#853) wie im Web: klein, groß (bisher), sehr groß - Sterne, Tempo, Sterngröße, Leben, tiefer zerplatzen. */
+export type Caliber = "small" | "large" | "giant";
+export type CaliberShape = { stars: number; speed: number; size: number; life: number; lower: number };
+export const CALIBERS: Record<Caliber, CaliberShape> = {
+  small: { stars: 0.62, speed: 0.7, size: 0.85, life: 0.85, lower: 0 },
+  large: { stars: 1, speed: 1, size: 1, life: 1, lower: 0 },
+  giant: { stars: 1.4, speed: 1.3, size: 1.15, life: 1.2, lower: 0.07 },
+};
+export const CALIBER_TYPES = Object.keys(CALIBERS) as Caliber[];
+
 export const COLORS = { blue: "#29B6E8", gold: "#ffc857", silver: "#dfe7ee", white: "#ffffff", red: "#e8453c", green: "#4fd18b", violet: "#a678f0" } as const;
 export type ColorName = keyof typeof COLORS;
 export const EMBER = "#ff8a3c";
 
-export type Launch = { id: string; at: number; type: ShellType; x: number; distance: number; colors: [ColorName, ColorName]; burstY: number; rise: number; drift: number; pattern?: string };
+export type Launch = {
+  id: string;
+  at: number;
+  type: ShellType;
+  /** Kaliber (#853) - ohne Angabe „groß“. */
+  caliber?: Caliber;
+  /** Ziffer der Jahreszahl (#853, yearDigits.ts) mit der ganzen Zahl und ihrem Platz darin. */
+  glyph?: string;
+  text?: string;
+  slot?: number;
+  slots?: number;
+  x: number;
+  distance: number;
+  colors: [ColorName, ColorName];
+  burstY: number;
+  rise: number;
+  drift: number;
+  pattern?: string;
+};
 export type Star = { vx: number; vy: number; life: number; size: number; color: ColorName; glitter: number | null; crackleAt: number | null };
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
+
+/** Das Kaliber einer Rakete - ohne Angabe „groß“ (so sah jede Rakete bis #853 aus). */
+export function caliberOf(launch: Pick<Launch, "caliber"> | null | undefined): CaliberShape {
+  "worklet";
+  return (launch?.caliber && CALIBERS[launch.caliber]) || CALIBERS.large;
+}
+
+/** Höchstens so viele Sterne hat eine Rakete ihrer Art und ihres Kalibers - danach richtet sich das Budget. */
+export function maxStars(launch: Pick<Launch, "type" | "caliber">): number {
+  "worklet";
+  const shell = SHELLS[launch.type] || SHELLS.peony;
+  return Math.round(shell.stars[1] * caliberOf(launch).stars);
+}
 
 function clamp01(value: number): number {
   "worklet";
@@ -97,6 +140,10 @@ function easeOutQuad(t: number): number {
 
 export function burstPoint(launch: Launch, size: Size, wind = 0): Point {
   "worklet";
+  if (isGlyph(launch)) {
+    const spot = glyphSpot(launch.slot ?? 0, launch.slots ?? 1, size);
+    return { x: Math.round((spot.x + wind * launch.rise * 0.5) * 10) / 10, y: spot.y };
+  }
   return {
     x: Math.round((launch.x * size.width + launch.drift * distanceScale(launch.distance) + wind * launch.rise * 0.5) * 10) / 10,
     y: Math.round(launch.burstY * size.height * 10) / 10,
@@ -109,7 +156,7 @@ export function rocketAt(launch: Launch, t: number, size: Size, wind = 0): { x: 
   const p = easeOutQuad(t / launch.rise);
   const startY = size.height + 12;
   const burst = burstPoint(launch, size, wind);
-  const x0 = launch.x * size.width;
+  const x0 = isGlyph(launch) ? glyphSpot(launch.slot ?? 0, launch.slots ?? 1, size).x : launch.x * size.width;
   return {
     x: Math.round((x0 + (burst.x - x0) * p) * 10) / 10,
     y: Math.round((startY + (burst.y - startY) * p) * 10) / 10,
@@ -124,14 +171,15 @@ function heartPoint(t: number): Point {
   return { x: x / 17, y: y / 17 };
 }
 
-/** Die Sterne einer Explosion - wie `burstStars` im Web; `scale` ist der Anteil am Budget, `spread` die Größe. */
+/** Die Sterne einer Explosion - wie `burstStars` im Web; `scale` ist der Anteil am Budget, `spread` die Größe, das Kaliber macht die Kugel kleiner oder größer. */
 export function burstStars(launch: Launch, rng: () => number, scale = 1, spread = 1): Star[] {
   "worklet";
   const shell = SHELLS[launch.type] || SHELLS.peony;
+  const caliber = caliberOf(launch);
   const near = distanceScale(launch.distance);
-  const wanted = Math.round(between(rng, shell.stars[0], shell.stars[1]));
+  const wanted = Math.round(between(rng, shell.stars[0], shell.stars[1]) * caliber.stars);
   const count = Math.max(12, Math.round(wanted * Math.max(0, Math.min(1, scale))));
-  const speed = between(rng, shell.speed[0], shell.speed[1]) * near * spread;
+  const speed = between(rng, shell.speed[0], shell.speed[1]) * near * spread * caliber.speed;
   const tilt = launch.type === "ring" ? between(rng, 0.3, 0.75) : 1;
   const spin = between(rng, 0, Math.PI * 2);
   const stars: Star[] = [];
@@ -159,8 +207,8 @@ export function burstStars(launch: Launch, rng: () => number, scale = 1, spread 
     stars.push({
       vx: Math.round(dx * v * 100) / 100,
       vy: Math.round(dy * v * 100) / 100,
-      life: Math.round(between(rng, shell.life[0], shell.life[1]) * 100) / 100,
-      size: Math.round(shell.size * near * between(rng, 0.8, 1.2) * 100) / 100,
+      life: Math.round(between(rng, shell.life[0], shell.life[1]) * caliber.life * 100) / 100,
+      size: Math.round(shell.size * near * between(rng, 0.8, 1.2) * caliber.size * 100) / 100,
       color: second ? launch.colors[1] : launch.colors[0],
       glitter: rng() < shell.glitter ? Math.round(between(rng, 0, Math.PI * 2) * 100) / 100 : null,
       crackleAt: launch.type === "crackle" ? Math.round(between(rng, 0.55, 0.78) * 100) / 100 : null,
@@ -224,8 +272,9 @@ export function trailRate(launch: Pick<Launch, "distance">): number {
 
 export const SPARK_SECONDS = 0.45;
 
-export function launchDuration(launch: Pick<Launch, "type" | "rise">): number {
+export function launchDuration(launch: Pick<Launch, "type" | "rise" | "caliber" | "glyph">): number {
   "worklet";
+  if (isGlyph(launch)) return yearDuration(launch);
   const shell = SHELLS[launch.type] || SHELLS.peony;
-  return Math.round((launch.rise + shell.life[1] + 0.2) * 100) / 100;
+  return Math.round((launch.rise + shell.life[1] * caliberOf(launch).life + 0.2) * 100) / 100;
 }

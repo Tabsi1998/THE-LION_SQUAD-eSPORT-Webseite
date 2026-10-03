@@ -100,6 +100,11 @@ test("Plan: die Raketen der Stunde nach dem Server, in der Show dazu die drei gr
   expect(salvos.length).toBeGreaterThanOrEqual(3 * 8);
   expect(new Set(salvos.map((launch: { at: number }) => Math.floor((launch.at - MIDNIGHT) / 60000)))).toEqual(new Set([0, 5, 10]));
   expect(planFor(silvester({ phase: "greeting" }), mockSeasonState.serverNow).some((launch: { id: string }) => launch.id.startsWith("salvo:"))).toBe(false);
+  // Um 00:00 zuerst die neue Jahreszahl (#853) - das Jahr aus dem Beginn der Show; ruhige Screens behalten sie ganz.
+  const digits = show.filter((launch: { glyph?: string }) => typeof launch.glyph === "string");
+  expect(digits.map((launch: { glyph: string }) => launch.glyph).join("")).toBe("2027");
+  expect(digits[0].at).toBe(MIDNIGHT);
+  expect(thinPlan(show, 0.45).filter((launch: { glyph?: string }) => typeof launch.glyph === "string")).toHaveLength(4);
   expect(planFor({ ...silvester(), key: "christmas" }, mockSeasonState.serverNow)).toEqual([]);
   // Probe-Show (Vorschau): die großen Salven in Sekunden statt Minuten - wie im Web.
   const demo = planFor(silvester({ phase: "countdown", data: { ...silvester().data, salvo_seconds: [0, 12, 24] } }), mockSeasonState.serverNow);
@@ -233,4 +238,33 @@ test("am 1. Jänner: der Gruß einmal am Tag über der Tab-Leiste - nicht auf st
   await flush();
   await advance(2000);
   expect(screen.queryByTestId("new-year-toast")).toBeNull();
+});
+
+test("„dezent“ und „Bewegung reduzieren“ (#853): um 00:00 steht die Jahreszahl ruhig am Himmel - ohne Raketen; sonst formen sie die Funken", async () => {
+  const { drawCalmYear } = require("./index");
+  // Die ruhige Zahl ist nur Schmuck und für Screenreader verborgen - gesucht wird sie trotzdem.
+  const HIDDEN = { includeHiddenElements: true };
+  at(MIDNIGHT + 1000);
+  const view = await render(<NewYearGreeting season={silvester({ phase: "show", effective: "subtle" })} screen="Dashboard" />);
+  const calm = screen.getByTestId("new-year-calm-year", HIDDEN);
+  expect(calm.props.pointerEvents).toBe("none");
+  expect(calm.props.importantForAccessibility).toBe("no-hide-descendants");
+  expect(screen.getByTestId("new-year-zero")).toHaveTextContent(/Frohes neues Jahr 2027!/);
+  await view.unmount();
+  mockSeasonState.reducedMotion = true;
+  const still = await render(<NewYearGreeting season={silvester({ phase: "show" })} screen="Dashboard" />);
+  expect(screen.getByTestId("new-year-calm-year", HIDDEN)).toBeTruthy();
+  await still.unmount();
+  mockSeasonState.reducedMotion = false;
+  // Mit Bewegung formen die Funken die Zahl - keine zweite, ruhige; auf stillen Screens gar keine.
+  const lively = await render(<NewYearGreeting season={silvester({ phase: "show" })} screen="Dashboard" />);
+  expect(screen.queryByTestId("new-year-calm-year", HIDDEN)).toBeNull();
+  await lively.unmount();
+  await render(<NewYearGreeting season={silvester({ phase: "show", effective: "subtle" })} screen="Settings" />);
+  expect(screen.queryByTestId("new-year-calm-year", HIDDEN)).toBeNull();
+  // Gezeichnet wird je Punkt ein Schein und ein Kern - wie die Funken im Feuerwerk.
+  const circles: number[] = [];
+  const paint = { setColor() {}, setAlphaf() {} };
+  drawCalmYear({ drawCircle: (_x: number, _y: number, r: number) => circles.push(r) } as never, [{ x: 10, y: 20, white: false }, { x: 30, y: 20, white: true }], paint as never, 1 as never, 2 as never);
+  expect(circles).toEqual([7, 2.6, 7, 2.2]);
 });

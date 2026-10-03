@@ -4,6 +4,7 @@
 // dieselbe Rechnung übernehmen kann (mobile/src/seasons/newYear/fireworks.ts, Paritätstest auf beiden Seiten).
 
 import { between } from "../rng";
+import { glyphSpot, isGlyph, yearDuration } from "./yearDigits";
 
 /** Schwerkraft in px/s² für eine nahe Rakete; ferne fallen im Bild langsamer (kleiner). */
 export const GRAVITY = 46;
@@ -27,6 +28,28 @@ export function spreadFor(size) {
   return Math.round(Math.max(0.5, Math.min(1.3, (Number(size?.height) || 900) / 900)) * 100) / 100;
 }
 export const SHELL_TYPES = Object.keys(SHELLS);
+
+/**
+ * Kaliber (#853): dieselbe Art klein, groß oder sehr groß - Sternzahl, Tempo (Größe der Kugel), Sterngröße, Lebensdauer
+ * und wie viel tiefer sie zerplatzt (die große Kugel bleibt unter der Kopfzeile). „groß“ ist das Feuerwerk von bisher.
+ */
+export const CALIBERS = {
+  small: { stars: 0.62, speed: 0.7, size: 0.85, life: 0.85, lower: 0 },
+  large: { stars: 1, speed: 1, size: 1, life: 1, lower: 0 },
+  giant: { stars: 1.4, speed: 1.3, size: 1.15, life: 1.2, lower: 0.07 },
+};
+export const CALIBER_TYPES = Object.keys(CALIBERS);
+
+/** Das Kaliber einer Rakete - ohne Angabe „groß“ (so sah jede Rakete bis #853 aus). */
+export function caliberOf(launch) {
+  return CALIBERS[launch?.caliber] || CALIBERS.large;
+}
+
+/** Höchstens so viele Sterne hat eine Rakete ihrer Art und ihres Kalibers - danach richtet sich das Budget. */
+export function maxStars(launch) {
+  const shell = SHELLS[launch.type] || SHELLS.peony;
+  return Math.round(shell.stars[1] * caliberOf(launch).stars);
+}
 
 /** Farben: Vereinsblau, Gold, Silber, Weiß - dazu Rot, Grün und Violett für Akzente; die Glut am Ende ist orange. */
 export const COLORS = { blue: "#29B6E8", gold: "#ffc857", silver: "#dfe7ee", white: "#ffffff", red: "#e8453c", green: "#4fd18b", violet: "#a678f0" };
@@ -71,7 +94,7 @@ export function rocketAt(launch, t, size, wind = 0) {
   const p = easeOutQuad(t / launch.rise);
   const startY = size.height + 12;
   const burst = burstPoint(launch, size, wind);
-  const x0 = launch.x * size.width;
+  const x0 = isGlyph(launch) ? glyphSpot(launch.slot, launch.slots, size).x : launch.x * size.width;
   return {
     x: Math.round((x0 + (burst.x - x0) * p) * 10) / 10,
     y: Math.round((startY + (burst.y - startY) * p) * 10) / 10,
@@ -80,8 +103,15 @@ export function rocketAt(launch, t, size, wind = 0) {
   };
 }
 
-/** Wo die Rakete zerplatzt: über ihrem Startpunkt, verschoben um die eigene Abweichung und den Wind im Aufstieg. */
+/**
+ * Wo die Rakete zerplatzt: über ihrem Startpunkt, verschoben um die eigene Abweichung und den Wind im Aufstieg. Eine
+ * Ziffer der Jahreszahl zerplatzt in der Mitte ihres Platzes (`glyphSpot`).
+ */
 export function burstPoint(launch, size, wind = 0) {
+  if (isGlyph(launch)) {
+    const spot = glyphSpot(launch.slot, launch.slots, size);
+    return { x: Math.round((spot.x + wind * launch.rise * 0.5) * 10) / 10, y: spot.y };
+  }
   return {
     x: Math.round((launch.x * size.width + launch.drift * distanceScale(launch.distance) + wind * launch.rise * 0.5) * 10) / 10,
     y: Math.round(launch.burstY * size.height * 10) / 10,
@@ -99,14 +129,15 @@ function heartPoint(t) {
  * Die Sterne einer Explosion: Richtung und Tempo je Art (Kugel, geneigter Ring, Herz), Lebensdauer, Größe, Farbe
  * (Hauptfarbe, ein Teil in der Zweitfarbe), Glitzern und - beim Knister - der Moment des Zerplatzens. `scale` ist der
  * Anteil am Teilchenbudget (0–1): bei knappem Budget weniger Sterne, nie weniger als zwölf. `spread` ist die Größe
- * im Fenster (`spreadFor`).
+ * im Fenster (`spreadFor`). Das Kaliber macht die Kugel kleiner oder größer (#853).
  */
 export function burstStars(launch, rng, scale = 1, spread = 1) {
   const shell = SHELLS[launch.type] || SHELLS.peony;
+  const caliber = caliberOf(launch);
   const near = distanceScale(launch.distance);
-  const wanted = Math.round(between(rng, shell.stars[0], shell.stars[1]));
+  const wanted = Math.round(between(rng, shell.stars[0], shell.stars[1]) * caliber.stars);
   const count = Math.max(12, Math.round(wanted * Math.max(0, Math.min(1, scale))));
-  const speed = between(rng, shell.speed[0], shell.speed[1]) * near * spread;
+  const speed = between(rng, shell.speed[0], shell.speed[1]) * near * spread * caliber.speed;
   const tilt = launch.type === "ring" ? between(rng, 0.3, 0.75) : 1;
   const spin = between(rng, 0, Math.PI * 2);
   const stars = [];
@@ -135,8 +166,8 @@ export function burstStars(launch, rng, scale = 1, spread = 1) {
     stars.push({
       vx: Math.round(dx * v * 100) / 100,
       vy: Math.round(dy * v * 100) / 100,
-      life: Math.round(between(rng, shell.life[0], shell.life[1]) * 100) / 100,
-      size: Math.round(shell.size * near * between(rng, 0.8, 1.2) * 100) / 100,
+      life: Math.round(between(rng, shell.life[0], shell.life[1]) * caliber.life * 100) / 100,
+      size: Math.round(shell.size * near * between(rng, 0.8, 1.2) * caliber.size * 100) / 100,
       color: second ? launch.colors[1] : launch.colors[0],
       glitter: rng() < shell.glitter ? Math.round(between(rng, 0, Math.PI * 2) * 100) / 100 : null,
       crackleAt: launch.type === "crackle" ? Math.round(between(rng, 0.55, 0.78) * 100) / 100 : null,
@@ -204,8 +235,9 @@ export function trailRate(launch) {
 
 export const SPARK_SECONDS = 0.45;
 
-/** Wie lange eine Rakete insgesamt sichtbar ist: Aufstieg plus die längste Lebensdauer ihrer Art. */
+/** Wie lange eine Rakete insgesamt sichtbar ist: Aufstieg plus die längste Lebensdauer ihrer Art und ihres Kalibers. */
 export function launchDuration(launch) {
+  if (isGlyph(launch)) return yearDuration(launch);
   const shell = SHELLS[launch.type] || SHELLS.peony;
-  return Math.round((launch.rise + shell.life[1] + 0.2) * 100) / 100;
+  return Math.round((launch.rise + shell.life[1] * caliberOf(launch).life + 0.2) * 100) / 100;
 }

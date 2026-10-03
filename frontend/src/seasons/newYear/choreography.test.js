@@ -1,5 +1,6 @@
-import { COLOR_PAIRS, SALVO_PATTERNS, handwriting, makeLaunch, pickType, planHour, salvoLaunches, salvoTimes } from "./choreography";
-import { SHELL_TYPES } from "./fireworks";
+import { CALIBER_SHARES, COLOR_PAIRS, SALVO_PATTERNS, handwriting, makeLaunch, pickCaliber, pickType, planHour, salvoLaunches, salvoTimes, showLaunches, withCaliber } from "./choreography";
+import { CALIBERS, SHELL_TYPES } from "./fireworks";
+import { YEAR_SALVO_DELAY_MS, isGlyph } from "./yearDigits";
 import { mulberry32 } from "../rng";
 
 // Choreografie (N2, #740): jedes Jahr eine eigene Handschrift, innerhalb des Jahres stabil (auch nach Neuladen), über
@@ -85,4 +86,55 @@ test("Große Salven um 00:00, 00:05, 00:10: je eigenes Muster - Fächer, Welle, 
   expect(cascade).toHaveLength(hand.zones.length * 3);
   expect(cascade.every((launch) => launch.type === "willow")).toBe(true);
   expect(new Set([...fan, ...wave, ...crown].map((launch) => launch.id)).size).toBe(fan.length + wave.length + crown.length);
+});
+
+test("Kaliber (#853): viele kleine, ab und zu große, selten sehr große - das Herz nie klein; die sehr große zerplatzt tiefer", () => {
+  const hand = handwriting(2026);
+  const launches = Array.from({ length: 800 }, (_, i) => makeLaunch(hand, `k:${i}`, "show", 0));
+  const share = (caliber) => launches.filter((launch) => launch.caliber === caliber).length / launches.length;
+  expect(share("small")).toBeGreaterThan(0.5);
+  expect(share("large")).toBeGreaterThan(0.22);
+  expect(share("giant")).toBeGreaterThan(0.03);
+  expect(share("giant")).toBeLessThan(0.14);
+  expect(CALIBER_SHARES.small + CALIBER_SHARES.large + CALIBER_SHARES.giant).toBeCloseTo(1, 5);
+  launches.filter((launch) => launch.type === "heart").forEach((launch) => expect(launch.caliber).not.toBe("small"));
+  const rng = mulberry32(5);
+  expect(Array.from({ length: 200 }, () => pickCaliber(rng, "heart")).includes("small")).toBe(false);
+  // Das Kaliber ist der letzte Zug: alles andere bleibt wie vor #853.
+  const large = launches.find((launch) => launch.caliber === "large");
+  const giant = withCaliber(large, "giant");
+  expect(giant.burstY).toBeCloseTo(large.burstY + CALIBERS.giant.lower, 3);
+  expect(withCaliber(giant, "large")).toEqual(large);
+});
+
+test("Salven mit festen Kalibern: Fächer groß, Welle hin klein und zurück groß, Krone mit sehr großer Weide, Kaskade von klein zu groß", () => {
+  const base = handwriting(2026);
+  const at = Date.UTC(2026, 11, 31, 23, 0, 0);
+  const calibers = (pattern) => salvoLaunches({ ...base, salvos: [pattern] }, 0, at).map((launch) => launch.caliber);
+  expect(new Set(calibers("fan"))).toEqual(new Set(["large"]));
+  const wave = calibers("wave");
+  expect(wave.slice(0, base.zones.length).every((caliber) => caliber === "small")).toBe(true);
+  expect(wave.slice(base.zones.length).every((caliber) => caliber === "large")).toBe(true);
+  const crown = calibers("crown");
+  expect(crown.filter((caliber) => caliber === "giant")).toHaveLength(1);
+  expect(crown[crown.length - 1]).toBe("giant");
+  const cascade = calibers("cascade");
+  expect(cascade.slice(0, 2 * base.zones.length).every((caliber) => caliber === "small")).toBe(true);
+  expect(cascade.slice(2 * base.zones.length).every((caliber) => caliber === "large")).toBe(true);
+});
+
+test("Um 00:00 zuerst die Jahreszahl, dann die gewohnte erste Salve; die anderen Salven und ohne Jahr wie bisher", () => {
+  const hand = handwriting(2026);
+  const start = Date.UTC(2026, 11, 31, 23, 0, 0);
+  const times = salvoTimes(start);
+  const show = showLaunches(hand, times, 2027);
+  const digits = show.filter(isGlyph);
+  expect(digits.map((launch) => launch.glyph).join("")).toBe("2027");
+  expect(digits[0].at).toBe(start);
+  const first = show.filter((launch) => launch.id.startsWith("salvo:0:"));
+  expect(Math.min(...first.map((launch) => launch.at))).toBe(start + YEAR_SALVO_DELAY_MS);
+  expect(first).toEqual(salvoLaunches(hand, 0, start + YEAR_SALVO_DELAY_MS));
+  expect(show.filter((launch) => launch.id.startsWith("salvo:2:"))).toEqual(salvoLaunches(hand, 2, times[2]));
+  expect(new Set(show.map((launch) => launch.id)).size).toBe(show.length);
+  expect(showLaunches(hand, times, null)).toEqual(times.flatMap((at, index) => salvoLaunches(hand, index, at)));
 });
