@@ -16,6 +16,8 @@ Ablauf je Auftrag (``billing_orders``, Status ``pending``/``ready``/``waiting_*`
    der Grund steht am Auftrag (`pdf_missing`), der Abgleich versucht es wieder.
 3. **Stand zurücklesen** (``sync_invoiced``): Nummer, Status, bezahlt/offen aus Dolibarr in Auftrag und
    Anmeldung. Dolibarr ist führend für den Beleg; die Website für die Buchung.
+4. **„Deine Rechnung ist da“** (#841, ``services/invoice_notice``): beim Übergang zur Freigabe - gleich beim Anlegen
+   oder später im Abgleich - einmal je Beleg an die Person, die angemeldet hat.
 
 Kein Löschen, keine Zahlungen buchen, keine zweite Rechnung für denselben Auftrag.
 
@@ -556,6 +558,18 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     return _invoice_state(invoice)
 
 
+async def _notice(db, order_id: str, previous_status: str | None, state: dict) -> bool:
+    """„Deine Rechnung ist da“ (#841) vormerken und, sobald das PDF da ist, schicken - nie ein Abbruch für den Beleg."""
+    from services import invoice_notice
+
+    try:
+        await invoice_notice.mark_due(db, order_id, previous_status, state)
+        return await invoice_notice.send_due(db, order_id)
+    except Exception as exc:
+        logger.warning("[billing] Meldung zu Auftrag %s nicht verschickt: %s", order_id, exc)
+        return False
+
+
 async def process_order(db, settings: dict, client: DolibarrClient, order: dict) -> str:
     """Einen Auftrag bis zum Beleg bringen. Gibt den neuen Status zurück."""
     try:
@@ -571,6 +585,7 @@ async def process_order(db, settings: dict, client: DolibarrClient, order: dict)
         logger.warning("[billing] Auftrag %s: %s (%s)", order["id"], exc.kind, attempts)
         return status
     await _mark_invoiced(db, order, state)
+    await _notice(db, order["id"], None, state)
     return "invoiced"
 
 
@@ -663,6 +678,9 @@ async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, coun
     # Fehlende PDFs nachbauen (#840) - auch für Belege, die jemand in Dolibarr von Hand freigegeben hat.
     if await ensure_pdf(db, settings, client, order, invoice) == "built":
         counts["pdfs"] = counts.get("pdfs", 0) + 1
+    # Freigegeben, seit wir zuletzt nachgesehen haben (auch von Hand in Dolibarr)? Dann die Meldung (#841).
+    if await _notice(db, order["id"], order.get("invoice_status"), state):
+        counts["notices"] = counts.get("notices", 0) + 1
     if changed:
         counts["changed"] += 1
         if state["paid"] and not order.get("paid"):

@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { InvoiceList } from "../../components/InvoiceList";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
@@ -18,11 +18,12 @@ import { colors } from "../../theme";
 
 // Meine Rechnungen (#320): für jedes Konto, nicht nur Mitglieder - Event- und Turnierrechnungen
 // stehen hier auch für Nicht-Mitglieder. Filter nach Quelle und Stand; Tippen öffnet das PDF.
-// Bezahlt wird nicht in der App (Zahlungslinks bleiben im Browser, Überweisung laut Rechnung).
+// Bezahlt wird nicht in der App (Zahlungslinks bleiben im Browser, Überweisung laut Rechnung). Aus „Deine
+// Rechnung ist da“ (#841) kommt der Screen mit `invoice`: der Beleg öffnet sich gleich, einmal.
 
 type Props = NativeStackScreenProps<MoreStackParamList, "MyInvoices">;
 
-export function MyInvoicesScreen(_props: Props) {
+export function MyInvoicesScreen({ route }: Props) {
   const { accessToken } = useAuth();
   const [data, setData] = useState<InvoiceListData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,6 +33,8 @@ export function MyInvoicesScreen(_props: Props) {
   const [openError, setOpenError] = useState("");
   const [source, setSource] = useState<SourceFilter>("all");
   const [state, setState] = useState<StateFilter>("all");
+  const wanted = route?.params?.invoice || "";
+  const opened = useRef("");
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +66,16 @@ export function MyInvoicesScreen(_props: Props) {
       setBusyKey(null);
     }
   };
+
+  // Aus der Meldung: den genannten Beleg öffnen, sobald die Liste da ist - nicht bei jedem Neuladen wieder.
+  useEffect(() => {
+    if (!wanted || opened.current === wanted || !data?.invoices) return;
+    const invoice = data.invoices.find((item) => item.key === wanted);
+    if (!invoice) return;
+    opened.current = wanted;
+    void open(invoice);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wanted, data]);
 
   const sources = sourceFilters(data);
   const rows = filterInvoices(data?.invoices, source, state);

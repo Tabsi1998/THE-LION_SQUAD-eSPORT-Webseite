@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 // Meine Rechnungen (#296): offen oben, Archiv unten, PDF im Betrachter, Bezahlen fragt den Server
 // im Moment des Klicks – und bei Ausfall bleibt der letzte Stand ohne Bezahlen-Knopf.
@@ -9,7 +9,7 @@ const apiMock = { get: vi.fn(), post: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, API: "/api", formatRequestError: (error, fallback) => error?.response?.data?.detail || fallback }));
 vi.mock("@/components/tls/PublicLayout", () => ({ PublicLayout: ({ children }) => <div>{children}</div> }));
-vi.mock("@/components/tls/DocumentViewer", () => ({ DocumentViewer: ({ path, title }) => <div data-testid="viewer">{title} · {path}</div> }));
+vi.mock("@/components/tls/DocumentViewer", () => ({ DocumentViewer: ({ path, title, onClose }) => <div data-testid="viewer">{title} · {path}<button type="button" onClick={onClose}>zu</button></div> }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -92,4 +92,25 @@ test("Quelle am Beleg, Filter nach Quelle und Stand; Nicht-Mitglieder gehen zur�
   expect(screen.queryByTestId("invoice-d-501")).toBeNull();
   expect(screen.getByTestId("invoice-d-30")).toBeInTheDocument();
   expect(screen.getByTestId("invoice-d-29")).toBeInTheDocument();
+});
+
+function Where() {
+  const location = useLocation();
+  return <div data-testid="where">{location.search}</div>;
+}
+
+test("aus „Deine Rechnung ist da“ (#841): der genannte Beleg öffnet sich gleich – einmal; beim Schließen ist der Zusatz weg", async () => {
+  const user = userEvent.setup();
+  render(<MemoryRouter initialEntries={["/account/invoices?invoice=d-31"]}><MyInvoicesPage /><Where /></MemoryRouter>);
+  expect(await screen.findByTestId("viewer")).toHaveTextContent("Rechnung FA-31 · /account/invoices/d-31/pdf");
+  expect(screen.getByTestId("where").textContent).toBe("?invoice=d-31");
+  await user.click(screen.getByRole("button", { name: "zu" }));
+  expect(screen.queryByTestId("viewer")).toBeNull();
+  expect(screen.getByTestId("where").textContent).toBe("");
+});
+
+test("ein unbekannter Beleg im Link öffnet nichts – die Liste steht wie immer da", async () => {
+  render(<MemoryRouter initialEntries={["/account/invoices?invoice=d-999"]}><MyInvoicesPage /></MemoryRouter>);
+  expect(await screen.findByTestId("invoice-d-31")).toBeInTheDocument();
+  expect(screen.queryByTestId("viewer")).toBeNull();
 });

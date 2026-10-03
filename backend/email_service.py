@@ -454,6 +454,30 @@ def tpl_achievement_recap(display_name: str, week: str, xp_week: str, level: str
     return f"Deine Woche: +{xp_week} XP", _wrap("Deine Woche", body, "Zu deinen Erfolgen", url or None)
 
 
+def tpl_invoice_ready(display_name: str, source: str, amount: str, due_on: str = "", paid: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+    """„Deine Rechnung ist da“ (#841): Vorgang, Betrag, Zahlungsziel und der Weg zum PDF im Konto. Das PDF hängt nie an
+    der Mail - es bleibt hinter der Anmeldung, nur für die Person selbst."""
+    esc = html_lib.escape
+    if paid:
+        state = " – schon bezahlt, danke!"
+    elif due_on:
+        state = f", zahlbar bis <strong>{esc(due_on)}</strong>."
+    else:
+        state = "."
+    body = (
+        f"<p>Hallo {esc(display_name or 'Löwe')},</p>"
+        f"<p>deine Rechnung zu <strong>{esc(source)}</strong> ist da: <strong>{esc(amount)}</strong>{state}</p>"
+        "<p>Das PDF findest du in deinem Konto unter „Rechnungen“ – nach der Anmeldung, nur für dich.</p>"
+    )
+    if preferences_url:
+        body += (
+            '<p style="font-size:12px;color:#6b7280">'
+            f'Diese Mails kannst du in deinen <a href="{esc(preferences_url, quote=True)}">E-Mail-Einstellungen</a> abbestellen.</p>'
+        )
+    subject_source = str(source or "deiner Anmeldung").replace("\r", " ").replace("\n", " ")[:80]
+    return f"Deine Rechnung zu {subject_source} ist da", _wrap("Deine Rechnung ist da", body, "Rechnung ansehen", url or None)
+
+
 def tpl_direct_message(display_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     sender_subject = str(sender_name or "Benutzer").replace("\r", " ").replace("\n", " ")[:80]
     sender = html_lib.escape(sender_name or "Benutzer")
@@ -580,6 +604,7 @@ async def send_template(
         "membership_blocked": tpl_membership_blocked,
         "birthday_greeting": tpl_birthday_greeting,
         "achievement_recap": tpl_achievement_recap,
+        "invoice_ready": tpl_invoice_ready,
         "direct_message": tpl_direct_message,
         "team_chat_mention": tpl_team_chat_mention,
         "newsletter_news": tpl_newsletter_news,

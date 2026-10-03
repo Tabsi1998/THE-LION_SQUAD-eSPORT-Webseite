@@ -50,7 +50,8 @@ export type MoreStackParamList = {
   AdventCalendar: undefined;
   EasterHunt: undefined;
   // Meine Rechnungen (#320): für jedes Konto, nicht nur Mitglieder.
-  MyInvoices: undefined;
+  /** `invoice`: aus „Deine Rechnung ist da“ (#841) - der Beleg öffnet sich gleich. */
+  MyInvoices: { invoice?: string } | undefined;
   // Mitgliederbereich (#340): nur für Vereinsmitglieder sichtbar, der Server prüft jede Antwort.
   MemberArea: undefined;
   MyMembership: undefined;
