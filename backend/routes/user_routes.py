@@ -860,6 +860,9 @@ async def update_me(body: UserUpdate, me: dict = Depends(get_current_user)):
     await db.users.update_one({"id": me["id"]}, {"$set": updates})
     for platform in dropped:
         await unlink(db, me["id"], platform)
+    # Sprinter (#615): wann das Profil zum ersten Mal vollständig war.
+    from services.member_activity import note_profile_completion
+    await note_profile_completion(db, me["id"])
     u = await db.users.find_one({"id": me["id"]}, PRIVATE_AUTH_FIELDS)
     await _attach_membership(u)
     return u

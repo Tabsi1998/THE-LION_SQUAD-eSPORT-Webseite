@@ -406,6 +406,10 @@ async def update_position(pid: str, body: BoardPositionUpdate, me: dict = Depend
             updates[k] = None
         elif k in updates and updates[k]:
             updates[k] = await _normalize_board_assignee(db, updates[k])
+        # Vorstandsarbeit (#615): seit wann jemand das Amt hat - neu bei jedem Wechsel, weg beim Leeren.
+        since_key = "user_since" if k == "user_id" else "deputy_since"
+        if k in updates and updates[k] != existing.get(k):
+            updates[since_key] = now_utc().isoformat() if updates[k] else None
     await db.board_positions.update_one({"id": pid}, {"$set": updates})
     return await db.board_positions.find_one({"id": pid}, {"_id": 0})
 
