@@ -260,7 +260,7 @@ export function DashboardScreen({ navigation }: Props) {
         {liveItems.length ? (
           <Section title="Heute und Live">
             {liveItems.map((item) => (
-              <TimelineCard key={`live-${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
+              <TimelineCard key={`live-${item.kind}-${item.id}`} item={item} perch={`home-live-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
             ))}
           </Section>
         ) : null}
@@ -299,7 +299,7 @@ export function DashboardScreen({ navigation }: Props) {
         >
           {nextItems.length ? (
             nextItems.map((item) => (
-              <TimelineCard key={`${item.kind}-${item.id}`} item={item} onPress={() => openTimelineItem(item)} />
+              <TimelineCard key={`${item.kind}-${item.id}`} item={item} perch={`home-${item.kind}-${item.id}`} onPress={() => openTimelineItem(item)} />
             ))
           ) : liveItems.length ? (
             <Muted>Alles Weitere steht oben unter „Heute und Live“.</Muted>
@@ -416,7 +416,7 @@ function Section({ title, actionLabel, onAction, children }: { title: string; ac
   );
 }
 
-function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => void }) {
+function TimelineCard({ item, onPress, perch }: { item: TimelineItem; onPress: () => void; perch?: string }) {
   // Die eigene Anmeldung als Pill neben dem Datum statt als Text (#248).
   return (
     <ContentCard
@@ -429,6 +429,7 @@ function TimelineCard({ item, onPress }: { item: TimelineItem; onPress: () => vo
       secondaryLabel={item.registrationStatus ? formatStatus(item.registrationStatus) : null}
       detail={item.detail}
       onPress={onPress}
+      perch={perch}
     />
   );
 }
@@ -478,6 +479,7 @@ function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
       label={post.pinned ? "Top" : null}
       detail={detail}
       onPress={onPress}
+      perch={`home-news-${post.id}`}
     />
   );
 }

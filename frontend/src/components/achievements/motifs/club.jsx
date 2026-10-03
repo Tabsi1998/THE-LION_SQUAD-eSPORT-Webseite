@@ -178,6 +178,13 @@ export const CLUB = {
       <path d="M20 42 C26 38 30 46 36 42 S44 38 46 42" stroke="#000" strokeOpacity="0.45" />
     </>
   ),
+  "egg-king": (
+    <>
+      <path d="M32 18 C41 18 48 30 48 41 C48 51 41 58 32 58 C23 58 16 51 16 41 C16 30 23 18 32 18 Z" fill="currentColor" stroke="none" />
+      <path d="M20 40 C25 36 29 44 34 40 S43 36 45 40" stroke="#000" strokeOpacity="0.45" />
+      <path d="M22 6 L26 14 L32 7 L38 14 L42 6 L41 16 H23 Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   negative: (
     <>
       <path d="M32 8 L58 54 H6 Z" fill="currentColor" stroke="none" />

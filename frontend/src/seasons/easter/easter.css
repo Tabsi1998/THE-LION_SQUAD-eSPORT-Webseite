@@ -1,0 +1,71 @@
+/* Ostern (S14 #645, E1 #753, E4 #756): Hasenohren auf dem Löwen, Eier-Reihe unter der Kopfzeile, Wiese über der
+   Fußzeile, Frühlingslicht hinter dem Inhalt, selten ein Zitronenfalter und ein Feldhase. Alle Ebenen gehören zur
+   Seite und liegen unter Kopfzeile, Menüs und Leiste unten (z 39); nichts davon ist klickbar außer den Ohren. */
+.tls-easter-layer { position: absolute; z-index: 39; pointer-events: none; }
+
+/* Hasenohren: fast aufrecht auf dem Haarreif; ab und zu zuckt das rechte von selbst, antippen lässt beide zucken. */
+.tls-ears { --hat-tilt: -4deg; }
+.tls-ears__left, .tls-ears__right { transform-box: fill-box; transform-origin: 50% 100%; }
+.tls-ears--alive .tls-ears__right { animation: tls-ears-flick 17s ease-in-out 7s infinite; }
+.tls-mascot-hat--twitch .tls-ears__right { animation: tls-ears-twitch 0.8s ease-in-out; }
+.tls-mascot-hat--twitch .tls-ears__left { animation: tls-ears-twitch-left 0.8s ease-in-out 0.08s; }
+@keyframes tls-ears-flick { 0%, 94%, 100% { transform: rotate(0deg); } 95.5% { transform: rotate(11deg); } 97% { transform: rotate(-3deg); } 98.5% { transform: rotate(2deg); } }
+@keyframes tls-ears-twitch { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(14deg); } 45% { transform: rotate(-6deg); } 70% { transform: rotate(5deg); } }
+@keyframes tls-ears-twitch-left { 0%, 100% { transform: rotate(0deg); } 30% { transform: rotate(-8deg); } 60% { transform: rotate(3deg); } }
+
+/* Die Reihe unter der Kopfzeile: Eier (oder Blumen) stehen im Gras, das Gras liegt davor. */
+.tls-easter-row__item { position: absolute; bottom: 3px; line-height: 0; transform-origin: 50% 100%; }
+.tls-easter-row .tls-egg__svg { display: block; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)); }
+.tls-easter-row--sway .tls-easter-row__item { animation: tls-row-sway 5.5s ease-in-out infinite alternate; }
+.tls-easter-row__grass { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; line-height: 0; }
+@keyframes tls-row-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+
+/* Die Wiese über der Fußzeile. */
+.tls-meadow__item { position: absolute; bottom: 0; line-height: 0; transform-origin: 50% 100%; }
+.tls-meadow--sway .tls-meadow__item--flower { animation: tls-flower-sway var(--sway, 4s) ease-in-out infinite alternate; }
+@keyframes tls-flower-sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+
+/* Frühlingslicht hinter dem Inhalt (wie der Winterhimmel: z -1, das Schwarz malt <html>) - es wandert sehr langsam. */
+.tls-easter-light {
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 40% 32% at 78% 10%, rgba(250, 240, 190, 0.075), transparent 72%),
+    radial-gradient(ellipse 34% 26% at 14% 88%, rgba(246, 190, 210, 0.05), transparent 70%),
+    radial-gradient(ellipse 50% 30% at 50% 100%, rgba(150, 200, 130, 0.045), transparent 72%);
+  background-size: 112% 112%;
+  background-position: 0% 0%;
+  animation: tls-easter-light 48s ease-in-out infinite alternate;
+}
+.tls-easter-light--still { animation: none; }
+.tls-easter-light--quiet { opacity: 0.5; }
+@keyframes tls-easter-light { from { background-position: 0% 0%; } to { background-position: 100% 60%; } }
+
+/* Der Zitronenfalter: eine Bahn quer über das Fenster (abgeschnitten - nie ein Querscrollen), darin Flug, Bogen, Flügel. */
+.tls-butterfly-lane { left: 0; right: 0; overflow: hidden; contain: paint; }
+.tls-butterfly-flight { position: absolute; left: 0; line-height: 0; animation: tls-butterfly-cross var(--fly-seconds, 9s) linear forwards; will-change: transform; }
+@keyframes tls-butterfly-cross { from { transform: translateX(var(--fly-from)); } to { transform: translateX(var(--fly-to)); } }
+.tls-butterfly-bob { animation: tls-butterfly-bob 2.4s ease-in-out infinite; }
+@keyframes tls-butterfly-bob { 0%, 100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(var(--bob, -18px)) rotate(5deg); } }
+.tls-butterfly__wing { transform-box: fill-box; animation: tls-wing-flap 0.28s ease-in-out infinite alternate; }
+.tls-butterfly__wing--left { transform-origin: 100% 50%; }
+.tls-butterfly__wing--right { transform-origin: 0% 50%; }
+@keyframes tls-wing-flap { from { transform: scaleX(1); } to { transform: scaleX(0.3); } }
+
+/* Der Feldhase: die Ohren steigen hinter der Oberkante einer Karte auf (die Box endet genau dort), zucken, sinken. */
+.tls-hare-peek { overflow: hidden; }
+.tls-hare-peek__ears { position: absolute; left: 2px; bottom: 0; line-height: 0; transform: translateY(105%); animation: tls-hare-peek 3.4s ease-in-out forwards; }
+@keyframes tls-hare-peek { 0% { transform: translateY(105%); } 18% { transform: translateY(6%); } 30% { transform: translateY(12%); } 72% { transform: translateY(10%); } 88%, 100% { transform: translateY(105%); } }
+.tls-hare__left, .tls-hare__right { transform-box: fill-box; transform-origin: 50% 100%; }
+.tls-hare__right { animation: tls-hare-twitch 3.4s ease-in-out; }
+@keyframes tls-hare-twitch { 0%, 40% { transform: rotate(0deg); } 45% { transform: rotate(-14deg); } 52% { transform: rotate(5deg); } 58%, 100% { transform: rotate(0deg); } }
+
+/* Der Gruß. */
+.tls-easter-toast { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 0.9rem; background: #12140f; border: 1px solid rgba(233, 196, 106, 0.4); border-radius: 0.6rem; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); color: #fff6e0; }
+.tls-easter-toast__text { font-weight: 800; letter-spacing: 0.02em; }
+.tls-easter-toast__close { margin-left: 0.4rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.1rem; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-ears--alive .tls-ears__right, .tls-mascot-hat--twitch .tls-ears__right, .tls-mascot-hat--twitch .tls-ears__left,
+  .tls-easter-row--sway .tls-easter-row__item, .tls-meadow--sway .tls-meadow__item--flower, .tls-easter-light,
+  .tls-butterfly-flight, .tls-butterfly-bob, .tls-butterfly__wing, .tls-hare-peek__ears, .tls-hare__right { animation: none; }
+}

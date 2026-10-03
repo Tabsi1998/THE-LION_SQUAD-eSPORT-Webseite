@@ -49,6 +49,9 @@ async def _user_data_export(db, user_id: str) -> dict:
         "stream_watches": await rows(db.stream_watches, {"user_id": user_id}),
         # Adventkalender (#641): welches Türchen wann geöffnet wurde - beim Quiz nur, dass mitgemacht wurde.
         "advent_openings": await rows(db.advent_openings, {"user_id": user_id}),
+        # Ostereiersuche (#646): welche Eier wann gefunden wurden und der Korb.
+        "easter_finds": await rows(db.easter_finds, {"user_id": user_id}),
+        "easter_progress": await rows(db.easter_progress, {"user_id": user_id}),
         # Verlosungen (#641): wo die Person mitmacht. Ein Gewinn steht bei ``prize_pickups``.
         "raffle_entries": await rows(db.season_raffle_entries, {"user_id": user_id}),
         "commendations_given": await rows(db.match_commendations, {"from_user_id": user_id}),
@@ -101,6 +104,7 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
                        # Das gegebene GG bleibt: es gehört zum Match wie das Ergebnis, und das Lob der anderen Seite
                        # soll nicht verschwinden, weil jemand sein Konto löscht.
                        db.user_signals, db.news_reads, db.stream_watches, db.user_achievement_stats, db.advent_openings,
+                       db.easter_finds, db.easter_progress,
                        # Teilnahmen an Verlosungen: wer kein Konto mehr hat, kann nicht gewinnen.
                        db.season_raffle_entries):
         await collection.delete_many({"user_id": user_id})

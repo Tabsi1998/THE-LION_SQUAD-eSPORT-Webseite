@@ -704,7 +704,8 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
       return true;
     };
     const recompute = () => {
-      const perches = perchesFor(screen);
+      // Karten mit Zuschnitt tragen keine Fledermaus - sie säße halb abgeschnitten auf der Kante.
+      const perches = perchesFor(screen).filter((perch) => !perch.clip);
       const now = Date.now();
       const vacated = Object.entries(vacatedRef.current).filter(([, until]) => until > now).map(([id]) => id);
       const current = assignmentsFor(screen).filter((entry) => perches.some((perch) => perch.id === entry.perchId));
@@ -745,7 +746,7 @@ export function usePerchAssignments(screen: string, wanted: number, active: bool
     // Umzug (A2): eine unruhige Fledermaus will zu einem anderen freien, sichtbaren Platz.
     const stopHops = subscribeHops(async (request) => {
       if (request.screen !== screen) return;
-      const perches = perchesFor(screen).filter((perch) => perch.id !== request.perchId);
+      const perches = perchesFor(screen).filter((perch) => perch.id !== request.perchId && !perch.clip);
       const taken = new Set([...assignmentsFor(screen).map((entry) => entry.perchId), ...reservedRef.current]);
       const free = perches.filter((perch) => !taken.has(perch.id));
       if (!free.length) return;

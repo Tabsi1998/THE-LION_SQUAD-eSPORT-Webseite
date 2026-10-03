@@ -226,8 +226,9 @@ def test_katalog_c_ziele_material_texte_und_schluessel():
 from achievement_catalog import GROUPS_D, REDEFINED_D, REPLACED_D, TIERS_D  # noqa: E402
 
 
-def test_katalog_d_hat_33_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
-    assert len(GROUPS_D) == 33 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1) + 15 + 13  # Verein 19, Besonders 15, Geheim 13
+def test_katalog_d_hat_34_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
+    # Verein 19, Besonders 16 (seit #646 mit „Eierkönig“), Geheim 13
+    assert len(GROUPS_D) == 34 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1) + 16 + 13
     codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D]
     assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
     tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C + TIERS_D]

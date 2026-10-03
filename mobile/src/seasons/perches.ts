@@ -13,6 +13,8 @@ export type Perch = {
   kind: PerchKind;
   /** Misst das Rechteck der Karte in Fensterkoordinaten - null, wenn sie gerade nicht messbar ist. */
   measure: () => Promise<PerchRect | null>;
+  /** Schneidet die Karte ab, was über ihren Rand ragt? Dann sitzt dort keine Fledermaus (sie wäre halb weg). */
+  clip?: boolean;
 };
 export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string; /** nach einem Flug gelandet (Einfedern mit Haptik) */ landed?: boolean };
 /** Ein kleines Netz in einer oberen Innenecke einer Karte (A4): Seite und Seed je Karte. */

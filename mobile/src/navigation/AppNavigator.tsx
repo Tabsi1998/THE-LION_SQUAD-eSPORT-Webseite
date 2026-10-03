@@ -12,6 +12,7 @@ import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ConsentScreen } from "../screens/auth/ConsentScreen";
 import { AdventCalendarScreen } from "../screens/main/AdventCalendarScreen";
+import { EasterHuntScreen } from "../screens/main/EasterHuntScreen";
 import { DashboardScreen } from "../screens/main/DashboardScreen";
 import { DirectMessagesScreen } from "../screens/main/DirectMessagesScreen";
 import { DirectThreadScreen } from "../screens/main/DirectThreadScreen";
@@ -239,6 +240,7 @@ function MoreStackScreen() {
       <MoreStack.Screen name="SeasonPass" component={SeasonPassScreen} options={{ title: "Jahreswertung" }} />
       <MoreStack.Screen name="AchievementShowcase" component={AchievementShowcaseScreen} options={{ title: "Achievements" }} />
       <MoreStack.Screen name="AdventCalendar" component={AdventCalendarScreen} options={{ title: "Adventkalender", headerTintColor: "#e9c46a" }} />
+      <MoreStack.Screen name="EasterHunt" component={EasterHuntScreen} options={{ title: "Ostereiersuche", headerTintColor: "#e9c46a" }} />
       <MoreStack.Screen name="MyInvoices" component={MyInvoicesScreen} options={{ title: "Meine Rechnungen", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberArea" component={MemberAreaScreen} options={{ title: "Mitgliederbereich", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MyMembership" component={MyMembershipScreen} options={{ title: "Meine Mitgliedschaft", headerTintColor: colors.gold }} />

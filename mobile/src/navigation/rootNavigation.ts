@@ -62,7 +62,7 @@ type NotificationTarget =
   | { area: "teams"; screen: "TeamDetail" | "TeamChat"; params: { id: string; title?: string } }
   | { area: "tournaments"; screen: "TournamentList"; params?: undefined }
   | { area: "tournaments"; screen: "TournamentDetail" | "EventDetail" | "FastLapDetail" | "MatchDetail" | "TournamentChat"; params: { id: string; title?: string } }
-  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar" | "AchievementShowcase"; params?: Record<string, unknown> };
+  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar" | "AchievementShowcase" | "EasterHunt"; params?: Record<string, unknown> };
 
 function targetFromNotification(item: UserNotification): NotificationTarget | null {
   const meta = (item.meta || {}) as Record<string, unknown>;
@@ -150,6 +150,8 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
     if (first === "gallery" || first === "galerie") return { area: "more", screen: "Gallery" };
     if (first === "fastlap" || first === "fastlaps" || first === "f1") return { area: "more", screen: "FastLapList" };
     if (first === "advent") return { area: "more", screen: "AdventCalendar" };
+    // Ostereiersuche (#647): Korb, Hinweise, Preise - auch aus Benachrichtigungen (Gewinn, voller Korb).
+    if (first === "ostern") return { area: "more", screen: "EasterHunt" };
   }
   return null;
 }

@@ -26,7 +26,7 @@ from .catalog_e import CONDITION_KEYS_E, GROUPS_E, TIERS_E  # noqa: F401
 # Zähler aus services/achievement_counters.py (#616): alle live, die Prüfung verlangt bekannte Schlüssel.
 COUNTER_KEYS_V2 = (
     "halloween_pumpkin", "snowflakes_clicked", "online_at_new_year", "konami_found", "lost_404", "logo_clicks", "explorer_done",
-    "calendar_subscribed", "member_card_added", "app_days", "onboarding_completed", "advent_doors_opened", "easter_eggs_found",
+    "calendar_subscribed", "member_card_added", "app_days", "onboarding_completed", "advent_doors_opened", "easter_eggs_found", "easter_hunts_completed",
     "discord_linked", "twitch_linked", "youtube_linked", "tiktok_linked", "linked_accounts", "avatar_and_banner", "bio_and_socials",
     "email_verified", "passkey_registered", "notification_prefs_saved", "privacy_reviewed", "newsletter_subscribed", "push_enabled",
     "account_years", "login_streak_max", "level", "prestige_stars", "birthday_logins", "hidden_unlocked", "categories_completed",

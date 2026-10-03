@@ -321,6 +321,15 @@ async def init_indexes():
     await db.advent_views.create_index([("year", 1), ("day", 1)], unique=True)
     # Geschenkte Saison-Sticker (#736): der Nikolaus bringt jeder Person einen je Jahr.
     await db.user_stickers.create_index([("user_id", 1), ("source", 1), ("year", 1)], unique=True)
+    # Ostereiersuche (#646): ein Jahr je Suche, jedes Ei einmal je Jahr, jede Person findet jedes Ei einmal.
+    await db.easter_hunts.create_index("year", unique=True)
+    await db.easter_eggs.create_index([("year", 1), ("egg_no", 1)], unique=True)
+    await db.easter_eggs.create_index([("hunt_id", 1), ("route", 1), ("channel", 1)])
+    await db.easter_finds.create_index([("hunt_id", 1), ("user_id", 1), ("egg_no", 1)], unique=True)
+    await db.easter_finds.create_index("user_id")
+    await db.easter_progress.create_index([("hunt_id", 1), ("user_id", 1)], unique=True)
+    await db.easter_progress.create_index([("hunt_id", 1), ("completed_at", 1)])
+    await db.easter_progress.create_index("user_id")
     # Saison-Gewinne (#641): eine Verlosung je Quelle, eine Teilnahme je Person.
     await db.season_raffles.create_index("id", unique=True)
     await db.season_raffles.create_index("source_key", unique=True)
