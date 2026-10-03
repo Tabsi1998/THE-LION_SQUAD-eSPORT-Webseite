@@ -257,6 +257,8 @@ export default function AdminTournamentEditPage() {
         replace_registration_id: participantForm.replace_registration_id || null,
       };
       const { data } = await api.post(`/tournaments/${id}/registrations`, payload);
+      // Turnier nur mit Event-Anmeldung (#875): eingetragen trotz fehlender Event-Anmeldung - sagen, nicht verhindern.
+      if (data?.event_gate_warning) toast.warning(data.event_gate_warning);
       const replacement = data.replacement;
       const autoBracketUpdate = data.auto_bracket_update;
       if (autoBracketUpdate?.preview === false && autoBracketUpdate?.ok !== false) {
@@ -630,6 +632,7 @@ export default function AdminTournamentEditPage() {
                     <div className="text-[10px] uppercase tracking-widest text-white/35">#{i + 1}</div>
                     <div className="mt-1 font-heading font-bold uppercase break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
                     <div className="mt-1 text-xs text-white/45 break-all">{r.discord || "Kein Discord"}</div>
+                    <EventGateMark mark={r.event_gate} />
                   </div>
                   <StatusBadge status={r.status} />
                 </div>
@@ -671,7 +674,7 @@ export default function AdminTournamentEditPage() {
               {filteredRegistrations.map((r, i) => (
                 <tr key={r.id}>
                   <td className="px-4 py-3 text-white/50">{i + 1}</td>
-                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}</td>
+                  <td className="px-4 py-3">{r.display_name || r.user?.display_name || r.ingame_name}<EventGateMark mark={r.event_gate} /></td>
                   <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                   <td className="px-4 py-3 text-white/60">{r.discord || "—"}</td>
                   <td className="px-4 py-3 text-right">
@@ -762,4 +765,10 @@ export default function AdminTournamentEditPage() {
       )}
     </AdminLayout>
   );
+}
+
+// Turnier nur mit Event-Anmeldung (#875): ob die Event-Anmeldung (noch) reicht - nur für die Turnierleitung.
+function EventGateMark({ mark }) {
+  if (!mark) return null;
+  return <div className={`mt-1 text-[11px] ${mark.ok ? "text-white/40" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
 }

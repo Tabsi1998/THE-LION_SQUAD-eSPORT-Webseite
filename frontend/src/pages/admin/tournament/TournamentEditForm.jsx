@@ -53,6 +53,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     registration_enabled: source.registration_enabled !== false,
     is_invite_only: !!source.is_invite_only,
     block_club_member_registration: !!source.block_club_member_registration,
+    requires_event_registration: !!source.requires_event_registration,
     registration_open_from: dt(source.registration_open_from),
     registration_open_until: dt(source.registration_open_until),
     check_in_from: dt(source.check_in_from),
@@ -111,6 +112,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     registration_enabled: tournament.registration_enabled !== false,
     is_invite_only: !!tournament.is_invite_only,
     block_club_member_registration: !!tournament.block_club_member_registration,
+    requires_event_registration: !!tournament.requires_event_registration,
     registration_open_from: dt(tournament.registration_open_from),
     registration_open_until: dt(tournament.registration_open_until),
     check_in_from: dt(tournament.check_in_from),
@@ -186,7 +188,10 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
   };
   const normalizeTournamentPayload = (source) => {
     const payload = { ...source };
-    if (!payload.event_id) payload.event_id = null;
+    if (!payload.event_id) {
+      payload.event_id = null;
+      payload.requires_event_registration = false;
+    }
     if (!payload.stream_platform) payload.stream_platform = null;
     if (!payload.result_entry_mode) payload.result_entry_mode = null;
     if (!payload.schedule_mode) payload.schedule_mode = null;
@@ -291,6 +296,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
             <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />
             <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
+            {/* Turnier nur mit Event-Anmeldung (#875): nur sinnvoll, wenn das Turnier zu einem Event gehört. */}
+            {f.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={f.requires_event_registration} onChange={(v)=>set("requires_event_registration",v)} accent="#29B6E8" testId="tr-edit-event-gate" />}
           </FormSection>
         )}
       >

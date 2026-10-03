@@ -194,3 +194,28 @@ test("Turnier vorbei: die Rangliste ist die Hauptaktion", async () => {
   expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
   expect(screen.queryByTestId("tournament-closed-btn")).toBeNull();
 });
+
+const GATE = { required: true, event: { id: "e1", name: "Vereins-LAN", slug: "vereins-lan" }, registered: false, team_need: 1 };
+
+test("Turnier nur mit Event-Anmeldung (#875): ohne Event-Anmeldung führt die Hauptaktion zum Event, mit ihr meldet der Knopf an", async () => {
+  mockApi({ ...base, event_gate: GATE });
+  const { unmount } = renderPage();
+  const first = await screen.findByTestId("tournament-event-first");
+  expect(first).toHaveTextContent("Zuerst beim Event anmelden");
+  expect(first).toHaveAttribute("href", "/events/vereins-lan");
+  expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
+  expect(screen.getByTestId("tournament-event-gate")).toHaveTextContent("Melde dich zuerst beim Event „Vereins-LAN“ an.");
+  unmount();
+
+  mockApi({ ...base, event_gate: { ...GATE, registered: true } });
+  renderPage();
+  expect(await screen.findByTestId("tournament-register-btn")).toBeInTheDocument();
+  expect(screen.getByTestId("tournament-event-gate")).toHaveTextContent("Du bist beim Event „Vereins-LAN“ angemeldet – die Turnieranmeldung ist frei.");
+});
+
+test("Teams (#875): der Hinweis nennt, wie viele beim Event sein müssen - der Server prüft das Team beim Anmelden", async () => {
+  mockApi({ ...base, team_mode: "team", team_size: 5, event_gate: { ...GATE, team_need: 5 } });
+  renderPage();
+  expect(await screen.findByTestId("tournament-event-gate")).toHaveTextContent("Mindestens 5 Spieler deines Teams müssen beim Event „Vereins-LAN“ angemeldet sein.");
+  expect(screen.queryByTestId("tournament-event-first")).toBeNull();
+});
