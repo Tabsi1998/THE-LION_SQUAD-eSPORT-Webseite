@@ -275,6 +275,62 @@ Seit dem 15. September gilt:
   `LegalPages.jsx` rendert nur noch (`lib/privacyFacts.js` weg). Tests `test_site_texts_flow.py`,
   `LegalPages.test.jsx`, e2e `public.spec.js` (`mockLegalPages` nach `**/api/settings/public**`).
   FAQ `google_pruefung`.
+- Discord VI D3: Spiel → Server (#626; PR #838 im Sammel-PR #839; Backend + Web + App; `update.sh`).
+  Das Spiel trägt `discord_guild_id` (leer = erben); `discord_guilds.guild_for_game` löst auf: eigenes
+  Feld → Hauptspiel (`parent_game_id`) → Hauptserver und überspringt ausgeschaltete oder verlassene
+  Server (`inherited_from`: None, Hauptspiel-ID oder „main“). Öffentlich nur `public_server` (Name,
+  Symbol, Mitglieder, Einladung; der Hauptserver nimmt sonst `branding.discord_invite_url`). „Du bist
+  dabei“ nur für die eigene Person: `own_status` fragt `bot.member_status` (Zwischenspeicher
+  `discord_memberships`, 5 min; Bot offline = None, nichts gemerkt), `note_membership` aus
+  `on_member_join`/`on_member_remove` (Zähler `discord_guilds_joined`, Neuberechnung über die
+  Warteschlange). `greet_linked`: nach dem Verknüpfen eine DM mit den Servern zu Lieblingsspielen und
+  Turnier-Anmeldungen, einmal je Discord-ID (`users.discord_servers_greeted_for`); das Log hat kein
+  `payload`, „erneut senden“ geht also nie in einen Kanal. Routen `GET /api/games/{spiel}/discord`
+  (optional angemeldet), `GET /api/games/discord-servers` (Formular, Bereich Turniere – vor
+  `/{slug_or_id}` registriert), `GET /api/membership/discord-servers` (angemeldet). Das Formular prüft
+  nur eine Änderung; ein später verlassener Server blockiert kein Speichern. Web
+  `components/tls/DiscordServerTile.jsx` (Kachel Turnierseite, Zeile unter der Spielkarte „Über uns“ –
+  kein Link im Link, Liste im Mitgliederbereich), App `MemberAreaScreen`. Tests
+  `test_discord_game_servers_flow.py` (5).
+- Discord VI D2: Kanalziele je Server (#625; PR #837 im #839). Jeder Server-Eintrag trägt `channels`;
+  Unterserver kennen nur Community, News, Events, Privates gibt es nur am Hauptserver
+  (`resolve_target(cfg, target, guild)` → `private_on_sub`), ein Rückfall nie über Servergrenzen.
+  `settings.discord.channels` spiegelt den Hauptserver (`mirror_main_channels`); `_switch_main` nimmt
+  beim Wechsel die öffentlichen Kanäle mit, private sind neu zu wählen. `send_to(…, guild_id=)`
+  überspringt unknown_guild, guild_left, guild_disabled, private_on_sub mit Log;
+  `test_every_send_to_caller_names_its_server_or_means_the_main_server` zählt jeden Aufrufer.
+  Kanalwahl je Unterserver im Reiter „Server“, Vorschau je Server (`?guild=`).
+- Discord VI D1: Server-Verzeichnis (#624; PR #836 im #839). `services/discord_guilds.py`: `reconcile`
+  bei ready/join/remove/update (neue Server als ausgeschalteter Unterserver, verlassene mit `left_at`,
+  genau ein Hauptserver – eingetragen oder der erste, nie ausschaltbar), `update_guild`, `health` in
+  Worten mit Klickweg, `bot_invite_url`, `send_test` (am Unterserver öffentlich, nur mit
+  Bestätigung); Sammlung `discord_guilds`, Routen `/api/settings/discord/guilds…`
+  (`routes/discord_guild_routes.py`). Die Discord-Seite im Admin hat Reiter: Meldungen · Einbettungen
+  & Termine · Willkommen · Bot & Aktivität · Server.
+- Discord V Teil 5: Kanal „Mitglieder (privat)“ (#605; PR #831 im #839). Privates Ziel `members` ohne
+  Rückfall; `allowed_in_target(item, target)` in `send_event`: news.members/event.members → members,
+  news.internal/event.internal → board nur mit Titel, Zeit, Ort.
+- Discord V Teil 4: Online-Zahl und Voice (#581; PR #830 im #839; der Betreiber schaltet in Discord
+  das Server-Widget ein). `services/discord_widget.py` liest das Widget (ohne Bot-Recht und
+  Presence-Intent) und verwirft Namen; Startseite „Discord: 42 online · 5 im Voice“
+  (`components/tls/DiscordNow.jsx`), Mitgliederbereich „Discord jetzt“
+  (`/api/membership/discord-voice`, nur Mitglieder, je Sprachkanal die Zahl), Admin
+  `DiscordWidgetStatus`. Der Bot merkt sich die Server-ID (`record_state(guild_id=…)`) vor dem Abgleich
+  des Verzeichnisses.
+- Discord V Teil 3: Willkommensnachricht (#574; PR #829 im #839). `services/discord_welcome.py`
+  (`greet` bei `on_member_join`, einmal je Person – gespeichert nur ein sha256 der Discord-ID,
+  Vorgabe aus), Admin `DiscordWelcomePanel` mit Vorschau und „an mich senden“.
+- Discord V Teil 2: Link-Knöpfe und Befehle (#573; PR #828 im #839). Knöpfe unter allen Meldungen
+  (`resolve_buttons`: Website-Pfade werden volle Adressen), `services/discord_commands.py` mit
+  /rangliste, /bracket, /wer-streamt, /mitglied, /verknuepfen – alle `ephemeral`.
+- Discord V Teil 1: ein Thread je Turnier (#572; PR #827 im #839; die Bot-Rolle braucht im Kanal
+  „Events und Turniere“ „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“).
+  `services/discord_threads.py`: `deliver` (die erste Meldung im Kanal öffnet den Thread, alles Weitere
+  geht hinein; Thread gelöscht → neu; im Thread verboten → einzeln im Kanal mit Log), Zustand
+  `discord_thread` am Turnier, `status_changed`/`status_written` aus allen Statuswegen (Knopf,
+  Formular, Anlegen, Zeitplan, Station, Gruppen/Swiss); „Ohne Discord“ (`discord_skip`). Bracket (#571)
+  und Endstand stehen im Thread (`note_message` hält den Endstand unten). Logs sortieren nach
+  `[("created_at", -1), ("_id", -1)]` – unter Windows haben Versand und Thread oft dieselbe Mikrosekunde.
 - Discord IV Teil 3: Turnier-Bracket als Einbettung, Slash-Antworten nur für die fragende Person
   (#571; PR #603; Backend; `update.sh`). `services/discord_bracket.py`: `bracket_embed`/`bracket_fields`/
   `match_line` aus demselben Graph-Speicher wie das Web-Bracket (`load_competition_read_model` +
@@ -3135,6 +3191,64 @@ Seit dem 15. September gilt:
 - Smoke: `scripts/check-media-serving.py` (CI-Schritt „Verify uploads are
   served by nginx“).
 
+- Winter-Interaktionen (W5 #731; PR #808): die Schneeflocke fangen nach der Temperatur – Frost:
+  Kristallbruch mit Splittern, Tauwetter: leises Schmelzen (`seasons/snow/catch.js`, App
+  `snow/catch.ts`, gleicher Paritäts-Fingerabdruck); selten eine Spur im Schnee
+  (`seasons/snow/tracks.js`, einmal am Tag; `capPath` mit Dellen). App mit dezenter Haptik.
+- Saison-Fundstücke öffentlich (#678 Rest; PR #809): Schalter `privacy_season_finds_public` (Vorgabe
+  aus) unter Privatsphäre in Web und App; das öffentliche Profil zeigt nur Summen je Saison
+  (`components/tls/PublicSeasonFinds.jsx`, App `PublicSeasonFindsCard`).
+- Fasching (S12 #643, F1–F3 #745–#747; PR #810): Web `seasons/carnival/` (Konfetti mit eigener Physik
+  in `confetti.js`/`layer.js`, Partyhut am Löwen im Kopf und auf der Startseite – noch mit eigener
+  Hut-Logik, der Umzug auf `seasons/mascot` aus Ostern steht aus –, Luftschlangen nur über freiem
+  Rand `geometry.js`, Gruß), App `mobile/src/seasons/carnival/` (Skia-Konfetti, Partyhut als Widget
+  und Tab-Symbol). Abnahme `e2e/carnival-regression.spec.js`.
+- Vereinsgeburtstag (S13 #644, B1–B3 #749–#751; PR #811 im #839): Gründungsdatum aus Dolibarr oder
+  Handfeld (`services/founding.py`, `years_on`), `services/club_birthday.py` (Gruß, Discord-Ereignis
+  `club.birthday`), Jahres-Sticker (`services/season_stickers.py`); Torte mit Kerzen je Jahr
+  (Fingerabdruck gleich in Web und App), Konfetti aus der Torte, Wimpel; die Flamme teilt er mit dem
+  Adventkranz.
+- Wochenrückblick (E12 #622; PR #813): `services/achievement_recap.py` (Mail einmal je Woche,
+  abbestellbar – Zeile „Wochenrückblick“ in den Benachrichtigungs-Einstellungen), Erfolg der Woche auf
+  Discord, Push-Deckel, Prestige und Rücknahme im Postfach (`xp._announce_prestige`).
+- Katalog D Nachtrag (#615; PR #814): Papierkram (`document_opens`), Vorstandsarbeit (Datum je
+  Funktion), Sprinter (`profile_completed_at`) sind messbar (`services/member_activity.py`); Katalog D
+  hat 37 Gruppen (Stufen: Verein 27, Besonders 16 mit Eierkönig, Geheim 14).
+- Erfolge in der App (E13 #623, Admin-Reiter #620; PRs #815–#817, #819, #820 im #839; wirkt mit
+  Build 85 = 1.1.0): Admin mit acht Reitern (`pages/admin/achievements/*Tab.jsx`; Massenvergabe in
+  einem Schreibzug, Material nur innerhalb der Leiter, Saisonabschluss nur für abgeschlossene
+  Saisons). App `mobile/src/achievements/`: `Badge.tsx` mit der Kunst aus dem Web (`npm run
+  sync:badge-art` → `badgeArt.generated.ts`; `badgeArt.test.ts` meldet Abweichungen), `ceremony/` (elf
+  Auftritte, Auswahl und Warteschlange wie im Web, Partikel, Klang, Haptik je Material), `profile/`
+  (Reiter „Erfolge“: Level, Prestige mit 24 h Rücknahme, Als Nächstes, Angeheftet, Vitrinen, Teilen),
+  `showcase/` + `AchievementShowcaseScreen` (Bestenliste, Erfolg der Woche, Seltenheit),
+  `PublicAchievements` im fremden Profil. Prestige auch im Web; `xp.prestige` meldet sich und gibt
+  `own_view` zurück.
+- Ostern und Eiersuche (S14 #645, S15 #646/#647, E1–E5 #753–#758; PRs #823–#826 im #839): Backend
+  `services/easter_hunt.py` + `routes/easter_routes.py` (`/api/seasonal/easter/*`: Eier je Seite,
+  sicherer Fund, Korb, Verlosung über `season_raffles`, Gruppe „Eierkönig“ mit Motiv `egg-king`,
+  Vorschau-Token für die Verwaltung). Web `seasons/easterHunt/` (Eier auf den Seiten, `/ostern`,
+  `/admin/ostern`) und `seasons/easter/` (Hasenohren über das gemeinsame `seasons/mascot/` –
+  Kopf-Scan und `MascotHat`, das Stück im Header per Portal –, Eier-Reihe, Wiese, Blätter, Falter,
+  Feldhase, Gruß). App `mobile/src/seasons/easterHunt/` (Eier auf den Saison-Plätzen der Karten,
+  `clip` an Plätzen, Korb-Screen `EasterHunt`, Deep Link `/ostern`). Abnahmen
+  `easter-hunt.spec.js`, `easter-regression.spec.js`.
+- App-Kopfzeile (PR #821): keine leere Fläche unter der Kopfzeile der Unterseiten (`Screen` lässt die
+  obere Kante weg; `screenLayout` + `UnderHeaderContext`).
+- GG in der App (PR #822): „GG geben“ auf der Matchseite der App wie im Web
+  (`/matches/{id}/commend`).
+- Startseite I (#832; PR #834): `components/tls/Reveal.jsx` blendet nur die Deckkraft der Inhalte ein
+  (die Rahmen bleiben, weil Saison-Deko daran hängt), News-Raster ohne Lücke (`newsCardSpan`),
+  Hover-Tiefe über Schatten statt Verschieben, Countdown `tls-tick`, das Licht hinter dem Löwen folgt
+  dem Zeiger (`glowOffset`) und atmet – als radialer Verlauf, nie als `blur` (siehe 6.4).
+- Turniere I (#833; PR #835): `TournamentCard` (sichtbares Bild, `gameLine`, `cardAction`),
+  `BracketTree` (Weg eines Spielers nur mit `(hover: hover)`, Tastatur über :focus-visible, „nicht
+  gespielt“ nach dem Ende, Spiel um Platz 3, Podest nur aus der letzten Phase).
+- Sammel-PR #839 (3.10.): die vier Stapel (E13, Geburtstag, Ostern, Discord V/VI) und #830 als ein PR –
+  Entwürfe hatten nie CI (6.4). Beim Zusammenführen: Abzeichen-Kunst mit `egg-king` neu erzeugt,
+  fehlender `HTTPException`-Import in `easter_routes` (F821), Zählung im Adminmenü auf 82,
+  Frontend-Job 40 Minuten.
+
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
   `splitOpenAndPast`, `seasonLine`), `lib/format.ts` (Begriffe statt
@@ -3438,6 +3552,26 @@ npx expo install --check
 - **Widgets im Dashboard-Kopf der App** müssen schmal bleiben (zwei Zeilen,
   Knöpfe als Symbol): ein breites Widget drückt den Namen in der
   Begrüßungskarte auf null Breite – die Karte wird riesig und leer (#803).
+- **CI läuft nicht für Entwürfe** (`ci.yml`: `github.event.pull_request.draft == false`, Typen
+  opened/synchronize/reopened/ready_for_review): gestapelte Entwurfs-PRs hatten deshalb nie CI. Erst
+  der Sammel-PR #839 fand den F821 in `easter_routes.py`, die veraltete Abzeichen-Kunst und die
+  Zählung im Adminmenü. Vor jedem Push `flake8 --select=E9,F63,F7,F82` wie im Backend-Job.
+- **Squash-Merges und Stapel:** nach dem Squash der Basis kollidiert ein gestapelter PR überall, wo er
+  Zeilen der Basis weiter ändert (Drei-Wege-Merge gegen den alten `main`). Will der Betreiber alles
+  auf einmal mergen: die Squash-Merges paarweise simulieren (Konfliktbild), konfliktfreie PRs sofort,
+  die Stapel samt kollidierender PRs als **einen** Sammel-PR (`git merge --no-ff` je Stapelspitze,
+  `git rerere` an, damit spätere `main`-Merges die Lösungen wiederholen); ist die Basis schon
+  gesquasht, die Konfliktdateien mit dem alten Basis-Stand als Bezug neu mergen (`git merge-file`).
+- **Frontend-Job: 40 Minuten** (seit #839): die Browser-Tests für Desktop und Handy laufen über
+  21 Minuten; mit 25 Minuten brach GitHub den Job als „cancelled“ ab – das sieht aus wie ein fremder
+  Abbruch. `concurrency: ci-${{ github.ref }}` bricht dagegen wirklich ab, sobald ein neuer Push kommt.
+- **Animation auf `filter: blur()`:** ohne Grafikkarte (CI) rechnet der Browser die Unschärfe bei jeder
+  Änderung der Deckkraft neu – das Atmen des Lichts hinter dem Löwen drückte den
+  Schnee-Leistungstest von 60 auf 30 Bilder je Sekunde. Bewegte Leuchten als `radial-gradient` bauen;
+  lokal ist das selbst mit `--disable-gpu` nicht nachzustellen.
+- **Neues Motiv im Web → App-Kunst nachziehen:** `npm run sync:badge-art` in `mobile/`, sonst schlägt
+  `badgeArt.test.ts` an.
+- **Neuer Eintrag im Adminmenü:** `e2e/admin-navigation.spec.js` zählt mit (82 seit „Ostereiersuche“).
 
 ---
 
@@ -3522,7 +3656,20 @@ braucht.
 
 ---
 
-## 9. Aktueller Stand (2. Oktober 2026)
+## 9. Aktueller Stand (3. Oktober 2026)
+
+### Gemergt 3. Oktober
+Der Betreiber hat alles Offene gemergt: #807 (Release-PR 1.0.6 – nie gebaut, geht in 1.1.0 auf),
+#808 (Winter-Interaktionen, schließt #731), #809 (Fundstücke öffentlich), #810 (Fasching, schließt
+#643 und #745–#747), #812 (Gruß-Merker nach dem Tag am Gerät), #813 (Wochenrückblick, schließt
+#622), #814 (Katalog D Nachtrag), #818 (App-Audit: braces bis 2.11. akzeptiert), #821
+(App-Kopfzeile), #822 (GG in der App), #834 (Startseite I, schließt #832), #835 (Turniere I,
+schließt #833) und den **Sammel-PR #839** mit E13 (#815–#817, #819, #820), Vereinsgeburtstag (#811),
+Ostern (#823–#826) und Discord V/VI (#827–#831, #836–#838). Die 18 Einzel-PRs sind mit Verweis
+geschlossen; mit #839 zu sind #620, #644, #645, #646, #749–#751, #753–#758, #572–#574, #581, #605
+und #624–#626. `main` entspricht dem Sammel-Zweig (geprüft). Die Website braucht `update.sh`. Für den
+Betreiber: Discord-Rechte für Threads, Willkommenstext prüfen und einschalten, Mitgliederkanal
+wählen, Server-Widget einschalten, weitere Server im Reiter „Server“.
 
 ### Gemergt 2. Oktober (Nacht)
 #801 (Release App 1.0.5 – Build 84 gebaut und veröffentlicht, siehe
@@ -3703,6 +3850,20 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
+- Offen (3.10. Nachmittag): #860 Saison-Feinschliff (Faschingshut über `seasons/mascot` mit `crownTop`,
+  keine Hasenohren in Web und App, „Ostereier verstecken“ – schließt #855, #857, #858). Aus der Sichtprobe
+  des Betreibers vom 3.10. offen: #852 Adventkalender und Nikolaus neben dem Kranz, #853 Silvester mit
+  Jahreszahl um 0 Uhr, #854 Discord-Zahl in „Dabei sein“, #856 Geburtstag festlicher, #859
+  Vereinsplatzierungen im neuen Design. Release 1.1.0 (#851) ist gebaut (siehe App-Builds). Pausiert auf Wunsch des
+  Betreibers: Discord VI D4 (#627) – Backend mit Tests als lokaler WIP-Commit `caef80f4` im Zweig
+  `feat/discord-routing` (nicht gepusht), es fehlt die Oberfläche. Neu geplant: Meilenstein
+  „Abrechnung III“ (#840 Rechnungs-PDF zuerst – die REST-Freigabe baut kein PDF, `PUT
+  /documents/builddoc`; dann #841 und #842, zuletzt #843) und „Vereinsmodul 1.5“ (#844 Abstimmung als
+  Popup, #845 Präsenz per Mitgliedskarte, #846 Konten in der Akte, #847 Teilnahmen, #848 Ehrungen,
+  #849 Dokumente als Datei, #850 Dolibarr-Events als Entwurf; die Teile im Vereinsmodul hat der
+  Betreiber neutral formuliert an die Vereine-Session gegeben). Entscheidung zur Datenpflege
+  (Kommentar an #329): der Vorstand pflegt in Dolibarr, Mitglieder beantragen Änderungen. Nachzug:
+  `seasons/carnival` auf `seasons/mascot` umstellen.
 - Offen (2.10. Nacht): keine Feature-PRs. Als Nächstes W5 #731
   Winter-Interaktionen (Web und App), dann der Release-PR für App 1.0.6
   (Build 85: Silvester mit Skia #803, Winterhimmel #804, W5) – bis Mitte
@@ -3778,6 +3939,12 @@ ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
   rebasen, `gh pr edit N --base main` und freigeben.
 
 ### App-Builds
+- **Build 85** (`mobile-v1.1.0-build85`, Commit ee67572, 03.10.; App 1.1.0 mit E13, Jahreszeiten III,
+  Discord im Mitgliederbereich, dazu Silvester mit Skia und der Winterhimmel aus der nie gebauten
+  1.0.6). APK nur für ARM (SHA-256 beginnt mit `7d8c20c5`) am Vereinsserver und am GitHub-Release, AAB
+  (115 MB, `535aa697`) auf dem Desktop des Betreibers; den Play-Upload macht der Betreiber (Notiz mit
+  459 Zeichen im PR #851). Gebaut mit `npm run release:local -- --aab`; #623 und #647 danach mit
+  Verweis aufs Release geschlossen.
 - **Build 84** (`mobile-v1.0.5-build84`, Commit 155d699, 02.10.; #795 Schnee
   und Wetter, #797 Weihnachten, #798 Nikolaus). APK nur für ARM (60 MB,
   SHA-256 beginnt mit `d0fc588e`) am Vereinsserver und am GitHub-Release,

@@ -2764,6 +2764,28 @@ der Verwaltung.
   Commit-Nachricht schließt diesen PR beim Merge (so geschehen mit #781). Vor fremden Nummern
   nie fix, close oder resolve schreiben.
 
+## Neu aufgenommen am 3. Oktober
+
+- **Alles gemergt, was offen war** – 31 PRs an einem Vormittag. Die vier großen Stapel (Erfolge in
+  der App, Vereinsgeburtstag, Ostern, Discord) kamen als ein Sammel-PR (#839): einzeln hätte jeder
+  Merge eine neue Prüfrunde gebraucht. Dabei fielen drei Kleinigkeiten auf, die als Entwurf nie
+  geprüft worden waren; sie sind behoben.
+- **Discord für den Verein:** Jedes Turnier hat seinen Thread, Meldungen haben Knöpfe zur Website,
+  dazu fünf neue Befehle, eine Willkommensnachricht (aus, bis ihr den Text prüft), ein privater
+  Mitgliederkanal, die Online-Zahl auf der Startseite und mehrere Discord-Server – je Spiel ein
+  eigener, mit „Du bist dabei“ im Mitgliederbereich.
+- **App 1.1.0 (Build 85)** bringt die Erfolge in die App (Abzeichen, Zeremonien, eigener Reiter,
+  Schaukasten), Ostern mit der Eiersuche, den Vereinsgeburtstag, Fasching und Discord im
+  Mitgliederbereich – dazu Silvester und den Winterhimmel aus der nie gebauten 1.0.6.
+- **Startseite und Turniere** sind überarbeitet: ruhiges Einblenden, das Licht folgt dem Zeiger;
+  Turnierkarten mit Bild, der Turnierbaum zeigt den Weg eines Spielers.
+- **Rechnungen:** Event-Rechnungen kamen ohne PDF, weil Dolibarr beim Freigeben über die
+  Schnittstelle keins baut. Das wird zuerst behoben (#840), danach die Meldung „Rechnung ist da“,
+  eine Übersicht für den Kassier und ein Gutschrift-Entwurf bei Abmeldung.
+- **Mitgliederbereich und Dolibarr** (geplant als „Vereinsmodul 1.5“): Abstimmen per Popup in App
+  und Web, Anwesenheit per Mitgliedskarte, Konten und Teilnahmen in der Akte, Ehrungen. Vereinsdaten
+  pflegt der Vorstand in Dolibarr; Mitglieder beantragen Änderungen.
+
 ## Noch offen und bewusst getrennt
 
 **Klassischen Leseweg entfernen.** Der Schreibweg ist mit Block 8 stillgelegt; gelesen
@@ -2788,6 +2810,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 | **Rechtstexte lesen (Oktober 2026)** | Datenschutzerklärung: der Absatz zu den Zählern der Fundstücke (#773), der Satz zum Adventkalender und der Absatz zu Verlosungen (#785); dazu die fünf Sätze der Teilnahmebedingungen. Ergänzungen wie ein Mindestalter oder Versand statt Abholung sind ein paar Zeilen. |
+| **Build 85 in die Play Console** | Das Bundle `LionsAPP-v1.1.0-build85-ee67572.aab` liegt auf deinem Desktop; in der Play Console beim internen Test hochladen, den Versionshinweis (459 Zeichen) aus PR #851 einfügen. |
+| **Discord nach dem Update** | Bot-Rolle im Kanal „Events und Turniere“: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“. Server-Widget einschalten (Servereinstellungen → Widget). Willkommenstext lesen und einschalten. Kanal „Mitglieder (privat)“ wählen. Weitere Server im Reiter „Server“ einschalten. |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
