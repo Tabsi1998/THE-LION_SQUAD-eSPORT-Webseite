@@ -14,6 +14,8 @@ import { Screen } from "../../components/Screen";
 import { SegmentedTabs } from "../../components/SegmentedTabs";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { PinnedAwardsCard, type PublicAchievementData, PublicAchievementsTab } from "../../achievements/profile/PublicAchievements";
+import { prestigeStars } from "../../achievements/showcase/model";
 import { api, errorMessage } from "../../lib/api";
 import { sortAwards, type Award } from "../../lib/awards";
 import { formatDate, formatStatus } from "../../lib/format";
@@ -89,14 +91,15 @@ type PublicProfilePayload = {
   can_message?: boolean;
   relationship?: Relationship | null;
   stats?: Record<string, number | string | undefined>;
-  achievement_level?: { level?: number; title?: string; points?: number; progress?: number };
+  achievement_level?: { level?: number; title?: string; points?: number; progress?: number; prestige?: number };
   badges?: any[];
   tournaments?: any[];
   f1_bests?: any[];
   teams?: any[];
 };
 
-type AchievementPayload = { awards?: any[]; groups?: any[] };
+// Erfolge II (#619): Vergaben, Gruppen, die Angehefteten, die gefundenen Geheimen - oder „privat“.
+type AchievementPayload = PublicAchievementData;
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "overview", label: "Übersicht" },
@@ -245,7 +248,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               <Title>{display}</Title>
               <View style={styles.wrap}>
                 <Pill label={profile.is_club_member ? "Vereinsmitglied" : "Community"} tone={profile.is_club_member ? "success" : "cyan"} />
-                <Pill label={profile.achievement_level?.title || `Level ${profile.achievement_level?.level || stats.level || 1}`} tone="gold" />
+                <Pill label={`${profile.achievement_level?.title || `Level ${profile.achievement_level?.level || stats.level || 1}`}${Number(profile.achievement_level?.prestige || 0) > 0 ? ` ${prestigeStars(profile.achievement_level?.prestige)}` : ""}`} tone="gold" />
                 {profile.role && profile.role !== "player" ? <Pill label={formatStatus(profile.role)} /> : null}
               </View>
               {profile.can_message ? (
@@ -284,6 +287,9 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               </View>
             </Card>
 
+            {/* Angeheftete Erfolge (#619) zuerst, wie im Web - „Alle ansehen“ führt in den Reiter. */}
+            {!achievements.achievements_hidden ? <PinnedAwardsCard pinned={achievements.pinned || []} onShowAll={() => setTab("achievements")} /> : null}
+
             {(profile.awards || []).length ? (
               <Card style={styles.card} testID="public-profile-awards">
                 <Heading>Auszeichnungen</Heading>
@@ -319,7 +325,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
           </>
         ) : null}
 
-        {tab === "achievements" ? <AchievementsTab awards={achievements.awards || profile.badges || []} groups={achievements.groups || []} /> : null}
+        {tab === "achievements" ? <PublicAchievementsTab data={achievements} displayName={display} /> : null}
         {tab === "tournaments" ? <TournamentTab items={profile.tournaments || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.slug || item.id } })} /> : null}
         {tab === "fastlaps" ? <FastLapTab items={profile.f1_bests || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.challenge?.slug || item.challenge?.id } })} /> : null}
         {tab === "teams" ? <TeamTab items={profile.teams || []} onOpen={(item) => navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: item.id } })} /> : null}
@@ -351,35 +357,6 @@ function ProfileStreamCard({ profile, stream }: { profile: PublicProfilePayload;
         </View>
       </Card>
     </Pressable>
-  );
-}
-
-function AchievementsTab({ awards, groups }: { awards: any[]; groups: any[] }) {
-  const flatAwards = awards.length ? awards : groups.flatMap((group) => (group.tiers || []).filter((tier: any) => tier.earned).map((tier: any) => ({ ...tier, group_name: group.name, group_accent: group.accent_color })));
-  if (!flatAwards.length) {
-    return <EmptyState icon="trophy-outline" title="Keine Erfolge" detail="Dieses Profil hat noch keine sichtbaren Erfolge." tone="gold" />;
-  }
-  return (
-    <View style={styles.list}>
-      {flatAwards.map((award, index) => {
-        const accent = award.level_color || award.group_accent || colors.gold;
-        return (
-          <Card key={award.code || `${award.name}-${index}`} style={[styles.card, { borderColor: `${accent}66` }]}>
-            <View style={styles.cardTop}>
-              <View style={[styles.awardIcon, { borderColor: `${accent}77`, backgroundColor: `${accent}18` }]}>
-                <Ionicons name="medal-outline" color={accent} size={20} />
-              </View>
-              <View style={styles.flex}>
-                <Muted style={[styles.tiny, { color: accent }]}>{award.level_name || award.group_name || "Achievement"}</Muted>
-                <Body style={styles.strong}>{award.name}</Body>
-                {award.description ? <Muted>{award.description}</Muted> : null}
-              </View>
-              <Muted style={styles.points}>+{award.points || 0}</Muted>
-            </View>
-          </Card>
-        );
-      })}
-    </View>
   );
 }
 
@@ -687,14 +664,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 36,
   },
-  awardIcon: {
-    alignItems: "center",
-    borderRadius: 8,
-    borderWidth: 1,
-    height: 42,
-    justifyContent: "center",
-    width: 42,
-  },
   leaderCard: {
     borderColor: "rgba(255,215,0,0.42)",
   },
@@ -746,16 +715,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "900",
   },
-  tiny: {
-    fontSize: 11,
-    fontWeight: "900",
-    textTransform: "uppercase",
-  },
   strong: {
-    fontWeight: "900",
-  },
-  points: {
-    color: colors.gold,
     fontWeight: "900",
   },
   gold: {

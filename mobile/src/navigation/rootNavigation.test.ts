@@ -45,6 +45,8 @@ test("eine Adresse der Website öffnet ihren Screen - sonst sagt die App, dass s
   expect(navigateToUrl("/teams")).toBe(true);
   expect(mockRef.navigate).toHaveBeenLastCalledWith("Teams", { screen: "TeamList", params: undefined });
   expect(targetFromUrl("/community")).toBeNull();
+  expect(navigateToUrl("/achievements")).toBe(true);
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "AchievementShowcase", params: undefined });
   expect(navigateToUrl("/news")).toBe(true);
   expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "NewsList", params: undefined });
   expect(navigateToUrl("/gallery")).toBe(true);

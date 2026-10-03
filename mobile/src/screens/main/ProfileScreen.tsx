@@ -416,6 +416,9 @@ export function ProfileScreen() {
     scrollRef.current?.scrollTo({ y: Math.max(0, scrollY.current + delta), animated: false });
   }, []);
   const openPrivacy = useCallback(() => setView("settings"), []);
+  const openShowcase = useCallback(() => {
+    navigation.getParent()?.navigate("More", { screen: "AchievementShowcase" });
+  }, [navigation]);
 
   const openReference = useCallback((item: PersonalReferenceItem) => {
     if (!item.target_id) return;
@@ -726,6 +729,7 @@ export function ProfileScreen() {
             canOpenLink={canOpenAchievementLink}
             onOpenLink={openAchievementLink}
             onShiftAbove={keepListPosition}
+            onOpenShowcase={openShowcase}
           />
         ) : null}
 

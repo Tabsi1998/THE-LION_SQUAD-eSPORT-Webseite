@@ -30,7 +30,7 @@ type Entry = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
   section?: NonNullable<NonNullable<MoreStackParamList["InfoCenter"]>["section"]>;
-  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "MyInvoices" | "MyMembership" | "AdventCalendar";
+  screen?: "NewsList" | "Gallery" | "DirectMessages" | "Notifications" | "SeasonPass" | "AchievementShowcase" | "MyInvoices" | "MyMembership" | "AdventCalendar";
   ownPublicProfile?: boolean;
 };
 
@@ -58,6 +58,8 @@ const GROUPS: Array<{ title: string; entries: Entry[] }> = [
     title: "Gaming",
     entries: [
       { title: "Jahreswertung", icon: "trophy-outline", screen: "SeasonPass" },
+      // Wie „Achievements“ im Menü der Website (#619): Erfolg der Woche, Bestenliste, alle Erfolge mit Seltenheit.
+      { title: "Achievements", icon: "sparkles-outline", screen: "AchievementShowcase" },
       { title: "Spielerprofile", icon: "people-outline", section: "profiles" },
     ],
   },

@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import { Alert, type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from "react-native";
 import { AchievementGroupCard, type TierPins, type TierShare } from "../../components/AchievementGroupCard";
 import { Card } from "../../components/Card";
@@ -33,9 +34,11 @@ type Props = {
   onOpenLink: (link: string) => void;
   /** „Angeheftet“ ist nach einem Anheften aus der Liste um `delta` gewachsen - die Ansicht soll mitrücken. */
   onShiftAbove?: (delta: number) => void;
+  /** Zum Schaukasten (Bestenliste, Erfolg der Woche, Seltenheit). */
+  onOpenShowcase?: () => void;
 };
 
-export function AchievementsTab({ data, onDataChange, guest = false, profileScore, evaluating, onEvaluate, onOpenPrivacy, canOpenLink, onOpenLink, onShiftAbove }: Props) {
+export function AchievementsTab({ data, onDataChange, guest = false, profileScore, evaluating, onEvaluate, onOpenPrivacy, canOpenLink, onOpenLink, onShiftAbove, onOpenShowcase }: Props) {
   const [filters, setFilters] = useState<TierFilters>(NO_FILTERS);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [savingPins, setSavingPins] = useState(false);
@@ -115,6 +118,13 @@ export function AchievementsTab({ data, onDataChange, guest = false, profileScor
       <LevelHeader level={data.level} earnedPercent={stats.earnedPercent} evaluating={evaluating} onEvaluate={onEvaluate} onLevelChange={onLevelChange} guest={guest} />
       {!guest ? <VisibilityNote isPublic={isPublic} onChange={onOpenPrivacy} /> : null}
       <StatsRow earned={stats.earned} total={stats.total} points={stats.points} hidden={data.hidden} profileScore={profileScore} />
+      {onOpenShowcase ? (
+        <Pressable onPress={onOpenShowcase} style={styles.showcaseLink} accessibilityRole="button" testID="achievement-open-showcase">
+          <Ionicons name="sparkles-outline" size={16} color={colors.cyan} />
+          <Text style={styles.showcaseText}>Bestenliste, Erfolg der Woche und wie selten deine Erfolge sind</Text>
+          <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+        </Pressable>
+      ) : null}
       <NextUpPanel items={data.next_up || []} canOpen={canOpenLink} onOpen={onOpenLink} />
       {!guest ? (
         <View onLayout={onPinnedLayout} testID="achievement-pinned-wrap">
@@ -165,4 +175,6 @@ const styles = StyleSheet.create({
   filterCount: { color: "rgba(255,255,255,0.45)", fontSize: 11, fontWeight: "800", textTransform: "uppercase", letterSpacing: 1 },
   reset: { color: colors.cyan, fontSize: 11, fontWeight: "900", textTransform: "uppercase", letterSpacing: 1 },
   filterEmpty: { color: colors.muted, textAlign: "center", paddingVertical: 16 },
+  showcaseLink: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "rgba(41,182,232,0.3)", backgroundColor: "rgba(41,182,232,0.06)", borderRadius: 2, paddingHorizontal: 12, paddingVertical: 12 },
+  showcaseText: { color: "rgba(255,255,255,0.8)", fontSize: 13, flex: 1 },
 });

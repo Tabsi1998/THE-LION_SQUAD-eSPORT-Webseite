@@ -94,6 +94,14 @@ beforeEach(() => {
 });
 
 describe("AchievementsShowcasePage (#619)", () => {
+  it("schreibt „1 Erfolg“ in der Bestenliste, nicht „1 Erfolge“", async () => {
+    mockApi({ board: [...BOARD, { user_id: "u3", username: "cem", display_name: "Cem", count: 1, points: 5, level: 1, prestige: 0, rank: 3 }, { user_id: "u4", username: "dora", display_name: "Dora", count: 1, points: 2, level: 1, prestige: 0, rank: 4 }] });
+    renderPage();
+    expect(await screen.findByTestId("leaderboard-row-4")).toHaveTextContent("1 Erfolg");
+    expect(screen.getByTestId("leaderboard-row-4")).not.toHaveTextContent("1 Erfolge");
+    expect(screen.getByTestId("podium-1")).toHaveTextContent("2 Erfolge");
+  });
+
   it("zeigt Erfolg der Woche, Kategorien mit Fortschritt, das Laufband und die Seltenheit je Gruppe", async () => {
     mockApi();
     renderPage();
@@ -144,6 +152,19 @@ describe("AchievementsShowcasePage (#619)", () => {
     expect(screen.getByTestId("category-hidden-count")).toHaveTextContent("2 von 13");
     expect(screen.queryByTestId("club-showcase-badge")).toBeNull();
     expect(screen.queryByTestId("club-showcase-note")).toBeNull();
+  });
+
+  it("angemeldet zeigt der Katalog den eigenen Fortschritt statt des leeren Katalogs", async () => {
+    authState.user = { id: "u1", username: "anna" };
+    const own = GROUPS.map((group) => (group.code === "matches_played"
+      ? { ...group, earned_count: 1, tiers: group.tiers.map((t, i) => (i === 0 ? { ...t, earned: true, earned_at: "2026-09-20T10:00:00Z", current: 10, percent: 100 } : t)) }
+      : group));
+    mockApi({ me: { groups: own, awards: [], hidden: { total: 13, earned: 0 }, next_up: [], pinned: [] } });
+    renderPage();
+    const card = await screen.findByTestId("achievement-group-matches_played");
+    fireEvent.click(within(card).getByRole("button"));
+    const badges = await screen.findAllByTestId("badge-matches_played_1");
+    for (const badge of badges) expect(within(badge).getByRole("img")).not.toHaveAttribute("data-locked", "true");
   });
 
   it("sortiert den Katalog nach Seltenheit und filtert über die Kategorie-Kachel", async () => {

@@ -186,8 +186,11 @@ export type GroupProgress = {
   done: boolean;
 };
 
-/** Was in der zugeklappten Zeile steht: „3 von 10“ zur nächsten Stufe, sonst der Stand der Stufen. */
-export function groupProgress(group: AchievementGroup): GroupProgress {
+/**
+ * Was in der zugeklappten Zeile steht: „3 von 10“ zur nächsten Stufe, sonst der Stand der Stufen. `countOnly` (fremdes
+ * Profil): nur „4 von 7 Stufen“ - wie weit jemand zur nächsten Stufe ist, steht dort nicht.
+ */
+export function groupProgress(group: AchievementGroup, { countOnly = false }: { countOnly?: boolean } = {}): GroupProgress {
   const tiers = group.all_tiers || group.tiers || [];
   const earned = tiers.filter((tier) => tier.earned);
   const highestLevel = earned.reduce((max, tier) => Math.max(max, Number(tier.level || 0)), 0);
@@ -195,7 +198,7 @@ export function groupProgress(group: AchievementGroup): GroupProgress {
   const next = tiers.find((tier) => !tier.earned && Number(tier.target || 0) > 0 && tier.condition_status !== "planned") || null;
   const done = tiers.length > 0 && earned.length === tiers.length;
   if (done) return { earned: earned.length, total: tiers.length, highestLevel, top, next: null, percent: 100, label: "Alle Stufen erreicht", done };
-  if (next) {
+  if (next && !countOnly) {
     const target = Number(next.target || 0);
     const current = Math.max(0, Math.min(Number(next.current || 0), target));
     const percent = Math.max(0, Math.min(100, Number(next.percent ?? (target ? (current / target) * 100 : 0))));

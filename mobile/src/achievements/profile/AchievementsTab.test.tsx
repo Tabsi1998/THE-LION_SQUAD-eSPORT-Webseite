@@ -249,3 +249,10 @@ test("als Gast nur ansehen: kein Anheften, kein Teilen, kein Prestige, keine Sic
   expect(screen.queryByTestId("achievement-share-matches_played_1")).toBeNull();
   await act(async () => {});
 });
+
+test("der Weg in den Schaukasten (Bestenliste, Erfolg der Woche, Seltenheit)", async () => {
+  const onOpenShowcase = jest.fn();
+  await render(<AchievementsTab data={DATA} onDataChange={() => {}} profileScore={55} canOpenLink={() => false} onOpenLink={() => {}} onOpenShowcase={onOpenShowcase} />);
+  await fireEvent.press(screen.getByTestId("achievement-open-showcase"));
+  expect(onOpenShowcase).toHaveBeenCalledTimes(1);
+});

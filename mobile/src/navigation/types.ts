@@ -44,6 +44,8 @@ export type MoreStackParamList = {
   DirectThread: { userId: string; title?: string };
   Notifications: undefined;
   SeasonPass: undefined;
+  // Schaukasten der Erfolge (E13, #623): Erfolg der Woche, Kategorien, Bestenliste, Katalog mit Seltenheit.
+  AchievementShowcase: undefined;
   // Adventkalender (#641, #642): 24 Türchen, derselbe Stand wie auf der Website.
   AdventCalendar: undefined;
   // Meine Rechnungen (#320): für jedes Konto, nicht nur Mitglieder.
