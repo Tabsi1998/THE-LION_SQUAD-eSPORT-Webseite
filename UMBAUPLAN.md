@@ -2794,6 +2794,24 @@ der Verwaltung.
   (Mütze mit der Zahl der Jahre, Luftballons) und Adventkalender und Nikolaus gleich neben dem Kranz.
 - **Ein Handbuch für dich** entsteht unter `docs/handbuch/`: zuerst Discord (Hauptserver, Unterserver,
   welche Rechte der Bot braucht, was du wo einstellst).
+- **Am späten Nachmittag gemergt:** Zu Silvester steigen kleine, große und sehr große Raketen; um
+  Mitternacht schreiben Funken die neue Jahreszahl in den Himmel, bei „dezent“ steht sie ruhig da. Ist
+  eine Rechnung fertig, bekommt das Mitglied „Deine Rechnung ist da“ in App und Website und per Mail,
+  mit Link direkt zum PDF. Der Kassier sieht in Finanzen auf einen Blick, was hängt (PDF fehlt, Entwurf
+  älter als 7 Tage, überfällig), und springt mit einem Klick in Dolibarr. Meldet sich jemand nach der
+  Rechnung ab, kann die Website einen Gutschrift-Entwurf in Dolibarr anlegen – das ist ein Schalter in
+  Finanzen, anfangs aus; freigeben kann die Gutschrift nur jemand in Dolibarr. Ein Turnier unter einem
+  Event kann verlangen, dass man zuerst beim Event angemeldet ist. Vereinsdokumente laden schneller,
+  und die App holt sie nur neu, wenn sie sich geändert haben.
+- **Bestandsaufnahme mit dir:** sechs erledigte Issues geschlossen, ein neues (Logo und Banner für den
+  dunklen Hintergrund). Als Nächstes kommt das Vereinsmodul 1.5 – Abstimmen per Popup, Anwesenheit per
+  Mitgliedskarte, Konten, Teilnahmen und Ehrungen in der Akte, Logos und Banner der Partner –, danach
+  die Discord-Zuordnung (D4).
+- **Aufgeräumt:** Der Projektordner ist wieder ein einziger Ordner wie früher; die vielen
+  Zwischenordner und ihre Prüfumgebungen (rund 43 GB) sind weg. Der große Gesamtcheck lief über alles – Website, App und Server-Container – und war grün. Gefunden
+  hat er nur Dinge ohne Wirkung für euch: erfundene Testwerte, die wie Passwörter aussehen, zwei Lücken in
+  Entwicklungswerkzeugen, für die es noch keine Reparatur gibt (sie stecken nicht in Website oder App), und
+  angesammelte Formatierungsabweichungen im Code.
 
 ## Noch offen und bewusst getrennt
 
@@ -2819,9 +2837,10 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 | **Rechtstexte lesen (Oktober 2026)** | Datenschutzerklärung: der Absatz zu den Zählern der Fundstücke (#773), der Satz zum Adventkalender und der Absatz zu Verlosungen (#785); dazu die fünf Sätze der Teilnahmebedingungen. Ergänzungen wie ein Mindestalter oder Versand statt Abholung sind ein paar Zeilen. |
-| **Build 85 in die Play Console** | Das Bundle `LionsAPP-v1.1.0-build85-ee67572.aab` liegt auf deinem Desktop; in der Play Console beim internen Test hochladen, den Versionshinweis (459 Zeichen) aus PR #851 einfügen. |
+| **Build 85 in die Play Console** | Das Bundle `LionsAPP-v1.1.0-build85-ee67572.aab` liegt auf deinem Desktop. Du hast den Zugang für Releases beantragt; sobald Google ihn freigibt: hochladen und den Versionshinweis (459 Zeichen) aus PR #851 einfügen. |
 | **Discord nach dem Update** | Bot-Rolle im Kanal „Events und Turniere“: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“. Server-Widget einschalten (Servereinstellungen → Widget). Willkommenstext lesen und einschalten. Kanal „Mitglieder (privat)“ wählen. Weitere Server im Reiter „Server“ einschalten. |
 | **Nach dem Update vom 3.10. Nachmittag** | Finanzen → „Fehlende PDFs nachziehen“ einmal drücken (alte Rechnungen ohne PDF). Discord → „Gestaltung“: Vorlagen ansehen, Stream-Meldungen einschalten und Kanal wählen. Soll eine Rolle bei Streams gepingt werden, muss sie in Discord „erwähnbar“ sein (Servereinstellungen → Rollen). |
+| **Gutschrift-Entwurf: ja oder nein?** | Admin → Finanzen: Schalter „Gutschrift-Entwurf bei Abmeldung anlegen“. Ist er an, legt die Website einen Entwurf über den ganzen Betrag in Dolibarr an, sobald sich jemand nach der Freigabe der Rechnung abmeldet. Du prüfst ihn dort (Teilbetrag?) und gibst ihn frei – die Website gibt nie frei. Anfangs ist er aus. |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
