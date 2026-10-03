@@ -1,9 +1,12 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
+import { releaseMotion, requestMotion } from "../motion";
 import { measureQuietZones, overlayZones, rectInQuiet, watchOverlays } from "../quiet";
+import { hashString } from "../rng";
 import { snowLightAt } from "../skyLight";
 import { OVERHANG, capLevel, capPath, capThickness, measureCaps } from "./caps";
+import { TRACK_MIN_RUN, TRACK_REST_MS, TRACK_STEP_MS, dentsAt, markTracks, trackSteps, tracksDuration, tracksToday } from "./tracks";
 
 // Schneehauben (S7, #638; W3, #729): still auf den Oberkanten von Karten, Rahmen und der Fußzeile im Fenster - je
 // Kante eine eigene Kontur und ein eigenes Wachstum aus dem Jahres-Seed, nur auf freien Stücken (nie über Abzeichen,
@@ -33,14 +36,96 @@ function sameCaps(a, b) {
 /** Das Licht des Tages, wenn der Himmel keines sagt: die Farben von früher (weiß, nach unten blauer). */
 const DAYLIGHT = { night: 0, warmth: 0, side: 0.7, clouds: 0, stars: 0, moon: 0 };
 
+/** Das längste freie Stück auf der Haube des Footers - dort läuft die Spur (mindestens TRACK_MIN_RUN breit). */
+export function footerRun(caps) {
+  let best = null;
+  caps.forEach((cap) => {
+    if (cap.kind !== "footer" || cap.yield) return;
+    cap.runs.forEach((run, index) => {
+      const width = run.to - run.from;
+      if (width >= TRACK_MIN_RUN && (!best || width > best.width)) best = { cap, index, width };
+    });
+  });
+  return best;
+}
+
+/**
+ * Die Spur im Schnee (W5 #731): einmal am Tag je Gerät, wenn die Haube des Footers anderthalb Sekunden im Fenster
+ * ist und das Bewegungsbudget Platz hat. Liefert die Dellen des Augenblicks für genau ein Stück einer Haube.
+ */
+function useSnowTracks(caps, enabled, level) {
+  const [walk, setWalk] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!enabled || walk || typeof window === "undefined") return undefined;
+    const target = footerRun(caps);
+    if (!target || tracksToday(window.localStorage)) return undefined;
+    const visible = () => {
+      const top = target.cap.y - (window.scrollY || 0);
+      return top > 60 && top < window.innerHeight - 30;
+    };
+    if (!visible()) return undefined;
+    // Das Bewegungsbudget lässt kurz nach dem Laden nichts starten (und nichts neben einer anderen großen Bewegung) -
+    // solange die Fußzeile im Bild ist, fragt die Spur deshalb ein paar Mal nach.
+    let attempts = 0;
+    let timer = 0;
+    const attempt = () => {
+      if (!visible() || tracksToday(window.localStorage)) return;
+      const token = requestMotion("snow_tracks");
+      if (!token) {
+        attempts += 1;
+        if (attempts < 6) timer = window.setTimeout(attempt, 3000);
+        return;
+      }
+      markTracks(window.localStorage);
+      const fromLeft = hashString(`${new Date().toDateString()}:${target.cap.key}`) % 2 === 0;
+      const steps = trackSteps({ width: target.width, thickness: capThickness(level, target.cap.growth), fromLeft });
+      setWalk({ key: target.cap.key, run: target.index, steps, started: Date.now(), token, done: false });
+    };
+    timer = window.setTimeout(attempt, 1500);
+    return () => window.clearTimeout(timer);
+  }, [caps, enabled, walk, level]);
+  const started = walk?.started;
+  useEffect(() => {
+    if (!walk || walk.done) return undefined;
+    const total = tracksDuration(walk.steps);
+    const lastStep = (walk.steps.length - 1) * TRACK_STEP_MS;
+    let timer = 0;
+    const tick = () => {
+      const now = Date.now() - walk.started;
+      setElapsed(now);
+      if (now >= total) {
+        releaseMotion(walk.token);
+        setWalk((current) => (current ? { ...current, done: true } : current));
+        return;
+      }
+      // Beim Laufen und beim Zurieseln oft nachsehen, in der Ruhe dazwischen selten.
+      const busy = now < lastStep + 800 || now > lastStep + TRACK_REST_MS;
+      timer = window.setTimeout(tick, busy ? 100 : 1000);
+    };
+    tick();
+    return () => {
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started]);
+  useEffect(() => () => {
+    if (walk?.token && !walk.done) releaseMotion(walk.token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (!walk || walk.done) return null;
+  return { key: walk.key, run: walk.run, dents: dentsAt(walk.steps, elapsed) };
+}
+
 /** Eine Haube: je freiem Stück der Kante ein eigenes SVG, damit ihr Kasten nur dort liegt, wo Schnee ist. */
-function Cap({ cap, level, light, moonX }) {
+function Cap({ cap, level, light, moonX, track = null }) {
   const ids = useId().replace(/[^a-zA-Z0-9]/g, "");
   const thickness = capThickness(level, cap.growth);
   const base = thickness + OVERHANG;
   return cap.runs.map((run, index) => {
     const width = run.to - run.from;
-    const { d, height } = capPath({ width, thickness, seed: `${cap.seed}:${index}`, level });
+    const dents = track && track.run === index ? track.dents : [];
+    const { d, height } = capPath({ width, thickness, seed: `${cap.seed}:${index}`, level, dents });
     const viewWidth = typeof window === "undefined" ? 1280 : window.innerWidth || 1280;
     const tone = snowLightAt(light, (cap.x - (typeof window === "undefined" ? 0 : window.scrollX || 0) + run.from + width / 2) / viewWidth, moonX);
     return (
@@ -57,6 +142,7 @@ function Cap({ cap, level, light, moonX }) {
         data-level={level}
         data-yield={cap.yield ? "1" : undefined}
         data-tone={tone.top}
+        data-tracks={dents.length || undefined}
       >
         <defs>
           <linearGradient id={`${ids}-${index}`} x1="0" x2="0" y1="0" y2="1">
@@ -66,6 +152,9 @@ function Cap({ cap, level, light, moonX }) {
           </linearGradient>
         </defs>
         <path d={d} fill={`url(#${ids}-${index})`} />
+        {dents.filter((dent) => dent.fresh).map((dent) => [-1, 0, 1].map((side) => (
+          <circle key={`${dent.x}:${side}`} className="tls-snow-crumb" cx={dent.x} cy={base - thickness} r={0.9} style={{ "--dx": `${side * 3}px` }} />
+        )))}
       </svg>
     );
   });
@@ -75,7 +164,7 @@ function Cap({ cap, level, light, moonX }) {
  * Hauben auf den Kanten im Fenster. `stage` (1–3) und `tempC` vom Server bzw. Wetter, `salt` das Jahres-Salz,
  * `max` die Obergrenze je Seite (Klasse), `light` das Licht des Himmels (skyLight.js), `moonX` wo der Mond steht.
  */
-export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24, light = DAYLIGHT, moonX = null }) {
+export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24, light = DAYLIGHT, moonX = null, tracks: tracksOn = false }) {
   const location = useLocation();
   const [caps, setCaps] = useState([]);
   const capsRef = useRef([]);
@@ -125,10 +214,11 @@ export function SnowCaps({ stage = 1, tempC = null, salt = "", max = 24, light =
     };
   }, [location.pathname, salt, max]);
 
+  const track = useSnowTracks(caps, tracksOn, level);
   if (typeof document === "undefined" || !caps.length) return null;
   return createPortal(
     <div className="tls-snowcaps" aria-hidden="true" data-testid="snow-caps" data-level={level}>
-      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} light={light || DAYLIGHT} moonX={moonX} />)}
+      {caps.map((cap) => <Cap key={cap.key} cap={cap} level={level} light={light || DAYLIGHT} moonX={moonX} track={track && track.key === cap.key ? track : null} />)}
     </div>,
     document.body,
   );

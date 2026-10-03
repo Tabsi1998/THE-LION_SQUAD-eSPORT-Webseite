@@ -73,7 +73,7 @@ export function capThickness(level, growth = 1) {
  * der Schnee darüber (y kleiner) mit weichen Buckeln aus dem Seed, an den Enden auslaufend, unten mit leichtem
  * Überhang; ab Stufe 2 hängen ein, zwei kleine Zapfen herunter.
  */
-export function capPath({ width, thickness, seed = "cap", level = 1 }) {
+export function capPath({ width, thickness, seed = "cap", level = 1, dents = [] }) {
   const rng = mulberry32(hashString(`snowcap:${seed}`));
   const w = Math.max(8, width);
   const t = Math.max(1, thickness);
@@ -87,6 +87,29 @@ export function capPath({ width, thickness, seed = "cap", level = 1 }) {
   }
   if (points[points.length - 1].x < w) points.push({ x: w, y: base - 0.2 });
   points[0].y = base - 0.2;
+  // Dellen einer Spur (W5 #731, tracks.js): die Schneelinie sinkt an jedem Schritt weich ein - die Zufallsfolge oben
+  // bleibt dieselbe, die Haube sieht ohne Spur genauso aus wie vorher.
+  const live = dents.filter((dent) => dent.depth > 0.05 && dent.x > 0 && dent.x < w);
+  if (live.length) {
+    const topAt = (x) => {
+      const i = Math.max(0, points.findIndex((point, n) => n + 1 < points.length && point.x <= x && points[n + 1].x >= x));
+      const a = points[i];
+      const b = points[Math.min(points.length - 1, i + 1)];
+      return b.x === a.x ? a.y : a.y + ((x - a.x) / (b.x - a.x)) * (b.y - a.y);
+    };
+    const extra = [];
+    live.forEach((dent) => {
+      const half = dent.width / 2;
+      [[-half, 0], [-half / 2, 0.75], [0, 1], [half / 2, 0.75], [half, 0]].forEach(([dx, share]) => {
+        const x = dent.x + dx;
+        // Höchstens zwei Drittel der Schneehöhe an dieser Stelle: unter dem Schritt bleibt immer etwas Schnee.
+        const top = topAt(x);
+        if (x > 0 && x < w) extra.push({ x, y: Math.min(base - 0.4, top + Math.min(dent.depth, (base - top) * 0.66) * share) });
+      });
+    });
+    const kept = points.filter((point, n) => n === 0 || n === points.length - 1 || !live.some((dent) => Math.abs(point.x - dent.x) < dent.width / 2));
+    points.splice(0, points.length, ...[...kept, ...extra].sort((a, b) => a.x - b.x));
+  }
   let d = `M 0 ${base.toFixed(1)} L ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
   for (let i = 1; i < points.length; i += 1) {
     const prev = points[i - 1];

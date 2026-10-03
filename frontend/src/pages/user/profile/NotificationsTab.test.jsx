@@ -44,6 +44,10 @@ test("mit Verknüpfung steht Discord als Kanal da; eine abgelehnte Direktnachric
   expect(screen.getByTestId("profile-notification-email-achievements-none")).toHaveTextContent("–");
   expect(screen.getByTestId("profile-notification-push-achievements")).toBeInTheDocument();
   expect(screen.getByTestId("profile-notification-discord-achievements")).toBeInTheDocument();
+  // Wochenrückblick (#622): nur per E-Mail - In-App und Push zeigen einen Strich.
+  expect(screen.getByTestId("profile-notification-email-achievement_recap")).toBeInTheDocument();
+  expect(screen.getByTestId("profile-notification-push-achievement_recap-none")).toHaveTextContent("–");
+  expect(screen.getByTestId("profile-notification-in_app-achievement_recap-none")).toHaveTextContent("–");
 });
 
 test("Zeremonien: Ton, Lautstärke und „dezent“ stehen in der Karte und schreiben über set()", async () => {

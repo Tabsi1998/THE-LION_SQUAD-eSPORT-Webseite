@@ -3,5 +3,10 @@
     "module": "node-forge",
     "expires": "2026-11-02",
     "reason": "node-forge 1.4.0 is the newest release and still affected; no patched version exists. It is used only by @expo/cli through @expo/code-signing-certificates (development tooling for signing over-the-air updates, which the app does not use) and is not part of the app bundle. Re-check on expiry."
+  },
+  "GHSA-VFJ7-8CJW-P6XM": {
+    "module": "braces",
+    "expires": "2026-11-02",
+    "reason": "braces 3.0.3 is the newest release and still affected (stack exhaustion through deeply nested brace patterns; first flagged by the audit gate on 2026-10-03); no patched version exists. It is used only by jest (@jest/core -> micromatch) to match the test file patterns of this repository; it is development tooling, never sees outside input and is not part of the app bundle. Re-check on expiry."
   }
 }

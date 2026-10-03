@@ -428,6 +428,32 @@ def tpl_birthday_greeting(display_name: str, preferences_url: str = "") -> tuple
     return "Alles Gute zum Geburtstag", _wrap("Alles Gute zum Geburtstag", body)
 
 
+def tpl_achievement_recap(display_name: str, week: str, xp_week: str, level: str, level_title: str, unlocked: str = "", next_up: str = "",
+                          bonus_hint: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
+    """Wochenrückblick (#622): XP der Woche, Level, neue Erfolge, was als Nächstes kommt - nur an die Person selbst.
+    `unlocked` sind Zeilen (je Erfolg eine), damit die Vorlage auch im Admin mit einfachem Text bearbeitbar bleibt."""
+    esc = html_lib.escape
+    items = [line.strip() for line in str(unlocked or "").splitlines() if line.strip()]
+    body = (
+        f"<p>Hallo {esc(display_name or 'Löwe')},</p>"
+        f"<p>deine Woche bei THE LION SQUAD ({esc(week)}):</p>"
+        f'<p style="font-size:20px;margin:16px 0"><strong>+{esc(xp_week)} XP</strong> · Level {esc(level)}'
+        + (f" – {esc(level_title)}" if level_title else "") + "</p>"
+    )
+    if items:
+        body += "<p><strong>Neu freigeschaltet:</strong></p><ul>" + "".join(f"<li>{esc(item)}</li>" for item in items) + "</ul>"
+    if next_up:
+        body += f"<p><strong>Als Nächstes:</strong> {esc(next_up)}</p>"
+    if bonus_hint:
+        body += f'<p style="color:#6b7280">{esc(bonus_hint)}</p>'
+    if preferences_url:
+        body += (
+            '<p style="font-size:12px;color:#6b7280">'
+            f'Den Wochenrückblick kannst du jederzeit in deinen <a href="{preferences_url}">E-Mail-Einstellungen</a> abbestellen.</p>'
+        )
+    return f"Deine Woche: +{xp_week} XP", _wrap("Deine Woche", body, "Zu deinen Erfolgen", url or None)
+
+
 def tpl_direct_message(display_name: str, sender_name: str, preview: str = "", url: str = "", preferences_url: str = "") -> tuple[str, str]:
     sender_subject = str(sender_name or "Benutzer").replace("\r", " ").replace("\n", " ")[:80]
     sender = html_lib.escape(sender_name or "Benutzer")
@@ -553,6 +579,7 @@ async def send_template(
         "membership_deactivated": tpl_membership_deactivated,
         "membership_blocked": tpl_membership_blocked,
         "birthday_greeting": tpl_birthday_greeting,
+        "achievement_recap": tpl_achievement_recap,
         "direct_message": tpl_direct_message,
         "team_chat_mention": tpl_team_chat_mention,
         "newsletter_news": tpl_newsletter_news,

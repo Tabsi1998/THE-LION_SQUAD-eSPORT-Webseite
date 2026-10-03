@@ -6,6 +6,7 @@ import { Body } from "../components/Text";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
+import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
@@ -54,6 +55,9 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon },
   // Silvester (S11 #642, wie #800 im Web): Feuerwerk mit Skia über allen Tabs, Hinweis im Kopf, Countdown und Gruß.
   new_year: { Sky: FireworksSky, Widget: NewYearWidget, Greeting: NewYearGreeting },
+  // Fasching (S12 #643, F1–F3 #745–#747, wie im Web): Konfetti beim ersten Start des Tages (Skia), der Partyhut im
+  // Dashboard-Kopf und am Tab „Mehr“, Luftschlangen oben in den Rändern, der Gruß einmal am Tag.
+  carnival: { Sky: ConfettiSky, Corners: CarnivalCorners, Widget: PartyHatWidget, TabIcon: PartyHatTabIcon, Greeting: CarnivalGreeting },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

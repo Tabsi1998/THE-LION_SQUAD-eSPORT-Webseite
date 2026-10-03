@@ -20,13 +20,23 @@ export function isQuietPath(pathname) {
 }
 
 /**
+ * Der Kalendertag am Gerät (JJJJ-MM-TT) - nach der Uhr der Person, nicht nach UTC: sonst finge der Tag in Wien erst um
+ * 01:00 (im Sommer 02:00) an, und der Neujahrsgruß käme nach der Null um Mitternacht eine Stunde später noch einmal.
+ * Die App rechnet genauso (christmas/greeting.ts).
+ */
+export function localDay(now = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
  * Kam der Gruß heute schon? In der Vorschau nie - wer testet, will ihn sehen, auch zum zweiten Mal; und die Vorschau
  * verbraucht den echten Gruß des Tages nicht (`markToastShown` merkt sich dann nichts).
  */
 export function toastShownToday(key, now = new Date()) {
   if (readPreviewToken()) return false;
   try {
-    return localStorage.getItem(`tls-season-toast-${key}`) === now.toISOString().slice(0, 10);
+    return localStorage.getItem(`tls-season-toast-${key}`) === localDay(now);
   } catch {
     return false;
   }
@@ -35,7 +45,7 @@ export function toastShownToday(key, now = new Date()) {
 export function markToastShown(key, now = new Date()) {
   if (readPreviewToken()) return;
   try {
-    localStorage.setItem(`tls-season-toast-${key}`, now.toISOString().slice(0, 10));
+    localStorage.setItem(`tls-season-toast-${key}`, localDay(now));
   } catch {
     // Ohne Speicher kommt der Gruß beim nächsten Laden noch einmal - das ist verschmerzbar.
   }

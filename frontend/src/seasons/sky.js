@@ -6,6 +6,12 @@
 export const TIERS = { low: 40, mid: 120, high: 240 };
 /** Ruhen alle Ebenen (`layer.idle()`), schläft der Loop und schaut so oft wieder nach (Wetter ohne Niederschlag). */
 export const IDLE_CHECK_MS = 2000;
+/** Ein Ereignis am Fenster weckt den schlafenden Loop sofort (eine Ebene hat gerade etwas Neues). */
+export const SKY_WAKE_EVENT = "tls:sky-wake";
+
+export function wakeSky(win = typeof window === "undefined" ? null : window) {
+  if (win && typeof win.dispatchEvent === "function" && typeof win.Event === "function") win.dispatchEvent(new win.Event(SKY_WAKE_EVENT));
+}
 
 /** Wie viele Partikel dieses Gerät verträgt - grob nach Kernen, Speicher und Fensterbreite. */
 export function particleBudget(env = typeof window === "undefined" ? {} : window) {
@@ -130,9 +136,12 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
     park(true);
   };
   const visibility = () => (doc.hidden ? stop() : start());
+  // Aufwecken auf Zuruf (Fasching: Konfetti nach einem Klick) - sonst käme es erst beim nächsten Nachschauen.
+  const wake = () => start();
 
   resize();
   win.addEventListener("resize", resize);
+  win.addEventListener(SKY_WAKE_EVENT, wake);
   doc.addEventListener("visibilitychange", visibility);
 
   return {
@@ -160,6 +169,7 @@ export function createSkyLoop(canvas, { win = window, doc = document, onFrameTim
       stop();
       layers.clear();
       win.removeEventListener("resize", resize);
+      win.removeEventListener(SKY_WAKE_EVENT, wake);
       doc.removeEventListener("visibilitychange", visibility);
     },
   };

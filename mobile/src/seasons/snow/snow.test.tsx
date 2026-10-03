@@ -75,6 +75,27 @@ test("Schneeflocke fangen: zählt als Fundstück, merkt sich die Zahl am Gerät,
   expect(timing.mock.calls.some(([, config]) => (config as { duration?: number }).duration === 650)).toBe(true);
 });
 
+test("Frost: der Kristall bricht in sechs Splitter und sechs Bruchstücke; Tauwetter: er schmilzt zu einem Tropfen - mit sanfterem Tippen", async () => {
+  const Haptics = require("expo-haptics");
+  mockSeasonState.weather = { temp_c: -4 };
+  await render(<SnowflakeWidget season={snowSeason()} screen="Dashboard" />);
+  await fireEvent.press(screen.getByTestId("snow-flake-widget"));
+  expect(screen.getAllByTestId("snow-flake-sliver")).toHaveLength(6);
+  expect(screen.getAllByTestId("snow-flake-chip")).toHaveLength(6);
+  expect(screen.queryByTestId("snow-flake-drop")).toBeNull();
+  expect(Haptics.impactAsync).toHaveBeenCalled();
+  await screen.unmount();
+  (Haptics.selectionAsync as jest.Mock).mockClear();
+  mockSeasonState.weather = { temp_c: 4 };
+  await render(<SnowflakeWidget season={snowSeason()} screen="Dashboard" />);
+  await fireEvent.press(screen.getByTestId("snow-flake-widget"));
+  expect(screen.getByTestId("snow-flake-drop")).toBeTruthy();
+  expect(screen.getByTestId("snow-flake-ripple")).toBeTruthy();
+  expect(screen.queryAllByTestId("snow-flake-sliver")).toHaveLength(0);
+  expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+  expect(mockSignals.recordSignal).toHaveBeenCalledWith(SNOW_SIGNAL, { onceIf: false });
+});
+
 test("fünfzig Flocken: der Schneekönig als Gruß-Karte; „Bewegung reduzieren“: kein Drehen, keine Splitter", async () => {
   await SecureStore.setItemAsync(CLICKS_KEY, String(SNOW_KING_AT - 1));
   mockSeasonState.reducedMotion = true;

@@ -3,6 +3,16 @@
 .tls-snowcaps { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 41; pointer-events: none; }
 .tls-snowcap { position: absolute; top: 0; left: 0; display: block; max-width: none; opacity: 0.94; transition: opacity 0.3s ease; filter: drop-shadow(0 1px 1px rgba(30, 60, 100, 0.35)); overflow: visible; }
 .tls-snowcap--yield { opacity: 0; }
+/* Die Spur im Schnee (W5 #731): beim Schritt stauben drei Krümel auf und fallen zurück. */
+.tls-snow-crumb { fill: #f4f8ff; opacity: 0; animation: tls-snow-crumb 0.65s ease-out forwards; }
+@keyframes tls-snow-crumb {
+  0% { opacity: 0.9; transform: translate(0, 0); }
+  45% { opacity: 0.9; transform: translate(var(--dx, 0px), -5px); }
+  100% { opacity: 0; transform: translate(calc(var(--dx, 0px) * 1.6), 1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-snow-crumb { animation: none; }
+}
 
 /* Winterhimmel (W4 #730): wirklich HINTER dem Inhalt (z-index -1; das Schwarz malt <html>) - Karten und Kopfzeile
    decken ihn, Schrift liegt darüber. Blauschein nach der Nacht, Glühen auf der Seite der Sonne, Sterne mit leisem
@@ -27,17 +37,48 @@
 .tls-snowflake__svg { width: 28px; height: 28px; transition: transform 0.25s ease; filter: drop-shadow(0 0 3px rgba(160, 200, 255, 0.45)); }
 .tls-snowflake:hover .tls-snowflake__svg { transform: rotate(18deg); }
 .tls-snowflake__burst { position: absolute; inset: 0; pointer-events: none; }
-.tls-snowflake__shard { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 1px; background: #e9f4ff; opacity: 0; }
-.tls-snowflake--burst .tls-snowflake__shard { animation: tls-snow-shard 0.7s ease-out forwards; }
-@keyframes tls-snow-shard {
-  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
-  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(180deg); }
+/* Gefangen (W5 #731): bei Frost bricht der Kristall - je Arm ein Splitter, der entlang des Arms davonfliegt und sich
+   dreht, dazwischen kleine Bruchstücke -, bei Tauwetter schmilzt er zu einem Tropfen, der fällt und einen kleinen
+   Ring zieht. Danach wächst eine neue Flocke nach. */
+.tls-snowflake__sliver { position: absolute; left: 50%; top: 50%; width: 2px; height: 8px; margin: -4px -1px; border-radius: 1px; background: linear-gradient(#ffffff, #cfe6ff); opacity: 0; }
+.tls-snowflake__chip { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; background: #e9f4ff; opacity: 0; }
+.tls-snowflake--break .tls-snowflake__sliver { animation: tls-snow-sliver 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
+.tls-snowflake--break .tls-snowflake__chip { animation: tls-snow-chip 0.7s ease-out forwards; }
+@keyframes tls-snow-sliver {
+  0% { opacity: 1; transform: translate(0, 0) rotate(var(--angle, 0deg)) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(calc(var(--angle, 0deg) + var(--turn, 0deg))) scale(0.55); }
 }
-.tls-snowflake--burst .tls-snowflake__svg { animation: tls-snow-pop 0.7s ease-out; }
+@keyframes tls-snow-chip {
+  0% { opacity: 0.9; transform: translate(0, 0) rotate(45deg); }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(calc(45deg + var(--turn, 0deg))); }
+}
+.tls-snowflake--break .tls-snowflake__svg { animation: tls-snow-pop 0.7s ease-out; }
 @keyframes tls-snow-pop {
   0% { transform: scale(1); opacity: 1; }
   30% { transform: scale(0.35); opacity: 0.2; }
   100% { transform: scale(1); opacity: 1; }
+}
+.tls-snowflake__drop { position: absolute; left: 50%; top: 50%; width: 6px; height: 8px; margin: -4px -3px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle at 35% 35%, #ffffff, #a8d4ff 60%, #6fa8e6); opacity: 0; }
+.tls-snowflake__ripple { position: absolute; left: 50%; top: calc(50% + 13px); width: 9px; height: 3px; margin: -1.5px -4.5px; border: 1px solid rgba(168, 212, 255, 0.75); border-radius: 50%; opacity: 0; }
+.tls-snowflake--melt .tls-snowflake__svg { animation: tls-snow-melt 0.9s ease-in-out; }
+.tls-snowflake--melt .tls-snowflake__drop { animation: tls-snow-drop 0.9s cubic-bezier(0.5, 0, 0.9, 0.6) forwards; }
+.tls-snowflake--melt .tls-snowflake__ripple { animation: tls-snow-ripple 0.9s ease-out forwards; }
+@keyframes tls-snow-melt {
+  0% { transform: scale(1); opacity: 1; filter: blur(0); }
+  35% { transform: scale(0.3); opacity: 0.15; filter: blur(1.5px); }
+  60% { transform: scale(0.3); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; filter: blur(0); }
+}
+@keyframes tls-snow-drop {
+  0% { opacity: 0; transform: translateY(-2px) scale(0.4); }
+  25% { opacity: 1; transform: translateY(0) scale(1); }
+  85% { opacity: 1; transform: translateY(11px) scale(0.9, 1.1); }
+  100% { opacity: 0; transform: translateY(12px) scale(1.2, 0.5); }
+}
+@keyframes tls-snow-ripple {
+  0%, 80% { opacity: 0; transform: scale(0.3); }
+  88% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1.8); }
 }
 .tls-snowflake__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #dbeeff; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(160, 200, 255, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
 @media (max-width: 640px) {
@@ -45,9 +86,9 @@
   .tls-snowflake__svg { width: 22px; height: 22px; }
 }
 
-/* „dezent“ und „Bewegung reduzieren“: keine Splitter, kein Aufpoppen - die Hauben bleiben, sie bewegen sich ohnehin nicht. */
-html[data-season-intensity~="subtle"] .tls-snowflake--burst .tls-snowflake__shard, html[data-season-intensity~="subtle"] .tls-snowflake--burst .tls-snowflake__svg { animation: none; }
+/* „dezent“ und „Bewegung reduzieren“: kein Bruch, kein Schmelzen - die Hauben bleiben, sie bewegen sich ohnehin nicht. */
+html[data-season-intensity~="subtle"] .tls-snowflake__burst > *, html[data-season-intensity~="subtle"] .tls-snowflake .tls-snowflake__svg { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .tls-snowflake--burst .tls-snowflake__shard, .tls-snowflake--burst .tls-snowflake__svg { animation: none !important; }
+  .tls-snowflake__burst > *, .tls-snowflake .tls-snowflake__svg { animation: none !important; }
   .tls-snowflake__svg { transition: none; }
 }

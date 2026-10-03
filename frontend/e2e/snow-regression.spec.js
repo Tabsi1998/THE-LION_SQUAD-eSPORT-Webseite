@@ -208,3 +208,28 @@ test.describe("Schnee: Winterhimmel (W4 #730)", () => {
     expect(await page.evaluate(() => document.querySelectorAll("[data-testid='winter-stars']").length)).toBe(0);
   });
 });
+
+test.describe("Schnee: Spur im Schnee (W5 #731)", () => {
+  test("einmal am Tag: wer bis zur Fußzeile scrollt, sieht Schritt für Schritt Dellen in der Haube - beim nächsten Besuch nicht", async ({ page, isMobile }, testInfo) => {
+    test.skip(Boolean(isMobile), "Hauben nur am PC");
+    test.setTimeout(90000);
+    await mockSeason(page, activePayload({ season: snow({ intensity: "normal", data: { night: false, snowcap_stage: 3 } }), now: "2026-12-22T15:00:00+01:00" }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => window.localStorage.removeItem("tls-snow-tracks"));
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const tracked = page.locator("[data-testid='snow-cap'][data-kind='footer'][data-tracks]");
+    await expect(tracked).toHaveCount(1, { timeout: 20000 });
+    await page.waitForTimeout(2500);
+    const dents = Number(await tracked.getAttribute("data-tracks"));
+    expect(dents).toBeGreaterThan(3);
+    await page.screenshot({ path: testInfo.outputPath("spur.png") });
+    expect(await page.evaluate(() => window.localStorage.getItem("tls-snow-tracks"))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(8000);
+    await expect(page.locator("[data-testid='snow-cap'][data-tracks]")).toHaveCount(0);
+  });
+});

@@ -36,6 +36,15 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         testId="profile-privacy-achievements"
       />
 
+      <SwitchRow
+        label="Saison-Fundstücke öffentlich"
+        description="Wenn aktiv, zeigt dein öffentliches Profil, was du über die Jahreszeiten gesammelt hast – nur die Summen je Saison, nie wann. Wenn aus, siehst nur du sie."
+        hint={publicProfile ? null : "Wirkt erst, sobald das Profil öffentlich ist."}
+        checked={form.privacy_season_finds_public === true}
+        onCheckedChange={(checked) => set("privacy_season_finds_public", checked)}
+        testId="profile-privacy-season-finds"
+      />
+
       <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]">
         <div className="flex items-start gap-3 mb-4">
           <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />

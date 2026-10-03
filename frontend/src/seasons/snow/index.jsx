@@ -7,6 +7,7 @@ import { capabilities, scaleForViewport } from "../intensity";
 import { useSeason } from "../SeasonContext";
 import { recordSignal } from "../signals";
 import { skyLight } from "../skyLight";
+import { MELT, breakShards, catchStyle } from "./catch";
 import { createSnowLayer } from "./layer";
 import { SnowCaps } from "./SnowCaps";
 import { WinterSky } from "./WinterSky";
@@ -121,7 +122,7 @@ export function Corners({ season, now }) {
   const layout = snowLayout(location.pathname, season.effective, width);
   if (!layout.caps) return null;
   const moonX = light.night > 0.05 ? moonSide(place, now ? now() : Date.now(), width) : null;
-  return <SnowCaps stage={Number(season.data?.snowcap_stage) || 1} tempC={weather && weather.temp_c !== undefined ? weather.temp_c : null} salt={yearSaltFor(season)} max={layout.capsMax} light={light} moonX={moonX} />;
+  return <SnowCaps stage={Number(season.data?.snowcap_stage) || 1} tempC={weather && weather.temp_c !== undefined ? weather.temp_c : null} salt={yearSaltFor(season)} max={layout.capsMax} light={light} moonX={moonX} tracks={season.effective !== "subtle"} />;
 }
 
 function readClicks(storage) {
@@ -142,11 +143,7 @@ function writeClicks(storage, value) {
 }
 
 /** Zwölf Splitter, die beim Fangen auseinanderfliegen. */
-const SHARDS = Array.from({ length: 12 }, (_, i) => {
-  const angle = (i / 12) * Math.PI * 2;
-  const distance = 14 + (i % 3) * 5;
-  return { dx: `${(Math.cos(angle) * distance).toFixed(1)}px`, dy: `${(Math.sin(angle) * distance).toFixed(1)}px` };
-});
+const SHARDS = breakShards();
 
 /** Ein sechsstrahliger Kristall. */
 export function Snowflake() {
@@ -167,10 +164,14 @@ export function Snowflake() {
   );
 }
 
-/** Die Schneeflocke neben dem Logo: fangen (Klick) lässt sie in Splitter platzen und zählt - fünfzig ergeben den Schneekönig. */
+/**
+ * Die Schneeflocke neben dem Logo: fangen (Klick) zählt - fünfzig ergeben den Schneekönig. Bei Frost bricht der
+ * Kristall in Splitter, bei Tauwetter schmilzt er zu einem Tropfen (W5 #731, echte Temperatur am Vereinsort).
+ */
 export function Widget({ season, storage = typeof window === "undefined" ? null : window.localStorage }) {
+  const { weather } = useSeason();
   const [clicks, setClicks] = useState(() => readClicks(storage));
-  const [burst, setBurst] = useState(false);
+  const [burst, setBurst] = useState(null);
   const [note, setNote] = useState("");
   const burstTimer = useRef(0);
   const noteTimer = useRef(0);
@@ -184,11 +185,12 @@ export function Widget({ season, storage = typeof window === "undefined" ? null 
     writeClicks(storage, next);
     recordSignal(SIGNAL_KEY, { onceIf: false });
     if (season?.effective !== "subtle") {
-      setBurst(false);
+      const style = catchStyle(weather?.temp_c, clicks);
+      setBurst(null);
       window.clearTimeout(burstTimer.current);
-      burstTimer.current = window.setTimeout(() => setBurst(false), BURST_MS);
+      burstTimer.current = window.setTimeout(() => setBurst(null), style === "melt" ? MELT.ms : BURST_MS);
       // Im nächsten Tick, damit die Animation bei jedem Klick neu startet.
-      window.setTimeout(() => setBurst(true), 0);
+      window.setTimeout(() => setBurst(style), 0);
     }
     if (next === SNOW_KING_AT) {
       setNote("Fünfzig Flocken gefangen – Schneekönig!");
@@ -199,10 +201,18 @@ export function Widget({ season, storage = typeof window === "undefined" ? null 
   const label = clicks >= SNOW_KING_AT ? `Schneeflocke – Schneekönig mit ${clicks} Flocken` : `Schneeflocke fangen – ${clicks} von ${SNOW_KING_AT}`;
   return (
     <span className="relative tls-snow-widget" data-testid="snow-widget" data-clicks={clicks}>
-      <button type="button" onClick={onClick} className={`tls-snowflake${burst ? " tls-snowflake--burst" : ""}`} aria-label={label} title={label} data-testid="snow-flake">
+      <button type="button" onClick={onClick} className={`tls-snowflake${burst ? ` tls-snowflake--${burst}` : ""}`} aria-label={label} title={label} data-testid="snow-flake" data-catch={burst || undefined}>
         <Snowflake />
         <span className="tls-snowflake__burst" aria-hidden="true">
-          {SHARDS.map((shard, index) => <span key={index} className="tls-snowflake__shard" style={{ "--dx": shard.dx, "--dy": shard.dy }} />)}
+          {burst === "break" && SHARDS.map((shard, index) => (
+            <span key={index} className={`tls-snowflake__${shard.kind}`} style={{ "--dx": `${shard.dx}px`, "--dy": `${shard.dy}px`, "--angle": `${shard.angle}deg`, "--turn": `${shard.turn}deg` }} />
+          ))}
+          {burst === "melt" && (
+            <>
+              <span className="tls-snowflake__drop" />
+              <span className="tls-snowflake__ripple" />
+            </>
+          )}
         </span>
       </button>
       {note && <span className="tls-snowflake__note" role="status" data-testid="snow-note">{note}</span>}
