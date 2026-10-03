@@ -9,7 +9,8 @@ import * as SecureStore from "expo-secure-store";
 const mockSeasonState: Record<string, unknown> = { ready: true, seasons: [], byKey: {}, preference: "on", setPreference: jest.fn(async () => {}), reducedMotion: false, reload: jest.fn(), toast: null, showToast: jest.fn() };
 jest.mock("./SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 0, left: 0, right: 0 }) }));
-jest.mock("../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {} } }));
+const mockNavigate = jest.fn();
+jest.mock("../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {}, navigate: (...args: unknown[]) => mockNavigate(...args) } }));
 
 const { SeasonStage, SeasonWidgetSlot, useSeasonTabIcon } = require("./SeasonStage");
 const { DecoSetting } = require("./DecoSetting");
@@ -74,7 +75,7 @@ test("mehrere Widgets im Kopf stehen übereinander, die Schneeflocke oben - der 
   await render(<SeasonWidgetSlot />);
   const slot = screen.getByTestId("season-widget-slot");
   expect(StyleSheet.flatten(slot.props.style).flexDirection).toBe("column");
-  expect(slot.props.children[0].key).toBe("snow");
+  expect(slot.props.children[0][0].key).toBe("snow");
   await screen.unmount();
   mockSeasonState.seasons = [halloween("normal")];
   await render(<SeasonWidgetSlot />);
@@ -92,4 +93,26 @@ test("Töne unter Darstellung: Vorgabe an wie im Web, „Aus“ merkt sich das G
   expect(await readSoundsOn()).toBe(false);
   await fireEvent.press(within(screen.getByTestId("season-sound-setting")).getByText("An"));
   expect(await readSoundsOn()).toBe(true);
+});
+
+test("#852: Türchen und Stiefel klein in einer Reihe unter dem Kranz - ein Tipp öffnet Kalender bzw. führt zum Stiefel", async () => {
+  const advent = { ...halloween("normal"), key: "advent", label: "Adventkranz", data: { candles: 2 } };
+  const calendar = { ...halloween("normal"), key: "advent_calendar", label: "Adventkalender", data: { today_door: 6, door_hour: 6, ready: true, catch_up: false } };
+  const nikolaus = { ...halloween("normal"), key: "nikolaus", label: "Nikolaus", texts: { greeting: "Der Nikolaus war da" } };
+  mockSeasonState.seasons = [advent, calendar, nikolaus];
+  await render(<SeasonWidgetSlot />);
+  const slot = screen.getByTestId("season-widget-slot");
+  expect(StyleSheet.flatten(slot.props.style).flexDirection).toBe("column");
+  const row = screen.getByTestId("season-widget-row");
+  expect(StyleSheet.flatten(row.props.style).flexDirection).toBe("row");
+  expect(within(row).getByTestId("advent-calendar-widget").props.accessibilityLabel).toBe("Adventkalender – Türchen 6 ist offen");
+  await fireEvent.press(within(row).getByTestId("advent-calendar-widget"));
+  expect(mockNavigate).toHaveBeenLastCalledWith("More", { screen: "AdventCalendar", initial: false });
+  await fireEvent.press(within(row).getByTestId("nikolaus-widget"));
+  expect(mockNavigate).toHaveBeenLastCalledWith("More", { screen: "MoreHub" });
+  await screen.unmount();
+  // Ohne angelegte Türchen kein Türchen; der Kranz allein steht wie bisher.
+  mockSeasonState.seasons = [advent, { ...calendar, data: { ready: false } }];
+  await render(<SeasonWidgetSlot />);
+  expect(screen.queryByTestId("advent-calendar-widget")).toBeNull();
 });

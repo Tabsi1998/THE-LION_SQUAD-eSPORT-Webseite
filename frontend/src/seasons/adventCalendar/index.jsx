@@ -4,7 +4,8 @@ import "./advent-calendar-widget.css";
 
 // Adventkalender (#641): der Einstieg neben dem Logo - ein kleines Türchen mit der Zahl des neuesten Tages, das zur
 // Seite /advent führt. Es erscheint nur, wenn für das Jahr Türchen angelegt sind (`data.ready` vom Server). Durch
-// den Spalt fällt Licht; „dezent“ und „Bewegung reduzieren“ lassen es ruhig stehen.
+// den Spalt fällt Licht; „dezent“ und „Bewegung reduzieren“ lassen es ruhig stehen. Am Handy steht er zusätzlich
+// ganz oben im Menü (#852) - dort ist er mit einem Tipp erreichbar, auch wenn der Kopf eng wird.
 
 export const ACCENT = "rgba(233, 196, 106, 0.26)";
 
@@ -66,4 +67,17 @@ export function Widget({ season }) {
   );
 }
 
-export const season = { key: "advent_calendar", accent: ACCENT, Widget };
+/** Der Eintrag ganz oben im Handy-Menü (#852): Türchen und Satz, ein Tipp führt zum Kalender. */
+export function MenuEntry({ season, onClose }) {
+  const entry = calendarEntry(season);
+  if (!entry) return null;
+  return (
+    <Link to="/advent" onClick={onClose} className="tls-advcal-menu" data-testid="season-menu-advent-calendar">
+      <span className="tls-advcal-menu__door" aria-hidden="true"><DoorGlyph door={entry.door} /></span>
+      <span className="tls-advcal-menu__text">{entry.label.replace("Adventkalender – ", "")}</span>
+      <span className="tls-advcal-menu__title">Adventkalender</span>
+    </Link>
+  );
+}
+
+export const season = { key: "advent_calendar", accent: ACCENT, Widget, MenuEntry };

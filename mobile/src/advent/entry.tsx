@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { navigationRef } from "../navigation/rootNavigation";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop, Text as SvgText } from "react-native-svg";
 import { useSeason, type ActiveSeason } from "../seasons/SeasonProvider";
@@ -65,6 +66,23 @@ export function DoorGlyph({ door, size = 40, waiting = false }: { door: number; 
   );
 }
 
+/**
+ * Das Türchen klein im Dashboard-Kopf unter dem Kranz (#852): ein Tipp öffnet den Kalender - unter ihm liegt „Mehr“, der
+ * Pfeil zurück führt dorthin (wie der Hinweis). Nur mit angelegten Türchen.
+ */
+export function AdventCalendarWidget({ season }: { season: ActiveSeason; screen: string }) {
+  const entry = calendarEntry(season);
+  if (!entry) return null;
+  const open = () => {
+    if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "AdventCalendar", initial: false } as never);
+  };
+  return (
+    <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={entry.label} hitSlop={6} style={({ pressed }) => [styles.widget, pressed && styles.pressed]} testID="advent-calendar-widget">
+      <DoorGlyph door={entry.door} size={28} waiting={entry.waiting} />
+    </Pressable>
+  );
+}
+
 /** Hinweis im Dashboard: nur solange der Kalender läuft, Türchen angelegt sind und die Person die Deko nicht abgeschaltet hat. */
 export function AdventHint({ onOpen }: { onOpen: () => void }) {
   const entry = useAdventEntry({ decoration: true });
@@ -82,6 +100,7 @@ export function AdventHint({ onOpen }: { onOpen: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  widget: { width: 28, height: 30, alignItems: "center", justifyContent: "center" },
   hint: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: "rgba(233, 196, 106, 0.32)", backgroundColor: "rgba(233, 196, 106, 0.07)" },
   text: { flex: 1, gap: 2 },
   kicker: { color: GOLD, fontSize: 11, fontWeight: "800", letterSpacing: 2 },

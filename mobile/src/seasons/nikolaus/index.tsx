@@ -82,6 +82,37 @@ function ShelfCard({ card, onClose, width }: { card: BootCard; onClose: () => vo
  * geöffnet wurde; Antippen öffnet ihn - die Antwort des Servers läuft parallel zum Wackeln, die Karte kommt, wenn
  * beides fertig ist. Selten ein kleines Wippen, solange er voll ist und man hinsieht.
  */
+// Der Stiefel im Dashboard-Kopf (#852) bittet „öffnen“ - der Stiefel unter „Mehr“ erledigt es, sobald er zu sehen ist.
+let openRequested = false;
+const openListeners = new Set<() => void>();
+
+/** Den Stiefel bitten, sich zu öffnen, sobald er zu sehen ist. */
+export function requestBootOpen(): void {
+  openRequested = true;
+  openListeners.forEach((listener) => listener());
+}
+
+/** Für Tests: keine offene Bitte. */
+export function resetBootOpenRequest(): void {
+  openRequested = false;
+}
+
+/** Ab dem Moment, in dem „Mehr“ zu sehen ist, bis der Stiefel sich öffnet - man soll ihn dabei sehen. */
+export const OPEN_AFTER_MS = 450;
+
+/** Der kleine Stiefel im Dashboard-Kopf unter dem Kranz (#852): ein Tipp führt zu „Mehr“ und öffnet ihn dort. */
+export function NikolausWidget({ season }: { season: ActiveSeason; screen: string }) {
+  const go = () => {
+    requestBootOpen();
+    if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "MoreHub" } as never);
+  };
+  return (
+    <Pressable onPress={go} accessibilityRole="button" accessibilityLabel={`${season.texts?.greeting || "Der Nikolaus war da"} – zum Stiefel`} hitSlop={6} style={styles.widget} testID="nikolaus-widget">
+      <BootSvg height={26} />
+    </Pressable>
+  );
+}
+
 export function NikolausShelf({ season }: { season: ActiveSeason; screen: string }) {
   const userId = useMember();
   const { reducedMotion } = useSeason();
@@ -98,6 +129,15 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
   const wobble = useRef(new Animated.Value(0)).current;
   const rise = useRef(new Animated.Value(0)).current;
   const timers = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  // Bitte aus dem Dashboard-Kopf (#852): ist „Mehr“ zu sehen, öffnet sich der Stiefel kurz danach von selbst.
+  const [asked, setAsked] = useState(() => openRequested);
+  useEffect(() => {
+    const listener = () => setAsked(true);
+    openListeners.add(listener);
+    return () => {
+      openListeners.delete(listener);
+    };
+  }, []);
   const busy = useRef(false);
 
   useEffect(() => {
@@ -184,6 +224,18 @@ export function NikolausShelf({ season }: { season: ActiveSeason; screen: string
     }, wait));
     timers.current.push(setTimeout(close, wait + CARD_MS));
   };
+  useEffect(() => {
+    if (!asked || !focused) return undefined;
+    // Erst beim Öffnen gilt die Bitte als erledigt - wer vorher wegwischt, bekommt sie beim nächsten Mal.
+    const timer = setTimeout(() => {
+      setAsked(false);
+      if (!openRequested) return;
+      openRequested = false;
+      void open();
+    }, OPEN_AFTER_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asked, focused]);
 
   const used = opened && phase !== "opening";
   const boxWidth = bootWidth(SHELF_HEIGHT);
@@ -296,6 +348,7 @@ export function NikolausGreeting({ season, screen }: { season: ActiveSeason; scr
 }
 
 const styles = StyleSheet.create({
+  widget: { width: 26, height: 30, alignItems: "center", justifyContent: "flex-end" },
   // Der Platz rechts im Kopf: die Sohle steht auf der Oberkante der ersten Karte (18 Punkte Abstand im Screen), links
   // neben der schwebenden Glocke (40 Punkte breit, 14 vom Rand - der Kopf beginnt 18 vom Rand).
   shelf: { position: "absolute", right: 48, bottom: -18, alignItems: "flex-end", zIndex: 3 },
