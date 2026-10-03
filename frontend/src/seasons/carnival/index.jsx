@@ -1,14 +1,13 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
-import { TEXT_LIKE } from "../anchors";
-import { blocksPoint } from "../glyphs";
+import { HeaderMascotHat, HeroMascotHat } from "../mascot/MascotHat";
 import { hashString, seasonYear } from "../rng";
 import { readPreviewToken } from "../preview";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { openSpot } from "../space";
 import { confettiWind } from "./confetti";
-import { HEAD_FALLBACK, headTop, streamerPath, streamerPlan } from "./geometry";
+import { streamerPath, streamerPlan } from "./geometry";
 import { createConfettiLayer, requestBurst } from "./layer";
 import "./carnival.css";
 
@@ -64,41 +63,6 @@ export function streamerLength(streamer, x, top, free) {
 /** Frei für eine Luftschlange - die gemeinsame Probe für Deko an Kanten (space.js). */
 export { openSpot };
 
-/**
- * Frei für den großen Hut: keine Schrift (mit ihrem ganzen Kasten), kein Bild, kein Bedienelement - die Hüte selbst
- * und der Löwe, auf dem er sitzt, zählen nicht.
- */
-export function hatRoom(doc, x, y, anchor = null) {
-  const hits = typeof doc.elementsFromPoint === "function" ? doc.elementsFromPoint(x, y) : [];
-  return !hits.some((el) => {
-    if (el.closest(".tls-party-hat, .tls-party-hat-page, .tls-streamers")) return false;
-    if (anchor && anchor.contains(el)) return false;
-    return el.matches(TEXT_LIKE) || blocksPoint(el, x, y);
-  });
-}
-
-/**
- * Wo im Hut nachgesehen wird (Anteile von Breite und Höhe): der ganze Kasten, nicht nur der Kegel - der Knopf fängt
- * dort Klicks ab -, mit etwas Rand für die Neigung; dazu Spitze, Schultern und Krempe.
- */
-export const HAT_PROBES = [[-0.06, 0], [0.5, 0], [1.06, 0], [-0.06, 0.5], [1.06, 0.5], [0.3, 0.3], [0.7, 0.3], [0.15, 0.62], [0.85, 0.62]];
-/** Erst kleiner, dann tiefer in die Mähne: so groß wie möglich, aber nie in die Schrift darüber. */
-export const HERO_HAT_SHARES = [0.2, 0.17, 0.14];
-export const HERO_HAT_SINKS = [0, 0.15, 0.3];
-
-/** Der Platz des großen Huts: der erste aus Größe und Tiefe, über dem nichts liegt - sonst keiner. */
-export function heroHatSpot(rect, head, free) {
-  for (const share of HERO_HAT_SHARES) {
-    const size = Math.round(rect.width * share);
-    for (const sink of HERO_HAT_SINKS) {
-      const at = hatSpot(rect, head, size);
-      const top = Math.round(at.top + sink * size);
-      if (HAT_PROBES.every(([px, py]) => free(at.left + px * size, top + py * size * 1.3))) return { left: at.left, top, size };
-    }
-  }
-  return null;
-}
-
 function localDay(now = new Date()) {
   const pad = (value) => String(value).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -152,101 +116,17 @@ export function PartyHatArt({ size = 24 }) {
 }
 
 /**
- * Ein Hut, der sich antippen lässt: wippt und wirft Konfetti - höchstens alle zehn Sekunden. Bei „dezent“ und
- * „Bewegung reduzieren“ ist er nur ein Bild: kein Knopf, der nichts tut.
+ * Der Partyhut auf dem Löwen - im Kopf mittig auf dem Kopf (#855), auf der Startseite auf dem großen Löwen. Platz,
+ * Kopf-Scan und Knopf kommen aus dem gemeinsamen `seasons/mascot`; Antippen lässt ihn wippen und wirft eine Handvoll
+ * Konfetti (höchstens alle zehn Sekunden). Bei „dezent“ ist er nur ein Bild.
  */
-function Hat({ style, size, moving, testId, className = "" }) {
-  const ref = useRef(null);
-  const last = useRef(0);
-  const [wiggle, setWiggle] = useState(false);
-  const timer = useRef(0);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
-  if (!moving) {
-    return (
-      <span className={`tls-party-hat tls-party-hat--still ${className}`} style={style} aria-hidden="true" data-testid={testId}>
-        <PartyHatArt size={size} />
-      </span>
-    );
-  }
-  const onClick = () => {
-    const now = Date.now();
-    if (now - last.current < HAT_COOLDOWN_MS) return;
-    last.current = now;
-    setWiggle(true);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setWiggle(false), WIGGLE_MS);
-    const box = ref.current?.getBoundingClientRect();
-    if (box) requestBurst({ x: box.left + box.width / 2, y: box.top + box.height * 0.3 });
-  };
+function Hats({ moving }) {
+  const common = { Art: PartyHatArt, moving, label: "Partyhut – Konfetti werfen", title: "Konfetti!", cooldownMs: HAT_COOLDOWN_MS, wiggleMs: WIGGLE_MS, onTap: requestBurst };
   return (
-    <button ref={ref} type="button" className={`tls-party-hat ${className}${wiggle ? " tls-party-hat--wiggle" : ""}`} style={style} onClick={onClick} aria-label="Partyhut – Konfetti werfen" title="Konfetti!" data-testid={testId}>
-      <PartyHatArt size={size} />
-    </button>
-  );
-}
-
-/** Wo der Hut auf einem Bild sitzt (Fensterkoordinaten): auf dem Scheitel des Löwen, etwas eingesunken. */
-export function hatSpot(rect, head, size, minTop = -Infinity) {
-  return { left: Math.round(rect.left + head.x * rect.width - size / 2), top: Math.round(Math.max(minTop, rect.top + head.y * rect.height - size * 1.15)) };
-}
-
-/** Wartet, bis ein Bild geladen ist, und misst dann - auch nach neuer Fenstergröße. */
-function useImageSpot(selector, measure, deps) {
-  const [spot, setSpot] = useState(null);
-  useEffect(() => {
-    if (typeof document === "undefined") return undefined;
-    let image = null;
-    const run = () => {
-      image = document.querySelector(selector);
-      if (!image || !image.complete || !(image.naturalWidth > 0)) {
-        setSpot(null);
-        return;
-      }
-      setSpot(measure(image));
-    };
-    run();
-    const retry = window.setTimeout(run, 600);
-    image?.addEventListener?.("load", run);
-    window.addEventListener("resize", run);
-    return () => {
-      window.clearTimeout(retry);
-      image?.removeEventListener?.("load", run);
-      window.removeEventListener("resize", run);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-  return spot;
-}
-
-/** Der Hut auf dem Löwen im Kopf der Seite (die Kopfzeile klebt oben - der Hut darum fest am Fenster). */
-function HeaderHat({ moving }) {
-  const spot = useImageSpot("header [data-testid='tls-logo']", (image) => {
-    const rect = image.getBoundingClientRect();
-    if (rect.width < 20) return null;
-    const size = Math.max(14, Math.round(rect.height * 0.46));
-    // Im Kopf ist über dem Löwen kaum Platz: der Hut bleibt ganz im Fenster und sitzt dafür etwas tiefer.
-    return { ...hatSpot(rect, headTop(image, "wordmark") || HEAD_FALLBACK.wordmark, size, 2), size };
-  }, []);
-  if (!spot) return null;
-  return <Hat style={{ position: "fixed", left: `${spot.left}px`, top: `${spot.top}px` }} size={spot.size} moving={moving} testId="carnival-hat" className="tls-party-hat--header" />;
-}
-
-/** Der Hut auf dem großen Löwen der Startseite - gehört zur Seite und scrollt mit. */
-function HeroHat({ moving }) {
-  const location = useLocation();
-  const spot = useImageSpot("[data-season-anchor='lion'] img", (image) => {
-    const rect = image.getBoundingClientRect();
-    if (rect.width < 80) return null;
-    const anchor = image.closest("[data-season-anchor='lion']");
-    const at = heroHatSpot(rect, headTop(image, "mascot") || HEAD_FALLBACK.mascot, (x, y) => hatRoom(document, x, y, anchor));
-    return at ? { left: at.left + (window.scrollX || 0), top: at.top + (window.scrollY || 0), size: at.size } : null;
-  }, [location.pathname]);
-  if (!spot || typeof document === "undefined") return null;
-  return createPortal(
-    <div className="tls-party-hat-page" style={{ left: `${spot.left}px`, top: `${spot.top}px` }}>
-      <Hat size={spot.size} moving={moving} testId="carnival-hero-hat" className="tls-party-hat--hero" />
-    </div>,
-    document.body,
+    <>
+      <HeaderMascotHat {...common} crown={0.42} share={0.42} testId="carnival-hat" className="tls-party-hat tls-party-hat--header" />
+      <HeroMascotHat {...common} testId="carnival-hero-hat" className="tls-party-hat tls-party-hat--hero" ignore=".tls-streamers" />
+    </>
   );
 }
 
@@ -315,8 +195,7 @@ export function Corners({ season }) {
   const moving = season.effective !== "subtle";
   return (
     <>
-      <HeaderHat moving={moving} />
-      <HeroHat moving={moving} />
+      <Hats moving={moving} />
       <Streamers season={season} moving={moving} />
     </>
   );

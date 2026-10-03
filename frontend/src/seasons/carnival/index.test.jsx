@@ -11,7 +11,7 @@ vi.mock("../preview", async (importOriginal) => ({ ...(await importOriginal()), 
 vi.mock("./layer", async (importOriginal) => ({ ...(await importOriginal()), requestBurst: (...args) => burst(...args) }));
 
 const {
-  Corners, HAT_COOLDOWN_MS, HERO_HAT_SHARES, RAIN_KEY, STREAMER_GAP, Toast, firstTimeToday, hatRoom, hatSpot, heroHatSpot, openSpot, season, skyLayers, streamerLength, streamerX,
+  Corners, HAT_COOLDOWN_MS, RAIN_KEY, STREAMER_GAP, Toast, firstTimeToday, openSpot, season, skyLayers, streamerLength, streamerX,
 } = await import("./index.jsx");
 
 function carnival(overrides = {}) {
@@ -109,37 +109,6 @@ test("frei für eine Luftschlange: nur, wo eine seitenbreite Fläche liegt - kei
   delete document.elementFromPoint;
 });
 
-test("der Hut im Kopf bleibt ganz im Fenster; der große weicht der Schrift aus - kleiner, dann tiefer, sonst keiner", () => {
-  expect(hatSpot({ left: 40, top: 16, width: 120, height: 40 }, { x: 0.1, y: 0.05 }, 18)).toEqual({ left: 43, top: -3 });
-  expect(hatSpot({ left: 40, top: 16, width: 120, height: 40 }, { x: 0.1, y: 0.05 }, 18, 2).top).toBe(2);
-  const lion = { left: 1000, top: 200, width: 200, height: 260 };
-  const head = { x: 0.5, y: 0.1 };
-  expect(heroHatSpot(lion, head, () => true)).toEqual({ left: 1080, top: 180, size: 40 });
-  // Schrift bis 190 über dem Löwen: der volle Hut passt nicht, ein kleinerer (oder tiefer gesetzter) schon.
-  const below = (limit) => (_x, y) => y > limit;
-  const spot = heroHatSpot(lion, head, below(190));
-  expect(spot).not.toBeNull();
-  expect(spot.top).toBeGreaterThan(190);
-  expect(spot.size).toBeLessThanOrEqual(Math.round(lion.width * HERO_HAT_SHARES[0]));
-  expect(heroHatSpot(lion, head, () => false)).toBeNull();
-});
-
-test("frei für den großen Hut: Schrift und Bilder sperren, der Löwe und die Hüte selbst nicht", () => {
-  const anchor = document.createElement("div");
-  const lionImg = document.createElement("img");
-  anchor.append(lionImg);
-  const text = document.createElement("p");
-  text.textContent = "Mitglied wird, wer sich einbringt";
-  const hat = document.createElement("span");
-  hat.className = "tls-party-hat";
-  document.body.append(anchor, text, hat);
-  document.elementsFromPoint = (_x, y) => (y < 100 ? [hat, text, document.body] : [hat, lionImg, anchor, document.body]);
-  expect(hatRoom(document, 10, 50, anchor)).toBe(false);
-  expect(hatRoom(document, 10, 150, anchor)).toBe(true);
-  expect(hatRoom(document, 10, 150, null)).toBe(false);
-  delete document.elementsFromPoint;
-});
-
 /** Kopf mit Logo und der große Löwe, beide „geladen“ und vermessen. */
 function stage() {
   const header = document.createElement("header");
@@ -174,7 +143,10 @@ test("Hüte im Kopf und auf dem Löwen; Antippen wirft Konfetti und wippt - höc
   expect(hero).toHaveAccessibleName("Partyhut – Konfetti werfen");
   fireEvent.click(hero);
   expect(burst).toHaveBeenCalledTimes(1);
-  expect(hero.className).toContain("tls-party-hat--wiggle");
+  // Platz und Knopf kommen aus seasons/mascot (#855) - dort sitzt auch die Rechnung samt Tests.
+  expect(hero.className).toContain("tls-mascot-hat--wiggle");
+  expect(hero.className).toContain("tls-party-hat--hero");
+  expect(screen.getByTestId("carnival-hat").closest("header")).not.toBeNull();
   now.mockReturnValue(1_000_000 + HAT_COOLDOWN_MS - 1);
   fireEvent.click(hero);
   expect(burst).toHaveBeenCalledTimes(1);

@@ -145,6 +145,10 @@ function SeasonCard({ season, busy, onSave, onPreview }) {
         {season.key === "advent_calendar" && (
           <Link to="/admin/advent" data-testid="season-advent_calendar-doors" className="ml-auto px-3 py-1.5 border border-[#e9c46a]/50 text-[#e9c46a] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#e9c46a]/10">Türchen pflegen</Link>
         )}
+        {season.key === "easter_hunt" && (
+          // Wie „Türchen pflegen“ (#858): die Eier versteckt man an genau einer Stelle, dorthin führt der Knopf.
+          <Link to="/admin/ostern" data-testid="season-easter_hunt-eggs" className="ml-auto px-3 py-1.5 border border-[#9be15d]/50 text-[#9be15d] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#9be15d]/10">Ostereier verstecken</Link>
+        )}
       </div>
     </div>
   );

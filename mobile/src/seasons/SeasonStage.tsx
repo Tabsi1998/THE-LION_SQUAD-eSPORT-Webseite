@@ -9,7 +9,7 @@ import { AdventWidget } from "./advent/AdventWidget";
 import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
-import { EasterBackdrop, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
+import { EasterBackdrop, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
 import { HuntStage, HuntWidget } from "./easterHunt";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
@@ -66,7 +66,7 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge },
   // Ostern (S14 #645, E1 #753, E4 #756, wie im Web): Hasenohren im Dashboard-Kopf, Eier-Reihe an der Begrüßungskarte,
   // das Osterei am Tab „Mehr“, Frühlingslicht, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
-  easter: { Widget: EasterEarsWidget, Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },
+  easter: { Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },
   // Ostereiersuche (S15 #646/#647, wie im Web): die Eier an den Karten der Screens (die Bühne lädt und verteilt sie),
   // das goldene Löwenei mit dem Stand im Dashboard-Kopf, der Korb unter „Mehr“.
   easter_hunt: { Corners: HuntStage, Widget: HuntWidget },

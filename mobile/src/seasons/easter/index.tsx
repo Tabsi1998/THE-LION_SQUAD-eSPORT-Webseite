@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Reanimated, { useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from "react-native-reanimated";
@@ -14,24 +13,22 @@ import { hashString, mulberry32 } from "../rng";
 import { seasonScroll, type ScrollState } from "../sky/scroll";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { onHuntActive } from "../easterHunt/api";
-import { BunnyEarsArt, ButterflyWing, EggArt, FlowerArt, GrassStrip, HareEarsArt } from "./art";
+import { ButterflyWing, EggArt, FlowerArt, GrassStrip, HareEarsArt } from "./art";
 import {
   BUTTERFLY_EVERY, BUTTERFLY_FIRST, PEEK_BOX, PEEK_EVERY, PEEK_FIRST, PETAL_COLORS, butterflyFlight, createPetal, edgeCount, greetingDay, isQuiet, nextDelay, peekSpot, petalCount, petalPose,
   rowPatterns, stepPetal, type EggPattern, type Flight, type Petal,
 } from "./plan";
 
 // Ostern in der App (S14 #645, E1 #753, E4 #756 - wie frontend/src/seasons/easter): von Palmsonntag bis Ostermontag.
-// Im Dashboard-Kopf sitzen Hasenohren (antippen: sie zucken, ein leichtes Tippen), an der Unterkante der Begrüßungskarte
-// liegt eine Reihe bemalter Eier im Gras, der Tab „Mehr“ trägt ein Osterei. Selten sinkt ein Blütenblatt (sie gehören
+// Hasenohren trägt der Löwe nicht mehr (#857). An der Unterkante der Begrüßungskarte liegt eine Reihe bemalter Eier
+// im Gras, der Tab „Mehr“ trägt ein Osterei. Selten sinkt ein Blütenblatt (sie gehören
 // zum Screen und ziehen beim Scrollen mit), bei „voll“ flattert ab und zu ein Zitronenfalter vorbei, und alle paar
 // Minuten streckt ein Feldhase die Ohren hinter einer Karte hervor. Ostersonntag und -montag kommt der Gruß.
 // Karfreitag ist still: alles da, nichts bewegt sich, kein Gruß. „dezent“ und „Bewegung reduzieren“: alles steht.
 
 export const GREETING_KEY = "easter-greeting";
-export const EARS_COOLDOWN_MS = 4000;
 export const TOAST_DELAY_MS = 1500;
 export const TOAST_MS = 10000;
-const TWITCH_MS = 800;
 const PEEK_MS = 3400;
 const EDGE_EGG = 12;
 const EDGE_STEP = 16;
@@ -40,43 +37,6 @@ const EDGE_STEP = 16;
 function useStill(season: ActiveSeason): boolean {
   const { reducedMotion } = useSeason();
   return reducedMotion || season.effective === "subtle" || isQuiet(season);
-}
-
-/**
- * Die Hasenohren im Dashboard-Kopf: antippen → beide zucken, ein leichtes Tippen - höchstens alle vier Sekunden.
- * Still (dezent, ohne Bewegung, Karfreitag) nur ein Bild, kein Knopf.
- */
-export function EasterEarsWidget({ season }: { season: ActiveSeason; screen: string }) {
-  const still = useStill(season);
-  const last = useRef(0);
-  const twitch = useRef(new Animated.Value(0)).current;
-  if (still) {
-    return (
-      <View style={styles.widget} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden testID="easter-ears-widget">
-        <BunnyEarsArt size={24} />
-      </View>
-    );
-  }
-  const onPress = () => {
-    const now = Date.now();
-    if (now - last.current < EARS_COOLDOWN_MS) return;
-    last.current = now;
-    void Promise.resolve(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => {});
-    twitch.setValue(0);
-    Animated.timing(twitch, { toValue: 1, duration: TWITCH_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  };
-  // Die Ebene ist doppelt so hoch und steht mit ihrer Mitte auf dem Haarreif - so dreht sie um den Reif (Android dreht
-  // um Prozent-Ursprünge nicht zuverlässig, um die Mitte schon).
-  const rotate = twitch.interpolate({ inputRange: [0, 0.2, 0.45, 0.7, 1], outputRange: ["0deg", "9deg", "-5deg", "3deg", "0deg"] });
-  return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel="Hasenohren – zucken lassen" hitSlop={8} style={styles.widget} testID="easter-ears-widget">
-      <Animated.View style={[styles.earsPivot, { transform: [{ rotate }] }]} testID="easter-ears">
-        <View style={styles.earsHalf}>
-          <BunnyEarsArt size={24} />
-        </View>
-      </Animated.View>
-    </Pressable>
-  );
 }
 
 /** Das Osterei am Tab „Mehr“ - je Tag ein anderes Muster. */
@@ -406,7 +366,7 @@ export function EasterGreeting({ season, screen }: { season: ActiveSeason; scree
   return (
     <View pointerEvents="box-none" style={[styles.toastWrap, { bottom: TAB_BAR + Math.max(insets.bottom, 8) + 12, width: Math.min(width - 32, 440), left: Math.max(16, (width - 440) / 2) }]}>
       <Pressable onPress={() => setOpen(false)} accessibilityRole="button" accessibilityLabel={`${greeting}. Schließen`} style={styles.toast} testID="easter-toast">
-        <BunnyEarsArt size={18} />
+        <FlowerArt kind="daisy" height={18} />
         <Body style={styles.toastText}>{greeting}</Body>
       </Pressable>
     </View>
@@ -414,9 +374,6 @@ export function EasterGreeting({ season, screen }: { season: ActiveSeason; scree
 }
 
 const styles = StyleSheet.create({
-  widget: { width: 34, height: 40, alignItems: "center", justifyContent: "center" },
-  earsPivot: { position: "absolute", top: (40 - 31) / 2, left: 0, right: 0, height: 31 * 2, alignItems: "center" },
-  earsHalf: { height: 31, justifyContent: "flex-end" },
   // 4 px unter der Innenkante der Karte: das Gras steht auf der Kante, die Eier ragen 12 px in den Innenabstand (16).
   edge: { position: "absolute", right: 16, bottom: -4, height: 18 },
   edgeEggPivot: { position: "absolute", width: EDGE_EGG, justifyContent: "flex-start" },

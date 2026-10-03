@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useLocation } from "react-router-dom";
 import { TEXT_LIKE } from "../anchors";
 import { blocksPoint } from "../glyphs";
-import { HEAD_FALLBACK, headTop } from "./head";
+import { HEAD_FALLBACK, crownTop, headTop } from "./head";
 import "./mascot.css";
 
 // Etwas auf dem Kopf des Löwen (gemeinsam für Partyhut #746 und Hasenohren #645): im Kopf der Seite auf dem Löwen
@@ -129,16 +129,23 @@ export function MascotHatButton({ Art, size, style, moving, label, title, testId
  * Das Stück auf dem Löwen im Kopf der Seite: in der Kopfzeile selbst (Koordinaten relativ zu ihr) - so klebt es mit
  * ihr oben, und was über der Kopfzeile liegt (Dialoge), liegt auch über dem Stück.
  */
-export function HeaderMascotHat({ className = "", ...props }) {
+export function HeaderMascotHat({ className = "", crown = false, share = 0.46, ...props }) {
   const spot = useImageSpot("header [data-testid='tls-logo']", (image) => {
     const rect = image.getBoundingClientRect();
     const header = image.closest("header");
     if (rect.width < 20 || !header) return null;
-    const size = Math.max(14, Math.round(rect.height * 0.46));
+    const size = Math.max(14, Math.round(rect.height * share));
     const frame = header.getBoundingClientRect();
-    // Im Kopf ist über dem Löwen kaum Platz: das Stück bleibt ganz in der Kopfzeile und sitzt dafür etwas tiefer.
-    const at = hatSpot(rect, headTop(image, "wordmark") || HEAD_FALLBACK.wordmark, size, frame.top + 2);
-    return { left: at.left - frame.left, top: at.top - frame.top, size, header };
+    // `crown` (#855): auf dem Kopf statt auf dem höchsten Punkt der Mähne - für Hüte, die gerade sitzen sollen; eine Zahl
+    // legt die Stelle entlang des Kopfes fest (0 = links, 1 = rechts, `true` = Mitte).
+    const along = typeof crown === "number" ? crown : 0.5;
+    const head = (crown ? crownTop(image, "wordmark", along) : headTop(image, "wordmark")) || HEAD_FALLBACK.wordmark;
+    // Im Kopf ist über dem Löwen kaum Platz. Ein Hut (`crown`) wird so groß, wie darüber Platz ist - die Kopfzeile
+    // drückte ihn sonst nach unten ins Gesicht; alles andere bleibt ganz in der Kopfzeile und sitzt dafür etwas tiefer.
+    const room = Math.floor((rect.top + head.y * rect.height - (frame.top + 2)) / 1.15);
+    const fitted = crown ? Math.max(12, Math.min(size, room)) : size;
+    const at = hatSpot(rect, head, fitted, frame.top + 2);
+    return { left: at.left - frame.left, top: at.top - frame.top, size: fitted, header };
   }, []);
   if (!spot) return null;
   return createPortal(

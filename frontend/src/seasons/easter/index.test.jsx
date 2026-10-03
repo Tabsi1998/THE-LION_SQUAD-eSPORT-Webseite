@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Ostern im Web (#645, #753, #756): das Modul im Register; Ohren auf dem Löwen (antippen lässt sie zucken), die
@@ -8,7 +8,7 @@ import { MemoryRouter } from "react-router-dom";
 const seasonState = { byKey: {} };
 vi.mock("../SeasonContext", () => ({ useSeason: () => seasonState }));
 
-const { Backdrop, Corners, EARS_COOLDOWN_MS, GREETING_KEY, Toast, season, skyLayers } = await import("./index.jsx");
+const { Backdrop, Corners, GREETING_KEY, Toast, season, skyLayers } = await import("./index.jsx");
 const { SEASON_MODULES, hasModule } = await import("../registry");
 const { reportHuntActive, resetHuntActive } = await import("../easterHunt/api");
 
@@ -76,18 +76,13 @@ test("das Modul steht im Register: Licht, Ecken, Gruß, Blätter", async () => {
   expect(Object.keys(season).sort()).toEqual(["Backdrop", "Corners", "Toast", "key", "skyLayers"]);
 });
 
-test("Ohren im Kopf und auf dem großen Löwen; antippen lässt sie zucken, höchstens alle vier Sekunden", async () => {
+test("keine Hasenohren mehr am Löwen (#857) - weder im Kopf noch auf der Startseite", async () => {
   stage();
   renderCorners(easter());
   await settle();
-  const ears = screen.getByTestId("easter-ears");
-  expect(ears).toHaveAccessibleName("Hasenohren – zucken lassen");
-  expect(ears.closest("header")).not.toBeNull();
-  const hero = screen.getByTestId("easter-hero-ears");
-  fireEvent.click(hero);
-  expect(hero.className).toContain("tls-mascot-hat--twitch");
-  expect(hero.className).toContain("tls-ears--alive");
-  expect(EARS_COOLDOWN_MS).toBe(4000);
+  expect(screen.queryByTestId("easter-ears")).toBeNull();
+  expect(screen.queryByTestId("easter-hero-ears")).toBeNull();
+  expect(document.querySelector(".tls-mascot-hat")).toBeNull();
 });
 
 test("Eier-Reihe und Wiese: auf der Startseite beides; Eier mit verschiedenen Mustern", async () => {
@@ -117,13 +112,12 @@ test("während einer laufenden Eiersuche: Blumen statt Eier - erst wenn feststeh
   expect(screen.getByTestId("easter-row").dataset.items).toBe("eggs");
 });
 
-test("Karfreitag: alles da, aber still - die Ohren sind nur ein Bild, nichts schwingt, kein Gruß", async () => {
+test("Karfreitag: alles da, aber still - nichts schwingt, kein Gruß", async () => {
   vi.setSystemTime(new Date("2027-03-26T10:00:00+01:00"));
   stage();
   const friday = easter({}, { quiet: true });
   renderCorners(friday);
   await settle();
-  expect(screen.getByTestId("easter-ears").tagName).toBe("SPAN");
   expect(screen.getByTestId("easter-row").className).not.toContain("--sway");
   expect(screen.getByTestId("easter-meadow").className).not.toContain("--sway");
   expect(skyLayers({ season: friday, budget: 120 })).toEqual([]);
@@ -143,7 +137,6 @@ test("Blätter nur mit Bewegung und Budget; „dezent“ hält alles still", asy
   stage();
   renderCorners(subtle);
   await settle();
-  expect(screen.getByTestId("easter-ears").tagName).toBe("SPAN");
   expect(document.querySelectorAll("button")).toHaveLength(0);
   expect(screen.queryByTestId("easter-butterfly")).toBeNull();
 });

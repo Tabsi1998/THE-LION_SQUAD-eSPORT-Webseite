@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { effectClasses, pageClass } from "../intensity";
-import { HeaderMascotHat, HeroMascotHat } from "../mascot/MascotHat";
 import { hashString } from "../rng";
 import { markToastShown, toastShownToday } from "../SeasonStage";
-import { BunnyEarsArt } from "./art";
+import { FlowerArt } from "./art";
 import { EggRow } from "./EggRow";
 import { Meadow } from "./Meadow";
 import { Butterflies, HarePeek } from "./Moments";
@@ -12,30 +11,17 @@ import { createPetalLayer, petalCount } from "./petals";
 import { greetingDay, isQuiet, yearOf } from "./plan";
 import "./easter.css";
 
-// Ostern (Jahreszeiten III S14 #645, E1 #753, E4 #756): von Palmsonntag bis Ostermontag. Der Löwe trägt Hasenohren -
-// im Kopf der Seite und auf der Startseite der große (Antippen lässt sie zucken). Unter der Kopfzeile eine Reihe
+// Ostern (Jahreszeiten III S14 #645, E1 #753, E4 #756): von Palmsonntag bis Ostermontag. Hasenohren trägt der Löwe
+// nicht mehr (Wunsch des Betreibers, #857). Unter der Kopfzeile eine Reihe
 // bemalter Eier im Gras (während der Eiersuche Blumen), über der Fußzeile eine kleine Wiese, hinter dem Inhalt ein
 // helles Frühlingslicht, das langsam wandert. Selten sinkt ein Blütenblatt, bei „voll“ flattert ab und zu ein
 // Zitronenfalter vorbei, und alle paar Minuten streckt ein Feldhase die Ohren hinter einer Karte hervor. Ostersonntag
 // und -montag kommt der Gruß. Karfreitag ist still: die Deko bleibt, aber nichts bewegt sich, kein Gruß.
-// „dezent“ und „Bewegung reduzieren“: alles steht, keine Blätter, keine Falter, kein Hase; die Ohren sind nur ein Bild.
+// „dezent“ und „Bewegung reduzieren“: alles steht, keine Blätter, keine Falter, kein Hase.
 
 export const GREETING_KEY = "easter-greeting";
-export const EARS_COOLDOWN_MS = 4000;
-const EARS_TWITCH_MS = 800;
-const OWN = ".tls-easter-layer";
 
-function Ears({ moving }) {
-  const common = { Art: BunnyEarsArt, moving, label: "Hasenohren – zucken lassen", title: "Hasenohren", cooldownMs: EARS_COOLDOWN_MS, wiggleMs: EARS_TWITCH_MS, wiggleClass: "tls-mascot-hat--twitch", className: `tls-ears${moving ? " tls-ears--alive" : ""}` };
-  return (
-    <>
-      <HeaderMascotHat {...common} testId="easter-ears" />
-      <HeroMascotHat {...common} testId="easter-hero-ears" ignore={OWN} />
-    </>
-  );
-}
-
-/** Ecken und Kanten: Ohren, Eier-Reihe, Wiese und die seltenen Momente - je nach Seitenklasse und Tag. */
+/** Ecken und Kanten: Eier-Reihe, Wiese und die seltenen Momente - je nach Seitenklasse und Tag. */
 export function Corners({ season }) {
   const location = useLocation();
   const quiet = isQuiet(season);
@@ -43,7 +29,6 @@ export function Corners({ season }) {
   const fx = effectClasses(pageClass(location.pathname), season.effective);
   return (
     <>
-      <Ears moving={moving} />
       {fx.corner > 0 ? <EggRow moving={moving} /> : null}
       {fx.scene !== "none" ? <Meadow year={yearOf(season)} small={fx.scene === "small"} moving={moving} /> : null}
       {moving && fx.motion && season.effective === "full" ? <Butterflies /> : null}
@@ -89,7 +74,7 @@ export function Toast({ season }) {
   if (!open) return null;
   return (
     <div className="tls-season-toast tls-easter-toast" role="status" data-testid="easter-toast">
-      <BunnyEarsArt size={18} />
+      <FlowerArt kind="daisy" height={18} />
       <span className="tls-easter-toast__text">{greeting}</span>
       <button type="button" className="tls-easter-toast__close" onClick={() => setOpen(false)} aria-label="Gruß schließen">×</button>
     </div>

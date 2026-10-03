@@ -1,4 +1,4 @@
-import { HEAD_RANGE, headTop, scanHead } from "./head";
+import { HEAD_RANGE, headTop, scanCrown, scanHead } from "./head";
 
 // Wo der Kopf des Löwen sitzt (für Partyhut und Hasenohren): der Scheitel aus dem Bild gelesen - auch für ein eigenes
 // Vereinslogo -, einmal je Bild; ohne lesbares Bild nichts (dann gilt der Ersatz der Aufrufer).
@@ -18,6 +18,17 @@ test("Scheitel: oberste deckende Zeile im Suchbereich, Mitte der deckenden Punkt
   expect(scanHead(data, 100, 50, HEAD_RANGE.wordmark)).toEqual({ x: 0.095, y: 0.2 });
   expect(scanHead(data, 100, 50, [0.5, 1])).toEqual({ x: 0.745, y: 0.04 });
   expect(scanHead(image(40, 40, []), 40, 40, [0, 1])).toBeNull();
+});
+
+test("Kopfmitte (#855): Mitte des Kopfes von hinten bis zur Schnauze, dort die oberste Zeile - nicht die Mähnenspitze", () => {
+  // Mähne hinten hoch (Spalten 4–8 ab Zeile 4), Kopf breit ab Zeile 10 bis Spalte 28 - die Mitte liegt bei Spalte 16.
+  const data = image(100, 50, [[4, 4, 9, 30], [4, 10, 29, 30], [60, 2, 90, 20]]);
+  expect(scanHead(data, 100, 50, HEAD_RANGE.wordmark).x).toBeLessThan(0.1);
+  expect(scanCrown(data, 100, 50, HEAD_RANGE.wordmark)).toEqual({ x: 0.16, y: 0.2 });
+  expect(scanCrown(image(40, 40, []), 40, 40, [0, 1])).toBeNull();
+  // Die Stelle entlang des Kopfes: 0 = linker Rand, 1 = rechter Rand.
+  expect(scanCrown(data, 100, 50, HEAD_RANGE.wordmark, 0).x).toBe(0.04);
+  expect(scanCrown(data, 100, 50, HEAD_RANGE.wordmark, 1).x).toBe(0.28);
 });
 
 test("halb durchsichtige Ränder zählen nicht als Kopf", () => {

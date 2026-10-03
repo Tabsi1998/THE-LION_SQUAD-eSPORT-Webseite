@@ -18,7 +18,7 @@ defineSeasonQa({
   now: NOW,
   season: carnival(),
   pieces: "[data-testid='carnival-streamer'], [data-testid='carnival-hat'], [data-testid='carnival-hero-hat']",
-  layers: ".tls-streamers, .tls-party-hat-page, [data-testid='carnival-toast']",
+  layers: ".tls-streamers, .tls-mascot-hat-page, [data-testid='carnival-toast']",
   exempt: "[data-testid='tls-logo-link'], [data-testid='tls-logo'], [data-season-anchor='lion']",
   offPieces: "[data-testid^='carnival-']",
   countPieces: () => ({
@@ -73,7 +73,7 @@ test.describe("Fasching: Konfetti", () => {
     // Der Hut wirft Konfetti und wippt.
     const hat = page.getByTestId("carnival-hero-hat");
     await hat.click();
-    await expect(hat).toHaveClass(/tls-party-hat--wiggle/);
+    await expect(hat).toHaveClass(/tls-mascot-hat--wiggle/);
     await expect.poll(() => skyAwake(page), { timeout: 3000 }).toBe(true);
     await testInfo.attach("fasching-hut.png", { body: await page.screenshot({ clip: { x: 760, y: 80, width: 680, height: 520 } }), contentType: "image/png" });
   });
