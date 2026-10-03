@@ -94,9 +94,8 @@ test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Da
   expect(screen.getByTestId("home-number-participations")).toHaveTextContent("5");
   expect(screen.getByTestId("home-number-participations")).toHaveTextContent("Turnierteilnahmen");
   expect(screen.queryByTestId("home-number-events")).toBeNull();
-  // Discord (#581): unter den Zahlen, nur Zahlen und der Einladungs-Link.
-  expect(screen.getByTestId("home-discord-summary")).toHaveTextContent("42 online · 5 im Voice");
-  expect(screen.getByTestId("home-numbers").compareDocumentPosition(screen.getByTestId("home-discord")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // Discord (#854): keine eigene Leiste mehr unter den Zahlen - die Zahl steht im Block „Dabei sein“ im Footer.
+  expect(screen.queryByTestId("home-discord")).toBeNull();
   expect(await screen.findByTestId("home-board-p1")).toHaveTextContent("Obfrau Otti");
   expect(screen.getByTestId("home-board-p1")).toHaveAttribute("href", "/members/otti");
   expect(screen.getByTestId("home-calendar-link")).toHaveAttribute("href", "/calendar");

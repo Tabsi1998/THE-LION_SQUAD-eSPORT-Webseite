@@ -33,12 +33,16 @@ def fake(monkeypatch):
     return instance
 
 
-def core_invoice(fake, invoice_id, socid, *, ref, statut=1, total=40.0, paye=0, remaining=None, kind="0", due=None):
+def core_invoice(fake, invoice_id, socid, *, ref, statut=1, total=40.0, paye=0, remaining=None, kind="0", due=None, pdf=True):
+    """Ein Beleg im Kern - freigegebene mit PDF, wie sie aus Dolibarrs Oberfläche oder seit #840 von der Website kommen."""
     row = {"id": invoice_id, "ref": ref, "socid": socid, "statut": statut, "paye": paye, "total_ttc": total,
            "remaintopay": total if remaining is None else remaining, "type": kind, "lines": []}
     if due:
         row["date_lim_reglement"] = due
     fake.core_invoices[invoice_id] = row
+    if pdf and statut >= 1:
+        fake.core_pdfs.add(invoice_id)
+        row["last_main_doc"] = f"facture/{ref}/{ref}.pdf"
     return row
 
 

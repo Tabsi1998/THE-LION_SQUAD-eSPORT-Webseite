@@ -1,7 +1,11 @@
-import { render, screen } from "@testing-library/react";
-import { DiscordPulse, DiscordVoice, discordSummary } from "./DiscordNow";
+import { render, screen, waitFor } from "@testing-library/react";
 
-// Discord auf der Website (#581): nur Zahlen - die Leiste auf der Startseite und „Discord jetzt“ im
+const apiMock = { get: vi.fn() };
+vi.mock("@/lib/api", () => ({ api: apiMock }));
+
+const { DiscordLiveLine, DiscordVoice, discordSummary, resetDiscordNow, useDiscordNow } = await import("./DiscordNow");
+
+// Discord auf der Website (#581, #854): nur Zahlen - die Zeile im Block „Dabei sein“ und „Discord jetzt“ im
 // Mitgliederbereich; ohne Widget nichts.
 
 test("die Summe in Worten", () => {
@@ -10,14 +14,37 @@ test("die Summe in Worten", () => {
   expect(discordSummary({ available: false })).toBe("");
 });
 
-test("Startseite: Leiste mit Zahlen und „Beitreten“ - ohne Widget gar nichts", () => {
-  const { rerender } = render(<DiscordPulse discord={{ available: true, online: 42, in_voice: 5, invite: "https://discord.gg/lions" }} />);
-  expect(screen.getByTestId("home-discord-summary")).toHaveTextContent("42 online · 5 im Voice");
-  expect(screen.getByTestId("home-discord-join")).toHaveAttribute("href", "https://discord.gg/lions");
-  rerender(<DiscordPulse discord={{ available: false }} />);
-  expect(screen.queryByTestId("home-discord")).toBeNull();
-  rerender(<DiscordPulse discord={undefined} />);
-  expect(screen.queryByTestId("home-discord")).toBeNull();
+test("Block „Dabei sein“: die Zeile mit den Zahlen - ohne Widget gar nichts", () => {
+  const { rerender } = render(<DiscordLiveLine discord={{ available: true, online: 42, in_voice: 5 }} />);
+  expect(screen.getByTestId("footer-discord-live")).toHaveTextContent("42 online · 5 im Voice");
+  rerender(<DiscordLiveLine discord={{ available: false }} />);
+  expect(screen.queryByTestId("footer-discord-live")).toBeNull();
+  rerender(<DiscordLiveLine discord={null} />);
+  expect(screen.queryByTestId("footer-discord-live")).toBeNull();
+});
+
+function Probe() {
+  const discord = useDiscordNow();
+  return <span data-testid="probe">{discord?.available ? discordSummary(discord) : "nichts"}</span>;
+}
+
+test("einmal geholt und gemerkt - zwei Seiten fragen nicht zweimal; ein Fehler lässt den Block leer", async () => {
+  resetDiscordNow();
+  apiMock.get.mockReset();
+  apiMock.get.mockResolvedValue({ data: { available: true, online: 33, in_voice: 0 } });
+  const first = render(<Probe />);
+  await waitFor(() => expect(first.getByTestId("probe")).toHaveTextContent("33 online"));
+  first.unmount();
+  const second = render(<Probe />);
+  expect(second.getByTestId("probe")).toHaveTextContent("33 online");
+  expect(apiMock.get).toHaveBeenCalledTimes(1);
+  expect(apiMock.get).toHaveBeenCalledWith("/home/discord");
+  second.unmount();
+  resetDiscordNow();
+  apiMock.get.mockRejectedValueOnce(new Error("offline"));
+  const third = render(<Probe />);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(2));
+  expect(third.getByTestId("probe")).toHaveTextContent("nichts");
 });
 
 test("Mitgliederbereich: je belegtem Sprachkanal Name und Zahl, leer ein ruhiger Satz", () => {

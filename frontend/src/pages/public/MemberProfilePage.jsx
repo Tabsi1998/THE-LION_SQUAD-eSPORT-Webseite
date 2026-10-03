@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Crown, ExternalLink, Gamepad2, Medal, Monitor, Radio, Trophy, User as UserIcon, Users } from "lucide-react";
+import { ArrowLeft, Crown, ExternalLink, Gamepad2, Monitor, Radio, Trophy, User as UserIcon } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { RichContent } from "@/components/tls/RichContent";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AccountLevelPill, AccountLevelProgress, accountLevelFrameClass } from "@/components/tls/AccountLevel";
 import { LevelAvatarFrame } from "@/components/tls/LevelAvatarFrame";
+import { CountLine, MedalStat, ReferenceCard, SectionTitle, entriesOf } from "@/components/tls/references/referenceParts";
 import { api, resolveMediaUrl } from "@/lib/api";
-import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -91,119 +91,41 @@ export default function MemberProfilePage() {
   );
 }
 
-function formatDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { dateStyle: "medium" });
+/** Der eigene Eintrag einer Teilnahme (#409): ein Einzelstarter zeigt seine Platzierung, ein Teammitglied die seines Teams. */
+export function memberEntry(item) {
+  return item.member_entry || entriesOf(item)[0] || item;
 }
 
-function referenceTone(item) {
-  if (item.medal === "gold") return "border-[#FFD700]/45 bg-[#FFD700]/10 text-[#FFD700]";
-  if (item.medal === "silver") return "border-white/30 bg-white/10 text-white";
-  if (item.medal === "bronze") return "border-[#CD7F32]/45 bg-[#CD7F32]/10 text-[#CD7F32]";
-  return "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]";
-}
-
+/**
+ * Vereinsplatzierungen im Mitgliederprofil (#859): dieselben Bausteine wie die Referenzen-Seite - Medaillen mit
+ * Zahlen, darunter Podest, Einzel und Team, dann je Teilnahme die Karte mit der Platzierung dieser Person.
+ */
 function MemberReferences({ profile }) {
   const references = profile.references || [];
   const stats = profile.reference_stats || {};
   if (!references.length) return null;
   return (
-    <section className="mt-10 border-t border-white/10 pt-8">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">
-            <Trophy className="w-3.5 h-3.5" /> Referenzen
-          </div>
-          <h2 className="mt-1 font-heading text-2xl font-black uppercase">Vereinsplatzierungen</h2>
-        </div>
-        <Link to="/references" className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:text-[#29B6E8] hover:border-[#29B6E8]/45 rounded-sm">
+    <section className="mt-10 border-t border-white/10 pt-8" data-testid="member-references">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <SectionTitle icon={Trophy} accent="#FFD700" eyebrow="Referenzen" title="Vereinsplatzierungen" />
+        <Link to={`/references?${new URLSearchParams({ member: profile.id, name: profile.gamertag || profile.display_name || "" })}`} data-testid="member-references-all" className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:text-[#29B6E8] hover:border-[#29B6E8]/45 rounded-sm">
           Alle Referenzen
         </Link>
       </div>
-      <div className="grid xl:grid-cols-[18rem_minmax(0,1fr)] gap-5 items-start">
-        <ReferenceStatsPanel stats={stats} />
-        <div className="grid lg:grid-cols-2 gap-3">
-          {references.map((item) => <MemberReferenceCard key={item.id} item={item} />)}
-        </div>
+      <div className="mt-6 grid grid-cols-3 gap-2 sm:gap-3 max-w-3xl" data-testid="member-reference-numbers">
+        <MedalStat medal="gold" value={stats.gold || 0} testId="member-reference-stat-gold" />
+        <MedalStat medal="silver" value={stats.silver || 0} testId="member-reference-stat-silver" />
+        <MedalStat medal="bronze" value={stats.bronze || 0} testId="member-reference-stat-bronze" />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/60">
+        <CountLine label="Podestplätze" value={stats.podiums || 0} testId="member-reference-stat-podiums" />
+        <CountLine label="als Einzelstarter" value={stats.solo || 0} testId="member-reference-stat-solo" />
+        <CountLine label="im Team" value={stats.team || 0} testId="member-reference-stat-team" />
+      </div>
+      <div className="mt-6 grid lg:grid-cols-2 gap-3">
+        {references.map((item) => <ReferenceCard key={item.id} item={item} entry={memberEntry(item)} testId={`member-reference-${item.id}`} />)}
       </div>
     </section>
-  );
-}
-
-function ReferenceStatsPanel({ stats }) {
-  return (
-    <aside className="border border-white/10 bg-[#101010] rounded-sm p-4 xl:sticky xl:top-24">
-      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Bilanz</div>
-      <div className="mt-3 grid grid-cols-3 xl:grid-cols-1 gap-2">
-        <ReferenceStat label="Gold" value={stats.gold || 0} color="#FFD700" />
-        <ReferenceStat label="Silber" value={stats.silver || 0} color="#D8DDE5" />
-        <ReferenceStat label="Bronze" value={stats.bronze || 0} color="#CD7F32" />
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <ReferenceStat label="Podest" value={stats.podiums || 0} color="#29B6E8" small />
-        <ReferenceStat label="Solo" value={stats.solo || 0} small />
-        <ReferenceStat label="Team" value={stats.team || 0} small />
-      </div>
-    </aside>
-  );
-}
-
-function ReferenceStat({ label, value, color = "#FFFFFF", small = false }) {
-  return (
-    <div className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
-      <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{label}</div>
-      <div className={`font-display ${small ? "text-xl" : "text-2xl"} font-bold tabular-nums`} style={{ color }}>{value}</div>
-    </div>
-  );
-}
-
-function MemberReferenceCard({ item }) {
-  // Der eigene Eintrag der Teilnahme (#409): ein Einzelstarter zeigt seine Platzierung, ein
-  // Teammitglied die seines Teams - nicht die beste Platzierung der ganzen Teilnahme.
-  const entry = item.member_entry || (item.entries || [])[0] || item;
-  const members = entry.lineup_members || [];
-  const otherLineup = (entry.lineup || []).filter(Boolean);
-  return (
-    <Link to={`/references/${item.id}`} className="h-full block border border-white/10 bg-[#121212] rounded-sm hover:border-[#29B6E8]/55 transition" data-testid={`member-reference-${item.id}`}>
-      <div className="p-4 flex gap-4">
-        <div className={`w-14 shrink-0 border rounded-sm flex flex-col items-center justify-center ${referenceTone(entry)}`}>
-          {entry.placement ? (
-            <>
-              <Medal className="w-4 h-4 mb-1" />
-              <span className="font-display text-xl font-black tabular-nums">{entry.placement}.</span>
-            </>
-          ) : (
-            <>
-              <Trophy className="w-4 h-4 mb-1" />
-              <span className="text-[10px] uppercase tracking-widest font-black">Dabei</span>
-            </>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{gameLabel(item.game) || item.game_name || "Extern"}</span>
-            {formatDate(item.start_date) && <span className="text-[10px] uppercase tracking-widest text-white/35">{formatDate(item.start_date)}</span>}
-          </div>
-          <div className="mt-2 font-heading text-base font-black uppercase leading-tight break-words">{item.display_title || item.title}</div>
-          <div className="mt-1 text-xs text-white/55 truncate">{entry.kind === "solo" ? "Einzelstarter" : (entry.team_name || "THE LION SQUAD")}{item.organizer ? ` · ${item.organizer}` : ""}</div>
-          {(members.length > 0 || otherLineup.length > 0) && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {members.slice(0, 5).map((member) => (
-                <span key={member.profile_id || member.display_name} className="inline-flex items-center gap-1.5 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm px-2 py-1 text-xs text-white/75">
-                  {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-4 h-4 rounded-sm object-cover" /> : <Users className="w-3 h-3 text-white/35" />}
-                  {member.display_name}
-                </span>
-              ))}
-              {otherLineup.slice(0, Math.max(5 - members.length, 0)).map((name) => <span key={name} className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/50">{name}</span>)}
-              {members.length + otherLineup.length > 5 && <span className="border border-white/10 bg-black/30 rounded-sm px-2 py-1 text-xs text-white/40">+{members.length + otherLineup.length - 5}</span>}
-            </div>
-          )}
-        </div>
-        <ExternalLink className="w-4 h-4 text-white/25 shrink-0 mt-1" />
-      </div>
-    </Link>
   );
 }
 

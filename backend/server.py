@@ -413,8 +413,9 @@ async def security_headers(request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     # Sticker-Bilder des Startpakets ändern sich nie und stehen in jedem Chat
     # dutzendfach - die dürfen im Browser und in der App zwischengespeichert werden. Die Jahreszeiten-
-    # Abfrage (#632) setzt ihre Cache-Regel selbst: eine Minute öffentlich, Vorschau ohne Cache.
-    if request.url.path.startswith("/api/") and not request.url.path.startswith(("/api/stickers/files/", "/api/seasonal/")):
+    # Abfrage (#632) setzt ihre Cache-Regel selbst: eine Minute öffentlich, Vorschau ohne Cache. „Discord jetzt“ (#854)
+    # steht im Footer jeder Seite und ist für alle gleich (nur Zahlen) - eine Minute öffentlich.
+    if request.url.path.startswith("/api/") and not request.url.path.startswith(("/api/stickers/files/", "/api/seasonal/", "/api/home/discord")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"

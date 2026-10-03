@@ -17,7 +17,7 @@ from auth import require_area
 from database import get_db
 from models import new_id, now_utc
 from services import billing_cases, billing_orders, pricing
-from services.dolibarr_billing import MAX_EXTRA_TEXT, assign_thirdparty, booking_facts, invoice_text_preview, service_view, sync_one, terms_complete
+from services.dolibarr_billing import MAX_EXTRA_TEXT, assign_thirdparty, booking_facts, build_missing_pdfs, invoice_text_preview, missing_pdf_query, service_view, sync_one, terms_complete
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings, write_capable
 
 router = APIRouter(prefix="/api/admin/finance", tags=["finance"])
@@ -92,6 +92,9 @@ async def finance_overview(kind: str | None = Query(None), source: str | None = 
         "summary": summary,
         "dolibarr": {"connected": settings.get("mode") != "off", "mode": settings.get("mode"), "write_capable": write_capable(settings),
                      "terms_complete": terms_complete(settings), "invoice_auto_validate": bool(settings.get("invoice_auto_validate"))},
+        # Rechnungs-PDF (#840): freigegebene Belege ohne bestätigtes PDF, davon gescheiterte (Grund am Auftrag).
+        "pdfs": {"unconfirmed": await db.billing_orders.count_documents(missing_pdf_query()),
+                 "failed": await db.billing_orders.count_documents({"status": "invoiced", "pdf_missing": True})},
         "tax_profiles": pricing.TAX_PROFILES,
         "price_bases": pricing.PRICE_BASE_LABELS,
     }
@@ -155,6 +158,10 @@ def _timeline(order: dict, cases: list[dict], audit: list[dict], people: dict) -
             items.append({"at": entry.get("created_at"), "kind": "audit", "text": f"{action} – {people.get(entry.get('actor_id'), 'System')}"})
     if order.get("sync_error"):
         items.append({"at": order.get("sync_error_at"), "kind": "error", "text": f"Dolibarr nicht lesbar: {order.get('sync_error_text') or order['sync_error']}"})
+    if order.get("pdf_built_at"):
+        items.append({"at": order["pdf_built_at"], "kind": "invoice", "text": "PDF in Dolibarr erzeugt" if order.get("pdf_source") == "website" else "PDF in Dolibarr vorhanden"})
+    if order.get("pdf_missing"):
+        items.append({"at": order.get("pdf_error_at"), "kind": "error", "text": f"PDF fehlt: {order.get('pdf_error_text') or order.get('pdf_error')} Der Abgleich versucht es stündlich wieder."})
     return sorted((item for item in items if item.get("at")), key=lambda item: str(item["at"]))
 
 
@@ -317,6 +324,23 @@ async def run_billing_orders(me: dict = Depends(require_area("finance"))):
     processed = await billing_orders.classify_due()
     synced = await billing_orders.sync_due()
     return {**processed, "synced": synced}
+
+
+@router.post("/pdfs/build-missing")
+async def build_missing_invoice_pdfs(me: dict = Depends(require_area("finance"))):
+    """Fehlende PDFs nachziehen (#840): freigegebene Belege ohne PDF - einmal nach dem Update, danach macht es der Abgleich."""
+    db = get_db()
+    settings = await load_settings(db)
+    if not write_capable(settings):
+        raise HTTPException(409, "PDFs erzeugen geht nur mit Schreibzugriff auf Dolibarr (Modus „Live“ und Schalter „Schreibzugriff“).")
+    try:
+        client = DolibarrClient(settings)
+    except DolibarrError as exc:
+        raise HTTPException(503, f"Dolibarr: {exc.text}")
+    result = await build_missing_pdfs(db, settings, client)
+    await db.audit_logs.insert_one({"id": new_id(), "action": "billing.pdfs.build_missing", "target_id": "billing", "actor_id": me["id"],
+                                    "data": {key: result[key] for key in ("looked", "built", "present", "failed", "skipped")}, "created_at": now_utc().isoformat()})
+    return result
 
 
 @router.post("/reconcile")

@@ -107,6 +107,29 @@ Beleg schließen den Auftrag. Die Aufträge stehen in derselben Finanzübersicht
 enthält, setzt ihr im Abschnitt „Startgeld“ den Haken „Im Eventbeitrag enthalten“ – dann zeigt
 das Turnier kein Startgeld und es entsteht keine zweite Rechnung.
 
+## Das PDF zum Beleg (#840)
+
+**Jeder freigegebene Beleg hat sofort sein PDF.** Dolibarrs Oberfläche erzeugt das PDF beim
+Freigeben selbst – die Schnittstelle, über die die Website arbeitet, tut das nicht. Deshalb lässt
+die Website das PDF gleich nach dem Freigeben erzeugen (`PUT /documents/builddoc`, mit der
+Vorlage des Belegs). Damit liegt es in Dolibarr am Beleg (mailen aus Dolibarr geht sofort), und
+Mitglieder wie Gäste laden es auf der Website unter „Meine Rechnungen“.
+
+- **Sprache:** Admin → Dolibarr → Rechnungskonditionen → „Sprache der Rechnungs-PDFs“, Vorgabe
+  Deutsch (Österreich). Ohne Angabe nähme Dolibarr die Sprache des Website-Benutzers – steht die
+  auf „automatisch“, käme ein englisches PDF heraus.
+- **Entwürfe** bekommen kein PDF; erst der freigegebene Beleg.
+- **Scheitert das Erzeugen** (Recht fehlt, PDF-Vorlage kaputt, Dolibarr kurz weg), bleibt der
+  Beleg gültig und die Anmeldung auch. Der Grund steht am Auftrag (Finanzen → Auftrag öffnen);
+  der Abgleich versucht es stündlich wieder.
+- **Von Hand freigegeben:** Gebt ihr einen Entwurf in Dolibarr frei, übernimmt der Abgleich das
+  PDF aus Dolibarr; entstand dort keins (z. B. mit `MAIN_DISABLE_PDF_AUTOUPDATE`), baut er es.
+- **Belege von vor dem Update:** Finanzen zeigt „N freigegebene Belege ohne bestätigtes PDF“ mit
+  dem Knopf **Fehlende PDFs nachziehen** – einmal drücken, das Ergebnis steht in Worten da
+  („3 PDFs erzeugt, 5 hatten schon eins“). Danach erledigt das der Abgleich.
+- **Gäste:** Fehlt die Datei beim Herunterladen noch, erzeugt die Website sie in diesem Moment
+  einmal – niemand muss auf den Abgleich warten.
+
 ## Nach dem Beleg: Zahlungsstand, Prüffälle, Erstattungen (#321)
 
 **Dolibarr ist führend für den Beleg und das Geld, die Website für die Buchung.** Die Website
@@ -171,6 +194,9 @@ Entwurf; wird er zurückgenommen, geht das automatische Freigeben mit aus.
   nach fünf Fehlversuchen „gescheitert“ – Text lesen, Ursache beheben, „Erneut versuchen“. Der
   Abgleich der Belege meldet den Fehler am Beleg und versucht es beim nächsten Lauf wieder.
 - **Recht fehlt** (403): Text nennt das Recht; beim Website-Benutzer in Dolibarr setzen.
+- **PDF fehlt** am Beleg: Grund am Auftrag lesen (meist das Recht „Rechnungen
+  erstellen/bearbeiten“ oder die PDF-Vorlage für Rechnungen in Dolibarr), beheben, dann
+  „Fehlende PDFs nachziehen“ – oder auf den Abgleich warten.
 - **Antwort verloren** (Beleg angelegt, Website hat es nicht mehr gespeichert): Der nächste Lauf
   findet den Beleg über die Auftragskennung (`ref_ext`) wieder – es entsteht nie ein zweiter.
 - **Falsche Zuordnung**: In Dolibarr richtigstellen; der Abgleich meldet „Empfänger weicht ab“,
@@ -204,7 +230,8 @@ und schreiben. Der Haken „Schreibzugriff einschalten“ ist die Sicherung.
 1. Beim Website-Benutzer (kein Administrator) diese Rechte setzen:
    - Geschäftspartner: einsehen, erstellen/bearbeiten, „Zugriff auf alle Geschäftspartner und
      deren Objekte erweitern“ – sonst darf er für niemanden eine Rechnung anlegen.
-   - Rechnungen: einsehen, erstellen/bearbeiten. **Nicht:** Zahlungen erstellen, löschen.
+   - Rechnungen: einsehen, erstellen/bearbeiten – das braucht Dolibarr auch, um das PDF zu
+     erzeugen. **Nicht:** Zahlungen erstellen, löschen.
    - Produkte und Leistungen: einsehen. Mitglieder: einsehen. Bank: einsehen (für die Kontenliste
      bei den Rechnungskonditionen – sonst Nummer eintippen).
    - Vereine (Österreich): die vier Rechte des Moduls, darunter „Mitglieder und Geschäftspartner

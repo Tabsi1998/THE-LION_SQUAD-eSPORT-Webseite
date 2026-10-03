@@ -16,7 +16,6 @@ import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { TwitchClips } from "@/components/tls/TwitchClips";
-import { DiscordPulse } from "@/components/tls/DiscordNow";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
@@ -106,7 +105,6 @@ export default function HomePage() {
 
       <ClubNumbers numbers={state?.club_numbers} shown={state?.club_numbers_shown} />
       {/* Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget. */}
-      <DiscordPulse discord={state?.discord} />
       <LiveStreamSlider />
       <TwitchClips />
       <SponsorTicker placement="home" spotlight />

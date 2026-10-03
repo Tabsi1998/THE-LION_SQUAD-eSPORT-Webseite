@@ -306,3 +306,20 @@ def test_katalog_e_saison_fundstuecke():
     # Die Deckel machen die oberen Stufen zu einer Sache von Jahren: acht Tage Halloween mit 30 am Tag sind 240.
     assert counters.SIGNAL_RULES["halloween_bats_scared"]["per_day"] * 8 < by_group["bat_whisperer"][3]["progress_target"]
     assert by_group["bat_whisperer"][0]["progress_target"] <= counters.SIGNAL_RULES["halloween_bats_scared"]["per_day"], "die erste Stufe geht an einem Abend"
+
+
+def test_tier_texts_name_the_unit_once_and_use_the_singular_for_one():
+    """#864: „90 Tage im Vorstand.“ statt „90 Tage Tage im Vorstand.“, „1 Jahr dabei.“ statt „1 Jahre dabei.“"""
+    import re
+
+    doubled = [t["description"] for t in ACHIEVEMENT_TIERS if re.search(r"\b(Tage?|Jahre?|%) (Tage?|Jahre?|%)(?=\W|$)", t.get("description") or "")]
+    assert doubled == []
+    plural_one = [t["description"] for t in ACHIEVEMENT_TIERS if re.search(r"(?<!\d)1 (Tage|Jahre)\b", t.get("description") or "")]
+    assert plural_one == []
+    texts = {t["code"]: t["description"] for t in ACHIEVEMENT_TIERS}
+    assert texts["board_service_1"] == "90 Tage im Vorstand."
+    assert texts["anniversary_1"] == "1 Jahr dabei." and texts["anniversary_2"] == "2 Jahre dabei."
+    assert texts["membership_tenure_1"] == "1 Tag Mitglied."
+    # Gegenprobe: der Suchausdruck findet den alten Fehler.
+    assert re.search(r"\b(Tage?|Jahre?|%) (Tage?|Jahre?|%)(?=\W|$)", "90 Tage Tage im Vorstand.")
+    assert re.search(r"(?<!\d)1 (Tage|Jahre)\b", "1 Jahre dabei.") and not re.search(r"(?<!\d)1 (Tage|Jahre)\b", "21 Tage dabei.")

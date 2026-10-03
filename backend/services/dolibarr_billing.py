@@ -11,6 +11,9 @@ Ablauf je Auftrag (``billing_orders``, Status ``pending``/``ready``/``waiting_*`
 2. **Beleg** anlegen (``create_invoice_for``): erst nachsehen, ob es zu diesem Auftrag schon einen Beleg
    gibt (``ref_ext`` = Auftragskennung) - nach einem Abbruch zwischen Anlegen und Speichern entsteht so
    keine zweite Rechnung. Neue Belege sind **Entwürfe**, außer die Einstellung „gleich freigeben“ ist an.
+   Ein freigegebener Beleg bekommt gleich sein **PDF** (#840): Dolibarrs Schnittstelle baut es beim Freigeben nicht
+   (das tut nur die Oberfläche) - die Website ruft `PUT /documents/builddoc`. Scheitert das, bleibt der Beleg gültig;
+   der Grund steht am Auftrag (`pdf_missing`), der Abgleich versucht es wieder.
 3. **Stand zurücklesen** (``sync_invoiced``): Nummer, Status, bezahlt/offen aus Dolibarr in Auftrag und
    Anmeldung. Dolibarr ist führend für den Beleg; die Website für die Buchung.
 
@@ -30,7 +33,7 @@ from datetime import datetime, timedelta, timezone
 
 from models import new_id, now_utc
 from services.billing_orders import SETTLED_STATES
-from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key
+from services.dolibarr_client import DolibarrClient, DolibarrError, instance_key, write_capable
 from services.dolibarr_links import verified_link
 from services.dolibarr_policy import CLUB_TZ
 
@@ -103,6 +106,128 @@ def tax_confirmed(settings: dict) -> bool:
 
 def may_auto_validate(settings: dict) -> bool:
     return bool(settings.get("invoice_auto_validate")) and terms_complete(settings) and tax_confirmed(settings)
+
+
+# ---------------------------------------------------------------- Rechnungs-PDF (#840)
+
+# Sprache des PDFs. Ohne Angabe nimmt Dolibarrs Schnittstelle die Vorgabe des Website-Benutzers - steht die auf
+# „automatisch“, entscheidet die Sprache des Browsers, und den gibt es bei der Website nicht: Das PDF käme englisch.
+PDF_LANGS = {"de_AT": "Deutsch (Österreich)", "de_DE": "Deutsch (Deutschland)", "de_CH": "Deutsch (Schweiz)",
+             "en_US": "Englisch", "": "wie in Dolibarr eingestellt"}
+DEFAULT_PDF_LANG = "de_AT"
+# Nur freigegebene und bezahlte Belege haben ein PDF nach außen - Entwürfe und aufgegebene nicht.
+PDF_STATES = ("validated", "paid")
+# Ein gescheiterter Versuch wird im Abgleich höchstens stündlich wiederholt.
+PDF_RETRY_MINUTES = 60
+
+
+def pdf_lang(settings: dict) -> str:
+    value = settings.get("invoice_pdf_lang")
+    return value if isinstance(value, str) and value in PDF_LANGS else DEFAULT_PDF_LANG
+
+
+def pdf_error_text(exc: DolibarrError) -> str:
+    """Warum das PDF fehlt - als Satz für die Finanzverwaltung."""
+    if exc.kind in ("forbidden", "unauthorized"):
+        return "Dem Website-Benutzer fehlt in Dolibarr das Recht „Rechnungen erstellen/bearbeiten“ – ohne das baut Dolibarr kein PDF."
+    if exc.kind == "not_found":
+        return "Dolibarr findet den Beleg oder die erzeugte Datei nicht."
+    if exc.status == 500:
+        return "Dolibarr konnte das PDF nicht erzeugen – in Dolibarr die PDF-Vorlage für Rechnungen prüfen (Einstellungen → Module → Rechnungen)."
+    return exc.text
+
+
+def has_pdf(invoice: dict) -> bool:
+    """Dolibarr merkt sich am Beleg das zuletzt erzeugte Hauptdokument (`last_main_doc`) - steht dort ein PDF, gibt es eins."""
+    return str(invoice.get("last_main_doc") or "").strip().lower().endswith(".pdf")
+
+
+def missing_pdf_query() -> dict:
+    """Freigegebene Belege, deren PDF die Website noch nicht bestätigt hat."""
+    return {"status": "invoiced", "invoice_status": {"$in": list(PDF_STATES)}, "pdf_built_at": {"$exists": False}}
+
+
+async def pdf_done(db, query: dict, source: str) -> None:
+    """Das PDF ist da - gebaut von der Website („website“) oder schon in Dolibarr vorhanden („dolibarr“)."""
+    await db.billing_orders.update_many(query, {"$set": {"pdf_built_at": now_utc().isoformat(), "pdf_source": source},
+                                                "$unset": {"pdf_missing": "", "pdf_error": "", "pdf_error_text": "", "pdf_error_at": ""}})
+
+
+async def ensure_pdf(db, settings: dict, client: DolibarrClient, order: dict, invoice: dict, *, retry_now: bool = False) -> str:
+    """Das PDF eines freigegebenen Belegs sicherstellen: „built“, „present“, „failed“, „waiting“ oder „skipped“.
+
+    Gibt es schon eins, passiert nichts; sonst baut Dolibarr es. Scheitert das, hält der Auftrag `pdf_missing` mit Grund
+    fest - die Anmeldung bleibt gültig. Der Abgleich versucht es höchstens stündlich wieder; „Fehlende PDFs nachziehen“
+    (`retry_now`) sofort."""
+    state = _invoice_state(invoice)
+    if state["invoice_status"] not in PDF_STATES or not state["invoice_ref"] or not write_capable(settings):
+        return "skipped"
+    if order.get("pdf_built_at"):
+        return "present"
+    if has_pdf(invoice):
+        await pdf_done(db, {"id": order["id"]}, "dolibarr")
+        return "present"
+    last = str(order.get("pdf_error_at") or "")
+    if last and not retry_now and last > (now_utc() - timedelta(minutes=PDF_RETRY_MINUTES)).isoformat():
+        return "waiting"
+    try:
+        await client.build_invoice_pdf(state["invoice_ref"], lang=pdf_lang(settings))
+    except DolibarrError as exc:
+        await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
+            "pdf_missing": True, "pdf_error": exc.kind, "pdf_error_text": pdf_error_text(exc), "pdf_error_at": now_utc().isoformat(),
+        }, "$inc": {"pdf_attempts": 1}})
+        logger.warning("[billing] PDF zu Beleg %s nicht erzeugt: %s (%s)", state["invoice_ref"], exc.kind, exc.status)
+        return "failed"
+    await pdf_done(db, {"id": order["id"]}, "website")
+    return "built"
+
+
+def pdf_summary(counts: dict) -> str:
+    """Das Ergebnis von „Fehlende PDFs nachziehen“ in Worten."""
+    if not counts["looked"]:
+        return "Alle freigegebenen Belege haben ihr PDF."
+    parts = []
+    if counts["built"]:
+        parts.append(f"{counts['built']} {'PDF' if counts['built'] == 1 else 'PDFs'} erzeugt")
+    if counts["present"]:
+        parts.append(f"{counts['present']} {'hatte' if counts['present'] == 1 else 'hatten'} schon eins")
+    if counts["failed"]:
+        parts.append(f"{counts['failed']} fehlgeschlagen")
+    if counts["skipped"]:
+        parts.append(f"{counts['skipped']} in Dolibarr nicht mehr freigegeben")
+    text = ", ".join(parts) + "."
+    if counts["reasons"]:
+        text += " Grund: " + " ".join(counts["reasons"])
+    if counts.get("more"):
+        text += " Es gibt noch weitere – bitte noch einmal drücken."
+    return text
+
+
+async def build_missing_pdfs(db, settings: dict, client: DolibarrClient, limit: int = 200) -> dict:
+    """„Fehlende PDFs nachziehen“: jeden freigegebenen Beleg ohne bestätigtes PDF lesen, ein vorhandenes übernehmen,
+    sonst bauen - einmal nach dem Update für die bestehenden Belege; danach erledigt das der Abgleich."""
+    counts = {"looked": 0, "built": 0, "present": 0, "failed": 0, "skipped": 0, "reasons": []}
+    rows = await db.billing_orders.find(missing_pdf_query(), {"_id": 0, "snapshot": 0}).sort("invoiced_at", 1).to_list(limit)
+    for order in rows:
+        counts["looked"] += 1
+        try:
+            invoice = await client.invoice(int(order["invoice_id"]))
+        except DolibarrError as exc:
+            counts["failed"] += 1
+            reason = f"Beleg {order.get('invoice_ref') or order.get('invoice_id')} in Dolibarr nicht lesbar ({exc.text})."
+            if reason not in counts["reasons"] and len(counts["reasons"]) < 3:
+                counts["reasons"].append(reason)
+            continue
+        result = await ensure_pdf(db, settings, client, order, invoice, retry_now=True)
+        counts[result if result in ("built", "present", "failed") else "skipped"] += 1
+        if result == "failed":
+            fresh = await db.billing_orders.find_one({"id": order["id"]}, {"_id": 0, "pdf_error_text": 1}) or {}
+            reason = fresh.get("pdf_error_text")
+            if reason and reason not in counts["reasons"] and len(counts["reasons"]) < 3:
+                counts["reasons"].append(reason)
+    counts["more"] = len(rows) >= limit
+    counts["summary"] = pdf_summary(counts)
+    return counts
 
 
 # ---------------------------------------------------------------- Texte (#370)
@@ -412,6 +537,7 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     existing = await client.invoices_by_ref_ext(ref_ext_for(order))
     if existing:
         invoice = await client.invoice(int(existing[0]["id"]))
+        await ensure_pdf(db, settings, client, order, invoice)
         return _invoice_state(invoice)
     facts = await booking_facts(db, order)
     if not facts.get("person"):
@@ -425,6 +551,8 @@ async def create_invoice_for(db, settings: dict, client: DolibarrClient, order: 
     if may_auto_validate(settings):
         await client.validate_invoice(invoice_id)
     invoice = await client.invoice(invoice_id)
+    # Das PDF gleich mitbauen (#840) - beim Freigeben über die Schnittstelle entsteht keins.
+    await ensure_pdf(db, settings, client, order, invoice)
     return _invoice_state(invoice)
 
 
@@ -532,6 +660,9 @@ async def sync_one(db, settings: dict, client: DolibarrClient, order: dict, coun
     changed = any(state.get(key) != order.get(key) for key in ("invoice_status", "paid", "invoice_ref", "payment_state", "remaining_cents", "remote_total_cents")) \
         or (payments is not None and payments != (order.get("payments") or [])) or state["credit_notes"] != (order.get("credit_notes") or [])
     await _mark_invoiced(db, order, state, payments=payments)
+    # Fehlende PDFs nachbauen (#840) - auch für Belege, die jemand in Dolibarr von Hand freigegeben hat.
+    if await ensure_pdf(db, settings, client, order, invoice) == "built":
+        counts["pdfs"] = counts.get("pdfs", 0) + 1
     if changed:
         counts["changed"] += 1
         if state["paid"] and not order.get("paid"):

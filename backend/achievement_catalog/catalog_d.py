@@ -33,7 +33,7 @@ def _hidden(code, name, description, how_to, icon, art, key, *, sort_order, targ
 
 CLUB = [
     _d("membership_tenure", "Vereinsmitglied", "club", "Bleib dem Verein treu.", "Tage als aktives Mitglied - die Zeit läuft von selbst.",
-       "crown", "membership-card", "membership_days", [1, 180, 365, 730, 1095, 1825, 3650], "{n} Tage Mitglied.", sort_order=910, unit=" Tage"),
+       "crown", "membership-card", "membership_days", [1, 180, 365, 730, 1095, 1825, 3650], "{n} Mitglied.", sort_order=910, unit=" Tage"),
     _d("member_card", "Mitgliedskarte", "club", "Hol dir deine Mitgliedskarte aufs Handy.", "Karte in die Wallet oder in die LionsAPP legen.",
        "id-card", "member-card", "member_card_added", [1], "Mitgliedskarte hinzugefügt.", sort_order=911),
     _d("club_events", "Vereinsleben", "club", "Sei bei vereinsinternen Events dabei.", "Zu internen Events anmelden und einchecken - jedes zählt einmal.",
@@ -45,7 +45,7 @@ CLUB = [
     _d("documents_read", "Papierkram", "club", "Lies, was der Verein beschließt.", "Dokumente im Mitgliederbereich öffnen - jedes zählt einmal.",
        "file-text", "clipboard", "member_documents_opened", [1, 5, 15], "{n} Vereinsdokumente gelesen.", sort_order=915),
     _d("board_service", "Vorstandsarbeit", "club", "Übernimm Verantwortung im Vorstand.", "Tage in einem Vorstandsamt - die Zeit läuft von selbst, solange du im Amt bist.",
-       "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} Tage im Vorstand.", sort_order=916, unit=" Tage"),
+       "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} im Vorstand.", sort_order=916, unit=" Tage"),
 ]
 
 SPECIAL = [

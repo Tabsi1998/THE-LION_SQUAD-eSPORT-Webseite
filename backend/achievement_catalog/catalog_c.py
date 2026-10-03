@@ -60,7 +60,7 @@ COMMUNITY = [
     _c("sticker_collector", "Sticker-Sammler", "community", "Nutz viele verschiedene Sticker.", "Jeder Sticker, den du in einem Chat schickst, zählt einmal.",
        "smile", "sticker", "stickers_collected", [1, 5, 15, 40, 100], "{n} verschiedene Sticker verschickt.", sort_order=622),
     _c("login_streak", "Treue", "community", "Komm Tag für Tag vorbei.", "Jeder Tag mit Anmeldung zählt zur Serie - die längste Serie bleibt.",
-       "flame", "streak", "login_streak_max", [3, 7, 14, 30, 60, 100, 365], "{n} Tage in Folge angemeldet.", sort_order=623, unit=" Tage"),
+       "flame", "streak", "login_streak_max", [3, 7, 14, 30, 60, 100, 365], "{n} in Folge angemeldet.", sort_order=623, unit=" Tage"),
     _c("app_user", "App-Nutzer", "community", "Nutz die LionsAPP.", "App öffnen, dranbleiben, Push einschalten.",
        "smartphone", "phone", "app_user_stage", [1, 2, 3], "", sort_order=624, materials=["silver", "gold", "diamond"],
        steps=["Die App genutzt.", "30 Tage mit der App.", "30 Tage mit der App und Push eingeschaltet."]),
@@ -121,7 +121,7 @@ PROFILE = [
     _c("hidden_found", "Geheimnisträger", "profile", "Finde die geheimen Erfolge.", "Es gibt Erfolge, die nirgends stehen - wer sie findet, sammelt sie hier.",
        "eye-off", "secret", "hidden_unlocked", [1, 3, 7, 12, 15], "{n} geheime Erfolge gefunden.", sort_order=822),
     _c("anniversary", "Jubiläum", "profile", "Bleib uns über Jahre treu.", "Jedes volle Jahr seit deiner Registrierung zählt.",
-       "cake", "anniversary", "account_years", [1, 2, 3, 4, 5, 7, 10], "{n} Jahre dabei.", sort_order=823, unit=" Jahre"),
+       "cake", "anniversary", "account_years", [1, 2, 3, 4, 5, 7, 10], "{n} dabei.", sort_order=823, unit=" Jahre"),
     _c("birthday_login", "Geburtstagskind", "profile", "Schau an deinem Geburtstag vorbei.", "Geburtsdatum im Profil eintragen und am Geburtstag anmelden.",
        "gift", "birthday", "birthday_logins", [1, 3, 5], "{n} Geburtstage bei uns gefeiert.", sort_order=824, materials=["silver", "gold", "diamond"]),
 ]

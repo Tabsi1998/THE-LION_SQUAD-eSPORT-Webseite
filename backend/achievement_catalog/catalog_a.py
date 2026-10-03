@@ -29,10 +29,15 @@ REPLACED: dict[str, str] = {
 REDEFINED = ("win_streak", "fairplay", "early_bird_match", "night_owl_match", "checkin_streak", "registration_speed")
 
 
+# Einzahl beim Ziel 1: „1 Tag“, „1 Jahr“ statt „1 Tage“, „1 Jahre“ (#864).
+SINGULAR_UNITS = {" Tage": " Tag", " Jahre": " Jahr"}
+
+
 def _group(code: str, name: str, category: str, description: str, how_to: str, icon: str, art: str, key: str | None, targets: list[int],
            step: str, *, sort_order: int, unit: str = "", staff_only: bool = False, catalog: str = "A",
            steps: list[str] | None = None, materials: list[str] | None = None, manual: bool = False) -> tuple[dict, list[dict]]:
-    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel; ``steps`` ersetzt ihn durch einen
+    """Eine Gruppe samt Stufen. ``step`` ist der Satz je Stufe mit ``{n}`` für das Ziel **samt** ``unit`` („{n} im Vorstand.“
+    wird „90 Tage im Vorstand.“ - die Einheit gehört nicht noch einmal in den Satz, #864); ``steps`` ersetzt ihn durch einen
     eigenen Satz je Stufe, ``materials`` die Leiter (z. B. eine einzelne Silber-Stufe). ``manual`` heißt: nur von Hand
     vergeben, kein Bedingungsschlüssel. Katalog B–D nutzen denselben Helfer."""
     materials = list(materials or LADDERS[len(targets)])
@@ -44,7 +49,8 @@ def _group(code: str, name: str, category: str, description: str, how_to: str, i
     }
     tiers = []
     for index, (material, target) in enumerate(zip(materials, targets)):
-        text = steps[index] if steps else step.format(n=f"{target}{unit}")
+        shown = SINGULAR_UNITS.get(unit, unit) if target == 1 else unit
+        text = steps[index] if steps else step.format(n=f"{target}{shown}")
         tiers.append(tier(f"{code}_{index + 1}", code, material, f"{name} {ROMAN[index]}", text, condition_key=None if manual else key,
                           progress_target=target, icon=icon, art=art, how_to=how_to, manual_only=manual))
     return group, tiers
