@@ -34,11 +34,12 @@ const base = {
   public_phase: { state: "registration_open", label: "Anmeldung" },
 };
 
-function mockApi(tournament, registrations = []) {
+function mockApi(tournament, registrations = [], discord = { available: false }) {
   apiMock.get.mockImplementation((path) => {
     if (path === "/tournaments/cup") return Promise.resolve({ data: tournament });
     if (path === "/tournaments/t1/registrations") return Promise.resolve({ data: registrations });
     if (path === "/teams/my") return Promise.resolve({ data: [] });
+    if (path === "/games/g1/discord") return Promise.resolve({ data: discord });
     return Promise.resolve({ data: [] });
   });
 }
@@ -54,6 +55,18 @@ function renderPage() {
 beforeEach(() => {
   authUser = { id: "u1", username: "paula", display_name: "Paula" };
   apiMock.post.mockResolvedValue({ data: { id: "r1", status: "approved" } });
+});
+
+test("Discord-Server zum Spiel (#626): Kachel mit Status; ohne Server keine Kachel", async () => {
+  mockApi(base, [], { available: true, guild_id: "2", name: "Rocket League DE", member_count: 40, invite_url: "https://discord.gg/rocket", main: false, for_game: true, linked: true, member: true });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("game-discord-tile")).toHaveTextContent("Discord-Server für Rocket League");
+  expect(screen.getByTestId("game-discord-tile-joined")).toHaveTextContent("Du bist dabei");
+  unmount();
+  mockApi(base);
+  renderPage();
+  expect(await screen.findByTestId("tournament-title")).toBeInTheDocument();
+  expect(screen.queryByTestId("game-discord-tile")).toBeNull();
 });
 
 test("ohne Startgeld meldet der Knopf sofort an - wie bisher", async () => {

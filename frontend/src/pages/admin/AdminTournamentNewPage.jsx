@@ -85,6 +85,7 @@ export default function AdminTournamentNewPage() {
     start_date: "", end_date: "",
     status: "draft",
     site_banner_enabled: false,
+    discord_skip: false,
     auto_start_enabled: false,
     event_mode: "online", result_entry_mode: "", schedule_mode: "",
     best_of: 1, bronze_match: false, seeding_mode: "random", randomize_advancement_rounds: false,
@@ -243,6 +244,7 @@ export default function AdminTournamentNewPage() {
           <FormGrid>
             <CheckField label="Öffentliche Anmeldung grundsätzlich erlauben" checked={form.registration_enabled} onChange={(v) => set("registration_enabled", v)} testId="new-tr-reg-enabled" />
             <CheckField label="Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="new-tr-site-banner" accent="#FFD700" />
+            <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={form.discord_skip} onChange={(v) => set("discord_skip", v)} testId="new-tr-discord-skip" accent="#5865F2" />
             <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten. Für Vor-Ort-Turniere ausgeschaltet lassen." checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />
           </FormGrid>
         </FormSection>

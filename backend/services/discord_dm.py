@@ -25,6 +25,14 @@ EXCLUDED_KINDS = {"moderation"}
 PRIVATE_BODY_CATEGORIES = {"community_messages"}
 PRIVATE_BODY_TEXT = "Öffne die Website oder die App, um sie zu lesen."
 COLORS = {"achievement": 0xFFD700, "prize_pending": 0xFFD700, "f1_prize": 0xFFD700, "f1_prize_reminder": 0xFFD700}
+# Der Knopf unter der Direktnachricht (#573) - je Thema ein Wort, sonst „Öffnen“.
+BUTTON_LABELS = {"achievement": "Profil", "match_reminder": "Zum Match", "tournament_checkin": "Zum Check-in", "prize_pending": "Zum Gewinn",
+                 "f1_prize": "Zum Gewinn", "f1_prize_reminder": "Zum Gewinn", "membership_update": "Mitgliederbereich",
+                 "direct_message": "Nachricht öffnen", "news_member": "Weiterlesen"}
+
+
+def dm_buttons(kind: str, url: str | None) -> list[dict]:
+    return [{"label": BUTTON_LABELS.get(kind, "Öffnen"), "url": url}] if url else []
 
 
 def achievement_content(notification: dict, name: str = "") -> dict:
@@ -75,7 +83,7 @@ async def dm_state(db, user: dict) -> dict:
 
 async def send_discord_dm_for_notification(notification: dict, category: str | None = None) -> int:
     """Eine Benachrichtigung als Direktnachricht: 1, wenn zugestellt, sonst 0 - mit Log und Merker."""
-    from discord_service import REASON_TEXTS, build_embed
+    from discord_service import REASON_TEXTS, build_embed, resolve_buttons
     from services.discord_bot import bot, bot_settings
 
     user_id = notification.get("user_id")
@@ -97,8 +105,9 @@ async def send_discord_dm_for_notification(notification: dict, category: str | N
         await db.email_logs.insert_one(log)
         return 0
     embed = await build_embed(content["title"], content["description"], color=content["color"], url=content["url"] or None)
+    buttons = await resolve_buttons(dm_buttons(kind, content["url"]))
     try:
-        result = await bot.send_dm(discord_id, embed)
+        result = await bot.send_dm(discord_id, embed, buttons=buttons)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf die Benachrichtigung nicht aufhalten
         logger.warning("[discord-dm] %s", type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}

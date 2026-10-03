@@ -17,6 +17,9 @@ const DATA = {
   entries: [
     { key: "news.published", label: "News veröffentlicht", group: "public", target: "news", source: "latest", source_text: "aus der letzten News", enabled: false, dm: false,
       embed: { title: "📰 Sommerfest", description: "Grillen am Vereinsplatz.", color: 0x29b6e8, url: "https://lionsquad.at/news/sommerfest" } },
+    { key: "tournament.live", label: "Turnier: jetzt live", group: "public", target: "events", source: "example", source_text: "Beispiel", enabled: true, dm: false,
+      place: "im Turnier-Thread", embed: { title: "🏆 Sommer-Cup · Jetzt live", description: "Das Turnier läuft.", color: 0x29b6e8 },
+      buttons: [{ label: "Bracket ansehen", url: "https://lionsquad.at/tournaments/sommer-cup/bracket" }] },
     { key: "membership.application", label: "Neuer Mitgliedsantrag", group: "board", target: "board", source: "example", source_text: "Beispiel", enabled: true, dm: false,
       embed: { title: "📝 Neuer Mitgliedsantrag", description: "Ein neuer Antrag wartet.", color: 0xffd700 } },
     { key: "notify.achievement", label: "Erfolg-Gratulation", group: "dm", target: "dm", source: "example", source_text: "Beispiel", dm: true,
@@ -48,6 +51,12 @@ test("Gruppen, Nachbildung, Herkunft und „Ereignis aus“; ohne Testkanal und 
   expect(screen.queryByTestId("discord-sample-membership.application-off")).toBeNull();
   expect(screen.getByTestId("discord-samples-test-channel")).toHaveTextContent("Kein Testkanal gewählt");
   expect(screen.getByTestId("discord-samples-dm-hint")).toHaveTextContent("Profil → Socials");
+  // Turnier-Threads (#572): wohin eine Turnier-Meldung geht, steht dabei.
+  expect(screen.getByTestId("discord-sample-tournament.live-place")).toHaveTextContent("im Turnier-Thread");
+  expect(screen.queryByTestId("discord-sample-news.published-place")).toBeNull();
+  // Link-Knöpfe (#573): unter der Nachbildung, wie im Discord.
+  expect(screen.getByTestId("discord-sample-tournament.live-message-buttons")).toHaveTextContent("Bracket ansehen");
+  expect(screen.queryByTestId("discord-sample-news.published-message-buttons")).toBeNull();
 });
 
 test("Testkanal und Direktnachricht rufen den Server; die Antwort steht als Toast", async () => {
@@ -70,4 +79,19 @@ test("ohne Antwort vom Server steht der Fehler, nicht eine leere Seite", async (
   apiMock.get.mockRejectedValue({ response: { data: { detail: "Nicht erlaubt" } } });
   render(<DiscordSamplesPanel />);
   expect(await screen.findByTestId("discord-samples-error")).toHaveTextContent("Nicht erlaubt");
+});
+
+// Mehrere Server (#625): die Vorschau je Server - auf einem Unterserver gibt es nichts Privates.
+test("Server-Auswahl lädt die Vorschau je Server; Privates steht als „nur am Hauptserver“", async () => {
+  const user = userEvent.setup();
+  const guilds = [{ guild_id: "1", name: "THE LION SQUAD", role: "main" }, { guild_id: "2", name: "Rocket League", role: "sub" }];
+  apiMock.get.mockImplementation(async (url) => ({ data: url.includes("guild=2")
+    ? { ...DATA, guilds, guild: "2", entries: [{ ...DATA.entries[2], only_main: true }] }
+    : { ...DATA, guilds } }));
+  render(<DiscordSamplesPanel />);
+  const select = await screen.findByTestId("discord-samples-guild");
+  expect(select).toHaveTextContent("THE LION SQUAD (Hauptserver)");
+  await user.selectOptions(select, "2");
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/settings/discord/samples?guild=2"));
+  expect(await screen.findByTestId("discord-sample-membership.application-only-main")).toHaveTextContent("nur am Hauptserver");
 });

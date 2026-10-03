@@ -29,7 +29,7 @@ async def flow():
 def posted(monkeypatch):
     calls = []
 
-    async def fake_send_embed(channel_id, embed):
+    async def fake_send_embed(channel_id, embed, buttons=None):
         calls.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{len(calls)}", "channel_id": channel_id}
 

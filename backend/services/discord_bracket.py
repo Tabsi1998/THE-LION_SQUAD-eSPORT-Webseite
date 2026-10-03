@@ -7,6 +7,11 @@ Nachricht einmal, pinnt sie und **bearbeitet** sie bei jedem bestätigten Ergebn
 Bearbeitung pro Minute wie die anderen Einbettungen (#569); nach dem Turnierende ein letztes Mal als
 „Endstand“ mit Podium. Große Brackets: nur die aktuelle und die nächste Runde vollständig, frühere und
 spätere Runden zusammengefasst (Discord: höchstens 25 Felder, 1024 Zeichen je Feld, 6000 gesamt).
+
+Seit #572 steht die Nachricht im Thread des Turniers, sobald es einen gibt. Dort ist der Endstand die letzte
+Nachricht: Steht beim Ende schon etwas darunter (etwa „Beendet“), postet der Bot ihn neu ans Ende und löscht
+die alte Fassung - kommt danach noch eine Meldung („Ergebnisse veröffentlicht“), wandert er wieder nach unten.
+Eine Nachricht, die schon vor dem Thread im Kanal stand, bleibt dort und wird weiter bearbeitet.
 """
 from __future__ import annotations
 
@@ -234,8 +239,9 @@ async def build(db, tournament: dict, now: datetime | None = None, *, final: boo
 
 async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | None = None, now: datetime | None = None) -> dict:
     """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“."""
-    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_target
+    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons, resolve_target
     from services.discord_bot import bot
+    from services.discord_threads import FIELD as THREAD_FIELD, thread_of
 
     current = now or now_utc()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
@@ -245,6 +251,9 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     state = tournament.get(FIELD) or {}
     if final is None:
         final = str(tournament.get("status") or "") in FINAL_STATUSES
+    if tournament.get("discord_skip"):
+        _dirty.pop(tournament_id, None)
+        return {"ok": False, "reason": "author_opt_out"}
     if tournament.get("is_public") is False or (tournament.get("visibility") or "public") != "public":
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "private_visibility"}
@@ -257,7 +266,9 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     if not cfg["bot"]["enabled"]:
         return {"ok": False, "reason": "bot_off", "error": REASON_TEXTS["bot_off"]}
     resolved = resolve_target(cfg, "events")
-    channel_id = str(state.get("channel_id") or resolved["channel_id"] or "")
+    thread_id = thread_of(tournament, resolved["channel_id"])
+    channel_id = str(state.get("channel_id") or thread_id or resolved["channel_id"] or "")
+    in_thread = bool(thread_id) and channel_id == thread_id
     if not channel_id:
         return {"ok": False, "reason": "channel_missing", "error": REASON_TEXTS["channel_missing"]}
     last = _dt(state.get("updated_at"))
@@ -271,20 +282,27 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
         _dirty.pop(tournament_id, None)
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
     embed = await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"], footer=raw["footer"])
+    buttons = await resolve_buttons([{"label": "Bracket ansehen", "url": raw["url"]}])  # #573
     message_id = str(state.get("message_id") or "")
+    # Endstand als letzte Nachricht im Thread (#572): steht etwas darunter, kommt er neu ans Ende.
+    replaced = ""
+    if final and in_thread and message_id and str((tournament.get(THREAD_FIELD) or {}).get("last_message_id") or "") != message_id:
+        replaced, message_id = message_id, ""
     action = "edited"
     result: dict = {"ok": False, "reason": "error"}
     try:
         if message_id:
-            result = await bot.edit_embed(channel_id, message_id, embed)
+            result = await bot.edit_embed(channel_id, message_id, embed, buttons=buttons)
             if not result.get("ok") and result.get("reason") == "unknown_message":
                 message_id = ""
         if not message_id:
             action = "posted"
-            result = await bot.send_embed(channel_id, embed)
+            result = await bot.send_embed(channel_id, embed, buttons=buttons)
             if result.get("ok"):
                 pinned = await bot.pin_message(channel_id, str(result.get("message_id")))
                 result["pinned"] = bool(pinned.get("ok"))
+                if replaced:
+                    await bot.delete_message(channel_id, replaced)
     except Exception as exc:  # noqa: BLE001
         logger.warning("[discord-bracket] %s: %s", tournament_id, type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
@@ -294,11 +312,20 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
                  "error": None, "final": bool(final), "last_action": action}
         if action == "posted":
             patch["posted_at"] = stamp
-        await db.tournaments.update_one({"id": tournament_id}, {"$set": {FIELD: {**state, **patch}}})
+        updates = {FIELD: {**state, **patch}}
+        if in_thread and action == "posted":
+            updates[f"{THREAD_FIELD}.last_message_id"] = patch["message_id"]
+            updates[f"{THREAD_FIELD}.last_message_at"] = stamp
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": updates})
         _dirty.pop(tournament_id, None)
-        return {"ok": True, "reason": action, "message_id": patch["message_id"], "final": bool(final), "pinned": result.get("pinned")}
+        return {"ok": True, "reason": action, "message_id": patch["message_id"], "final": bool(final), "pinned": result.get("pinned"),
+                "moved": bool(replaced)}
     error = result.get("error") or REASON_TEXTS.get(result.get("reason") or "", "") or str(result.get("reason") or "error")
-    await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{FIELD}.error": error}})
+    if result.get("reason") == "unknown_channel" and state.get("channel_id"):
+        # Kanal oder Thread gelöscht: beim nächsten Mal neu - im heutigen Thread oder Kanal.
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": {FIELD: {"error": error}}})
+    else:
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{FIELD}.error": error}})
     return {"ok": False, "reason": result.get("reason") or "error", "error": error}
 
 
@@ -319,6 +346,6 @@ async def sweep(db, *, full: bool = False) -> dict:
             outcome[result["reason"]] += 1
         elif result.get("reason") == "throttled":
             outcome["throttled"] += 1
-        elif not result.get("ok") and result.get("reason") not in ("unchanged", "final", "private_visibility", "unknown_tournament"):
+        elif not result.get("ok") and result.get("reason") not in ("unchanged", "final", "private_visibility", "author_opt_out", "unknown_tournament"):
             outcome["errors"] += 1
     return outcome

@@ -21,6 +21,7 @@ from models import new_id, now_utc
 
 GROUPS = (
     {"key": "public", "label": "Öffentliche Kanäle"},
+    {"key": "members", "label": "Mitglieder (privat)"},
     {"key": "board", "label": "Vorstand (privat)"},
     {"key": "ops", "label": "Betrieb (privat)"},
     {"key": "dm", "label": "Direktnachrichten"},
@@ -28,6 +29,9 @@ GROUPS = (
 TEST_FOOTER = "Test · nicht an die Community"
 SAMPLE_NAME = "Paula"
 SOURCE_EXAMPLE = "Beispiel"
+# Turnier-Threads (#572): die erste Meldung steht im Kanal und öffnet den Thread, alles Weitere steht darin.
+PLACE_OPENS_THREAD = "im Kanal · öffnet den Turnier-Thread"
+PLACE_IN_THREAD = "im Turnier-Thread"
 
 
 def _example_news() -> dict:
@@ -82,27 +86,33 @@ async def _latest_public(collection, query: dict, sort: list) -> dict | None:
     return None
 
 
-async def sample_catalog(db=None) -> list[dict]:
-    """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist."""
-    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_target
+async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
+    """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist. Mit ``guild_id``
+    (#625): wohin sie auf diesem Server ginge - auf einem Unterserver nur öffentliche Ziele."""
+    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
     from services.discord_announcements import (EVENT_PUBLIC_STATUSES, TOURNAMENT_STATUS, board_message, event_message, fast_lap_message,
                                                 news_message, stream_live_message, tournament_message)
-    from services.discord_dm import dm_content
+    from services.discord_dm import dm_buttons, dm_content
     from services.notification_preferences import NOTIFICATION_KIND_CATEGORY
     from services.ops_alerts import RED, check_red_message, error_group_message
 
     db = db if db is not None else get_db()
     cfg = await _get_discord_config()
+    guild = await db.discord_guilds.find_one({"guild_id": str(guild_id)}, {"_id": 0}) if guild_id else None
     entries: list[dict] = []
 
-    async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example"):
+    async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example", place: str | None = None):
         embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                                   fields=message.get("fields"), image_url=message.get("image_url"))
         entry = {"key": key, "label": label, "group": group, "target": target, "source": source, "source_text": source_text,
-                 "embed": embed, "dm": target == "dm", "message": message}
+                 "embed": embed, "buttons": await resolve_buttons(message.get("buttons")), "dm": target == "dm", "message": message}
+        if place:
+            entry["place"] = place
         if target != "dm":
-            resolved = resolve_target(cfg, target)
+            resolved = resolve_target(cfg, target, guild)
             entry["delivers_to"] = resolved["target"] if resolved["channel_id"] else None
+            if resolved.get("error") == "private_on_sub":
+                entry["only_main"] = True
             event_key = message.get("event_key")
             entry["enabled"] = event_enabled(cfg, event_key) if event_key in EVENTS else True
         entries.append(entry)
@@ -119,8 +129,10 @@ async def sample_catalog(db=None) -> list[dict]:
     game_name = (game or {}).get("name") or (None if tournament else "Rocket League")
     for status in TOURNAMENT_STATUS:
         key = f"tournament.{status}"
-        await add(key, EVENTS[key]["label"], "public", tournament_message(tournament or _example_tournament(), status, game_name=game_name), target="events",
-                  source="latest" if tournament else "example", source_text=f"aus dem Turnier „{tournament.get('title')}“" if tournament else SOURCE_EXAMPLE)
+        opens = status == "registration_open"
+        await add(key, EVENTS[key]["label"], "public", tournament_message(tournament or _example_tournament(), status, game_name=game_name, in_thread=not opens),
+                  target="events", source="latest" if tournament else "example", place=PLACE_OPENS_THREAD if opens else PLACE_IN_THREAD,
+                  source_text=f"aus dem Turnier „{tournament.get('title')}“" if tournament else SOURCE_EXAMPLE)
     challenge = await db.f1_challenges.find_one({}, {"_id": 0}, sort=[("created_at", -1)])
     await add("f1.new_leader", EVENTS["f1.new_leader"]["label"], "public",
               fast_lap_message(challenge or _example_challenge(), driver=SAMPLE_NAME, track="Spa-Francorchamps", time_text="1:42.318", previous_text="1:42.905"),
@@ -131,7 +143,7 @@ async def sample_catalog(db=None) -> list[dict]:
     await add("tournament.stream_live", EVENTS["tournament.stream_live"]["label"], "public",
               stream_live_message(tournament or _example_tournament(), {"display_name": SAMPLE_NAME, "title": "Finale – wir holen den Cup!", "game_name": game_name or "Rocket League",
                                                                          "viewer_count": 12, "stream_url": "https://www.twitch.tv/paula", "thumbnail_url": None}),
-              target="events", source_text=SOURCE_EXAMPLE)
+              target="events", source_text=SOURCE_EXAMPLE, place=PLACE_IN_THREAD)
 
     # Vereinsgeburtstag (#644): der Gruß aus den Saison-Texten, die Jahre beim nächsten Gründungstag (sonst ein Beispiel).
     from services import club_birthday, founding, seasons
@@ -150,7 +162,21 @@ async def sample_catalog(db=None) -> list[dict]:
               target="community", source="latest" if founded_on else "example",
               source_text=f"mit dem Gründungsdatum {born.strftime('%d.%m.%Y')}" if founded_on else SOURCE_EXAMPLE)
 
-    # Vorstand: nie Namen oder Texte - die stehen im Admin.
+    # Nur für Mitglieder (#605): in den Mitgliederkanal - die letzte Mitglieder-News, das nächste Mitglieder-Event.
+    members_post = await db.news_posts.find_one({"published": True, "visibility": "members"}, {"_id": 0}, sort=[("published_at", -1)])
+    await add("news.members", EVENTS["news.members"]["label"], "members", news_message(members_post or {**_example_news(), "visibility": "members"}),
+              target="members", source="latest" if members_post else "example",
+              source_text=f"aus der Mitglieder-News „{members_post.get('title')}“" if members_post else SOURCE_EXAMPLE)
+    members_event = await db.events.find_one({"visibility": "members", "start_date": {"$gte": now_utc().isoformat()}}, {"_id": 0}, sort=[("start_date", 1)])
+    await add("event.members", EVENTS["event.members"]["label"], "members", event_message(members_event or {**_example_event(), "visibility": "members"}),
+              target="members", source="latest" if members_event else "example",
+              source_text=f"aus dem Mitglieder-Event „{members_event.get('name') or members_event.get('title')}“" if members_event else SOURCE_EXAMPLE)
+
+    # Vorstand: nie Namen oder Texte - die stehen im Admin. Interne News und Events nur mit Titel, Zeit, Ort (#605).
+    await add("news.internal", EVENTS["news.internal"]["label"], "board", news_message({**_example_news(), "title": "Vorstandssitzung: Protokoll online", "visibility": "internal"}),
+              target="board", source_text=SOURCE_EXAMPLE)
+    await add("event.internal", EVENTS["event.internal"]["label"], "board", event_message({**_example_event(), "name": "Vorstandssitzung", "visibility": "internal"}),
+              target="board", source_text=SOURCE_EXAMPLE)
     await add("membership.application", EVENTS["membership.application"]["label"], "board",
               board_message("membership.application", "Ein neuer Antrag wartet auf die Entscheidung des Vorstands."), target="board", source_text=SOURCE_EXAMPLE)
     await add("contact.request", EVENTS["contact.request"]["label"], "board", board_message("contact.request", "Thema: Turniere"), target="board", source_text=SOURCE_EXAMPLE)
@@ -166,7 +192,8 @@ async def sample_catalog(db=None) -> list[dict]:
     # Direktnachrichten: dieselbe Funktion wie beim Versand - fremde Nachrichtentexte bleiben draußen.
     for key, label, notification in DM_SAMPLES:
         content = dm_content(notification, NOTIFICATION_KIND_CATEGORY.get(notification["kind"]), name=SAMPLE_NAME)
-        await add(key, label, "dm", {**content, "event_key": key, "fields": [], "image_url": None}, target="dm", source_text=SOURCE_EXAMPLE)
+        await add(key, label, "dm", {**content, "event_key": key, "fields": [], "image_url": None, "buttons": dm_buttons(notification["kind"], content["url"])},
+                  target="dm", source_text=SOURCE_EXAMPLE)
     return entries
 
 
@@ -188,7 +215,8 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
     message = entry["message"]
     if via == "test":
         result = await send_to("test", message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
-                               fields=message.get("fields"), image_url=message.get("image_url"), event_key=f"test.{key}", footer=TEST_FOOTER, test=True)
+                               fields=message.get("fields"), image_url=message.get("image_url"), event_key=f"test.{key}", footer=TEST_FOOTER, test=True,
+                               buttons=message.get("buttons"))
         if result.get("ok"):
             from discord_service import target_status
             result["channel_name"] = (await target_status(db)).get("test", {}).get("channel_name")
@@ -212,7 +240,7 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
     embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                               fields=message.get("fields"), image_url=message.get("image_url"), footer=TEST_FOOTER)
     try:
-        result = await bot.send_dm(discord_id, embed)
+        result = await bot.send_dm(discord_id, embed, buttons=entry.get("buttons") or [])
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
     if result.get("ok"):

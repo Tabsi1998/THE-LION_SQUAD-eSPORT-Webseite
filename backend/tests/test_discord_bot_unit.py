@@ -1,5 +1,6 @@
 """Discord-Bot (#302), reine Logik ohne Netz: Rollen je Person, Abgleich nur der drei verwalteten
 Rollen, Zählen nur für verknüpfte Konten, Antworttexte der Befehle."""
+import asyncio
 import pathlib
 import sys
 
@@ -90,12 +91,16 @@ def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
             self.id, self.name, self.category, self.position = cid, name, category, position
 
     class Permissions:
-        def __init__(self, view=True, send=True, embed=True):
+        def __init__(self, view=True, send=True, embed=True, threads=True, in_threads=True):
             self.view_channel, self.send_messages, self.embed_links = view, send, embed
+            self.create_public_threads, self.send_messages_in_threads = threads, in_threads
 
     row = discord_bot.channel_row(Channel(1, "news", Category("Community"), 2), Permissions(embed=False))
-    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False}
+    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False, "can_thread": True}
     assert discord_bot.channel_row(Channel(2, "regeln"), Permissions(send=False))["can_send"] is False
+    # Turnier-Threads (#572): öffnen und darin schreiben - beides nötig.
+    assert discord_bot.channel_row(Channel(3, "turniere"), Permissions(threads=False))["can_thread"] is False
+    assert discord_bot.channel_row(Channel(3, "turniere"), Permissions(in_threads=False))["can_thread"] is False
     rows = discord_bot.sorted_channels([
         {"id": "9", "name": "regeln", "category": "Info", "position": 0, "can_send": False},
         {"id": "2", "name": "news", "category": "Community", "position": 1, "can_send": True},
@@ -103,3 +108,18 @@ def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
     ])
     assert [row["name"] for row in rows] == ["allgemein", "news", "regeln"]
     assert "Kanal-ID" in discord_bot.CHANNEL_TEXTS["offline"]
+
+
+def test_link_buttons_are_cleaned_and_become_link_components():
+    """Link-Knöpfe (#573): nur http(s), jede Adresse einmal, höchstens fünf - als Discord-Link-Knöpfe ohne Rückruf."""
+    rows = discord_bot.clean_buttons([{"label": "Bracket", "url": "https://x/b"}, {"label": "doppelt", "url": "https://x/b"}, {"label": "", "url": "https://x/c"},
+                                      {"label": "relativ", "url": "/x"}, None, *({"label": f"K{i}", "url": f"https://x/{i}"} for i in range(9))])
+    assert [row["label"] for row in rows] == ["Bracket", "K0", "K1", "K2", "K3"]
+    assert discord_bot.link_view([]) is None and discord_bot.link_view(None) is None
+
+    async def build():
+        return discord_bot.link_view([{"label": "Bracket ansehen", "url": "https://lionsquad.at/tournaments/cup/bracket"}])
+
+    view = asyncio.run(build())
+    [button] = view.children
+    assert button.url == "https://lionsquad.at/tournaments/cup/bracket" and button.label == "Bracket ansehen" and button.style.name == "link"

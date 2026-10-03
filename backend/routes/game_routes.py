@@ -1,7 +1,7 @@
 """Game/Discipline routes."""
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
-from auth import require_admin
+from auth import get_optional_user, require_admin
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from models import GameCreate, GameUpdate, now_utc, new_id
 
@@ -68,11 +68,36 @@ def _enrich_games(games: list[dict]) -> list[dict]:
     return games
 
 
+async def _check_discord_guild(db, doc: dict, current: dict | None = None) -> None:
+    """Discord-Server eines Spiels (#626): leer heißt erben; sonst ein Server aus dem Verzeichnis, den der Bot nicht
+    verlassen hat. Geprüft wird nur eine Änderung - ein inzwischen verlassener Server blockiert kein anderes Speichern."""
+    if "discord_guild_id" not in doc:
+        return
+    guild_id = str(doc.get("discord_guild_id") or "").strip()
+    doc["discord_guild_id"] = guild_id or None
+    if guild_id and guild_id != str((current or {}).get("discord_guild_id") or ""):
+        row = await db.discord_guilds.find_one({"guild_id": guild_id}, {"_id": 0, "left_at": 1})
+        if not row:
+            raise HTTPException(status_code=404, detail="Diesen Discord-Server kennt die Website nicht (Verbindungen → Discord → Server).")
+        if row.get("left_at"):
+            raise HTTPException(status_code=400, detail="Der Bot ist nicht mehr auf diesem Discord-Server.")
+
+
 @router.get("")
 async def list_games():
     db = get_db()
     games = await db.games.find({}, {"_id": 0}).sort("name", 1).to_list(200)
     return sorted(_enrich_games(games), key=lambda game: (game.get("display_name") or game.get("name") or "").lower())
+
+
+@router.get("/discord-servers")
+async def game_discord_choices(me: dict = Depends(require_admin())):
+    """Die Server zur Auswahl im Spielformular (#626) - für die Turnierleitung, ohne Zugriff auf die Einstellungen."""
+    from services import discord_guilds
+
+    rows = await discord_guilds.list_guilds(get_db())
+    return [{"guild_id": row["guild_id"], "name": row.get("name"), "role": row.get("role"), "enabled": bool(row.get("enabled")),
+             "left": bool(row.get("left_at"))} for row in rows]
 
 
 @router.get("/{slug_or_id}")
@@ -86,6 +111,28 @@ async def get_game(slug_or_id: str):
     return next((row for row in enriched if row.get("id") == game.get("id")), game)
 
 
+@router.get("/{slug_or_id}/discord")
+async def game_discord_server(slug_or_id: str, me: dict | None = Depends(get_optional_user)):
+    """Der Discord-Server eines Spiels (#626) für die Kachel auf Spielkarte und Turnierseite: eigener Server, sonst
+    der des Hauptspiels, sonst der Hauptserver. Ausgeschaltete erscheinen nie; „du bist dabei“ nur für die eigene Person."""
+    from services import discord_guilds
+
+    db = get_db()
+    game, _ = await find_by_slug_or_history(db.games, slug_or_id, {"_id": 0})
+    if not game:
+        raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
+    row = await discord_guilds.guild_for_game(db, game)
+    out = await discord_guilds.public_server(db, row)
+    if not out.get("available"):
+        return out
+    out["for_game"] = row.get("inherited_from") != "main"
+    if me:
+        status = await discord_guilds.own_status(db, me["id"], [out["guild_id"]])
+        out["linked"] = status["linked"]
+        out["member"] = status["statuses"].get(out["guild_id"]) if status["linked"] else None
+    return out
+
+
 @router.post("")
 async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
     db = get_db()
@@ -95,6 +142,7 @@ async def create_game(body: GameCreate, me: dict = Depends(require_admin())):
         raise HTTPException(status_code=404, detail="Hauptspiel nicht gefunden")
     if doc.get("identity_source_game_id") and not await db.games.find_one({"id": doc["identity_source_game_id"]}, {"id": 1}):
         raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
+    await _check_discord_guild(db, doc)
     doc["id"] = new_id()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -110,7 +158,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     current = await db.games.find_one({"id": game_id}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
-    nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id"}
+    nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id", "discord_guild_id"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")
@@ -127,6 +175,7 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
             raise HTTPException(status_code=400, detail="Ein Spiel kann nicht seine eigene externe ID-Quelle sein")
         if not await db.games.find_one({"id": updates["identity_source_game_id"]}, {"id": 1}):
             raise HTTPException(status_code=404, detail="ID-Quelle nicht gefunden")
+    await _check_discord_guild(db, updates, current)
     updates["updated_at"] = now_utc().isoformat()
     await db.games.update_one({"id": game_id}, {"$set": updates})
     game = await db.games.find_one({"id": game_id}, {"_id": 0})

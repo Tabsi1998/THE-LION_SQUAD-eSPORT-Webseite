@@ -19,16 +19,18 @@ export function DiscordSamplesPanel() {
   const [data, setData] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState("");
+  // Mehrere Server (#625): wohin jede Meldung auf welchem Server ginge.
+  const [guild, setGuild] = useState("");
 
   const load = useCallback(async () => {
     try {
-      const { data: result } = await api.get("/settings/discord/samples");
+      const { data: result } = await api.get(guild ? `/settings/discord/samples?guild=${encodeURIComponent(guild)}` : "/settings/discord/samples");
       setData(result);
       setLoadError("");
     } catch (err) {
       setLoadError(formatApiError(err.response?.data?.detail) || "Die Vorschau konnte nicht geladen werden.");
     }
-  }, []);
+  }, [guild]);
   useEffect(() => { load(); }, [load]);
 
   const send = async (key, via) => {
@@ -46,6 +48,7 @@ export function DiscordSamplesPanel() {
   };
 
   const testChannel = data?.test_channel || {};
+  const guilds = Array.isArray(data?.guilds) ? data.guilds : [];
   const dm = data?.dm || {};
   const groups = Array.isArray(data?.groups) ? data.groups : [];
   const entries = Array.isArray(data?.entries) ? data.entries : [];
@@ -65,6 +68,17 @@ export function DiscordSamplesPanel() {
           : <>Kein Testkanal gewählt – oben unter „Kanäle je Zweck“ beim Ziel <strong>Test</strong> einen privaten Kanal wählen (etwa #bot-test). Bis dahin geht aus der Vorschau nichts in einen Kanal.</>}
         {!dm.linked && <div className="mt-1 text-white/60" data-testid="discord-samples-dm-hint">„An mich“ braucht dein verknüpftes Discord-Konto (Profil → Socials → Discord).</div>}
       </div>
+      {guilds.length > 1 && (
+        <label className="flex flex-wrap items-center gap-2 text-xs text-white/60">
+          <span>Server:</span>
+          <select value={guild} onChange={(event) => setGuild(event.target.value)} data-testid="discord-samples-guild" aria-label="Vorschau für Server"
+            className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-sm">
+            {guilds.map((entry) => (
+              <option key={entry.guild_id} value={entry.role === "main" ? "" : entry.guild_id}>{entry.name}{entry.role === "main" ? " (Hauptserver)" : ""}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {loadError && <div className="text-xs text-[#FF6B6B]" data-testid="discord-samples-error">{loadError}</div>}
       {groups.map((group) => {
         const rows = entries.filter((entry) => entry.group === group.key);
@@ -78,10 +92,12 @@ export function DiscordSamplesPanel() {
                   <div className="text-sm font-bold">{entry.label}</div>
                   <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
                     {entry.enabled === false && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-off`}>Ereignis aus</span>}
+                    {entry.only_main && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-only-main`}>nur am Hauptserver</span>}
+                    {entry.place && <span className="text-[#b8c0ff]" data-testid={`discord-sample-${entry.key}-place`}>{entry.place}</span>}
                     <span>{entry.source_text}</span>
                   </div>
                 </div>
-                <DiscordMessagePreview embed={entry.embed} botName={data?.bot_name || "Vereins-Bot"} testId={`discord-sample-${entry.key}-message`} />
+                <DiscordMessagePreview embed={entry.embed} buttons={entry.buttons} botName={data?.bot_name || "Vereins-Bot"} testId={`discord-sample-${entry.key}-message`} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => send(entry.key, "test")} disabled={!!busy} data-testid={`discord-sample-${entry.key}-test`}
                     className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">

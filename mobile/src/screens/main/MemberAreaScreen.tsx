@@ -28,6 +28,16 @@ type Membership = { member_number?: string | null; member_since?: string | null;
 type SteamPlayer = { user_id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null; state: "playing" | "online"; state_text: string; game?: string | null };
 type SteamPresence = { available: boolean; stale?: boolean; online_count: number; players: SteamPlayer[]; me?: { linked?: boolean; opted_in?: boolean } };
 
+// Discord-Server des Vereins (#626): alle eingeschalteten, „Du bist dabei“ nur mit verknüpftem Discord.
+type DiscordServer = { available: boolean; guild_id: string; name?: string | null; icon_url?: string | null; member_count?: number | null; invite_url?: string | null; main?: boolean; member?: boolean | null };
+type DiscordServers = { linked?: boolean; servers?: DiscordServer[] };
+
+export function discordServerLine(server: DiscordServer): string {
+  const count = Number(server.member_count) || 0;
+  const members = count <= 0 ? "" : count === 1 ? "1 Mitglied" : `${count} Mitglieder`;
+  return [server.main ? "Hauptserver" : "", members].filter(Boolean).join(" · ");
+}
+
 export function steamSummary(presence: SteamPresence | null): string {
   if (!presence) return "";
   if (presence.stale) return "Stand veraltet – Steam wurde länger nicht abgefragt.";
@@ -46,11 +56,12 @@ export function MemberAreaScreen({ navigation }: Props) {
   const [contacts, setContacts] = useState<BoardContact[]>([]);
   const [discordUrl, setDiscordUrl] = useState("");
   const [steam, setSteam] = useState<SteamPresence | null>(null);
+  const [discordServers, setDiscordServers] = useState<DiscordServers | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings, presence] = await Promise.allSettled([
+    const [my, liveEvents, liveNews, liveDocs, liveBenefits, board, settings, presence, servers] = await Promise.allSettled([
       api.get<{ membership?: Membership }>("/membership/me"),
       api.get<ClubEvent[]>("/events", { params: { upcoming: true, compact: true, limit: 48 } }),
       api.get<NewsPost[]>("/news"),
@@ -59,6 +70,7 @@ export function MemberAreaScreen({ navigation }: Props) {
       api.get<any[]>("/board", { params: { active_only: true } }),
       api.get<{ discord_invite_url?: string }>("/settings/public"),
       api.get<SteamPresence>("/membership/steam-presence"),
+      api.get<DiscordServers>("/membership/discord-servers"),
     ]);
     if (my.status === "fulfilled") setMembership(my.value.data?.membership || null);
     if (liveEvents.status === "fulfilled") setEvents(memberEvents(Array.isArray(liveEvents.value.data) ? liveEvents.value.data : []));
@@ -68,6 +80,7 @@ export function MemberAreaScreen({ navigation }: Props) {
     if (board.status === "fulfilled") setContacts(boardContacts(Array.isArray(board.value.data) ? board.value.data : []));
     if (settings.status === "fulfilled") setDiscordUrl(String(settings.value.data?.discord_invite_url || ""));
     if (presence.status === "fulfilled") setSteam(presence.value.data?.available ? presence.value.data : null);
+    if (servers.status === "fulfilled") setDiscordServers(servers.value.data || null);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -79,6 +92,8 @@ export function MemberAreaScreen({ navigation }: Props) {
 
   const openEvent = (event: ClubEvent) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } });
   const nothingYet = !loading && !events.length && !docs.length && !benefits.length && !news.length;
+  const serverList = (discordServers?.servers || []).filter((server) => server.available);
+  const openInvite = (url?: string | null) => { if (url) Linking.openURL(url).catch(() => {}); };
 
   return (
     <Screen padded={false}>
@@ -193,7 +208,35 @@ export function MemberAreaScreen({ navigation }: Props) {
           </Section>
         ) : null}
 
-        {discordUrl ? (
+        {serverList.length ? (
+          <Section title="Discord-Server" testID="member-area-discord-servers">
+            {serverList.map((server) => (
+              <View key={server.guild_id} style={styles.contact} testID={`member-area-discord-server-${server.guild_id}`}>
+                <MediaImage uri={server.icon_url || undefined} style={styles.serverIcon} fallback={<Ionicons name="logo-discord" color="#5865F2" size={18} />} />
+                <View style={styles.contactText}>
+                  <Body style={styles.lineTitle} numberOfLines={1}>{server.name}</Body>
+                  {discordServerLine(server) ? <Muted>{discordServerLine(server)}</Muted> : null}
+                </View>
+                {server.member === true ? (
+                  <View style={styles.joined} testID={`member-area-discord-server-${server.guild_id}-joined`}>
+                    <Ionicons name="checkmark-circle" color={colors.success} size={16} />
+                    <Muted style={styles.joinedText}>Du bist dabei</Muted>
+                  </View>
+                ) : server.invite_url ? (
+                  <Pressable onPress={() => openInvite(server.invite_url)} accessibilityRole="link" hitSlop={6}
+                    testID={`member-area-discord-server-${server.guild_id}-join`} style={({ pressed }) => [styles.join, pressed && styles.pressed]}>
+                    <Body style={styles.joinText}>Beitreten</Body>
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
+            {discordServers?.linked === false ? (
+              <Muted testID="member-area-discord-link-hint">Discord auf lionsquad.at unter Profil → Socials verknüpfen, dann steht hier, wo du schon dabei bist.</Muted>
+            ) : null}
+          </Section>
+        ) : null}
+
+        {discordUrl && !serverList.length ? (
           <Pressable onPress={() => { Linking.openURL(discordUrl).catch(() => {}); }} accessibilityRole="link" testID="member-area-discord" style={({ pressed }) => [styles.discord, pressed && styles.pressed]}>
             <Ionicons name="logo-discord" color="#5865F2" size={22} />
             <Body style={styles.discordText}>Zum Vereins-Discord</Body>
@@ -348,6 +391,35 @@ const styles = StyleSheet.create({
   },
   discordText: {
     flex: 1,
+    fontWeight: "900",
+  },
+  serverIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(88, 101, 242, 0.12)",
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 40,
+  },
+  joined: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+  },
+  joinedText: {
+    color: colors.success,
+    fontWeight: "900",
+  },
+  join: {
+    backgroundColor: "#5865F2",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  joinText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "900",
   },
   pressed: {

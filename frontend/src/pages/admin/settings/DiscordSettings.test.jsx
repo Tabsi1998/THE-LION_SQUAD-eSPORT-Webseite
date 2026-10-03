@@ -15,6 +15,8 @@ vi.mock("./DiscordTargets", () => ({ DiscordTargets: () => <div data-testid="dis
 vi.mock("./DiscordSamplesPanel", () => ({ DiscordSamplesPanel: () => <div data-testid="discord-samples" /> }));
 vi.mock("./DiscordEmbedsPanel", () => ({ DiscordEmbedsPanel: () => <div data-testid="discord-embeds" /> }));
 vi.mock("./DiscordScheduledPanel", () => ({ DiscordScheduledPanel: () => <div data-testid="discord-scheduled" /> }));
+vi.mock("./DiscordWelcomePanel", () => ({ DiscordWelcomePanel: () => <div data-testid="discord-welcome" /> }));
+vi.mock("./DiscordGuildsPanel", () => ({ DiscordGuildsPanel: () => <div data-testid="discord-guilds" /> }));
 
 const { DiscordSettings, discordPayload } = await import("./DiscordSettings");
 
@@ -33,22 +35,33 @@ beforeEach(() => {
   });
 });
 
-test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort", async () => {
+test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort; Reiter zeigen je ihre Kästen (#624)", async () => {
   render(<DiscordSettings />);
-  expect(await screen.findByTestId("discord-counter-save-u1")).toBeInTheDocument();
-  expect(screen.getByTestId("discord-settings")).toHaveTextContent("12 Nachrichten");
-  expect(screen.getByTestId("discord-bot-panel")).toHaveTextContent("system");
+  // Reiter „Meldungen“: Schalter, letzte Meldung, Kanäle, Vorschau.
+  expect(await screen.findByTestId("discord-last-status")).toHaveTextContent("tournament.live");
+  expect(screen.getByTestId("discord-tab-messages")).toHaveAttribute("aria-selected", "true");
   expect(screen.getByTestId("discord-targets")).toBeInTheDocument();
   expect(screen.getByTestId("discord-samples")).toBeInTheDocument();
-  expect(screen.getByTestId("discord-embeds")).toBeInTheDocument();
-  expect(screen.getByTestId("discord-scheduled")).toBeInTheDocument();
-  expect(screen.getByTestId("discord-last-status")).toHaveTextContent("tournament.live");
+  expect(screen.queryByTestId("discord-embeds")).toBeNull();
   expect(screen.queryByTestId("discord-not-configured")).toBeNull();
   expect(screen.getByTestId("discord-settings")).not.toHaveTextContent("Webhook");
 
   fireEvent.click(screen.getByTestId("discord-enabled"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { enabled: false }));
   expect(toastMock.success).toHaveBeenCalledWith("Discord-Meldungen aus – es wird nichts mehr gesendet.");
+
+  fireEvent.click(screen.getByTestId("discord-tab-embeds"));
+  expect(screen.getByTestId("discord-embeds")).toBeInTheDocument();
+  expect(screen.getByTestId("discord-scheduled")).toBeInTheDocument();
+  expect(screen.queryByTestId("discord-targets")).toBeNull();
+  fireEvent.click(screen.getByTestId("discord-tab-welcome"));
+  expect(screen.getByTestId("discord-welcome")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("discord-tab-servers"));
+  expect(screen.getByTestId("discord-guilds")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("discord-tab-bot"));
+  expect(screen.getByTestId("discord-bot-panel")).toHaveTextContent("system");
+  expect(await screen.findByTestId("discord-counter-save-u1")).toBeInTheDocument();
+  expect(screen.getByTestId("discord-settings")).toHaveTextContent("12 Nachrichten");
 });
 
 test("ohne gewählten Kanal steht der Hinweis; discordPayload lässt nur Einstellbares durch", async () => {

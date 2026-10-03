@@ -21,7 +21,7 @@ test("die Vorschau zeigt Titel, Felder und Bild und sagt, wohin es geht", async 
   apiMock.post.mockResolvedValue({ data: { would_send: true, reason: null, target: "events", embed: {
     title: "📅 LAN-Party", description: "Zwei Tage zocken.", color: 0x00ff88, url: "https://lionsquad.at/events/lan",
     fields: [{ name: "Wann", value: "01.07.2026, 18:00 Uhr" }], image: { url: "https://lionsquad.at/api/static/uploads/public/lan.webp" },
-  } } });
+  }, buttons: [{ label: "Event ansehen", url: "https://lionsquad.at/events/lan" }] } });
   render(<DiscordPreview kind="event" item={{ name: "LAN-Party" }} skip={false} onSkipChange={() => {}} />);
   await user.click(screen.getByTestId("discord-preview-load"));
   await waitFor(() => expect(screen.getByTestId("discord-preview-embed")).toHaveTextContent("LAN-Party"));
@@ -29,6 +29,19 @@ test("die Vorschau zeigt Titel, Felder und Bild und sagt, wohin es geht", async 
   expect(screen.getByTestId("discord-preview-embed")).toHaveTextContent("01.07.2026, 18:00 Uhr");
   expect(screen.getByTestId("discord-preview-embed").querySelector("img")).toHaveAttribute("src", expect.stringContaining("lan.webp"));
   expect(screen.getByTestId("discord-preview-verdict")).toHaveTextContent("Geht beim Veröffentlichen an: Events und Turniere.");
+  // Link-Knöpfe (#573) unter dem Embed, wie im Discord.
+  const button = screen.getByTestId("discord-preview-message-buttons").querySelector("a");
+  expect(button).toHaveTextContent("Event ansehen");
+  expect(button).toHaveAttribute("href", "https://lionsquad.at/events/lan");
+});
+
+// Mitgliederkanal (#605): die Vorschau nennt das private Ziel beim Namen.
+test("ein Mitglieder-Event geht an den Mitgliederkanal - so steht es in der Vorschau", async () => {
+  const user = userEvent.setup();
+  apiMock.post.mockResolvedValue({ data: { would_send: true, reason: null, target: "members", embed: { title: "📅 Stammtisch", color: 1 }, buttons: [] } });
+  render(<DiscordPreview kind="event" item={{ name: "Stammtisch", visibility: "members" }} skip={false} onSkipChange={() => {}} />);
+  await user.click(screen.getByTestId("discord-preview-load"));
+  await waitFor(() => expect(screen.getByTestId("discord-preview-verdict")).toHaveTextContent("Geht beim Veröffentlichen an: Mitglieder (privat)."));
 });
 
 // Discord-Termin (#570): die Vorschau sagt, ob und wie das Event als Termin erscheint.

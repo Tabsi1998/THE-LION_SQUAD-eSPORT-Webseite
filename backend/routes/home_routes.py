@@ -475,10 +475,24 @@ async def _about_organization(db) -> dict:
     return organization
 
 
+async def _about_game_discord(db, game: dict) -> dict | None:
+    """Der eigene Discord-Server eines Spiels für seine Karte (#626) - der Hauptserver steht schon im Footer, darum
+    nur ein Server, der dem Spiel (oder seinem Hauptspiel) gehört; ausgeschaltete nie."""
+    if not game.get("discord_guild_id"):
+        return None
+    from services import discord_guilds
+
+    row = await discord_guilds.guild_for_game(db, game)
+    if not row or row.get("inherited_from") == "main":
+        return None
+    server = await discord_guilds.public_server(db, row)
+    return server if server.get("available") else None
+
+
 async def _about_games(db) -> list[dict]:
     """Was wir spielen: die Spiele aus der Verwaltung mit der Zahl öffentlicher Turniere und Referenzen.
     Editionen zählen zu ihrem Hauptspiel; Spiele ohne Turnier und ohne Referenz stehen hinten."""
-    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "display_name": 1, "short_name": 1, "slug": 1, "logo_url": 1, "cover_url": 1, "kind": 1, "parent_game_id": 1, "platforms": 1}).to_list(300)
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "display_name": 1, "short_name": 1, "slug": 1, "logo_url": 1, "cover_url": 1, "kind": 1, "parent_game_id": 1, "platforms": 1, "discord_guild_id": 1}).to_list(300)
     parent_of = {g["id"]: g.get("parent_game_id") for g in games if g.get("kind") == "edition" and g.get("parent_game_id")}
     counts: dict[str, dict[str, int]] = {}
 
@@ -501,6 +515,7 @@ async def _about_games(db) -> list[dict]:
             "id": game["id"], "name": game.get("display_name") or game.get("name"), "slug": game.get("slug"), "short_name": game.get("short_name"),
             "logo_url": game.get("logo_url"), "cover_url": game.get("cover_url"), "platforms": game.get("platforms") or [],
             "tournaments": numbers["tournaments"], "references": numbers["references"],
+            "discord": await _about_game_discord(db, game),
         })
     out.sort(key=lambda g: (-(g["tournaments"] + g["references"]), (g["name"] or "").lower()))
     return out

@@ -69,6 +69,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     is_public: source.is_public !== false,
     visibility: source.visibility || "public",
     site_banner_enabled: !!source.site_banner_enabled,
+    discord_skip: !!source.discord_skip,
     auto_start_enabled: !!source.auto_start_enabled,
     event_mode: source.event_mode || "online",
     result_entry_mode: source.result_entry_mode || "",
@@ -126,6 +127,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
     is_public: tournament.is_public !== false,
     visibility: tournament.visibility || "public",
     site_banner_enabled: !!tournament.site_banner_enabled,
+    discord_skip: !!tournament.discord_skip,
     auto_start_enabled: !!tournament.auto_start_enabled,
     event_mode: tournament.event_mode || "online",
     result_entry_mode: tournament.result_entry_mode || "",
@@ -302,6 +304,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <SelectInput label="Status" value={f.status} onChange={(v)=>set("status",v)} options={TOURNAMENT_STATUS_OPTIONS} />
             <SelectInput label="Sichtbarkeit" value={f.visibility} onChange={(v)=>set("visibility",v)} options={VISIBILITY_OPTIONS} />
             <CheckField label="Auf Public-Seiten sichtbar, sobald nicht Entwurf" checked={f.is_public} onChange={(v)=>set("is_public",v)} className="self-end pb-2" />
+            <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={f.discord_skip} onChange={(v)=>set("discord_skip",v)} accent="#5865F2" testId="tr-edit-discord-skip" />
           </FormGrid>
         </FormSection>
 

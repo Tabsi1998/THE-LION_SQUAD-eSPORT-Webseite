@@ -322,32 +322,13 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
         except Exception:
             pass
 
-    # Bracket im Discord (#571): ab „live“ eine Einbettung, nach dem Ende ein letztes Mal als Endstand.
-    if prev != status and status in ("live", "completed", "results_published"):
+    # Discord (#572): die Meldung in den Thread des Turniers, danach das Bracket (#571) - dieselbe Stelle wie
+    # Formular, Zeitplan und Station; nur öffentlich, nie mit „Ohne Discord“.
+    if prev != status:
         try:
-            from services.discord_bracket import request_refresh
-            request_refresh(tid, final=status in ("completed", "results_published"))
-        except Exception:  # noqa: BLE001
-            pass
-    # Discord trigger
-    is_public_discord_status = (
-        t.get("is_public") is not False
-        and (t.get("visibility") or "public") == "public"
-    )
-    if is_public_discord_status and prev != status and status in ("registration_open", "live", "completed", "results_published"):
-        try:
-            from discord_service import send_public_discord
-            from services.discord_announcements import tournament_message
-            game_id = t.get("game_id")
-            game = await db.games.find_one({"id": game_id}, {"name": 1}) if game_id else None
-            # Dieselbe Meldung wie in der Vorschau unter Verbindungen → Discord (#583).
-            message = tournament_message({**t, "id": tid}, status, game_name=(game or {}).get("name"))
-            await send_public_discord(
-                t, message["title"], message["description"],
-                color=message["color"], url=message["url"], fields=message["fields"],
-                event_key=message["event_key"], image_url=message["image_url"],
-            )
-        except Exception:
+            from services.discord_threads import status_changed
+            await status_changed(db, {**t, "id": tid}, prev, status)
+        except Exception:  # noqa: BLE001 - Discord hält keinen Statuswechsel auf
             pass
     return {
         "ok": True,

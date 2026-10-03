@@ -6,16 +6,27 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { DiscordBotPanel } from "./DiscordBotPanel";
 import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
+import { DiscordGuildsPanel } from "./DiscordGuildsPanel";
 import { DiscordScheduledPanel } from "./DiscordScheduledPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordTargets } from "./DiscordTargets";
+import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
 
 // Discord: Meldungen über den Bot (Kanal je Zweck, Schalter je Ereignis), Bot und Aktivitätszähler.
 // Seit #566 gibt es keine Webhook-Adressen mehr - der Bot schickt alles; ist er aus, wird nichts
 // gesendet. Alles steht auf der Discord-Seite unter Verbindungen (24.09.: „muss das doppelt sein?“).
+// Seit Discord VI (#624) in Reitern: die Seite war eine lange Kette von Kästen, und je Server kommt noch mehr dazu.
+
+export const DISCORD_TABS = [
+  { key: "messages", label: "Meldungen" },
+  { key: "embeds", label: "Einbettungen & Termine" },
+  { key: "welcome", label: "Willkommen" },
+  { key: "bot", label: "Bot & Aktivität" },
+  { key: "servers", label: "Server" },
+];
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
-const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
+const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
 
 /** Nur, was sich einstellen lässt - der Rest der Antwort ist Stand, kein Feld. */
 export function discordPayload(source) {
@@ -24,8 +35,9 @@ export function discordPayload(source) {
   return payload;
 }
 
-export function DiscordSettings() {
+export function DiscordSettings({ initialTab = "messages" }) {
   const { user } = useAuth();
+  const [tab, setTab] = useState(DISCORD_TABS.some((entry) => entry.key === initialTab) ? initialTab : "messages");
   const [discord, setDiscord] = useState(EMPTY_DISCORD);
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -109,6 +121,15 @@ export function DiscordSettings() {
           </div>
         </div>
       )}
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Discord">
+        {DISCORD_TABS.map((entry) => (
+          <button key={entry.key} type="button" role="tab" aria-selected={tab === entry.key} onClick={() => setTab(entry.key)} data-testid={`discord-tab-${entry.key}`}
+            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${tab === entry.key ? "border-[#5865F2] text-[#b8c0ff] bg-[#5865F2]/15" : "border-white/10 text-white/60 hover:text-white"}`}>
+            {entry.label}
+          </button>
+        ))}
+      </div>
+      {tab === "messages" && <>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div className="flex items-center justify-between">
           <div className="font-heading font-bold uppercase">Discord-Meldungen</div>
@@ -127,9 +148,15 @@ export function DiscordSettings() {
         )}
       </div>
       <DiscordTargets />
-      <DiscordEmbedsPanel />
-      <DiscordScheduledPanel />
       <DiscordSamplesPanel />
+      </>}
+      {tab === "embeds" && <>
+        <DiscordEmbedsPanel />
+        <DiscordScheduledPanel />
+      </>}
+      {tab === "welcome" && <DiscordWelcomePanel />}
+      {tab === "servers" && <DiscordGuildsPanel />}
+      {tab === "bot" && <>
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
@@ -179,6 +206,7 @@ export function DiscordSettings() {
           )}
         </div>
       </div>
+      </>}
     </div>
   );
 }

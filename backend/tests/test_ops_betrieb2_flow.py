@@ -189,7 +189,7 @@ async def test_alerts_use_only_the_ops_channel_never_the_community_channel(flow,
 
     posted = []
 
-    async def fake_send(channel_id, embed):
+    async def fake_send(channel_id, embed, buttons=None):
         posted.append({"channel_id": channel_id, "title": embed.get("title")})
         return {"ok": True, "message_id": "m1", "channel_id": channel_id}
 

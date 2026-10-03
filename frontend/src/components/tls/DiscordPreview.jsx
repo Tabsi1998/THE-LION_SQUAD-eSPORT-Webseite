@@ -19,7 +19,7 @@ export const SKIP_REASONS = {
   no_channel: "Für dieses Ziel ist kein Kanal gewählt (Verbindungen → Discord → Kanäle je Zweck).",
   too_old: "Schon länger veröffentlicht – Altes wird nicht nachträglich gemeldet.",
 };
-const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere" };
+const TARGET_NAMES = { community: "Community", news: "News", events: "Events und Turniere", members: "Mitglieder (privat)", board: "Vorstand (privat)" };
 // Discord-Termin (#570): warum keiner entsteht - Texte vom Server, hier nur der Rückfall.
 export function scheduledEventText(entry) {
   if (!entry) return "";
@@ -68,7 +68,7 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
           <div className={`text-xs ${preview.would_send ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
             {preview.would_send ? `Geht beim Veröffentlichen an: ${TARGET_NAMES[preview.target] || preview.target}.` : (SKIP_REASONS[preview.reason] || "Wird nicht gesendet.")}
           </div>
-          <DiscordMessagePreview embed={embed} testId="discord-preview-message" embedTestId="discord-preview-embed" />
+          <DiscordMessagePreview embed={embed} buttons={preview.buttons} testId="discord-preview-message" embedTestId="discord-preview-embed" />
           {preview.scheduled_event && (
             <div className={`text-xs ${preview.scheduled_event.would_create ? "text-[#00FF88]" : "text-white/50"}`} data-testid="discord-preview-scheduled">
               {scheduledEventText(preview.scheduled_event)}

@@ -136,7 +136,7 @@ async def test_first_run_only_remembers_then_new_videos_become_drafts_once(flow,
 async def test_publish_switch_publishes_and_discord_announces_it(flow, fake, monkeypatch):
     posted = []
 
-    async def fake_send_embed(channel_id, embed):
+    async def fake_send_embed(channel_id, embed, buttons=None):
         posted.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": "m1", "channel_id": channel_id}
 

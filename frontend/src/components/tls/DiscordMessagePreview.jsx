@@ -1,9 +1,11 @@
 import { Fragment } from "react";
+import { ExternalLink } from "lucide-react";
 
 // Discord-Nachbildung (#583): so sieht ein Embed des Bots ungefähr im Discord aus - dunkler Kasten,
-// Bot-Name mit BOT-Plakette, Farbleiste, Titel, Text, Felder, Bild, Fußzeile. Eine Annäherung; wer es
-// genau wissen will, schickt die Meldung in den Testkanal. Dieselbe Komponente steht im News- und
-// Event-Formular („So sieht die Meldung aus“) und auf der Vorschau unter Verbindungen → Discord.
+// Bot-Name mit BOT-Plakette, Farbleiste, Titel, Text, Felder, Bild, Fußzeile und seit #573 die
+// Link-Knöpfe darunter. Eine Annäherung; wer es genau wissen will, schickt die Meldung in den
+// Testkanal. Dieselbe Komponente steht im News- und Event-Formular („So sieht die Meldung aus“) und
+// auf der Vorschau unter Verbindungen → Discord.
 
 export function embedColor(color) {
   return `#${Number(color || 0x29b6e8).toString(16).padStart(6, "0")}`;
@@ -23,8 +25,9 @@ export function renderDiscordText(text) {
   ));
 }
 
-export function DiscordMessagePreview({ embed, botName = "Vereins-Bot", avatarUrl = "", time = "heute um 18:00", testId = "discord-message", embedTestId = "" }) {
+export function DiscordMessagePreview({ embed, buttons = [], botName = "Vereins-Bot", avatarUrl = "", time = "heute um 18:00", testId = "discord-message", embedTestId = "" }) {
   const fields = Array.isArray(embed?.fields) ? embed.fields : [];
+  const links = Array.isArray(buttons) ? buttons.filter((button) => button?.label && button?.url) : [];
   return (
     <div className="bg-[#313338] rounded-sm p-3 text-[15px] leading-snug text-[#DBDEE1]" data-testid={testId}>
       <div className="flex gap-3">
@@ -57,6 +60,17 @@ export function DiscordMessagePreview({ embed, botName = "Vereins-Bot", avatarUr
             {embed?.image?.url && <img src={embed.image.url} alt="" className="mt-2 rounded max-h-48 w-full object-cover" />}
             {embed?.footer?.text && <div className="mt-2 text-xs text-[#949BA4]">{embed.footer.text}</div>}
           </div>
+          {links.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2" data-testid={`${testId}-buttons`}>
+              {links.map((button) => (
+                <a key={button.url} href={button.url} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-[3px] bg-[#4E5058] hover:bg-[#6D6F78] px-4 py-1.5 text-sm font-medium text-white">
+                  {button.label}
+                  <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -14,8 +14,8 @@ const { DiscordTargets, deliveryText, lastAttemptText, channelOptionLabel } = aw
 
 const FORBIDDEN = "Der Bot darf in diesem Kanal nicht schreiben: Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: „Kanal ansehen“, „Nachrichten senden“, „Links einbetten“.";
 const DATA = {
-  channels: { community: "100000000000000001", news: "100000000000000002", events: "", board: "", ops: "", test: "" },
-  bot: { enabled: true, configured: true },
+  channels: { community: "100000000000000001", news: "100000000000000002", events: "", board: "", ops: "", test: "", members: "" },
+  bot: { enabled: true, configured: true, roles: { member: "Löwe" } },
   events: [
     { key: "news.published", label: "News veröffentlicht", target: "news", enabled: false },
     { key: "tournament.live", label: "Turnier: jetzt live", target: "events", enabled: true },
@@ -28,6 +28,7 @@ const DATA = {
     board: { label: "Vorstand (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
     ops: { label: "Betrieb (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
     test: { label: "Test (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
+    members: { label: "Mitglieder (privat)", private: true, configured: false, channel_id: "", channel_name: null, delivers_to: null, last: null },
   },
 };
 const CHANNELS = {
@@ -55,6 +56,12 @@ test("wohin ein Ziel wirklich liefert, steht in Worten da", () => {
   expect(lastAttemptText(DATA.target_status.news.last)).toContain("Berechtigungen");
   expect(channelOptionLabel(CHANNELS.channels[2])).toBe("#vorstand (Intern) – ohne „Links einbetten“");
   expect(channelOptionLabel(CHANNELS.channels[3])).toBe("#regeln (Info) – Bot darf hier nicht schreiben");
+  // Turnier-Threads (#572): nur wo Turnier-Meldungen landen, zählt das Thread-Recht.
+  const noThreads = { name: "turniere", category: "", can_send: true, can_embed: true, can_thread: false };
+  expect(channelOptionLabel(noThreads, "events")).toBe("#turniere – ohne Threads: Turnier-Meldungen einzeln");
+  expect(channelOptionLabel(noThreads, "community")).toBe("#turniere – ohne Threads: Turnier-Meldungen einzeln");
+  expect(channelOptionLabel(noThreads, "board")).toBe("#turniere");
+  expect(channelOptionLabel({ ...noThreads, can_thread: undefined }, "events")).toBe("#turniere");
 });
 
 test("Vorstand ist als privat erkennbar; ein Kanal ohne Recht steht beim Ziel mit dem Klickweg", async () => {
@@ -67,6 +74,9 @@ test("Vorstand ist als privat erkennbar; ein Kanal ohne Recht steht beim Ziel mi
   const locked = Array.from(select.querySelectorAll("option")).find((option) => option.textContent.includes("#regeln"));
   expect(locked.disabled).toBe(true);
   expect(screen.queryByTestId("discord-targets-bot-off")).toBeNull();
+  // Mitgliederkanal (#605): privat, ohne Rückfall, mit dem Namen der Rolle, die ihn allein sehen soll.
+  expect(screen.getByTestId("discord-target-members")).toHaveTextContent("kein Kanal – es wird nichts gesendet");
+  expect(screen.getByTestId("discord-target-members-hint")).toHaveTextContent("nur die Rolle „Löwe“ ihn sieht");
 });
 
 test("Kanal aus der Liste wählen und speichern, Schalter umlegen, Test sagt, wenn er in der Community gelandet ist", async () => {

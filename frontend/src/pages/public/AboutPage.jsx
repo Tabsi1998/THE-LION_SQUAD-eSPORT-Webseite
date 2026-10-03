@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
+import { useOptionalAuth } from "@/context/AuthContext";
+import { JoinAction, memberCountText } from "@/components/tls/DiscordServerTile";
+import { PlatformIcon } from "@/lib/platformBrand";
 import { boardContacts } from "@/lib/memberArea";
 import { formatDate } from "@/lib/datetime";
 import { useCountUp } from "@/hooks/useCountUp";
@@ -27,10 +30,24 @@ export default function AboutPage() {
   );
   const [about, setAbout] = useState(null);
   const [board, setBoard] = useState([]);
+  const auth = useOptionalAuth();
+  const signedIn = !!auth?.user;
+  // „Du bist dabei“ je Spielkarte (#626) - nur angemeldet und nur der eigene Stand.
+  const [joined, setJoined] = useState({});
   useEffect(() => {
     api.get("/home/about").then(({ data }) => setAbout(data)).catch(() => setAbout({ texts: {}, organization: {}, numbers: {}, games: [], offline_events: [] }));
     api.get("/board?active_only=true").then(({ data }) => setBoard(boardContacts(data, 4))).catch(() => setBoard([]));
   }, []);
+  const hasGameServers = (about?.games || []).some((game) => game.discord);
+  useEffect(() => {
+    if (!signedIn || !hasGameServers) return undefined;
+    let alive = true;
+    api.get("/membership/discord-servers").then(({ data }) => {
+      if (!alive) return;
+      setJoined(Object.fromEntries((data?.servers || []).map((server) => [server.guild_id, server.member])));
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [signedIn, hasGameServers]);
 
   if (!about) {
     return <PublicLayout><div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20"><SkeletonDetailHeader label="Lade Verein" /></div></PublicLayout>;
@@ -93,17 +110,20 @@ export default function AboutPage() {
           {games.length > 0 && (
             <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3" data-testid="about-games">
               {games.map((game) => (
-                <Link key={game.id} to={game.tournaments > 0 ? "/tournaments" : "/esports"} data-testid={`about-game-${game.id}`} className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 flex items-center gap-3 min-w-0 transition">
-                  {game.logo_url ? (
-                    <LazyImg src={game.logo_url} alt="" className="w-12 h-12 rounded-sm object-cover shrink-0" />
-                  ) : (
-                    <span className="w-12 h-12 rounded-sm bg-[#29B6E8]/10 text-[#29B6E8] inline-flex items-center justify-center shrink-0"><Gamepad2 className="w-5 h-5" /></span>
-                  )}
-                  <span className="min-w-0">
-                    <span className="block font-heading font-black uppercase text-sm truncate group-hover:text-[#29B6E8] transition">{game.name}</span>
-                    <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">{gameLine(game)}</span>
-                  </span>
-                </Link>
+                <div key={game.id} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] flex flex-col min-w-0 transition">
+                  <Link to={game.tournaments > 0 ? "/tournaments" : "/esports"} data-testid={`about-game-${game.id}`} className="group p-4 flex items-center gap-3 min-w-0 flex-1">
+                    {game.logo_url ? (
+                      <LazyImg src={game.logo_url} alt="" className="w-12 h-12 rounded-sm object-cover shrink-0" />
+                    ) : (
+                      <span className="w-12 h-12 rounded-sm bg-[#29B6E8]/10 text-[#29B6E8] inline-flex items-center justify-center shrink-0"><Gamepad2 className="w-5 h-5" /></span>
+                    )}
+                    <span className="min-w-0">
+                      <span className="block font-heading font-black uppercase text-sm truncate group-hover:text-[#29B6E8] transition">{game.name}</span>
+                      <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">{gameLine(game)}</span>
+                    </span>
+                  </Link>
+                  {game.discord ? <GameServerRow server={{ ...game.discord, member: joined[game.discord.guild_id] }} testId={`about-game-${game.id}-discord`} /> : null}
+                </div>
               ))}
             </div>
           )}
@@ -205,6 +225,18 @@ export function organizationFacts(organization) {
   if (organization?.zvr_number) facts.push({ key: "zvr", label: `ZVR ${organization.zvr_number}` });
   if (organization?.registered_seat) facts.push({ key: "seat", label: `Sitz in ${organization.registered_seat}` });
   return facts;
+}
+
+/** Der eigene Discord-Server eines Spiels unter seiner Karte (#626) - kein Link im Link. */
+function GameServerRow({ server, testId }) {
+  const members = memberCountText(server.member_count);
+  return (
+    <div data-testid={testId} className="border-t border-white/5 px-4 py-2 flex items-center gap-2 min-w-0">
+      <PlatformIcon kind="discord" className="w-3.5 h-3.5 text-[#8EA1FF] shrink-0" />
+      <span className="min-w-0 flex-1 text-[11px] text-white/60 truncate" title={[server.name, members].filter(Boolean).join(" · ")}>{server.name}</span>
+      <JoinAction server={server} testId={testId} size="sm" />
+    </div>
+  );
 }
 
 export function gameLine(game) {
