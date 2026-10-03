@@ -246,6 +246,8 @@ def document_view(row: dict) -> dict:
         "audience": audience, "personal": audience == "person", "code": row.get("code"), "revision": row.get("revision"),
         "visibility": "members", "original_filename": f"{row.get('code') or doc_id}.pdf", "mime": "application/pdf",
         "file_size": row.get("size"), "pinned": False, "allow_download": True,
+        # Die Prüfsumme der Fassung (#849): die App fragt damit nach („If-None-Match“) und lädt nur Geändertes.
+        "checksum": row.get("sha256") or None,
         "view_url": f"/api/documents/{doc_id}/view", "download_url": f"/api/documents/{doc_id}/download",
         "created_at": row.get("date"), "updated_at": row.get("date"),
     }
@@ -367,6 +369,34 @@ async def document_pdf(db, user: dict, document_id: int) -> tuple[bytes, dict]:
     if not content or not expected or hashlib.sha256(content).hexdigest() != expected:
         raise DolibarrError("invalid_response", 200)
     return content, data
+
+
+# Dokumente als Datei (#849): `…/file` gibt es ab Vereine 1.3.0 - ältere Module bleiben beim JSON mit base64.
+FILE_MIN_VERSION = (1, 3, 0)
+
+
+async def document_file(db, user: dict, document_id: int, conditional: dict | None = None) -> dict | None:
+    """Ein Dokument als Datei über die Person (sonst das öffentliche) mit Durchreichen von ETag, 304 und Teilabruf.
+    None, wenn das Modul `…/file` noch nicht kennt - dann gilt `document_pdf`. Eine ganze Datei muss zur Prüfsumme
+    passen (ETag), sonst kommt keine Byte-Folge an, die nicht in der Vereinsakte steht."""
+    settings = await load_settings(db)
+    if settings.get("mode") != "live":
+        raise DolibarrError("not_configured")
+    if parse_version((await _sync_state(db)).get("module_version")) < FILE_MIN_VERSION:
+        return None
+    access = await access_for(db, settings, user["id"])
+    client = DolibarrClient(settings)
+    try:
+        answer = await client.document_file(document_id, access["params"] if access else None, conditional=conditional)
+    except DolibarrError as exc:
+        if access and exc.kind == "forbidden":
+            await forbidden(db, access)
+        raise
+    if answer["status"] == 200:
+        expected = str(answer["headers"].get("ETag") or "").strip().removeprefix("W/").strip('"')
+        if not answer["content"] or not expected or hashlib.sha256(answer["content"]).hexdigest() != expected:
+            raise DolibarrError("invalid_response", 200)
+    return answer
 
 
 async def statute_pdf(db, user: dict, version_id: int) -> tuple[bytes, dict]:
