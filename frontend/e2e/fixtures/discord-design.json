@@ -1,0 +1,1145 @@
+{
+ "kinds": [
+  {
+   "key": "stream_live",
+   "label": "Stream gestartet",
+   "group": "Streams",
+   "hint": "Je Stream eine Meldung, sobald jemand aus dem Verein live geht. Zuschauer und Vorschaubild werden alle zehn Minuten aktualisiert.",
+   "list": false,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "streamer",
+     "text": "Name (Gamertag im Mitgliederprofil)",
+     "kind": "text",
+     "sample": "TheLostFriday",
+     "row": false
+    },
+    {
+     "name": "login",
+     "text": "Twitch-Name",
+     "kind": "text",
+     "sample": "thelostfriday",
+     "row": false
+    },
+    {
+     "name": "title",
+     "text": "Titel des Streams",
+     "kind": "text",
+     "sample": "Irgendwie? Irgendwo? Aniimo!",
+     "row": false
+    },
+    {
+     "name": "game",
+     "text": "Spiel",
+     "kind": "text",
+     "sample": "Aniimo",
+     "row": false
+    },
+    {
+     "name": "viewers",
+     "text": "Zuschauer gerade",
+     "kind": "text",
+     "sample": "4",
+     "row": false
+    },
+    {
+     "name": "url",
+     "text": "Link zum Stream",
+     "kind": "url",
+     "sample": "https://twitch.tv/thelostfriday",
+     "row": false
+    },
+    {
+     "name": "preview",
+     "text": "Vorschaubild des Streams (wird bei jeder Aktualisierung neu geladen)",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/og-default.png",
+     "row": false
+    },
+    {
+     "name": "avatar",
+     "text": "Bild aus dem Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-mascot.png",
+     "row": false
+    },
+    {
+     "name": "started",
+     "text": "Beginn, z. B. 19:15 Uhr",
+     "kind": "text",
+     "sample": "19:15 Uhr",
+     "row": false
+    },
+    {
+     "name": "profile",
+     "text": "Link zum Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/members/thelostfriday",
+     "row": false
+    },
+    {
+     "name": "platform",
+     "text": "Plattform",
+     "kind": "text",
+     "sample": "Twitch",
+     "row": false
+    },
+    {
+     "name": "role",
+     "text": "Erwähnung der gewählten Rolle – pingt nur im Text über dem Kasten",
+     "kind": "raw",
+     "sample": "@Stream-Ping",
+     "row": false
+    }
+   ],
+   "template": {
+    "content": "🔴 **{streamer}** ist jetzt live auf {platform}! {role}",
+    "color": "#9146FF",
+    "author": {
+     "name": "{streamer}",
+     "url": "{profile}",
+     "icon_url": "{avatar}"
+    },
+    "title": "{title}",
+    "url": "{url}",
+    "fields": [
+     {
+      "name": "Spiel",
+      "value": "{game}",
+      "inline": true
+     },
+     {
+      "name": "Zuschauer",
+      "value": "{viewers}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "image": {
+     "url": "{preview}"
+    },
+    "footer": {
+     "text": "{platform}[[ · live seit {started}]]",
+     "icon_url": "{logo}"
+    },
+    "timestamp": true
+   },
+   "default": {
+    "content": "🔴 **{streamer}** ist jetzt live auf {platform}! {role}",
+    "color": "#9146FF",
+    "author": {
+     "name": "{streamer}",
+     "url": "{profile}",
+     "icon_url": "{avatar}"
+    },
+    "title": "{title}",
+    "url": "{url}",
+    "fields": [
+     {
+      "name": "Spiel",
+      "value": "{game}",
+      "inline": true
+     },
+     {
+      "name": "Zuschauer",
+      "value": "{viewers}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "image": {
+     "url": "{preview}"
+    },
+    "footer": {
+     "text": "{platform}[[ · live seit {started}]]",
+     "icon_url": "{logo}"
+    },
+    "timestamp": true
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": "🔴 **TheLostFriday** ist jetzt live auf Twitch! @Stream-Ping",
+    "embed": {
+     "color": 9520895,
+     "title": "Irgendwie? Irgendwo? Aniimo!",
+     "url": "https://twitch.tv/thelostfriday",
+     "author": {
+      "name": "TheLostFriday",
+      "url": "http://e2e-origin.test/members/thelostfriday",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-mascot.png"
+     },
+     "fields": [
+      {
+       "name": "Spiel",
+       "value": "Aniimo",
+       "inline": true
+      },
+      {
+       "name": "Zuschauer",
+       "value": "4",
+       "inline": true
+      }
+     ],
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-mascot.png"
+     },
+     "image": {
+      "url": "http://e2e-origin.test/assets/brand/og-default.png"
+     },
+     "footer": {
+      "text": "Twitch · live seit 19:15 Uhr",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     },
+     "timestamp": "2026-10-03T17:15:00+00:00"
+    }
+   }
+  },
+  {
+   "key": "stream_ended",
+   "label": "Stream beendet",
+   "group": "Streams",
+   "hint": "So wird die Meldung, wenn der Stream vorbei ist (oder sie verschwindet – Einstellung bei den Stream-Meldungen).",
+   "list": false,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "streamer",
+     "text": "Name (Gamertag im Mitgliederprofil)",
+     "kind": "text",
+     "sample": "TheLostFriday",
+     "row": false
+    },
+    {
+     "name": "login",
+     "text": "Twitch-Name",
+     "kind": "text",
+     "sample": "thelostfriday",
+     "row": false
+    },
+    {
+     "name": "title",
+     "text": "Titel des Streams",
+     "kind": "text",
+     "sample": "Irgendwie? Irgendwo? Aniimo!",
+     "row": false
+    },
+    {
+     "name": "game",
+     "text": "Spiel",
+     "kind": "text",
+     "sample": "Aniimo",
+     "row": false
+    },
+    {
+     "name": "viewers",
+     "text": "Zuschauer gerade",
+     "kind": "text",
+     "sample": "4",
+     "row": false
+    },
+    {
+     "name": "url",
+     "text": "Link zum Stream",
+     "kind": "url",
+     "sample": "https://twitch.tv/thelostfriday",
+     "row": false
+    },
+    {
+     "name": "preview",
+     "text": "Vorschaubild des Streams (wird bei jeder Aktualisierung neu geladen)",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/og-default.png",
+     "row": false
+    },
+    {
+     "name": "avatar",
+     "text": "Bild aus dem Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-mascot.png",
+     "row": false
+    },
+    {
+     "name": "started",
+     "text": "Beginn, z. B. 19:15 Uhr",
+     "kind": "text",
+     "sample": "19:15 Uhr",
+     "row": false
+    },
+    {
+     "name": "profile",
+     "text": "Link zum Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/members/thelostfriday",
+     "row": false
+    },
+    {
+     "name": "platform",
+     "text": "Plattform",
+     "kind": "text",
+     "sample": "Twitch",
+     "row": false
+    },
+    {
+     "name": "duration",
+     "text": "Dauer, z. B. 2 Std. 14 Min.",
+     "kind": "text",
+     "sample": "2 Std. 14 Min.",
+     "row": false
+    },
+    {
+     "name": "peak",
+     "text": "Höchste Zuschauerzahl",
+     "kind": "text",
+     "sample": "12",
+     "row": false
+    }
+   ],
+   "template": {
+    "content": "⚫ **{streamer}** war live auf {platform}.",
+    "color": "#4E5058",
+    "author": {
+     "name": "{streamer}",
+     "url": "{profile}",
+     "icon_url": "{avatar}"
+    },
+    "title": "{title}",
+    "url": "{url}",
+    "description": "[[War {duration} live]][[ · bis zu {peak} Zuschauer]]",
+    "fields": [
+     {
+      "name": "Spiel",
+      "value": "{game}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "footer": {
+     "text": "{platform} · Stream beendet",
+     "icon_url": "{logo}"
+    },
+    "timestamp": true
+   },
+   "default": {
+    "content": "⚫ **{streamer}** war live auf {platform}.",
+    "color": "#4E5058",
+    "author": {
+     "name": "{streamer}",
+     "url": "{profile}",
+     "icon_url": "{avatar}"
+    },
+    "title": "{title}",
+    "url": "{url}",
+    "description": "[[War {duration} live]][[ · bis zu {peak} Zuschauer]]",
+    "fields": [
+     {
+      "name": "Spiel",
+      "value": "{game}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "footer": {
+     "text": "{platform} · Stream beendet",
+     "icon_url": "{logo}"
+    },
+    "timestamp": true
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": "⚫ **TheLostFriday** war live auf Twitch.",
+    "embed": {
+     "color": 5132376,
+     "title": "Irgendwie? Irgendwo? Aniimo!",
+     "url": "https://twitch.tv/thelostfriday",
+     "description": "War 2 Std. 14 Min. live · bis zu 12 Zuschauer",
+     "author": {
+      "name": "TheLostFriday",
+      "url": "http://e2e-origin.test/members/thelostfriday",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-mascot.png"
+     },
+     "fields": [
+      {
+       "name": "Spiel",
+       "value": "Aniimo",
+       "inline": true
+      }
+     ],
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-mascot.png"
+     },
+     "footer": {
+      "text": "Twitch · Stream beendet",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     },
+     "timestamp": "2026-10-03T17:15:00+00:00"
+    }
+   }
+  },
+  {
+   "key": "live",
+   "label": "Live jetzt",
+   "group": "Angeheftete Einbettungen",
+   "hint": "Die angeheftete Übersicht, wer gerade streamt – ein Eintrag je Stream.",
+   "list": true,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "rows",
+     "text": "Die Einträge als Zeilen – oder der Text ohne Einträge",
+     "kind": "raw",
+     "sample": "",
+     "row": false
+    },
+    {
+     "name": "streamer",
+     "text": "Name (Gamertag im Mitgliederprofil)",
+     "kind": "text",
+     "sample": "TheLostFriday",
+     "row": true
+    },
+    {
+     "name": "login",
+     "text": "Twitch-Name",
+     "kind": "text",
+     "sample": "thelostfriday",
+     "row": true
+    },
+    {
+     "name": "title",
+     "text": "Titel des Streams",
+     "kind": "text",
+     "sample": "Irgendwie? Irgendwo? Aniimo!",
+     "row": true
+    },
+    {
+     "name": "game",
+     "text": "Spiel",
+     "kind": "text",
+     "sample": "Aniimo",
+     "row": true
+    },
+    {
+     "name": "viewers",
+     "text": "Zuschauer gerade",
+     "kind": "text",
+     "sample": "4",
+     "row": true
+    },
+    {
+     "name": "url",
+     "text": "Link zum Stream",
+     "kind": "url",
+     "sample": "https://twitch.tv/thelostfriday",
+     "row": true
+    },
+    {
+     "name": "preview",
+     "text": "Vorschaubild des Streams (wird bei jeder Aktualisierung neu geladen)",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/og-default.png",
+     "row": true
+    },
+    {
+     "name": "avatar",
+     "text": "Bild aus dem Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-mascot.png",
+     "row": true
+    },
+    {
+     "name": "started",
+     "text": "Beginn, z. B. 19:15 Uhr",
+     "kind": "text",
+     "sample": "19:15 Uhr",
+     "row": true
+    },
+    {
+     "name": "profile",
+     "text": "Link zum Mitgliederprofil",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/members/thelostfriday",
+     "row": true
+    },
+    {
+     "name": "platform",
+     "text": "Plattform",
+     "kind": "text",
+     "sample": "Twitch",
+     "row": true
+    }
+   ],
+   "template": {
+    "color": "#9146FF",
+    "title": "🔴 Live jetzt",
+    "url": "{site}/#live",
+    "description": "{rows}",
+    "rows": "fields",
+    "row_field": {
+     "name": "🔴 {streamer} · {viewers} Zuschauer",
+     "value": "[{title}]({url})\n🎮 {game}[[ · seit {started}]]",
+     "inline": false
+    },
+    "empty": "Gerade streamt niemand – schau später wieder vorbei.",
+    "max_rows": 10,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "default": {
+    "color": "#9146FF",
+    "title": "🔴 Live jetzt",
+    "url": "{site}/#live",
+    "description": "{rows}",
+    "rows": "fields",
+    "row_field": {
+     "name": "🔴 {streamer} · {viewers} Zuschauer",
+     "value": "[{title}]({url})\n🎮 {game}[[ · seit {started}]]",
+     "inline": false
+    },
+    "empty": "Gerade streamt niemand – schau später wieder vorbei.",
+    "max_rows": 10,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": null,
+    "embed": {
+     "color": 9520895,
+     "title": "🔴 Live jetzt",
+     "url": "http://e2e-origin.test/#live",
+     "fields": [
+      {
+       "name": "🔴 TheLostFriday · 4 Zuschauer",
+       "value": "[Irgendwie? Irgendwo? Aniimo!](https://twitch.tv/thelostfriday)\n🎮 Aniimo · seit 19:15 Uhr",
+       "inline": false
+      }
+     ],
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     },
+     "footer": {
+      "text": "Stand: 03.10.2026, 20:12 Uhr",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     }
+    }
+   }
+  },
+  {
+   "key": "events",
+   "label": "Nächste Events und Turniere",
+   "group": "Angeheftete Einbettungen",
+   "hint": "Die angeheftete Übersicht der nächsten Termine aus dem Kalender der Website.",
+   "list": true,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "rows",
+     "text": "Die Einträge als Zeilen – oder der Text ohne Einträge",
+     "kind": "raw",
+     "sample": "",
+     "row": false
+    },
+    {
+     "name": "icon",
+     "text": "📅 Event, 🏆 Turnier, 🏁 Fast Lap",
+     "kind": "text",
+     "sample": "🏆",
+     "row": true
+    },
+    {
+     "name": "date",
+     "text": "Datum und Uhrzeit, z. B. Sa, 03.10.2026 · 18:00 Uhr",
+     "kind": "text",
+     "sample": "Sa, 03.10.2026 · 18:00 Uhr",
+     "row": true
+    },
+    {
+     "name": "name",
+     "text": "Name des Termins",
+     "kind": "text",
+     "sample": "Sommer-Cup",
+     "row": true
+    },
+    {
+     "name": "link",
+     "text": "Link zur Seite des Termins",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/tournaments/sommer-cup",
+     "row": true
+    },
+    {
+     "name": "kind",
+     "text": "Event, Turnier oder Fast Lap",
+     "kind": "text",
+     "sample": "Turnier",
+     "row": true
+    },
+    {
+     "name": "state",
+     "text": "Stand der Anmeldung, z. B. Anmeldung offen",
+     "kind": "text",
+     "sample": "Anmeldung offen",
+     "row": true
+    }
+   ],
+   "template": {
+    "color": "#29B6E8",
+    "title": "📅 Nächste Events und Turniere",
+    "url": "{site}/calendar",
+    "description": "{rows}",
+    "rows": "fields",
+    "row_field": {
+     "name": "{icon} {date}",
+     "value": "**[{name}]({link})**\n{kind}[[ · {state}]]",
+     "inline": false
+    },
+    "empty": "Nichts geplant – Termine folgen.",
+    "max_rows": 5,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now} · alle Termine im Kalender",
+     "icon_url": "{logo}"
+    }
+   },
+   "default": {
+    "color": "#29B6E8",
+    "title": "📅 Nächste Events und Turniere",
+    "url": "{site}/calendar",
+    "description": "{rows}",
+    "rows": "fields",
+    "row_field": {
+     "name": "{icon} {date}",
+     "value": "**[{name}]({link})**\n{kind}[[ · {state}]]",
+     "inline": false
+    },
+    "empty": "Nichts geplant – Termine folgen.",
+    "max_rows": 5,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now} · alle Termine im Kalender",
+     "icon_url": "{logo}"
+    }
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": null,
+    "embed": {
+     "color": 2733800,
+     "title": "📅 Nächste Events und Turniere",
+     "url": "http://e2e-origin.test/calendar",
+     "fields": [
+      {
+       "name": "🏆 Sa, 03.10.2026 · 18:00 Uhr",
+       "value": "**[Sommer-Cup](http://e2e-origin.test/tournaments/sommer-cup)**\nTurnier · Anmeldung offen",
+       "inline": false
+      },
+      {
+       "name": "📅 Sa, 10.10.2026 · 19:00 Uhr",
+       "value": "**[LAN-Party](http://e2e-origin.test/events/lan-party)**\nEvent · Plätze frei",
+       "inline": false
+      }
+     ],
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     },
+     "footer": {
+      "text": "Stand: 03.10.2026, 20:12 Uhr · alle Termine im Kalender",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     }
+    }
+   }
+  },
+  {
+   "key": "ranking",
+   "label": "Rangliste",
+   "group": "Angeheftete Einbettungen",
+   "hint": "Die angeheftete Jahreswertung der laufenden Saison.",
+   "list": true,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "season",
+     "text": "Name der Saison",
+     "kind": "text",
+     "sample": "Saison 2026",
+     "row": false
+    },
+    {
+     "name": "season_url",
+     "text": "Link zur Saison",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/seasons/2026",
+     "row": false
+    },
+    {
+     "name": "rows",
+     "text": "Die Einträge als Zeilen – oder der Text ohne Einträge",
+     "kind": "raw",
+     "sample": "",
+     "row": false
+    },
+    {
+     "name": "medal",
+     "text": "🥇, 🥈, 🥉 – ab Platz 4 die Zahl",
+     "kind": "text",
+     "sample": "🥇",
+     "row": true
+    },
+    {
+     "name": "rank",
+     "text": "Platz",
+     "kind": "text",
+     "sample": "1",
+     "row": true
+    },
+    {
+     "name": "name",
+     "text": "Name",
+     "kind": "text",
+     "sample": "Paula",
+     "row": true
+    },
+    {
+     "name": "points",
+     "text": "Punkte",
+     "kind": "text",
+     "sample": "120,5",
+     "row": true
+    }
+   ],
+   "template": {
+    "color": "#FFD700",
+    "title": "🏆 Rangliste – {season}",
+    "url": "{season_url}",
+    "description": "{rows}",
+    "rows": "lines",
+    "row": "{medal} **{name}** — {points} Punkte",
+    "empty": "Noch keine Punkte vergeben.",
+    "max_rows": 10,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "default": {
+    "color": "#FFD700",
+    "title": "🏆 Rangliste – {season}",
+    "url": "{season_url}",
+    "description": "{rows}",
+    "rows": "lines",
+    "row": "{medal} **{name}** — {points} Punkte",
+    "empty": "Noch keine Punkte vergeben.",
+    "max_rows": 10,
+    "thumbnail": {
+     "url": "{logo}"
+    },
+    "footer": {
+     "text": "Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": null,
+    "embed": {
+     "color": 16766720,
+     "title": "🏆 Rangliste – Saison 2026",
+     "url": "http://e2e-origin.test/seasons/2026",
+     "description": "🥇 **Paula** — 120,5 Punkte\n🥈 **Leon** — 80 Punkte\n🥉 **Mira** — 64 Punkte",
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     },
+     "footer": {
+      "text": "Stand: 03.10.2026, 20:12 Uhr",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     }
+    }
+   }
+  },
+  {
+   "key": "achievement_week",
+   "label": "Erfolg der Woche",
+   "group": "Angeheftete Einbettungen",
+   "hint": "Die seltenste Freischaltung der letzten Woche – nur Personen mit öffentlichem Profil.",
+   "list": false,
+   "placeholders": [
+    {
+     "name": "site",
+     "text": "Adresse der Website",
+     "kind": "url",
+     "sample": "http://e2e-origin.test",
+     "row": false
+    },
+    {
+     "name": "club",
+     "text": "Vereinsname",
+     "kind": "text",
+     "sample": "THE LION SQUAD",
+     "row": false
+    },
+    {
+     "name": "logo",
+     "text": "Vereinslogo als Bild",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-favicon.png",
+     "row": false
+    },
+    {
+     "name": "now",
+     "text": "Jetzt, z. B. 03.10.2026, 20:12 Uhr",
+     "kind": "text",
+     "sample": "03.10.2026, 20:12 Uhr",
+     "row": false
+    },
+    {
+     "name": "achievement",
+     "text": "Name des Erfolgs",
+     "kind": "text",
+     "sample": "Eiserner Löwe",
+     "row": false
+    },
+    {
+     "name": "description",
+     "text": "Beschreibung des Erfolgs",
+     "kind": "text",
+     "sample": "365 Tage in Folge angemeldet.",
+     "row": false
+    },
+    {
+     "name": "person",
+     "text": "Wer ihn freigeschaltet hat",
+     "kind": "text",
+     "sample": "Paula",
+     "row": false
+    },
+    {
+     "name": "material",
+     "text": "Material, z. B. Gold",
+     "kind": "text",
+     "sample": "Diamant",
+     "row": false
+    },
+    {
+     "name": "rarity",
+     "text": "Seltenheit, z. B. 0,4 % – nur diese Person",
+     "kind": "text",
+     "sample": "0,4 % – nur diese Person",
+     "row": false
+    },
+    {
+     "name": "group",
+     "text": "Gruppe des Erfolgs",
+     "kind": "text",
+     "sample": "Treue",
+     "row": false
+    },
+    {
+     "name": "link",
+     "text": "Link zum Profil oder zu den Erfolgen",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/achievements",
+     "row": false
+    },
+    {
+     "name": "avatar",
+     "text": "Profilbild der Person",
+     "kind": "url",
+     "sample": "http://e2e-origin.test/assets/brand/tls-mascot.png",
+     "row": false
+    },
+    {
+     "name": "material_color",
+     "text": "Farbe des Materials",
+     "kind": "color",
+     "sample": "#B9F2FF",
+     "row": false
+    }
+   ],
+   "template": {
+    "color": "{material_color}",
+    "author": {
+     "name": "🏅 Erfolg der Woche"
+    },
+    "title": "{achievement}",
+    "url": "{link}",
+    "description": "{description}",
+    "fields": [
+     {
+      "name": "Freigeschaltet von",
+      "value": "{person}",
+      "inline": true
+     },
+     {
+      "name": "Material",
+      "value": "{material}",
+      "inline": true
+     },
+     {
+      "name": "Seltenheit",
+      "value": "{rarity}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "footer": {
+     "text": "{group} · Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "default": {
+    "color": "{material_color}",
+    "author": {
+     "name": "🏅 Erfolg der Woche"
+    },
+    "title": "{achievement}",
+    "url": "{link}",
+    "description": "{description}",
+    "fields": [
+     {
+      "name": "Freigeschaltet von",
+      "value": "{person}",
+      "inline": true
+     },
+     {
+      "name": "Material",
+      "value": "{material}",
+      "inline": true
+     },
+     {
+      "name": "Seltenheit",
+      "value": "{rarity}",
+      "inline": true
+     }
+    ],
+    "thumbnail": {
+     "url": "{avatar}"
+    },
+    "footer": {
+     "text": "{group} · Stand: {now}",
+     "icon_url": "{logo}"
+    }
+   },
+   "customized": false,
+   "changed": null,
+   "preview": {
+    "content": null,
+    "embed": {
+     "color": 12186367,
+     "title": "Eiserner Löwe",
+     "url": "http://e2e-origin.test/achievements",
+     "description": "365 Tage in Folge angemeldet.",
+     "author": {
+      "name": "🏅 Erfolg der Woche"
+     },
+     "fields": [
+      {
+       "name": "Freigeschaltet von",
+       "value": "Paula",
+       "inline": true
+      },
+      {
+       "name": "Material",
+       "value": "Diamant",
+       "inline": true
+      },
+      {
+       "name": "Seltenheit",
+       "value": "0,4 % – nur diese Person",
+       "inline": true
+      }
+     ],
+     "thumbnail": {
+      "url": "http://e2e-origin.test/assets/brand/tls-mascot.png"
+     },
+     "footer": {
+      "text": "Treue · Stand: 03.10.2026, 20:12 Uhr",
+      "icon_url": "http://e2e-origin.test/assets/brand/tls-favicon.png"
+     }
+    }
+   }
+  }
+ ],
+ "groups": [
+  "Streams",
+  "Angeheftete Einbettungen"
+ ],
+ "limits": {
+  "content": 2000,
+  "title": 256,
+  "description": 4096,
+  "field_name": 256,
+  "field_value": 1024,
+  "fields": 25,
+  "footer": 2048,
+  "author": 256,
+  "total": 6000
+ }
+}

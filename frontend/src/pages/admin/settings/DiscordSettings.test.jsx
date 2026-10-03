@@ -17,6 +17,8 @@ vi.mock("./DiscordEmbedsPanel", () => ({ DiscordEmbedsPanel: () => <div data-tes
 vi.mock("./DiscordScheduledPanel", () => ({ DiscordScheduledPanel: () => <div data-testid="discord-scheduled" /> }));
 vi.mock("./DiscordWelcomePanel", () => ({ DiscordWelcomePanel: () => <div data-testid="discord-welcome" /> }));
 vi.mock("./DiscordGuildsPanel", () => ({ DiscordGuildsPanel: () => <div data-testid="discord-guilds" /> }));
+vi.mock("./DiscordStreamsPanel", () => ({ DiscordStreamsPanel: ({ onDesign }) => <button type="button" data-testid="discord-streams" onClick={onDesign}>Streams</button> }));
+vi.mock("./DiscordDesignPanel", () => ({ DiscordDesignPanel: () => <div data-testid="discord-design" /> }));
 
 const { DiscordSettings, discordPayload } = await import("./DiscordSettings");
 
@@ -54,6 +56,11 @@ test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort
   expect(screen.getByTestId("discord-embeds")).toBeInTheDocument();
   expect(screen.getByTestId("discord-scheduled")).toBeInTheDocument();
   expect(screen.queryByTestId("discord-targets")).toBeNull();
+  // Stream-Meldungen (#866) stehen bei den Einbettungen; „Aussehen gestalten“ führt in den Reiter „Gestaltung“.
+  fireEvent.click(screen.getByTestId("discord-streams"));
+  expect(screen.getByTestId("discord-tab-design")).toHaveAttribute("aria-selected", "true");
+  expect(screen.getByTestId("discord-design")).toBeInTheDocument();
+  expect(screen.queryByTestId("discord-embeds")).toBeNull();
   fireEvent.click(screen.getByTestId("discord-tab-welcome"));
   expect(screen.getByTestId("discord-welcome")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("discord-tab-servers"));

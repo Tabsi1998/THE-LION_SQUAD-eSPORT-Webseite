@@ -36,7 +36,7 @@ async def answer_rangliste(db) -> dict:
     """Dieselbe Rechnung wie die angepinnte Rangliste (#569)."""
     from services.discord_embeds import build
 
-    embed = await build(db, "ranking")
+    embed = (await build(db, "ranking"))["embed"]
     return answer(embed=embed, buttons=[{"label": "Rangliste ansehen", "url": embed.get("url")}])
 
 
@@ -44,7 +44,7 @@ async def answer_wer_streamt(db) -> dict:
     """Wer aus dem Verein gerade streamt - dieselbe Regel wie die Startseite (nur freigegebene Kanäle)."""
     from services.discord_embeds import build
 
-    return answer(embed=await build(db, "live"))
+    return answer(embed=(await build(db, "live"))["embed"])
 
 
 # ---------------------------------------------------------------- /bracket

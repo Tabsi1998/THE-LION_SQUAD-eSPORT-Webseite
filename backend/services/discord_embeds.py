@@ -9,6 +9,9 @@ Auslöser sind Änderungen (``request_refresh``: Ergebnis bestätigt, Event ange
 oder endet) - gebündelt auf höchstens eine Bearbeitung je Einbettung pro Minute (Discord-Limit),
 und ein Sammler alle zehn Minuten schreibt „Stand: 18:32 Uhr“ in die Fußzeile neu. Gleicher Inhalt
 wird nicht noch einmal geschickt (``content_hash``). Ist die Nachricht gelöscht, postet der Bot neu.
+
+Das Aussehen kommt seit #866 aus der Gestaltung (``discord_design``): hier entstehen nur die Werte (``*_context``),
+die Vorlage - eigene Fassung oder Standard - macht daraus die Einbettung.
 """
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from models import now_utc
+from services import discord_design
 
 logger = logging.getLogger("tls.discord.embeds")
 
@@ -71,89 +75,121 @@ def vienna(value) -> str:
     return parsed.astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M Uhr") if parsed else ""
 
 
-def _embed(kind: str, title: str, description: str, *, url: str | None, now: datetime | None) -> dict:
-    return {"title": title[:256], "description": description[:4000], "color": COLORS[kind], "url": url, "fields": [], "image_url": None,
-            "footer": stand_footer(now)}
+WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 
 
-def ranking_embed(season: dict | None, standings: list[dict], origin: str, now: datetime | None = None) -> dict:
-    """Top 10 der laufenden Saison – reine Rechnung, damit der Test sie ohne Discord prüft."""
+def vienna_day(value) -> str:
+    """„Sa, 03.10.2026 · 18:00 Uhr“ - für die Feldnamen der Termine."""
+    parsed = _dt(value)
+    if not parsed:
+        return ""
+    local = parsed.astimezone(VIENNA)
+    return f"{WEEKDAYS[local.weekday()]}, {local.strftime('%d.%m.%Y · %H:%M')} Uhr"
+
+
+def _points(value) -> str:
+    try:
+        return f"{float(value):g}".replace(".", ",")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def ranking_context(season: dict | None, standings: list[dict], origin: str) -> tuple[dict, list[dict]]:
+    """Top 10 der laufenden Saison als Werte - reine Rechnung, damit der Test sie ohne Discord prüft."""
     if not season:
-        return _embed("ranking", "🏆 Rangliste", "Keine laufende Saison – die nächste Wertung startet mit der neuen Saison.", url=f"{origin}/seasons", now=now)
-    lines = []
+        return {"season": "keine laufende Saison", "season_url": f"{origin}/seasons"}, []
+    rows = []
     for index, row in enumerate(standings[:10], start=1):
-        name = row.get("display_name") or row.get("username") or "—"
-        points = row.get("points", row.get("total_points", 0))
-        try:
-            points_text = f"{float(points):g}".replace(".", ",")
-        except (TypeError, ValueError):
-            points_text = str(points)
-        medal = {1: "🥇", 2: "🥈", 3: "🥉"}.get(index, f"{index}.")
-        lines.append(f"{medal} **{name}** – {points_text} Punkte")
-    if not lines:
-        lines.append("Noch keine Punkte vergeben.")
+        rows.append({"medal": {1: "🥇", 2: "🥈", 3: "🥉"}.get(index, f"{index}."), "rank": str(index),
+                     "name": row.get("display_name") or row.get("username") or "—",
+                     "points": _points(row.get("points", row.get("total_points", 0)))})
     slug = season.get("slug") or season.get("id")
-    return _embed("ranking", f"🏆 Rangliste – {season.get('title') or season.get('name') or 'Saison'}", "\n".join(lines), url=f"{origin}/seasons/{slug}", now=now)
+    return {"season": season.get("title") or season.get("name") or "Saison", "season_url": f"{origin}/seasons/{slug}"}, rows
 
 
-def events_embed(items: list[dict], origin: str, now: datetime | None = None) -> dict:
-    """Die nächsten fünf Termine aus derselben Liste wie der Kalender der Website."""
-    lines = []
-    for item in items[:5]:
-        kind = {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap"}.get(item.get("kind"), "Termin")
+def events_context(items: list[dict], origin: str) -> tuple[dict, list[dict]]:
+    """Die nächsten Termine aus derselben Liste wie der Kalender der Website."""
+    rows = []
+    for item in items[:25]:
+        kind = item.get("kind")
         state = (item.get("phase") or {}).get("label") if isinstance(item.get("phase"), dict) else ""
-        parts = [f"**{item.get('title')}**", vienna(item.get("start")), kind]
-        if state:
-            parts.append(state)
-        lines.append(" · ".join(part for part in parts if part) + f"\n<{origin}{item.get('path')}>")
-    description = "\n".join(lines) if lines else "Nichts geplant – Termine folgen."
-    return _embed("events", "📅 Nächste Events und Turniere", description, url=f"{origin}/calendar", now=now)
+        rows.append({"icon": {"event": "📅", "tournament": "🏆", "fastlap": "🏁"}.get(kind, "📅"), "date": vienna_day(item.get("start")),
+                     "name": item.get("title") or "", "link": f"{origin}{item.get('path') or ''}",
+                     "kind": {"event": "Event", "tournament": "Turnier", "fastlap": "Fast Lap"}.get(kind, "Termin"), "state": state or ""})
+    return {}, rows
 
 
-def live_embed(streams: list[dict], origin: str, now: datetime | None = None) -> dict:
-    """Wer gerade streamt – dieselbe Regel wie die Startseite (nur freigeschaltete Kanäle)."""
-    lines = []
-    for stream in streams[:10]:
-        name = stream.get("display_name") or stream.get("username") or stream.get("twitch_login") or "—"
-        what = f" spielt {stream['game_name']}" if stream.get("game_name") else " ist live"
-        title = f" – „{str(stream['title'])[:80]}“" if stream.get("title") else ""
-        viewers = f" · {int(stream.get('viewer_count') or 0)} Zuschauer"
-        lines.append(f"🔴 **{name}**{what}{title}{viewers}\n<{stream.get('stream_url') or 'https://www.twitch.tv/' + str(stream.get('twitch_login') or '')}>")
-    description = "\n".join(lines) if lines else "Gerade streamt niemand."
-    return _embed("live", "🔴 Live jetzt", description, url=f"{origin}/#live", now=now)
+def live_context(streams: list[dict], origin: str, verdicts: dict | None = None) -> tuple[dict, list[dict]]:
+    """Wer gerade streamt – dieselbe Regel wie die Startseite (nur freigeschaltete Kanäle); Name aus dem Mitgliederprofil."""
+    rows = []
+    for stream in streams[:25]:
+        profile = ((verdicts or {}).get(stream.get("user_id")) or {}).get("member_profile") or {}
+        login = str(stream.get("twitch_login") or "")
+        rows.append({"streamer": profile.get("gamertag") or profile.get("display_name") or stream.get("display_name") or stream.get("username") or login or "—",
+                     "login": login, "title": stream.get("title") or "", "game": stream.get("game_name") or "",
+                     "viewers": str(int(stream.get("viewer_count") or 0)), "url": stream.get("stream_url") or (f"https://www.twitch.tv/{login}" if login else ""),
+                     "preview": stream.get("thumbnail_url") or "", "avatar": "", "started": discord_design.vienna_time(stream.get("started_at")),
+                     "profile": f"{origin}/members/{profile['slug']}" if profile.get("slug") else "", "platform": "Twitch"})
+    return {}, rows
 
 
-def achievement_week_embed(doc: dict | None, origin: str, now: datetime | None = None) -> dict:
+def achievement_week_context(doc: dict | None, origin: str) -> tuple[dict, list[dict]]:
     """Der Erfolg der Woche (#622): was die Website-Kachel zeigt - die Person nur mit öffentlichem Profil (das prüft
     schon die Auswahl), sonst „diese Woche keiner“."""
     award = (doc or {}).get("award")
     if not award:
-        return _embed("achievement_week", "🏅 Erfolg der Woche", "Diese Woche wurde kein Erfolg freigeschaltet, den wir zeigen dürfen – nächster Versuch am Montag.", url=f"{origin}/achievements", now=now)
+        return {"achievement": "Diese Woche keiner", "description": "Diese Woche wurde kein Erfolg freigeschaltet, den wir zeigen dürfen – nächster Versuch am Montag.",
+                "link": f"{origin}/achievements", "material_color": "#A66BFF", "group": "Erfolge"}, []
     user = award.get("user") or {}
-    name = user.get("display_name") or user.get("username") or "—"
-    material = f" · {award['material_name']}" if award.get("material_name") else ""
     holders = int(award.get("holders") or 0)
     rarity = f"{float(award.get('percent') or 0):g}".replace(".", ",")
-    lines = [f"**{award.get('name')}**{material} – {award.get('group_name') or ''}".rstrip(" –")]
-    if award.get("description"):
-        lines.append(str(award["description"])[:300])
-    lines.append(f"Freigeschaltet von **{name}**")
-    lines.append(f"Seltenheit: {rarity} % – {'nur diese Person' if holders <= 1 else f'{holders} Personen'}")
-    embed = _embed("achievement_week", f"🏅 Erfolg der Woche: {award.get('name')}", "\n".join(lines), url=f"{origin}/u/{user.get('username')}" if user.get("username") else f"{origin}/achievements", now=now)
-    color = str(award.get("material_color") or "").lstrip("#")
-    if len(color) == 6:
-        embed["color"] = int(color, 16)
-    return embed
+    color = str(award.get("material_color") or "").strip()
+    return {"achievement": award.get("name") or "", "description": str(award.get("description") or "")[:300],
+            "person": user.get("display_name") or user.get("username") or "", "material": award.get("material_name") or "",
+            "rarity": f"{rarity} % – {'nur diese Person' if holders <= 1 else f'{holders} Personen'}", "group": award.get("group_name") or "Erfolge",
+            "link": f"{origin}/u/{user.get('username')}" if user.get("username") else f"{origin}/achievements",
+            "avatar": user.get("avatar_url") if str(user.get("avatar_url") or "").startswith("http") else "",
+            "material_color": color if len(color.lstrip("#")) == 6 else "#A66BFF"}, []
 
 
-def content_hash(embed: dict) -> str:
-    """Der Inhalt ohne Fußzeile – eine neue Uhrzeit allein ist keine Änderung."""
-    body = {key: value for key, value in embed.items() if key != "footer"}
+def _common(origin: str, now: datetime | None) -> dict:
+    return {"site": origin, "club": "THE LION SQUAD", "logo": f"{origin}/assets/brand/tls-favicon.png",
+            "now": (now or now_utc()).astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M Uhr")}
+
+
+def _standard(kind: str, context: tuple[dict, list[dict]], origin: str, now: datetime | None) -> dict:
+    values, rows = context
+    return discord_design.render(kind, discord_design.default_template(kind), {**_common(origin, now), **values}, rows, now=now)["embed"]
+
+
+def ranking_embed(season: dict | None, standings: list[dict], origin: str, now: datetime | None = None) -> dict:
+    """Die Rangliste im Standard-Aussehen – für Tests und als Rückfall."""
+    return _standard("ranking", ranking_context(season, standings, origin), origin, now)
+
+
+def events_embed(items: list[dict], origin: str, now: datetime | None = None) -> dict:
+    return _standard("events", events_context(items, origin), origin, now)
+
+
+def live_embed(streams: list[dict], origin: str, now: datetime | None = None, verdicts: dict | None = None) -> dict:
+    return _standard("live", live_context(streams, origin, verdicts), origin, now)
+
+
+def achievement_week_embed(doc: dict | None, origin: str, now: datetime | None = None) -> dict:
+    return _standard("achievement_week", achievement_week_context(doc, origin), origin, now)
+
+
+def content_hash(rendered: dict) -> str:
+    """Der Inhalt ohne Fußzeile und Zeitstempel – eine neue Uhrzeit allein ist keine Änderung."""
+    embed = rendered.get("embed") if isinstance(rendered.get("embed"), dict) else rendered
+    body = {key: value for key, value in embed.items() if key not in ("footer", "timestamp")}
+    if rendered.get("content"):
+        body["__content"] = rendered["content"]
     return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
-async def build(db, kind: str, now: datetime | None = None) -> dict:
-    """Die Einbettung aus den echten Daten der Website."""
+async def context(db, kind: str, now: datetime | None = None) -> tuple[dict, list[dict]]:
+    """Die Werte einer Einbettung aus den echten Daten der Website."""
     from services.platform_links import frontend_url
 
     origin = (frontend_url() or "https://lionsquad.at").rstrip("/")
@@ -162,23 +198,31 @@ async def build(db, kind: str, now: datetime | None = None) -> dict:
 
         season = await _active_season(db)
         rows = await aggregate_leaderboard(season_id=season["id"], limit=10) if season else []
-        return ranking_embed(season, rows, origin, now)
+        return ranking_context(season, rows, origin)
     if kind == "events":
         from services.calendar_items import collect
 
         cutoff = (now or now_utc()).isoformat()
         items = [item for item in await collect(db, None) if item.get("start") and item["start"] >= cutoff]
-        return events_embed(items, origin, now)
+        return events_context(items, origin)
     if kind == "achievement_week":
         from services.achievement_visibility import achievement_of_week
 
-        return achievement_week_embed(await achievement_of_week(db, now=now), origin, now)
+        return achievement_week_context(await achievement_of_week(db, now=now), origin)
     from services.stream_visibility import homepage_visibility
 
     streams = await db.live_streams.find({}, {"_id": 0}).sort("viewer_count", -1).to_list(50)
     verdicts = await homepage_visibility(db, [stream.get("user_id") for stream in streams])
     visible = [stream for stream in streams if (verdicts.get(stream.get("user_id")) or {}).get("visible")]
-    return live_embed(visible, origin, now)
+    return live_context(visible, origin, verdicts)
+
+
+async def build(db, kind: str, now: datetime | None = None) -> dict:
+    """Die Einbettung aus den echten Daten der Website im Aussehen der Gestaltung: ``{"content", "embed"}``."""
+    values, rows = await context(db, kind, now)
+    common = await discord_design.common_values(db, now)
+    template = await discord_design.template_for(db, kind)
+    return discord_design.render(kind, template, {**common, **values}, rows, now=now)
 
 
 async def _config(db) -> tuple[dict, dict]:
@@ -197,7 +241,7 @@ async def _save(db, kind: str, patch: dict, unset: tuple[str, ...] = ()) -> None
 async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = None) -> dict:
     """Eine Einbettung aktuell halten: bearbeiten, wenn sich der Inhalt geändert hat; neu posten, wenn die
     Nachricht weg ist; höchstens einmal pro Minute (``force`` überstimmt die Unveränderlichkeit, nie die Bremse)."""
-    from discord_service import REASON_TEXTS as SEND_TEXTS, build_embed
+    from discord_service import REASON_TEXTS as SEND_TEXTS
     from services.discord_bot import bot, bot_settings
 
     if kind not in KINDS:
@@ -220,24 +264,24 @@ async def refresh(db, kind: str, *, force: bool = False, now: datetime | None = 
         _dirty.add(kind)
         return {"ok": False, "reason": "throttled", "error": REASON_TEXTS["throttled"]}
 
-    raw = await build(db, kind, current)
-    digest = content_hash(raw)
+    rendered = await build(db, kind, current)
+    digest = content_hash(rendered)
     if state.get("message_id") and state.get("hash") == digest and not force:
         _dirty.discard(kind)
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
-    embed = await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw.get("url"), fields=raw.get("fields"), footer=raw.get("footer"))
+    embed = rendered["embed"]
     channel_id = str(state["channel_id"])
     message_id = str(state.get("message_id") or "")
     action = "edited"
     result: dict = {"ok": False, "reason": "error"}
     try:
         if message_id:
-            result = await bot.edit_embed(channel_id, message_id, embed)
+            result = await bot.edit_embed(channel_id, message_id, embed, content=rendered.get("content") or "")
             if not result.get("ok") and result.get("reason") == "unknown_message":
                 message_id = ""
         if not message_id:
             action = "posted"
-            result = await bot.send_embed(channel_id, embed)
+            result = await bot.send_embed(channel_id, embed, content=rendered.get("content"))
             if result.get("ok"):
                 pinned = await bot.pin_message(channel_id, str(result.get("message_id")))
                 result["pinned"] = bool(pinned.get("ok"))
