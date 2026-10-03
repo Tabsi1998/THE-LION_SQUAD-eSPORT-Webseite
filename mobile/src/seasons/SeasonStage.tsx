@@ -7,7 +7,7 @@ import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
-import { EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
+import { EasterBackdrop, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
 import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
@@ -56,8 +56,8 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Silvester (S11 #642, wie #800 im Web): Feuerwerk mit Skia über allen Tabs, Hinweis im Kopf, Countdown und Gruß.
   new_year: { Sky: FireworksSky, Widget: NewYearWidget, Greeting: NewYearGreeting },
   // Ostern (S14 #645, E1 #753, E4 #756, wie im Web): Hasenohren im Dashboard-Kopf, Eier-Reihe an der Begrüßungskarte,
-  // das Osterei am Tab „Mehr“, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
-  easter: { Widget: EasterEarsWidget, Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon },
+  // das Osterei am Tab „Mehr“, Frühlingslicht, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
+  easter: { Widget: EasterEarsWidget, Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

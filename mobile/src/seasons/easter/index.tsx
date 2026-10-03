@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
 import Reanimated, { useAnimatedStyle, useFrameCallback, useSharedValue, type SharedValue } from "react-native-reanimated";
+import Svg, { Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body } from "../../components/Text";
 import { greetingShownToday, localDay, markGreetingShown } from "../christmas/greeting";
@@ -83,6 +84,38 @@ export function EasterTabIcon({ size }: { size: number }) {
   return (
     <View style={{ transform: [{ rotate: "-8deg" }] }} testID="easter-tab-egg">
       <EggArt pattern={pattern} size={Math.round(size * 0.72)} />
+    </View>
+  );
+}
+
+/**
+ * Hinter dem Inhalt ein helles Frühlingslicht (#753, wie im Web): oben rechts warm, unten links ein Hauch Rosa, unten
+ * Grün - am Karfreitag halb so hell; nicht auf stillen Screens.
+ */
+export function EasterBackdrop({ season, screen }: { season: ActiveSeason; screen: string }) {
+  if (screenClass(screen) === "quiet") return null;
+  const dim = isQuiet(season) ? 0.5 : 1;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="easter-light">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <RadialGradient id="easterLightTop" cx="78%" cy="8%" rx="44%" ry="28%">
+            <Stop offset="0" stopColor="#faf0be" stopOpacity={0.075 * dim} />
+            <Stop offset="0.72" stopColor="#faf0be" stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="easterLightPink" cx="14%" cy="86%" rx="40%" ry="24%">
+            <Stop offset="0" stopColor="#f6bed2" stopOpacity={0.05 * dim} />
+            <Stop offset="0.7" stopColor="#f6bed2" stopOpacity={0} />
+          </RadialGradient>
+          <RadialGradient id="easterLightGreen" cx="50%" cy="100%" rx="60%" ry="26%">
+            <Stop offset="0" stopColor="#96c882" stopOpacity={0.045 * dim} />
+            <Stop offset="0.72" stopColor="#96c882" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#easterLightTop)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#easterLightPink)" />
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#easterLightGreen)" />
+      </Svg>
     </View>
   );
 }

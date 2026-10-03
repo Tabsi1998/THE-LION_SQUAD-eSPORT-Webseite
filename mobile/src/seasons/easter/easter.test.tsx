@@ -12,7 +12,7 @@ jest.mock("../SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
 jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {} } }));
 
-const { EARS_COOLDOWN_MS, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon, GREETING_KEY, TOAST_DELAY_MS, TOAST_MS } = require("./index");
+const { EARS_COOLDOWN_MS, EasterBackdrop, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon, GREETING_KEY, TOAST_DELAY_MS, TOAST_MS } = require("./index");
 const { SEASON_MODULES, appNamesSeason } = require("../SeasonStage");
 
 const SUNDAY = "2027-03-28";
@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 test("im Register: Ohren, Kante, Gruß, Himmel, Tab-Symbol - und die App nennt Ostern als laufend", () => {
-  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
+  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Backdrop", "Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
   expect(appNamesSeason({ key: "easter" })).toBe(true);
 });
 
@@ -87,6 +87,14 @@ test("die Eier-Reihe an der Begrüßungskarte: verschiedene Muster, nicht auf st
   await screen.unmount();
   await render(<EasterTabIcon size={24} />);
   expect(screen.getByTestId("easter-tab-egg")).toBeTruthy();
+});
+
+test("Frühlingslicht hinter dem Inhalt - nicht auf stillen Screens", async () => {
+  await render(<EasterBackdrop season={easter()} screen="Dashboard" />);
+  expect(screen.getByTestId("easter-light")).toBeTruthy();
+  await screen.unmount();
+  await render(<EasterBackdrop season={easter()} screen="AdminHome" />);
+  expect(screen.queryByTestId("easter-light")).toBeNull();
 });
 
 test("Himmel: Blätter nur mit Bewegung und nicht am Karfreitag", async () => {
