@@ -73,3 +73,17 @@ test("Mitglied mit Online-Zahlung: der Hinweis führt auf die Website; bei Ausfa
   expect(screen.getByText(/Mitgliedsbeitrag/)).toBeTruthy();
   expect(screen.getByTestId("invoices-pay-hint")).toHaveTextContent(/auf der Website/);
 });
+
+test("aus „Deine Rechnung ist da“ (#841): der genannte Beleg öffnet sich gleich - einmal, auch wenn die Liste neu lädt", async () => {
+  const fromNotice = { key: "i", name: "MyInvoices", params: { invoice: "d-601" } } as never;
+  const view = await render(<MyInvoicesScreen navigation={navigation} route={fromNotice} />);
+  await waitFor(() => expect(mockOpenInvoice).toHaveBeenCalledWith(expect.objectContaining({ key: "d-601" }), "tok-1"));
+  await view.rerender(<MyInvoicesScreen navigation={navigation} route={fromNotice} />);
+  expect(mockOpenInvoice).toHaveBeenCalledTimes(1);
+});
+
+test("ein unbekannter Beleg aus dem Link öffnet nichts", async () => {
+  await render(<MyInvoicesScreen navigation={navigation} route={{ key: "i", name: "MyInvoices", params: { invoice: "d-999" } } as never} />);
+  await waitFor(() => expect(screen.getByTestId("invoice-d-501")).toBeTruthy());
+  expect(mockOpenInvoice).not.toHaveBeenCalled();
+});

@@ -62,7 +62,7 @@ type NotificationTarget =
   | { area: "teams"; screen: "TeamDetail" | "TeamChat"; params: { id: string; title?: string } }
   | { area: "tournaments"; screen: "TournamentList"; params?: undefined }
   | { area: "tournaments"; screen: "TournamentDetail" | "EventDetail" | "FastLapDetail" | "MatchDetail" | "TournamentChat"; params: { id: string; title?: string } }
-  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar" | "AchievementShowcase" | "EasterHunt"; params?: Record<string, unknown> };
+  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar" | "AchievementShowcase" | "EasterHunt" | "MyInvoices"; params?: Record<string, unknown> };
 
 function targetFromNotification(item: UserNotification): NotificationTarget | null {
   const meta = (item.meta || {}) as Record<string, unknown>;
@@ -135,6 +135,12 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
   if (first === "profile" && second) return { area: "more", screen: "PublicProfile", params: { username: second } };
   if (first === "profile" && parsed.query.includes("tab=inbox")) return { area: "more", screen: "DirectMessages" };
   if (first === "profile" && parsed.query.includes("tab=teams")) return { area: "teams", screen: "TeamList" };
+  // „Deine Rechnung ist da“ (#841): Meine Rechnungen - mit dem genannten Beleg, der sich gleich öffnet.
+  if (first === "profile" && parsed.query.includes("tab=invoices")) {
+    const invoice = new URLSearchParams(parsed.query).get("invoice") || "";
+    return { area: "more", screen: "MyInvoices", params: /^d-\d{1,12}$/.test(invoice) ? { invoice } : undefined };
+  }
+  if (first === "account" && second === "invoices") return { area: "more", screen: "MyInvoices" };
   // „Erfolg freigeschaltet“ (#301, #218) führt zu den Erfolgen, nicht nur ins Profil.
   if (first === "profile" && parsed.query.includes("tab=achievements")) return { area: "profile", params: { tab: "achievements" } };
   if (first === "profile") return { area: "profile" };

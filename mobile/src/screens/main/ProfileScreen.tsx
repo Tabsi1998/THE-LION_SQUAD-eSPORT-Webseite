@@ -73,6 +73,8 @@ const notificationLabels: Array<{ key: string; label: string; detail: string; ch
   { key: "achievements", label: "Erfolge", detail: "Freigeschaltete Erfolge – als Gratulation.", channels: ["in_app", "push", "discord"] },
   // Wochenrückblick (#622): nur per E-Mail, montags, nur bei Aktivität.
   { key: "achievement_recap", label: "Wochenrückblick", detail: "Montags eine Mail mit XP, Level und neuen Erfolgen.", channels: ["email"] },
+  // Rechnungen (#841): Postfach, Push und Mail - Beträge nie über Discord.
+  { key: "billing_updates", label: "Rechnungen", detail: "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF.", channels: ["in_app", "push", "email"] },
   { key: "membership_updates", label: "Mitgliedschaft", detail: "Bewerbung, Status und Vereinsvorteile." },
   { key: "birthday_greetings", label: "Geburtstag", detail: "Geburtstagsgruß vom Verein." },
   { key: "community_messages", label: "Community", detail: "Direktnachrichten und Erwähnungen." },

@@ -33,6 +33,14 @@ OPTIONAL_EMAIL_PREFERENCES = {
         "default": True,
         "channels": ["in_app", "push", "discord"],
     },
+    # Rechnungen (#841): „Deine Rechnung ist da“ mit Betrag, Zahlungsziel und Link zum PDF - nur an die Person
+    # selbst; Beträge gehen nie über Discord, deshalb gibt es dort keinen Schalter.
+    "billing_updates": {
+        "label": "Rechnungen",
+        "description": "Neue Rechnung mit Betrag, Zahlungsziel und Link zum PDF in deinem Konto.",
+        "default": True,
+        "channels": ["in_app", "push", "email"],
+    },
     "membership_updates": {
         "label": "Vereinsmitgliedschaft",
         "description": "Bewerbung, Mitgliedsstatus und Vereinsvorteile.",
@@ -128,6 +136,7 @@ TEMPLATE_CATEGORY = {
     "membership_reject": "membership_updates",
     "birthday_greeting": "birthday_greetings",
     "achievement_recap": "achievement_recap",
+    "invoice_ready": "billing_updates",
     "direct_message": "community_messages",
     "team_chat_message": "community_messages",
     "team_chat_mention": "community_messages",
@@ -167,6 +176,7 @@ NOTIFICATION_KIND_CATEGORY = {
     "event_member": "club_internal",
     "event_board": "club_internal",
     "membership_update": "membership_updates",
+    "invoice_ready": "billing_updates",
 }
 
 

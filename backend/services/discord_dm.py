@@ -20,7 +20,8 @@ from models import new_id, now_utc
 logger = logging.getLogger("tls-arena.discord.dm")
 DM_TARGET = "dm"
 # Moderation bleibt in App und Web - nie als Direktnachricht in einem fremden Dienst.
-EXCLUDED_KINDS = {"moderation"}
+# Rechnungen (#841) nennen Beträge - die gehören nicht in einen fremden Dienst, auch nicht als Direktnachricht.
+EXCLUDED_KINDS = {"moderation", "invoice_ready"}
 # Nachrichten anderer Personen: nur der Hinweis, nie der Text.
 PRIVATE_BODY_CATEGORIES = {"community_messages"}
 PRIVATE_BODY_TEXT = "Öffne die Website oder die App, um sie zu lesen."

@@ -60,3 +60,11 @@ test("eine Adresse der Website öffnet ihren Screen - sonst sagt die App, dass s
   for (const url of ["/servers", "/about", "", null, undefined]) expect(navigateToUrl(url)).toBe(false);
   expect(mockRef.navigate).not.toHaveBeenCalled();
 });
+
+test("„Deine Rechnung ist da“ (#841) öffnet Meine Rechnungen mit dem Beleg - fremde Werte fallen weg", () => {
+  expect(targetFromUrl("/profile?tab=invoices&invoice=d-501")).toEqual({ area: "more", screen: "MyInvoices", params: { invoice: "d-501" } });
+  expect(targetFromUrl("https://lionsquad.at/profile?tab=invoices&invoice=d-501")).toEqual({ area: "more", screen: "MyInvoices", params: { invoice: "d-501" } });
+  expect(targetFromUrl("/profile?tab=invoices&invoice=../../x")).toEqual({ area: "more", screen: "MyInvoices", params: undefined });
+  expect(targetFromUrl("/profile?tab=invoices")).toEqual({ area: "more", screen: "MyInvoices", params: undefined });
+  expect(targetFromUrl("/account/invoices")).toEqual({ area: "more", screen: "MyInvoices" });
+});

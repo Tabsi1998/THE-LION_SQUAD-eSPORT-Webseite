@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { CreditCard, Eye, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
@@ -12,7 +13,8 @@ import { amountLine, dueLine, filterInvoices, invoiceLine, outageText, sourceFil
 // des Klicks. Für alle Konten: Nicht-Mitglieder sehen ihre Event- und Turnierrechnungen, jeder Beleg
 // trägt seinen Vorgang, Filter nach Quelle und Stand gibt es ab zwei Quellen. Rechnungen gehören zum
 // Konto, nicht zum Vereinsbereich (Entscheidung des Betreibers vom 23.09.): dieselbe Tafel steht im
-// Profil-Reiter „Rechnungen“ und auf /account/invoices.
+// Profil-Reiter „Rechnungen“ und auf /account/invoices. „Deine Rechnung ist da“ (#841) verlinkt mit
+// `?invoice=d-…`: der Beleg öffnet sich gleich im Betrachter, einmal - beim Schließen verschwindet der Zusatz.
 
 const TONE_CLASSES = {
   info: "border-[#29B6E8]/50 text-[#29B6E8]",
@@ -27,6 +29,9 @@ export function InvoicesPanel() {
   const [viewing, setViewing] = useState(null);
   const [source, setSource] = useState("all");
   const [state, setState] = useState("all");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wanted = searchParams.get("invoice") || "";
+  const opened = useRef("");
 
   const load = useCallback(() => {
     api.get("/account/invoices").then(({ data: result }) => { setData(result); setError(""); })
@@ -34,6 +39,23 @@ export function InvoicesPanel() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["membership", "account/invoices"]);
+
+  // Aus der Meldung „Deine Rechnung ist da“: den genannten Beleg öffnen, sobald die Liste da ist.
+  useEffect(() => {
+    if (!wanted || opened.current === wanted || !data?.invoices) return;
+    const row = data.invoices.find((item) => item.key === wanted);
+    if (!row) return;
+    opened.current = wanted;
+    setViewing(row);
+  }, [wanted, data]);
+
+  const closeViewer = () => {
+    setViewing(null);
+    if (!wanted) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete("invoice");
+    setSearchParams(next, { replace: true });
+  };
 
   const pay = async (row) => {
     // Der Server prüft im Moment des Klicks (eigener Beleg, noch offen, zulässiges Ziel) und nennt das Ziel.
@@ -92,7 +114,7 @@ export function InvoicesPanel() {
           downloadPath={`/account/invoices/${viewing.key}/pdf?download=1`}
           title={`${viewing.type_label} ${viewing.ref}`}
           subtitle={amountLine(viewing, currency)}
-          onClose={() => setViewing(null)}
+          onClose={closeViewer}
         />
       )}
     </div>

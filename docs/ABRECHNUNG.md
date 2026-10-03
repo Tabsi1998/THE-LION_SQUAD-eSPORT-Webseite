@@ -130,6 +130,23 @@ Mitglieder wie Gäste laden es auf der Website unter „Meine Rechnungen“.
 - **Gäste:** Fehlt die Datei beim Herunterladen noch, erzeugt die Website sie in diesem Moment
   einmal – niemand muss auf den Abgleich warten.
 
+## „Deine Rechnung ist da“ (#841)
+
+**Wer sich anmeldet, erfährt, sobald die Rechnung freigegeben ist.** Die Meldung nennt den
+Vorgang, den Betrag und das Zahlungsziel („Weihnachtsfeier: 40,00 €, zahlbar bis 17.10.2026.“) und
+führt direkt zum Beleg im Konto – im Web öffnet sich das PDF, in der App der Beleg.
+
+- **Wege:** Postfach in Web und App, Push und Mail. Die Mail hat einen **Link, keinen Anhang** –
+  das PDF bleibt hinter der Anmeldung. **Discord ist kein Weg** dafür: Beträge gehören nicht in
+  einen fremden Dienst, auch nicht als Direktnachricht.
+- **Einstellungen:** Profil → Benachrichtigungen → „Rechnungen“ (Postfach, Push, E-Mail).
+- **Einmal je Beleg**, ausgelöst von der Freigabe: gleich beim Anlegen („gleich freigeben“) oder,
+  wenn ihr den Entwurf in Dolibarr von Hand freigebt, beim nächsten Abgleich.
+- **Wartet auf das PDF** – höchstens zwei Stunden; danach kommt sie trotzdem, der Download im
+  Konto baut ein fehlendes PDF selbst.
+- **Nie** für Entwürfe, nie nach einer Abmeldung, nie für Gutschriften – und Belege, die schon vor
+  dem Update freigegeben waren, bleiben still (kein Schwall alter Rechnungen).
+
 ## Nach dem Beleg: Zahlungsstand, Prüffälle, Erstattungen (#321)
 
 **Dolibarr ist führend für den Beleg und das Geld, die Website für die Buchung.** Die Website
