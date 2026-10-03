@@ -191,6 +191,15 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
 
 Zählen, Rollen und Befehle gelten nur für Konten, die im Profil verknüpft sind (Abschnitt oben).
 
+**Willkommensnachricht (#574):** Wer neu auf den Server kommt, bekommt vom Bot eine
+Direktnachricht – einmal je Person – mit den Knöpfen „Auf der Website anmelden“ und „Konto
+verknüpfen“. Text unter Verbindungen → Discord → „Willkommensnachricht“ mit Vorschau und „An mich
+senden“; `{name}` wird der Name im Discord, `{verein}` der Vereinsname. **Standard aus**, bis der
+Text geprüft ist. Lässt jemand keine Direktnachrichten zu, passiert nichts – nur der Zähler steigt.
+Gemerkt wird nur ein Hash der Discord-Kennung (`discord_welcomes`), nie Name oder Kennung; ein
+vorübergehender Fehler darf beim nächsten Beitritt noch einmal. Braucht den Server Members Intent,
+der für den Rollenabgleich ohnehin an ist.
+
 ### Einrichten (einmalig, im Admin beschrieben)
 
 1. discord.com/developers → dieselbe App wie fürs Konto-Verknüpfen → **Bot** → „Reset Token“ →
@@ -228,6 +237,10 @@ Konto-Verknüpfung läuft unabhängig vom Bot weiter.
   `list_channels`, `send_embed`) um discord.py. Routen `routes/discord_bot_routes.py`
   (`/api/settings/discord/bot/status|sync|restart`) und `GET /api/settings/discord/channels`,
   Job `discord_bot_roles` alle zehn Minuten, Start im Lifespan.
+- `backend/services/discord_welcome.py` (#574): `greet` (Beitritt, `on_member_join`),
+  `render` (Embed und Knöpfe für Vorschau, Test und Versand), `welcome_status`, `send_test`;
+  Einstellung `settings.discord.welcome` {`enabled`, `text`} über `PUT /api/settings/discord`,
+  dazu `POST /api/settings/discord/welcome/preview|test`.
 - `backend/services/discord_commands.py` (#573): die Antworten der neuen Befehle als Rechnung
   (`answer_*`, `bracket_choices`, `membership_text`); `discord_bot.answer_kwargs` macht daraus die
   Antwort nur für die fragende Person. Link-Knöpfe: `buttons` an jeder Meldung

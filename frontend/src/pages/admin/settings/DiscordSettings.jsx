@@ -9,13 +9,14 @@ import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
 import { DiscordScheduledPanel } from "./DiscordScheduledPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordTargets } from "./DiscordTargets";
+import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
 
 // Discord: Meldungen über den Bot (Kanal je Zweck, Schalter je Ereignis), Bot und Aktivitätszähler.
 // Seit #566 gibt es keine Webhook-Adressen mehr - der Bot schickt alles; ist er aus, wird nichts
 // gesendet. Alles steht auf der Discord-Seite unter Verbindungen (24.09.: „muss das doppelt sein?“).
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
-const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
+const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
 
 /** Nur, was sich einstellen lässt - der Rest der Antwort ist Stand, kein Feld. */
 export function discordPayload(source) {
@@ -129,6 +130,7 @@ export function DiscordSettings() {
       <DiscordTargets />
       <DiscordEmbedsPanel />
       <DiscordScheduledPanel />
+      <DiscordWelcomePanel />
       <DiscordSamplesPanel />
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">

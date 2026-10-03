@@ -408,6 +408,18 @@ class BotRunner:
             await record_state(db, connected=True, guild_name=runner.guild_name, last_error=runner.last_error, last_action=runner.last_action, started_at=now_utc().isoformat())
 
         @client.event
+        async def on_member_join(member):
+            # Willkommensnachricht (#574): einmal je Person, nur wenn eingeschaltet - ohne Erlaubnis still.
+            from services.discord_welcome import greet
+            try:
+                result = await greet(db, member.id, getattr(member, "display_name", "") or "", is_bot=bool(member.bot))
+            except Exception as exc:  # noqa: BLE001 - ein Beitritt darf nie an der Website scheitern
+                logger.warning("[discord-bot] Willkommen: %s", type(exc).__name__)
+                return
+            if result.get("ok"):
+                runner.last_action = f"Willkommensnachricht gesendet ({now_utc().strftime('%H:%M')} UTC)"
+
+        @client.event
         async def on_message(message):
             if not view["count_messages"] or message.guild is None:
                 return

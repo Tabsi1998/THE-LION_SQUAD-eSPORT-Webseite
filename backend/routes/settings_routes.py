@@ -324,6 +324,8 @@ class DiscordSettings(BaseModel):
     embeds: Optional[dict[str, dict]] = None
     # Discord-Termine (#570): {enabled, internal}.
     scheduled_events: Optional[dict[str, bool]] = None
+    # Willkommensnachricht (#574): {enabled, text}; leerer Text heißt Vorlage.
+    welcome: Optional[dict] = None
 
 
 class YoutubeFeedSettings(BaseModel):
@@ -1532,6 +1534,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     # Discord-Termine (#570): Schalter, letzter Abgleich, Anzahl.
     from services.discord_scheduled import scheduled_status
     s["scheduled_events"] = await scheduled_status(db)
+    # Willkommensnachricht (#574): Schalter, Text, Vorschau, Zähler.
+    from services.discord_welcome import welcome_status
+    s["welcome"] = await welcome_status(db, s)
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     # Tests aus der Vorschau (#583) zählen nicht als Meldung.
@@ -1601,6 +1606,20 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in ("enabled", "internal") or not isinstance(value, bool):
                 raise HTTPException(400, f"Unbekannte Einstellung für Discord-Termine: {key}")
             updates[f"scheduled_events.{key}"] = value
+    # Willkommensnachricht (#574): Schalter und Text - mehr nicht.
+    incoming_welcome = updates.pop("welcome", None)
+    if incoming_welcome is not None:
+        from services.discord_welcome import MAX_TEXT
+        for key, value in incoming_welcome.items():
+            if key == "enabled" and isinstance(value, bool):
+                updates["welcome.enabled"] = value
+            elif key == "text" and isinstance(value, str):
+                text = value.strip()
+                if len(text) > MAX_TEXT:
+                    raise HTTPException(400, f"Die Willkommensnachricht ist zu lang – höchstens {MAX_TEXT} Zeichen.")
+                updates["welcome.text"] = text
+            else:
+                raise HTTPException(400, f"Unbekannte Einstellung für die Willkommensnachricht: {key}")
     # Live-Einbettungen (#569): Schalter und Kanal je Art; ein neuer Kanal heißt eine neue Nachricht.
     incoming_embeds = updates.pop("embeds", None)
     if incoming_embeds is not None:
@@ -1634,6 +1653,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             flat_current[f"embeds.{kind}.{key}"] = value
     for key, value in (current.get("scheduled_events") or {}).items():
         flat_current[f"scheduled_events.{key}"] = value
+    for key, value in (current.get("welcome") or {}).items():
+        flat_current[f"welcome.{key}"] = value
     current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
@@ -1870,6 +1891,23 @@ async def discord_preview(body: dict, me: dict = Depends(require_area("content",
     if kind not in ("news", "event") or not isinstance(body.get("item"), dict):
         raise HTTPException(400, "kind ist „news“ oder „event“, item das Formular.")
     return await preview(kind, body["item"])
+
+
+@settings_router.post("/discord/welcome/preview")
+async def discord_welcome_preview(body: dict, me: dict = Depends(require_club_admin())):
+    """Die Willkommensnachricht (#574) mit dem Text aus dem Formular - so kommt sie an."""
+    from services.discord_welcome import MAX_TEXT, render, welcome_settings
+    text = str((body or {}).get("text") or "").strip()[:MAX_TEXT]
+    if not text:
+        text = welcome_settings(await get_db().settings.find_one({"id": "discord"}, {"_id": 0, "welcome": 1}))["text"]
+    return await render(get_db(), text, "Paula")
+
+
+@settings_router.post("/discord/welcome/test")
+async def discord_welcome_test(body: dict, me: dict = Depends(require_club_admin())):
+    """„An mich senden“ (#574): als Direktnachricht an das eigene verknüpfte Konto - zählt nicht."""
+    from services.discord_welcome import MAX_TEXT, send_test
+    return await send_test(get_db(), me, str((body or {}).get("text") or "")[:MAX_TEXT])
 
 
 @settings_router.post("/discord/resend/{log_id}")
