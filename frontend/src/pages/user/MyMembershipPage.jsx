@@ -8,6 +8,7 @@ import { feeCard, formatDate } from "@/lib/dolibarr";
 import { MemberCardPanel } from "@/components/tls/MemberCardPanel";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { SwitchRow } from "@/pages/user/profile/SwitchRow";
+import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
@@ -106,6 +107,8 @@ export default function MyMembershipPage() {
         {erp?.connected && <IdentityCard />}
         {/* Eigene Daten und Austritt (#329 Teil 2): nur mit Bindung und Fähigkeit „eigene Daten“ */}
         {erp?.connected && <SelfServiceCard />}
+        {/* Konten in der Mitgliederakte (#846): geprüfte Konten nur auf Wunsch in die Akte */}
+        {erp?.connected && <MemberFileAccountsCard />}
         {/* Eigenes Website-Profil (#260): Gamertag, Kurztext, Spiele, Plattformen in der Vereinsakte, Anzeige nur mit Einwilligung */}
         {erp?.connected && <WebsiteProfileCard />}
         {erp?.connected && !erp.led_by_dolibarr && (

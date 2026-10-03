@@ -747,6 +747,28 @@ class DolibarrClient:
         return data
 
     # ------------------------------------------------ Eigenes Website-Profil (#260, Vereine ab 1.2), über die Bindung
+    # ------------------------------------------------ Konten in der Akte (#846), Fähigkeit accounts
+    async def my_accounts(self, who: dict) -> list[dict]:
+        """Die Konten der Person: jedes Netzwerk, das der Verein abfragt (`asked`), und jedes mit einem Namen."""
+        data = await self._get("/vereine/me/accounts", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def put_my_account(self, who: dict, network: str, payload: dict) -> list[dict]:
+        """Name setzen; `confirmed: true` heißt: die Website hat das Konto beim Netzwerk geprüft. Antwort: die Konten danach."""
+        data = await self._request("PUT", f"/vereine/me/accounts/{quote(str(network), safe='')}", params=dict(who), payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def delete_my_account(self, who: dict, network: str) -> list[dict]:
+        """Name und Bestätigung entfernen. Antwort: die Konten danach."""
+        data = await self._request("DELETE", f"/vereine/me/accounts/{quote(str(network), safe='')}", params=dict(who), key=self._write_key, retries=0)
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
     async def my_website_profile(self, who: dict) -> dict:
         """Gamertag, Kurztext, Spiele und Plattformen, wie die Person sie selbst pflegt - plus die Einwilligung."""
         data = await self._get("/vereine/me/website-profile", dict(who))

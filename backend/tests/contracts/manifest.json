@@ -37,6 +37,8 @@
       "/vereine/me/invoices/{invoice}/pdf",
       "/vereine/me/profile",
       "/vereine/me/profile/changes",
+      "/vereine/me/accounts",
+      "/vereine/me/accounts/{network}",
       "/vereine/me/exit",
       "/vereine/me/statutes",
       "/vereine/me/statutes/{id}/pdf",

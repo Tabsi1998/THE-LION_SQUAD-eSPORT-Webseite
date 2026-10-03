@@ -630,6 +630,28 @@ async def withdraw_helper_shift(event_id: int, shift_id: int, request: Request, 
         raise HTTPException(exc.status, exc.detail)
 
 
+class AccountShareBody(BaseModel):
+    share: bool
+
+
+@router.get("/me/accounts")
+async def my_accounts(user: dict = Depends(get_current_user)):
+    """Meine Konten in der Mitgliederakte (#846): was der Verein wünscht, was dort steht, was die Website geprüft hat."""
+    from services import dolibarr_accounts
+    return await dolibarr_accounts.overview(get_db(), user)
+
+
+@router.put("/me/accounts/{network}")
+async def share_my_account(network: str, body: AccountShareBody, request: Request, user: dict = Depends(get_current_user)):
+    """Ein geprüftes Konto in die Akte übernehmen oder dort herausnehmen - nur auf Wunsch der Person."""
+    from services import dolibarr_accounts
+    await enforce_rate_limit(request, "dolibarr:accounts:share", limit=30, window_seconds=3600, subject=user["id"])
+    try:
+        return await dolibarr_accounts.share(get_db(), user, network.strip().lower()[:40], body.share)
+    except dolibarr_accounts.AccountsError as exc:
+        raise HTTPException(exc.status, exc.detail)
+
+
 class WebsiteProfileBody(BaseModel):
     # Kürzel → Wert, wie das Modul es erwartet (Text, Zahl, Ja/Nein, Tag, Kürzel, Liste); nur Geändertes senden.
     fields: dict[str, object]

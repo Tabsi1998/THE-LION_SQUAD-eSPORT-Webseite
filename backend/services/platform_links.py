@@ -1331,6 +1331,9 @@ async def link_account(db, user_id: str, platform: str, identity: dict) -> dict:
     # Ein verknüpftes Konto füllt ein Profilfeld - vielleicht das letzte fehlende (Sprinter, #615).
     from services.member_activity import note_profile_completion
     await note_profile_completion(db, user_id)
+    # In die Mitgliederakte übernommen (#846)? Dann folgt der neue Name dorthin.
+    from services.dolibarr_accounts import follow_platform
+    await follow_platform(db, user_id, platform, linked=link)
     return link
 
 
@@ -1338,6 +1341,9 @@ async def unlink(db, user_id: str, platform: str) -> bool:
     """Trennen: Verknüpfung weg, Häkchen weg - der Text im Profilfeld bleibt."""
     result = await db.platform_links.delete_many({"user_id": user_id, "platform": platform})
     await db.users.update_one({"id": user_id}, {"$unset": {f"platform_verified.{platform}": ""}, "$set": {"updated_at": now_utc().isoformat()}})
+    # Getrennt heißt auch: aus der Mitgliederakte heraus, wenn es dort übernommen war (#846).
+    from services.dolibarr_accounts import follow_platform
+    await follow_platform(db, user_id, platform, linked=None)
     return result.deleted_count > 0
 
 

@@ -169,6 +169,13 @@ class FakeDolibarr:
         self.fail_paths: set[str] = set()
         self.break_after_pages: int | None = None
         self.core_status = 403
+        # Konten in der Mitgliederakte (#846): das Wörterbuch der sozialen Netzwerke (was der Verein abfragt) und je
+        # Mitglied, was in der Akte steht.
+        self.account_networks: dict[str, dict] = {
+            "discord": {"label": "Discord", "asked": "required"}, "twitch": {"label": "Twitch", "asked": ""},
+            "steam": {"label": "Steam", "asked": "optional"}, "youtube": {"label": "YouTube", "asked": ""},
+        }
+        self.member_accounts: dict[int, dict[str, dict]] = {}
         self.server_time = "2026-09-21T10:00:00Z"
         self.module_version = MANIFEST["vereine"]["module_version"]
         # Kern-API für die Abrechnung (#316, #317): Geschäftspartner, Belege, Mitglieder (fk_soc),
@@ -359,6 +366,20 @@ class FakeDolibarr:
         if ident is None:
             return None, httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
         return ident, None
+
+    def _my_accounts(self, member_id: int) -> list[dict]:
+        """`me/accounts`: jedes abgefragte Netzwerk und jedes, das die Person hat - mit „bestätigt durch Anwendung“."""
+        own = self.member_accounts.get(member_id, {})
+        rows = []
+        for network, meta in self.account_networks.items():
+            entry = own.get(network)
+            if not entry and not meta.get("asked"):
+                continue
+            handle = (entry or {}).get("handle") or ""
+            rows.append({"network": network, "label": meta["label"], "asked": meta.get("asked") or "", "handle": handle,
+                         "url": f"https://example.test/{network}/{handle}" if handle else "", "confirmed": bool((entry or {}).get("confirmed")),
+                         "confirmed_at": (entry or {}).get("confirmed_at") or "", "client": (entry or {}).get("client") or ""})
+        return rows
 
     def profile_for(self, member_id: int) -> dict:
         """Die eigenen Daten, wie das Modul sie liefert - beim ersten Zugriff aus der Zusammenfassung gebaut."""
@@ -987,6 +1008,28 @@ class FakeDolibarr:
             code = self.website_profile_consent
             given = bool(code) and (self.member_consents.get(member_id, {}).get(code) or {}).get("state") == "given"
             return self._json("/vereine/me/website-profile", {"consent": code, "given": given, "fields": fields})
+        if path == "/vereine/me/accounts" and request.method == "GET":
+            ident, denied = self._person(params, "accounts")
+            if denied:
+                return denied
+            return self._json("/vereine/me/accounts", self._my_accounts(ident["member_id"]))
+        match = re.fullmatch(r"/vereine/me/accounts/([a-z0-9_-]+)", path)
+        if match and request.method in ("PUT", "DELETE"):
+            ident, denied = self._person(params, "accounts")
+            if denied:
+                return denied
+            network = match.group(1)
+            if network not in self.account_networks:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "unknown network"}})
+            own = self.member_accounts.setdefault(ident["member_id"], {})
+            if request.method == "PUT":
+                body = json.loads(request.content.decode("utf-8"))
+                validate(body, request_schema("/vereine/me/accounts/{network}", "put"))
+                own[network] = {"handle": body["handle"], "external_id": body.get("external_id") or "", "confirmed": bool(body.get("confirmed")),
+                                "confirmed_at": self.server_time if body.get("confirmed") else "", "client": "Website" if body.get("confirmed") else ""}
+                return self._json_method("/vereine/me/accounts/{network}", "put", self._my_accounts(ident["member_id"]))
+            own.pop(network, None)
+            return self._json_method("/vereine/me/accounts/{network}", "delete", self._my_accounts(ident["member_id"]))
         if path == "/vereine/me/profile" and request.method == "GET":
             ident, denied = self._person(params, "profile")
             if denied:

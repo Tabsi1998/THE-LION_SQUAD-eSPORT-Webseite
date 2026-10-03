@@ -327,6 +327,22 @@ Die Modulversion merkt sich die Website beim Verbindungstest und bei jedem Abgle
 Einladungscode der Weg – der Abschnitt unten gilt dann unverändert. Hat ein Konto beides
 (Zuordnung und alte Bindung), zählt ab 1.4.0 die Zuordnung.
 
+## Konten in der Mitgliederakte (#846)
+
+Wer auf der Website ein Konto verknüpft hat (Discord, Twitch, Steam, YouTube, TikTok, X – per Anmeldung bei der
+Plattform geprüft), kann es unter *Meine Mitgliedschaft → Meine Konten in der Mitgliederakte* in seine Akte
+übernehmen: je Konto ein Schalter, **nur auf eigenen Wunsch**. In Dolibarr steht es dann am Mitglied als
+„bestätigt durch Anwendung“. Ausschalten oder Trennen auf der Website nimmt es wieder heraus; war es übernommen
+und wird neu verknüpft, bringt es seinen neuen Namen mit.
+
+- Voraussetzung: die Vereinsakte ist verbunden (ab Vereine 1.4.0 über die Mitgliedsnummer, sonst Einladungscode
+  mit der Fähigkeit **„Konten“**). Fehlt die Fähigkeit, sagt die Karte das.
+- Netzwerke, die der Verein abfragt, zeigt die Karte mit „Der Verein wünscht“; fehlt die Verknüpfung, führt
+  „Jetzt verknüpfen“ ins Profil (Web: *Socials*, App: *Bearbeiten*).
+- Kennt Dolibarr ein Netzwerk nicht (nicht im Wörterbuch der sozialen Netzwerke), lehnt das Modul ab – die Karte
+  sagt, dass der Vorstand es dort aufnimmt.
+- Übertragen werden nur Name und Kennung bei der Plattform, nie Kennwörter oder Tokens.
+
 ## Vereinsakte verbinden (Dolibarr III, #324 Teil 1)
 
 Der API-Schlüssel der Website liest Mitgliedsdaten **mehrerer** Personen – er beweist nicht, wer
