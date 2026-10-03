@@ -125,9 +125,15 @@ async def cancel_orders_for(db, *, kind: str, registration_id: str, reason: str)
         {"$set": {"status": "cancelled", "cancel_reason": reason, "updated_at": now}},
     )
     count = int(result.modified_count)
+    credit_draft: bool | None = None
     async for order in db.billing_orders.find({"kind": kind, "registration_id": registration_id, "status": "invoiced", "booking_state": {"$ne": "cancelled"}}, {"_id": 0}):
+        if credit_draft is None:
+            # Gutschrift-Entwurf bei Abmeldung (#843): nur vormerken - Dolibarr fragt der Abgleich, nicht die Abmeldung.
+            switch = await db.settings.find_one({"id": "dolibarr"}, {"_id": 0, "credit_note_draft_on_cancel": 1}) or {}
+            credit_draft = bool(switch.get("credit_note_draft_on_cancel"))
         await db.billing_orders.update_one({"id": order["id"]}, {"$set": {
             "booking_state": "cancelled", "booking_cancelled_at": now, "cancel_reason": reason, "paid_cents_at_cancel": paid_cents(order), "updated_at": now,
+            **({"credit_note_due_at": now} if credit_draft and not order.get("credit_note_id") else {}),
         }})
         await billing_cases.open_case(db, order, "cancelled_after_invoice", {"reason": reason, "invoice_ref": order.get("invoice_ref") or "", "paid_cents": paid_cents(order),
                                                                             "invoice_status": order.get("invoice_status")})
@@ -207,7 +213,11 @@ async def sync_due(limit: int = 50, *, full: bool = False, order_ids: list[str] 
         client = DolibarrClient(settings)
     except DolibarrError:
         return empty
-    return await sync_invoiced(db, settings, client, limit, full=full, order_ids=order_ids)
+    counts = await sync_invoiced(db, settings, client, limit, full=full, order_ids=order_ids)
+    # Vorgemerkte Gutschrift-Entwürfe (#843) - nur mit Schalter und Schreibzugriff.
+    from services.dolibarr_billing import draft_credit_notes_due
+    counts["credit_drafts"] = await draft_credit_notes_due(db, settings, client)
+    return counts
 
 
 async def reconcile_due() -> dict:

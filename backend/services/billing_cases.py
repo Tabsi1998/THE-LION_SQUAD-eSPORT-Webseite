@@ -18,7 +18,7 @@ from models import new_id, now_utc
 KINDS = {
     "cancelled_after_invoice": {
         "label": "Storniert, Beleg existiert",
-        "todo": "In Dolibarr entscheiden: einen Entwurf löschen, einen freigegebenen Beleg mit einer Gutschrift (Bezug auf das Original) ausgleichen und bezahltes Geld erstatten. Die Website legt keine Gutschrift an und zahlt nichts aus.",
+        "todo": "In Dolibarr entscheiden: einen Entwurf löschen, einen freigegebenen Beleg mit einer Gutschrift (Bezug auf das Original) ausgleichen und bezahltes Geld erstatten. Liegt schon ein Gutschrift-Entwurf bereit (Schalter in Finanzen), nur prüfen und freigeben. Die Website gibt nie eine Gutschrift frei und zahlt nichts aus.",
     },
     "changed_after_invoice": {
         "label": "Buchung nach dem Beleg geändert",

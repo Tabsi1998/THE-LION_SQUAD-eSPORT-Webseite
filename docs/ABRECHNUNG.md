@@ -171,6 +171,18 @@ Ein Fall wird **mit Grund** erledigt („Gutschrift GA2026-0003 angelegt, 20 €
 ganzen Betrag, Beleg aufgegeben, Betrag stimmt wieder), erledigt er ihn selbst und schreibt das
 dazu. Offene Prüffälle stehen als Aufgabe auf der Admin-Startseite (nur für Finanzen).
 
+**Gutschrift-Entwurf bei Abmeldung (#843, Schalter in Finanzen, Vorgabe aus).** Mit dem Haken
+„Gutschrift-Entwurf bei Abmeldung anlegen“ legt die Website nach einer Abmeldung mit freigegebenem
+Beleg in Dolibarr **einen Entwurf** über den ganzen Betrag an – mit Bezug auf den Beleg und denselben
+Zeilen. Der Prüffall nennt den Entwurf; ihr prüft (Teilbetrag?) und gebt ihn frei, danach erledigt
+der Abgleich den Fall von selbst. Die Website gibt **nie** eine Gutschrift frei.
+
+- Die Abmeldung merkt den Entwurf nur vor; angelegt wird er beim nächsten Abgleich.
+- Ist der Beleg noch Entwurf, gibt es keine Gutschrift – der Fall sagt „in Dolibarr löschen“.
+- Gibt es in Dolibarr schon eine Gutschrift zum Beleg, wird sie übernommen, keine zweite angelegt.
+- Scheitert das Anlegen, steht der Grund am Fall; nach drei Versuchen legt ihr ihn von Hand an.
+- Haken aus: wie bisher, vorgemerkte und noch nicht angelegte Entwürfe fallen weg.
+
 **Gutschrift ≠ Erstattung.** Die Gutschrift gleicht den Beleg in Dolibarr aus. Erstattet ist erst,
 was tatsächlich zurücküberwiesen (oder bar zurückgegeben) wurde – das haltet ihr im Detail des
 Auftrags fest: Betrag, Tag, Referenz, Grund. Nie mehr als bezahlt abzüglich schon erstattet; die
