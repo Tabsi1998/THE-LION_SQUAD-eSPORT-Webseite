@@ -448,6 +448,17 @@ async def _safe_dolibarr_pending():
         _log_task_failure("dolibarr_pending", exc)
 
 
+async def _safe_dolibarr_participations():
+    """Teilnahmen in die Mitgliederakte (#847): Check-ins und Turnierenden melden, Widerrufenes zurücknehmen."""
+    try:
+        from services.dolibarr_participations import run_due
+        res = await run_due()
+        if any(res.get(key) for key in ("sent", "replaced", "retracted", "failed", "error")):
+            logger.info(f"[scheduler] dolibarr_participations {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_participations", exc)
+
+
 async def _safe_youtube_feed():
     """Neue YouTube-Videos als News (#578) - alle 15 Minuten, ein Replikat; aus = kein Abruf."""
     try:
@@ -791,6 +802,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("dolibarr_pending", _safe_dolibarr_pending), IntervalTrigger(seconds=30), id="dolibarr_pending",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("dolibarr_participations", _safe_dolibarr_participations, lease_seconds=300.0), IntervalTrigger(minutes=10),
+                  id="dolibarr_participations", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("game_server_sync", _safe_game_server_sync), IntervalTrigger(seconds=60), id="game_server_sync",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("mobile_push_receipts", _safe_mobile_push_receipts), IntervalTrigger(minutes=5), id="mobile_push_receipts",

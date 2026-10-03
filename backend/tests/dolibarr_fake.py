@@ -231,6 +231,10 @@ class FakeDolibarr:
         self.motions: dict[int, list[dict]] = {}
         self.ballots: dict[int, dict] = {}
         self.ballot_rights: dict[int, dict[int, list[dict]]] = {}
+        # Teilnahmen (#847, Vereine 1.8.0): je Mitglied die Liste; Meldungen einer Anwendung mit eigener Kennung.
+        self.participations: dict[int, list[dict]] = {}
+        self.participation_right = True      # „Teilnahmen von Mitgliedern erfassen“ (Recht im Modul)
+        self.participation_kinds = {"event": "Vereinsevent", "competition": "Wettbewerb", "shift": "Helferdienst"}
         self.present: dict[int, set[int]] = {}
         self.votes: dict[tuple[int, str], dict] = {}
         self.members_vote_right = True       # „… im Namen jedes Mitglieds abstimmen“ (member_id-Modus)
@@ -374,6 +378,41 @@ class FakeDolibarr:
         return self.profiles[member_id]
 
     # ---------- Versammlungen und Abstimmungen (#327)
+    def _participations(self, request: httpx.Request, member_id: int, external_id: str | None) -> httpx.Response:
+        """`members/{id}/participations` (Vereine 1.8.0): dieselbe Meldung zweimal ist derselbe Eintrag, eine andere unter
+        derselben Kennung 409; abgelehnte Felder mit Code; ohne das Recht „Teilnahmen erfassen“ 403."""
+        if not self.participation_right:
+            return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to record participations"}})
+        if member_id not in self.members:
+            return httpx.Response(404, json={"error": {"code": 404, "message": "Member not found"}})
+        rows = self.participations.setdefault(member_id, [])
+        if external_id is not None:
+            if request.method != "DELETE":
+                return httpx.Response(405, json={"error": {"code": 405, "message": "Method not allowed"}})
+            earlier = next((row for row in rows if row["external_id"] == external_id and row["source"] == "api"), None)
+            if earlier is None:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "No such participation"}})
+            rows.remove(earlier)
+            return self._json_method("/vereine/members/{id}/participations/{external_id}", "delete", {"external_id": external_id, "deleted": True})
+        if request.method == "GET":
+            return self._json("/vereine/members/{id}/participations", sorted(rows, key=lambda row: row["day"], reverse=True))
+        body = json.loads(request.content.decode("utf-8"))
+        validate(body, request_schema("/vereine/members/{id}/participations"))
+        if body["kind"] not in self.participation_kinds:
+            return httpx.Response(400, json={"error": {"code": 400, "message": "unknown kind", "field": "kind"}})
+        if body["day"] > self.today:
+            return httpx.Response(400, json={"error": {"code": 400, "message": "day in the future", "field": "day"}})
+        entry = {"kind": body["kind"], "kind_label": self.participation_kinds[body["kind"]], "title": body["title"], "day": body["day"],
+                 "hours": body.get("hours"), "source": "api", "external_id": body["external_id"]}
+        earlier = next((row for row in rows if row["external_id"] == body["external_id"]), None)
+        if earlier:
+            same = all(earlier[key] == entry[key] for key in ("kind", "title", "day", "hours"))
+            if not same:
+                return httpx.Response(409, json={"error": {"code": 409, "message": "external_id"}})
+            return self._json_post("/vereine/members/{id}/participations", earlier)
+        rows.append(entry)
+        return self._json_post("/vereine/members/{id}/participations", entry)
+
     def add_meeting(self, meeting_id: int, *, kind: str = "general", title: str = "Generalversammlung 2026", day: str = "2026-10-24", time: str = "18:00",
                     format: str = "hybrid", place: str = "Vereinsheim", access: str = "https://meet.example.test/gv-2026", status: str = "invited",
                     agenda=("Begrüßung", "Bericht des Vorstands"), motion_deadline: str = "2026-10-21", invited=()) -> dict:
@@ -1020,6 +1059,9 @@ class FakeDolibarr:
                 row["decided_at"] = "2026-09-24T12:00:00Z"
             rows.append(row)
             return self._json_post("/vereine/me/profile/changes", row)
+        match = re.fullmatch(r"/vereine/members/(\d+)/participations(?:/([A-Za-z0-9._:-]{1,64}))?", path)
+        if match:
+            return self._participations(request, int(match.group(1)), match.group(2))
         if path == "/vereine/me/meetings" and request.method == "GET":
             ident, denied = self._person(params, "meetings")
             if denied:

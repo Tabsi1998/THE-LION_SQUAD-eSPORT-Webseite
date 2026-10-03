@@ -29,7 +29,7 @@ from services.dolibarr_client import (
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
 from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
-from services import dolibarr_identity
+from services import dolibarr_identity, dolibarr_participations
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.membership_service import VALID_TYPES
 from services.permissions import user_has_area
@@ -89,6 +89,21 @@ async def _features(db, settings: dict) -> list[dict]:
     elif mode != "off":
         facts_state += " · noch nie gelesen (Rechtliches → „Jetzt nachlesen“)"
     mode_state = {"live": "Modus Live", "preview": "Modus Vorschau (liest, übernimmt nichts)", "off": "aus"}.get(mode, mode)
+    # Teilnahmen in die Akte (#847): eigener Schalter, ab Vereine 1.8.0; die Zeile zeigt den letzten Lauf und Abgelehntes.
+    participations = await dolibarr_participations.admin_view(db, settings)
+    participations_on = bool(settings.get("participations_enabled"))
+    participations_module = dolibarr_identity.parse_version(state.get("module_version")) >= dolibarr_participations.MIN_VERSION
+    participations_last = participations.get("last_run") or {}
+    if not participations_on:
+        participations_state = "aus"
+    elif not live:
+        participations_state = "Schalter an, wirkt erst im Modus Live"
+    elif not participations_module:
+        participations_state = f"Modul {state.get('module_version') or '–'} – braucht Vereine 1.8.0"
+    elif participations_last.get("error"):
+        participations_state = f"Fehler: {participations_last.get('text') or participations_last.get('error')}"
+    else:
+        participations_state = f"an · {participations['sent']} gemeldet" + (f", {participations['failed_total']} abgelehnt" if participations["failed_total"] else "")
     return [
         {"key": "members", "label": "Mitgliedschaft, Beitrag und Funktionen aus Dolibarr", "enabled": live, "state": mode_state,
          "hint": "Gilt für Konten mit bestätigter Zuordnung (Reiter Zuordnungen und Umstellung).", "where": connection, "where_label": "Verbindung → Modus"},
@@ -118,6 +133,12 @@ async def _features(db, settings: dict) -> list[dict]:
                    f"{directory_entries} Einträge aus Dolibarr" + (f", davon {directory_without_account} ohne Konto" if directory_without_account else "")) if live and directory_code else ("erst im Modus Live" if directory_code else "aus (keine Einwilligung gewählt)"),
          "hint": "Wer in Dolibarr dieser Einwilligung zugestimmt hat, bekommt sein Vereinsprofil von selbst; Gamertag, Kurztext, Spiele und Foto kommen von der Mitgliedskarte (Reiter Verein), wenn sie dort gepflegt sind. Widerruf nimmt den Eintrag offline.",
          "switch": {"on": live and bool(directory_code), "kind": "select"}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
+        {"key": "participations", "label": "Teilnahmen in die Mitgliederakte (Check-ins und Turniere)",
+         "enabled": live and participations_on and participations_module and not participations_last.get("error"), "state": participations_state,
+         "hint": "Besuchte Vereinsevents (Check-in) und gespielte Turniere stehen beim Mitglied in Dolibarr – nur für Konten mit bestätigter Zuordnung, "
+                 "nie für Gäste. Helferdienste trägt das Vereinsmodul selbst ein. Braucht Vereine 1.8.0 und in Dolibarr das Recht "
+                 f"„{dolibarr_participations.RIGHT_LABEL}“.",
+         "switch": {"on": participations_on}, "where": features_tab, "where_label": "Dolibarr → Funktionen", "participations": participations},
         {"key": "invoices", "label": "Rechnungen und Geschäftspartner in Dolibarr anlegen", "enabled": bool(settings.get("write_enabled")), "state": "an" if settings.get("write_enabled") else "aus",
          "hint": "Schreibzugriff einschalten; Belege werden erst mit vollständigen Konditionen und geprüften Steuersätzen von selbst freigegeben.",
          "switch": {"on": bool(settings.get("write_enabled")), "system_only": True}, "where": features_tab, "where_label": "Dolibarr → Funktionen"},
@@ -309,6 +330,8 @@ class DolibarrSettingsUpdate(BaseModel):
     type_map: dict[str, str] | None = None
     directory_consent_code: str | None = Field(None, max_length=60)
     directory_field_map: dict[str, str] | None = None
+    # Teilnahmen in die Mitgliederakte (#847): Check-ins und Turniere; ab dem Einschalten, Älteres per Nachzug.
+    participations_enabled: bool | None = None
 
 
 @admin_router.get("/consent-texts")
@@ -355,6 +378,11 @@ async def update_dolibarr_settings(body: DolibarrSettingsUpdate, me: dict = Depe
         updates["write_enabled"] = bool(data["write_enabled"])
     if "applications_enabled" in data:
         updates["applications_enabled"] = bool(data["applications_enabled"])
+    if "participations_enabled" in data:
+        updates["participations_enabled"] = bool(data["participations_enabled"])
+        if updates["participations_enabled"] and not current.get("participations_enabled"):
+            # Ab heute meldet der Abgleich; was davor war, holt der Nachzug - kein stiller Schwall in die Akten.
+            updates["participations_since"] = dolibarr_participations.current_day().isoformat()
     for key in TERM_FIELDS:
         if key in data:
             updates[key] = int(data[key]) if data[key] else None
@@ -475,10 +503,12 @@ async def update_feature(body: FeatureUpdate, me: dict = Depends(require_area("c
         if not updates:
             raise HTTPException(400, "Nichts zu ändern.")
         await _set_sponsor_source(db, me, updates)
-    elif key in ("applications", "invoices", "members", "directory"):
+    elif key in ("applications", "invoices", "members", "directory", "participations"):
         patch: dict = {}
         if key == "applications" and body.on is not None:
             patch["applications_enabled"] = bool(body.on)
+        if key == "participations" and body.on is not None:
+            patch["participations_enabled"] = bool(body.on)
         if key == "invoices" and body.on is not None:
             patch["write_enabled"] = bool(body.on)
         if key == "members" and "auto_link_verified_email" in options:
@@ -496,6 +526,15 @@ async def update_feature(body: FeatureUpdate, me: dict = Depends(require_area("c
     else:
         raise HTTPException(404, "Diese Funktion hat keinen Schalter – sie läuft mit dem Modus oder dem Modul.")
     return {"ok": True, "features": await _features(db, await load_settings(db))}
+
+
+@admin_router.post("/participations/backfill")
+async def participations_backfill(me: dict = Depends(require_area("club", "system"))):
+    """Teilnahmen der letzten zwölf Monate nachtragen (#847): der erste Teil gleich, der Rest mit dem Abgleich."""
+    result = await dolibarr_participations.request_backfill(get_db())
+    await _audit(me["id"], "dolibarr.participations_backfill", SETTINGS_ID,
+                 {key: result.get(key) for key in ("sent", "replaced", "retracted", "failed", "pending", "error", "skipped") if result.get(key) is not None})
+    return result
 
 
 @admin_router.get("/invoice-options")

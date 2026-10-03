@@ -730,6 +730,22 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Teilnahmen in der Akte (#847, Vereine ab 1.8), Recht „Teilnahmen erfassen“
+    async def report_participation(self, member_id: int, payload: dict) -> dict:
+        """Eine Teilnahme melden. Dieselbe `external_id` mit demselben Inhalt ist derselbe Eintrag; anderer Inhalt: 409."""
+        data = await self._request("POST", f"/vereine/members/{int(member_id)}/participations", payload=payload, key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "external_id" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def withdraw_participation(self, member_id: int, external_id: str) -> dict:
+        """Eine eigene Meldung zurücknehmen - 404, wenn es sie nicht (mehr) gibt."""
+        data = await self._request("DELETE", f"/vereine/members/{int(member_id)}/participations/{quote(str(external_id), safe='')}",
+                                   key=self._write_key, retries=0)
+        if not isinstance(data, dict) or "deleted" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     # ------------------------------------------------ Website-Profil je Mitglied (#255, Vereine ab 1.1)
     async def member_profile(self, member_id: int) -> dict:
         """Was der Verein in Dolibarr am Website-Profil pflegt - nur mit der dort gewählten Einwilligung

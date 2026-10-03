@@ -298,6 +298,9 @@ async def init_indexes():
     await db.dolibarr_links.create_index("member_key", unique=True, sparse=True)
     await db.dolibarr_links.create_index("status")
     await db.dolibarr_pending.create_index("key", unique=True)
+    # Teilnahmen in der Akte (#847): eine Meldung je Kennung und Installation; der Abgleich liest nach Tag.
+    await db.dolibarr_participations.create_index("key", unique=True)
+    await db.dolibarr_participations.create_index([("instance", 1), ("day", 1)])
     # Rechnungsaufträge (#317): je Buchung höchstens ein offener Auftrag.
     await db.billing_orders.create_index("id", unique=True)
     await db.billing_orders.create_index([("kind", 1), ("registration_id", 1), ("status", 1)])

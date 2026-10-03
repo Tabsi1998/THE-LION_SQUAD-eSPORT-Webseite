@@ -10,6 +10,8 @@
       "/vereine/status",
       "/vereine/members",
       "/vereine/members/{id}/summary",
+      "/vereine/members/{id}/participations",
+      "/vereine/members/{id}/participations/{external_id}",
       "/vereine/members/lookup",
       "/vereine/members/{id}/invoices",
       "/vereine/members/{id}/invoices/{invoice}/pdf",

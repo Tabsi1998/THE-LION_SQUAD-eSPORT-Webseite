@@ -231,3 +231,27 @@ test("Funktionen: ein Haken je Funktion, Schreibzugriff nur für System, Webhook
   await user.click((await screen.findAllByTestId("dolibarr-tab-features")).at(-1));
   await waitFor(() => expect(screen.getAllByTestId("dolibarr-switch-invoices").at(-1)).not.toBeDisabled());
 });
+
+// Teilnahmen in die Mitgliederakte (#847): Stand des Abgleichs, Abgelehntes mit Grund und der Knopf für den Nachzug.
+test("Teilnahmen: letzter Abgleich, Abgelehntes mit Grund und der Nachzug über zwölf Monate", async () => {
+  const user = userEvent.setup();
+  const participations = {
+    key: "participations", label: "Teilnahmen in die Mitgliederakte (Check-ins und Turniere)", enabled: true, state: "an · 3 gemeldet, 1 abgelehnt",
+    hint: "Besuchte Vereinsevents und gespielte Turniere.", switch: { on: true }, where: "/admin/dolibarr?tab=features", where_label: "Dolibarr → Funktionen",
+    participations: {
+      last_run: { at: "2026-09-25T08:00:00+00:00", ok: true, sent: 3, replaced: 0, retracted: 1, failed: 1, pending: 0 }, backfill_from: null, sent: 3, failed_total: 1,
+      failed: [{ title: "Herbstcup", day: "2026-09-21", kind: "Turnier", text: "Diese Art ist im Wörterbuch „Vereine: Arten von Teilnahmen“ nicht eingeschaltet." }],
+    },
+  };
+  const base = apiMock.get.getMockImplementation();
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/dolibarr/status" ? { data: { ...STATUS, features: [...STATUS.features, participations] } } : base(url)));
+  apiMock.post.mockResolvedValue({ data: { ok: true, sent: 12, pending: 5 } });
+  renderPage();
+  await user.click(await screen.findByTestId("dolibarr-tab-features"));
+  expect(await screen.findByTestId("dolibarr-participations-last")).toHaveTextContent("3 gemeldet, 0 ersetzt, 1 zurückgenommen, 1 abgelehnt.");
+  expect(screen.getByTestId("dolibarr-participations-failed")).toHaveTextContent("21.09.2026 · Turnier „Herbstcup“: Diese Art ist im Wörterbuch");
+  expect(screen.getByTestId("dolibarr-switch-participations")).toBeChecked();
+  await user.click(screen.getByTestId("dolibarr-participations-backfill"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/participations/backfill"));
+  expect(toastMock.success).toHaveBeenCalledWith("Nachgetragen: 12 gemeldet – 5 folgen mit den nächsten Abgleichen.");
+});
