@@ -10,6 +10,7 @@ import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../badgeArt.generated";
 import { lookFor, materialName } from "../badgeArt";
 import { playHaptics } from "./haptics";
+import { playCeremonySound, readCeremonySoundPrefs, writeCeremonyMuted } from "./sounds";
 import { Motion } from "./motions";
 import { CeremonyParticles } from "./particles";
 import { type CeremonyPlan, type CeremonyTier, groupTier, particleKind } from "./select";
@@ -213,7 +214,9 @@ export function ceremonyTexts(plan: CeremonyPlan, count: number) {
   return { heading, sub };
 }
 
-export function Ceremony({ plan, onClose, reduced = false, autoClose = true }: { plan: CeremonyPlan; onClose: () => void; reduced?: boolean; autoClose?: boolean }) {
+type SoundUser = { ceremony_sound?: boolean | null; ceremony_volume?: number | null } | null;
+
+export function Ceremony({ plan, onClose, reduced = false, autoClose = true, user = null }: { plan: CeremonyPlan; onClose: () => void; reduced?: boolean; autoClose?: boolean; user?: SoundUser }) {
   useSeasonOverlay("achievement-ceremony", true);
   const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(0);
@@ -226,10 +229,23 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true }: {
   const duration = reduced ? Math.min(plan.duration, 4500) : plan.duration;
   const look = useMemo(() => lookFor(plan.material), [plan.material]);
 
-  // Haptik je Material, einmal je Zeremonie.
+  // Haptik und Klang je Material, einmal je Zeremonie - der Klang nur, wenn er weder am Gerät noch im Profil aus ist.
+  const [muted, setMuted] = useState(false);
   useEffect(() => {
     playHaptics(look);
+    let alive = true;
+    void readCeremonySoundPrefs(user).then((prefs) => { if (alive) setMuted(prefs.muted); });
+    void playCeremonySound(plan.sound, { user });
+    return () => { alive = false; };
+    // Einmal je Zeremonie, nicht bei jeder neuen Profil-Kopie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.id, look]);
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    void writeCeremonyMuted(next);
+    if (!next) void playCeremonySound(plan.sound, { user, force: true });
+  };
 
   // Die Partikel verglühen nach gut vier Sekunden - dann steht auch ihr Takt.
   useEffect(() => {
@@ -285,6 +301,9 @@ export function Ceremony({ plan, onClose, reduced = false, autoClose = true }: {
         ) : null}
         <Animated.View style={[styles.card, { borderColor: plan.accent, shadowColor: plan.accent }, cardStyle]} onStartShouldSetResponder={() => true} testID="ceremony-card">
           {plan.sequence === "legendary" ? <LegendaryBanner reduced={reduced} /> : null}
+          <Pressable style={styles.mute} onPress={toggleMute} hitSlop={12} testID="achievement-unlock-mute" accessibilityRole="button" accessibilityLabel={muted ? "Ton einschalten" : "Ton ausschalten"}>
+            <Ionicons name={muted ? "volume-mute" : "volume-high"} size={20} color="rgba(255,255,255,0.5)" />
+          </Pressable>
           <Pressable style={styles.close} onPress={onClose} hitSlop={12} testID="achievement-unlock-close" accessibilityRole="button" accessibilityLabel="Schließen">
             <Ionicons name="close" size={22} color="rgba(255,255,255,0.5)" />
           </Pressable>
@@ -364,6 +383,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.88)", alignItems: "center", justifyContent: "center", padding: 16 },
   card: { width: "100%", maxWidth: 460, backgroundColor: "#101012", borderWidth: 1, borderRadius: radius.lg, overflow: "hidden", shadowOpacity: 0.45, shadowRadius: 30, shadowOffset: { width: 0, height: 0 }, elevation: 14 },
   close: { position: "absolute", top: 12, right: 12, zIndex: 10 },
+  mute: { position: "absolute", top: 13, right: 48, zIndex: 10 },
   stage: { height: 210, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   stageLegendary: { marginTop: 34 },
   fanned: { position: "absolute" },

@@ -14,6 +14,13 @@ jest.mock("@expo/vector-icons", () => {
   return { Ionicons: ({ name }: { name: string }) => <Text>{`icon:${name}`}</Text> };
 });
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+const mockPlay = jest.fn(async (..._args: unknown[]) => true);
+const mockWriteMuted = jest.fn(async (..._args: unknown[]) => {});
+jest.mock("./sounds", () => ({
+  playCeremonySound: (...args: unknown[]) => mockPlay(...args),
+  readCeremonySoundPrefs: async () => ({ muted: false, volume: 80 }),
+  writeCeremonyMuted: (...args: unknown[]) => mockWriteMuted(...args),
+}));
 const mockNavigate = jest.fn();
 jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, navigate: (...args: unknown[]) => mockNavigate(...args) } }));
 
@@ -29,6 +36,8 @@ async function show(pkg: Parameters<typeof planCeremony>[0], props: Partial<Reac
 beforeEach(() => {
   jest.useFakeTimers();
   mockNavigate.mockReset();
+  mockPlay.mockClear();
+  mockWriteMuted.mockClear();
 });
 afterEach(() => jest.useRealTimers());
 
@@ -40,6 +49,17 @@ test("jede Kategorie hat ihren Auftritt, das Abzeichen trägt Material und Rang"
     expect(screen.getByTestId("ceremony-badge").props.accessibilityLabel).toBe("Stufe a");
     await rendered.unmount();
   }
+});
+
+test("Klang je Material und Sonderablauf beim Öffnen; der Schalter merkt „aus“ und spielt beim Einschalten zur Probe", async () => {
+  const { plan } = await show({ tiers: [tier("d", "diamond", 7, "match")] });
+  expect(mockPlay).toHaveBeenCalledWith({ material: "diamond", special: "diamond" }, { user: null });
+  await fireEvent.press(screen.getByTestId("achievement-unlock-mute"));
+  expect(mockWriteMuted).toHaveBeenLastCalledWith(true);
+  expect(screen.getByTestId("achievement-unlock-mute").props.accessibilityLabel).toBe("Ton einschalten");
+  await fireEvent.press(screen.getByTestId("achievement-unlock-mute"));
+  expect(mockWriteMuted).toHaveBeenLastCalledWith(false);
+  expect(mockPlay).toHaveBeenLastCalledWith(plan.sound, { user: null, force: true });
 });
 
 test("eine Stufe: Material im Untertitel, Punkte, Schließen per Kreuz", async () => {

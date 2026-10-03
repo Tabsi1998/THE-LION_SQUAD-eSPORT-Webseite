@@ -16,5 +16,5 @@ export function CeremonyHost({ queue = ceremonyQueue }: { queue?: CeremonyQueue 
   const plan = useMemo(() => (current ? planCeremony(current) : null), [current]);
   const close = useCallback(() => { queue.advance(); }, [queue]);
   if (!plan) return null;
-  return <Ceremony key={plan.id} plan={plan} onClose={close} reduced={reduced} />;
+  return <Ceremony key={plan.id} plan={plan} onClose={close} reduced={reduced} user={user as { ceremony_sound?: boolean | null; ceremony_volume?: number | null } | null} />;
 }
