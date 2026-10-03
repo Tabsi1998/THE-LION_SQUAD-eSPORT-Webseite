@@ -177,6 +177,8 @@ async def test_vorschau_zeigt_die_eier_der_seite_auch_im_entwurf_aber_ohne_schlu
     res = await flow.post("/api/seasonal/easter/admin/2027/preview")
     assert res.status_code == 200, res.text
     assert res.json()["at"].startswith("2027-03-27T12:00") and seasons.read_preview_token(res.json()["token"])[0] == easter.SEASON
+    bad = await flow.post("/api/seasonal/easter/admin/1999/preview")
+    assert bad.status_code == 400 and "Jahr" in bad.json()["detail"], "ein unmögliches Jahr ist ein klarer Fehler, kein Absturz"
     flow.act_as(None)
     assert (await flow.post("/api/seasonal/easter/admin/2027/preview")).status_code == 401
 

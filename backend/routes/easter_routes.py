@@ -6,7 +6,7 @@ aus genau dieser Abfrage.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user, require_area
