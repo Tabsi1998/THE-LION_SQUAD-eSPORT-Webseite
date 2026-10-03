@@ -81,4 +81,23 @@ test.describe("Abzeichen-Kunst", () => {
     await page.keyboard.press("Escape");
     await expect(overlay).toBeHidden();
   });
+
+  test("Verein (#864): die Fahne hängt mittig hinter der Medaille", async ({ page }, testInfo) => {
+    await mockAdminSession(page);
+    await page.goto("/admin/achievements/preview");
+    await expect(page.getByTestId("achievement-preview-page")).toBeVisible();
+    await page.getByTestId("ceremony-material").selectOption("gold");
+    await page.getByTestId("ceremony-category").selectOption("club");
+    await page.getByTestId("ceremony-play").click();
+    const overlay = page.getByTestId("achievement-unlock-overlay");
+    await expect(overlay).toBeVisible();
+    const flag = overlay.getByTestId("ceremony-flag");
+    await expect(flag).toBeVisible();
+    await page.waitForTimeout(1500);   // der Schwung der Fahne ist vorbei
+    const flagBox = await flag.boundingBox();
+    const badgeBox = await overlay.locator("svg.tls-badge").first().boundingBox();
+    expect(Math.abs((flagBox.x + flagBox.width / 2) - (badgeBox.x + badgeBox.width / 2))).toBeLessThan(4);
+    expect(flagBox.y).toBeLessThan(badgeBox.y);
+    await testInfo.attach("ceremony-club.png", { body: await page.screenshot(), contentType: "image/png" });
+  });
 });
