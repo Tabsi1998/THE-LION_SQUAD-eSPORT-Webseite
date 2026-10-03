@@ -209,6 +209,17 @@ async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E
     return embed
 
 
+async def resolve_buttons(buttons: list | None) -> list[dict]:
+    """Link-Knöpfe (#573): Website-Pfade werden volle Adressen wie der Link im Embed; was keine öffentliche
+    Adresse ergibt, fällt weg."""
+    out = []
+    for button in buttons or []:
+        url = await _public_link_url((button or {}).get("url"))
+        if url and (button or {}).get("label"):
+            out.append({"label": str(button["label"])[:80], "url": url})
+    return out
+
+
 def _new_log(event_key: str, title: str, target: str, *, test: bool = False) -> dict:
     log = {
         "id": new_id(), "channel": "discord", "target": target, "event_key": event_key,
@@ -220,10 +231,10 @@ def _new_log(event_key: str, title: str, target: str, *, test: bool = False) -> 
     return log
 
 
-def _payload(title, description, color, url, fields, image_url) -> dict:
-    """Für „erneut senden“ (#303): was gesendet werden sollte."""
+def _payload(title, description, color, url, fields, image_url, buttons=None) -> dict:
+    """Für „erneut senden“ (#303): was gesendet werden sollte - mit den Knöpfen (#573)."""
     return {"title": title[:256], "description": (description or "")[:4000], "color": color, "url": url,
-            "fields": (fields or [])[:10], "image_url": image_url}
+            "fields": (fields or [])[:10], "image_url": image_url, "buttons": list(buttons or [])[:5]}
 
 
 async def _skip(log: dict, reason: str, error: str) -> dict:
@@ -234,15 +245,17 @@ async def _skip(log: dict, reason: str, error: str) -> dict:
 
 
 async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
-                      fields: list | None, image_url: str | None, log: dict, footer: str | None = None) -> dict:
+                      fields: list | None, image_url: str | None, log: dict, footer: str | None = None,
+                      buttons: list | None = None) -> dict:
     """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID."""
     from services.discord_bot import bot
 
     db = get_db()
     embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url, footer=footer)
+    links = await resolve_buttons(buttons)
     log["channel_id"] = channel_id
     try:
-        result = await bot.send_embed(channel_id, embed)
+        result = await bot.send_embed(channel_id, embed, buttons=links)  # Knöpfe als Link-Zeile darunter (#573)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
         logger.error("[discord] %s", type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
@@ -262,7 +275,8 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
-                  footer: str | None = None, test: bool = False, thread_id: str | None = None) -> dict:
+                  footer: str | None = None, test: bool = False, thread_id: str | None = None,
+                  buttons: list | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
     ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst."""
     cfg = await _get_discord_config()
@@ -270,7 +284,7 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     log = _new_log(event_key, title, resolved["target"], test=test)
     if resolved["fallback"]:
         log["wanted_target"] = target
-    log["payload"] = _payload(title, description, color, url, fields, image_url)
+    log["payload"] = _payload(title, description, color, url, fields, image_url, buttons)
     if not cfg["master"]:
         return await _skip(log, "disabled", REASON_TEXTS["disabled"])
     if not cfg["bot"]["enabled"]:
@@ -282,12 +296,12 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     if thread_id:
         log["thread_id"] = str(thread_id)
     return await _send_embed(str(thread_id or resolved["channel_id"]), title=title, description=description, color=color, url=url,
-                             fields=fields, image_url=image_url, log=log, footer=footer)
+                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
                      color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
-                     thread_id: str | None = None) -> dict:
+                     thread_id: str | None = None, buttons: list | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if spec["target"] in PUBLIC_TARGETS and item is not None and not should_post_to_public_discord(item):
@@ -296,7 +310,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key, thread_id=thread_id)
+                         image_url=image_url, event_key=event_key, thread_id=thread_id, buttons=buttons)
 
 
 async def send_discord(title: str, description: str = "", *,
@@ -315,13 +329,14 @@ async def send_ops_discord(title: str, description: str = "", *,
 
 async def send_public_discord(item: dict | None, title: str, description: str = "", *,
                               color: int = 0x29B6E8, url: str = None,
-                              fields: list = None, event_key: str = "custom", image_url: str = None) -> dict:
+                              fields: list = None, event_key: str = "custom", image_url: str = None,
+                              buttons: list | None = None) -> dict:
     """Send to a public Discord target only for publicly visible content."""
     if not should_post_to_public_discord(item):
         return {"ok": False, "reason": "private_visibility"}
     if event_key in EVENTS:
         return await send_event(event_key, title, description, item=item, color=color, url=url,
-                                fields=fields, image_url=image_url)
+                                fields=fields, image_url=image_url, buttons=buttons)
     return await send_discord(title, description, color=color, url=url, fields=fields, event_key=event_key)
 
 

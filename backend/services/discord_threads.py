@@ -101,7 +101,8 @@ async def _send(message: dict, tournament: dict, thread_id: str | None = None) -
     from discord_service import send_event
 
     return await send_event(message["event_key"], message["title"], message.get("description") or "", item=tournament, color=message.get("color") or 0x29B6E8,
-                            url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"), thread_id=thread_id)
+                            url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"), thread_id=thread_id,
+                            buttons=message.get("buttons"))
 
 
 async def deliver(db, tournament: dict, message: dict, *, in_thread: dict | None = None) -> dict:

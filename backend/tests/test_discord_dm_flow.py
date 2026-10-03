@@ -35,7 +35,7 @@ def dms(monkeypatch):
     calls = Calls()
     state = {"answer": {"ok": True}}
 
-    async def fake_dm(discord_user_id, embed):
+    async def fake_dm(discord_user_id, embed, buttons=None):
         calls.append({"to": discord_user_id, "title": embed.get("title"), "description": embed.get("description"), "url": embed.get("url"), "color": embed.get("color")})
         answer = dict(state["answer"])
         if answer.get("ok"):

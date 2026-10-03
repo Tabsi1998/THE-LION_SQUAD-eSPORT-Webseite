@@ -87,10 +87,10 @@ async def _latest_public(collection, query: dict, sort: list) -> dict | None:
 
 async def sample_catalog(db=None) -> list[dict]:
     """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist."""
-    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_target
+    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
     from services.discord_announcements import (EVENT_PUBLIC_STATUSES, TOURNAMENT_STATUS, board_message, event_message, fast_lap_message,
                                                 news_message, stream_live_message, tournament_message)
-    from services.discord_dm import dm_content
+    from services.discord_dm import dm_buttons, dm_content
     from services.notification_preferences import NOTIFICATION_KIND_CATEGORY
     from services.ops_alerts import RED, check_red_message, error_group_message
 
@@ -102,7 +102,7 @@ async def sample_catalog(db=None) -> list[dict]:
         embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                                   fields=message.get("fields"), image_url=message.get("image_url"))
         entry = {"key": key, "label": label, "group": group, "target": target, "source": source, "source_text": source_text,
-                 "embed": embed, "dm": target == "dm", "message": message}
+                 "embed": embed, "buttons": await resolve_buttons(message.get("buttons")), "dm": target == "dm", "message": message}
         if place:
             entry["place"] = place
         if target != "dm":
@@ -156,7 +156,8 @@ async def sample_catalog(db=None) -> list[dict]:
     # Direktnachrichten: dieselbe Funktion wie beim Versand - fremde Nachrichtentexte bleiben draußen.
     for key, label, notification in DM_SAMPLES:
         content = dm_content(notification, NOTIFICATION_KIND_CATEGORY.get(notification["kind"]), name=SAMPLE_NAME)
-        await add(key, label, "dm", {**content, "event_key": key, "fields": [], "image_url": None}, target="dm", source_text=SOURCE_EXAMPLE)
+        await add(key, label, "dm", {**content, "event_key": key, "fields": [], "image_url": None, "buttons": dm_buttons(notification["kind"], content["url"])},
+                  target="dm", source_text=SOURCE_EXAMPLE)
     return entries
 
 
@@ -178,7 +179,8 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
     message = entry["message"]
     if via == "test":
         result = await send_to("test", message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
-                               fields=message.get("fields"), image_url=message.get("image_url"), event_key=f"test.{key}", footer=TEST_FOOTER, test=True)
+                               fields=message.get("fields"), image_url=message.get("image_url"), event_key=f"test.{key}", footer=TEST_FOOTER, test=True,
+                               buttons=message.get("buttons"))
         if result.get("ok"):
             from discord_service import target_status
             result["channel_name"] = (await target_status(db)).get("test", {}).get("channel_name")
@@ -202,7 +204,7 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
     embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                               fields=message.get("fields"), image_url=message.get("image_url"), footer=TEST_FOOTER)
     try:
-        result = await bot.send_dm(discord_id, embed)
+        result = await bot.send_dm(discord_id, embed, buttons=entry.get("buttons") or [])
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
     if result.get("ok"):

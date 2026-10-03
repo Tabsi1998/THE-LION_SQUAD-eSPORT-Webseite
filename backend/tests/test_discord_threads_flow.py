@@ -42,7 +42,7 @@ class FakeDiscord:
         self.counter = 0
         self.thread_answer: dict | None = None
 
-    async def send_embed(self, channel_id, embed):
+    async def send_embed(self, channel_id, embed, buttons=None):
         if channel_id in self.gone:
             return {"ok": False, "reason": "unknown_channel"}
         self.counter += 1
@@ -50,7 +50,7 @@ class FakeDiscord:
         self.messages.setdefault(channel_id, []).append({"id": message_id, "embed": embed})
         return {"ok": True, "message_id": message_id, "channel_id": channel_id}
 
-    async def edit_embed(self, channel_id, message_id, embed):
+    async def edit_embed(self, channel_id, message_id, embed, buttons=None):
         for row in self.messages.get(channel_id, []):
             if row["id"] == message_id:
                 row["embed"] = embed

@@ -18,7 +18,8 @@ const DATA = {
     { key: "news.published", label: "News veröffentlicht", group: "public", target: "news", source: "latest", source_text: "aus der letzten News", enabled: false, dm: false,
       embed: { title: "📰 Sommerfest", description: "Grillen am Vereinsplatz.", color: 0x29b6e8, url: "https://lionsquad.at/news/sommerfest" } },
     { key: "tournament.live", label: "Turnier: jetzt live", group: "public", target: "events", source: "example", source_text: "Beispiel", enabled: true, dm: false,
-      place: "im Turnier-Thread", embed: { title: "🏆 Sommer-Cup · Jetzt live", description: "Das Turnier läuft.", color: 0x29b6e8 } },
+      place: "im Turnier-Thread", embed: { title: "🏆 Sommer-Cup · Jetzt live", description: "Das Turnier läuft.", color: 0x29b6e8 },
+      buttons: [{ label: "Bracket ansehen", url: "https://lionsquad.at/tournaments/sommer-cup/bracket" }] },
     { key: "membership.application", label: "Neuer Mitgliedsantrag", group: "board", target: "board", source: "example", source_text: "Beispiel", enabled: true, dm: false,
       embed: { title: "📝 Neuer Mitgliedsantrag", description: "Ein neuer Antrag wartet.", color: 0xffd700 } },
     { key: "notify.achievement", label: "Erfolg-Gratulation", group: "dm", target: "dm", source: "example", source_text: "Beispiel", dm: true,
@@ -53,6 +54,9 @@ test("Gruppen, Nachbildung, Herkunft und „Ereignis aus“; ohne Testkanal und 
   // Turnier-Threads (#572): wohin eine Turnier-Meldung geht, steht dabei.
   expect(screen.getByTestId("discord-sample-tournament.live-place")).toHaveTextContent("im Turnier-Thread");
   expect(screen.queryByTestId("discord-sample-news.published-place")).toBeNull();
+  // Link-Knöpfe (#573): unter der Nachbildung, wie im Discord.
+  expect(screen.getByTestId("discord-sample-tournament.live-message-buttons")).toHaveTextContent("Bracket ansehen");
+  expect(screen.queryByTestId("discord-sample-news.published-message-buttons")).toBeNull();
 });
 
 test("Testkanal und Direktnachricht rufen den Server; die Antwort steht als Toast", async () => {

@@ -37,12 +37,12 @@ class FakeBot:
         self.deleted: set[str] = set()
         self.counter = 0
 
-    async def send_embed(self, channel_id, embed):
+    async def send_embed(self, channel_id, embed, buttons=None):
         self.counter += 1
         self.sent.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{self.counter}", "channel_id": channel_id}
 
-    async def edit_embed(self, channel_id, message_id, embed):
+    async def edit_embed(self, channel_id, message_id, embed, buttons=None):
         if message_id in self.deleted:
             return {"ok": False, "reason": "unknown_message"}
         self.edited.append({"channel_id": channel_id, "message_id": message_id, "embed": embed})

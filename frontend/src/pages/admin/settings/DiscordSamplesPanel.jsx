@@ -82,7 +82,7 @@ export function DiscordSamplesPanel() {
                     <span>{entry.source_text}</span>
                   </div>
                 </div>
-                <DiscordMessagePreview embed={entry.embed} botName={data?.bot_name || "Vereins-Bot"} testId={`discord-sample-${entry.key}-message`} />
+                <DiscordMessagePreview embed={entry.embed} buttons={entry.buttons} botName={data?.bot_name || "Vereins-Bot"} testId={`discord-sample-${entry.key}-message`} />
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => send(entry.key, "test")} disabled={!!busy} data-testid={`discord-sample-${entry.key}-test`}
                     className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">

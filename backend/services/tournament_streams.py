@@ -77,7 +77,7 @@ async def sync(db) -> dict:
             key = {"tournament_id": tournament["id"], "stream_id": stream.get("stream_id")}
             if not stream.get("stream_id") or await db[ANNOUNCEMENTS].find_one(key, {"_id": 0, "id": 1}):
                 continue
-            result = await deliver(db, tournament, stream_live_message(tournament, stream))
+            result = await deliver(db, tournament, stream_live_message(tournament, stream))  # mit „Zuschauen“ und „Profil“ (#573)
             await db[ANNOUNCEMENTS].insert_one({"id": new_id(), **key, "user_id": stream.get("user_id"), "announced_at": now_utc().isoformat(),
                                                 "outcome": "sent" if result.get("ok") else (result.get("reason") or "failed")})
             announced += 1

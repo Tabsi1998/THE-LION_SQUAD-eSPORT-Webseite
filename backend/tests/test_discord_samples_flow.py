@@ -35,11 +35,11 @@ class Calls(list):
 def posted(monkeypatch):
     calls = Calls()
 
-    async def fake_send_embed(channel_id, embed):
+    async def fake_send_embed(channel_id, embed, buttons=None):
         calls.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{len(calls)}", "channel_id": channel_id}
 
-    async def fake_send_dm(discord_user_id, embed):
+    async def fake_send_dm(discord_user_id, embed, buttons=None):
         calls.append({"dm": discord_user_id, "embed": embed})
         return dict(calls.answer, message_id=f"d{len(calls)}") if calls.answer.get("ok") else dict(calls.answer)
 

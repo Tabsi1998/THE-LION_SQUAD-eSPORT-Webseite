@@ -239,7 +239,7 @@ async def build(db, tournament: dict, now: datetime | None = None, *, final: boo
 
 async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | None = None, now: datetime | None = None) -> dict:
     """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“."""
-    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_target
+    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons, resolve_target
     from services.discord_bot import bot
     from services.discord_threads import FIELD as THREAD_FIELD, thread_of
 
@@ -282,6 +282,7 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
         _dirty.pop(tournament_id, None)
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
     embed = await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"], footer=raw["footer"])
+    buttons = await resolve_buttons([{"label": "Bracket ansehen", "url": raw["url"]}])  # #573
     message_id = str(state.get("message_id") or "")
     # Endstand als letzte Nachricht im Thread (#572): steht etwas darunter, kommt er neu ans Ende.
     replaced = ""
@@ -291,12 +292,12 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     result: dict = {"ok": False, "reason": "error"}
     try:
         if message_id:
-            result = await bot.edit_embed(channel_id, message_id, embed)
+            result = await bot.edit_embed(channel_id, message_id, embed, buttons=buttons)
             if not result.get("ok") and result.get("reason") == "unknown_message":
                 message_id = ""
         if not message_id:
             action = "posted"
-            result = await bot.send_embed(channel_id, embed)
+            result = await bot.send_embed(channel_id, embed, buttons=buttons)
             if result.get("ok"):
                 pinned = await bot.pin_message(channel_id, str(result.get("message_id")))
                 result["pinned"] = bool(pinned.get("ok"))

@@ -109,6 +109,16 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   dafür gibt es nicht. Negative Auszeichnungen werden nie gemeldet. In einen
   Kanal geht nichts mehr.
 
+## Knöpfe unter den Meldungen (#573)
+
+Unter jeder Meldung steht ein Link-Knopf zur passenden Seite – ein Klick statt Suchen:
+„Zur Anmeldung“ (Anmeldung offen), „Zum Check-in“, „Bracket ansehen“ (live, beendet,
+Ergebnisse und unter dem Bracket selbst), „Event ansehen“, „Weiterlesen“ (News),
+„Bestenliste“ (Fast Lap), „Zuschauen“ und „Profil“ (Stream; das Profil nur, wenn es öffentlich
+ist), „Im Admin öffnen“ (Vorstand). Direktnachrichten tragen ihren Knopf je Thema – die
+Gratulation zu Erfolgen „Profil“. Link-Knöpfe melden nichts an den Bot zurück; „erneut senden“,
+die Vorschau im Formular und die Beispiele unter Verbindungen → Discord zeigen dieselben Knöpfe.
+
 ## Wenn etwas nicht ankommt
 
 - Darf der Bot in einem gewählten Kanal nicht schreiben oder gibt es den Kanal
@@ -173,7 +183,11 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
   abgleichen“). Der Bot fasst **nur diese drei Rollen** an – andere Rollen bleiben, wie sie sind.
   Die Namen lassen sich in den Einstellungen ändern; fehlt eine Rolle im Discord, steht das dort.
 - **Befehle:** `/naechstes-event`, `/turniere` (offene Anmeldungen), `/meine-erfolge` (nur
-  verknüpft, Antwort nur für einen selbst), `/status` (nur Vorstand, Antwort nur für einen selbst).
+  verknüpft), `/status` (nur Vorstand) und seit #573 `/rangliste` (Top 10 der Saison),
+  `/bracket` (Auswahl aus den laufenden öffentlichen Turnieren), `/wer-streamt`, `/mitglied`
+  (eigener Stand mit Art und „seit“, nur verknüpft – nie Beitrag, Nummer oder Zahlungsdaten) und
+  `/verknuepfen` (der Weg zum Verknüpfen). **Jede Antwort sieht nur die fragende Person**; was
+  für alle gilt, steht in den angepinnten Einbettungen.
 
 Zählen, Rollen und Befehle gelten nur für Konten, die im Profil verknüpft sind (Abschnitt oben).
 
@@ -214,6 +228,11 @@ Konto-Verknüpfung läuft unabhängig vom Bot weiter.
   `list_channels`, `send_embed`) um discord.py. Routen `routes/discord_bot_routes.py`
   (`/api/settings/discord/bot/status|sync|restart`) und `GET /api/settings/discord/channels`,
   Job `discord_bot_roles` alle zehn Minuten, Start im Lifespan.
+- `backend/services/discord_commands.py` (#573): die Antworten der neuen Befehle als Rechnung
+  (`answer_*`, `bracket_choices`, `membership_text`); `discord_bot.answer_kwargs` macht daraus die
+  Antwort nur für die fragende Person. Link-Knöpfe: `buttons` an jeder Meldung
+  (`discord_announcements`), `discord_service.resolve_buttons` macht volle Adressen,
+  `discord_bot.clean_buttons`/`link_view` die Discord-Knöpfe (höchstens fünf).
 - `backend/services/discord_announcements.py`: `announce_due` (Job, jede Minute),
   `news_message`, `event_message`, `preview`, `notify_board`.
 - `backend/services/discord_threads.py` (#572): `status_changed` – die eine Stelle für jeden

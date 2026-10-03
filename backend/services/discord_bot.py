@@ -12,7 +12,9 @@ Drei Aufgaben, jede nur für **verknüpfte Konten** (#260, ``platform_links`` mi
   Turnierleitung (Bereich ``tournaments``) ↔ „Turnierleitung“. Alle zehn Minuten und auf Knopfdruck;
   der Bot fasst nur die drei eingestellten Rollen an, nie andere.
 - **Befehle:** ``/naechstes-event``, ``/turniere`` (offene Anmeldungen), ``/meine-erfolge`` (nur
-  verknüpft, private Antwort), ``/status`` (nur Vorstand/System, private Antwort).
+  verknüpft), ``/status`` (nur Vorstand/System); seit #573 ``/rangliste``, ``/bracket``,
+  ``/wer-streamt``, ``/mitglied`` (nur verknüpft) und ``/verknuepfen`` - die Antworten rechnet
+  ``services/discord_commands.py``. Jede Antwort sieht nur die fragende Person.
 
 Bricht die Verbindung ab (fehlender Intent im Developer Portal, falscher Token, Netz), steht der
 Grund als Klickweg in ``last_error`` (``friendly_bot_error``) und der Scheduler-Job
@@ -39,6 +41,8 @@ DEFAULT_ROLES = {"member": "Mitglied", "board": "Vorstand", "tournament": "Turni
 SYNC_LIMIT = 500
 # Turnier-Threads (#572): eine Woche - Discords längste Frist, bevor ein ruhiger Thread ins Archiv geht.
 THREAD_ARCHIVE_MINUTES = 10080
+# Link-Knöpfe (#573): höchstens fünf unter einer Nachricht (eine Discord-Zeile); sie führen zur Website, der Bot hört nichts zurück.
+MAX_BUTTONS = 5
 
 
 # ---------------------------------------------------------------- reine Logik
@@ -72,6 +76,55 @@ def role_diff(current: set[str], wanted: set[str]) -> tuple[set[str], set[str]]:
     """Was der Bot hinzufügt und entfernt - nur innerhalb der drei verwalteten Rollen."""
     managed = set(ROLE_KEYS)
     return (wanted - current) & managed, (current - wanted) & managed
+
+
+def clean_buttons(buttons: list[dict] | None) -> list[dict]:
+    """Link-Knöpfe (#573): nur mit Beschriftung und http(s)-Adresse, jede Adresse einmal, höchstens fünf."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for button in buttons or []:
+        label = str((button or {}).get("label") or "").strip()[:80]
+        url = str((button or {}).get("url") or "").strip()
+        if not label or not url.startswith(("https://", "http://")) or len(url) > 512 or url in seen:
+            continue
+        seen.add(url)
+        out.append({"label": label, "url": url})
+        if len(out) >= MAX_BUTTONS:
+            break
+    return out
+
+
+def link_view(buttons: list[dict] | None):
+    """Die Knöpfe als discord.py-Ansicht - oder None. Link-Knöpfe brauchen keinen laufenden Bot-Rückruf."""
+    rows = clean_buttons(buttons)
+    if not rows:
+        return None
+    import discord
+
+    view = discord.ui.View(timeout=None)
+    for row in rows:
+        view.add_item(discord.ui.Button(label=row["label"], url=row["url"], style=discord.ButtonStyle.link))
+    return view
+
+
+async def answer_kwargs(answer: dict) -> dict:
+    """Eine Antwort aus discord_commands (#573) als Discord-Nachricht: Text, Embed wie bei Meldungen, Link-Knöpfe -
+    immer nur für die fragende Person."""
+    import discord
+    from discord_service import build_embed, resolve_buttons
+
+    kwargs: dict = {"ephemeral": True}
+    if answer.get("content"):
+        kwargs["content"] = str(answer["content"])[:2000]
+    raw = answer.get("embed")
+    if raw:
+        kwargs["embed"] = discord.Embed.from_dict(await build_embed(
+            raw["title"], raw.get("description") or "", color=raw.get("color") or 0x29B6E8, url=raw.get("url"),
+            fields=raw.get("fields"), image_url=raw.get("image_url"), footer=raw.get("footer")))
+    view = link_view(await resolve_buttons(answer.get("buttons")))
+    if view is not None:
+        kwargs["view"] = view
+    return kwargs
 
 
 def counted_user(author_id: str, author_is_bot: bool, links: dict[str, str]) -> str | None:
@@ -398,6 +451,35 @@ class BotRunner:
             points = sum(int(tiers.get(a["tier_code"], {}).get("points") or 0) for a in awards)
             await interaction.response.send_message(achievements_text(named, points), ephemeral=True)
 
+        # Seit #573: die Antworten rechnet services/discord_commands.py; Discord wartet nur drei Sekunden, darum erst
+        # „denkt nach“ und dann die Antwort - auch sie nur für die fragende Person.
+        from services import discord_commands
+
+        @tree.command(name="rangliste", description="Die Top 10 der laufenden Saison")
+        async def rangliste(interaction):
+            await runner._reply(interaction, lambda: discord_commands.answer_rangliste(db))
+
+        @tree.command(name="bracket", description="Das Bracket eines laufenden Turniers")
+        @app_commands.describe(turnier="Welches laufende Turnier")
+        async def bracket(interaction, turnier: str | None = None):
+            await runner._reply(interaction, lambda: discord_commands.answer_bracket(db, turnier))
+
+        @bracket.autocomplete("turnier")
+        async def bracket_turniere(interaction, current: str):
+            return [app_commands.Choice(name=row["name"], value=row["value"]) for row in await discord_commands.bracket_choices(db, current)]
+
+        @tree.command(name="wer-streamt", description="Wer aus dem Verein gerade live ist")
+        async def wer_streamt(interaction):
+            await runner._reply(interaction, lambda: discord_commands.answer_wer_streamt(db))
+
+        @tree.command(name="mitglied", description="Dein Stand im Verein (nur mit verknüpftem Konto)")
+        async def mitglied(interaction):
+            await runner._reply(interaction, lambda: discord_commands.answer_mitglied(db, interaction.user.id, base_url))
+
+        @tree.command(name="verknuepfen", description="Discord-Konto mit der Website verknüpfen")
+        async def verknuepfen(interaction):
+            await runner._reply(interaction, lambda: discord_commands.answer_verknuepfen(db, interaction.user.id, base_url))
+
         @tree.command(name="status", description="Bot-Stand (nur Vorstand)")
         async def status(interaction):
             from services.permissions import areas_for
@@ -422,6 +504,16 @@ class BotRunner:
             await record_state(db, connected=False, last_error=runner.last_error)
         finally:
             runner.connected = False
+
+    async def _reply(self, interaction, produce) -> None:
+        """Erst „denkt nach“ (nur für die fragende Person), dann die Antwort - ein Fehler wird ein freundlicher Satz."""
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            kwargs = await answer_kwargs(await produce())
+        except Exception as exc:  # noqa: BLE001 - eine Frage im Discord darf nie im Leeren enden
+            logger.warning("[discord-bot] Befehl: %s", type(exc).__name__)
+            kwargs = {"content": "Das hat gerade nicht geklappt – versuch es gleich noch einmal.", "ephemeral": True}
+        await interaction.followup.send(**kwargs)
 
     def _guild(self, view: dict | None = None):
         client = self._client
@@ -451,9 +543,10 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
 
-    async def send_embed(self, channel_id: str, embed: dict) -> dict:
-        """Ein Embed in genau diesen Kanal (#566). Kein Rückfall: ist der Bot aus oder darf er dort nicht
-        schreiben, kommt der Grund zurück - den Text dazu kennt discord_service.REASON_TEXTS."""
+    async def send_embed(self, channel_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+        """Ein Embed in genau diesen Kanal (#566), auf Wunsch mit Link-Knöpfen darunter (#573). Kein Rückfall:
+        ist der Bot aus oder darf er dort nicht schreiben, kommt der Grund zurück - den Text dazu kennt
+        discord_service.REASON_TEXTS."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -469,7 +562,7 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
             await self._reopen(channel)
-            message = await channel.send(embed=discord.Embed.from_dict(embed))
+            message = await channel.send(embed=discord.Embed.from_dict(embed), view=link_view(buttons))
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:
@@ -498,8 +591,9 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
 
-    async def edit_embed(self, channel_id: str, message_id: str, embed: dict) -> dict:
-        """Eine eigene Nachricht bearbeiten (#569). Ist sie weg, kommt ``unknown_message`` - dann wird neu gepostet."""
+    async def edit_embed(self, channel_id: str, message_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+        """Eine eigene Nachricht bearbeiten (#569). Ist sie weg, kommt ``unknown_message`` - dann wird neu gepostet.
+        Ohne ``buttons`` bleiben die Knöpfe, wie sie sind (#573)."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -511,7 +605,10 @@ class BotRunner:
         try:
             await self._reopen(channel)
             message = await channel.fetch_message(int(message_id))
-            await message.edit(embed=discord.Embed.from_dict(embed))
+            changes = {"embed": discord.Embed.from_dict(embed)}
+            if buttons is not None:
+                changes["view"] = link_view(buttons)
+            await message.edit(**changes)
         except (discord.NotFound, ValueError):
             return {"ok": False, "reason": "unknown_message"}
         except discord.Forbidden:
@@ -685,8 +782,9 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         return {"ok": True}
 
-    async def send_dm(self, discord_user_id: str, embed: dict) -> dict:
-        """Eine Direktnachricht an ein verknüpftes Konto (#567). Geschlossene Direktnachrichten melden „forbidden“."""
+    async def send_dm(self, discord_user_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+        """Eine Direktnachricht an ein verknüpftes Konto (#567), auf Wunsch mit Link-Knöpfen (#573).
+        Geschlossene Direktnachrichten melden „forbidden“."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -699,7 +797,7 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
-            message = await user.send(embed=discord.Embed.from_dict(embed))
+            message = await user.send(embed=discord.Embed.from_dict(embed), view=link_view(buttons))
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:

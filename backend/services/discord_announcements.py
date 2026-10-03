@@ -59,14 +59,16 @@ def plain_text(value: str | None, limit: int = 300) -> str:
 
 
 def news_message(post: dict) -> dict:
+    url = f"/news/{post.get('slug') or post.get('id')}"
     return {
         "event_key": "news.published",
         "title": f"📰 {post.get('title') or 'News'}",
         "description": plain_text(post.get("excerpt") or post.get("content"), 400),
         "color": NEWS_COLOR,
-        "url": f"/news/{post.get('slug') or post.get('id')}",
+        "url": url,
         "image_url": post.get("banner_url") or post.get("cover_url"),
         "fields": [],
+        "buttons": [{"label": "Weiterlesen", "url": url}],
     }
 
 
@@ -87,14 +89,16 @@ def event_message(event: dict) -> dict:
             fields.append({"name": "Anmeldung bis", "value": vienna(event["registration_closes_at"]), "inline": True})
         if event.get("max_participants"):
             fields.append({"name": "Plätze", "value": str(event["max_participants"]), "inline": True})
+    url = f"/events/{event.get('slug') or event.get('id')}"
     return {
         "event_key": "event.announced",
         "title": f"📅 {event.get('name') or event.get('title') or 'Event'}",
         "description": plain_text(event.get("short_description") or event.get("description"), 400),
         "color": EVENT_COLOR,
-        "url": f"/events/{event.get('slug') or event.get('id')}",
+        "url": url,
         "image_url": event.get("banner_url") or event.get("poster_url"),
         "fields": fields,
+        "buttons": [{"label": "Event ansehen", "url": url}],
     }
 
 
@@ -113,8 +117,8 @@ def skip_reason(item: dict, *, published_at, now: datetime | None = None) -> str
 
 
 async def preview(kind: str, item: dict) -> dict:
-    """Dasselbe Embed wie beim Senden, plus ob und wohin es ginge."""
-    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_target
+    """Dasselbe Embed wie beim Senden - mit den Knöpfen darunter (#573) -, plus ob und wohin es ginge."""
+    from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
 
     message = news_message(item) if kind == "news" else event_message(item)
     cfg = await _get_discord_config()
@@ -130,7 +134,7 @@ async def preview(kind: str, item: dict) -> dict:
         reason = "no_channel"
     embed = await build_embed(message["title"], message["description"], color=message["color"], url=message["url"],
                               fields=message["fields"], image_url=message["image_url"])
-    out = {"embed": embed, "would_send": reason is None, "reason": reason, "target": resolved["target"]}
+    out = {"embed": embed, "buttons": await resolve_buttons(message["buttons"]), "would_send": reason is None, "reason": reason, "target": resolved["target"]}
     if kind == "event":
         # Discord-Termin (#570): so erscheint der Termin - oder warum nicht.
         from database import get_db
@@ -146,7 +150,8 @@ async def _announce(collection, item: dict, message: dict, published_at) -> str:
     outcome = reason
     if not reason:
         result = await send_event(message["event_key"], message["title"], message["description"], item=item,
-                                  color=message["color"], url=message["url"], fields=message["fields"], image_url=message["image_url"])
+                                  color=message["color"], url=message["url"], fields=message["fields"], image_url=message["image_url"],
+                                  buttons=message["buttons"])
         outcome = "sent" if result.get("ok") else (result.get("reason") or "failed")
     await collection.update_one({"id": item["id"]}, {"$set": {"discord_checked_at": now_utc().isoformat(), "discord_outcome": outcome}})
     return outcome
@@ -204,6 +209,16 @@ def thread_line(tournament: dict, status: str) -> str:
     return ""
 
 
+def tournament_buttons(tournament: dict, status: str) -> list[dict]:
+    """Der Knopf je Status (#573): zur Anmeldung, zum Check-in, sonst zum Bracket."""
+    base = f"/tournaments/{tournament.get('slug') or tournament.get('id')}"
+    if status == "registration_open":
+        return [{"label": "Zur Anmeldung", "url": base}]
+    if status == "check_in":
+        return [{"label": "Zum Check-in", "url": base}]
+    return [{"label": "Bracket ansehen", "url": f"{base}/bracket"}]
+
+
 def tournament_message(tournament: dict, status: str, *, game_name: str | None = None, in_thread: bool = False) -> dict:
     """Die Turnier-Meldung je Statuswechsel - der Statuswechsel und die Vorschau bauen sie hiermit. Im Thread des
     Turniers (#572) kurz: Spiel, Format, Beschreibung und Bild stehen schon in der Ankündigung darüber."""
@@ -211,7 +226,8 @@ def tournament_message(tournament: dict, status: str, *, game_name: str | None =
     if in_thread:
         return {"event_key": f"tournament.{status}", "title": f"🏆 {tournament.get('title') or 'Turnier'} · {spec['label']}",
                 "description": thread_line(tournament, status), "color": spec["color"],
-                "url": f"/tournaments/{tournament.get('slug') or tournament.get('id')}", "fields": [], "image_url": None}
+                "url": f"/tournaments/{tournament.get('slug') or tournament.get('id')}", "fields": [], "image_url": None,
+                "buttons": tournament_buttons(tournament, status)}
     fields = []
     if game_name:
         fields.append({"name": "Spiel", "value": game_name, "inline": True})
@@ -227,6 +243,7 @@ def tournament_message(tournament: dict, status: str, *, game_name: str | None =
         "url": f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
         "fields": fields,
         "image_url": tournament.get("banner_url"),
+        "buttons": tournament_buttons(tournament, status),
     }
 
 
@@ -243,6 +260,7 @@ def fast_lap_message(challenge: dict, *, driver: str, track: str, time_text: str
         "url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}",
         "fields": fields,
         "image_url": None,
+        "buttons": [{"label": "Bestenliste", "url": f"/fastlap/{challenge.get('slug') or challenge.get('id')}"}],
     }
 
 
@@ -257,6 +275,9 @@ def stream_live_message(tournament: dict, stream: dict) -> dict:
     fields = [{"name": "Turnier", "value": title, "inline": True}]
     if stream.get("game_name"):
         fields.append({"name": "Spiel", "value": str(stream["game_name"]), "inline": True})
+    buttons = [{"label": "Zuschauen", "url": stream.get("stream_url")}] if stream.get("stream_url") else []
+    if stream.get("public_profile_url"):
+        buttons.append({"label": "Profil", "url": stream["public_profile_url"]})
     return {
         "event_key": "tournament.stream_live",
         "title": f"🔴 {name} streamt den {title}",
@@ -265,6 +286,7 @@ def stream_live_message(tournament: dict, stream: dict) -> dict:
         "url": stream.get("stream_url") or f"/tournaments/{tournament.get('slug') or tournament.get('id')}",
         "fields": fields,
         "image_url": stream.get("thumbnail_url") or None,
+        "buttons": buttons,
     }
 
 
@@ -279,7 +301,8 @@ BOARD_MESSAGES = {
 
 def board_message(event_key: str, description: str = "") -> dict:
     spec = BOARD_MESSAGES.get(event_key) or {"title": "Hinweis an den Vorstand", "url": "/admin"}
-    return {"event_key": event_key, "title": spec["title"], "description": description, "color": 0xFFD700, "url": spec["url"], "fields": [], "image_url": None}
+    return {"event_key": event_key, "title": spec["title"], "description": description, "color": 0xFFD700, "url": spec["url"], "fields": [], "image_url": None,
+            "buttons": [{"label": "Im Admin öffnen", "url": spec["url"]}]}
 
 
 async def notify_board(event_key: str, description: str = "", *, fields: list | None = None) -> dict:
@@ -288,7 +311,8 @@ async def notify_board(event_key: str, description: str = "", *, fields: list | 
 
     message = board_message(event_key, description)
     try:
-        return await send_event(event_key, message["title"], description, color=message["color"], url=message["url"], fields=fields)
+        return await send_event(event_key, message["title"], description, color=message["color"], url=message["url"], fields=fields,
+                                buttons=message["buttons"])
     except Exception:  # noqa: BLE001 - ein Antrag darf nie an Discord scheitern
         logger.warning("[discord] board notification failed", exc_info=True)
         return {"ok": False, "reason": "error"}
