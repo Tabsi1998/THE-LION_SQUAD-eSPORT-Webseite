@@ -289,6 +289,7 @@ function HubContentCard({ item, onPress }: { item: HubItem; onPress: () => void 
       detail={item.detail}
       visibility={item.visibility}
       onPress={onPress}
+      perch={`hub-${item.kind}-${item.id}`}
     />
   );
 }

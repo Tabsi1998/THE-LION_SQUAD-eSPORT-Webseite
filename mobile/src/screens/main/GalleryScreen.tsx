@@ -73,7 +73,7 @@ export function GalleryScreen({ navigation }: Props) {
               <Muted>{[formatDate(album.taken_at), albumCountLabel(album)].filter(Boolean).join(" · ")}</Muted>
               {album.visibility && album.visibility !== "public" ? <Muted style={styles.internal}>Nur für Mitglieder</Muted> : null}
             </View>
-            <SeasonPerch id={`album-${album.id}`} kind="tile" />
+            <SeasonPerch id={`album-${album.id}`} kind="tile" clip />
           </Pressable>
         )) : (
           <EmptyState icon="images-outline" title="Noch keine Alben" detail="Sobald Bilder hochgeladen sind, stehen sie hier." />

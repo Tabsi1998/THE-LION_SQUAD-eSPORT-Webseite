@@ -168,7 +168,7 @@ export function SeasonPassScreen({ navigation }: Props) {
 
         {/* Eigener Rang */}
         {ownEntry ? (
-          <Card style={styles.card}>
+          <Card style={styles.card} perch="season-pass-own">
             <Heading>Dein Rang</Heading>
             <RankRow entry={ownEntry} highlight />
             <SourceBreakdownList entry={ownEntry} />
@@ -177,7 +177,7 @@ export function SeasonPassScreen({ navigation }: Props) {
 
         {/* Top 3 Podium */}
         {top3.length > 0 ? (
-          <Card style={styles.card}>
+          <Card style={styles.card} perch="season-pass-podium">
             <Heading>Podium</Heading>
             {top3.map((entry) => (
               <RankRow
@@ -191,7 +191,7 @@ export function SeasonPassScreen({ navigation }: Props) {
 
         {/* Restliche Rangliste */}
         {rest.length > 0 ? (
-          <Card style={styles.card}>
+          <Card style={styles.card} perch="season-pass-ranks">
             <Heading>Rangliste</Heading>
             {rest.map((entry) => (
               <RankRow
@@ -210,7 +210,7 @@ export function SeasonPassScreen({ navigation }: Props) {
         ) : null}
 
         {/* Punkte-Erklärung */}
-        <Card style={styles.card}>
+        <Card style={styles.card} perch="season-pass-points">
           <Heading>Wie zählt die Jahreswertung?</Heading>
           <PointRow icon="trophy-outline" label="Turniere" detail="Teilnahme zählt, Platzierungen und größere Teilnehmerfelder zählen mehr." />
           <PointRow icon="timer-outline" label="Fast Lap" detail="Gültige Zeiten, starke Ränge und veröffentlichte Challenges fließen ein." />

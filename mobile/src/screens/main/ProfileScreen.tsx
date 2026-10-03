@@ -527,7 +527,7 @@ export function ProfileScreen() {
                 </Pressable>
               </Card>
             ) : null}
-            <Card style={styles.card}>
+            <Card style={styles.card} perch="profile-status">
               <Heading>Profilstatus</Heading>
               <ProgressBar value={completeness.score || 0} color={colors.cyan} />
               <View style={styles.statGrid}>
@@ -543,14 +543,14 @@ export function ProfileScreen() {
             </Card>
             {/* Freunde (#240): offene Anfragen oben, darunter die Liste - live über den Änderungsstrom. */}
             <FriendsCard onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })} />
-            <Card style={styles.card}>
+            <Card style={styles.card} perch="profile-gaming">
               <Heading>Gaming</Heading>
               <Info label="Lieblingsspiele" value={form.favorite_games || "-"} />
               <Info label="Plattform" value={form.main_platform || "-"} />
               <Info label="Rolle" value={form.preferred_role || "-"} />
               <Info label="Discord" value={form.discord_name || "-"} />
             </Card>
-            <Card style={styles.card}>
+            <Card style={styles.card} perch="profile-next">
               <Heading>Nächster Erfolg</Heading>
               {insights.next ? (
                 <>

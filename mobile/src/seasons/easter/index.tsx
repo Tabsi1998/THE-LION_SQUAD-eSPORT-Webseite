@@ -13,7 +13,8 @@ import { anyOverlayOpen, subscribeQuiet } from "../quiet";
 import { hashString, mulberry32 } from "../rng";
 import { seasonScroll, type ScrollState } from "../sky/scroll";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
-import { BunnyEarsArt, ButterflyWing, EggArt, GrassStrip, HareEarsArt } from "./art";
+import { onHuntActive } from "../easterHunt/api";
+import { BunnyEarsArt, ButterflyWing, EggArt, FlowerArt, GrassStrip, HareEarsArt } from "./art";
 import {
   BUTTERFLY_EVERY, BUTTERFLY_FIRST, PEEK_BOX, PEEK_EVERY, PEEK_FIRST, PETAL_COLORS, butterflyFlight, createPetal, edgeCount, greetingDay, isQuiet, nextDelay, peekSpot, petalCount, petalPose,
   rowPatterns, stepPetal, type EggPattern, type Flight, type Petal,
@@ -120,8 +121,10 @@ export function EasterBackdrop({ season, screen }: { season: ActiveSeason; scree
   );
 }
 
-/** Ein Ei der Reihe: wiegt sich langsam, je Ei versetzt; still ohne Bewegung. */
-function EdgeEgg({ pattern, index, moving }: { pattern: EggPattern; index: number; moving: boolean }) {
+const EDGE_FLOWERS = ["daisy", "tulip", "primrose", "daisy", "tulip"];
+
+/** Ein Ei der Reihe (oder eine Blume, solange die Suche läuft): wiegt sich langsam, je Stück versetzt; still ohne Bewegung. */
+function EdgeEgg({ pattern, index, moving, flower = null }: { pattern: EggPattern; index: number; moving: boolean; flower?: string | null }) {
   const sway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!moving) return undefined;
@@ -141,8 +144,8 @@ function EdgeEgg({ pattern, index, moving }: { pattern: EggPattern; index: numbe
   const height = EDGE_EGG * (38 / 30);
   // Gedreht wird um den Fuß des Eis: die Ebene ist doppelt so hoch, ihre Mitte liegt auf dem Fuß (1 px über dem Boden).
   return (
-    <Animated.View style={[styles.edgeEggPivot, { left: 6 + index * EDGE_STEP, height: height * 2, bottom: -height + 1, transform: [{ rotate }] }]} testID="easter-edge-egg">
-      <EggArt pattern={pattern} size={EDGE_EGG} />
+    <Animated.View style={[styles.edgeEggPivot, { left: 6 + index * EDGE_STEP, height: height * 2, bottom: -height + 1, transform: [{ rotate }] }]} testID={flower ? "easter-edge-flower" : "easter-edge-egg"}>
+      {flower ? <FlowerArt kind={flower} height={height} /> : <EggArt pattern={pattern} size={EDGE_EGG} />}
     </Animated.View>
   );
 }
@@ -155,13 +158,20 @@ function EdgeEgg({ pattern, index, moving }: { pattern: EggPattern; index: numbe
 export function EasterEdge({ season, screen }: { season: ActiveSeason; screen: string }) {
   const still = useStill(season);
   const { width } = useWindowDimensions();
+  // Läuft die Eiersuche wirklich, liegen hier Blumen statt Eiern: Eier, die man nicht sammeln kann, sähen sonst genauso
+  // aus wie die versteckten (wie im Web). Bis feststeht, ob sie läuft, auch Blumen.
+  const { byKey } = useSeason();
+  const huntWindow = Boolean(byKey?.easter_hunt && byKey.easter_hunt.effective !== "off");
+  const [huntActive, setHuntActive] = useState<boolean | null>(null);
+  useEffect(() => (huntWindow ? onHuntActive(setHuntActive) : undefined), [huntWindow]);
+  const flowers = huntWindow && huntActive !== false;
   const count = edgeCount(width);
   const patterns = useMemo(() => rowPatterns(hashString(`easter-edge:${localDay()}`), count), [count]);
   if (screenClass(screen) === "quiet") return null;
   const rowWidth = count * EDGE_STEP + 12;
   return (
     <View pointerEvents="none" style={[styles.edge, { width: rowWidth }]} testID="easter-edge">
-      {patterns.map((pattern, index) => <EdgeEgg key={pattern} pattern={pattern} index={index} moving={!still} />)}
+      {patterns.map((pattern, index) => <EdgeEgg key={pattern} pattern={pattern} index={index} moving={!still} flower={flowers ? EDGE_FLOWERS[index % EDGE_FLOWERS.length] : null} />)}
       <View style={styles.edgeGrass}>
         <GrassStrip width={rowWidth} height={7} />
       </View>

@@ -60,10 +60,10 @@ function Pattern({ pattern, ink }: { pattern: EggPattern; ink: string }) {
 
 let eggIds = 0;
 
-/** Ein Osterei: Muster, Glanz, Rand. `size` ist die Breite. */
-export function EggArt({ pattern, size = 16 }: { pattern: EggPattern; size?: number }) {
+/** Ein Osterei: Muster, Glanz, Rand. `size` ist die Breite; `palette` ersetzt die Farben (Widget). */
+export function EggArt({ pattern, size = 16, palette }: { pattern: EggPattern; size?: number; palette?: [string, string] }) {
   const [clip] = useState(() => `tls-egg-${(eggIds += 1)}`);
-  const [base, ink] = PALETTES[pattern] || PALETTES.stripes;
+  const [base, ink] = palette || PALETTES[pattern] || PALETTES.stripes;
   return (
     <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" testID={`easter-egg-art-${pattern}`}>
       <Defs>

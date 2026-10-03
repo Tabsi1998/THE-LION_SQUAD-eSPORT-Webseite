@@ -7,6 +7,7 @@ import { colors } from "../theme";
 import { Body, Muted } from "./Text";
 import { MediaImage } from "./MediaImage";
 import { StatusBadge } from "./StatusBadge";
+import { SeasonPerch } from "../seasons/anchors";
 
 export type ContentCardKind = "event" | "fastlap" | "news" | "team" | "tournament";
 
@@ -23,6 +24,7 @@ export function ContentCard({
   kind,
   label,
   onPress,
+  perch,
   phase,
   secondaryLabel,
   status,
@@ -37,6 +39,8 @@ export function ContentCard({
   kind: ContentCardKind;
   label?: string | null;
   onPress?: () => void;
+  /** Ein Platz für die Jahreszeiten (Ostereier, #647) - die Karte schneidet ab, Eier liegen innen in der Ecke. */
+  perch?: string;
   phase?: { label?: string | null; state?: string | null } | string | null;
   secondaryLabel?: string | null;
   status?: string | null;
@@ -68,6 +72,7 @@ export function ContentCard({
         {body ? <Muted numberOfLines={2}>{body}</Muted> : null}
       </View>
       {onPress ? <Ionicons name="chevron-forward" color={colors.muted} size={16} /> : null}
+      {perch ? <SeasonPerch id={perch} kind="card" clip /> : null}
     </>
   );
 
