@@ -56,3 +56,17 @@ condition = "AND"
 paths = ['''^(backend/tests/test_partner_pages_flow\.py|frontend/src/pages/admin/AdminPartnersPage\.test\.jsx)$''']
 regexTarget = "secret"
 regexes = ['''^123456789012345678$''']
+
+[[allowlists]]
+description = "The made-up Discord user ids of the game-server tests (#838, merged with #839): eighteen digits after a Discord name look like a Discord client id to the scanner; the values are only asserted, nothing is real."
+condition = "AND"
+paths = ['''^backend/tests/test_discord_game_servers_flow\.py$''']
+regexTarget = "secret"
+regexes = ['''^[12]23456789012345678$''']
+
+[[allowlists]]
+description = "The made-up preview and egg tokens of the season tests (#632/#633 seasons, #810 carnival, #839 Easter egg hunt): the dotted shape looks like an API key to the scanner; the values are only mocked or asserted, nothing is real."
+condition = "AND"
+paths = ['''^(backend/tests/test_easter_hunt_flow\.py|frontend/src/pages/admin/AdminEasterHuntPage\.test\.jsx|frontend/src/seasons/carnival/index\.test\.jsx|frontend/src/pages/admin/settings/SeasonsSettings\.test\.jsx)$''']
+regexTarget = "secret"
+regexes = ['''^1\.2\.kaputt-und-zu-kurz$''', '''^easter_hunt\.1\.2\.sig$''', '''^carnival\.123\.0\.sig$''', '''^halloween\.123\.456\.abc$''']

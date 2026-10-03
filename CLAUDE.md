@@ -2832,8 +2832,8 @@ Seit dem 15. September gilt:
   Kalender und macht den Deko-Schalter im Footer ganzjährig sichtbar (gewollt);
   (2) wo sich zwei Striche kreuzen, addiert sich die Deckkraft – Tests prüfen
   den **Anteil** der Punkte über der Grenze, nicht den hellsten Punkt; mehrere
-  Formen derselben Figur (Spritzer) in **einem** Pfad zeichnen; (3) Arbeitsbäume
-  haben unter Windows CRLF – Patch-Skripte müssen Zeilenenden erhalten.
+  Formen derselben Figur (Spritzer) in **einem** Pfad zeichnen; (3) die
+  Arbeitskopie hat unter Windows CRLF – Patch-Skripte müssen Zeilenenden erhalten.
 - Saison-Fundstücke (#678; PRs #773 Server und Web, #776 Katalog E, #777
   App): `SIGNAL_RULES` in `achievement_counters.py` je Signal mit `per_day`,
   `season`, optional `phases`, `live` (zählt nur im Augenblick) und `server`
@@ -3293,6 +3293,42 @@ Seit dem 15. September gilt:
   öffnet nach 0,7 s; am Handy nicht im Kopf). App: kompakte Widgets (`compactWidget`) in einer Reihe
   unter dem Kranz – das Türchen öffnet den Kalender, der Stiefel führt zu „Mehr“ und öffnet sich dort
   (`requestBootOpen`).
+- Silvester: Kaliber und Jahreszahl (#853; PR #872): `seasons/newYear/fireworks.js` mit `CALIBERS`
+  (klein, groß, sehr groß; `caliberOf`, `maxStars`), `choreography.js` (`CALIBER_SHARES`, `pickCaliber`;
+  das Kaliber ist der letzte Zufallszug je Start, die übrigen Ströme bleiben gleich), `yearDigits.js`
+  (Ziffern als Punktfolgen: um 00:00 schreiben Funken die neue Jahreszahl, bei „dezent“ und ohne
+  Bewegung steht sie ruhig als `CalmYear`), `sound.js` (`CALIBER_VOICES`, `BURST_LEVEL` 0,9 – nie lauter
+  als bisher). App gleich (`yearDigits.ts`, `sky.ts` mit `drawYear`, `SOUND_VERSION` 2); neue
+  Paritäts-Fingerabdrücke für Feuerwerk, Choreografie und Jahreszahl.
+- „Deine Rechnung ist da“ (#841; PR #874): `services/invoice_notice.py` (Art `invoice_ready`, Kategorie
+  `billing_updates` mit In-App, Push und Mail; `mark_due` beim Freigeben, `send_due` meldet, sobald das
+  PDF da ist, nach `PDF_GRACE_HOURS` = 2 auch ohne), aufgerufen aus `dolibarr_billing` (`process_order`,
+  `sync_one`); nie als Discord-DM (`discord_dm.EXCLUDED_KINDS`). Mail `tpl_invoice_ready` mit Link
+  `/profile?tab=invoices&invoice=…`: das Web öffnet die Rechnung in `InvoicesPanel`, die App führt über
+  `rootNavigation` zu `MyInvoices` und öffnet sie dort.
+- Finanzen: was hängt (#842; PR #876): `billing_orders.ATTENTION` (PDF fehlt, Entwurf älter als 7 Tage,
+  überfällig) mit `attention_query`, `attention_counts` und `overview(attention=…)`;
+  `finance_routes.dolibarr_invoice_url` (Sprung zur Rechnung in Dolibarr), `finance_attention` in
+  `admin_routes` für die Tageszentrale („Belege prüfen“). Web `lib/billing.js` (`ATTENTION_ORDER`,
+  `attentionLine`, `firstAttention`, `csvFilename` mit Filter) und `AttentionBar` in `AdminFinancePage`.
+- Turnier nur mit Event-Anmeldung (#875; PR #877): Feld `requires_event_registration` (wirkt nur mit
+  `event_id`), `services/tournament_event_gate.py` (`check`, `viewer_state`, `staff_marks` – eine Abfrage
+  für die ganze Liste). Es zählt angemeldet oder eingecheckt, nicht die Warteliste; Teams brauchen so
+  viele beim Event Angemeldete, wie ein Team Spieler hat. Die Prüfung sitzt in
+  `_create_self_registration` (auch hinter Zugangslinks); Eintragen von Hand geht mit Hinweis und Audit
+  „übergangen“. Web `TournamentDetailPage` und App `TournamentDetailScreen` zeigen „Zuerst beim Event
+  anmelden“, die Teilnehmerliste der Leitung `EventGateMark`.
+- Gutschrift-Entwurf bei Abmeldung (#843; PR #878): Schalter `credit_note_draft_on_cancel` in Finanzen
+  (Vorgabe aus; `PUT /api/admin/finance/settings`). `billing_orders.cancel_orders_for` merkt
+  `credit_note_due_at` vor, der Abgleich legt mit `dolibarr_billing.draft_credit_notes_due` einen
+  **Entwurf** an (`credit_note_payload`: Typ 2, negative Preise, `fk_facture_source`; `credit_ref_ext`,
+  höchstens 3 Versuche). Freigegeben wird nur in Dolibarr.
+- Vereinsdokumente als Datei (#849; PR #879): ab Vereinsmodul 1.3.0 (`FILE_MIN_VERSION`) über `…/file`
+  statt JSON mit base64. `DolibarrClient.document_file` reicht `If-None-Match`, `Range` und `If-Range`
+  durch (200, 206, 304, 416); `document_routes._dolibarr_file_response` übernimmt Dateinamen und ETag
+  (die Prüfsumme), persönliche Dateien bleiben `no-store`. App `memberDocuments.ts` (`fetchChecked`):
+  Cache unter der Prüfsumme, Nachfrage bei jedem Öffnen (offline öffnet sie bewusst nicht), Fortsetzen
+  über Expos `resumeData`. Die Attrappe `tests/dolibarr_fake.py` kann `…/file` nach den Regeln des Moduls.
 
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
@@ -3442,11 +3478,11 @@ npx expo install --check
   `~/.local-toolchain`, damit `package-lock.json` zum CI passt. Zuletzt am
   21.09. mit #335 nachgezogen (expo 57.0.24, expo-constants 57.0.19,
   expo-image-picker 57.0.19, expo-notifications 57.0.20).
-- **Dependabot-PRs prüfen:** alle Zweige in einen eigenen Arbeitsordner
-  mergen (`git worktree add -b chore/dependabot-pruefung C:/ldep
-  origin/main`, dann `git merge origin/dependabot/…`), dort den lokalen
-  Check einmal laufen lassen, Ordner danach mit `git worktree remove`
-  entfernen. Ein CI-Job, der nach 2 s „fehlschlägt“ und alle anderen
+- **Dependabot-PRs prüfen:** im Hauptordner einen Prüfzweig anlegen
+  (`git checkout -b chore/dependabot-pruefung origin/main`, dann
+  `git merge origin/dependabot/…` je Zweig), den lokalen Check einmal
+  laufen lassen, danach zurück auf `main` und den Prüfzweig löschen –
+  kein eigener Arbeitsordner (siehe unten). Ein CI-Job, der nach 2 s „fehlschlägt“ und alle anderen
   überspringt, ist kein Code: die Meldung steht in den Annotations des
   Check-Runs (am 21.09.: GitHub-Abrechnung).
 - **Git Bash + Docker:** `MSYS_NO_PATHCONV=1` setzen; Env-Dateien,
@@ -3470,11 +3506,11 @@ npx expo install --check
   Kleinschreibung auf, die Komponente ist `undefined` („Element type is
   invalid“). Deshalb `scareRules.js`.
 - **Browser-Proben eines Zweigs:** der lokale Check lässt `frontend/dist`
-  liegen – `npx vite preview --port 3011` aus dem Worktree, Playwright mit
+  liegen – `npx vite preview --port 3011` in `frontend/`, Playwright mit
   `context.route("**/api/**")` und nachgestellten Antworten
   (`/seasonal/active` wie in `SeasonContext.test.jsx`, `/auth/me`,
   `/seasonal/me`), Skript aus dem Scratchpad mit
-  `NODE_PATH=<worktree>/frontend/node_modules`. Canvas-Ebenen über
+  `NODE_PATH=<repo>/frontend/node_modules`. Canvas-Ebenen über
   `getImageData` zählen. `page.clock.install()` fälscht auch
   `requestAnimationFrame`: nie `runFor(Stunden)` (spielt jeden Frame nach),
   sondern `setSystemTime` und dann `runFor(61000)` für einen Minutentakt.
@@ -3549,7 +3585,7 @@ npx expo install --check
   die Mitte), darin ein kleines Svg mit `viewBox` um den Drehpunkt, nativer
   Treiber. Prüfen mit Signalfarben: fester Teil bei 0° rot, bei −12° grün,
   der bewegte gelb dazwischen.
-- **Metro liefert alten Stand:** nach Worktree-Wechseln oder Änderungen an
+- **Metro liefert alten Stand:** nach Zweigwechseln oder Änderungen an
   Modulen ohne Komponente lieferte Metro (Expo CLI, CI=1) auch mit `--clear`
   alte Dateien. Abhilfe: Metro über den Port 8081 beenden
   (`Get-NetTCPConnection -LocalPort 8081`), `%TEMP%\metro-cache` und
@@ -3575,10 +3611,13 @@ npx expo install --check
   MMDDhhmmYYYY.ss`; Backend als Probe-Server (echte App, mongomock,
   freezegun auf dem Zeitpunkt, Port 8010) und Metro mit
   `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:8010`, `adb reverse tcp:8081
-  tcp:8081`. Für neue native Module einen Debug-Build im Worktree:
-  `google-services.json` aus dem Hauptordner kurz hineinkopieren, `expo
-  prebuild --platform android --no-install`, `gradlew assembleDebug` (etwa
-  5 min), die Datei danach wieder löschen. Aufnahmen mit `adb shell
+  tcp:8081`. Für neue native Module einen Debug-Build in `mobile/`
+  (`android/` und `google-services.json` stehen in `mobile/.gitignore`):
+  `google-services.json` aus `%USERPROFILE%\.lionsapp-release` kurz
+  hineinkopieren, `expo prebuild --platform android --no-install`,
+  `gradlew assembleDebug` (etwa 5 min), die Datei danach wieder löschen;
+  am Ende `adb kill-server`, sonst hält der adb-Server seinen Startordner
+  fest. Aufnahmen mit `adb shell
   screenrecord`, Bilder mit ffmpeg; Git Bash braucht `MSYS_NO_PATHCONV=1`
   für `/sdcard/…` und Windows-Pfade für das Ziel von `adb pull`.
 - **GitHub-CI läuft in UTC**, die Maschine hier in Wien: ein Test, der um
@@ -3627,7 +3666,29 @@ npx expo install --check
 - **Paralleles Einfügen an derselben Stelle:** zwei PRs, die je eine Zeile an dieselbe Stelle einfügen
   (etwa einen Import unter denselben Nachbarn), kollidieren beim zweiten Merge. Vor dem Push mit
   `git merge-tree --write-tree a b` gegen die offenen PRs prüfen und im zweiten PR eine andere Stelle
-  nehmen (#870/#871).
+  nehmen (#870/#871). Dasselbe am Dateiende: hängen zwei PRs ihre Tests unten an dieselbe Datei an,
+  kollidiert der zweite (#876/#878).
+- **Nur der Haupt-Checkout (Wunsch des Betreibers, 3.10.):** keine Arbeitsbäume neben
+  `C:\Programmieren\THE-LION_SQUAD-eSPORT-Webseite`. Am 3.10. lagen dort 55 `tls-*`-Ordner, dazu 82
+  venvs unter `~/.local-ci` (rund 43 GB) – alle entfernt. Gearbeitet wird ein Zweig nach dem anderen im
+  Hauptordner; solange `local_check.py` läuft, kein Zweigwechsel. Einzige Ausnahme bleibt der
+  Build-Worktree `C:\lsb` des Release-Skripts (Abschnitt 7). Eigene Hintergrundprozesse (vite preview,
+  Log-Beobachter, Prozess-Pools, der adb-Server) am Ende beenden: ein verwaister Prozess hält sein
+  Arbeitsverzeichnis fest, der Ordner lässt sich dann nicht löschen.
+- **Gitleaks läuft nur lokal:** `ci.yml` hat nur `check-secrets.py`, kein Gitleaks – das macht allein
+  `local_check.py` (Gruppe `repository`). Wer nur `--only backend,frontend` laufen lässt, übersieht
+  Testwerte, die wie Schlüssel aussehen; so kamen fünf erfundene Tokens in `main` (Vollcheck 3.10.).
+  Erfundene Testwerte bekommen in `.gitleaks.toml` einen Eintrag, der an Datei **und** genauen Wert
+  gebunden ist.
+- **Zusatzprüfungen regelmäßig:** `--all` mindestens einmal die Woche (mit #775). Laufen die Ratschen
+  black/isort, flake8 und mypy lange nicht, wächst die Abweichung unbemerkt (3.10.: 326, 140 und 144 neue
+  Klassen seit 15.09.) – dann neue Funde stichprobenartig prüfen und erst danach `--record`.
+- **Nach einem Neustart** startet Docker den Entwicklungsstack (`tls-frontend` auf 3000, `tls-backend` auf
+  8001) von selbst. Der Check setzt `CI=true`, die Browser-Tests würden am belegten Port scheitern: mit
+  `E2E_PORT=3105` starten (der Container-Smoke überspringt sich bei belegten Ports von selbst).
+- **Mocks in App-Tests:** liefert ein `jest.mock` bei jedem Aufruf ein neues Nutzerobjekt, laufen Effekte
+  mit dem Nutzer als Abhängigkeit endlos, bis Jest ohne Speicher abbricht – das Objekt einmal außerhalb
+  anlegen (`mockAuth`, #877).
 
 ---
 
@@ -3713,6 +3774,40 @@ braucht.
 ---
 
 ## 9. Aktueller Stand (3. Oktober 2026)
+
+### Gemergt 3. Oktober (später Nachmittag), Bestandsaufnahme und Vollcheck
+#872 (Silvester: Kaliber und Jahreszahl, schließt #853), #873 (Doku-Stand), #874 („Deine Rechnung ist
+da“, schließt #841), #876 (Finanzen: was hängt, schließt #842), #877 (Turnier nur mit Event-Anmeldung,
+schließt #875), #878 (Gutschrift-Entwurf, schließt #843) und #879 (Vereinsdokumente als Datei, schließt
+#849). Damit ist „Abrechnung III“ (#840–#843) fertig. Der Betreiber hat danach `update.sh` ausgeführt
+und das Vereinsmodul 1.9.0 installiert. Build 85 (App 1.1.0) ist gebaut, aber noch nicht in der Play
+Console: der Betreiber hat den Zugang für Releases beantragt.
+
+Bestandsaufnahme auf Wunsch des Betreibers (erst alles fertig machen, dann Neues): geschlossen, weil
+erledigt, #618, #642, #728, #734, #735, #737; neu #880 (Logo und Banner für dunklen Hintergrund).
+Entscheidungen (je als Kommentar im Issue): D4 (#627) wird fertig, aber nach Vereinsmodul 1.5;
+Partner-Logos zuerst dunkel, dann hell, dann der Upload der Website, Banner auf der Sponsorenseite und
+für den Hauptsponsor auf der Startseite (#880); #779 alles Empfohlene, aber ganz später (Meilenstein
+„Später“); #775 wöchentliche Frühwarnung auf GitHub und lokal auf Knopfdruck; #667 Neigen mit dem
+nächsten App-Build; #729 Schneehauben in der App nur im Dashboard-Kopf; #329 einmalige
+Selbstbearbeitung über das Vereinsmodul 1.8; #575 und #576 gehen in D5/D6 auf, #577 und #323 bleiben
+geparkt.
+
+Vollcheck auf `main` (`local_check.py --all`, 3.10. gegen 17 Uhr): alle CI-Gruppen grün – Backend 1591 bestanden und 20 übersprungen, Web 1335
+Vitest- und 350 Browser-Tests, App 715 Jest-Tests, Container (Images, live/ready/health, Release-Marker,
+Uploads über nginx) –, dazu Kontrast und ShellCheck. Befunde: (1) Gitleaks meldete fünf erfundene
+Testwerte aus Jahreszeiten I, #810 und #839; sie stehen jetzt in `.gitleaks.toml`, an Datei und Wert
+gebunden. (2) OSV: `braces 3.0.3` (Web über Tailwind, App über Jest) und `node-forge 1.4.0` (App über
+`@expo/cli`) haben keinen Fix und sind reine Werkzeuge – in die Ratsche aufgenommen, die App-Allowlist
+gilt bis 2.11. (3) Die Ratschen black/isort, flake8 und mypy liefen seit 15.09. nicht: 326 Dateien
+Formatdrift, 140 flake8- und 144 mypy-Klassen neu. Stichproben (Rechenoperationen, ungenutzte
+Variablen) zeigten keine Fehler, nur eine überflüssige Abfrage (`better` in `user_routes.py`); als neuer
+Stand aufgenommen (`--record`).
+
+Aufgeräumt: alle `tls-*`-Arbeitsbäume und ihre venvs (6.4 „Nur der Haupt-Checkout“). Nur lokal und
+nicht gepusht: `feat/member-accounts` (`bb250f3c`, #846 – Backend für Konten in der Akte; es fehlen
+Attrappe, Tests und Oberfläche) und `feat/discord-routing` (`caef80f4`, D4 – Backend mit Tests; es fehlt
+die Oberfläche).
 
 ### Gemergt 3. Oktober (Nachmittag)
 #860 (Saison-Feinschliff, schließt #855, #857, #858), #862 (Discord-Zahl in „Dabei sein“ und
@@ -3914,26 +4009,14 @@ Uhrzeit und Ort), #683 (E4 Katalog C). Der Betreiber merged, sobald ein PR
 ready ist; Halloween-Runden kamen aus seinen Screenshots (siehe #658).
 
 ### Offene PRs
-- Offen (3.10. Abend): #872 Silvester – Kaliber im Feuerwerk (klein, groß, sehr groß; Knall nie lauter
-  als bisher) und um 00:00 die Jahreszahl aus Funken, bei „dezent“ ruhig (schließt #853; Web und App,
-  neuer Paritäts-Fingerabdruck). Wartet auf den Betreiber: D4 (#627, lokaler WIP-Commit, siehe unten),
-  danach #866 Teil 2. Wenn der Betreiber meldet, dass das Vereinsmodul Logos für dunklen und hellen
-  Hintergrund liefert: Website und App nehmen das Logo für dunklen Hintergrund (Rückfall auf das
-  einzige Logo). Als Nächstes: Abrechnung III (#841, #842, #843), dann Vereinsmodul 1.5 (#844–#850).
-- Stand 3.10. Nachmittag (inzwischen gemergt, siehe oben): #860 Saison-Feinschliff (Faschingshut über `seasons/mascot` mit `crownTop`,
-  keine Hasenohren in Web und App, „Ostereier verstecken“ – schließt #855, #857, #858). Aus der Sichtprobe
-  des Betreibers vom 3.10. offen: #852 Adventkalender und Nikolaus neben dem Kranz, #853 Silvester mit
-  Jahreszahl um 0 Uhr, #854 Discord-Zahl in „Dabei sein“, #856 Geburtstag festlicher, #859
-  Vereinsplatzierungen im neuen Design. Release 1.1.0 (#851) ist gebaut (siehe App-Builds). Pausiert auf Wunsch des
-  Betreibers: Discord VI D4 (#627) – Backend mit Tests als lokaler WIP-Commit `caef80f4` im Zweig
-  `feat/discord-routing` (nicht gepusht), es fehlt die Oberfläche. Neu geplant: Meilenstein
-  „Abrechnung III“ (#840 Rechnungs-PDF zuerst – die REST-Freigabe baut kein PDF, `PUT
-  /documents/builddoc`; dann #841 und #842, zuletzt #843) und „Vereinsmodul 1.5“ (#844 Abstimmung als
-  Popup, #845 Präsenz per Mitgliedskarte, #846 Konten in der Akte, #847 Teilnahmen, #848 Ehrungen,
-  #849 Dokumente als Datei, #850 Dolibarr-Events als Entwurf; die Teile im Vereinsmodul hat der
-  Betreiber neutral formuliert an die Vereine-Session gegeben). Entscheidung zur Datenpflege
-  (Kommentar an #329): der Vorstand pflegt in Dolibarr, Mitglieder beantragen Änderungen. Nachzug:
-  `seasons/carnival` auf `seasons/mascot` umstellen.
+- Keine offenen PRs (3.10. Abend). Reihenfolge des Betreibers: (1) **Vereinsmodul 1.5** – zuerst den
+  festgehaltenen Vertrag `backend/tests/contracts/vereine-openapi.json` samt Manifest von 1.4.0 auf
+  1.9.0 heben (neu: Partner und ihre Bilder, Ehrungen, Teilnahmen, Anwesenheit je Mitglied), dann #880,
+  #846 (WIP-Zweig fortsetzen), #847, #848, #845, #844, #850 und #329. (2) **D4** (#627) auf den dann
+  aktuellen `main` setzen, danach D5–D8 (#628–#631) und #866 Teil 2 (Vorlagen für News, Events,
+  Turniere). (3) Mit dem nächsten App-Build #667 (Neigen) und #729 (Schneehauben). (4) #775
+  (Zeitreise-Prüfung). Handbuch: als Nächstes Kapitel nach dem Discord-Muster für Abrechnung und
+  Finanzen, Vereinsmodul und Turniere.
 - Offen (2.10. Nacht): keine Feature-PRs. Als Nächstes W5 #731
   Winter-Interaktionen (Web und App), dann der Release-PR für App 1.0.6
   (Build 85: Silvester mit Skia #803, Winterhimmel #804, W5) – bis Mitte
@@ -4460,7 +4543,7 @@ Vor jedem neuen Paket: Stand melden und auf das OK warten.
   und machte den ETag-Cache wirkungslos (Ausnahme in `server.py`). Der Vorschau-Knopf tat
   nichts, weil das Token nur in `sessionStorage` lag und die Bühne im Admin still ist (#653).
   Ein `filter: drop-shadow` auf einer inneren SVG-Gruppe ergibt einen rechteckigen Kasten –
-  Schein nur über Verläufe oder auf dem ganzen SVG. Vitest aus dem Worktree-Stamm startet ein
+  Schein nur über Verläufe oder auf dem ganzen SVG. Vitest aus dem Repo-Stamm startet ein
   globales Vitest 5 ohne jsdom – immer aus `frontend/` mit `--root`.
 - App-Tests (28.09.): RNTL 14 macht auch `screen.unmount()` async; ohne `await` kippen alle
   späteren Fake-Timer-Tests mit „overlapping act() calls“. Unter jest-expo endet eine native
