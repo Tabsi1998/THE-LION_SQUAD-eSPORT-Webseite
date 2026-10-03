@@ -474,6 +474,33 @@ test("club members render gamertag-first cards", async ({ page }) => {
   await expect(card.getByText("Obmann")).toBeVisible();
 });
 
+test("level frames: the hex shield sits square and centred on the avatar (#888)", async ({ page }) => {
+  // Die globale Regel svg { max-width: 100% } kappte das Sechseck auf die Bildbreite - schmal, hoch, 12 px zu weit links.
+  await mockPublicChrome(page);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.route("**/api/users/public-list**", async (route) => {
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ total: 2, items: [
+      { id: "u9", username: "garlic", display_name: "Garlic Jr.", achievement_level: { level: 9 }, achievements_count: 12 },
+      { id: "u24", username: "totor", display_name: "TotorRuns", achievement_level: { level: 24 }, achievements_count: 24 },
+    ] }) });
+  });
+  await page.route("**/api/membership/public", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
+  await page.route("**/api/achievements/crowns", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ crowns: {} }) }));
+
+  await page.goto("/players");
+  await acceptCookies(page);
+  for (const username of ["garlic", "totor"]) {
+    const card = page.getByTestId(`player-card-${username}`);
+    await expect(card).toBeVisible();
+    const frame = await card.locator(".tls-lvf").boundingBox();
+    const hexa = await card.locator(".tls-lvf-hexa").boundingBox();
+    expect(Math.abs(hexa.width - hexa.height), `${username}: Sechseck quadratisch`).toBeLessThanOrEqual(1);
+    expect(Math.abs(hexa.width - (frame.width + 18)), `${username}: in der Liste 9 px ringsum`).toBeLessThanOrEqual(1);
+    expect(Math.abs(hexa.x + hexa.width / 2 - (frame.x + frame.width / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
+    expect(Math.abs(hexa.y + hexa.height / 2 - (frame.y + frame.height / 2)), `${username}: mittig`).toBeLessThanOrEqual(1);
+  }
+});
+
 test("public profile social links render as icons without raw values", async ({ page }) => {
   await mockPublicChrome(page);
   await page.route("**/api/users/public/tabsi98", async (route) => {

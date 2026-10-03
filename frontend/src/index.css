@@ -1477,6 +1477,8 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-lvf--compact .tls-lvf-crown-rays { display: none; }
 .tls-lvf--compact .tls-lvf-dashed { inset: -3.5px; border-radius: 6px; padding: 1.4px; }
 .tls-lvf--compact .tls-lvf-corners i { width: 8px; height: 8px; border-width: 1.5px; }
+/* In Listenkarten (p-4) reicht das Sechseck sonst beim Pulsieren an den Kartenrand (#888). */
+.tls-lvf--compact .tls-lvf-hexa { inset: -9px; width: calc(100% + 18px); height: calc(100% + 18px); }
 
 /* --- extra effect primitives for the 30-level system --- */
 .tls-lvf-corners { position: absolute; inset: -8px; z-index: 1; pointer-events: none; }
@@ -1705,13 +1707,15 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   filter: drop-shadow(0 0 6px color-mix(in srgb, var(--lvf-c) 70%, transparent));
 }
 
-/* Hexagon shield outline pulsing */
+/* Hexagon shield outline pulsing. max-width: none - die globale Regel svg { max-width: 100% } kappte die Breite auf das
+   Bild, die Höhe blieb: schmal, hoch und 12 px zu weit links (#888). */
 .tls-lvf-hexa {
   position: absolute;
   inset: -12px;
   z-index: 1;
   width: calc(100% + 24px);
   height: calc(100% + 24px);
+  max-width: none;
   pointer-events: none;
   filter: drop-shadow(0 0 6px var(--lvf-c));
   animation: tls-lvf-hexa-pulse calc(var(--lvf-speed) * 0.5) ease-in-out infinite;
