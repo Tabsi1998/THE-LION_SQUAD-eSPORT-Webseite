@@ -10,6 +10,7 @@ import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { recordSignal } from "../signals";
 import { SnowField } from "../sky/SnowField";
 import { seasonScroll } from "../sky/scroll";
+import { MELT, breakShards, catchStyle, type CatchStyle } from "./catch";
 import { fadeAt, flakeCounts, snowfallFactor, windFrom } from "./flakes";
 
 // Schnee in der App (#642, Web #766/#768): vom 1. Advent bis Dreikönig schneit es - Flocken in drei Tiefen mit Wind
@@ -65,12 +66,8 @@ async function writeClicks(value: number): Promise<void> {
   }
 }
 
-/** Zwölf Splitter, wenn die Flocke gefangen wird - wie im Web, ringsum in drei Weiten. */
-export const SHARDS = Array.from({ length: 12 }, (_, i) => {
-  const angle = (i / 12) * Math.PI * 2;
-  const distance = 14 + (i % 3) * 5;
-  return { dx: Math.cos(angle) * distance, dy: Math.sin(angle) * distance };
-});
+/** Die Splitter eines brechenden Kristalls (W5 #731) - dieselben wie im Web: je Arm ein langer, dazwischen kleine. */
+export const SHARDS = breakShards();
 
 /** Ein sechsstrahliger Kristall - dieselbe Zeichnung wie die Schneeflocke im Web. */
 export function SnowflakeShape({ size = 26, color = "#dff6ff" }: { size?: number; color?: string }) {
@@ -92,10 +89,12 @@ export function SnowflakeShape({ size = 26, color = "#dff6ff" }: { size?: number
 }
 
 export function SnowflakeWidget({ season }: { season: ActiveSeason; screen: string }) {
-  const { reducedMotion, showToast } = useSeason();
+  const { reducedMotion, showToast, weather } = useSeason();
   const [clicks, setClicks] = useState(0);
+  const [style, setStyle] = useState<CatchStyle | null>(null);
   const turn = useRef(new Animated.Value(0)).current;
   const burst = useRef(new Animated.Value(0)).current;
+  const melt = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(1)).current;
   const calm = reducedMotion || season.effective === "subtle";
   useEffect(() => {
@@ -119,39 +118,87 @@ export function SnowflakeWidget({ season }: { season: ActiveSeason; screen: stri
   }, [calm, turn]);
   const onPress = () => {
     const next = clicks + 1;
+    // Bei Frost bricht der Kristall, bei Tauwetter schmilzt er (W5 #731) - die echte Temperatur am Vereinsort.
+    const kind = catchStyle(weather?.temp_c, clicks);
     setClicks(next);
     void writeClicks(next);
     // Gefangen zählt als Saison-Fundstück (#678) - der Server deckelt je Tag.
     void recordSignal(SNOW_SIGNAL, { onceIf: false });
-    void Promise.resolve(Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => {});
+    // Dezent: ein kurzes Tippen beim Bruch, beim Schmelzen nur ein Hauch.
+    void Promise.resolve(kind === "melt" ? Haptics.selectionAsync() : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)).catch(() => {});
     if (!calm) {
+      setStyle(kind);
       burst.setValue(0);
+      melt.setValue(0);
       pop.setValue(1);
-      Animated.parallel([
-        Animated.timing(burst, { toValue: 1, duration: BURST_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.sequence([
-          Animated.timing(pop, { toValue: 0.2, duration: 160, useNativeDriver: true }),
-          Animated.timing(pop, { toValue: 1, duration: 360, easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }),
-        ]),
-      ]).start();
+      if (kind === "break") {
+        Animated.parallel([
+          Animated.timing(burst, { toValue: 1, duration: BURST_MS, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(pop, { toValue: 0.2, duration: 160, useNativeDriver: true }),
+            Animated.timing(pop, { toValue: 1, duration: 360, easing: Easing.out(Easing.back(1.6)), useNativeDriver: true }),
+          ]),
+        ]).start();
+      } else {
+        Animated.parallel([
+          Animated.timing(melt, { toValue: 1, duration: MELT.ms, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.sequence([
+            Animated.timing(pop, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+            Animated.delay(250),
+            Animated.timing(pop, { toValue: 1, duration: 350, easing: Easing.out(Easing.back(1.4)), useNativeDriver: true }),
+          ]),
+        ]).start();
+      }
     }
     if (next === SNOW_KING_AT) showToast("Fünfzig Flocken gefangen – Schneekönig!", 5000);
   };
   const label = clicks >= SNOW_KING_AT ? `Schneeflocke – Schneekönig mit ${clicks} Flocken` : `Schneeflocke fangen – ${clicks} von ${SNOW_KING_AT}`;
   const rotate = turn.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "60deg"] });
+  // Beim Schmelzen verblasst der Kristall, während er schrumpft; danach wächst eine neue Flocke nach.
+  const crystalOpacity = melt.interpolate({ inputRange: [0, 0.35, 0.6, 1], outputRange: [1, 0.15, 0, 1] });
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.widget} testID="snow-flake-widget">
-      {SHARDS.map((shard, index) => (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} hitSlop={8} style={styles.widget} testID="snow-flake-widget" data-catch={style || undefined}>
+      {style === "break" ? SHARDS.map((shard, index) => (
         <Animated.View
           key={index}
           pointerEvents="none"
-          style={[styles.shard, {
+          style={[shard.kind === "sliver" ? styles.sliver : styles.chip, {
             opacity: burst.interpolate({ inputRange: [0, 0.05, 1], outputRange: [0, 1, 0] }),
-            transform: [{ translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, shard.dx] }) }, { translateY: burst.interpolate({ inputRange: [0, 1], outputRange: [0, shard.dy] }) }],
+            transform: [
+              { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, shard.dx] }) },
+              { translateY: burst.interpolate({ inputRange: [0, 1], outputRange: [0, shard.dy] }) },
+              { rotate: burst.interpolate({ inputRange: [0, 1], outputRange: [`${shard.kind === "chip" ? 45 : shard.angle}deg`, `${(shard.kind === "chip" ? 45 : shard.angle) + shard.turn}deg`] }) },
+              { scale: burst.interpolate({ inputRange: [0, 1], outputRange: [1, shard.kind === "sliver" ? 0.55 : 1] }) },
+            ],
           }]}
+          testID={`snow-flake-${shard.kind}`}
         />
-      ))}
-      <Animated.View style={{ transform: [{ rotate }, { scale: pop }] }} testID="snow-flake-crystal">
+      )) : null}
+      {style === "melt" ? (
+        <>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.drop, {
+              opacity: melt.interpolate({ inputRange: [0, 0.25, 0.85, 1], outputRange: [0, 1, 1, 0] }),
+              transform: [
+                { translateY: melt.interpolate({ inputRange: [0, 0.25, 0.85, 1], outputRange: [-2, 0, MELT.fall, MELT.fall + 1] }) },
+                { scaleX: melt.interpolate({ inputRange: [0, 0.25, 0.85, 1], outputRange: [0.4, 1, 0.9, 1.2] }) },
+                { scaleY: melt.interpolate({ inputRange: [0, 0.25, 0.85, 1], outputRange: [0.4, 1, 1.1, 0.5] }) },
+              ],
+            }]}
+            testID="snow-flake-drop"
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.ripple, {
+              opacity: melt.interpolate({ inputRange: [0, 0.8, 0.88, 1], outputRange: [0, 0, 0.8, 0] }),
+              transform: [{ scale: melt.interpolate({ inputRange: [0, 0.8, 1], outputRange: [0.3, 0.3, 1.8] }) }],
+            }]}
+            testID="snow-flake-ripple"
+          />
+        </>
+      ) : null}
+      <Animated.View style={{ opacity: crystalOpacity, transform: [{ rotate }, { scale: pop }] }} testID="snow-flake-crystal">
         <SnowflakeShape />
       </Animated.View>
     </Pressable>
@@ -160,6 +207,9 @@ export function SnowflakeWidget({ season }: { season: ActiveSeason; screen: stri
 
 const styles = StyleSheet.create({
   widget: { width: 34, height: 34, alignItems: "center", justifyContent: "center" },
-  shard: { position: "absolute", left: 15.5, top: 15.5, width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#dff6ff" },
+  sliver: { position: "absolute", left: 16, top: 13, width: 2, height: 8, borderRadius: 1, backgroundColor: "#ffffff" },
+  chip: { position: "absolute", left: 15.5, top: 15.5, width: 3, height: 3, backgroundColor: "#e9f4ff" },
+  drop: { position: "absolute", left: 14, top: 13, width: 6, height: 8, borderRadius: 3, borderTopLeftRadius: 2, borderTopRightRadius: 2, backgroundColor: "#a8d4ff" },
+  ripple: { position: "absolute", left: 12.5, top: 28.5, width: 9, height: 3, borderRadius: 4.5, borderWidth: 1, borderColor: "rgba(168, 212, 255, 0.75)" },
 });
 
