@@ -131,6 +131,36 @@ img, video, canvas, svg {
 
 .tls-bracket-node.is-winner::before { background: #29B6E8; box-shadow: 0 0 8px rgba(41,182,232,0.5); }
 
+/* Turniere I (#833): der Weg eines Spielers - seine Partien leuchten, der Rest tritt zurück; Linien ziehen mit. */
+.tls-bracket-node { transition: opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+.tls-bracket-node[data-path="off"] { opacity: 0.38; }
+.tls-bracket-node[data-path="on"] {
+  border-color: rgba(41, 182, 232, 0.75);
+  box-shadow: 0 0 0 1px rgba(41, 182, 232, 0.35), 0 12px 28px -18px rgba(41, 182, 232, 0.85);
+}
+.tls-bracket-line { transition: opacity 0.25s ease, stroke 0.25s ease; }
+.tls-bracket-line[data-path="off"] { opacity: 0.35; }
+
+/* Laufende Partien atmen leise (grün wie „live“). */
+@keyframes tls-bracket-live {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.55), 0 0 20px -6px rgba(0, 255, 136, 0.45); }
+}
+.tls-bracket-live { animation: tls-bracket-live 2.4s ease-in-out infinite; }
+
+/* Ein neues Ergebnis gleitet ein (der Schlüssel ist der Wert). */
+@keyframes tls-score-tick {
+  from { opacity: 0.3; transform: translateY(-0.25em); }
+  to { opacity: 1; transform: none; }
+}
+.tls-score-tick { display: inline-block; animation: tls-score-tick 0.45s cubic-bezier(0.22, 1, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-bracket-node, .tls-bracket-line { transition: none; }
+  .tls-bracket-live { animation: none; box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.45); }
+  .tls-score-tick { animation: none; }
+}
+
 /* TV mode */
 .tv-bg {
   background: radial-gradient(ellipse at top, #001a26 0%, #000 60%);

@@ -14,6 +14,42 @@ const EMPTY_SET = new Set();
 // Kennung nicht durch Stufe → Abschnitt → Runde → Knoten gereicht werden muss.
 const ChangedMatchesContext = createContext(EMPTY_SET);
 const MineContext = createContext(null);
+// Der Weg eines Spielers (#833): Fahren über einen Namen hebt jede Partie dieser Person hervor und dämpft den Rest;
+// Fokus auf einer Partie (Tastatur) hebt die Wege ihrer Spieler hervor. `ids` ist eine Menge von Anmeldungen.
+const PathContext = createContext({ ids: null, show: () => {} });
+// Nach dem Ende (#833): was nicht gespielt wurde, heißt so - nicht mehr „Bereit“ oder „Geplant“.
+const FinishedContext = createContext(false);
+const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived", "cancelled"]);
+
+/** Kürzel für Spieler ohne Bild (#833): die Anfangsbuchstaben von bis zu zwei Wörtern. */
+export function initials(label) {
+  const words = String(label || "").trim().split(/[\s_.-]+/).filter(Boolean);
+  if (!words.length) return "";
+  return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+}
+
+/** Liegt diese Partie auf dem hervorgehobenen Weg - oder wird sie gedämpft? */
+export function pathState(ids, registrationIds) {
+  if (!ids || !ids.size) return "";
+  return registrationIds.some((id) => id && ids.has(id)) ? "on" : "off";
+}
+
+/** Nur Tastatur-Fokus zeigt den Weg - ein Tippen am Handy (öffnet die Partie) soll den Baum nicht dämpfen. */
+function keyboardFocus(element) {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
+function canHover() {
+  try {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches;
+  } catch {
+    return false;
+  }
+}
 
 function useMatchChanged(matchId) {
   return useContext(ChangedMatchesContext).has(matchId);
@@ -27,7 +63,10 @@ const COLUMN_GAP = 48;
 
 export function BracketTree({ data, compact = false, viewMode = "standard", onMatchClick, changedMatchIds = EMPTY_SET, mineId = null, layout = "auto" }) {
   const { matches_v2 = [], stages = [], registrations = [] } = data || {};
-  const podiumMap = useMemo(() => buildPodiumMap(matches_v2), [matches_v2]);
+  const [pathIds, setPathIds] = useState(null);
+  const path = useMemo(() => ({ ids: pathIds, show: setPathIds }), [pathIds]);
+  const finished = FINISHED_TOURNAMENT.has(String(data?.tournament?.status || ""));
+  const podiumMap = useMemo(() => buildPodiumMap(matches_v2, stages), [matches_v2, stages]);
   const regMap = useMemo(() => {
     const m = new Map();
     for (const r of registrations) m.set(r.id, r);
@@ -38,17 +77,21 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
   return (
     <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
       <MineContext.Provider value={mine}>
-        {mine && viewMode !== "tv" ? <NextMatchBanner matches={matches_v2} regMap={regMap} mineId={mine} onMatchClick={onMatchClick} /> : null}
-        <StageBracketTree
-          stages={stages}
-          matches={matches_v2}
-          regMap={regMap}
-          podiumMap={podiumMap}
-          compact={compact}
-          viewMode={viewMode}
-          layout={layout}
-          onMatchClick={onMatchClick}
-        />
+        <FinishedContext.Provider value={finished}>
+          <PathContext.Provider value={path}>
+            {mine && viewMode !== "tv" && !finished ? <NextMatchBanner matches={matches_v2} regMap={regMap} mineId={mine} onMatchClick={onMatchClick} /> : null}
+            <StageBracketTree
+              stages={stages}
+              matches={matches_v2}
+              regMap={regMap}
+              podiumMap={podiumMap}
+              compact={compact}
+              viewMode={viewMode}
+              layout={layout}
+              onMatchClick={onMatchClick}
+            />
+          </PathContext.Provider>
+        </FinishedContext.Provider>
       </MineContext.Provider>
     </ChangedMatchesContext.Provider>
   );
@@ -211,7 +254,7 @@ function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, l
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
           <span className="w-2 h-2 bg-[#FFD700]" />
-          <span className="text-white/80">{formatBracketSection(section)}</span>
+          <span className="text-white/80" data-testid={`bracket-section-title-${normalizeSection(section)}`}>{formatBracketSection(section)}</span>
         </div>
         {flowHint ? <span className="text-xs text-white/40">{flowHint}</span> : null}
       </div>
@@ -255,7 +298,7 @@ function StageSection({ section, rounds, regMap, podiumMap, compact, viewMode, l
       ) : steps ? (
         <RoundSteps roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
       ) : (
-        <KnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} />
+        <KnockoutTree roundNums={roundNums} rounds={rounds} regMap={regMap} podiumMap={podiumMap} compact={compact} onMatchClick={onMatchClick} sectionTitle={formatBracketSection(section)} />
       )}
     </div>
   );
@@ -302,10 +345,22 @@ export function connectorTargets(countFrom, countTo) {
   return Array.from({ length: countFrom }, (_, index) => Math.min(countTo - 1, Math.floor((index * countTo) / countFrom)));
 }
 
-function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick }) {
+/** Runden-Kopf - leer, wenn er nur den Abschnitt wiederholt (#833). */
+export function roundTitle(match, number, sectionTitle = "") {
+  const title = formatRoundName(match?.round_name, number);
+  return sectionTitle && title.toLowerCase() === String(sectionTitle).toLowerCase() ? "" : title;
+}
+
+function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchClick, sectionTitle = "" }) {
   const containerRef = useRef(null);
   const nodeRefs = useRef(new Map());
   const [lines, setLines] = useState([]);
+  const { ids: pathIds } = useContext(PathContext);
+  const playersByMatch = useMemo(() => {
+    const map = new Map();
+    for (const rn of roundNums) for (const match of rounds[rn]) map.set(match.id, (match.slots || []).map((slot) => slot.registration_id).filter(Boolean));
+    return map;
+  }, [roundNums, rounds]);
 
   const register = (id) => (node) => {
     if (node) nodeRefs.current.set(id, node);
@@ -332,7 +387,7 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
           const x2 = b.left - base.left + container.scrollLeft;
           const y2 = b.top + b.height / 2 - base.top + container.scrollTop;
           const mid = x1 + (x2 - x1) / 2;
-          next.push({ id: `${match.id}-${target.id}`, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
+          next.push({ id: `${match.id}-${target.id}`, from: match.id, to: target.id, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
         });
       }
       setLines(next);
@@ -348,13 +403,22 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
   return (
     <div ref={containerRef} className="relative overflow-x-auto pb-4" data-testid="bracket-tree">
       <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true" data-testid="bracket-connectors">
-        {lines.map((line) => <path key={line.id} d={line.d} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="2" />)}
+        {lines.map((line) => {
+          // Eine Linie liegt auf dem Weg, wenn die Person in beiden Partien steht (#833).
+          const state = pathIds && pathIds.size
+            ? ((playersByMatch.get(line.from) || []).some((id) => pathIds.has(id) && (playersByMatch.get(line.to) || []).includes(id)) ? "on" : "off")
+            : "";
+          return (
+            <path key={line.id} d={line.d} fill="none" className="tls-bracket-line" data-path={state || undefined}
+              stroke={state === "on" ? "rgba(41,182,232,0.85)" : "rgba(255,255,255,0.22)"} strokeWidth={state === "on" ? 2.5 : 2} />
+          );
+        })}
       </svg>
       <div className="flex items-stretch" style={{ gap: COLUMN_GAP, minWidth: "max-content" }}>
         {roundNums.map((rn) => (
           <div key={rn} className={`flex flex-col ${compact ? "w-[228px]" : "w-[272px]"} shrink-0`}>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2 mb-3 sticky top-0">
-              {formatRoundName(rounds[rn][0].round_name, rn)}
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/50 px-2 mb-3 sticky top-0 min-h-[1rem]">
+              {roundTitle(rounds[rn][0], rn, sectionTitle)}
             </div>
             <div className="flex flex-col justify-around flex-1 gap-4">
               {rounds[rn].map((match) => (
@@ -396,7 +460,11 @@ function isBye(slot) {
 }
 
 function LiveStatus({ status }) {
+  const finished = useContext(FinishedContext);
   const isLive = LIVE_STATUSES.has(String(status || "").toLowerCase());
+  if (finished && !DONE_STATUSES.has(String(status || "").toLowerCase())) {
+    return <span className="text-white/35" data-testid="bracket-not-played">nicht gespielt</span>;
+  }
   return (
     <span className={`inline-flex items-center gap-1.5 ${isLive ? "text-[#00FF88]" : ""}`}>
       {isLive && <span className="w-1.5 h-1.5 rounded-full bg-[#00FF88] tv-live-dot" />}
@@ -430,15 +498,23 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const changed = useMatchChanged(match.id);
   const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
   const done = DONE_STATUSES.has(String(match.status || "").toLowerCase());
+  const { ids: pathIds, show } = useContext(PathContext);
+  const finished = useContext(FinishedContext);
+  const players = slots.map((slot) => slot.registration_id).filter(Boolean);
+  const onPath = pathState(pathIds, players);
+  const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
 
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
+      onFocus={(event) => players.length && keyboardFocus(event.currentTarget) && show(new Set(players))}
+      onBlur={() => show(null)}
       data-testid={`bracket-match-v2-${match.id}`}
       data-changed={changed ? "true" : undefined}
       data-mine={isMine ? "true" : undefined}
-      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group ${changed ? "tls-changed-frame" : ""}`}
+      data-path={onPath || undefined}
+      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group ${changed ? "tls-changed-frame" : ""} ${live ? "tls-bracket-live" : ""}`}
     >
       <div className={`${compact ? "px-2.5 py-1" : "px-3 py-1.5"} flex items-center justify-between gap-2 border-b border-white/5`}>
         <span className="text-[11px] font-bold tracking-wider text-white/55">{match.match_key || "Spiel"}{isMine ? <span className="ml-2 text-[#FFD700]">Du</span> : null}</span>
@@ -452,6 +528,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
         return (
           <Row
             key={slot.slot || index}
+            registrationId={slot.registration_id}
             label={slotLabel(slot, regMap)}
             empty={!reg}
             bye={isBye(slot)}
@@ -484,19 +561,30 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
     : slots;
   const filled = slots.filter((slot) => slot.registration_id).length;
   const isMine = Boolean(mine) && slots.some((slot) => slot.registration_id === mine);
-  const title = [match.match_type === "ffa" ? `Durchgang ${match.match_key || ""}`.trim() : (match.match_key || "Spiel"), `${filled || slots.length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null].filter(Boolean).join(" · ");
+  // Zweizeilig statt abgeschnitten (#833): oben der Name, darunter Spielerzahl und Weiterkommer.
+  const name = match.match_type === "ffa" ? `Durchgang ${match.match_key || ""}`.trim() : (match.match_key || "Spiel");
+  const meta = [`${filled || slots.length} Spieler`, qualifiers ? `${qualifiers} ${qualifiers === 1 ? "kommt" : "kommen"} weiter` : null].filter(Boolean).join(" · ");
+  const { ids: pathIds, show } = useContext(PathContext);
+  const finished = useContext(FinishedContext);
+  const players = slots.map((slot) => slot.registration_id).filter(Boolean);
+  const onPath = pathState(pathIds, players);
+  const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
   return (
     <button
       type="button"
       onClick={() => onClick?.(match)}
+      onFocus={(event) => players.length && keyboardFocus(event.currentTarget) && show(new Set(players))}
+      onBlur={() => show(null)}
       data-testid={`bracket-heat-${match.id}`}
       data-changed={changed ? "true" : undefined}
       data-mine={isMine ? "true" : undefined}
-      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A] ${changed ? "tls-changed-frame" : ""}`}
+      data-path={onPath || undefined}
+      className={`tls-bracket-node relative w-full text-left rounded-md overflow-hidden border ${podiumBorderClass(nodePodium)} ${isMine ? "ring-1 ring-[#FFD700]/60" : ""} hover:border-[#29B6E8]/60 transition-all group bg-[#0A0A0A] ${changed ? "tls-changed-frame" : ""} ${live ? "tls-bracket-live" : ""}`}
     >
-      <div className={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 flex items-center justify-between gap-2`}>
+      <div className={`${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 flex items-start justify-between gap-2`}>
         <div className="min-w-0">
-          <div className="text-xs font-bold text-white/85 truncate" data-testid={`bracket-heat-title-${match.id}`}>{title}</div>
+          <div className="text-xs font-bold text-white/85 truncate" data-testid={`bracket-heat-title-${match.id}`}>{name}</div>
+          <div className="text-[10px] text-white/45 leading-snug" data-testid={`bracket-heat-meta-${match.id}`}>{meta}</div>
           {isMine ? <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Du bist dabei</div> : null}
         </div>
         <span className="text-[11px] text-white/45 shrink-0"><LiveStatus status={match.status} /></span>
@@ -509,6 +597,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
         return (
           <HeatRow
             key={slot.slot}
+            registrationId={slot.registration_id}
             registration={reg}
             result={result}
             played={played}
@@ -523,19 +612,16 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   );
 }
 
-function HeatRow({ registration, result, played, qualified, isMine, podiumRank, compact = false }) {
+function HeatRow({ registrationId, registration, result, played, qualified, isMine, podiumRank, compact = false }) {
   const user = registration?.user || {};
   const label = registration ? (registration.display_name || user.display_name || registration.ingame_name || "-") : "";
   const score = result?.score ?? result?.points;
   const podium = podiumMeta(podiumRank);
+  const pathHandlers = usePathHover(registrationId);
   return (
-    <div className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")}`}>
+    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")}`}>
       <div className="flex items-center gap-2 min-w-0">
-        {user.avatar_url ? (
-          <img src={resolveMediaUrl(user.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover" />
-        ) : (
-          <div className={`w-7 h-7 rounded-sm border ${registration ? "bg-white/5 border-white/10" : "border-dashed border-white/15"}`} />
-        )}
+        <SlotAvatar avatar={user.avatar_url} label={label} empty={!registration} />
         <div className="min-w-0">
           <div className={`${compact ? "text-sm" : "text-base"} truncate ${label ? "" : "text-white/25"} ${podium?.text || (qualified ? "text-[#29B6E8] font-semibold" : "text-white/85")}`}>{label || "—"}</div>
           {isMine ? <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Du</div> : null}
@@ -545,7 +631,7 @@ function HeatRow({ registration, result, played, qualified, isMine, podiumRank, 
         {played ? (
           <>
             <div className={`font-display font-bold ${podium?.text || (qualified ? "text-[#29B6E8]" : "text-white/70")}`}>{podium ? podium.label : result?.rank ? `#${result.rank}` : "-"}</div>
-            {score != null && <div className="text-[10px] text-white/45">{score} Pkt.</div>}
+            {score != null && <div key={score} className="tls-score-tick text-[10px] text-white/45">{score} Pkt.</div>}
           </>
         ) : null}
       </div>
@@ -553,16 +639,35 @@ function HeatRow({ registration, result, played, qualified, isMine, podiumRank, 
   );
 }
 
-function Row({ label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false }) {
-  const podium = podiumMeta(podiumRank);
+/** Bild oder Kürzel (#833) - leere graue Quadrate gibt es nur noch für freie Plätze. */
+function SlotAvatar({ avatar, label, empty }) {
+  if (avatar) return <img src={resolveMediaUrl(avatar)} alt="" className="w-7 h-7 rounded-sm object-cover shrink-0" />;
+  const short = empty ? "" : initials(label);
+  if (!short) return <div className="w-7 h-7 rounded-sm border border-dashed border-white/15 shrink-0" />;
   return (
-    <div className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")}`}>
+    <div className="w-7 h-7 rounded-sm border border-white/10 bg-gradient-to-br from-white/[0.09] to-white/[0.02] text-[10px] font-bold tracking-wide text-white/65 flex items-center justify-center shrink-0" aria-hidden="true" data-testid="bracket-initials">
+      {short}
+    </div>
+  );
+}
+
+/** Fahren über einen Namen zeigt den Weg dieser Person - nur mit Maus, am Handy bleibt alles ruhig. */
+function usePathHover(registrationId) {
+  const { show } = useContext(PathContext);
+  if (!registrationId) return {};
+  return {
+    onMouseEnter: () => canHover() && show(new Set([registrationId])),
+    onMouseLeave: () => canHover() && show(null),
+  };
+}
+
+function Row({ registrationId, label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false }) {
+  const podium = podiumMeta(podiumRank);
+  const pathHandlers = usePathHover(registrationId);
+  return (
+    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")}`}>
       <div className="flex items-center gap-2 min-w-0">
-        {avatar ? (
-          <img src={resolveMediaUrl(avatar)} alt="" className="w-7 h-7 rounded-sm object-cover" />
-        ) : (
-          <div className={`w-7 h-7 rounded-sm border ${empty ? "border-dashed border-white/15" : "bg-white/5 border-white/10"}`} />
-        )}
+        <SlotAvatar avatar={avatar} label={bye ? "" : label} empty={empty || bye} />
         <span className={`${compact ? "text-sm" : "text-base"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-bold" : isLoser ? "text-white/45" : empty ? "text-white/25" : "text-white/85")}`}>
           {bye ? "Freilos" : label || "—"}
         </span>
@@ -571,7 +676,7 @@ function Row({ label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, 
       <div className="flex items-center gap-2 shrink-0">
         {podium && <span className={`px-1.5 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span>}
         {score != null && (
-          <span className={`font-display font-bold ${compact ? "text-base" : "text-lg"} ${podium?.text || (isWinner ? "text-[#29B6E8]" : "text-white/55")}`}>
+          <span key={score} className={`tls-score-tick font-display font-bold ${compact ? "text-base" : "text-lg"} ${podium?.text || (isWinner ? "text-[#29B6E8]" : "text-white/55")}`}>
             {score}
           </span>
         )}
@@ -599,7 +704,21 @@ function isBronzeMatch(match) {
   return haystack.includes("bronze") || haystack.includes("platz 3") || haystack.includes("third");
 }
 
-function buildPodiumMap(matchesV2 = []) {
+/** Mehrere Phasen (#833): die letzte Phase (höchste Nummer) - nur sie vergibt das Podium. */
+export function lastStageId(matches = [], stages = []) {
+  const ids = [...new Set(matches.map((match) => match.stage_id || "__default"))];
+  if (ids.length <= 1) return null;
+  const numbers = new Map(stages.map((stage) => [stage.id, Number(stage.number) || 0]));
+  const numberOf = (id) => (numbers.has(id)
+    ? numbers.get(id)
+    : Math.max(0, ...matches.filter((match) => (match.stage_id || "__default") === id).map((match) => Number(match.stage_number) || 0)));
+  return ids.reduce((best, id) => (best === null || numberOf(id) > numberOf(best) ? id : best), null);
+}
+
+export function buildPodiumMap(allMatches = [], stages = []) {
+  // Vorrunden-Sieger stehen nicht auf dem Podest: mit mehreren Phasen zählt nur die letzte (#833).
+  const lastStage = lastStageId(allMatches, stages);
+  const matchesV2 = lastStage ? allMatches.filter((match) => (match.stage_id || "__default") === lastStage) : allMatches;
   const podium = new Map();
   const place = (id, rank) => {
     if (!id || ![1, 2, 3].includes(rank)) return;
