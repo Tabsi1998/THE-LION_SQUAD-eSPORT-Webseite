@@ -6,7 +6,8 @@ import * as SecureStore from "expo-secure-store";
 // Vereinsgeburtstag in der App (S13 #644, B1–B3): die Karte einmal am Tag (nicht auf stillen Screens, nicht unter einem
 // offenen Fenster), Kerzen nach Jahren gehen nacheinander an, dann ein leichtes Tippen und Konfetti aus der Torte;
 // „dezent“ brennt gleich und feiert nicht. Mitglieder holen den Jahres-Sticker, andere sehen dafür nichts. Die
-// Wimpelkette hängt an der Begrüßungskarte, je Jahr etwas anders.
+// Wimpelkette hängt an der Begrüßungskarte, je Jahr etwas anders. Seit #856: Zahlkerzen, die Mütze im Kopf und am Tab
+// „Mehr“, Luftballons und Konfetti im Takt (eigene Tests in hat.test.tsx und balloons.test.tsx).
 
 const mockSeasonState: Record<string, unknown> = { ready: true, seasons: [], byKey: {}, preference: "on", setPreference: jest.fn(async () => {}), reducedMotion: false, reload: jest.fn(), toast: null, showToast: jest.fn(), weather: null, serverOffset: 0, serverNow: null };
 const mockAuth: { user: Record<string, unknown> | null } = { user: null };
@@ -61,8 +62,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("die Bühne kennt den Vereinsgeburtstag: Konfetti, Karte und Wimpel an der Begrüßungskarte", () => {
-  expect(Object.keys(SEASON_MODULES.club_birthday).sort()).toEqual(["Edge", "Greeting", "Sky"]);
+test("die Bühne kennt den Vereinsgeburtstag: Konfetti, Karte, Wimpel, Mütze im Kopf und am Tab „Mehr“", () => {
+  expect(Object.keys(SEASON_MODULES.club_birthday).sort()).toEqual(["Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
   expect(appNamesSeason({ key: "club_birthday" })).toBe(true);
   expect(yearsOf(birthday())).toBe(8);
   expect(yearsOf(birthday({ data: {} }))).toBeNull();
@@ -70,20 +71,22 @@ test("die Bühne kennt den Vereinsgeburtstag: Konfetti, Karte und Wimpel an der 
   expect(cardText("Heute feiern wir!", 8)).toBe("Heute feiern wir!");
 });
 
-test("die Karte einmal am Tag: Kerzen nacheinander, dann ein leichtes Tippen; am selben Tag nicht noch einmal", async () => {
-  const first = await render(<BirthdayGreeting season={birthday()} screen="Dashboard" />);
+test("die Karte einmal am Tag: Zahlkerzen nacheinander, dann ein leichtes Tippen; am selben Tag nicht noch einmal", async () => {
+  const twelve = birthday({ data: { years: 12 }, texts: { greeting: "12 Jahre THE LION SQUAD – danke, dass ihr dabei seid" } });
+  const first = await render(<BirthdayGreeting season={twelve} screen="Dashboard" />);
   await flush();
   expect(screen.queryByTestId("birthday-card")).toBeNull();
   await advance(CARD_DELAY_MS);
   expect(screen.getByTestId("birthday-card")).toBeTruthy();
-  expect(screen.getByText("8 Jahre")).toBeTruthy();
+  expect(screen.getByText("12 Jahre")).toBeTruthy();
   expect(screen.getByText("Danke, dass ihr dabei seid")).toBeTruthy();
+  expect(screen.getByTestId("birthday-cake", { includeHiddenElements: true }).props.style).toEqual(expect.objectContaining({ width: 132 }));
   expect(litCount()).toBe(0);
-  await advance(IGNITE_DELAY_MS + IGNITE_STEP_MS * 2 + 10);
-  expect(litCount()).toBe(3);
+  await advance(IGNITE_DELAY_MS + 10);
+  expect(litCount()).toBe(1);
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
-  await advance(IGNITE_STEP_MS * 6 + 600);
-  expect(litCount()).toBe(8);
+  await advance(IGNITE_STEP_MS + 600);
+  expect(litCount()).toBe(2);
   expect(Haptics.impactAsync).toHaveBeenCalledTimes(1);
   await first.unmount();
   await render(<BirthdayGreeting season={birthday()} screen="Dashboard" />);
@@ -108,7 +111,7 @@ test("„dezent“: alle Kerzen brennen gleich, kein Tippen; still nicht auf sti
   await flush();
   await advance(CARD_DELAY_MS);
   expect(screen.getByTestId("birthday-card")).toBeTruthy();
-  expect(litCount()).toBe(8);
+  expect(litCount()).toBe(1);
   await advance(6000);
   expect(Haptics.impactAsync).not.toHaveBeenCalled();
 });

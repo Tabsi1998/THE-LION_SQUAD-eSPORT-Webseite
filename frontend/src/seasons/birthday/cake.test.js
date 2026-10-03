@@ -1,37 +1,32 @@
 import { hashString } from "../rng";
-import { MAX_CANDLES, PLATE, TOP, cakePlan, ignitionOrder } from "./cake";
+import { PLATE, TOP, cakePlan, ignitionOrder } from "./cake";
 import { GARLAND_PAD, PENNANT_COLORS, garlandPlan, garlandSpan, pennants, probePoints, stringY } from "./garland";
 
-// Torte (B1 #749) und Girlanden (B2 #750): Kerzen = Jahre (bis zwölf einzeln, darüber Zahlkerzen), keine hart codierten
+// Torte (B1 #749, #856) und Girlanden (B2 #750): die Jahre als Zahlkerzen, keine hart codierten
 // Jahre, je Jahr etwas anders und innerhalb des Jahres gleich; die App rechnet dieselbe Torte (gleicher Fingerabdruck in
 // mobile/src/seasons/birthday/cake.test.ts). Die Wimpel hängen am Faden, je Seite und Jahr anders.
 
-const CAKE_PARITY = 3401302350;
+const CAKE_PARITY = 1925493762;
 
-test("Kerzen nach Jahren: einzeln bis zwölf, darüber Zahlkerzen; ohne Jahre eine", () => {
-  for (const years of [1, 2, 8, 12]) {
+test("die Jahre als Zahlkerzen (#856): eine Ziffer je Kerze; ohne Jahre eine „1“", () => {
+  for (const [years, text] of [[1, "1"], [7, "7"], [12, "12"], [13, "13"], [105, "105"]]) {
     const plan = cakePlan(years, 2027);
-    expect(plan.numbers).toBe(false);
-    expect(plan.candles).toHaveLength(years);
-    expect(plan.digits).toEqual([]);
+    expect(plan.numbers).toBe(true);
+    expect(plan.candles).toEqual([]);
+    expect(plan.digits.map((candle) => candle.digit).join("")).toBe(text);
   }
-  const thirteen = cakePlan(13, 2032);
-  expect(thirteen.numbers).toBe(true);
-  expect(thirteen.digits.map((candle) => candle.digit).join("")).toBe("13");
-  expect(cakePlan(105, 2124).digits.map((candle) => candle.digit).join("")).toBe("105");
-  expect(cakePlan(null, 2027).candles).toHaveLength(1);
-  expect(cakePlan(0, 2027).candles).toHaveLength(1);
-  expect(MAX_CANDLES).toBe(12);
+  expect(cakePlan(null, 2027).digits.map((candle) => candle.digit).join("")).toBe("1");
+  expect(cakePlan(0, 2027).digits.map((candle) => candle.digit).join("")).toBe("1");
 });
 
-test("Kerzen stehen auf dem oberen Stock, hinten zuerst gezeichnet; Streusel lassen die Zuckerplatte frei", () => {
-  const plan = cakePlan(9, 2028);
-  plan.candles.forEach((candle) => {
+test("Zahlkerzen stehen mittig auf dem oberen Stock; Streusel lassen die Zuckerplatte frei", () => {
+  const plan = cakePlan(18, 2028);
+  plan.digits.forEach((candle) => {
     expect(Math.abs(candle.x - TOP.cx)).toBeLessThanOrEqual(TOP.rx);
     expect(Math.abs(candle.base - TOP.y)).toBeLessThanOrEqual(TOP.ry);
   });
-  const bases = plan.candles.map((candle) => candle.base);
-  expect(bases).toEqual([...bases].sort((a, b) => a - b));
+  const middle = plan.digits.reduce((sum, candle) => sum + candle.x, 0) / plan.digits.length;
+  expect(Math.abs(middle - TOP.cx)).toBeLessThan(0.01);
   plan.sprinkles.forEach((dot) => expect(Math.hypot(dot.x - PLATE.cx, dot.y - PLATE.cy)).toBeGreaterThan(PLATE.r));
 });
 
@@ -42,10 +37,10 @@ test("je Jahr etwas anders, innerhalb des Jahres gleich - und dieselbe Torte wie
 });
 
 test("angezündet wird von links nach rechts, im festen Abstand", () => {
-  const order = ignitionOrder(cakePlan(5, 2027), 200);
-  expect(order.map((step) => step.at)).toEqual([0, 200, 400, 600, 800]);
-  const plan = cakePlan(5, 2027);
-  const xs = order.map((step) => plan.candles.find((candle) => candle.index === step.index).x);
+  const order = ignitionOrder(cakePlan(105, 2027), 200);
+  expect(order.map((step) => step.at)).toEqual([0, 200, 400]);
+  const plan = cakePlan(105, 2027);
+  const xs = order.map((step) => plan.digits.find((candle) => candle.index === step.index).x);
   expect(xs).toEqual([...xs].sort((a, b) => a - b));
 });
 

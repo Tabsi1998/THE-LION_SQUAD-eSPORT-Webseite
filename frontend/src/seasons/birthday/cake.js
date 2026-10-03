@@ -1,7 +1,8 @@
 // Die Geburtstagstorte (Vereinsgeburtstag B1 #749): zwei Stöcke in Vereinsfarben, oben weiß mit blauer Glasur, unten
-// dunkel mit goldener; vorne die Zuckerplatte mit dem Maskottchen. Kerzen nach Jahren - bis zwölf einzeln im Kreis auf
-// dem oberen Stock, darüber Zahlkerzen. Was je Jahr anders ist (Tropfen, Streusel, Kerzen), kommt aus dem Jahres-Seed:
-// dieselbe Torte für alle im selben Jahr, im nächsten eine etwas andere. Reine Rechnung - das Bild baut index.jsx.
+// dunkel mit goldener; vorne die Zuckerplatte mit dem Maskottchen. Seit #856 stehen die Jahre als Zahlkerzen auf dem
+// oberen Stock - eine „7“ statt sieben einzelner Kerzen. Was je Jahr anders ist (Tropfen, Streusel, Neigung der Kerzen),
+// kommt aus dem Jahres-Seed: dieselbe Torte für alle im selben Jahr, im nächsten eine etwas andere. Reine Rechnung - das
+// Bild baut index.jsx; die App rechnet dasselbe (mobile/src/seasons/birthday/cake.ts).
 import { seasonRng } from "../rng";
 
 /** Die Bühne der Torte in SVG-Einheiten. */
@@ -10,8 +11,6 @@ export const TOP = { cx: 60, y: 40, rx: 28, ry: 5, height: 22 };
 export const BOTTOM = { cx: 60, y: 62, rx: 42, ry: 7, height: 30 };
 /** Wo die Zuckerplatte mit dem Maskottchen sitzt (Mitte, Halbmesser). */
 export const PLATE = { cx: 60, cy: 78, r: 12 };
-/** Bis zu so vielen Jahren einzelne Kerzen - darüber Zahlkerzen. */
-export const MAX_CANDLES = 12;
 export const CLUB = { cyan: "#29B6E8", gold: "#FFD700", white: "#f7f4ee" };
 
 const round = (value, digits = 2) => Math.round(value * 10 ** digits) / 10 ** digits;
@@ -33,18 +32,7 @@ function flameLook(rng) {
   };
 }
 
-/** Einzelkerzen im Kreis auf dem oberen Stock: hinten zuerst (für die Malreihenfolge), Höhe und Neigung je Kerze. */
-export function candleRing(count, rng) {
-  const n = Math.max(1, Math.min(MAX_CANDLES, Math.round(count)));
-  const ring = { rx: n === 1 ? 0 : Math.min(21, 7 + n * 1.4), ry: n === 1 ? 0 : Math.min(3.2, 1.4 + n * 0.18) };
-  const start = rng() * 360;
-  return Array.from({ length: n }, (_, index) => {
-    const at = onEllipse(TOP.cx, TOP.y, ring.rx, ring.ry, start + (index * 360) / n);
-    return { index, x: at.x, base: at.y, height: round(9 + rng() * 2.4), lean: round((rng() - 0.5) * 6), stripe: index % 2 === 0 ? "cyan" : "gold", ...flameLook(rng) };
-  }).sort((a, b) => a.base - b.base || a.x - b.x);
-}
-
-/** Zahlkerzen ab dreizehn Jahren: je Ziffer eine, nebeneinander auf dem oberen Stock. */
+/** Zahlkerzen: je Ziffer der Jahre eine, nebeneinander auf dem oberen Stock. */
 export function numberCandles(years, rng) {
   const digits = String(Math.max(0, Math.round(years)));
   const width = 13;
@@ -81,19 +69,18 @@ export function sprinkles(rng, count = 22) {
 }
 
 /**
- * Die Torte eines Jahres: Kerzen (einzeln oder als Zahl), Glasur, Streusel - aus dem Jahres-Seed. `years` sind die
- * Jahre des Vereins, `year` das Kalenderjahr (Seed). Ohne Jahre (kein Gründungsdatum, Vorschau) eine Kerze.
+ * Die Torte eines Jahres: Zahlkerzen, Glasur, Streusel - aus dem Jahres-Seed. `years` sind die Jahre des Vereins,
+ * `year` das Kalenderjahr (Seed). Ohne Jahre (kein Gründungsdatum, Vorschau) eine „1“.
  */
 export function cakePlan(years, year) {
   // Ort „cake“ statt einer Route: die App rechnet mit demselben Seed (Screen „cake“) dieselbe Torte.
   const rng = seasonRng({ season: "club_birthday", year, route: "cake" }, "cake");
   const count = Number.isFinite(Number(years)) && Number(years) > 0 ? Math.round(Number(years)) : 1;
-  const numbers = count > MAX_CANDLES;
   return {
     years: count,
-    numbers,
-    candles: numbers ? [] : candleRing(count, rng),
-    digits: numbers ? numberCandles(count, rng) : [],
+    numbers: true,
+    candles: [],
+    digits: numberCandles(count, rng),
     topDrips: dripPath(TOP, rng, 8),
     bottomDrips: dripPath(BOTTOM, rng, 11),
     sprinkles: sprinkles(rng),
