@@ -27,6 +27,7 @@ import { SecurityTab } from "./profile/SecurityTab";
 import { TeamsPanel } from "./profile/TeamsPanel";
 import { FriendsPanel } from "./profile/FriendsPanel";
 import { InvoicesPanel } from "./profile/InvoicesPanel";
+import { HonoursPanel } from "./profile/HonoursPanel";
 
 // Das Profil: Rahmen, Formularzustand und Speichern. Jeder Reiter ist eine
 // eigene Datei unter ./profile - vorher standen 1.800 Zeilen in dieser einen
@@ -55,7 +56,7 @@ export default function ProfilePage() {
     if (inboxTarget) navigate(inboxTarget, { replace: true });
   }, [inboxTarget, navigate]);
   const requestedTab = TAB_ALIASES[requestedParam] || requestedParam;
-  const tab = TABS.some((item) => item.k === requestedTab) ? requestedTab : "basic";
+  const tab = TABS.some((item) => item.k === requestedTab && (!item.membersOnly || isClubMember)) ? requestedTab : "basic";
   // Der Reiter steht in der Adresse (?tab=…, wie in Mails und Benachrichtigungen
   // verlinkt) und wird als eigener Verlaufseintrag gesetzt, damit „Zurück“ zum
   // vorigen Reiter führt statt aus dem Profil hinaus.
@@ -354,7 +355,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="mt-8 lg:grid lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:items-start">
-          <ProfileNav tab={tab} onSelect={setTab} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
+          <ProfileNav tab={tab} onSelect={setTab} isClubMember={isClubMember} badges={{ friends: { count: friendCounts.friends, alert: friendCounts.incoming > 0 } }} />
 
           <form onSubmit={submit} className="mt-6 lg:mt-0 space-y-5 min-w-0">
             {tab === "basic" && <BasicTab form={form} set={set} />}
@@ -372,6 +373,7 @@ export default function ProfilePage() {
             {tab === "teams" && <TeamsPanel />}
             {tab === "friends" && <FriendsPanel onChanged={loadFriendCounts} />}
             {tab === "invoices" && <InvoicesPanel />}
+            {tab === "honours" && <HonoursPanel />}
             {tab === "security" && <SecurityTab user={user} refresh={refresh} siteSettings={siteSettings} />}
             {tab === "privacy" && (
               <PrivacyTab

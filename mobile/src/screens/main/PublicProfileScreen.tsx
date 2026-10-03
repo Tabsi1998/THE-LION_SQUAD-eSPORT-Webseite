@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { AwardCard } from "../../components/AwardCard";
 import { Card } from "../../components/Card";
+import { HonourList, type Honour } from "../../components/Honours";
 import { FriendButton } from "../../components/FriendButton";
 import type { Relationship } from "../../lib/friends";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
@@ -36,6 +37,8 @@ type PublicProfilePayload = {
   banner_url?: string | null;
   // Auszeichnungen (#230): nur aus öffentlichen Turnieren; das gewählte Banner steht im Kopf.
   awards?: Award[];
+  // Ehrungen (#848): aus der Mitgliederakte - nur mit Freigabe des Vereins und dem Schalter der Person.
+  honours?: Honour[];
   featured_award?: Award | null;
   bio?: string | null;
   role?: string | null;
@@ -295,6 +298,13 @@ export function PublicProfileScreen({ navigation, route }: Props) {
               <Card style={styles.card} testID="public-profile-awards">
                 <Heading>Auszeichnungen</Heading>
                 {sortAwards(profile.awards).slice(0, 6).map((award) => <AwardCard key={award.id} award={award} onPress={() => openAward(award)} />)}
+              </Card>
+            ) : null}
+
+            {(profile.honours || []).length ? (
+              <Card style={styles.card} testID="public-profile-honours">
+                <Heading>Ehrungen</Heading>
+                <HonourList honours={profile.honours || []} />
               </Card>
             ) : null}
 

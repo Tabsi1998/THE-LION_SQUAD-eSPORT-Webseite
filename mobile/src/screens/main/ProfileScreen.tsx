@@ -9,6 +9,7 @@ import { AwardCard } from "../../components/AwardCard";
 import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../components/LinkedAccounts";
 import { BlockedUsersCard } from "../../components/BlockedUsersCard";
 import { FriendsCard } from "../../components/FriendsCard";
+import { HonoursCard } from "../../components/Honours";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -585,6 +586,8 @@ export function ProfileScreen() {
                 <Muted>Alle wichtigen Profilfelder sind gepflegt.</Muted>
               )}
             </Card>
+            {/* Ehrungen (#848): aus der Mitgliederakte, nur für Mitglieder; der Schalter bringt freigegebene aufs öffentliche Profil. */}
+            {user?.is_club_member ? <HonoursCard /> : null}
             {/* Freunde (#240): offene Anfragen oben, darunter die Liste - live über den Änderungsstrom. */}
             <FriendsCard onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })} />
             <Card style={styles.card} perch="profile-gaming">

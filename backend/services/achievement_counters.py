@@ -1374,6 +1374,20 @@ async def _founding_member(ctx):
     return 1 if year and since and since.year == year else 0
 
 
+@counter("membership_years", "club")
+async def _membership_years(ctx):
+    """Vereinsjubiläum (#848): volle Jahre seit dem Mitgliedsbeginn - der Jahrestag zählt am Tag selbst, in Wien."""
+    membership = await ctx.db.memberships.find_one({"user_id": ctx.user_id}, {"_id": 0, "member_since": 1, "member_status": 1})
+    if not membership or membership.get("member_status") not in ("active", "honorary"):
+        return 0
+    since = _parse(membership.get("member_since"))
+    if not since:
+        return 0
+    start = since.astimezone(VIENNA).date()
+    today = now_utc().astimezone(VIENNA).date()
+    return max(today.year - start.year - ((today.month, today.day) < (start.month, start.day)), 0)
+
+
 @counter("pioneer_account", "profile")
 async def _pioneer(ctx):
     """Eines der ersten hundert Konten der Plattform."""

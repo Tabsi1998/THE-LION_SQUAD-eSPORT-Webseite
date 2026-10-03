@@ -175,3 +175,26 @@ test("private Erfolge: Hinweis statt Liste, keine Angehefteten", async () => {
   expect(await screen.findByText("Erfolge sind privat")).toBeInTheDocument();
   expect(screen.queryByTestId("achievement-groups")).toBeNull();
 });
+
+// Ehrungen (#848): eigener Reiter neben den Auszeichnungen - nur, wenn es freigegebene gibt.
+test("Ehrungen: eigener Reiter nur mit freigegebenen Ehrungen", async () => {
+  mockApi();
+  const { unmount } = renderPage();
+  await screen.findByRole("heading", { level: 1 });
+  expect(screen.queryByTestId("profile-tab-honours")).toBeNull();
+  unmount();
+
+  const honour = { kind: "honorary", kind_label: "Ehrenmitgliedschaft", title: "Ehrenmitglied", years: 0, label: "Aufbau der Jugendarbeit", given_on: "2026-05-01" };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/users/public/paula") return { data: { ...PROFILE, honours: [honour] } };
+    if (url === "/achievements/user/u1") return { data: ACHIEVEMENTS };
+    return { data: [] };
+  });
+  renderPage();
+  const tab = await screen.findByTestId("profile-tab-honours");
+  expect(tab).toHaveTextContent("Ehrungen (1)");
+  fireEvent.click(tab);
+  expect(screen.getByTestId("public-profile-honours")).toHaveTextContent("EhrenmitgliedschaftEhrenmitgliedAufbau der JugendarbeitVerliehen am 01.05.2026");
+  expect(screen.getByTestId("public-profile-honours")).not.toHaveTextContent("Darf aufs Profil");
+});
+

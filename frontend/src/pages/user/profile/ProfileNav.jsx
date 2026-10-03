@@ -6,13 +6,13 @@ import { TABS } from "./constants";
 // an einen Reiter einen Zähler („Freunde (6)“) und einen Punkt für Offenes
 // (#259). Die Konto-Seiten (Mitgliedschaft, Strafen, Gewinne, Hilfe) stehen seit #516 nur noch im
 // Benutzermenü - hier gab es sie doppelt.
-export function ProfileNav({ tab, onSelect, badges = {} }) {
+export function ProfileNav({ tab, onSelect, badges = {}, isClubMember = false }) {
   return (
     <nav
       aria-label="Profilbereiche"
       className="flex gap-2 overflow-x-auto pb-2 border-b border-white/10 lg:flex-col lg:overflow-visible lg:pb-0 lg:border-b-0 lg:border-r lg:pr-6 lg:sticky lg:top-24 lg:self-start"
     >
-      {TABS.map((item) => {
+      {TABS.filter((item) => !item.membersOnly || isClubMember).map((item) => {
         const active = tab === item.k;
         const badge = badges[item.k] || {};
         const label = typeof badge.count === "number" ? `${item.label} (${badge.count})` : item.label;

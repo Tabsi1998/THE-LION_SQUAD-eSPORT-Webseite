@@ -651,6 +651,9 @@ async def get_public_profile(username: str, viewer: dict | None = Depends(get_op
     # Die verknüpften Konten mit offizieller Adresse - nur die Plattformen, deren Feld sichtbar ist.
     from services.platform_links import linked_accounts
     base["linked_accounts"] = await linked_accounts(db, u["id"], base["verified_platforms"])
+    # Ehrungen (#848): nur mit Freigabe des Vereins und dem Schalter der Person - aus dem Zwischenstand, nie live aus Dolibarr.
+    from services.dolibarr_honours import public_honours
+    base["honours"] = await public_honours(db, u["id"])
     if viewer:
         from services.friend_service import relationship_status
         base["relationship"] = await relationship_status(db, viewer.get("id"), u["id"])

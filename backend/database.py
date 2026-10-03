@@ -310,6 +310,8 @@ async def init_indexes():
     # Letzter verlässlicher Stand der eigenen Rechnungen (#296) - für den Ausfall, nie für PDFs.
     await db.dolibarr_invoice_cache.create_index("user_id", unique=True)
     await db.dolibarr_invoice_cache.create_index("expires_at", expireAfterSeconds=0)
+    # Ehrungen fürs öffentliche Profil (#848): ein Zwischenstand je Konto.
+    await db.dolibarr_honours.create_index("user_id", unique=True)
     await db.dolibarr_pending.create_index("due_at")
     await db.live_streams.create_index("user_id", unique=True)
     await db.live_streams.create_index("twitch_login")

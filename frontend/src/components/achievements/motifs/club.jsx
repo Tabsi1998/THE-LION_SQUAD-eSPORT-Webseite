@@ -59,6 +59,17 @@ export const CLUB = {
       <circle cx="32" cy="16" r="2.5" fill="currentColor" stroke="none" />
     </>
   ),
+  // Vereinsjubiläum (#848): Zackenrosette mit Stern und zwei Bändern - 5, 10 und 25 Jahre in Silber, Gold, Diamant.
+  jubilee: (
+    <>
+      <path d="M25 37 L18 57 L23.5 54 L27 60 L33.5 41 Z" fill="currentColor" stroke="none" opacity="0.75" />
+      <path d="M39 37 L46 57 L40.5 54 L37 60 L30.5 41 Z" fill="currentColor" stroke="none" opacity="0.75" />
+      <path d="M32 6 L36 10 L41.5 8.5 L43 14 L48.5 15.5 L47 21 L51 25 L47 29 L48.5 34.5 L43 36 L41.5 41.5 L36 40 L32 44 L28 40 L22.5 41.5 L21 36 L15.5 34.5 L17 29 L13 25 L17 21 L15.5 15.5 L21 14 L22.5 8.5 L28 10 Z" fill="currentColor" stroke="none" />
+      <circle cx="32" cy="25" r="11" fill="#000" fillOpacity="0.38" stroke="none" />
+      <circle cx="32" cy="25" r="11" strokeWidth="2" opacity="0.9" />
+      <path d="M32 17.5 L33.9 22.4 L39.1 22.7 L35 26 L36.4 31.1 L32 28.2 L27.6 31.1 L29 26 L24.9 22.7 L30.1 22.4 Z" fill="currentColor" stroke="none" />
+    </>
+  ),
   mvp: (
     <>
       <path d="M8 44 V18 L18 30 L28 18 V44" strokeWidth="5" />

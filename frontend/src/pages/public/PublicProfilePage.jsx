@@ -17,6 +17,7 @@ import { AccountLevelPill, AccountLevelProgress } from "@/components/tls/Account
 import { LevelAvatarFrame, useCrownFor } from "@/components/tls/LevelAvatarFrame";
 import { SeasonHighlightCard } from "@/components/tls/SeasonHighlightCard";
 import { AwardBanner } from "@/components/tls/AwardBanner";
+import { HonourCard } from "@/pages/user/profile/HonoursPanel";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -27,7 +28,7 @@ import {
   Trophy, Flag, Medal, Shield, Calendar,
   MapPin, Zap, TrendingUp, Lock, ExternalLink, Radio, Gamepad2, Globe,
   MessageSquare, UserPlus, UserCheck, X, Info, Cake, Crown,
-  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy,
+  Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -379,6 +380,8 @@ export default function PublicProfilePage() {
   const highlights = podiumHighlights(referenceItems);
   const referenceTargets = new Set(referenceItems.map((item) => item.target_id).filter(Boolean));
   const awards = Array.isArray(profile.awards) ? profile.awards : [];
+  // Ehrungen (#848): nur, was der Verein freigibt und die Person selbst zeigt - sonst gibt es den Reiter nicht.
+  const honours = Array.isArray(profile.honours) ? profile.honours : [];
   const badges = Array.isArray(achievementsData?.awards) ? achievementsData.awards : [];
   // Erfolge II (#619): Angeheftete zuerst, der Schalter „Erfolge öffentlich“ und die geheimen Funde.
   const pinned = Array.isArray(achievementsData?.pinned) ? achievementsData.pinned : [];
@@ -462,6 +465,7 @@ export default function PublicProfilePage() {
     ["overview", "Übersicht"],
     ["badges", `Achievements (${badges.length})`],
     ["awards", `Auszeichnungen (${awards.length})`],
+    ...(honours.length ? [["honours", `Ehrungen (${honours.length})`]] : []),
     ["references", `Referenzen (${referenceStats.total || referenceItems.length})`],
     ["teams", `Teams (${teams.length})`],
   ];
@@ -785,6 +789,17 @@ export default function PublicProfilePage() {
             ) : (
               <EmptyState text={isOwnProfile ? "Noch keine Auszeichnungen – sie entstehen, wenn ein Turnier seine Ergebnisse veröffentlicht." : "Noch keine Auszeichnungen aus öffentlichen Turnieren."} />
             )}
+          </div>
+        )}
+
+        {/* Ehrungen (#848, eigener Reiter): aus der Mitgliederakte - Ehrenmitgliedschaft, Verdienstnadel, Jubiläum.
+            Keine Auszeichnungen: die kommen aus Turnieren. */}
+        {tab === "honours" && honours.length > 0 && (
+          <div className="space-y-3" data-testid="public-profile-honours">
+            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
+            <ul className="grid gap-3 md:grid-cols-2">
+              {honours.map((honour) => <HonourCard key={`${honour.kind}-${honour.given_on}-${honour.title}`} honour={honour} />)}
+            </ul>
           </div>
         )}
 

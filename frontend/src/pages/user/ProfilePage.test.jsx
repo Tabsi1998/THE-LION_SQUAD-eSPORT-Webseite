@@ -306,3 +306,14 @@ test("Freunde: suchen, Anfrage senden, Eintrag unter Gesendet, Zaehler im Reiter
   expect(screen.getByTestId("friends-candidate-u-2")).toHaveTextContent("Anfrage gesendet");
   expect(screen.getByTestId("friends-friend-f-1")).toHaveTextContent("Anna");
 });
+
+// Ehrungen (#848): eigener Reiter für Mitglieder; er liest die Ehrungen aus der Mitgliederakte.
+test("der Reiter Ehrungen lädt die eigenen Ehrungen aus der Akte", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/me/honours"
+    ? { data: { available: true, public: false, shown: 0, honours: [{ kind: "jubilee", kind_label: "Jubiläum", title: "10 Jahre Mitgliedschaft", years: 10, label: "", given_on: "2026-04-20", publishable: true }] } }
+    : { data: [] }));
+  renderPage(["/profile?tab=honours"]);
+  expect(await screen.findByTestId("honours-panel")).toHaveTextContent("10 Jahre Mitgliedschaft");
+  expect(screen.getByTestId("profile-tab-honours")).toHaveAttribute("aria-current", "page");
+});
+

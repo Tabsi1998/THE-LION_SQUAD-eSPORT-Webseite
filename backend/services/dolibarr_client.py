@@ -767,6 +767,21 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Ehrungen (#848, Vereine ab 1.8)
+    async def member_honours(self, member_id: int) -> list[dict]:
+        """Nur die Ehrungen, die der Verein veröffentlichen lässt, neueste zuerst - ohne interne Notiz."""
+        data = await self._get(f"/vereine/members/{int(member_id)}/honours")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
+    async def my_honours(self, who: dict) -> list[dict]:
+        """Alle eigenen Ehrungen mit `publishable` - über die Bindung (Fähigkeit `record`) oder die Mitgliedsnummer."""
+        data = await self._get("/vereine/me/honours", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
     async def lookup_by_email(self, email: str) -> dict:
         return await self._get("/vereine/members/lookup", {"email": str(email or "").strip()})
 

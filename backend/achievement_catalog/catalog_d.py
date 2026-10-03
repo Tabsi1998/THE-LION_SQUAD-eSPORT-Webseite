@@ -46,6 +46,9 @@ CLUB = [
        "file-text", "clipboard", "member_documents_opened", [1, 5, 15], "{n} Vereinsdokumente gelesen.", sort_order=915),
     _d("board_service", "Vorstandsarbeit", "club", "Übernimm Verantwortung im Vorstand.", "Tage in einem Vorstandsamt - die Zeit läuft von selbst, solange du im Amt bist.",
        "landmark", "gavel", "board_days", [90, 365, 730, 1095, 1825], "{n} im Vorstand.", sort_order=916, unit=" Tage"),
+    # Jubiläen (#848): runde Jahre ab dem Mitgliedsbeginn aus der Mitgliederverwaltung - mit eigenem Abzeichen.
+    _d("membership_jubilee", "Vereinsjubiläum", "club", "Feiere runde Jahre im Verein.", "Volle Jahre seit deinem Mitgliedsbeginn - 5, 10 und 25 Jahre sind ein Jubiläum.",
+       "award", "jubilee", "membership_years", [5, 10, 25], "{n} im Verein.", sort_order=917, unit=" Jahre"),
 ]
 
 SPECIAL = [

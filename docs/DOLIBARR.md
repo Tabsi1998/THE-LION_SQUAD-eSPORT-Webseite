@@ -257,6 +257,31 @@ nicht (Fehler 502). Den Entwurf, an dem der Vorstand arbeitet, kennt die Website
 oder mit einem Modul vor 0.11 bleibt der Hinweis auf den Mitgliederbereich; im Reiter Rechtliches
 steht, was Sache ist.
 
+## Ehrungen im Profil (Vereine ab 1.8.0, #848)
+
+Ehrenmitgliedschaft, Verdienstnadel, Jubiläum: Was der Vorstand in Dolibarr an der Mitgliedskarte unter
+*Ehrungen* einträgt, sieht das Mitglied im eigenen Profil – auf der Website unter *Profil → Ehrungen*, in
+der App in der Übersicht des Profils. Dort stehen **alle** eigenen Ehrungen, jeweils mit dem Hinweis, ob
+der Verein sie veröffentlichen lässt.
+
+**Öffentlich nur mit beidem:** Aufs öffentliche Profil (Reiter *Ehrungen*) kommt eine Ehrung nur, wenn
+der Vorstand in Dolibarr *darf veröffentlicht werden* angehakt hat **und** das Mitglied den Schalter
+„Ehrungen auf meinem öffentlichen Profil zeigen“ eingeschaltet hat. Der Schalter ist aus, bis das
+Mitglied ihn einschaltet. Die interne Notiz des Vorstands kommt nie auf die Website.
+
+**Einrichten:** Nichts Neues auf der Website. Mitglieder mit bestätigter Zuordnung sehen ihre Ehrungen
+von selbst; bei einer Bindung per Einladungscode braucht die Bindung die Fähigkeit
+**„Mitgliederakte: eigene Teilnahmen und Ehrungen lesen“** (Einrichtung → Externe Identitäten). Die
+Arten von Ehrungen pflegt ihr im Wörterbuch *Vereine: Arten von Ehrungen*.
+
+**Wann es sich ändert:** Die eigene Liste kommt jedes Mal frisch aus der Akte. Das öffentliche Profil
+fragt Dolibarr nie selbst: Die Website merkt sich die freigegebenen Ehrungen und frischt sie stündlich
+auf. Zieht der Vorstand den Haken zurück, verschwindet die Ehrung spätestens nach einer Stunde;
+schaltet das Mitglied aus, sofort.
+
+**Jubiläen als Erfolge:** 5, 10 und 25 Jahre im Verein gibt es als Erfolg „Vereinsjubiläum“ mit eigenem
+Abzeichen – gerechnet ab dem Mitgliedsbeginn aus der Mitgliederverwaltung, nur für aktive Mitglieder.
+
 ## Mitgliederverzeichnis aus der Einwilligung
 
 Das Mitgliederverzeichnis auf der Website (*Verein → Mitglieder*) kann der Abgleich füllen, ohne

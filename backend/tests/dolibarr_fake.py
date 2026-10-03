@@ -234,6 +234,8 @@ class FakeDolibarr:
         self.present: dict[int, set[int]] = {}
         self.votes: dict[tuple[int, str], dict] = {}
         self.members_vote_right = True       # „… im Namen jedes Mitglieds abstimmen“ (member_id-Modus)
+        # Ehrungen (#848, Vereine 1.8.0): je Mitglied, mit „darf veröffentlicht werden“; me/honours braucht die Fähigkeit record.
+        self.honours: dict[int, list[dict]] = {}
         self.today = "2026-09-25"
         # Veranstaltungen und Helferdienste (#331, Vereine 1.4): Schichten mit Plätzen, Stand je Mitglied.
         self.events: dict[int, dict] = {}
@@ -571,6 +573,16 @@ class FakeDolibarr:
     def _json_post(self, template: str, payload) -> httpx.Response:
         validate(payload, OPENAPI["paths"][template]["post"]["responses"]["200"]["content"]["application/json"]["schema"])
         return httpx.Response(200, json=payload)
+
+    def add_honour(self, member_id: int, *, kind: str = "honorary", kind_label: str = "Ehrenmitgliedschaft", title: str = "Ehrenmitglied",
+                   years: int = 0, label: str = "", given_on: str = "2026-05-01", publishable: bool = True) -> dict:
+        row = {"kind": kind, "kind_label": kind_label, "title": title, "years": years, "label": label, "given_on": given_on, "publishable": publishable}
+        self.honours.setdefault(member_id, []).append(row)
+        return row
+
+    def _honours_of(self, member_id: int, *, publishable_only: bool) -> list[dict]:
+        rows = [row for row in self.honours.get(member_id, []) if row["publishable"] or not publishable_only]
+        return sorted(rows, key=lambda row: row["given_on"], reverse=True)
 
     def _consent_rows(self, member_id: int) -> list[dict]:
         rows = []
@@ -1103,6 +1115,17 @@ class FakeDolibarr:
             right["state"], right["option"] = "used", body["option"]
             self.votes[(bid, external_id or f"anon-{len(self.votes)}")] = {"right_id": body["right_id"], "option": body["option"], "member_id": ident["member_id"]}
             return self._json_method("/vereine/me/ballots/{id}/votes", "post", self._my_ballot(bid, ident["member_id"]))
+        match = re.fullmatch(r"/vereine/members/(\d+)/honours", path)
+        if match and request.method == "GET":
+            member_id = int(match.group(1))
+            if member_id not in self.members:
+                return httpx.Response(404, json={"error": {"code": 404, "message": "Member not found"}})
+            return self._json("/vereine/members/{id}/honours", self._honours_of(member_id, publishable_only=True))
+        if path == "/vereine/me/honours" and request.method == "GET":
+            ident, denied = self._person(params, "record")
+            if denied:
+                return denied
+            return self._json("/vereine/me/honours", self._honours_of(ident["member_id"], publishable_only=False))
         if path == "/vereine/me/events" and request.method == "GET":
             ident, denied = self._person(params, "events")
             if denied:

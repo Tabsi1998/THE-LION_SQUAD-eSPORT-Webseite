@@ -1,4 +1,4 @@
-import { Bell, Crown, Eye, Gamepad2, Gift, Globe, LayoutDashboard, LifeBuoy, Medal, MessageSquare, Receipt, Settings, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
+import { Award, Bell, Crown, Eye, Gamepad2, Gift, Globe, LayoutDashboard, LifeBuoy, Medal, MessageSquare, Receipt, Settings, ShieldAlert, ShieldCheck, User, UserPlus, Users } from "lucide-react";
 
 // Das Benutzermenü (#282, #516): eine Liste für den Kopf am PC und das Handy-Menü - jeder Eintrag
 // genau ein Ziel, Reihenfolge nach Häufigkeit. Strafen und Gewinne erscheinen nur, wenn es welche
@@ -41,6 +41,8 @@ export const TABS = [
   { k: "teams", label: "Teams", icon: Users },
   { k: "friends", label: "Freunde", icon: UserPlus },
   { k: "achievements", label: "Achievements", icon: Medal },
+  // Ehrungen aus der Mitgliederakte (#848): nur für Vereinsmitglieder - eigener Reiter, keine Auszeichnungen aus Turnieren.
+  { k: "honours", label: "Ehrungen", icon: Award, membersOnly: true },
   // Rechnungen gehören zum Konto, nicht zum Vereinsbereich (#320, Entscheidung vom 23.09.).
   { k: "invoices", label: "Rechnungen", icon: Receipt },
   { k: "privacy", label: "Privatsphäre", icon: Eye },
