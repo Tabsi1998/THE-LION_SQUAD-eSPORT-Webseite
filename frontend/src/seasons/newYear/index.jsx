@@ -1,20 +1,22 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { seasonYear } from "../rng";
 import { useSeason } from "../SeasonContext";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { recordSignal } from "../signals";
-import { handwriting, planHour, salvoLaunches, salvoTimes } from "./choreography";
+import { handwriting, planHour, salvoTimes, showLaunches } from "./choreography";
 import { countdownState, newYearOf, pulseLevel, COUNTDOWN_SECONDS, ZERO_SECONDS } from "./countdown";
 import { windDrift } from "./fireworks";
 import { createFireworksLayer } from "./layer";
 import { NEW_YEAR_SOUND_EVENT, createNewYearSound, readNewYearSound, writeNewYearSound } from "./sound";
+import { calmYearDots } from "./yearDigits";
 import "./newyear.css";
 
 // Silvester (Jahreszeiten II S9, #640; N1–N5, #739–#743): ab dem 29.12. abends vereinzelt Raketen, am 31. aufbauend,
-// ab 23:59 der Countdown, um Mitternacht die Show mit drei großen Salven, danach der Ausklang und am 1. Jänner der Gruß.
-// Wann eine Rakete steigt, sagt der Server (Rampe und Startsekunden je Stunde, für alle Geräte gleich); wie sie aussieht,
-// die Handschrift des Jahres (choreography.js). Alles nach der Serveruhr. Ton nur nach Einschalten. Untertags, bei
-// „dezent“ und „Bewegung reduzieren“: keine Raketen - Countdown und Gruß bleiben, ruhig.
+// ab 23:59 der Countdown, um Mitternacht die Show: zuerst die neue Jahreszahl aus Funken (#853), dann drei große
+// Salven, danach der Ausklang und am 1. Jänner der Gruß. Wann eine Rakete steigt, sagt der Server (Rampe und
+// Startsekunden je Stunde, für alle Geräte gleich); wie sie aussieht, die Handschrift des Jahres (choreography.js).
+// Alles nach der Serveruhr. Ton nur nach Einschalten. Untertags, bei „dezent“ und „Bewegung reduzieren“: keine
+// Raketen - Countdown und Gruß bleiben, ruhig, und um 00:00 steht die Jahreszahl still am Himmel.
 
 export const SIGNAL_KEY = "online_at_new_year";
 /** In diesen Phasen zählt „um Mitternacht dabei“ (der Server prüft dasselbe Fenster). */
@@ -54,7 +56,7 @@ function handFor(season) {
   return handCache.hand;
 }
 
-/** Die Raketen der laufenden Stunde (Server) und - in der Show - die drei großen Salven. Gecacht je Antwort. */
+/** Die Raketen der laufenden Stunde (Server) und - in der Show - Jahreszahl und große Salven. Gecacht je Antwort. */
 export function currentPlan() {
   if (planCache.version === live.version) return planCache.launches;
   const season = live.season;
@@ -67,7 +69,7 @@ export function currentPlan() {
     launches = planHour(hand, { hourSeed: data.seed, salvos: Array.isArray(data.salvos) ? data.salvos : [], phase: season.phase, hourStart });
     const showStart = Date.parse(data.show_start || "");
     if (Number.isFinite(showStart) && (season.phase === "countdown" || season.phase === "show" || season.phase === "pre_countdown")) {
-      salvoTimes(showStart, data.salvo_seconds).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
+      launches.push(...showLaunches(hand, salvoTimes(showStart, data.salvo_seconds), data.new_year || newYearOf(data.show_start)));
     }
   }
   planCache = { version: live.version, launches };
@@ -88,8 +90,8 @@ export function skyLayers({ season, budget = 0, reducedMotion = false, weather =
     clock: () => Date.now() + (live.offset || 0),
     wind: () => windDrift(live.weather),
     budget,
-    onLaunch: (launch) => soundEngine().whistle(launch.distance, launch.rise),
-    onBurst: (launch) => soundEngine().burst(launch.type, launch.distance),
+    onLaunch: (launch) => soundEngine().whistle(launch.distance, launch.rise, launch.caliber),
+    onBurst: (launch) => soundEngine().burst(launch.type, launch.distance, launch.caliber),
   })];
 }
 
@@ -165,10 +167,40 @@ export function Widget({ season }) {
   );
 }
 
+/** Die Größe des Fensters - für die ruhige Jahreszahl, die dort steht, wo sonst die Funken sie formen. */
+function viewportSize() {
+  return { width: window.innerWidth || 1280, height: window.innerHeight || 800 };
+}
+
+function useViewport() {
+  const [size, setSize] = useState(viewportSize);
+  useEffect(() => {
+    const onResize = () => setSize(viewportSize());
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return size;
+}
+
+/**
+ * Die Jahreszahl ohne Feuerwerk (#853: „dezent“ und „Bewegung reduzieren“): dieselben Funkenpunkte wie in der
+ * Salve, fertig geformt, ruhig ein- und ausgeblendet (ohne Bewegung gar nicht). Nur Schmuck - die Karte sagt das Jahr.
+ */
+export function CalmYear({ year }) {
+  const size = useViewport();
+  const dots = useMemo(() => calmYearDots(year, size), [year, size]);
+  if (!dots.length) return null;
+  return (
+    <svg className="tls-ny-year" width={size.width} height={size.height} viewBox={`0 0 ${size.width} ${size.height}`} aria-hidden="true" focusable="false" data-testid="new-year-calm-year">
+      {dots.map((dot, i) => <circle key={i} cx={dot.x} cy={dot.y} r={dot.white ? 2.2 : 2.6} fill={dot.white ? "#ffffff" : "#ffc857"} />)}
+    </svg>
+  );
+}
+
 /**
  * Der Countdown als Karte oben in der Mitte (ab 23:59:00): ruhig, die letzten zehn Sekunden mit Puls, um 00:00 bricht
- * die Zahl auf, der Gruß steht acht Sekunden groß da. Danach - und wer erst später kommt - einmal am Tag der Gruß als
- * Karte unten. Nie über die ganze Seite, nie blockierend.
+ * die Zahl auf, der Gruß steht acht Sekunden groß da (bei „dezent“ mit der ruhigen Jahreszahl darunter). Danach - und
+ * wer erst später kommt - einmal am Tag der Gruß als Karte unten. Nie über die ganze Seite, nie blockierend.
  */
 export function Toast({ season }) {
   const showStart = Date.parse(season.data?.show_start || "");
@@ -211,11 +243,14 @@ export function Toast({ season }) {
   }
   if (state.stage === "zero") {
     return (
-      <div className={`tls-ny-countdown tls-ny-countdown--zero${still ? " tls-ny-countdown--still" : ""}`} role="status" data-testid="new-year-zero">
-        <div className="tls-ny-countdown__burst" aria-hidden="true">0</div>
-        <div className="tls-ny-countdown__title">Frohes neues Jahr{year ? ` ${year}` : ""}!</div>
-        <div className="tls-ny-countdown__text">{greeting}</div>
-      </div>
+      <>
+        {still && <CalmYear year={year} />}
+        <div className={`tls-ny-countdown tls-ny-countdown--zero${still ? " tls-ny-countdown--still" : ""}`} role="status" data-testid="new-year-zero">
+          <div className="tls-ny-countdown__burst" aria-hidden="true">0</div>
+          <div className="tls-ny-countdown__title">Frohes neues Jahr{year ? ` ${year}` : ""}!</div>
+          <div className="tls-ny-countdown__text">{greeting}</div>
+        </div>
+      </>
     );
   }
   if (!toast) return null;

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BlendMode, Canvas, Picture, Skia, createPicture, type SkPicture } from "@shopify/react-native-skia";
+import { BlendMode, Canvas, Picture, Skia, createPicture, type SkCanvas, type SkColor, type SkPaint, type SkPicture } from "@shopify/react-native-skia";
 import * as Haptics from "expo-haptics";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated as RNAnimated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
@@ -14,17 +14,19 @@ import { hashString, seasonYear } from "../rng";
 import { recordSignal } from "../signals";
 import { seasonScroll, type ScrollState } from "../sky/scroll";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
-import { handwriting, planHour, salvoLaunches, salvoTimes, type Hand } from "./choreography";
+import { handwriting, planHour, salvoTimes, showLaunches, type Hand } from "./choreography";
 import { countdownState, newYearOf, ZERO_SECONDS } from "./countdown";
 import { COLORS, EMBER, soundDelay, windDrift, type Launch } from "./fireworks";
 import { capFor, drawFire, emptyFire, fireIdle, nextLaunchAt, stepFire, type FireState } from "./sky";
 import { playFireSound, useNewYearSound } from "./sound";
+import { calmYearDots, type CalmDot } from "./yearDigits";
 
 // Silvester in der App (S11 #642; N1–N5 #739–#743), wie auf der Website (#800): ab dem 29.12. abends Raketen nach der
 // Rampe des Servers, ab 23:00 der Hinweis im Dashboard-Kopf, ab 23:59:00 der Countdown als Karte oben, um 00:00 der
-// Gruß und die Show mit drei großen Salven, danach der Ausklang und am 1. Jänner der Gruß einmal am Tag. Gezeichnet
-// mit Skia auf dem UI-Thread (#667), alles nach der Serveruhr. Ton nur nach Einschalten; Haptik nur um Mitternacht und
-// bei den großen Salven. „dezent“ und „Bewegung reduzieren“: keine Raketen, Countdown und Gruß stehen still.
+// Gruß und die Show: zuerst die neue Jahreszahl aus Funken (#853), dann drei große Salven, danach der Ausklang und am
+// 1. Jänner der Gruß einmal am Tag. Gezeichnet mit Skia auf dem UI-Thread (#667), alles nach der Serveruhr. Ton nur
+// nach Einschalten; Haptik nur um Mitternacht und bei den großen Salven. „dezent“ und „Bewegung reduzieren“: keine
+// Raketen, Countdown und Gruß stehen still, um 00:00 steht die Jahreszahl ruhig am Himmel.
 
 export const SIGNAL_KEY = "online_at_new_year";
 export const LIVE_PHASES = new Set(["pre_countdown", "countdown", "show", "fade"]);
@@ -60,17 +62,17 @@ function handFor(season: ActiveSeason): Hand {
   return handCache.hand as Hand;
 }
 
-/** Die Raketen der laufenden Stunde (Server) und - in der Show - die drei großen Salven; wie `currentPlan` im Web. */
+/** Die Raketen der laufenden Stunde (Server) und - in der Show - Jahreszahl und große Salven; wie `currentPlan` im Web. */
 export function planFor(season: ActiveSeason, serverNow: string | null): Launch[] {
   if (season.key !== "new_year") return [];
-  const data = (season.data || {}) as { seed?: number; salvos?: number[]; show_start?: string; salvo_seconds?: number[] };
+  const data = (season.data || {}) as { seed?: number; salvos?: number[]; show_start?: string; salvo_seconds?: number[]; new_year?: number };
   const hand = handFor(season);
   const payloadNow = Date.parse(serverNow || "");
   const hourStart = Number.isFinite(payloadNow) ? Math.floor(payloadNow / 3600000) * 3600000 : 0;
   const launches = planHour(hand, { hourSeed: data.seed ?? 0, salvos: Array.isArray(data.salvos) ? data.salvos : [], phase: season.phase, hourStart });
   const showStart = Date.parse(data.show_start || "");
   if (Number.isFinite(showStart) && ["pre_countdown", "countdown", "show"].includes(season.phase)) {
-    salvoTimes(showStart, data.salvo_seconds ?? null).forEach((at, index) => launches.push(...salvoLaunches(hand, index, at)));
+    launches.push(...showLaunches(hand, salvoTimes(showStart, data.salvo_seconds ?? null), data.new_year || newYearOf(data.show_start)));
   }
   return launches;
 }
@@ -192,7 +194,7 @@ export function FireworksSky({ season, screen, reducedMotion }: { season: Active
         scheduled.add(launch.id);
         const startIn = launch.at - now;
         timers.push(setTimeout(() => void playFireSound("whistle", launch.distance), startIn));
-        timers.push(setTimeout(() => void playFireSound(`boom-${launch.type}`, launch.distance), startIn + (launch.rise + soundDelay(launch.distance)) * 1000));
+        timers.push(setTimeout(() => void playFireSound(`boom-${launch.type}-${launch.caliber || "large"}`, launch.distance), startIn + (launch.rise + soundDelay(launch.distance)) * 1000));
       }
     };
     plan30();
@@ -208,6 +210,53 @@ export function FireworksSky({ season, screen, reducedMotion }: { season: Active
     <Canvas style={StyleSheet.absoluteFill} pointerEvents="none" testID="new-year-sky">
       <Picture picture={picture} />
     </Canvas>
+  );
+}
+
+/** Die ruhige Jahreszahl zeichnen: je Punkt ein weicher Schein und ein heller Kern - wie die Funken im Feuerwerk. */
+export function drawCalmYear(canvas: SkCanvas, dots: CalmDot[], paint: SkPaint, gold: SkColor, white: SkColor): void {
+  for (const dot of dots) {
+    paint.setColor(dot.white ? white : gold);
+    paint.setAlphaf(0.22);
+    canvas.drawCircle(dot.x, dot.y, 7, paint);
+    paint.setAlphaf(1);
+    canvas.drawCircle(dot.x, dot.y, dot.white ? 2.2 : 2.6, paint);
+  }
+}
+
+/**
+ * Die Jahreszahl ohne Feuerwerk (#853: „dezent“ und „Bewegung reduzieren“): dieselben Funkenpunkte wie in der Salve,
+ * fertig geformt, still; bei „dezent“ sanft ein- und ausgeblendet, ohne Bewegung einfach da. Nur Schmuck - die Karte
+ * sagt das Jahr.
+ */
+export function CalmYear({ year, since, fade }: { year: number | null; since: number; fade: boolean }) {
+  const { width, height } = useWindowDimensions();
+  const dots = useMemo(() => calmYearDots(year, { width, height }), [year, width, height]);
+  const picture = useMemo(
+    () =>
+      createPicture((canvas) => {
+        const paint = Skia.Paint();
+        paint.setAntiAlias(true);
+        paint.setBlendMode(BlendMode.Plus);
+        drawCalmYear(canvas, dots, paint, Skia.Color("#ffc857"), Skia.Color("#ffffff"));
+      }),
+    [dots],
+  );
+  const opacity = useRef(new RNAnimated.Value(fade ? 0 : 1)).current;
+  useEffect(() => {
+    if (!fade) return undefined;
+    RNAnimated.timing(opacity, { toValue: 1, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    const out = setTimeout(() => RNAnimated.timing(opacity, { toValue: 0, duration: 900, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(), Math.max(0, (ZERO_SECONDS - since) * 1000 - 950));
+    return () => clearTimeout(out);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fade]);
+  if (!dots.length) return null;
+  return (
+    <RNAnimated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="new-year-calm-year">
+      <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Picture picture={picture} />
+      </Canvas>
+    </RNAnimated.View>
   );
 }
 
@@ -350,12 +399,15 @@ export function NewYearGreeting({ season, screen }: { season: ActiveSeason; scre
   }
   if (state.stage === "zero") {
     return (
-      <View pointerEvents="none" style={[styles.countWrap, { top: insets.top + 64, width: cardWidth, left: (width - cardWidth) / 2 }]}>
-        <View style={styles.countCard} accessibilityLiveRegion="assertive" testID="new-year-zero">
-          <Body style={styles.zeroTitle}>Frohes neues Jahr{year ? ` ${year}` : ""}!</Body>
-          <Body style={styles.zeroText}>{greeting}</Body>
+      <>
+        {still && fireShare(screen) > 0 ? <CalmYear year={year} since={state.since ?? 0} fade={!reducedMotion} /> : null}
+        <View pointerEvents="none" style={[styles.countWrap, { top: insets.top + 64, width: cardWidth, left: (width - cardWidth) / 2 }]}>
+          <View style={styles.countCard} accessibilityLiveRegion="assertive" testID="new-year-zero">
+            <Body style={styles.zeroTitle}>Frohes neues Jahr{year ? ` ${year}` : ""}!</Body>
+            <Body style={styles.zeroText}>{greeting}</Body>
+          </View>
         </View>
-      </View>
+      </>
     );
   }
   if (!toast) return null;

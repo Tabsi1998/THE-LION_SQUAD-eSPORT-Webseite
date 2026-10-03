@@ -1,10 +1,12 @@
 // Silvester-Choreografie (N2, #740): jedes Jahr eine eigene Handschrift aus dem Jahres-Seed (C4) - Abschusszonen,
 // eine Lieblingsart, Farbpaare, die Muster der drei großen Salven - und innerhalb des Jahres stabil, auch nach einem
 // Neuladen. WANN eine Rakete steigt, sagt der Server (Sekunden je Stunde aus seiner Saat, `data.salvos`, für alle
-// Geräte gleich); WIE sie aussieht, sagt die Handschrift. Keine Jahreszahl steht im Code.
+// Geräte gleich); WIE sie aussieht, sagt die Handschrift. Keine Jahreszahl steht im Code. Um 00:00 steigt zuerst die
+// neue Jahreszahl (#853, yearDigits.js), die gewohnte erste Salve folgt, sobald die Zahl zu rieseln beginnt.
 
 import { between, hashString, mulberry32, seasonRng } from "../rng";
-import { SHELLS, SHELL_TYPES } from "./fireworks";
+import { CALIBERS, SHELLS, SHELL_TYPES } from "./fireworks";
+import { YEAR_SALVO_DELAY_MS, yearLaunches } from "./yearDigits";
 
 /** Die großen Salven der Show: um 00:00, 00:05 und 00:10 - jede mit eigenem Muster. */
 export const SALVO_MINUTES = [0, 5, 10];
@@ -13,6 +15,8 @@ export const SALVO_PATTERNS = ["fan", "wave", "crown", "cascade"];
 export const COLOR_PAIRS = [["blue", "gold"], ["gold", "white"], ["blue", "silver"], ["red", "gold"], ["violet", "blue"], ["green", "gold"], ["white", "blue"], ["silver", "red"]];
 /** Phasen der Show: dort steigen auch nahe Raketen und Herzen; in der Rampe eher ferne, schlichte. */
 export const SHOW_PHASES = new Set(["countdown", "show"]);
+/** Kaliber (#853): viele kleine, ab und zu große, selten eine sehr große Kugel. */
+export const CALIBER_SHARES = { small: 0.6, large: 0.32, giant: 0.08 };
 
 function round3(value) {
   return Math.round(value * 1000) / 1000;
@@ -59,9 +63,24 @@ export function pickType(hand, rng, phase) {
   return entries[0][0];
 }
 
+/** Ein Kaliber nach den Anteilen - das Herz nie klein (sonst erkennt man es nicht). */
+export function pickCaliber(rng, type) {
+  const roll = rng();
+  if (roll < CALIBER_SHARES.giant) return "giant";
+  if (roll < CALIBER_SHARES.giant + CALIBER_SHARES.large || type === "heart") return "large";
+  return "small";
+}
+
+/** Ein anderes Kaliber für eine geplante Rakete - die sehr große zerplatzt tiefer (unter der Kopfzeile). */
+export function withCaliber(launch, caliber) {
+  const before = CALIBERS[launch.caliber] || CALIBERS.large;
+  return { ...launch, caliber, burstY: round3(launch.burstY - before.lower + CALIBERS[caliber].lower) };
+}
+
 /**
  * Eine Rakete: Zone der Handschrift (leicht versetzt), Entfernung (in der Rampe eher fern, in der Show auch nah), Art,
- * Farbpaar, Höhe des Zerplatzens (ferne tiefer), Aufstieg je Art, eine kleine eigene Abweichung. `seed` macht sie fest.
+ * Farbpaar, Höhe des Zerplatzens (ferne tiefer), Aufstieg je Art, eine kleine eigene Abweichung, das Kaliber (#853 -
+ * als letzter Zug, so bleibt alles andere wie bisher). `seed` macht sie fest.
  */
 export function makeLaunch(hand, seed, phase, at) {
   const rng = mulberry32(hashString(`launch:${hand.year}:${seed}`));
@@ -72,18 +91,13 @@ export function makeLaunch(hand, seed, phase, at) {
   const distance = round3(show ? between(rng, 0.05, 0.85) : between(rng, 0.45, 1));
   const pair = hand.pairs[Math.floor(rng() * hand.pairs.length)];
   const colors = type === "willow" ? ["gold", rng() < 0.5 ? "gold" : pair[1]] : type === "heart" ? ["red", "white"] : [pair[0], pair[1]];
-  return {
-    id: String(seed),
-    at,
-    type,
-    x: round3(Math.max(0.05, Math.min(0.95, zone + between(rng, -0.03, 0.03)))),
-    distance,
-    colors,
-    // Nicht zu hoch: auch die obersten Sterne bleiben unter der Kopfzeile (Bedienung frei).
-    burstY: round3(0.25 + 0.2 * distance + between(rng, -0.03, 0.03)),
-    rise: round3(between(rng, shell.rise[0], shell.rise[1]) * (1 - 0.12 * distance)),
-    drift: round3(between(rng, -26, 26)),
-  };
+  const x = round3(Math.max(0.05, Math.min(0.95, zone + between(rng, -0.03, 0.03))));
+  // Nicht zu hoch: auch die obersten Sterne bleiben unter der Kopfzeile (Bedienung frei).
+  const burstY = 0.25 + 0.2 * distance + between(rng, -0.03, 0.03);
+  const rise = round3(between(rng, shell.rise[0], shell.rise[1]) * (1 - 0.12 * distance));
+  const drift = round3(between(rng, -26, 26));
+  const caliber = pickCaliber(rng, type);
+  return { id: String(seed), at, type, caliber, x, distance, colors, burstY: round3(burstY + CALIBERS[caliber].lower), rise, drift };
 }
 
 /**
@@ -96,28 +110,43 @@ export function planHour(hand, { hourSeed, salvos = [], phase, hourStart = 0 }) 
 
 /**
  * Eine große Salve (00:00, 00:05, 00:10) nach ihrem Muster: Fächer aus der Mitte, Welle über alle Zonen hin und
- * zurück, Krone (alle Zonen zugleich, dann eine Weide in der Mitte), Kaskade (drei Wellen goldener Weiden).
+ * zurück, Krone (alle Zonen zugleich, dann eine Weide in der Mitte), Kaskade (drei Wellen goldener Weiden). Die
+ * Kaliber folgen dem Muster (#853): Fächer groß, Welle hin klein und zurück groß, Krone groß mit einer sehr großen
+ * Weide in der Mitte, Kaskade von klein zu groß.
  */
 export function salvoLaunches(hand, index, at) {
   const pattern = hand.salvos[index % hand.salvos.length];
   const zones = hand.zones;
   const middle = zones[Math.floor(zones.length / 2)];
-  const base = (n, phase = "show") => makeLaunch(hand, `salvo:${index}:${n}`, phase, at);
+  const base = (n, caliber, phase = "show") => withCaliber(makeLaunch(hand, `salvo:${index}:${n}`, phase, at), caliber);
   const out = [];
   if (pattern === "fan") {
-    for (let n = 0; n < 7; n += 1) out.push({ ...base(n), x: middle, drift: round3(-96 + n * 32), distance: 0.15, at: at + n * 120 });
+    for (let n = 0; n < 7; n += 1) out.push({ ...base(n, "large"), x: middle, drift: round3(-96 + n * 32), distance: 0.15, at: at + n * 120 });
   } else if (pattern === "wave") {
-    zones.forEach((zone, n) => out.push({ ...base(n), x: zone, distance: 0.25, at: at + n * 280 }));
-    zones.slice(0, -1).reverse().forEach((zone, n) => out.push({ ...base(zones.length + n), x: zone, distance: 0.4, at: at + (zones.length + n) * 280 }));
+    zones.forEach((zone, n) => out.push({ ...base(n, "small"), x: zone, distance: 0.25, at: at + n * 280 }));
+    zones.slice(0, -1).reverse().forEach((zone, n) => out.push({ ...base(zones.length + n, "large"), x: zone, distance: 0.4, at: at + (zones.length + n) * 280 }));
   } else if (pattern === "crown") {
-    zones.forEach((zone, n) => out.push({ ...base(n), x: zone, distance: 0.3, at }));
-    out.push({ ...base(zones.length), type: "willow", colors: ["gold", "gold"], x: middle, distance: 0.1, at: at + 420 });
+    zones.forEach((zone, n) => out.push({ ...base(n, "large"), x: zone, distance: 0.3, at }));
+    out.push({ ...base(zones.length, "giant"), type: "willow", colors: ["gold", "gold"], x: middle, distance: 0.1, at: at + 420 });
   } else {
     for (let wave = 0; wave < 3; wave += 1) {
-      zones.forEach((zone, n) => out.push({ ...base(wave * zones.length + n), type: "willow", colors: ["gold", wave === 1 ? "white" : "gold"], x: zone, distance: round3(0.2 + wave * 0.2), at: at + wave * 800 + n * 90 }));
+      zones.forEach((zone, n) => out.push({ ...base(wave * zones.length + n, wave === 2 ? "large" : "small"), type: "willow", colors: ["gold", wave === 1 ? "white" : "gold"], x: zone, distance: round3(0.2 + wave * 0.2), at: at + wave * 800 + n * 90 }));
     }
   }
   return out.map((launch, n) => ({ ...launch, id: `salvo:${index}:${n}`, pattern }));
+}
+
+/**
+ * Alle großen Salven der Show zu ihren Zeiten (`salvoTimes`): in der ersten zuerst die neue Jahreszahl (#853), ihr
+ * Muster folgt, sobald die Zahl zu rieseln beginnt. Ohne Jahreszahl wie bisher.
+ */
+export function showLaunches(hand, times, year = null) {
+  const out = [];
+  times.forEach((at, index) => {
+    const digits = index === 0 ? yearLaunches(year, at) : [];
+    out.push(...digits, ...salvoLaunches(hand, index, digits.length ? at + YEAR_SALVO_DELAY_MS : at));
+  });
+  return out;
 }
 
 /**

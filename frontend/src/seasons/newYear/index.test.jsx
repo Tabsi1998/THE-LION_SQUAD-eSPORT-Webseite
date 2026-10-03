@@ -55,6 +55,23 @@ test("Plan: die Startsekunden des Servers in der laufenden Stunde, in der Show d
   expect(salvos.length).toBeGreaterThanOrEqual(3 * 5);
   const minutes = new Set(salvos.map((launch) => Math.floor((launch.at - Date.parse(SHOW)) / 60000)));
   expect([...minutes].sort((a, b) => a - b)).toEqual([0, 5, 10]);
+  // Um 00:00 zuerst die neue Jahreszahl (#853) - das Jahr aus dem Beginn der Show.
+  const digits = show.filter((launch) => typeof launch.glyph === "string");
+  expect(digits.map((launch) => launch.glyph).join("")).toBe("2027");
+  expect(digits[0].at).toBe(Date.parse(SHOW));
+});
+
+test("„dezent“ und „Bewegung reduzieren“ (#853): um 00:00 die Jahreszahl ruhig am Himmel, ohne Salve; sonst formen sie die Funken", async () => {
+  vi.useFakeTimers({ now: new Date(Date.parse(SHOW) + 1000) });
+  const view = render(<Toast season={ny("show", { effective: "subtle" })} />);
+  const calm = screen.getByTestId("new-year-calm-year");
+  expect(calm.getAttribute("aria-hidden")).toBe("true");
+  expect(calm.querySelectorAll("circle").length).toBeGreaterThan(100);
+  expect(screen.getByTestId("new-year-zero")).toHaveTextContent("Frohes neues Jahr 2027!");
+  view.unmount();
+  render(<Toast season={ny("show")} />);
+  expect(screen.getByTestId("new-year-zero")).toBeTruthy();
+  expect(screen.queryByTestId("new-year-calm-year")).toBeNull();
 });
 
 test("Kopf: ab 23:00 „noch … Min. bis 2027“ nach der Serveruhr; der Ton-Schalter ist aus und merkt sich die Wahl", async () => {

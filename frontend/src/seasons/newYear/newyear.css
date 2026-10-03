@@ -31,6 +31,15 @@
   100% { transform: scale(2.6); opacity: 0; filter: blur(6px); }
 }
 .tls-ny-countdown--zero .tls-ny-countdown__burst { position: absolute; top: 0.6rem; }
+/* Ohne Bewegung bricht die Null nicht auf - sie bleibt dann weg, sonst stünde sie still mitten im Gruß. */
+.tls-ny-countdown--still .tls-ny-countdown__burst { display: none; }
+/* Handy: der Gruß in einer Zeile und schmal genug, dass die Jahreszahl darunter frei steht (#853). Ohne feste Breite
+   bekam die Karte nur ihre Mindestbreite (links 50 %) und brach in drei Zeilen um. */
+@media (max-width: 480px) {
+  .tls-ny-countdown--zero { width: min(22rem, calc(100vw - 2rem)); padding: 0.8rem 1rem 0.95rem; }
+  .tls-ny-countdown--zero .tls-ny-countdown__title { font-size: 1.3rem; text-align: center; }
+  .tls-ny-countdown--zero .tls-ny-countdown__text { font-size: 0.85rem; text-align: center; }
+}
 .tls-ny-countdown__title { margin-top: 0.4rem; font-size: 1.7rem; font-weight: 800; color: #fff6e0; animation: tls-ny-rise 0.7s ease-out 0.35s both; }
 .tls-ny-countdown__text { font-size: 0.95rem; color: rgba(255, 246, 224, 0.85); animation: tls-ny-rise 0.7s ease-out 0.6s both; }
 @keyframes tls-ny-rise {
@@ -58,8 +67,18 @@
   100% { opacity: 0; transform: translateY(140px) rotate(320deg); }
 }
 
+/* Die ruhige Jahreszahl (#853, dezent): dieselben Funkenpunkte wie im Feuerwerk, leuchtend, sanft ein und aus. */
+.tls-ny-year { position: fixed; inset: 0; z-index: 60; pointer-events: none; filter: drop-shadow(0 0 3px rgba(255, 200, 87, 0.9)) drop-shadow(0 0 9px rgba(255, 200, 87, 0.4)); animation: tls-ny-year 8s ease-in-out both; }
+@keyframes tls-ny-year {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .tls-ny-countdown--still, .tls-ny-countdown--still *, .tls-ny-toast--still { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .tls-ny-countdown, .tls-ny-countdown *, .tls-ny-toast, .tls-ny-toast__confetti span { animation: none !important; }
+  .tls-ny-countdown, .tls-ny-countdown *, .tls-ny-toast, .tls-ny-toast__confetti span, .tls-ny-year { animation: none !important; }
+  .tls-ny-countdown__burst { display: none; }
   .tls-ny-toast__confetti { display: none; }
 }

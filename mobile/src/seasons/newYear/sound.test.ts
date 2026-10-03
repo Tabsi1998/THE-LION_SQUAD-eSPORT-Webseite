@@ -18,7 +18,7 @@ const mockFs = {
 };
 jest.mock("expo-file-system/legacy", () => mockFs);
 
-const { BURST_VOICES, MAX_VOICES, NEW_YEAR_SOUND_KEY, playFireSound, readNewYearSound, renderBoom, renderWhistle, resetNewYearSound, setNewYearSound, volumeFor } = require("./sound");
+const { BURST_VOICES, CALIBER_VOICES, MAX_VOICES, NEW_YEAR_SOUND_KEY, burstShape, playFireSound, readNewYearSound, renderBoom, renderWhistle, resetNewYearSound, setNewYearSound, soundLevel, volumeFor } = require("./sound");
 const { seasonAudioMode } = require("../sound/player");
 
 beforeEach(async () => {
@@ -51,7 +51,8 @@ test("eingeschaltet: Zischen und Knall aus dem Cache, ohne fremde Musik zu unter
   expect(mockAudio.setAudioModeAsync).toHaveBeenCalledWith(seasonAudioMode());
   expect(mockFs.writeAsStringAsync).toHaveBeenCalledTimes(1);
   const player = mockAudio.createAudioPlayer.mock.results[0].value;
-  expect(player.volume).toBeCloseTo(volumeFor(0.9), 2);
+  expect(player.volume).toBeCloseTo(soundLevel("boom-crackle", 0.9), 2);
+  expect(player.volume).toBeLessThan(volumeFor(0.2));
   jest.advanceTimersByTime(5_000);
   jest.useRealTimers();
 });
@@ -67,4 +68,28 @@ test("Laute: Zischen steigt, Knall je Art anders lang, nie übersteuert", () => 
   expect(Math.max(...Array.from(peony, Math.abs))).toBeCloseTo(0.7, 2);
   expect(new Set(Object.values(BURST_VOICES).map((voice) => JSON.stringify(voice))).size).toBe(6);
   expect(volumeFor(0)).toBe(1);
+});
+
+test("Kaliber (#853): leise knisternd bis kräftiger Knall - nie lauter als der lauteste Knall bisher; je Kaliber eine eigene Datei", async () => {
+  for (const caliber of Object.keys(CALIBER_VOICES)) {
+    for (const distance of [0, 0.4, 1]) expect(soundLevel(`boom-peony-${caliber}`, distance)).toBeLessThanOrEqual(volumeFor(distance));
+  }
+  expect(soundLevel("boom-peony-giant", 0)).toBe(1);
+  expect(soundLevel("boom-peony-small", 0)).toBeLessThan(soundLevel("boom-peony-large", 0) * 0.6);
+  expect(soundLevel("boom-peony", 0)).toBe(soundLevel("boom-peony-large", 0));
+  expect(soundLevel("whistle", 0.4)).toBe(volumeFor(0.4));
+  const small = renderBoom("peony", 8000, "small");
+  const giant = renderBoom("peony", 8000, "giant");
+  expect(giant.length).toBeGreaterThan(renderBoom("peony", 8000).length);
+  // Die kleine knistert (Klicks nach dem Knall), auch wenn ihre Art sonst nicht knistert.
+  expect(burstShape("peony", "small").crackle).toBeGreaterThan(0);
+  expect(small.length).toBeGreaterThan(Math.floor(burstShape("peony", "small").seconds * 8000));
+  for (const samples of [small, giant]) expect(Math.max(...Array.from(samples as Float32Array, Math.abs))).toBeLessThanOrEqual(0.71);
+  jest.useFakeTimers();
+  await setNewYearSound(true);
+  expect(await playFireSound("boom-willow-giant", 0, 20_000)).toBe(true);
+  expect(mockFs.writeAsStringAsync.mock.calls[0][0]).toBe("file:///cache/newyear-sounds/boom-willow-giant-v2.wav");
+  expect(mockAudio.createAudioPlayer.mock.results[0].value.volume).toBe(1);
+  jest.advanceTimersByTime(5_000);
+  jest.useRealTimers();
 });

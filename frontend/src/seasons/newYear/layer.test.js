@@ -1,5 +1,6 @@
 import { LATE_MS, LOOKAHEAD_MS, createFireworksLayer, showCap } from "./layer";
 import { launchDuration, SMOKE_SECONDS } from "./fireworks";
+import { YEAR_FORM, YEAR_RISE, YEAR_STAGGER_MS, glyphSpot, yearLaunches, yearStarCount } from "./yearDigits";
 
 // Feuerwerks-Ebene (S9, N1, N5): startet zur Serverzeit, holt nach einem versteckten Tab nichts nach, hält das
 // Teilchenbudget, räumt fertige Raketen und Rauch weg und schläft, wenn nichts ansteht.
@@ -109,4 +110,28 @@ test("die Teilchen gehören zur Seite: Scrollen schiebt Rakete und Explosion mit
   win.scrollY = 120;
   layer.draw(ctx, 16, SIZE);
   expect(arcs[arcs.length - 1]).toBeCloseTo(before - 120, 1);
+});
+
+test("Jahreszahl (#853): die Funken der Ziffer-Raketen stehen als Zahl am Himmel - lesbar auch bei vollem Budget", () => {
+  const T = 5_000;
+  let now = T - 200;
+  const crowd = Array.from({ length: 12 }, (_, i) => rocket(`c${i}`, T - 200));
+  const plan = [...crowd, ...yearLaunches(2027, T)];
+  const dots = [];
+  const ctx = { ...mockCtx(), arc: (x, y, r) => dots.push({ x, y, r }) };
+  const layer = createFireworksLayer({ plan: () => plan, clock: () => now, budget: 40, doc: null });
+  for (now = T - 200; now <= T + 3 * YEAR_STAGGER_MS + (YEAR_RISE + 0.1) * 1000; now += 50) layer.update(now, SIZE);
+  // Die vielen Raketen davor haben das Budget aufgebraucht - die Zahl bekommt trotzdem ihren festen Anteil.
+  expect(layer.snapshot().particles).toBeGreaterThanOrEqual(yearStarCount(200) - 2);
+  now = T + 3 * YEAR_STAGGER_MS + (YEAR_RISE + YEAR_FORM + 1) * 1000;
+  layer.draw(ctx, 16, SIZE);
+  const stars = dots.filter((dot) => dot.r < 10);
+  expect(stars.length).toBeGreaterThanOrEqual(yearStarCount(200) - 2);
+  const spots = [0, 1, 2, 3].map((slot) => glyphSpot(slot, 4, SIZE));
+  const height = spots[0].height;
+  // Jeder Funke steht in seiner Ziffer (Kasten 0,6 × 1 der Höhe, etwas Spiel für Wind und Sinken).
+  stars.forEach((dot) => {
+    expect(spots.some((spot) => Math.abs(dot.x - spot.x) <= height * 0.32 + 4 && Math.abs(dot.y - spot.y) <= height * 0.5 + 8)).toBe(true);
+  });
+  spots.forEach((spot) => expect(stars.filter((dot) => Math.abs(dot.x - spot.x) <= height * 0.32 + 4).length).toBeGreaterThan(20));
 });

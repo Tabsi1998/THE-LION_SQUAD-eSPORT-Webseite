@@ -2,9 +2,11 @@
 // Choreografie zu ihrer Zeit (Serveruhr), zeichnet Aufstieg mit Funkenspur, die Sterne je Art (mit Spuren, Glitzern,
 // Knistern, Nachglühen) und dahinter den Rauch. Hält das Teilchenbudget (#640: 200/600/1200 je Gerät), holt nach einem
 // versteckten Tab nichts nach, räumt fertige Raketen weg und schläft, wenn nichts ansteht (der Loop prüft alle 2 s).
+// Um 00:00 formen die Funken der Ziffer-Raketen die neue Jahreszahl (#853, yearDigits.js).
 
 import { hashString, mulberry32 } from "../rng";
-import { COLORS, CRACKLE_SECONDS, EMBER, SHELLS, SMOKE_SECONDS, SPARK_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, launchDuration, rocketAt, smokeAt, spreadFor, starAt, starLight, trailRate } from "./fireworks";
+import { COLORS, CRACKLE_SECONDS, EMBER, SHELLS, SMOKE_SECONDS, SPARK_SECONDS, burstPoint, burstStars, crackleFlashes, distanceLight, launchDuration, maxStars, rocketAt, smokeAt, spreadFor, starAt, starLight, trailRate } from "./fireworks";
+import { YEAR_FORM, isGlyph, yearStarAt, yearStarCount, yearStarLight, yearStars } from "./yearDigits";
 
 /** Teilchen je Gerät für die Show (#640); `budget` des Himmels (40/120/240) wird darauf abgebildet. */
 export const SHOW_CAPS = { 40: 200, 60: 300, 120: 600, 240: 1200 };
@@ -109,12 +111,11 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
           state.particles += 1;
         }
       } else if (!item.stars) {
-        // Zerplatzen: so viele Sterne, wie das Budget noch erlaubt.
-        const shell = SHELLS[launch.type] || SHELLS.peony;
+        // Zerplatzen: so viele Sterne, wie das Budget noch erlaubt - die Jahreszahl bekommt ihren festen Anteil, damit
+        // sie lesbar bleibt.
         const room = Math.max(0, cap - state.particles);
-        const wanted = shell.stars[1];
         item.origin = burstPoint(launch, size, drift);
-        item.stars = burstStars(launch, item.rng, Math.min(1, room / wanted), spreadFor(size));
+        item.stars = isGlyph(launch) ? yearStars(launch, item.rng, size, yearStarCount(cap)) : burstStars(launch, item.rng, Math.min(1, room / maxStars(launch)), spreadFor(size));
         state.particles += item.stars.length;
         if (state.smoke.length < MAX_SMOKE) state.smoke.push({ origin: item.origin, t0: item.t0 + launch.rise * 1000, distance: launch.distance, shift: item.shift });
         if (launch.type === "crackle") item.flashes = item.stars.map(() => crackleFlashes(null, item.rng));
@@ -139,6 +140,23 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
       ctx.beginPath();
       ctx.arc(x, y, radius, 0, Math.PI * 2);
       ctx.fill();
+    }
+  };
+
+  /** Die Funken einer Ziffer: im Flug in die Form mit kurzer Spur, dann stehend, beim Rieseln mit Glut. */
+  const drawYear = (ctx, stars, age, origin, drift, light) => {
+    for (const star of stars) {
+      const lit = yearStarLight(star, age);
+      if (lit.alpha <= 0) continue;
+      const pos = yearStarAt(star, age, origin, drift);
+      const color = lit.ember > 0.6 ? "ember" : star.color;
+      if (age < YEAR_FORM) {
+        for (let k = 1; k <= 2; k += 1) {
+          const prev = yearStarAt(star, Math.max(0, age - 0.05 * k), origin, drift);
+          drawGlow(ctx, color, prev.x, prev.y, star.size * (1 - k * 0.25), lit.alpha * light * (0.4 - k * 0.12));
+        }
+      }
+      drawGlow(ctx, color, pos.x, pos.y, star.size, lit.alpha * light);
     }
   };
 
@@ -182,6 +200,10 @@ export function createFireworksLayer({ plan, clock = () => Date.now(), wind = ()
       if (!item.stars) continue;
       const age = t - launch.rise;
       const origin = { x: item.origin.x, y: item.origin.y + item.shift };
+      if (isGlyph(launch)) {
+        drawYear(ctx, item.stars, age, origin, drift, light);
+        continue;
+      }
       item.stars.forEach((star, index) => {
         const lit = starLight(star, age);
         const pos = starAt(star, age, shell, origin, drift, launch.distance);
