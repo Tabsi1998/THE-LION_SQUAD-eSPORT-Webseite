@@ -34,6 +34,12 @@ test("eine fremde Adresse wird nicht zerlegt, IDs ohne Profilseite bleiben unver
   expect(socialProfileUrl("website", "lionsquad.at")).toBe("https://lionsquad.at");
 });
 
+test("PSN: eine eingefuegte Profil-Adresse wird zur Online-ID, die Vorschau fuehrt zu Sonys Web-Profil (#891)", () => {
+  expect(normalizeSocialInput("psn_id", "https://profile.playstation.com/Tabsi98")).toBe("Tabsi98");
+  expect(normalizeSocialInput("psn_id", "Tabsi98")).toBe("Tabsi98");
+  expect(socialProfileUrl("psn_id", "Tabsi98")).toBe("https://profile.playstation.com/Tabsi98");
+});
+
 test("jede Plattform hat Symbol, Bezeichnung und Feldschluessel", () => {
   for (const platform of SOCIAL_PLATFORMS) {
     expect(platform.icon).toBeTruthy();

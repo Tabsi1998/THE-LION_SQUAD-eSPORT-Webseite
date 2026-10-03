@@ -14,7 +14,8 @@ export const SOCIAL_PLATFORMS = [
   { k: "x_handle", l: "X (Twitter)", icon: Twitter, hosts: ["x.com", "twitter.com"], url: (h) => `https://x.com/${h}`, placeholder: "@nutzername oder Adresse", handle: true },
   { k: "steam_id", l: "Steam", icon: Gamepad2, hosts: ["steamcommunity.com"], skip: ["id", "profiles"], url: (h) => (/^\d{17}$/.test(h) ? `https://steamcommunity.com/profiles/${h}` : `https://steamcommunity.com/id/${h}`), placeholder: "Profilname, 17-stellige ID oder Adresse" },
   { k: "epic_id", l: "Epic", icon: Rocket, placeholder: "Epic-Anzeigename" },
-  { k: "psn_id", l: "PlayStation Network", icon: Gamepad, placeholder: "Online-ID" },
+  // #891: eine eingefügte Profil-Adresse wird zur Online-ID, die Vorschau führt zu Sonys Web-Profil.
+  { k: "psn_id", l: "PlayStation Network", icon: Gamepad, hosts: ["profile.playstation.com"], url: (h) => `https://profile.playstation.com/${h}`, placeholder: "Online-ID oder Profil-Adresse" },
   { k: "xbox_id", l: "Xbox", icon: Joystick, placeholder: "Gamertag" },
   { k: "nintendo_fc", l: "Nintendo Friend Code", icon: Zap, placeholder: "SW-XXXX-XXXX-XXXX" },
   { k: "ea_id", l: "EA ID", icon: Gamepad2, placeholder: "EA-ID" },

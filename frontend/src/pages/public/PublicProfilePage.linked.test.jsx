@@ -12,10 +12,10 @@ vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("@/hooks/useDocumentTitle", () => ({ useDocumentTitle: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { AccountsCard, accountGroups } = await import("./PublicProfilePage");
+const { AccountsCard, accountGroups, psnProfileUrl } = await import("./PublicProfilePage");
 
 const PROFILE = {
-  discord_name: "paula#0001", youtube_handle: "@paula", psn_id: "paula_psn", steam_id: "76561198000000001", website: "https://paula.example/",
+  discord_name: "paula#0001", youtube_handle: "@paula", psn_id: "paula_psn", nintendo_fc: "SW-1234-5678-9012", steam_id: "76561198000000001", website: "https://paula.example/",
   verified_platforms: ["discord", "steam"],
   linked_accounts: [
     { platform: "discord", label: "Discord", handle: "paula", display_name: "Paula B.", linked_at: "2026-09-22T20:00:00Z", url: "https://discord.com/users/123" },
@@ -32,9 +32,11 @@ test("accountGroups: verknüpft schlägt getippt, Socials und Spielkonten getren
   expect(groups.socials[1]).toMatchObject({ title: "paula", detail: "YouTube", verified: false, url: "https://www.youtube.com/@paula" });
   expect(groups.socials[2]).toMatchObject({ title: "paula.example", url: "https://paula.example/" });
   expect(groups.socials[3]).toMatchObject({ label: "Mastodon", url: "https://mastodon.example/@paula" });
-  expect(groups.games.map((e) => e.key)).toEqual(["steam", "psn"]);
+  expect(groups.games.map((e) => e.key)).toEqual(["steam", "psn", "nintendo"]);
   expect(groups.games[0]).toMatchObject({ title: "Steam-Profil", detail: "Steam · 76561198000000001 · seit 23.09.2026", verified: true });
-  expect(groups.games[1]).toMatchObject({ title: "paula_psn", label: "PlayStation", url: "", verified: false });
+  // #891: getippt, aber verlinkt; Nintendo hat keine Profilseite im Netz und bleibt zum Kopieren.
+  expect(groups.games[1]).toMatchObject({ title: "paula_psn", label: "PlayStation", url: "https://profile.playstation.com/paula_psn", verified: false });
+  expect(groups.games[2]).toMatchObject({ key: "nintendo", url: "", verified: false });
   expect(groups.verifiedCount).toBe(2);
   expect(accountGroups(null)).toEqual({ socials: [], games: [], verifiedCount: 0 });
 });
@@ -57,7 +59,18 @@ test("Konten-Kasten: eine Zeile je Konto mit Farbe, Haken, Link oder Kopieren", 
   expect(steam).not.toHaveTextContent("76561198000000001 · 76561198000000001");
   expect(steam.style.getPropertyValue("--social-color")).toBe("#66C0F4");
   const psn = screen.getByTestId("profile-account-psn");
-  expect(psn.tagName).toBe("BUTTON");
+  expect(psn.tagName).toBe("A");
+  expect(psn).toHaveAttribute("href", "https://profile.playstation.com/paula_psn");
+  expect(screen.getByTestId("profile-account-nintendo").tagName).toBe("BUTTON");
   expect(psn).toHaveTextContent("paula_psn");
   expect(screen.queryByTestId("profile-account-psn-verified")).toBeNull();
+});
+
+test("PSN-ID: gültige Online-ID und eingefügte Profil-Adresse werden verlinkt, alles andere nicht (#891)", () => {
+  expect(psnProfileUrl("Tabsi98")).toBe("https://profile.playstation.com/Tabsi98");
+  expect(psnProfileUrl(" paula_psn ")).toBe("https://profile.playstation.com/paula_psn");
+  expect(psnProfileUrl("https://profile.playstation.com/Tabsi-98?share=1")).toBe("https://profile.playstation.com/Tabsi-98");
+  for (const bad of ["", "ab", "1abc", "zu_lang_fuer_psn_x", "Tabsi 98", "Täbsi", "<script>", "https://evil.example/Tabsi98"]) {
+    expect(psnProfileUrl(bad)).toBe("");
+  }
 });
