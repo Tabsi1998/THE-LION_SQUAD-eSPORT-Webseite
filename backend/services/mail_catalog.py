@@ -58,6 +58,7 @@ CATALOG: dict[str, dict[str, str]] = {
     "membership_reject": {"name": "Bewerbung abgelehnt", "purpose": "Der Vorstand hat die Mitgliedsbewerbung abgelehnt.", "recipient": "der Bewerber", "category": "membership"},
     "membership_application_admin": {"name": "Neue Bewerbung (an den Vorstand)", "purpose": "Hinweis an Club-Admins, dass eine Bewerbung wartet.", "recipient": "Club-Admins und Superadmins", "category": "membership"},
     "birthday_greeting": {"name": "Geburtstagsgruß", "purpose": "Ein Gruß am Geburtstag, wenn das Datum im Profil steht.", "recipient": "das Konto", "category": "community"},
+    "achievement_recap": {"name": "Wochenrückblick Erfolge", "purpose": "Montags 09:00 an alle, die in der Woche XP oder Erfolge gesammelt haben – abbestellbar.", "recipient": "das Konto", "category": "community"},
     "direct_message": {"name": "Neue Direktnachricht", "purpose": "Jemand hat eine Nachricht geschrieben (nur, wenn die Person Mails dazu zulässt).", "recipient": "der Empfänger der Nachricht", "category": "community"},
     "team_chat_mention": {"name": "Erwähnung im Team-Chat", "purpose": "Jemand hat die Person im Team-Chat erwähnt.", "recipient": "die erwähnte Person", "category": "community"},
     "newsletter_news": {"name": "Newsletter: News", "purpose": "Eine veröffentlichte News an alle mit Newsletter-Einwilligung.", "recipient": "Newsletter-Empfänger", "category": "newsletter"},
@@ -80,6 +81,9 @@ SAMPLES: dict[str, str] = {
     "excerpt": "Mario Kart Winter Cup und Smash Showdown – jetzt anmelden!", "preview": "Bist du am Samstag dabei?", "note": "Wir freuen uns auf dich!",
     "url": "{origin}/tournaments/mario-kart-winter-cup", "verification_url": "{origin}/verify-email?token=beispiel", "reset_url": "{origin}/reset-password?token=beispiel",
     "invite_url": "{origin}/register?invite=beispiel", "preferences_url": "{origin}/profile", "appeal_url": "{origin}/contact", "branding": "THE LION SQUAD",
+    # Wochenrückblick (#622)
+    "week": "29.09. – 05.10.2026", "xp_week": "240", "level": "12", "level_title": "Kämpfer", "unlocked": "Champion III (Gold)\nFrühaufsteher I (Bronze)",
+    "next_up": "Turnierspieler II – noch 2", "bonus_hint": "Vereinsmitglieder bekommen 10 % mehr XP auf alles.",
 }
 
 
