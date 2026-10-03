@@ -359,6 +359,14 @@ async def _safe_dolibarr_public():
             logger.info(f"[scheduler] dolibarr_sponsors {res}")
     except Exception as exc:
         _log_task_failure("dolibarr_sponsors", exc)
+    try:
+        # Ehrungen auf öffentlichen Profilen (#848): nur für Konten mit Schalter; was der Verein zurückzieht, geht raus.
+        from services.dolibarr_honours import refresh_due as refresh_honours
+        res = await refresh_honours()
+        if res.get("refreshed"):
+            logger.info(f"[scheduler] dolibarr_honours {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_honours", exc)
 
 
 async def _safe_billing_reconcile():
