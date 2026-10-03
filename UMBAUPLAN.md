@@ -2785,6 +2785,15 @@ der Verwaltung.
 - **Mitgliederbereich und Dolibarr** (geplant als „Vereinsmodul 1.5“): Abstimmen per Popup in App
   und Web, Anwesenheit per Mitgliedskarte, Konten und Teilnahmen in der Akte, Ehrungen. Vereinsdaten
   pflegt der Vorstand in Dolibarr; Mitglieder beantragen Änderungen.
+- **Am Nachmittag gemergt:** Rechnungen bekommen ihr PDF gleich beim Freigeben, und Gäste können es
+  wieder herunterladen. Für alte Rechnungen ohne PDF gibt es in Finanzen den Knopf „Fehlende PDFs
+  nachziehen“. Discord-Meldungen lassen sich im neuen Reiter „Gestaltung“ selbst formulieren, mit
+  Vorschau wie in Discord. Streams kommen als eigene Meldung wie bei einem Stream-Bot, so wird ein
+  zweiter Bot überflüssig. Die Online-Zahl steht jetzt im Footer bei „Dabei sein“. Dazu kommen
+  der Faschingshut gerade auf dem Kopf, keine Hasenohren, ein festlicherer Vereinsgeburtstag
+  (Mütze mit der Zahl der Jahre, Luftballons) und Adventkalender und Nikolaus gleich neben dem Kranz.
+- **Ein Handbuch für dich** entsteht unter `docs/handbuch/`: zuerst Discord (Hauptserver, Unterserver,
+  welche Rechte der Bot braucht, was du wo einstellst).
 
 ## Noch offen und bewusst getrennt
 
@@ -2812,6 +2821,7 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Rechtstexte lesen (Oktober 2026)** | Datenschutzerklärung: der Absatz zu den Zählern der Fundstücke (#773), der Satz zum Adventkalender und der Absatz zu Verlosungen (#785); dazu die fünf Sätze der Teilnahmebedingungen. Ergänzungen wie ein Mindestalter oder Versand statt Abholung sind ein paar Zeilen. |
 | **Build 85 in die Play Console** | Das Bundle `LionsAPP-v1.1.0-build85-ee67572.aab` liegt auf deinem Desktop; in der Play Console beim internen Test hochladen, den Versionshinweis (459 Zeichen) aus PR #851 einfügen. |
 | **Discord nach dem Update** | Bot-Rolle im Kanal „Events und Turniere“: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“. Server-Widget einschalten (Servereinstellungen → Widget). Willkommenstext lesen und einschalten. Kanal „Mitglieder (privat)“ wählen. Weitere Server im Reiter „Server“ einschalten. |
+| **Nach dem Update vom 3.10. Nachmittag** | Finanzen → „Fehlende PDFs nachziehen“ einmal drücken (alte Rechnungen ohne PDF). Discord → „Gestaltung“: Vorlagen ansehen, Stream-Meldungen einschalten und Kanal wählen. Soll eine Rolle bei Streams gepingt werden, muss sie in Discord „erwähnbar“ sein (Servereinstellungen → Rollen). |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
