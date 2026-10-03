@@ -9,6 +9,8 @@ import { getMotionScheduler, requestMotion } from "./motion";
 import { hashString, mulberry32 } from "./rng";
 import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type PerchAssignment, type PerchKind, type PerchRect, type WebAssignment } from "./perches";
 import { CornerWeb } from "./cornerWeb";
+import { HuntEggView } from "./easterHunt/HuntEgg";
+import { useHuntSpots } from "./easterHunt/store";
 import { anyOverlayOpen, setOverlay, setQuietZone, subscribeQuiet } from "./quiet";
 
 // Anker in der App (A1, #715): eine Karte, die einen Platz anbietet, legt `SeasonPerch` als unsichtbare Ebene über
@@ -99,15 +101,17 @@ function measurePerch(perchId: string, fallback: () => Promise<PerchRect | null>
 }
 
 /**
- * Die unsichtbare Ebene über einer Karte: meldet den Platz an, zeigt die zugeteilte Fledermaus. `id` muss je
- * Screen eindeutig und über Renders stabil sein (Karten-ID, nicht Index).
+ * Die unsichtbare Ebene über einer Karte: meldet den Platz an, zeigt die zugeteilte Fledermaus und die Ostereier der
+ * Suche (#647). `id` muss je Screen eindeutig und über Renders stabil sein (Karten-ID, nicht Index). `clip`: die
+ * Karte schneidet ab, was über ihren Rand ragt - Eier liegen dann innen in der Ecke, Fledermäuse gar nicht.
  */
-export function SeasonPerch({ id, kind = "card", timeScale = 1 }: { id: string; kind?: PerchKind; timeScale?: number }) {
+export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: { id: string; kind?: PerchKind; timeScale?: number; clip?: boolean }) {
   const screen = useRouteNameSafe();
   const ref = useRef<View>(null);
   const [assignment, setAssignment] = useState<PerchAssignment | null>(() => perchSnapshot().assignments[id] || null);
   const [web, setWeb] = useState<WebAssignment | null>(() => perchSnapshot().webs[id] || null);
   const [covered, setCovered] = useState(anyOverlayOpen());
+  const eggs = useHuntSpots(id);
   useEffect(() => {
     // Erst zuhören, dann anmelden: die Bühne teilt oft schon während der Anmeldung zu.
     const stop = subscribePerches((state) => {
@@ -115,7 +119,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1 }: { id: string; 
       setWeb(state.webs[id] || null);
     });
     const stopQuiet = subscribeQuiet((state) => setCovered(state.overlays.length > 0));
-    registerPerch({ id, screen, kind, measure: () => measureNode(ref.current) });
+    registerPerch({ id, screen, kind, clip, measure: () => measureNode(ref.current) });
     setAssignment(perchSnapshot().assignments[id] || null);
     setWeb(perchSnapshot().webs[id] || null);
     return () => {
@@ -123,11 +127,12 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1 }: { id: string; 
       stopQuiet();
       unregisterPerch(id);
     };
-  }, [id, screen, kind]);
+  }, [id, screen, kind, clip]);
   return (
     <View ref={ref} collapsable={false} pointerEvents="box-none" style={StyleSheet.absoluteFill} testID={`season-perch-${id}`}>
       {web && !covered ? <CornerWeb side={web.side} seed={web.seed} radius={web.radius} /> : null}
       {assignment && !covered ? <PerchBat perchId={id} screen={screen} assignment={assignment} landed={Boolean(assignment.landed)} timeScale={timeScale} measure={() => measurePerch(id, () => measureNode(ref.current))} /> : null}
+      {eggs.map((spot) => <HuntEggView key={spot.egg.egg_no} spot={spot} clip={clip} />)}
     </View>
   );
 }

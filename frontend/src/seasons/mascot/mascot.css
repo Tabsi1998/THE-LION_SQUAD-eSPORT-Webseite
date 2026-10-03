@@ -1,0 +1,20 @@
+/* Etwas auf dem Kopf des Löwen (Partyhut #746, Hasenohren #645): im Kopf der Seite in der Kopfzeile selbst, auf der
+   Startseite in Seitenkoordinaten (unter Kopfzeile und Leiste unten). `--hat-tilt` neigt das Stück je Saison. */
+.tls-mascot-hat { position: absolute; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; line-height: 0; transform: rotate(var(--hat-tilt, -12deg)); transform-origin: 50% 90%; z-index: 2; }
+.tls-mascot-hat:focus-visible { outline: 2px solid #ffd700; outline-offset: 2px; border-radius: 4px; }
+.tls-mascot-hat svg { max-width: none; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45)); }
+.tls-mascot-hat--hero { position: relative; --hat-tilt: -8deg; }
+.tls-mascot-hat--still { display: inline-block; cursor: default; pointer-events: none; }
+.tls-mascot-hat--wiggle { animation: tls-mascot-wiggle 0.7s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes tls-mascot-wiggle {
+  0% { transform: rotate(var(--hat-tilt, -12deg)) translateY(0); }
+  25% { transform: rotate(calc(var(--hat-tilt, -12deg) - 12deg)) translateY(-6px); }
+  55% { transform: rotate(calc(var(--hat-tilt, -12deg) + 16deg)) translateY(-2px); }
+  80% { transform: rotate(calc(var(--hat-tilt, -12deg) - 4deg)) translateY(0); }
+  100% { transform: rotate(var(--hat-tilt, -12deg)) translateY(0); }
+}
+.tls-mascot-hat-page { position: absolute; z-index: 39; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-mascot-hat--wiggle { animation: none; }
+}

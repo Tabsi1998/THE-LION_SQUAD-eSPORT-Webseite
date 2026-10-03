@@ -79,17 +79,32 @@ describe("Ceremony", () => {
     expect(screen.getByTestId("ceremony-flood")).toBeInTheDocument();
   });
 
-  it("erster Erfolg erklärt und verlinkt den Schaukasten; Level-up zeigt Zahl, Titel und Sterne", () => {
+  it("erster Erfolg erklärt und verlinkt den Schaukasten; Level-up zeigt Zahl und Titel, Prestige den Stern", () => {
     const { unmount } = renderPlan({ tiers: [tier("f", "wood", 1, "community")], context: { firstEver: true } });
     expect(screen.getByTestId("ceremony-first-text")).toHaveTextContent("Das war dein erster Erfolg");
     expect(screen.getByTestId("ceremony-showcase-link")).toHaveAttribute("href", "/achievements");
     unmount();
-    renderPlan({ tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 1, prestigeGained: true } }, { reduced: true });
+    const level = renderPlan({ tiers: [], levelUp: { level: 10, previous: 9, title: "Kämpfer", titleChanged: true, prestige: 1, prestigeGained: false } }, { reduced: true });
     expect(screen.getByTestId("achievement-unlock-overlay")).toHaveAttribute("data-sequence", "levelup");
     expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("10");
     expect(screen.getByTestId("ceremony-title-banner")).toHaveTextContent("Neuer Titel: Kämpfer");
-    expect(screen.getByTestId("ceremony-prestige-stars")).toBeInTheDocument();
+    expect(screen.queryByTestId("ceremony-prestige-stars")).toBeNull();
     expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Level 10 erreicht");
+    level.unmount();
+    // Prestige (#617): von 60 zurück auf 1, ein Stern mehr - die Überschrift nennt das Prestige, nicht „Level 1 erreicht“.
+    renderPlan({ tiers: [], levelUp: { level: 1, previous: 60, title: "Rookie", titleChanged: true, prestige: 1, prestigeGained: true } }, { reduced: true });
+    expect(screen.getByTestId("ceremony-level-number")).toHaveTextContent("1");
+    expect(screen.getByTestId("ceremony-prestige-stars")).toBeInTheDocument();
+    expect(screen.getByTestId("ceremony-heading")).toHaveTextContent("Prestige");
+    expect(screen.getByTestId("ceremony-sub")).toHaveTextContent("1. Stern · Neustart bei Level 1");
+  });
+
+  it("Level-Zeremonien glitzern - nur mit „Bewegung reduzieren“ nicht", () => {
+    const { unmount } = renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Kämpfer" } });
+    expect(screen.getByTestId("ceremony-particles")).toBeInTheDocument();
+    unmount();
+    renderPlan({ tiers: [], levelUp: { level: 12, previous: 11, title: "Kämpfer" } }, { reduced: true });
+    expect(screen.queryByTestId("ceremony-particles")).toBeNull();
   });
 
   it("reduzierte Bewegung: keine Partikel, kein Prisma, kürzeres Schließen; Stumm schaltet den Klang", () => {

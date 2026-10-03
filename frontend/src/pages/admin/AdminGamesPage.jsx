@@ -31,16 +31,48 @@ const GAME_KIND_OPTIONS = [
 const emptyGameForm = {
   name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "",
   kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
-  player_id_fields: [],
+  player_id_fields: [], discord_guild_id: "",
 };
+
+// Discord-Server je Spiel (#626): leer heißt erben - vom Hauptspiel, sonst der Hauptserver.
+export function inheritedServerText(form, games, servers) {
+  const main = servers.find((server) => server.role === "main");
+  const parent = form.kind === "edition" ? games.find((game) => game.id === form.parent_game_id) : null;
+  const parentServer = parent?.discord_guild_id ? servers.find((server) => server.guild_id === parent.discord_guild_id) : null;
+  if (parentServer && parentServer.enabled && !parentServer.left) return `geerbt von ${gameLabel(parent)}: ${parentServer.name}`;
+  return main ? `Hauptserver: ${main.name}` : "Hauptserver";
+}
+
+export function serverOptionLabel(server) {
+  if (server.left) return `${server.name} – Bot nicht mehr dort`;
+  return `${server.name}${server.role === "main" ? " (Hauptserver)" : ""}${server.enabled ? "" : " – ausgeschaltet"}`;
+}
+
+function DiscordServerField({ form, games, servers, onChange, testId }) {
+  if (!servers.length) return null;
+  const current = servers.find((server) => server.guild_id === form.discord_guild_id);
+  const options = servers.filter((server) => !server.left || server.guild_id === form.discord_guild_id);
+  const inherited = inheritedServerText(form, games, servers);
+  return (
+    <div className="space-y-1">
+      <Select value={form.discord_guild_id} onChange={onChange} testId={testId}
+        options={[["", `Discord-Server: erben (${inherited})`], ...options.map((server) => [server.guild_id, `Discord: ${serverOptionLabel(server)}`])]} />
+      {current && (!current.enabled || current.left) ? (
+        <div className="text-[11px] text-[#FFD700]" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function AdminGamesPage() {
   const [list, setList] = useState([]);
   const [form, setForm] = useState(emptyGameForm);
   const [editing, setEditing] = useState(null);
+  const [servers, setServers] = useState([]);
   const confirm = useConfirm();
   const load = useCallback(async () => { const { data } = await api.get("/games"); setList(data); }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.get("/games/discord-servers").then(({ data }) => setServers(Array.isArray(data) ? data : [])).catch(() => setServers([])); }, []);
   useApiInvalidation(load, ["games"]);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const parentOptions = list.filter((g) => g.kind !== "edition").map((g) => [g.id, gameLabel(g)]);
@@ -96,6 +128,7 @@ export default function AdminGamesPage() {
               </label>
             </>
           )}
+          <DiscordServerField form={form} games={list} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-discord" />
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
           <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
@@ -117,6 +150,7 @@ export default function AdminGamesPage() {
                   <td className="px-4 py-3">
                     <div className="font-semibold text-white">{gameLabel(g)}</div>
                     {gameLabel(g) !== g.name && <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">Version: {g.name}</div>}
+                    {g.discord_guild_id && servers.length ? <div className="mt-0.5 text-[10px] uppercase tracking-widest text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                   </td>
                   <td className="px-4 py-3 text-white/60">{GAME_KIND_OPTIONS.find(([v]) => v === (g.kind || "standalone"))?.[1] || "Einzelspiel"}</td>
                   <td className="px-4 py-3 text-white/60">{g.identity_source_game?.display_name || g.identity_source_game?.name || (g.inherit_player_ids !== false && (g.parent_game?.display_name || g.parent_game?.name)) || "Eigene IDs"}</td>
@@ -136,7 +170,7 @@ export default function AdminGamesPage() {
           </table>
         </div>
       </div>
-      {editing && <EditGameModal game={editing} games={list} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && <EditGameModal game={editing} games={list} servers={servers} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
     </AdminLayout>
   );
 }
@@ -175,6 +209,7 @@ function toForm(game) {
     default_team_size: game.default_team_size ?? 1,
     default_format: game.default_format || "single_elim",
     player_id_fields: game.player_id_fields || [],
+    discord_guild_id: game.discord_guild_id || "",
   };
 }
 
@@ -200,10 +235,11 @@ function gamePayload(form) {
     platforms: form.platforms ? form.platforms.split(",").map((s) => s.trim()).filter(Boolean) : [],
     default_team_size: Number(form.default_team_size) || 1,
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
+    discord_guild_id: form.discord_guild_id || null,
   };
 }
 
-function EditGameModal({ game, games, onClose, onSaved }) {
+function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
   const [form, setForm] = useState(game);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -233,6 +269,7 @@ function EditGameModal({ game, games, onClose, onSaved }) {
         <Input placeholder="Kurzname" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-edit-short" />
         <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
         <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
+        <DiscordServerField form={form} games={games} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-edit-discord" />
       </FormGrid>
       {form.kind === "edition" && (
         <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">

@@ -4,7 +4,7 @@ Die Live-Erkennung (``twitch_service``) weiß, welche verknüpften Konten gerade
 öffentliches Turnier (Status ``live``) und einer seiner Teilnehmer streamt, dann
 
 - zeigt die Turnierseite einen Kasten „Live“ mit den Streams (``GET /api/tournaments/{id}/streams``),
-- meldet der Bot es **einmal je Stream-Start** in den Kanal „Events und Turniere“
+- meldet der Bot es **einmal je Stream-Start** im Thread des Turniers (#572) im Kanal „Events und Turniere“
   („🔴 Paula streamt den Sommer-Cup – zuschauen“) - festgehalten je Turnier und Stream-ID.
 
 Nur öffentliche Turniere, nur Teilnehmer mit öffentlichem Profil (und Twitch nicht auf „privat“).
@@ -65,8 +65,8 @@ async def live_streams_for_tournament(db, tournament: dict) -> list[dict]:
 
 async def sync(db) -> dict:
     """Nach jeder Live-Abfrage: je laufendem öffentlichen Turnier und neuem Stream genau eine Meldung."""
-    from discord_service import send_event
     from services.discord_announcements import stream_live_message
+    from services.discord_threads import deliver
 
     announced = 0
     tournaments = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}}, {"_id": 0}).to_list(200)
@@ -77,9 +77,7 @@ async def sync(db) -> dict:
             key = {"tournament_id": tournament["id"], "stream_id": stream.get("stream_id")}
             if not stream.get("stream_id") or await db[ANNOUNCEMENTS].find_one(key, {"_id": 0, "id": 1}):
                 continue
-            message = stream_live_message(tournament, stream)
-            result = await send_event(message["event_key"], message["title"], message["description"], item=tournament, color=message["color"],
-                                      url=message["url"], fields=message["fields"], image_url=message["image_url"])
+            result = await deliver(db, tournament, stream_live_message(tournament, stream))  # mit „Zuschauen“ und „Profil“ (#573)
             await db[ANNOUNCEMENTS].insert_one({"id": new_id(), **key, "user_id": stream.get("user_id"), "announced_at": now_utc().isoformat(),
                                                 "outcome": "sent" if result.get("ok") else (result.get("reason") or "failed")})
             announced += 1

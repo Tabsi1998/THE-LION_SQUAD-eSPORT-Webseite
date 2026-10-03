@@ -76,7 +76,7 @@ export function AccountLevelPill({ level, className = "" }) {
   );
 }
 
-export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100, progress = 0, compact = false }) {
+export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100, progress = 0, compact = false, title = null, unit = "Punkte" }) {
   const tier = accountLevelTier(level);
   const pct = Math.max(0, Math.min(100, Number(progress || 0)));
   const lvlNum = Number(level || 1);
@@ -99,8 +99,8 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
           </motion.div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
-              <span style={{ color: tier.color }}>{tier.title}</span>
-              <span className="tabular-nums">{shownPoints} / {nextLevelPoints} Punkte</span>
+              <span style={{ color: tier.color }} data-testid="account-level-title">{title || tier.title}</span>
+              <span className="tabular-nums">{shownPoints} / {nextLevelPoints} {unit}</span>
             </div>
             <div className="mt-2 h-2.5 rounded-sm bg-white/10 overflow-hidden relative">
               <motion.div

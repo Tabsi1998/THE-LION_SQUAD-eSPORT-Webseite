@@ -125,7 +125,6 @@ const AdminDocumentsPage = lazy(() => import("@/pages/admin/AdminDocumentsPage")
 const SeasonPage = lazy(() => import("@/pages/public/SeasonPage"));
 const PublicProfilePage = lazy(() => import("@/pages/public/PublicProfilePage"));
 const AdminAchievementsPage = lazy(() => import("@/pages/admin/AdminAchievementsPage"));
-const AdminAchievementPreviewPage = lazy(() => import("@/pages/admin/AdminAchievementPreviewPage"));
 const AdminMembershipApplicationsPage = lazy(() => import("@/pages/admin/AdminMembershipApplicationsPage"));
 const AdminEmailTemplatesPage = lazy(() => import("@/pages/admin/AdminEmailTemplatesPage"));
 const AdminMediaPage = lazy(() => import("@/pages/admin/AdminMediaPage"));
@@ -135,6 +134,8 @@ const AdminSponsorsPage = lazy(() => import("@/pages/admin/AdminSponsorsPage"));
 const AdminPartnersPage = lazy(() => import("@/pages/admin/AdminPartnersPage"));
 const AdminStickersPage = lazy(() => import("@/pages/admin/AdminStickersPage"));
 const AdminAdventPage = lazy(() => import("@/pages/admin/AdminAdventPage"));
+const AdminEasterHuntPage = lazy(() => import("@/pages/admin/AdminEasterHuntPage"));
+const EasterHuntPage = lazy(() => import("@/pages/public/EasterHuntPage"));
 
 const AboutPage = lazy(() => import("@/pages/public/AboutPage"));
 const ContactPage = lazy(() => import("@/pages/public/ContactPage"));
@@ -245,6 +246,7 @@ function App() {
           <Route path="/events/:slug/live" element={<EventLivePage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/advent" element={<AdventCalendarPage />} />
+          <Route path="/ostern" element={<EasterHuntPage />} />
           <Route path="/teams" element={<TeamsPage />} />
           <Route path="/teams/:id" element={<TeamsPage />} />
           <Route path="/news" element={<NewsPage />} />
@@ -345,9 +347,10 @@ function App() {
           <Route path="/admin/about" element={<ProtectedRoute requireArea="content"><AdminAboutPage /></ProtectedRoute>} />
           <Route path="/admin/game-servers" element={<ProtectedRoute requireArea="system"><AdminGameServersPage /></ProtectedRoute>} />
           <Route path="/admin/achievements" element={<ProtectedRoute requireArea="content"><AdminAchievementsPage /></ProtectedRoute>} />
-          <Route path="/admin/achievements/preview" element={<ProtectedRoute requireArea="content"><AdminAchievementPreviewPage /></ProtectedRoute>} />
+          <Route path="/admin/achievements/preview" element={<Navigate to="/admin/achievements?tab=preview" replace />} />
           <Route path="/admin/stickers" element={<ProtectedRoute requireArea="content"><AdminStickersPage /></ProtectedRoute>} />
           <Route path="/admin/advent" element={<ProtectedRoute requireArea={["content", "club"]}><AdminAdventPage /></ProtectedRoute>} />
+          <Route path="/admin/ostern" element={<ProtectedRoute requireArea={["content", "club"]}><AdminEasterHuntPage /></ProtectedRoute>} />
           <Route path="/admin/membership-applications" element={<ProtectedRoute requireArea="club"><AdminMembershipApplicationsPage /></ProtectedRoute>} />
           <Route path="/admin/email-templates" element={<ProtectedRoute requireArea="system"><AdminEmailTemplatesPage /></ProtectedRoute>} />
           {/* Das Web-CMS ist weg (#437 A): alte Lesezeichen landen bei den E-Mail-Vorlagen, seiner einen verbliebenen Aufgabe. */}

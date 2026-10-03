@@ -155,6 +155,22 @@ def test_ostern_fasching_und_vereinsgeburtstag():
     monday = keys(seasons.active(at(2027, 3, 29, 23), {}))
     assert monday["easter"]["data"]["quiet"] is False and "easter_hunt" in monday
     assert "easter" not in keys(seasons.active(at(2027, 3, 30, 0, 0, 1), {}))
+
+
+def test_ostern_2028_bis_2030_palmsonntag_bis_ostermontag_karfreitag_still():
+    # (Palmsonntag, Karfreitag, Ostersonntag, Ostermontag) - Ostern wandert, das Fenster wandert mit.
+    for palm_day, friday_day, sunday_day, monday_day in [
+        ((2028, 4, 9), (2028, 4, 14), (2028, 4, 16), (2028, 4, 17)),
+        ((2029, 3, 25), (2029, 3, 30), (2029, 4, 1), (2029, 4, 2)),
+        ((2030, 4, 14), (2030, 4, 19), (2030, 4, 21), (2030, 4, 22)),
+    ]:
+        assert "easter" not in keys(seasons.active(at(*palm_day, 0, 0) - timedelta(seconds=1), {}))
+        palm = keys(seasons.active(at(*palm_day, 0, 0, 1), {}))["easter"]
+        assert palm["data"] == {"quiet": False, "sunday": date(*sunday_day).isoformat()}
+        assert keys(seasons.active(at(*friday_day, 12), {}))["easter"]["data"]["quiet"] is True
+        assert keys(seasons.active(at(*sunday_day, 12), {}))["easter"]["data"]["quiet"] is False
+        assert "easter" in keys(seasons.active(at(*monday_day, 23, 59), {}))
+        assert "easter" not in keys(seasons.active(at(*monday_day, 23, 59) + timedelta(minutes=1, seconds=1), {}))
     # Vereinsgeburtstag nur mit Gründungsdatum; der Text nennt die Jahre.
     assert "club_birthday" not in keys(seasons.active(at(2027, 5, 12, 10), {}, None))
     birthday = keys(seasons.active(at(2027, 5, 12, 10), {}, "2019-05-12"))["club_birthday"]

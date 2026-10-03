@@ -362,6 +362,13 @@ async def _eggs(ctx):
     return _signal_count(await ctx.signals(), "easter_egg")
 
 
+@counter("easter_hunts_completed", "signal")
+async def _egg_king(ctx):
+    """Wie oft jemand bei der Ostereiersuche (#646) alle Eier gefunden hat - aus den Körben, nicht aus dem Signal."""
+    from services.easter_hunt import hunts_completed
+    return await hunts_completed(ctx.db, ctx.user_id)
+
+
 @counter("halloween_bats_scared", "signal")
 async def _bats(ctx):
     return _signal_count(await ctx.signals(), "halloween_bats_scared")
@@ -379,6 +386,15 @@ async def _collectibles(ctx):
 @counter("discord_linked", "profile")
 async def _discord_linked(ctx):
     return 1 if "discord" in await ctx.links() else 0
+
+
+@counter("discord_guilds_joined", "discord")
+async def _discord_guilds_joined(ctx):
+    """Auf wie vielen eingeschalteten Servern des Vereins die Person ist (#626) - wie der Bot es zuletzt gesehen hat."""
+    enabled = [row["guild_id"] async for row in ctx.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
+    if not enabled:
+        return 0
+    return await ctx.db.discord_memberships.count_documents({"user_id": ctx.user_id, "member": True, "guild_id": {"$in": enabled}})
 
 
 @counter("twitch_linked", "profile")
@@ -1203,24 +1219,23 @@ async def _season_climbs(ctx):
     return climbs(await ctx.rank_snapshots(), 10)
 
 
+def fully_played(season: dict, points: list[dict]) -> bool:
+    """Bei jedem Turnier und jeder Challenge einer Saison Punkte geholt (``points``: Saisonpunkte der Person)."""
+    tournaments = [tid for tid in season.get("tournament_ids") or [] if tid]
+    challenges = [cid for cid in season.get("f1_challenge_ids") or [] if cid]
+    if not tournaments and not challenges:
+        return False
+    sources = {str(row.get("source_id") or "") for row in points if row.get("season_id") == season["id"]}
+    played_tournaments = all(tid in sources for tid in tournaments)
+    played_challenges = all(any(source == cid or source.startswith(f"{cid}:") for source in sources) for cid in challenges)
+    return played_tournaments and played_challenges
+
+
 @counter("seasons_fully_played", "season")
 async def _seasons_fully_played(ctx):
     """Abgeschlossene Saisons, in denen die Person bei jedem Turnier und jeder Challenge Punkte geholt hat."""
     points = await ctx.season_points()
-    count = 0
-    for season in await ctx.seasons():
-        if not _finished(season):
-            continue
-        tournaments = [tid for tid in season.get("tournament_ids") or [] if tid]
-        challenges = [cid for cid in season.get("f1_challenge_ids") or [] if cid]
-        if not tournaments and not challenges:
-            continue
-        sources = {str(row.get("source_id") or "") for row in points if row.get("season_id") == season["id"]}
-        played_tournaments = all(tid in sources for tid in tournaments)
-        played_challenges = all(any(source == cid or source.startswith(f"{cid}:") for source in sources) for cid in challenges)
-        if played_tournaments and played_challenges:
-            count += 1
-    return count
+    return sum(1 for season in await ctx.seasons() if _finished(season) and fully_played(season, points))
 
 
 @counter("season_openers_played", "season")
@@ -1351,10 +1366,12 @@ async def _founding_member(ctx):
     membership = await ctx.db.memberships.find_one({"user_id": ctx.user_id}, {"_id": 0, "member_since": 1, "member_status": 1})
     if not membership or membership.get("member_status") not in ("active", "honorary"):
         return 0
-    about = await ctx.db.settings.find_one({"id": "about_page"}, {"_id": 0, "founded_on": 1}) or {}
-    founded = _parse(about.get("founded_on"))
+    from services import founding
+
+    # Das Jahr reicht (Handfeld, Gründungsdatum oder Dolibarr) - früher zählte nur ein volles Datum.
+    year = (await founding.founding(ctx.db))["founded_year"]
     since = _parse(membership.get("member_since"))
-    return 1 if founded and since and since.year == founded.year else 0
+    return 1 if year and since and since.year == year else 0
 
 
 @counter("pioneer_account", "profile")

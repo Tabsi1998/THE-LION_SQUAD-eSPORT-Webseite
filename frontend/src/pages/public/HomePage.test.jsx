@@ -78,7 +78,8 @@ test("Countdown, Live-Zahlen - und „Neu“ erst nach einer echten Änderung", 
 test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Daten", async () => {
   apiMock.get.mockImplementation(async (url) => {
     if (url.startsWith("/board")) return { data: [{ id: "p1", is_active: true, display_title: "Obfrau", user: { display_name: "Obfrau Otti", slug: "otti" } }] };
-    return { data: { ...stateWith(3), news: NEWS, club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5, prizes: 0 }, club_numbers_shown: ["members", "tournaments", "participations", "events", "prizes"] } };
+    return { data: { ...stateWith(3), news: NEWS, club_numbers: { members: 42, tournaments: 17, events: 0, participations: 5, prizes: 0 }, club_numbers_shown: ["members", "tournaments", "participations", "events", "prizes"],
+      discord: { available: true, online: 42, in_voice: 5, invite: "https://discord.gg/lions" } } };
   });
   render(<MemoryRouter><HomePage /></MemoryRouter>);
   await screen.findByTestId("home-next-tournament-cup");
@@ -93,6 +94,9 @@ test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Da
   expect(screen.getByTestId("home-number-participations")).toHaveTextContent("5");
   expect(screen.getByTestId("home-number-participations")).toHaveTextContent("Turnierteilnahmen");
   expect(screen.queryByTestId("home-number-events")).toBeNull();
+  // Discord (#581): unter den Zahlen, nur Zahlen und der Einladungs-Link.
+  expect(screen.getByTestId("home-discord-summary")).toHaveTextContent("42 online · 5 im Voice");
+  expect(screen.getByTestId("home-numbers").compareDocumentPosition(screen.getByTestId("home-discord")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(await screen.findByTestId("home-board-p1")).toHaveTextContent("Obfrau Otti");
   expect(screen.getByTestId("home-board-p1")).toHaveAttribute("href", "/members/otti");
   expect(screen.getByTestId("home-calendar-link")).toHaveAttribute("href", "/calendar");
@@ -111,6 +115,7 @@ test("ohne Zahlen und ohne Vorstand: keine leere Leiste und kein leerer Block", 
   expect(screen.queryByTestId("home-numbers")).toBeNull();
   expect(screen.queryByTestId("home-board")).toBeNull();
   expect(screen.queryByTestId("home-app-strip")).toBeNull();
+  expect(screen.queryByTestId("home-discord")).toBeNull();
 });
 
 test("Mitglieder sehen im Hero keine Zeile - der Mitgliederbereich steht im Benutzermenü", async () => {

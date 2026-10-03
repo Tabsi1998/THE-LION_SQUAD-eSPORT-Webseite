@@ -49,7 +49,8 @@ async def list_events(db, *, limit: int = 100, kind: str | None = None, user_id:
     if kind:
         query["kind"] = kind
     if user_id:
-        query["user_id"] = user_id
+        # Massenvergaben tragen ihre Empfänger in data.user_ids - so findet die Suche nach einer Person auch sie.
+        query["$or"] = [{"user_id": user_id}, {"data.user_ids": user_id}]
     capped = max(1, min(int(limit or 100), 500))
     return await db[EVENTS].find(query, {"_id": 0}).sort("at", -1).to_list(capped)
 
@@ -174,9 +175,9 @@ async def import_catalog(db, payload: dict, actor: dict | None, *, dry_run: bool
 
 # ------------------------------------------------------------------ Vergeben
 
-async def award_with_options(db, actor: dict, user_id: str, tier_code: str, *, note: str | None = None, earned_at: str | None = None, silent: bool = False) -> dict:
-    """Einzelvergabe mit Datum (rückwirkend) und „ohne Zeremonie“ - Web und App überspringen dann das Fest,
-    die Benachrichtigung bleibt dem Postfach (E12) überlassen."""
+async def award_with_options(db, actor: dict, user_id: str, tier_code: str, *, note: str | None = None, earned_at: str | None = None, silent: bool = False, notify: bool = True) -> dict:
+    """Einzelvergabe mit Datum (rückwirkend) und „ohne Zeremonie“ - Web und App überspringen dann das Fest.
+    Die Benachrichtigung (Postfach, Push, Discord) kommt wahlweise: ``notify`` aus lässt sie weg."""
     from badges import award_achievement, can_award_tier_to_user
     tier = await db.achievements.find_one({"code": tier_code}, {"_id": 0})
     if not tier:
@@ -190,7 +191,7 @@ async def award_with_options(db, actor: dict, user_id: str, tier_code: str, *, n
         raise ValueError("Das Datum ist nicht lesbar.")
     if when and when > now_utc() + timedelta(minutes=5):
         raise ValueError("Das Datum liegt in der Zukunft.")
-    awarded = await award_achievement(user_id, tier_code, context={"manual": True, "by": actor["id"], "note": note, "silent": silent}, awarded_by=actor["id"])
+    awarded = await award_achievement(user_id, tier_code, context={"manual": True, "by": actor["id"], "note": note, "silent": silent, "notify": notify}, awarded_by=actor["id"])
     if not awarded:
         return {"ok": True, "already_awarded": True}
     updates: dict = {}
@@ -200,8 +201,8 @@ async def award_with_options(db, actor: dict, user_id: str, tier_code: str, *, n
         updates["silent"] = True
     if updates:
         await db.user_achievements.update_one({"user_id": user_id, "tier_code": tier_code}, {"$set": updates})
-    await log_event(db, "award", actor, user_id=user_id, tier_code=tier_code, note=note, data={"earned_at": updates.get("earned_at"), "silent": silent})
-    return {"ok": True, "newly_awarded": True, "earned_at": updates.get("earned_at"), "silent": silent}
+    await log_event(db, "award", actor, user_id=user_id, tier_code=tier_code, note=note, data={"earned_at": updates.get("earned_at"), "silent": silent, "notify": notify})
+    return {"ok": True, "newly_awarded": True, "earned_at": updates.get("earned_at"), "silent": silent, "notify": notify}
 
 
 async def revoke_with_reason(db, actor: dict, user_id: str, tier_code: str, *, note: str | None) -> dict:
@@ -253,39 +254,119 @@ async def resolve_recipients(db, selection: dict) -> list[str]:
     return ids
 
 
-async def bulk_award(db, actor: dict, tier_code: str, selection: dict, *, note: str | None = None, earned_at: str | None = None, silent: bool = False, dry_run: bool = False) -> dict:
-    """Massenvergabe: Empfänger auflösen, jede Vergabe wie eine Einzelvergabe (Prüfungen, Protokoll),
-    höchstens 500 auf einmal. ``dry_run`` zählt nur."""
-    recipients = await resolve_recipients(db, selection)
-    if len(recipients) > BULK_LIMIT:
-        raise ValueError(f"Höchstens {BULK_LIMIT} Personen auf einmal - es wären {len(recipients)}.")
+async def resolve_names(db, names: list[str]) -> tuple[list[str], list[str]]:
+    """Namen aus einer CSV-Liste (Benutzername, E-Mail oder Konto-ID, Groß-/Kleinschreibung egal) → Konten.
+    Liefert (gefundene IDs in Reihenfolge, nicht gefundene Namen)."""
+    import re
+
+    wanted = [name for name in (str(raw or "").strip().lstrip("@") for raw in names or []) if name]
+    if not wanted:
+        return [], []
+    lowered = sorted({name.lower() for name in wanted})
+    projection = {"_id": 0, "id": 1, "username": 1, "email": 1}
+    index: dict[str, str] = {}
+
+    def remember(row: dict) -> None:
+        index.setdefault(row["id"], row["id"])
+        for field in ("username", "email"):
+            if row.get(field):
+                index.setdefault(str(row[field]).lower(), row["id"])
+
+    # Ein Zug über die Indizes: Konto-ID, Benutzername wie getippt oder klein, E-Mail (immer klein gespeichert).
+    query = {"$or": [{"id": {"$in": sorted(set(wanted))}}, {"username": {"$in": sorted(set(wanted) | set(lowered))}}, {"email": {"$in": lowered}}]}
+    async for row in db.users.find(query, projection):
+        remember(row)
+    # Übrig (z. B. „Paula“ für das Konto „pAuLa“): eine einzige Suche ohne Groß/Klein-Unterschied.
+    rest = sorted({name for name in wanted if name not in index and name.lower() not in index})
+    if rest:
+        pattern = "^(?:" + "|".join(re.escape(name) for name in rest) + ")$"
+        async for row in db.users.find({"$or": [{"username": {"$regex": pattern, "$options": "i"}}, {"email": {"$regex": pattern, "$options": "i"}}]}, projection):
+            remember(row)
+    found: list[str] = []
+    unknown: list[str] = []
+    for name in wanted:
+        user_id = index.get(name) or index.get(name.lower())
+        if user_id:
+            found.append(user_id)
+        else:
+            unknown.append(name)
+    return found, unknown
+
+
+async def bulk_award(db, actor: dict, tier_code: str, selection: dict, *, note: str | None = None, earned_at: str | None = None, silent: bool = False, notify: bool = True, dry_run: bool = False) -> dict:
+    """Massenvergabe: Empfänger auflösen (Liste, Namen aus einer CSV, Turnier, Event, Team, Mitglieder, Rolle),
+    prüfen und in einem Zug schreiben - höchstens 500 auf einmal. XP, Schlange und Meldung folgen wie bei der
+    Einzelvergabe (``badges.after_award``); die Auswertung danach (Sammler und Co.) läuft über die Warteschlange.
+    ``dry_run`` schreibt nichts und zeigt je Person, ob sie es bekäme, schon hat oder nicht darf."""
+    from badges import after_award, award_doc
+    from pymongo.errors import BulkWriteError
+
+    named, unknown = await resolve_names(db, selection.get("names") or [])
+    candidates = await resolve_recipients(db, {**selection, "user_ids": [*(selection.get("user_ids") or []), *named]})
+    if len(candidates) > 2 * BULK_LIMIT:
+        raise ValueError(f"Höchstens {BULK_LIMIT} Personen auf einmal - es wären {len(candidates)}.")
     tier = await db.achievements.find_one({"code": tier_code}, {"_id": 0})
     if not tier:
         raise LookupError("Stufe nicht gefunden.")
-    result = {"recipients": len(recipients), "awarded": 0, "already": 0, "skipped": 0, "dry_run": dry_run, "user_ids": recipients}
-    if dry_run:
-        return result
-    from badges import award_achievement, can_award_tier_to_user
+    group = await db.achievement_groups.find_one({"code": tier.get("group_code")}, {"_id": 0})
+    if not group:
+        raise LookupError("Gruppe nicht gefunden.")
     when = _parse(earned_at) if earned_at else None
     if earned_at and not when:
         raise ValueError("Das Datum ist nicht lesbar.")
+    if when and when > now_utc() + timedelta(minutes=5):
+        raise ValueError("Das Datum liegt in der Zukunft.")
+    users = {u["id"]: u for u in await db.users.find({"id": {"$in": candidates}}, {"_id": 0, "id": 1, "username": 1, "display_name": 1}).to_list(len(candidates) or 1)}
+    unknown += [uid for uid in candidates if uid not in users]
+    recipients = [uid for uid in candidates if uid in users]
+    if len(recipients) > BULK_LIMIT:
+        raise ValueError(f"Höchstens {BULK_LIMIT} Personen auf einmal - es wären {len(recipients)}.")
+    holders = set(await db.user_achievements.distinct("user_id", {"tier_code": tier_code, "user_id": {"$in": recipients}}))
+    members: set[str] | None = None
+    if tier.get("member_only"):
+        from services.membership_service import is_active_member
+        members = {m["user_id"] async for m in db.memberships.find({"user_id": {"$in": recipients}}, {"_id": 0, "user_id": 1, "member_status": 1}) if is_active_member(m)}
+    states: dict[str, str] = {}
     for user_id in recipients:
-        if not await can_award_tier_to_user(user_id, tier):
-            result["skipped"] += 1
-            continue
-        awarded = await award_achievement(user_id, tier_code, context={"manual": True, "bulk": True, "by": actor["id"], "note": note, "silent": silent}, awarded_by=actor["id"])
-        if not awarded:
-            result["already"] += 1
-            continue
-        updates: dict = {}
-        if when:
-            updates["earned_at"] = when.astimezone(timezone.utc).isoformat()
+        if members is not None and user_id not in members:
+            states[user_id] = "skipped"
+        elif user_id in holders:
+            states[user_id] = "already"
+        else:
+            states[user_id] = "new"
+    fresh = [uid for uid in recipients if states[uid] == "new"]
+    result = {
+        "recipients": len(recipients), "awarded": 0, "would_award": len(fresh),
+        "already": sum(1 for s in states.values() if s == "already"), "skipped": sum(1 for s in states.values() if s == "skipped"),
+        "unknown": unknown, "dry_run": dry_run, "user_ids": recipients,
+    }
+    if dry_run:
+        result["people"] = [{"id": uid, "username": users[uid].get("username"), "display_name": users[uid].get("display_name"), "state": states[uid]} for uid in recipients]
+        return result
+    stamp = when.astimezone(timezone.utc).isoformat() if when else None
+    context = {"manual": True, "bulk": True, "by": actor["id"], "note": note, "silent": silent, "notify": notify}
+    docs = []
+    for user_id in fresh:
+        doc = award_doc(user_id, tier, group, context=dict(context), awarded_by=actor["id"], earned_at=stamp)
         if silent:
-            updates["silent"] = True
-        if updates:
-            await db.user_achievements.update_one({"user_id": user_id, "tier_code": tier_code}, {"$set": updates})
-        result["awarded"] += 1
-    await log_event(db, "bulk_award", actor, tier_code=tier_code, note=note, data={"selection": {k: v for k, v in selection.items() if k != "user_ids"}, **{k: result[k] for k in ("recipients", "awarded", "already", "skipped")}, "silent": silent, "earned_at": earned_at})
+            doc["silent"] = True
+        docs.append(doc)
+    awarded = list(fresh)
+    if docs:
+        try:
+            await db.user_achievements.insert_many(docs, ordered=False)
+        except BulkWriteError as exc:
+            # Dazwischen vergeben (die Auswertung lief parallel): diese zählen als „schon da“.
+            clashed = {docs[err["index"]]["user_id"] for err in (exc.details or {}).get("writeErrors", [])}
+            awarded = [uid for uid in fresh if uid not in clashed]
+    await after_award(awarded, tier, group, notify=notify)
+    result["awarded"] = len(awarded)
+    result["already"] += len(fresh) - len(awarded)
+    await log_event(db, "bulk_award", actor, tier_code=tier_code, note=note, data={
+        "selection": {k: v for k, v in selection.items() if k not in ("user_ids", "names")},
+        **{k: result[k] for k in ("recipients", "awarded", "already", "skipped")},
+        "unknown": len(unknown), "silent": silent, "notify": notify, "earned_at": stamp, "user_ids": awarded,
+    })
     return result
 
 
@@ -304,7 +385,61 @@ async def season_preview(db, season_id: str) -> dict:
     standings = [{"rank": r.get("rank"), "user_id": r.get("user_id"), "points": r.get("points"), "username": users.get(r.get("user_id"), {}).get("username"), "display_name": users.get(r.get("user_id"), {}).get("display_name")} for r in ranks]
     groups = await db.achievement_groups.find({"category": "season", "is_negative": {"$ne": True}}, {"_id": 0, "code": 1, "name": 1, "condition_key": 1}).sort("sort_order", 1).to_list(100)
     existing = await db.season_standings.count_documents({"season_id": season_id}) if "season_standings" in await db.list_collection_names() else 0
-    return {"season": season, "standings": standings, "ranked": len(standings), "season_groups": groups, "already_written": existing > 0}
+    await _season_close_awards(db, season_id, standings)
+    mvp = await db.achievements.find_one({"code": MVP_TIER}, {"_id": 0, "code": 1, "name": 1, "material": 1})
+    if mvp:
+        mvp["holders"] = await db.user_achievements.distinct("user_id", {"tier_code": MVP_TIER})
+    return {
+        "season": season, "standings": standings, "ranked": len(standings), "season_groups": groups, "already_written": existing > 0,
+        "finished": season.get("status") in ("completed", "archived"),
+        "awards_total": sum(len(row["awards"]) for row in standings), "mvp": mvp,
+    }
+
+
+MVP_TIER = "season_mvp_1"
+# Was der Abschluss an den Zählern ändert: Platz 1 (Saisonmeister), Top 10 (Saisonspitze), jede Runde gespielt (Volle Saison).
+SEASON_CLOSE_KEYS = ("season_wins", "season_top10_finishes", "seasons_fully_played")
+
+
+def _top10(rank) -> bool:
+    return isinstance(rank, int) and rank <= 10
+
+
+async def _season_close_awards(db, season_id: str, standings: list[dict]) -> None:
+    """Je Platz die Stufen, die der Abschluss neu freischalten würde - gerechnet wie die Zähler, mit dieser Saison
+    als festgeschrieben und abgeschlossen. Schreibt ``awards`` in jede Zeile, ohne etwas zu speichern."""
+    from badges import can_award_tier_to_user
+    from services import achievement_counters as counters
+
+    tiers = await db.achievements.find({"condition_key": {"$in": list(SEASON_CLOSE_KEYS)}, "manual_only": {"$ne": True}}, {"_id": 0}).to_list(200)
+    for row in standings:
+        row["awards"] = []
+    if not tiers:
+        return
+    group_names = {g["code"]: g.get("name") for g in await db.achievement_groups.find({"code": {"$in": list({t.get("group_code") for t in tiers})}}, {"_id": 0, "code": 1, "name": 1}).to_list(50)}
+    tiers.sort(key=lambda t: (str(t.get("group_code")), int(t.get("rank") or 0)))
+    codes = [t["code"] for t in tiers]
+    season = await db.seasons.find_one({"id": season_id}, {"_id": 0}) or {"id": season_id}
+    finished = counters._finished(season)
+    before = {row["user_id"]: row.get("rank") async for row in db.season_standings.find({"season_id": season_id}, {"_id": 0, "user_id": 1, "rank": 1})}
+    for row in standings:
+        user_id = row.get("user_id")
+        if not user_id:
+            continue
+        values = await counters.compute(user_id, set(SEASON_CLOSE_KEYS), legacy=False)
+        rank, old = row.get("rank"), before.get(user_id)
+        values["season_wins"] = values.get("season_wins", 0) + int(rank == 1) - int(old == 1)
+        values["season_top10_finishes"] = values.get("season_top10_finishes", 0) + int(_top10(rank)) - int(_top10(old))
+        if not finished:
+            points = await db.season_points.find({"user_id": user_id, "season_id": season_id}, {"_id": 0, "season_id": 1, "source_id": 1}).to_list(5000)
+            values["seasons_fully_played"] = values.get("seasons_fully_played", 0) + int(counters.fully_played(season, points))
+        held = set(await db.user_achievements.distinct("tier_code", {"user_id": user_id, "tier_code": {"$in": codes}}))
+        for tier in tiers:
+            if tier["code"] in held or values.get(tier["condition_key"], 0) < int(tier.get("progress_target") or 0):
+                continue
+            if tier.get("member_only") and not await can_award_tier_to_user(user_id, tier):
+                continue
+            row["awards"].append({"code": tier["code"], "name": tier.get("name"), "group_name": group_names.get(tier.get("group_code")), "material": tier.get("material")})
 
 
 # ------------------------------------------------------------------ XP

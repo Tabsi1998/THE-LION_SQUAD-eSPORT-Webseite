@@ -18,8 +18,24 @@ export type AchievementTier = {
   target?: number;
   percent?: number;
   manual_only?: boolean;
+  /** Nur für Vereinsmitglieder sichtbar - lässt sich deshalb nicht öffentlich teilen. */
+  member_only?: boolean;
   condition_status?: string;
   earned_at?: string;
+  /** Vom Admin „ohne Zeremonie“ vergeben – zählt, wird aber nicht gefeiert. */
+  silent?: boolean;
+  /** Erfolge II (#611): Material (Holz bis Diamant, Legendär, Geheim), Rang 1–9, Motiv. */
+  material?: string | null;
+  material_name?: string | null;
+  rank?: number | null;
+  art?: string | null;
+  icon?: string | null;
+  how_to?: string | null;
+  /** Aus der Gruppe (für das Abzeichen außerhalb der Liste, z. B. im Freischalt-Fenster). */
+  group_art?: string | null;
+  group_icon?: string | null;
+  group_name?: string;
+  category?: string;
 };
 
 export type AchievementGroup = {
@@ -30,7 +46,11 @@ export type AchievementGroup = {
   description?: string;
   accent_color?: string;
   is_negative?: boolean;
+  art?: string | null;
+  hidden?: boolean;
   tiers?: AchievementTier[];
+  /** Nach einem Filter: alle Stufen der Gruppe – der Fortschritt rechnet immer mit allen. */
+  all_tiers?: AchievementTier[];
   earned_count?: number;
   tier_count?: number;
 };
@@ -124,10 +144,41 @@ export function knownIconNames(): string[] {
   return Object.keys(ICONS);
 }
 
+export type TierStatus = "earned" | "progress" | "locked" | "secret";
+export type StatusFilter = "all" | TierStatus;
+
+/** Dieselben Filter wie im Web-Profil. */
+export const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "all", label: "Alle" },
+  { key: "earned", label: "Erreicht" },
+  { key: "progress", label: "In Arbeit" },
+  { key: "locked", label: "Gesperrt" },
+  { key: "secret", label: "Geheim" },
+];
+
+/** Status einer Stufe: erreicht, in Arbeit (messbar und angefangen), gesperrt – geheime Gruppen zählen als „geheim“. */
+export function tierStatus(tier: AchievementTier, group?: AchievementGroup | null): TierStatus {
+  if (group?.hidden) return "secret";
+  if (tier.earned) return "earned";
+  const measurable = !tier.manual_only && tier.condition_status !== "planned" && Number(tier.target || 0) > 0;
+  if (measurable && Number(tier.current || 0) > 0) return "progress";
+  return "locked";
+}
+
+/** Nur die Stufen mit diesem Status; Gruppen ohne passende Stufe fallen weg. „Alle“ lässt alles, wie es ist. */
+export function applyStatusFilter(groups: AchievementGroup[], status: StatusFilter): AchievementGroup[] {
+  if (status === "all") return groups;
+  return groups
+    .map((group) => ({ ...group, all_tiers: group.tiers || [], tiers: (group.tiers || []).filter((tier) => tierStatus(tier, group) === status) }))
+    .filter((group) => (group.tiers || []).length > 0);
+}
+
 export type GroupProgress = {
   earned: number;
   total: number;
   highestLevel: number;
+  /** Die höchste erreichte Stufe (nach Rang) – ihr Abzeichen steht für die Gruppe. */
+  top: AchievementTier | null;
   /** Nächste Stufe, die sich zählen lässt – oder null. */
   next: AchievementTier | null;
   percent: number;
@@ -135,29 +186,33 @@ export type GroupProgress = {
   done: boolean;
 };
 
-/** Was in der zugeklappten Zeile steht: „3 von 10“ zur nächsten Stufe, sonst der Stand der Stufen. */
-export function groupProgress(group: AchievementGroup): GroupProgress {
-  const tiers = group.tiers || [];
+/**
+ * Was in der zugeklappten Zeile steht: „3 von 10“ zur nächsten Stufe, sonst der Stand der Stufen. `countOnly` (fremdes
+ * Profil): nur „4 von 7 Stufen“ - wie weit jemand zur nächsten Stufe ist, steht dort nicht.
+ */
+export function groupProgress(group: AchievementGroup, { countOnly = false }: { countOnly?: boolean } = {}): GroupProgress {
+  const tiers = group.all_tiers || group.tiers || [];
   const earned = tiers.filter((tier) => tier.earned);
   const highestLevel = earned.reduce((max, tier) => Math.max(max, Number(tier.level || 0)), 0);
+  const top = earned.reduce<AchievementTier | null>((best, tier) => (!best || Number(tier.rank || tier.level || 0) >= Number(best.rank || best.level || 0) ? tier : best), null);
   const next = tiers.find((tier) => !tier.earned && Number(tier.target || 0) > 0 && tier.condition_status !== "planned") || null;
   const done = tiers.length > 0 && earned.length === tiers.length;
-  if (done) return { earned: earned.length, total: tiers.length, highestLevel, next: null, percent: 100, label: "Alle Stufen erreicht", done };
-  if (next) {
+  if (done) return { earned: earned.length, total: tiers.length, highestLevel, top, next: null, percent: 100, label: "Alle Stufen erreicht", done };
+  if (next && !countOnly) {
     const target = Number(next.target || 0);
     const current = Math.max(0, Math.min(Number(next.current || 0), target));
     const percent = Math.max(0, Math.min(100, Number(next.percent ?? (target ? (current / target) * 100 : 0))));
-    return { earned: earned.length, total: tiers.length, highestLevel, next, percent, label: `${formatCount(current)} von ${formatCount(target)}`, done };
+    return { earned: earned.length, total: tiers.length, highestLevel, top, next, percent, label: `${formatCount(current)} von ${formatCount(target)}`, done };
   }
   const percent = tiers.length ? (earned.length / tiers.length) * 100 : 0;
-  return { earned: earned.length, total: tiers.length, highestLevel, next: null, percent, label: `${earned.length} von ${tiers.length} Stufen`, done };
+  return { earned: earned.length, total: tiers.length, highestLevel, top, next: null, percent, label: `${earned.length} von ${tiers.length} Stufen`, done };
 }
 
 function formatCount(value: number): string {
   return Number.isInteger(value) ? value.toLocaleString("de-DE") : value.toLocaleString("de-DE", { maximumFractionDigits: 1 });
 }
 
-/** Freigeschaltete Stufen seit `since`, die neuesten zuerst – negative Gruppen nie. */
+/** Freigeschaltete Stufen seit `since`, die neuesten zuerst – negative Gruppen und stille Vergaben („ohne Zeremonie“) nie. */
 export function freshTiers(groups: AchievementGroup[] | undefined, since: string | null, limit = 8): AchievementTier[] {
   if (!since) return [];
   const threshold = +new Date(since);
@@ -166,7 +221,9 @@ export function freshTiers(groups: AchievementGroup[] | undefined, since: string
   for (const group of groups || []) {
     if (group.is_negative) continue;
     for (const tier of group.tiers || []) {
-      if (tier.earned && tier.earned_at && +new Date(tier.earned_at) > threshold) earned.push(tier);
+      if (tier.earned && tier.earned_at && !tier.silent && +new Date(tier.earned_at) > threshold) {
+        earned.push({ ...tier, group_art: group.art, group_icon: group.icon, group_name: group.name, category: group.category });
+      }
     }
   }
   return earned.sort((a, b) => +new Date(b.earned_at || 0) - +new Date(a.earned_at || 0)).slice(0, limit);
@@ -186,5 +243,19 @@ export function onAchievementUnlocked(listener: Listener): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
+  };
+}
+
+const levelListeners = new Set<Listener>();
+
+/** Das Level hat sich gerade geändert (Prestige im Profil) - die Level-Erkennung soll gleich nachsehen. */
+export function announceLevelChanged(): void {
+  levelListeners.forEach((listener) => listener());
+}
+
+export function onLevelChanged(listener: Listener): () => void {
+  levelListeners.add(listener);
+  return () => {
+    levelListeners.delete(listener);
   };
 }

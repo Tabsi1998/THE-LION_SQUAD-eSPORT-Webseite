@@ -5,8 +5,12 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { MEMBER_AREA_LINKS as LINKS, boardContacts, eventDateLine, memberEvents, memberNews } from "@/lib/memberArea";
-import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2 } from "lucide-react";
+import { Crown, Gift, FileText, Bell, Calendar, Hash, Eye, MapPin, Users, MessageCircle, Vote, HandHelping, Gamepad2, Cake } from "lucide-react";
 import { SteamPresence } from "@/components/tls/SteamPresence";
+import { useSeason } from "@/seasons/SeasonContext";
+import { StickerClaim } from "@/seasons/birthday/StickerClaim";
+import { DiscordServerList } from "@/components/tls/DiscordServerTile";
+import { DiscordVoice } from "@/components/tls/DiscordNow";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -31,6 +35,10 @@ export default function MemberAreaPage() {
   const [helping, setHelping] = useState({ my_count: 0, open_places: 0 });
   // „Gerade in Steam“ (#584): nur Mitglieder mit verknüpftem Konto und Opt-in, nur der aktuelle Stand.
   const [steam, setSteam] = useState(null);
+  // „Discord jetzt“ (#581): online und je belegtem Sprachkanal die Zahl - nie Namen.
+  const [discordVoice, setDiscordVoice] = useState(null);
+  // Discord-Server des Vereins (#626): alle eingeschalteten, mit „Du bist dabei“ für mich.
+  const [discordServers, setDiscordServers] = useState(null);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -45,7 +53,9 @@ export default function MemberAreaPage() {
       api.get("/membership/me/meetings"),
       api.get("/membership/me/helper-shifts"),
       api.get("/membership/steam-presence"),
-    ]).then(([b, m, d, n, e, p, s, mt, hs, sp]) => {
+      api.get("/membership/discord-servers"),
+      api.get("/membership/discord-voice"),
+    ]).then(([b, m, d, n, e, p, s, mt, hs, sp, ds, dv]) => {
       if (b.status === "fulfilled") setBenefits(Array.isArray(b.value.data) ? b.value.data : []);
       if (m.status === "fulfilled") setMy(m.value.data);
       if (d.status === "fulfilled") setDocs(Array.isArray(d.value.data) ? d.value.data : []);
@@ -56,6 +66,8 @@ export default function MemberAreaPage() {
       if (mt.status === "fulfilled" && mt.value.data?.available) setMeetings({ meetings: mt.value.data.meetings || [], ballots: mt.value.data.ballots || [] });
       if (hs.status === "fulfilled" && hs.value.data?.available) setHelping({ my_count: hs.value.data.my_count || 0, open_places: hs.value.data.open_places || 0 });
       if (sp.status === "fulfilled" && sp.value.data?.available) setSteam(sp.value.data);
+      if (ds.status === "fulfilled") setDiscordServers(ds.value.data);
+      if (dv.status === "fulfilled" && dv.value.data?.available) setDiscordVoice(dv.value.data);
       setLoaded(true);
     });
   }, []);
@@ -107,6 +119,8 @@ export default function MemberAreaPage() {
             </a>
           ) : null}
         </nav>
+
+        <BirthdayNote />
 
         {nothingYet ? (
           <div data-testid="member-area-empty" className="mt-10 border border-white/10 rounded-sm bg-[#121212] p-8 text-center">
@@ -198,6 +212,18 @@ export default function MemberAreaPage() {
           </div>
 
           <div className="space-y-6">
+            {discordVoice ? (
+              <Section title="Discord jetzt" icon={MessageCircle} testId="member-area-discord-now">
+                <DiscordVoice data={discordVoice} />
+              </Section>
+            ) : null}
+
+            {discordServers?.servers?.length ? (
+              <Section title="Discord-Server" icon={MessageCircle} testId="member-area-discord-servers">
+                <DiscordServerList data={discordServers} testId="member-area-discord-server" />
+              </Section>
+            ) : null}
+
             {steam ? (
               <Section title="Gerade in Steam" icon={Gamepad2} testId="member-area-steam">
                 <SteamPresence data={steam} />
@@ -249,6 +275,24 @@ function Section({ title, icon: Icon, more, testId, children }) {
         {more && <Link to={more.to} className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700] hover:underline">{more.label} →</Link>}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Am Vereinsgeburtstag (#644): der Hinweis mit dem Jahres-Sticker für Mitglieder - nur, solange die Saison läuft. */
+export function BirthdayNote() {
+  const { seasons } = useSeason();
+  const birthday = (seasons || []).find((season) => season.key === "club_birthday");
+  if (!birthday) return null;
+  const years = Number(birthday.data?.years);
+  return (
+    <div data-testid="member-area-birthday" className="mt-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <Cake className="w-7 h-7 text-[#FFD700] shrink-0" aria-hidden="true" />
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Vereinsgeburtstag</div>
+        <p className="mt-1 text-sm text-white/80">{years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} wurde der Verein gegründet.` : "Heute hat der Verein Geburtstag."} Als Mitglied bekommst du dazu einen Jahres-Sticker für den Chat – jedes Jahr einen anderen.</p>
+      </div>
+      <StickerClaim testId="member-area-birthday-sticker" />
     </div>
   );
 }

@@ -1,8 +1,16 @@
-import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
+import { MOTIONS, MOTION_KEYS, SEQUENCE_KEYS, describePackage, groupTier, levelTexts, particleBudget, particleKind, planCeremony, sortByRank } from "./select";
 
 // Auswahl-Logik (E8): welcher Ablauf für welches Paket, welche Bewegung für welche Kategorie.
 
 const tier = (code, material, rank, category, extra = {}) => ({ code, name: code, material, rank, category, points: rank * 10, ...extra });
+
+describe("levelTexts", () => {
+  it("ein Aufstieg nennt das Level und darunter den Titel, ein Prestige den Stern statt „Level 1 erreicht“", () => {
+    expect(levelTexts({ level: 12, previous: 11, title: "Kämpfer" })).toEqual({ heading: "Level 12 erreicht", sub: "Level-Aufstieg", phaseSub: "Level 12 erreicht", phaseHeading: "Kämpfer" });
+    expect(levelTexts({ level: 1, previous: 60, title: "Rookie", prestige: 2, prestigeGained: true })).toEqual({ heading: "Prestige", sub: "2. Stern · Neustart bei Level 1", phaseSub: "2. Stern · Neustart bei Level 1", phaseHeading: "Prestige" });
+    expect(levelTexts({ level: 14, prestige: 2, prestigeGained: false }).heading).toBe("Level 14 erreicht");
+  });
+});
 
 describe("planCeremony", () => {
   it("nimmt Material und Bewegung von der höchsten Stufe", () => {
@@ -28,6 +36,11 @@ describe("planCeremony", () => {
     expect(planCeremony({ tiers: [tier("a", "diamond", 7, "match")] }).sequence).toBe("diamond");
     expect(planCeremony({ tiers: [tier("a", "legendary", 8, "special")] }).sequence).toBe("legendary");
     expect(planCeremony({ tiers: [tier("a", "legendary", 8, "special")], context: { groupCompleted: "x" } }).sequence).toBe("group");
+    // Gemischtes Paket: abgeschlossen hat die Gruppe „x“, nicht die höchste Stufe - die Gruppe trägt Sockel und Titel.
+    const mixed = planCeremony({ tiers: [tier("s", "hidden", 9, "hidden"), tier("g", "gold", 5, "match", { group_code: "x" })], context: { groupCompleted: "x" } });
+    expect(mixed.groupCompleted).toBe("x");
+    expect(groupTier(mixed).code).toBe("g");
+    expect(groupTier(planCeremony({ tiers: [tier("a", "gold", 5, "match")] })).code).toBe("a");
     expect(planCeremony({ tiers: [tier("a", "diamond", 7, "match")], context: { groupCompleted: "x", categoryCompleted: "match" } }).sequence).toBe("category");
     expect(planCeremony({ tiers: [tier("a", "wood", 1, "match")], context: { firstEver: true, categoryCompleted: "match" } }).sequence).toBe("first");
     expect(planCeremony({ tiers: [], levelUp: { level: 10, title: "Kämpfer" } }).sequence).toBe("levelup");

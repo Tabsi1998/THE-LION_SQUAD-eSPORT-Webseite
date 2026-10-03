@@ -110,7 +110,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Die Browser-Tests (Desktop und Handy) brauchen mit Ostern, Eiersuche, Geburtstag und Discord gut 25 Minuten.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - name: Validate reverse-proxy deployment config

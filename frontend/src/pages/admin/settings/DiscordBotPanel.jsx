@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bot, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { DiscordWidgetStatus } from "./DiscordWidgetStatus";
 
 // Discord-Bot (#302): Token, Schalter, Server-ID und Rollennamen - alles hier, nichts in der .env.
 // Der Token verlässt den Server nie; „gespeichert“ ist alles, was die Seite davon sieht.
@@ -123,6 +124,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           {data.enabled && !online && <div className="text-white/45" data-testid="discord-bot-retry">Der Bot versucht es alle fünf Minuten von selbst wieder – nach dem Speichern hier sofort.</div>}
         </div>
       )}
+      <DiscordWidgetStatus />
     </div>
   );
 }

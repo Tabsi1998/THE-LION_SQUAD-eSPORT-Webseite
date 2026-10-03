@@ -67,18 +67,25 @@ export function tabBarLedge(width: number, height: number, bottomInset: number):
 
 const EMPTY_PICTURE: SkPicture = createPicture(() => undefined);
 
-/**
- * Die Konfetti-Ebene über allen Tabs (nie klickbar). Ohne Stücke gibt es keine Zeichenfläche; der Regen und die
- * Explosionen des Huts wecken sie, nach der letzten liegenden Stück schläft sie wieder.
- */
+/** Die Konfetti-Ebene am Fasching: Regen beim ersten Start des Tages, Explosionen des Huts. */
 export function ConfettiSky({ season, screen, reducedMotion }: { season: ActiveSeason; screen: string; reducedMotion: boolean }) {
+  return <ConfettiField cap={reducedMotion ? 0 : capForApp(season.effective)} screen={screen} rain />;
+}
+
+type ConfettiFieldProps = { cap: number; screen: string; rain?: boolean; palette?: number[] | null; burstSize?: number; seedKey?: string };
+
+/**
+ * Eine Konfetti-Ebene über allen Tabs (nie klickbar), für Fasching und Vereinsgeburtstag (#644): `rain` lässt es beim
+ * ersten Start des Tages einmal regnen, `palette` beschränkt die Farben, Explosionen kommen über
+ * `requestConfettiBurst`. Ohne Stücke gibt es keine Zeichenfläche; nach dem letzten liegenden Stück schläft sie wieder.
+ */
+export function ConfettiField({ cap, screen, rain = false, palette = null, burstSize = APP_BURST, seedKey = "carnival" }: ConfettiFieldProps) {
   const { weather } = useSeason();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const appActive = useAppActive();
-  const cap = reducedMotion ? 0 : capForApp(season.effective);
   const [awake, setAwake] = useState(false);
-  const rng = useRef(mulberry32(hashString(`${localDay()}:carnival`))).current;
+  const rng = useRef(mulberry32(hashString(`${localDay()}:${seedKey}`))).current;
 
   const state = useSharedValue<ConfettiState>(emptyConfetti());
   const picture = useSharedValue<SkPicture>(EMPTY_PICTURE);
@@ -102,29 +109,29 @@ export function ConfettiSky({ season, screen, reducedMotion }: { season: ActiveS
 
   // Der Regen: einmal am Tag, auf dem ersten Screen, wo er fallen darf.
   useEffect(() => {
-    if (cap <= 0 || once.rained || !rainAllowed(screen)) return undefined;
+    if (!rain || cap <= 0 || once.rained || !rainAllowed(screen)) return undefined;
     let cancelled = false;
     void greetingShownToday(RAIN_KEY).then((shown) => {
       if (cancelled || once.rained) return;
       once.rained = true;
       if (shown) return;
       void markGreetingShown(RAIN_KEY);
-      throwPieces(flyingFrom(rainPieces(rng, { width, height }, cap), Date.now(), rng));
+      throwPieces(flyingFrom(rainPieces(rng, { width, height }, cap, 2500, palette), Date.now(), rng));
     });
     return () => {
       cancelled = true;
     };
-  }, [screen, cap, width, height, rng, throwPieces]);
+  }, [rain, screen, cap, width, height, rng, palette, throwPieces]);
 
   // Die Explosionen des Huts.
   useEffect(() => {
     if (cap <= 0) return undefined;
-    const listener = (point: Point) => throwPieces(flyingFrom(burstPieces(rng, point, Math.min(APP_BURST, cap)), Date.now(), rng));
+    const listener = (point: Point) => throwPieces(flyingFrom(burstPieces(rng, point, Math.min(burstSize, cap), palette), Date.now(), rng));
     bursts.add(listener);
     return () => {
       bursts.delete(listener);
     };
-  }, [cap, rng, throwPieces]);
+  }, [cap, rng, burstSize, palette, throwPieces]);
 
   const onIdle = useCallback(() => setAwake(false), []);
   const size = useMemo(() => ({ width, height }), [width, height]);

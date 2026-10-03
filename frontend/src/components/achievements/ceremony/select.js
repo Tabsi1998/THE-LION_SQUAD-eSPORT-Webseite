@@ -94,6 +94,21 @@ export function describePackage(groups = [], fresh = []) {
  * Der Plan für ein Paket: Sonderablauf, Material, Bewegung, Dauer, Klang und die Stufen in Bühnenfolge.
  * Gibt null zurück, wenn es nichts zu feiern gibt (leer oder nur Negatives).
  */
+/**
+ * Texte für den Level-Teil einer Zeremonie: ein Aufstieg („Level 12 erreicht“, darunter der Titel) oder ein Prestige
+ * („Prestige“, n. Stern, Neustart bei Level 1). `heading`/`sub` gelten für eine reine Level-Zeremonie, `phaseSub`/
+ * `phaseHeading` für die Level-Phase nach den Abzeichen.
+ */
+export function levelTexts(levelUp) {
+  const level = Number(levelUp?.level || 1);
+  const stars = Number(levelUp?.prestige || 0);
+  if (levelUp?.prestigeGained && stars > 0) {
+    const line = `${stars}. Stern · Neustart bei Level 1`;
+    return { heading: "Prestige", sub: line, phaseSub: line, phaseHeading: "Prestige" };
+  }
+  return { heading: `Level ${level} erreicht`, sub: "Level-Aufstieg", phaseSub: `Level ${level} erreicht`, phaseHeading: levelUp?.title || "Aufstieg" };
+}
+
 export function planCeremony(pkg) {
   const levelUp = pkg?.levelUp || null;
   const tiers = sortByRank((pkg?.tiers || []).filter((t) => !isNegative(t)));
@@ -127,6 +142,8 @@ export function planCeremony(pkg) {
     autoAdvanceMs: sequence === "stack" ? meta.perItem : 0,
     tiers,
     top,
+    // Die Gruppe, die das Paket vollständig macht - Sockel und Überschrift zeigen sie, nicht die höchste Stufe.
+    groupCompleted: context.groupCompleted || null,
     points: tiers.reduce((sum, t) => sum + Number(t.points || 0), 0),
     levelUp,
     catchUp: Boolean(context.catchUp),
@@ -144,6 +161,11 @@ export function particleBudget(sequence, material) {
   const base = { single: 40, stack: 60, first: 80, group: 110, category: 120, diamond: 160, legendary: 160, levelup: 120 }[sequence] || 40;
   const bonus = material === "gold" ? 20 : material === "diamond" ? 30 : material === "legendary" ? 30 : 0;
   return Math.min(160, base + bonus);
+}
+
+/** Die Stufe, die für die abgeschlossene Gruppe steht - sonst die höchste. */
+export function groupTier(plan) {
+  return (plan?.groupCompleted && (plan.tiers || []).find((t) => t.group_code === plan.groupCompleted)) || plan?.top || null;
 }
 
 export function particleKind(material) {

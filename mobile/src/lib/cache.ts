@@ -14,6 +14,8 @@ const NO_CACHE_PATTERNS = [
   "/notifications/read",
   "/settings/site-banners/impression",
   "/settings/site-banners/click",
+  // Ostereier tragen kurzlebige, persönliche Schlüssel - eine alte Antwort hilft offline nicht.
+  "/seasonal/easter/",
 ];
 
 export type CacheEntry<T = unknown> = {

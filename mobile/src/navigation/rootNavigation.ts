@@ -62,7 +62,7 @@ type NotificationTarget =
   | { area: "teams"; screen: "TeamDetail" | "TeamChat"; params: { id: string; title?: string } }
   | { area: "tournaments"; screen: "TournamentList"; params?: undefined }
   | { area: "tournaments"; screen: "TournamentDetail" | "EventDetail" | "FastLapDetail" | "MatchDetail" | "TournamentChat"; params: { id: string; title?: string } }
-  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar"; params?: Record<string, unknown> };
+  | { area: "more"; screen: "NewsDetail" | "PublicProfile" | "DirectThread" | "DirectMessages" | "Notifications" | "InfoCenter" | "NewsList" | "Gallery" | "FastLapList" | "AdventCalendar" | "AchievementShowcase" | "EasterHunt"; params?: Record<string, unknown> };
 
 function targetFromNotification(item: UserNotification): NotificationTarget | null {
   const meta = (item.meta || {}) as Record<string, unknown>;
@@ -142,10 +142,16 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
   // Adressen ohne Kennung (aus Inhalten wie dem Adventkalender, #641): die passende Liste der App.
   if (!second) {
     if (first === "events" || first === "tournaments") return { area: "tournaments", screen: "TournamentList" };
+    // „Als Nächstes“ bei den Team-Erfolgen (E13, #623) verlinkt die Teams.
+    if (first === "teams") return { area: "teams", screen: "TeamList" };
+    // Der Schaukasten der Erfolge (E13, #623) - auch Ziel von „Krone“-Benachrichtigungen im Web.
+    if (first === "achievements") return { area: "more", screen: "AchievementShowcase" };
     if (first === "news") return { area: "more", screen: "NewsList" };
     if (first === "gallery" || first === "galerie") return { area: "more", screen: "Gallery" };
     if (first === "fastlap" || first === "fastlaps" || first === "f1") return { area: "more", screen: "FastLapList" };
     if (first === "advent") return { area: "more", screen: "AdventCalendar" };
+    // Ostereiersuche (#647): Korb, Hinweise, Preise - auch aus Benachrichtigungen (Gewinn, voller Korb).
+    if (first === "ostern") return { area: "more", screen: "EasterHunt" };
   }
   return null;
 }

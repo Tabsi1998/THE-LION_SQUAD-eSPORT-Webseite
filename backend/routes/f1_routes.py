@@ -834,6 +834,7 @@ async def add_time(cid: str, body: F1LapTimeCreate, me: dict = Depends(get_curre
                 await send_public_discord(
                     c, message["title"], message["description"],
                     color=message["color"], url=message["url"], fields=message["fields"], event_key=message["event_key"],
+                    buttons=message["buttons"],
                 )
         except Exception:
             pass

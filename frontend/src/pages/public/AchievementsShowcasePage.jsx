@@ -15,13 +15,20 @@ import { useAuth } from "@/context/AuthContext";
 
 // Der Schaukasten (#619): Erfolg der Woche, Kategorien mit dem Fortschritt der Community, das Laufband der
 // neuesten Freischaltungen, Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum) und der Katalog
-// mit Seltenheit je Gruppe - wahlweise nach Kategorie oder nach Seltenheit sortiert.
+// mit Seltenheit je Gruppe - wahlweise nach Kategorie oder nach Seltenheit sortiert. Angemeldet zeigt der Katalog
+// den eigenen Fortschritt (E13: wie in der App), als Gast den öffentlichen Katalog.
 
 const RANK_STYLES = {
   1: { color: "#FFD700", ring: "border-[#FFD700]", label: "1" },
   2: { color: "#C0C0C0", ring: "border-[#C0C0C0]", label: "2" },
   3: { color: "#CD7F32", ring: "border-[#CD7F32]", label: "3" },
 };
+
+/** „1 Erfolg“, „3 Erfolge“. */
+export function erfolge(count) {
+  const n = Number(count || 0);
+  return `${n} ${n === 1 ? "Erfolg" : "Erfolge"}`;
+}
 
 export const PERIODS = [
   { key: "all", label: "Gesamt" },
@@ -283,7 +290,7 @@ export default function AchievementsShowcasePage() {
                         {entry.display_name}
                         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
                       </Link>
-                      <span className="text-xs text-white/40 tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : `${entry.count} Erfolge`}</span>
+                      <span className="text-xs text-white/40 tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
                       <span className="font-display font-bold text-[#FFD700] tabular-nums shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
                     </motion.div>
                   ))}
@@ -323,7 +330,7 @@ export default function AchievementsShowcasePage() {
             <div className="text-white/40 py-10 text-center">Lade Achievements …</div>
           ) : (
             <AchievementGroupsView
-              groups={groups}
+              groups={me?.groups || groups}
               rarity={overview?.rarity || null}
               sortBy={sortBy}
               hidden={hidden}
@@ -554,7 +561,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
       <div className="mt-2 font-display text-2xl font-black tabular-nums" style={{ color: style.color }}>
         {byLevel ? `Level ${entry.level}` : entry.points}
       </div>
-      <div className="text-[10px] uppercase tracking-widest text-white/55">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : `${entry.count} Erfolge`}</div>
+      <div className="text-[10px] uppercase tracking-widest text-white/55">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
     </motion.div>
   );
 }

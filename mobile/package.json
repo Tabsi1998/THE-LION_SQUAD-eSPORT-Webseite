@@ -11,6 +11,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "audit:ci": "node scripts/audit-ci.cjs",
+    "sync:badge-art": "node scripts/sync-badge-art.js",
     "test:security": "node --no-warnings --test scripts/cache-security.test.mjs scripts/logging-security.test.mjs",
     "release:preflight": "node scripts/release-preflight.cjs",
     "release:local": "node scripts/release-local.cjs",

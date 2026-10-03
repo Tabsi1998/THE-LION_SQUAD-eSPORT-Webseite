@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 
@@ -86,8 +86,18 @@ async def bluesky_client_metadata():
     return JSONResponse(platform_links.bluesky_client_metadata(branding), headers={"Cache-Control": "public, max-age=300"})
 
 
+async def _greet_linked(user_id: str, discord_id: str) -> None:
+    """Nach dem Verknüpfen (#626): Server zu den eigenen Spielen per Direktnachricht - im Hintergrund, nie ein Fehler."""
+    from services.discord_guilds import greet_linked
+
+    try:
+        await greet_linked(get_db(), user_id, discord_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[platform-links] Discord-Gruß: %s", type(exc).__name__)
+
+
 @router.get("/platform-links/{platform}/callback")
-async def platform_link_callback(platform: str, request: Request):
+async def platform_link_callback(platform: str, request: Request, background: BackgroundTasks):
     """Rückruf der Plattform. Immer eine Weiterleitung ins Profil - nie eine nackte Fehlerseite."""
     if platform not in PLATFORMS:
         return RedirectResponse(platform_links.callback_target(error="unknown"), status_code=302)
@@ -107,6 +117,8 @@ async def platform_link_callback(platform: str, request: Request):
         detail = str(exc) if exc.code in ("platform_error", "exchange_failed") else None
         return RedirectResponse(platform_links.callback_target(error=exc.code, detail=detail), status_code=302)
     await _audit(db, user_id, "platform_link.linked", platform, {"handle": link.get("handle")})
+    if platform == "discord":
+        background.add_task(_greet_linked, user_id, str(link.get("external_id") or ""))
     return RedirectResponse(platform_links.callback_target(linked=platform), status_code=302)
 
 

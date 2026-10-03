@@ -116,7 +116,7 @@ export function FastLapScreen({ navigation }: Props) {
 function FeaturedChallengeCard({ item, onPress }: { item: F1Challenge; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
-      <Card style={styles.featuredCard}>
+      <Card style={styles.featuredCard} perch={`fastlap-featured-${item.id}`} perchClip>
         <MediaImage
           uri={item.banner_url}
           style={styles.featuredImage}
@@ -150,6 +150,7 @@ function ChallengeCard({ item, onPress }: { item: F1Challenge; onPress: () => vo
       status={item.status}
       detail={challengeDetail(item)}
       onPress={onPress}
+      perch={`fastlap-${item.id}`}
     />
   );
 }

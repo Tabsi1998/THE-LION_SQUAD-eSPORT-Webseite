@@ -127,10 +127,15 @@ function Candle({ candle, height, drip, lit }: { candle: CandleSpec; height: num
   );
 }
 
-type FireProps = { candle: CandleSpec; height: number; lighting: boolean; calm: boolean; still: boolean; wind: number; fit: { k: number; ox: number; oy: number } };
+/** Was eine Flamme von ihrer Kerze braucht: Fuß und Neigung, Kennung und wie sie flackert (Kranz und Torte, #644). */
+export type FireCandle = Pick<CandleSpec, "x" | "y" | "lean" | "index" | "flameDuration" | "flameDelay" | "flameAmp" | "wickGlow">;
+type FireProps = { candle: FireCandle; height: number; lighting: boolean; calm: boolean; still: boolean; wind: number; fit: { k: number; ox: number; oy: number }; testID?: string };
 
-/** Schein, Flamme und Streichholz einer brennenden Kerze - drei kleine Ebenen über dem Kranz, mit eigenem Takt. */
-function Fire({ candle, height, lighting, calm, still, wind, fit }: FireProps) {
+/**
+ * Schein, Flamme und Streichholz einer brennenden Kerze - drei kleine Ebenen über dem Bild, mit eigenem Takt. `fit`
+ * rechnet SVG-Einheiten in Punkte um; der Kranz und die Geburtstagstorte (#644) teilen sich die Flamme.
+ */
+export function Fire({ candle, height, lighting, calm, still, wind, fit, testID = "advent-flame" }: FireProps) {
   const flicker = useRef(new Animated.Value(0)).current;
   const ignite = useRef(new Animated.Value(lighting && !still ? 0 : 1)).current;
   const igniting = lighting && !still;
@@ -194,7 +199,7 @@ function Fire({ candle, height, lighting, calm, still, wind, fit }: FireProps) {
   const boxHeight = box.top + box.bottom;
   const index = candle.index;
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="advent-flame">
+    <View pointerEvents="none" style={StyleSheet.absoluteFill} testID={testID}>
       <Animated.View style={[styles.layer, { left: ox + (glow.x - GLOW_R) * k, top: oy + (glow.y - GLOW_R) * k, width: GLOW_R * 2 * k, height: GLOW_R * 2 * k, opacity: glowOpacity }]}>
         <Svg width={GLOW_R * 2 * k} height={GLOW_R * 2 * k} viewBox={`${-GLOW_R} ${-GLOW_R} ${GLOW_R * 2} ${GLOW_R * 2}`}>
           <Defs>

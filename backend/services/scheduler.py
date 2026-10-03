@@ -212,6 +212,21 @@ async def _safe_birthday_greetings():
         _log_task_failure("birthday_greetings", exc)
 
 
+async def _safe_club_birthday():
+    """Vereinsgeburtstag (#644): ab 10:00 am Gründungstag einmal im Jahr der Gruß auf Discord (Ereignis eingeschaltet)."""
+    try:
+        from datetime import datetime
+        from database import get_db
+        from routes.seasons_routes import running_season
+        from services import club_birthday, seasons
+        db = get_db()
+        res = await club_birthday.greet_on_discord(db, await running_season(db, club_birthday.SEASON), datetime.now(tz=seasons.VIENNA))
+        if res.get("sent"):
+            logger.info("[scheduler] club_birthday greeted on Discord")
+    except Exception as exc:
+        _log_task_failure("club_birthday", exc)
+
+
 async def _safe_discord_announcements():
     try:
         from services.discord_announcements import announce_due
@@ -285,6 +300,16 @@ async def _safe_discord_scheduled_events():
             logger.info(f"[scheduler] discord_scheduled_events {res}")
     except Exception as exc:
         _log_task_failure("discord_scheduled_events", exc)
+
+
+async def _safe_discord_widget():
+    """Online-Zahl und Sprachkanäle für die Website (#581): jede Minute das Server-Widget holen."""
+    try:
+        from database import get_db
+        from services.discord_widget import refresh
+        await refresh(get_db())
+    except Exception as exc:
+        _log_task_failure("discord_widget", exc)
 
 
 async def _safe_discord_bot_roles():
@@ -646,6 +671,15 @@ async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> boo
         return next_status == "check_in"
 
 
+async def _discord_status_changed(db, doc: dict, status: str) -> None:
+    """Zeitgesteuerte Wechsel melden sich im Discord wie die von Hand (#572) - vorher blieben sie stumm."""
+    try:
+        from services.discord_threads import status_changed
+        await status_changed(db, doc, doc.get("status"), status)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[scheduler] discord status %s: %s", doc.get("id"), type(exc).__name__)
+
+
 async def _safe_status_transitions():
     try:
         from database import get_db
@@ -669,6 +703,8 @@ async def _safe_status_transitions():
                         {"$set": {"status": nxt, "updated_at": now_iso}},
                     )
                     changed += 1
+                    if kind == "tournament":
+                        await _discord_status_changed(db, doc, nxt)
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")
     except Exception as exc:
@@ -706,6 +742,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("birthday_greetings", _safe_birthday_greetings), IntervalTrigger(hours=6), id="birthday_greetings",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("club_birthday", _safe_club_birthday), IntervalTrigger(minutes=10), id="club_birthday",
+                  max_instances=1, coalesce=True)
     sched.add_job(_single_replica("steam_presence", _safe_steam_presence), IntervalTrigger(seconds=120), id="steam_presence",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("twitch_clips", _safe_twitch_clips, lease_seconds=300.0), IntervalTrigger(hours=1), id="twitch_clips",
@@ -735,6 +773,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_safe_discord_bot_watch, IntervalTrigger(minutes=5), id="discord_bot_watch", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_scheduled_events", _safe_discord_scheduled_events, lease_seconds=300.0), IntervalTrigger(minutes=5), id="discord_scheduled_events",
+                  max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("discord_widget", _safe_discord_widget), IntervalTrigger(seconds=60), id="discord_widget",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_embeds", _safe_discord_embeds), IntervalTrigger(seconds=60), id="discord_embeds",
                   max_instances=1, coalesce=True)

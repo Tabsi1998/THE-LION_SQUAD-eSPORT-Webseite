@@ -40,16 +40,39 @@ async def request_evaluation(user_ids, reason: str = "", sources=None) -> int:
     (#616) merkt sich der Eintrag, welche Zähler dran sind; ohne Quelle wird alles gerechnet."""
     db = get_db()
     due = (now_utc() + timedelta(seconds=EVAL_DELAY_SECONDS)).isoformat()
-    count = 0
-    for user_id in {uid for uid in (user_ids or []) if uid}:
-        update = {"$set": {"user_id": user_id, "reason": reason[:60]}, "$setOnInsert": {"due_at": due, "created_at": now_utc().isoformat()}}
+    ids = sorted({uid for uid in (user_ids or []) if uid})
+
+    def update_for(user_id: str | None = None) -> dict:
+        update = {"$set": {"reason": reason[:60], **({"user_id": user_id} if user_id else {})}, "$setOnInsert": {"due_at": due, "created_at": now_utc().isoformat()}}
         if sources:
             update["$addToSet"] = {"sources": {"$each": sorted(set(sources))}}
         else:
             update["$set"]["full"] = True
-        await db.achievement_eval_queue.update_one({"user_id": user_id}, update, upsert=True)
-        count += 1
-    return count
+        return update
+
+    if len(ids) <= 1:
+        for user_id in ids:
+            await db.achievement_eval_queue.update_one({"user_id": user_id}, update_for(user_id), upsert=True)
+        return len(ids)
+    # Viele auf einmal (Massenvergabe): vorhandene Einträge gemeinsam ergänzen, neue in einem Zug anlegen.
+    present = set(await db.achievement_eval_queue.distinct("user_id", {"user_id": {"$in": ids}}))
+    if present:
+        update = update_for()
+        update.pop("$setOnInsert")
+        await db.achievement_eval_queue.update_many({"user_id": {"$in": sorted(present)}}, update)
+    stamp = now_utc().isoformat()
+    fresh = [{"user_id": uid, "reason": reason[:60], "due_at": due, "created_at": stamp, **({"sources": sorted(set(sources))} if sources else {"full": True})}
+             for uid in ids if uid not in present]
+    if fresh:
+        from pymongo.errors import BulkWriteError
+        try:
+            await db.achievement_eval_queue.insert_many(fresh, ordered=False)
+        except BulkWriteError as exc:
+            # Dazwischen vorgemerkt (eindeutiger Index): dann den Eintrag ergänzen.
+            for err in (exc.details or {}).get("writeErrors", []):
+                uid = fresh[err["index"]]["user_id"]
+                await db.achievement_eval_queue.update_one({"user_id": uid}, update_for(uid), upsert=True)
+    return len(ids)
 
 
 async def process_queue(limit: int = BATCH) -> dict:
@@ -106,16 +129,22 @@ async def queue_state() -> dict:
 
 async def note_award(user_id: str, tier: dict, group: dict) -> None:
     """Eine Vergabe für die gebündelte Meldung vormerken. Negative Gruppen werden nie gemeldet."""
-    if group.get("is_negative"):
+    await note_awards([user_id], tier, group)
+
+
+async def note_awards(user_ids: list[str], tier: dict, group: dict) -> None:
+    """Dieselbe Vergabe für viele vormerken (Massenvergabe) - in einem Schreibzug."""
+    if group.get("is_negative") or not user_ids:
         return
-    await get_db().achievement_outbox.insert_one({
+    stamp = now_utc().isoformat()
+    await get_db().achievement_outbox.insert_many([{
         "id": new_id(), "user_id": user_id, "tier_code": tier.get("code"), "tier_name": tier.get("name"),
         "tier_description": tier.get("description") or "", "points": int(tier.get("points") or 0),
         "level": int(tier.get("level") or 1), "material": tier.get("material"), "group_name": group.get("name"),
         # Für das Abzeichen im Postfach (#622): Motiv und Symbol der Stufe.
         "art": tier.get("art"), "icon": tier.get("icon") or group.get("icon"), "rank": int(tier.get("rank") or 0),
-        "group_public": bool(group.get("public", True)), "created_at": now_utc().isoformat(),
-    })
+        "group_public": bool(group.get("public", True)), "created_at": stamp,
+    } for user_id in user_ids])
 
 
 async def flush_awards() -> dict:

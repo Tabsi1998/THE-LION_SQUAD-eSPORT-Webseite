@@ -324,6 +324,8 @@ class DiscordSettings(BaseModel):
     embeds: Optional[dict[str, dict]] = None
     # Discord-Termine (#570): {enabled, internal}.
     scheduled_events: Optional[dict[str, bool]] = None
+    # Willkommensnachricht (#574): {enabled, text}; leerer Text heißt Vorlage.
+    welcome: Optional[dict] = None
 
 
 class YoutubeFeedSettings(BaseModel):
@@ -1532,6 +1534,9 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     # Discord-Termine (#570): Schalter, letzter Abgleich, Anzahl.
     from services.discord_scheduled import scheduled_status
     s["scheduled_events"] = await scheduled_status(db)
+    # Willkommensnachricht (#574): Schalter, Text, Vorschau, Zähler.
+    from services.discord_welcome import welcome_status
+    s["welcome"] = await welcome_status(db, s)
     for key in ("bot_token", "bot_enabled", "bot_guild_id", "bot_roles", "bot_count_messages"):
         s.pop(key, None)
     # Tests aus der Vorschau (#583) zählen nicht als Meldung.
@@ -1601,6 +1606,20 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in ("enabled", "internal") or not isinstance(value, bool):
                 raise HTTPException(400, f"Unbekannte Einstellung für Discord-Termine: {key}")
             updates[f"scheduled_events.{key}"] = value
+    # Willkommensnachricht (#574): Schalter und Text - mehr nicht.
+    incoming_welcome = updates.pop("welcome", None)
+    if incoming_welcome is not None:
+        from services.discord_welcome import MAX_TEXT
+        for key, value in incoming_welcome.items():
+            if key == "enabled" and isinstance(value, bool):
+                updates["welcome.enabled"] = value
+            elif key == "text" and isinstance(value, str):
+                text = value.strip()
+                if len(text) > MAX_TEXT:
+                    raise HTTPException(400, f"Die Willkommensnachricht ist zu lang – höchstens {MAX_TEXT} Zeichen.")
+                updates["welcome.text"] = text
+            else:
+                raise HTTPException(400, f"Unbekannte Einstellung für die Willkommensnachricht: {key}")
     # Live-Einbettungen (#569): Schalter und Kanal je Art; ein neuer Kanal heißt eine neue Nachricht.
     incoming_embeds = updates.pop("embeds", None)
     if incoming_embeds is not None:
@@ -1634,6 +1653,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             flat_current[f"embeds.{kind}.{key}"] = value
     for key, value in (current.get("scheduled_events") or {}).items():
         flat_current[f"scheduled_events.{key}"] = value
+    for key, value in (current.get("welcome") or {}).items():
+        flat_current[f"welcome.{key}"] = value
     current = flat_current
     changed_fields = _changed_setting_fields(current, updates, unset)
     if not changed_fields:
@@ -1646,6 +1667,10 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         {"id": "discord"}, op, upsert=True,
     )
     await _audit_settings_change(db, "settings.discord.update", "discord", me["id"], changed_fields)
+    # Mehrere Server (#625): die „Kanäle je Zweck“ sind die des Hauptservers - in seinen Eintrag spiegeln.
+    if any(field.startswith("channels.") for field in changed_fields):
+        from services.discord_guilds import mirror_main_channels
+        await mirror_main_channels(db)
     # Bot-Einstellungen geändert (#302): neu verbinden oder anhalten - ohne Neustart des Servers.
     if any(field.startswith("bot_") for field in changed_fields):
         try:
@@ -1872,6 +1897,23 @@ async def discord_preview(body: dict, me: dict = Depends(require_area("content",
     return await preview(kind, body["item"])
 
 
+@settings_router.post("/discord/welcome/preview")
+async def discord_welcome_preview(body: dict, me: dict = Depends(require_club_admin())):
+    """Die Willkommensnachricht (#574) mit dem Text aus dem Formular - so kommt sie an."""
+    from services.discord_welcome import MAX_TEXT, render, welcome_settings
+    text = str((body or {}).get("text") or "").strip()[:MAX_TEXT]
+    if not text:
+        text = welcome_settings(await get_db().settings.find_one({"id": "discord"}, {"_id": 0, "welcome": 1}))["text"]
+    return await render(get_db(), text, "Paula")
+
+
+@settings_router.post("/discord/welcome/test")
+async def discord_welcome_test(body: dict, me: dict = Depends(require_club_admin())):
+    """„An mich senden“ (#574): als Direktnachricht an das eigene verknüpfte Konto - zählt nicht."""
+    from services.discord_welcome import MAX_TEXT, send_test
+    return await send_test(get_db(), me, str((body or {}).get("text") or "")[:MAX_TEXT])
+
+
 @settings_router.post("/discord/resend/{log_id}")
 async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
     """Eine fehlgeschlagene Meldung noch einmal an dasselbe Ziel (#303)."""
@@ -1884,16 +1926,18 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
         raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden.")
     payload = entry["payload"]
     # An das Ziel, an das sie ging - nie an ein anderes. Privat bleibt privat.
+    # Eine Meldung aus einem Turnier-Thread (#572) geht zurück in diesen Thread.
     result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
                            color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
-                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom")
+                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
+                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"))
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
     return result
 
 
 @settings_router.post("/discord/test")
-async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops|test)$"), me: dict = Depends(require_club_admin())):
+async def discord_test(target: str = Query(default="community", pattern="^(community|news|events|board|ops|test|members)$"), me: dict = Depends(require_club_admin())):
     """Testmeldung über den Bot in den Kanal des Ziels - privat bleibt privat, ohne Kanal kommt der Grund zurück (#566)."""
     from discord_service import TARGET_LABELS, send_to
     texts = {
@@ -1901,22 +1945,28 @@ async def discord_test(target: str = Query(default="community", pattern="^(commu
         "ops": "Diese Nachricht bestätigt, dass der Bot im Betriebskanal schreiben darf. Hierher kommen rote Auto-Checks und neue Serverfehler - sonst nichts.",
         "board": "Diese Nachricht bestätigt, dass der Bot im Vorstandskanal schreiben darf. Hierher kommen Mitgliedsanträge und Kontaktanfragen – ohne Namen.",
         "test": "Diese Nachricht bestätigt, dass der Bot im Testkanal schreiben darf. Hierher kommen Probe-Meldungen aus der Vorschau – nie an die Community.",
+        "members": ("Diese Nachricht bestätigt, dass der Bot im Mitgliederkanal schreiben darf. Hierher kommen News und Events nur für Mitglieder – "
+                    "der Kanal sollte nur für die Rolle „Mitglied“ sichtbar sein."),
     }
     title = "THE LION SQUAD · Testnachricht" if target == "community" else f"{TARGET_LABELS[target]} · Testnachricht"
     return await send_to(target, title, texts.get(target, "Diese Nachricht bestätigt, dass der Bot in diesem Kanal schreiben darf."), event_key="test")
 
 
 @settings_router.get("/discord/samples")
-async def discord_samples(me: dict = Depends(require_club_admin())):
-    """Vorschau jeder Meldungsart (#583): Embeds wie im Betrieb, dazu Testkanal und ob „an mich“ geht."""
+async def discord_samples(guild: Optional[str] = Query(default=None), me: dict = Depends(require_club_admin())):
+    """Vorschau jeder Meldungsart (#583): Embeds wie im Betrieb, dazu Testkanal und ob „an mich“ geht; mit ``guild`` je
+    Server (#625) - die Liste der Server kommt für die Auswahl mit."""
     from discord_service import target_status
     from services.discord_dm import discord_link_id
     from services.discord_samples import GROUPS, public_entries, sample_catalog
     db = get_db()
     test_channel = (await target_status(db)).get("test") or {}
+    servers = await db.discord_guilds.find({"left_at": None}, {"_id": 0, "guild_id": 1, "name": 1, "role": 1, "enabled": 1}).to_list(100)
     return {
         "groups": list(GROUPS),
-        "entries": public_entries(await sample_catalog(db)),
+        "guilds": sorted(servers, key=lambda row: (row.get("role") != "main", str(row.get("name") or "").lower())),
+        "guild": guild or None,
+        "entries": public_entries(await sample_catalog(db, guild)),
         "test_channel": {"configured": bool(test_channel.get("configured")), "channel_name": test_channel.get("channel_name"), "channel_id": test_channel.get("channel_id") or ""},
         "dm": {"linked": bool(await discord_link_id(db, me["id"]))},
     }

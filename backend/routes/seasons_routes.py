@@ -12,17 +12,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from auth import get_current_user, get_optional_user
 from database import get_db
-from services import nikolaus, seasons, weather
+from services import club_birthday, founding, nikolaus, seasons, weather
 
 router = APIRouter(prefix="/api/seasonal", tags=["seasonal"])  # /api/seasons gehört den Wettkampf-Saisonen
-ABOUT_SETTINGS_ID = "about_page"
 
 
 async def load_context(db) -> tuple[dict, str | None]:
-    """Gespeicherte Saison-Einstellungen und das Gründungsdatum aus Verein → Über uns."""
+    """Gespeicherte Saison-Einstellungen und das Gründungsdatum (Dolibarr oder Verein → Über uns, #644)."""
     stored = await db.settings.find_one({"id": seasons.SETTINGS_ID}, {"_id": 0}) or {}
-    about = await db.settings.find_one({"id": ABOUT_SETTINGS_ID}, {"_id": 0, "founded_on": 1}) or {}
-    return stored, about.get("founded_on")
+    return stored, (await founding.founding(db))["founded_on"]
 
 
 async def with_calendar(db, payload: dict) -> dict:
@@ -90,20 +88,28 @@ async def seasonal_me(response: Response, user: dict | None = Depends(get_option
     return {"scares_allowed": seasons.adult_from_birth_date(stored.get("birth_date") or user.get("birth_date"))}
 
 
-async def nikolaus_season(db) -> dict | None:
-    """Läuft der Nikolaus gerade - nach derselben Rechnung wie die öffentliche Abfrage (Admin: an, aus, erzwungen)?"""
+async def running_season(db, key: str) -> dict | None:
+    """Läuft diese Saison gerade - nach derselben Rechnung wie die öffentliche Abfrage (Admin: an, aus, erzwungen)?"""
     stored, founded = await load_context(db)
-    return next((season for season in seasons.active(None, stored, founded)["seasons"] if season["key"] == nikolaus.SEASON), None)
+    return next((season for season in seasons.active(None, stored, founded)["seasons"] if season["key"] == key), None)
+
+
+async def preview_season(db, token: str | None, key: str) -> dict | None:
+    """Die Saison aus einem gültigen Vorschau-Token für genau diese Saison - sonst None."""
+    preview = seasons.read_preview_token(token)
+    if not preview or preview[0] != key:
+        return None
+    stored, founded = await load_context(db)
+    payload = seasons.active(preview[1], stored, founded, preview_key=key)
+    return next((season for season in payload["seasons"] if season["key"] == key), None)
+
+
+async def nikolaus_season(db) -> dict | None:
+    return await running_season(db, nikolaus.SEASON)
 
 
 async def nikolaus_preview(db, token: str | None) -> dict | None:
-    """Der Nikolaus aus einem gültigen Vorschau-Token für genau diese Saison - sonst None."""
-    preview = seasons.read_preview_token(token)
-    if not preview or preview[0] != nikolaus.SEASON:
-        return None
-    stored, founded = await load_context(db)
-    payload = seasons.active(preview[1], stored, founded, preview_key=nikolaus.SEASON)
-    return next((season for season in payload["seasons"] if season["key"] == nikolaus.SEASON), None)
+    return await preview_season(db, token, nikolaus.SEASON)
 
 
 @router.get("/nikolaus")
@@ -131,3 +137,32 @@ async def nikolaus_open(response: Response, preview: str | None = Query(None), u
     if not season:
         raise HTTPException(status_code=409, detail="Der Nikolaus kommt am 6. Dezember.")
     return await nikolaus.open_boot(db, user, season)
+
+
+@router.get("/birthday")
+async def birthday_state(response: Response, preview: str | None = Query(None), user: dict = Depends(get_current_user)):
+    """Der Vereinsgeburtstag für diese Person (#644): läuft er, wie viele Jahre, und - für Mitglieder - ob der
+    Jahres-Sticker schon abgeholt ist. Die Vorschau zeigt den Gruß, wie ihn ein Mitglied sieht."""
+    response.headers["Cache-Control"] = "private, no-store"
+    db = get_db()
+    demo = await preview_season(db, preview, club_birthday.SEASON)
+    if demo:
+        return club_birthday.preview_state(demo)
+    return await club_birthday.sticker_state(db, user, await running_season(db, club_birthday.SEASON))
+
+
+@router.post("/birthday/sticker")
+async def birthday_sticker(response: Response, preview: str | None = Query(None), user: dict = Depends(get_current_user)):
+    """Den Jahres-Sticker abholen: einmal je Vereinsmitglied und Jahr aus „Zum Vereinsgeburtstag“, danach derselbe
+    noch einmal. In der Vorschau nur zeigen - vergeben und gespeichert wird nichts."""
+    response.headers["Cache-Control"] = "private, no-store"
+    db = get_db()
+    demo = await preview_season(db, preview, club_birthday.SEASON)
+    if demo:
+        return club_birthday.preview_sticker(user, demo)
+    if not user.get("is_club_member"):
+        raise HTTPException(status_code=403, detail="Den Jahres-Sticker bekommen Vereinsmitglieder.")
+    season = await running_season(db, club_birthday.SEASON)
+    if not season:
+        raise HTTPException(status_code=409, detail="Den Jahres-Sticker gibt es am Vereinsgeburtstag.")
+    return await club_birthday.claim_sticker(db, user, season)

@@ -180,10 +180,15 @@ async def _assign_match_to_station(db, station: dict, match: dict, collection_na
     }})
     await db[collection_name].update_one({"id": match["id"]}, {"$set": match_updates})
     if start_now:
-        await db.tournaments.update_one(
+        before = await db.tournaments.find_one({"id": match["tournament_id"]}, {"_id": 0, "status": 1}) or {}
+        went_live = await db.tournaments.update_one(
             {"id": match["tournament_id"], "status": {"$in": ["scheduled", "registration_open", "registration_closed", "check_in"]}},
             {"$set": {"status": "live", "updated_at": now_iso}},
         )
+        if went_live.modified_count:
+            # Das erste Match an einer Station startet das Turnier - im Discord wie über den Knopf (#572).
+            from services.discord_threads import status_written
+            await status_written(db, match["tournament_id"], before.get("status"))
         started_match = {**match, **match_updates}
         await notify_match_started(db, started_match, station, collection_name)
 

@@ -93,16 +93,36 @@ async def test_level_stand_prestige_und_ruecknahme(flow):
     body = res.json()
     assert body["level"] == 1 and body["xp"] == 0 and body["points"] == 0 and body["title"] == "Rookie" and body["max_level"] == 60
     assert {"current_level_points", "next_level_points", "progress", "prestige", "prestige_available", "member_bonus", "login_streak"} <= set(body)
+    assert body["prestige_undo_until"] is None
     assert (await flow.post("/api/users/me/prestige")).status_code == 400, "erst ab Level 60"
     await xp.grant(user["id"], "correction", "boost", amount=levels.xp_for_level(60))
     body = (await flow.get("/api/users/me/level")).json()
     assert body["level"] == 60 and body["title"] == "Legende" and body["prestige_available"] is True
     res = await flow.post("/api/users/me/prestige")
     assert res.status_code == 200 and res.json()["prestige"] == 1 and res.json()["level"] == 1
+    assert res.json()["prestige_undo_until"], "die App und das Web zeigen, bis wann die Rücknahme geht"
+    assert (await flow.get("/api/achievements/me")).json()["level"]["prestige_undo_until"]
+    other = await flow.add_user(name="Gast")
+    await flow.db.users.update_one({"id": user["id"]}, {"$set": {"privacy_public_profile": True}})
+    flow.act_as(other)
+    username = (await flow.db.users.find_one({"id": user["id"]}, {"_id": 0, "username": 1}))["username"]
+    res = await flow.get(f"/api/users/public/{username}")
+    assert res.status_code == 200 and "achievement_level" in res.json()
+    assert "prestige_undo_until" not in res.text, "das öffentliche Profil verrät nicht, wann jemand Prestige gemacht hat"
+    flow.act_as(user)
     assert await flow.db.audit_logs.find_one({"action": "xp.prestige", "target_id": user["id"]})
+    # XP aus den Stunden nach dem Prestige gehen bei der Rücknahme nicht verloren.
+    await xp.grant(user["id"], "correction", "after-prestige", amount=40)
     res = await flow.post("/api/users/me/prestige/undo")
     assert res.status_code == 200 and res.json()["prestige"] == 0 and res.json()["level"] == 60
+    assert res.json()["xp"] == levels.xp_for_level(60) + 40 and res.json()["prestige_undo_until"] is None
     assert (await flow.post("/api/users/me/prestige/undo")).status_code == 400
+    # Nach Ablauf der Frist meldet der Stand keine Rücknahme mehr.
+    await flow.post("/api/users/me/prestige")
+    await flow.db.user_xp.update_one({"user_id": user["id"]}, {"$set": {"prestige_undo.until": "2000-01-01T00:00:00+00:00"}})
+    assert (await flow.get("/api/users/me/level")).json()["prestige_undo_until"] is None
+    assert (await flow.post("/api/users/me/prestige/undo")).status_code == 400
+    await flow.db.user_xp.update_one({"user_id": user["id"]}, {"$set": {"prestige": 0, "total": levels.xp_for_level(60)}, "$unset": {"prestige_undo": ""}})
     # Mit Stern ist die Kurve länger: 170 XP reichen nicht mehr für Level 2.
     await flow.post("/api/users/me/prestige")
     await xp.grant(user["id"], "match_won", "m1", amount=170)

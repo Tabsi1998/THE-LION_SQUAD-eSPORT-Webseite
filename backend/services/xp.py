@@ -84,6 +84,14 @@ async def view(user_id: str) -> dict:
     return {**levels.level_view(doc.get("total", 0), doc.get("prestige", 0), member=await _is_member(user_id)), "login_streak": int(doc.get("login_streak") or 0)}
 
 
+async def own_view(user_id: str) -> dict:
+    """Der eigene Level-Stand - dazu, bis wann sich ein Prestige zurücknehmen lässt (sonst None). Nur für die Person
+    selbst: das öffentliche Profil nutzt `view` und verrät nicht, wann jemand Prestige gemacht hat."""
+    doc = await state(user_id)
+    undo_until = str((doc.get("prestige_undo") or {}).get("until") or "")
+    return {**await view(user_id), "prestige_undo_until": undo_until if undo_until and undo_until >= now_utc().isoformat() else None}
+
+
 async def grant(user_id: str, source: str, ref: str, *, amount: int | None = None, count: int = 1, note: str | None = None) -> dict | None:
     """XP gutschreiben. None, wenn die Quelle unbekannt ist, der Bezug schon gezählt wurde oder der Tagesdeckel voll ist."""
     if source not in SOURCES or not user_id:
@@ -179,6 +187,86 @@ async def grant_achievement(user_id: str, tier: dict) -> dict | None:
     return await grant(user_id, "achievement", str(tier.get("code")), amount=points * ACHIEVEMENT_FACTOR)
 
 
+async def grant_achievement_many(user_ids: list[str], tier: dict) -> list[dict]:
+    points = int(tier.get("points") or 0)
+    return await grant_many(user_ids, "achievement", str(tier.get("code")), amount=points * ACHIEVEMENT_FACTOR)
+
+
+async def grant_many(user_ids: list[str], source: str, ref: str, *, amount: int) -> list[dict]:
+    """Dieselbe Gutschrift für viele (Massenvergabe, E10) - rechnet wie ``grant``, aber in wenigen Schreibzügen:
+    schon gezählte Bezüge, Stände und Mitgliedschaften gesammelt lesen, die Ereignisse in einem Zug schreiben, die
+    Stände je gleichem Zuwachs und Ziel-Level gemeinsam erhöhen ($inc, atomar). Level-ups melden sich wie bei
+    ``grant``. Nur für Gutschriften ohne Tagesdeckel und mit positivem Betrag - sonst einzeln."""
+    from collections import defaultdict
+    from pymongo.errors import BulkWriteError
+    from services.membership_service import is_active_member
+
+    ids = [uid for uid in dict.fromkeys(user_ids or []) if uid]
+    if source not in SOURCES or not ids or amount <= 0:
+        return []
+    if SOURCES[source][1] is not None:
+        out = [await grant(uid, source, ref, amount=amount) for uid in ids]
+        return [r for r in out if r]
+    db = get_db()
+    counted = {row["user_id"] async for row in db.xp_events.find({"user_id": {"$in": ids}, "source": source, "ref": str(ref)}, {"_id": 0, "user_id": 1})}
+    ids = [uid for uid in ids if uid not in counted]
+    if not ids:
+        return []
+    states = {doc["user_id"]: doc async for doc in db.user_xp.find({"user_id": {"$in": ids}}, {"_id": 0})}
+    members = {doc["user_id"] async for doc in db.memberships.find({"user_id": {"$in": ids}}, {"_id": 0, "user_id": 1, "member_status": 1}) if is_active_member(doc)}
+    day = today_key()
+    stamp = now_utc().isoformat()
+    events, plans = [], {}
+    for uid in ids:
+        before = states.get(uid) or {}
+        prestige = int(before.get("prestige") or 0)
+        bonus = int(round(amount * levels.MEMBER_BONUS)) if uid in members and amount > 0 else 0
+        events.append({"id": new_id(), "user_id": uid, "source": source, "ref": str(ref), "amount": int(amount), "bonus": bonus, "note": None, "day": day, "at": stamp})
+        total_before = int(before.get("total") or 0)
+        total_after = max(0, total_before + amount + bonus)
+        plans[uid] = (prestige, bonus, total_before, total_after)
+    try:
+        await db.xp_events.insert_many(events, ordered=False)
+    except BulkWriteError as exc:
+        # Dazwischen schon gezählt (eindeutiger Index): diese Personen bekommen hier nichts.
+        for err in (exc.details or {}).get("writeErrors", []):
+            plans.pop(events[err["index"]]["user_id"], None)
+    together: dict[tuple[int, int], list[str]] = defaultdict(list)
+    new_docs: list[dict] = []
+    results, risen = [], []
+    for uid, (prestige, bonus, total_before, total_after) in plans.items():
+        level_before = levels.level_for_xp(total_before, prestige)
+        level_after = levels.level_for_xp(total_after, prestige)
+        if uid in states:
+            together[(amount + bonus, level_after)].append(uid)
+        else:
+            new_docs.append({"user_id": uid, "total": total_after, "level": level_after, "prestige": prestige, "updated_at": stamp})
+        result = {"user_id": uid, "amount": amount, "bonus": bonus, "total": total_after, "level": level_after, "level_up": level_after > level_before,
+                  "title_changed": levels.title_for_level(level_after) != levels.title_for_level(level_before)}
+        results.append(result)
+        if result["level_up"]:
+            risen.append((uid, level_before, level_after, prestige))
+    for (increment, level), uids in together.items():
+        await db.user_xp.update_many({"user_id": {"$in": uids}}, {"$inc": {"total": increment}, "$set": {"level": level, "updated_at": stamp}})
+    if new_docs:
+        try:
+            await db.user_xp.insert_many(new_docs, ordered=False)
+        except BulkWriteError as exc:
+            # Dazwischen angelegt: dann eben erhöhen.
+            for err in (exc.details or {}).get("writeErrors", []):
+                doc = new_docs[err["index"]]
+                await db.user_xp.update_one({"user_id": doc["user_id"]}, {"$inc": {"total": doc["total"]}, "$set": {"level": doc["level"], "updated_at": stamp}})
+    for uid, level_before, level_after, prestige in risen:
+        await _announce_level_up(uid, level_before, level_after, prestige)
+    if risen:
+        try:
+            from services.achievement_queue import request_evaluation
+            await request_evaluation([uid for uid, *_ in risen], "level_up", sources={"xp"})
+        except Exception:  # noqa: BLE001
+            logger.debug("[xp] queue after level-up failed", exc_info=True)
+    return results
+
+
 async def correct(user_id: str, amount: int, reason: str, actor_id: str) -> dict:
     """Admin-Korrektur, auch negativ - immer mit Grund und Protokoll."""
     ref = f"{actor_id}:{now_utc().isoformat()}"
@@ -202,7 +290,7 @@ async def prestige(user_id: str) -> dict:
     await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": stars + 1, "total": 0, "level": 1, "prestige_at": stamp, "prestige_undo": {"total": int(doc.get("total") or 0), "prestige": stars, "until": (now_utc() + timedelta(hours=PRESTIGE_UNDO_HOURS)).isoformat()}}})
     await db.audit_logs.insert_one({"id": new_id(), "action": "xp.prestige", "actor_id": user_id, "target_id": user_id, "data": {"stars": stars + 1}, "created_at": stamp})
     await _announce_prestige(user_id, stars + 1, stamp)
-    return await view(user_id)
+    return await own_view(user_id)
 
 
 async def _announce_prestige(user_id: str, stars: int, stamp: str) -> None:
@@ -224,8 +312,10 @@ async def undo_prestige(user_id: str) -> dict:
     undo = doc.get("prestige_undo") or {}
     if not undo or str(undo.get("until") or "") < now_utc().isoformat():
         raise ValueError("Die Rücknahme war nur 24 Stunden lang möglich.")
-    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": int(undo["prestige"]), "total": int(undo["total"]), "level": levels.level_for_xp(int(undo["total"]), int(undo["prestige"]))}, "$unset": {"prestige_undo": "", "prestige_at": ""}})
-    return await view(user_id)
+    # Was seit dem Prestige dazukam, bleibt: zurück kommt der alte Stand plus die XP der letzten Stunden.
+    restored = int(undo["total"]) + int(doc.get("total") or 0)
+    await db.user_xp.update_one({"user_id": user_id}, {"$set": {"prestige": int(undo["prestige"]), "total": restored, "level": levels.level_for_xp(restored, int(undo["prestige"]))}, "$unset": {"prestige_undo": "", "prestige_at": ""}})
+    return await own_view(user_id)
 
 
 # ------------------------------------------------------------------ Erstberechnung

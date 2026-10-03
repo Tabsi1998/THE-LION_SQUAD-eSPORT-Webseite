@@ -6,8 +6,11 @@ import { Body } from "../components/Text";
 import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
+import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
+import { EasterBackdrop, EasterEarsWidget, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
+import { HuntStage, HuntWidget } from "./easterHunt";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
 import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
@@ -58,6 +61,15 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Fasching (S12 #643, F1–F3 #745–#747, wie im Web): Konfetti beim ersten Start des Tages (Skia), der Partyhut im
   // Dashboard-Kopf und am Tab „Mehr“, Luftschlangen oben in den Rändern, der Gruß einmal am Tag.
   carnival: { Sky: ConfettiSky, Corners: CarnivalCorners, Widget: PartyHatWidget, TabIcon: PartyHatTabIcon, Greeting: CarnivalGreeting },
+  // Vereinsgeburtstag (S13 #644, B1–B3 wie im Web): die Karte mit der Torte, Konfetti in Vereinsfarben aus der Torte,
+  // die Wimpelkette an der Begrüßungskarte.
+  club_birthday: { Sky: BirthdaySky, Greeting: BirthdayGreeting, Edge: BirthdayEdge },
+  // Ostern (S14 #645, E1 #753, E4 #756, wie im Web): Hasenohren im Dashboard-Kopf, Eier-Reihe an der Begrüßungskarte,
+  // das Osterei am Tab „Mehr“, Frühlingslicht, wenige Blätter, bei „voll“ der Zitronenfalter, selten der Feldhase, der Gruß.
+  easter: { Widget: EasterEarsWidget, Edge: EasterEdge, Greeting: EasterGreeting, Sky: EasterSky, TabIcon: EasterTabIcon, Backdrop: EasterBackdrop },
+  // Ostereiersuche (S15 #646/#647, wie im Web): die Eier an den Karten der Screens (die Bühne lädt und verteilt sie),
+  // das goldene Löwenei mit dem Stand im Dashboard-Kopf, der Korb unter „Mehr“.
+  easter_hunt: { Corners: HuntStage, Widget: HuntWidget },
 };
 
 /** Saisonen mit eigenem Screen statt Deko-Modul: der Adventkalender (#641). */

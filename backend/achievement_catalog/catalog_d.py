@@ -3,10 +3,10 @@
 Verein (nur Mitglieder, mit dem XP-Bonus aus E7), Besonders (Legendär, je eine Stufe), Geheim (versteckt bis zur
 Freischaltung, 40 Punkte). Die sieben Negativ-Gruppen bleiben unverändert im alten Block. Papierkram (Öffnen-Spur in
 ``document_opens``), Vorstandsarbeit (Datum je Funktion aus Dolibarr bzw. je Zuweisung von Hand) und Sprinter
-(``profile_completed_at``) sind seit dem Nachtrag messbar. Neun Gruppen aus #615 fehlen hier weiter, weil es ihre
+(``profile_completed_at``) sind seit dem Nachtrag messbar. Acht Gruppen aus #615 fehlen hier weiter, weil es ihre
 Daten (noch) nicht gibt: Versammlungen, Helferdienste, Helferstunden, LAN-Crew, Mitgliederstimme und Förderer liegen
 nur live in Dolibarr; Pünktlicher Beitrag braucht das Zahldatum (der Rechnungs-Zwischenspeicher kennt nur Status und
-Fälligkeit); Mitglieder werben braucht Einladungslinks; Eierkönig die Eiersuche (Jahreszeiten III).
+Fälligkeit); Mitglieder werben braucht Einladungslinks. Eierkönig kam mit der Ostereiersuche (#646) dazu.
 """
 from __future__ import annotations
 
@@ -64,6 +64,8 @@ SPECIAL = [
     _special("new_year", "Silvester dabei", "Um Mitternacht zu Silvester online gewesen.", "Am 31.12. um Mitternacht auf der Seite oder in der App sein.", "party-popper", "fireworks", "online_at_new_year", sort_order=1022, step="Silvester um Mitternacht dabei."),
     _special("advent_all", "Alle Türchen", "Alle 24 Türchen des Adventkalenders geöffnet.", "Jeden Tag im Advent das Türchen öffnen.", "calendar-heart", "advent", "advent_doors_opened", sort_order=1023, target=24, step="Alle 24 Türchen geöffnet."),
     _special("halloween", "Gruselnacht", "Am 31. Oktober abends den Kürbis angeklickt.", "Am 31.10. ab 18 Uhr den Kürbis oder die Laterne anklicken.", "ghost", "pumpkin-night", "halloween_pumpkin", sort_order=1024, step="Gruselnacht erlebt."),
+    # Eierkönig (#615, #646): kam erst mit der Eiersuche dazu.
+    _special("egg_king", "Eierkönig", "Bei der Ostereiersuche alle Eier gefunden.", "Zu Ostern alle versteckten Eier auf der Website und in der App finden.", "egg", "egg-king", "easter_hunts_completed", sort_order=1025, step="Alle Eier gefunden."),
 ]
 
 HIDDEN = [
