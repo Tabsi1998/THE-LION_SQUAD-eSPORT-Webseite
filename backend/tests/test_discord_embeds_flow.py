@@ -26,12 +26,12 @@ class FakeBot:
         self.deleted: set[str] = set()
         self.counter = 0
 
-    async def send_embed(self, channel_id, embed, buttons=None):
+    async def send_embed(self, channel_id, embed, buttons=None, *, content=None, mention_role_ids=None):
         self.counter += 1
         self.sent.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{self.counter}", "channel_id": channel_id}
 
-    async def edit_embed(self, channel_id, message_id, embed, buttons=None):
+    async def edit_embed(self, channel_id, message_id, embed, buttons=None, *, content=None):
         if message_id in self.deleted:
             return {"ok": False, "reason": "unknown_message"}
         self.edited.append({"channel_id": channel_id, "message_id": message_id, "embed": embed})
@@ -66,22 +66,35 @@ def bot(monkeypatch):
     return fake
 
 
+def text_of(embed: dict) -> str:
+    """Alles Lesbare einer Einbettung - Text und Felder (seit #866 stehen Listen als Felder)."""
+    return "\n".join([embed.get("description") or ""] + [f"{field['name']}\n{field['value']}" for field in embed.get("fields") or []])
+
+
 def test_embeds_are_pure_functions():
     season = {"id": "s1", "slug": "2026", "title": "Saison 2026"}
     rows = [{"display_name": "Paula", "total_points": 120.5}, {"username": "leon", "total_points": 80}]
     ranking = discord_embeds.ranking_embed(season, rows, "https://lionsquad.at", now_utc())
-    assert ranking["title"] == "🏆 Rangliste – Saison 2026" and "🥇 **Paula** – 120,5 Punkte" in ranking["description"] and "🥈 **leon** – 80 Punkte" in ranking["description"]
-    assert ranking["url"] == "https://lionsquad.at/seasons/2026" and ranking["footer"].startswith("Stand: ")
-    assert "Keine laufende Saison" in discord_embeds.ranking_embed(None, [], "https://lionsquad.at")["description"]
+    assert ranking["title"] == "🏆 Rangliste – Saison 2026" and "🥇 **Paula** — 120,5 Punkte" in ranking["description"] and "🥈 **leon** — 80 Punkte" in ranking["description"]
+    assert ranking["url"] == "https://lionsquad.at/seasons/2026" and ranking["footer"]["text"].startswith("Stand: ")
+    assert ranking["thumbnail"]["url"] == "https://lionsquad.at/assets/brand/tls-favicon.png"
+    nothing = discord_embeds.ranking_embed(None, [], "https://lionsquad.at")
+    assert "keine laufende Saison" in nothing["title"] and nothing["description"] == "Noch keine Punkte vergeben."
 
     items = [{"kind": "tournament", "title": "Sommer-Cup", "start": "2026-10-03T16:00:00+00:00", "path": "/tournaments/sommer-cup", "phase": {"label": "Anmeldung offen"}}]
     events = discord_embeds.events_embed(items, "https://lionsquad.at")
-    assert "**Sommer-Cup** · 03.10.2026, 18:00 Uhr · Turnier · Anmeldung offen" in events["description"] and "<https://lionsquad.at/tournaments/sommer-cup>" in events["description"]
-    assert "Nichts geplant" in discord_embeds.events_embed([], "https://lionsquad.at")["description"]
+    assert events["fields"][0]["name"].startswith("🏆 ") and events["fields"][0]["name"].endswith("03.10.2026 · 18:00 Uhr")
+    assert events["fields"][0]["value"] == "**[Sommer-Cup](https://lionsquad.at/tournaments/sommer-cup)**\nTurnier · Anmeldung offen"
+    without_state = discord_embeds.events_embed([{**items[0], "phase": None}], "https://lionsquad.at")
+    assert without_state["fields"][0]["value"].endswith("\nTurnier"), "ohne Stand kein loser Trennpunkt"
+    assert discord_embeds.events_embed([], "https://lionsquad.at")["description"] == "Nichts geplant – Termine folgen."
 
     live = discord_embeds.live_embed([{"display_name": "Paula", "game_name": "Rocket League", "title": "Finale!", "viewer_count": 12, "stream_url": "https://twitch.tv/paula"}], "https://lionsquad.at")
-    assert "🔴 **Paula** spielt Rocket League – „Finale!“ · 12 Zuschauer" in live["description"]
-    assert "Gerade streamt niemand." in discord_embeds.live_embed([], "https://lionsquad.at")["description"]
+    assert live["fields"] == [{"name": "🔴 Paula · 12 Zuschauer", "value": "[Finale!](https://twitch.tv/paula)\n🎮 Rocket League", "inline": False}]
+    assert "Gerade streamt niemand" in discord_embeds.live_embed([], "https://lionsquad.at")["description"]
+    sneaky = discord_embeds.live_embed([{"display_name": "x", "title": "**fett** @everyone [link](https://evil.example)", "viewer_count": 1, "stream_url": "https://twitch.tv/x"}], "https://lionsquad.at")
+    assert "\\*\\*fett\\*\\*" in sneaky["fields"][0]["value"] and "@\u200beveryone" in sneaky["fields"][0]["value"] and "\\[link\\]" in sneaky["fields"][0]["value"], \
+        "Werte aus der Website setzen kein Markdown, keine Links und pingen niemanden"
 
     a = discord_embeds.content_hash({"title": "x", "description": "y", "footer": "Stand: 10:00 Uhr"})
     b = discord_embeds.content_hash({"title": "x", "description": "y", "footer": "Stand: 10:10 Uhr"})
@@ -119,7 +132,7 @@ async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_th
 
     first = await discord_embeds.refresh(flow.db, "events", now=t0)
     assert first == {"ok": True, "reason": "posted", "message_id": "m1", "pinned": True}, first
-    assert bot.pinned == ["m1"] and "LAN-Party" in bot.sent[0]["embed"]["description"] and bot.sent[0]["embed"]["footer"]["text"].startswith("Stand: ")
+    assert bot.pinned == ["m1"] and "LAN-Party" in text_of(bot.sent[0]["embed"]) and bot.sent[0]["embed"]["footer"]["text"].startswith("Stand: ")
     assert (await discord_embeds.refresh(flow.db, "ranking", now=t0))["reason"] == "disabled"
 
     # Gleicher Inhalt eine Minute später: keine Bearbeitung.
@@ -133,7 +146,7 @@ async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_th
     # Nach der Minute: bearbeitet statt neu, die Nachricht bleibt m1.
     edited = await discord_embeds.refresh(flow.db, "events", now=t0 + timedelta(seconds=90))
     assert edited == {"ok": True, "reason": "edited", "message_id": "m1", "pinned": None}
-    assert len(bot.sent) == 1 and bot.edited[-1]["message_id"] == "m1" and "Herbst-Cup" in bot.edited[-1]["embed"]["description"]
+    assert len(bot.sent) == 1 and bot.edited[-1]["message_id"] == "m1" and "Herbst-Cup" in text_of(bot.edited[-1]["embed"])
     assert "events" not in discord_embeds.pending()
 
     # Nachricht gelöscht: der Bot postet neu und pinnt wieder.
@@ -146,7 +159,7 @@ async def test_one_message_per_embed_edit_on_change_repost_after_deletion_and_th
     # Der Sammler alle 10 min schreibt den Stand neu (force), auch ohne Änderung; leer bleibt „niemand“.
     outcome = await discord_embeds.sweep(flow.db, full=True)
     assert outcome["checked"] == 2 and outcome["posted"] == 1, outcome   # live wird zum ersten Mal gepostet, events gebremst oder bearbeitet
-    assert "Gerade streamt niemand." in bot.sent[-1]["embed"]["description"]
+    assert "Gerade streamt niemand" in text_of(bot.sent[-1]["embed"])
 
     flow.act_as(await flow.add_user(role="club_admin", name="admin2"))
     status = (await flow.get("/api/settings/discord")).json()["embeds"]

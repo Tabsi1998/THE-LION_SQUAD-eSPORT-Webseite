@@ -236,6 +236,32 @@ Der Reiter „Server“ zeigt umgekehrt je Server die **Spiele auf diesem Server
 
 Versand je Spiel, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
 
+## Gestaltung und Stream-Meldungen (#866)
+
+**Gestaltung** (Verbindungen → Discord → Reiter „Gestaltung“): Jede Meldungsart ist eine Vorlage im Discord-Format –
+Farbe, Text über dem Kasten, Autorzeile mit Bild, Titel mit Link, Text, Felder, Bild rechts, großes Bild, Fußzeile mit
+Symbol, Zeitstempel. Platzhalter in geschweiften Klammern (`{streamer}`, `{title}` …) füllt die Website; was in `[[ … ]]`
+steht, erscheint nur, wenn jeder Platzhalter darin einen Wert hat. Listen (Live jetzt, Nächste Events, Rangliste) zeigen
+je Eintrag eine Zeile (`row` → `{rows}`) oder ein Feld (`row_field`). Bearbeiten als Formular oder JSON, Vorschau vom
+Server mit Beispielwerten oder echten Daten, „Standard wiederherstellen“, Testnachricht in den Testkanal (erwähnt
+niemanden). Gespeichert wird nur, was die Prüfung besteht (Platzhalter, Adressen, Farbe, Discord-Grenzen, nie
+`@everyone`/`@here`). Werte aus der Website werden dort, wo Discord Markdown zeigt, entschärft.
+
+Heute gestaltbar: Stream gestartet, Stream beendet und die vier angehefteten Einbettungen (Live jetzt, Nächste Events,
+Rangliste, Erfolg der Woche). News-, Event- und Turnier-Meldungen folgen im zweiten Teil.
+
+**Stream-Meldungen je Stream** (Reiter „Einbettungen & Termine“ → „Stream-Meldungen“): Sobald jemand aus dem Verein
+live geht – dieselbe Regel wie die Startseite (aktive Mitgliedschaft, Mitgliederprofil) –, postet der Bot eine Meldung
+in den gewählten Kanal, auf Wunsch mit Erwähnung **einer** Rolle (nur beim ersten Posten, `allowed_mentions` nur diese
+Rolle). Alle zehn Minuten aktualisiert (Zuschauer, Titel, Spiel, neues Vorschaubild), am Ende zu „war live“ mit Dauer
+und Höchstzahl – oder gelöscht. Höchstens fünf neue Meldungen je Lauf.
+
+- Code: `services/discord_design.py` (`KINDS`, `render`, `validate`, `sample`, `template_for`; Einstellung
+  `discord_design`), `services/discord_streams.py` (`sync` am Twitch-Abruf, `status`; Sammlung `discord_stream_posts`,
+  Einstellung `settings.discord.streams`), `services/discord_embeds.py` liefert nur noch die Werte (`*_context`),
+  Routen `routes/discord_design_routes.py` (`/api/settings/discord/design…`, `/api/settings/discord/streams`), Bot
+  `send_embed(content=, mention_role_ids=)`, `edit_embed(content=)`, `list_roles`, `allowed_mentions`.
+
 ## Konten verknüpfen (Discord, Twitch, Steam)
 
 Mitglieder verknüpfen im Profil → Socials ihr Discord-, Twitch- oder Steam-Konto per Anmeldung

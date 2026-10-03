@@ -5,9 +5,11 @@ import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useAuth } from "@/context/AuthContext";
 import { DiscordBotPanel } from "./DiscordBotPanel";
+import { DiscordDesignPanel } from "./DiscordDesignPanel";
 import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
 import { DiscordGuildsPanel } from "./DiscordGuildsPanel";
 import { DiscordScheduledPanel } from "./DiscordScheduledPanel";
+import { DiscordStreamsPanel } from "./DiscordStreamsPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordTargets } from "./DiscordTargets";
 import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
@@ -20,13 +22,14 @@ import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
 export const DISCORD_TABS = [
   { key: "messages", label: "Meldungen" },
   { key: "embeds", label: "Einbettungen & Termine" },
+  { key: "design", label: "Gestaltung" },
   { key: "welcome", label: "Willkommen" },
   { key: "bot", label: "Bot & Aktivität" },
   { key: "servers", label: "Server" },
 ];
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
-const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
+const READ_ONLY = ["configured", "channels", "events", "embeds", "scheduled_events", "welcome", "streams", "streams_state", "target_status", "bot", "last_status", "last_error", "last_event_key", "last_checked_at", "updated_at"];
 
 /** Nur, was sich einstellen lässt - der Rest der Antwort ist Stand, kein Feld. */
 export function discordPayload(source) {
@@ -152,8 +155,10 @@ export function DiscordSettings({ initialTab = "messages" }) {
       </>}
       {tab === "embeds" && <>
         <DiscordEmbedsPanel />
+        <DiscordStreamsPanel onDesign={() => setTab("design")} />
         <DiscordScheduledPanel />
       </>}
+      {tab === "design" && <DiscordDesignPanel />}
       {tab === "welcome" && <DiscordWelcomePanel />}
       {tab === "servers" && <DiscordGuildsPanel />}
       {tab === "bot" && <>

@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { DiscordMessagePreview, embedColor, renderDiscordText } from "./DiscordMessagePreview";
+import { DiscordMessagePreview, discordTime, embedColor, renderDiscordText } from "./DiscordMessagePreview";
 
 // Discord-Nachbildung (#583): Bot-Name mit BOT-Plakette, Farbleiste, Titel als Link, Fettschrift im
 // Text, Felder, Bild und Fußzeile - alles aus dem Embed, das der Server auch wirklich schickt.
@@ -33,7 +33,7 @@ test("Titel, Felder, Bild und Fußzeile stehen im Kasten; der Titel ist ein Link
   );
   const message = screen.getByTestId("msg");
   expect(message).toHaveTextContent("LION Bot");
-  expect(message).toHaveTextContent("BOT");
+  expect(message).toHaveTextContent("APP");
   const embed = screen.getByTestId("msg-embed");
   expect(embed).toHaveStyle({ borderLeftColor: "#00ff88" });
   expect(embed.querySelector("a")).toHaveAttribute("href", "https://lionsquad.at/tournaments/sommer-cup");
@@ -48,4 +48,45 @@ test("ohne Link ist der Titel nur Text", () => {
   const embed = screen.getByTestId("custom-embed");
   expect(embed.querySelector("a")).toBeNull();
   expect(embed).toHaveTextContent("Neuer Mitgliedsantrag");
+});
+
+// Gestaltung (#866): was ein Discord-Embed kann, zeigt auch die Vorschau.
+test("Text über dem Kasten mit Rollen-Erwähnung, Autorzeile, Bild rechts, großes Bild und Fußzeile mit Symbol und Uhrzeit", () => {
+  render(
+    <DiscordMessagePreview
+      testId="stream"
+      content="🔴 **Paula** ist jetzt live! <@&300>"
+      roles={{ 300: "Stream-Ping" }}
+      embed={{
+        color: 0x9146ff, title: "Finale!", url: "https://twitch.tv/paula",
+        author: { name: "Paula", url: "https://lionsquad.at/members/paula", icon_url: "https://lionsquad.at/a.png" },
+        fields: [{ name: "Zuschauer", value: "12", inline: true }],
+        thumbnail: { url: "https://lionsquad.at/t.png" }, image: { url: "https://lionsquad.at/preview.jpg" },
+        footer: { text: "Twitch", icon_url: "https://lionsquad.at/f.png" }, timestamp: "2026-10-03T17:15:00+00:00",
+      }}
+    />,
+  );
+  expect(screen.getByTestId("stream-content")).toHaveTextContent("Paula ist jetzt live! @Stream-Ping");
+  expect(screen.getByTestId("stream-content").querySelector("strong")).toHaveTextContent("Paula");
+  expect(screen.getByTestId("stream-author").querySelector("a")).toHaveAttribute("href", "https://lionsquad.at/members/paula");
+  expect(screen.getByTestId("stream-thumbnail")).toHaveAttribute("src", "https://lionsquad.at/t.png");
+  expect(screen.getByTestId("stream-image")).toHaveAttribute("src", "https://lionsquad.at/preview.jpg");
+  expect(screen.getByTestId("stream-footer")).toHaveTextContent("Twitch •");
+  expect(screen.getByTestId("stream-footer").querySelector("img")).toHaveAttribute("src", "https://lionsquad.at/f.png");
+});
+
+test("Markdown wie im Discord: Links mit Text, kursiv, Escapes zeigen das Zeichen", () => {
+  render(<div data-testid="md">{renderDiscordText("[Sommer-Cup](https://lionsquad.at/cup) *bald* \\*\\*kein fett\\*\\* \\[x\\]")}</div>);
+  const md = screen.getByTestId("md");
+  expect(md.querySelector("a")).toHaveAttribute("href", "https://lionsquad.at/cup");
+  expect(md.querySelector("em")).toHaveTextContent("bald");
+  expect(md.querySelector("strong")).toBeNull();
+  expect(md).toHaveTextContent("**kein fett** [x]");
+});
+
+test("die Uhrzeit heißt heute „Heute um …“, sonst steht das Datum da", () => {
+  const now = new Date("2026-10-03T18:00:00");
+  expect(discordTime("2026-10-03T17:15:00", now)).toMatch(/^Heute um 17:15 Uhr$/);
+  expect(discordTime("2026-10-01T17:15:00", now)).toMatch(/^01\.10\.2026 17:15$/);
+  expect(discordTime("kein Datum", now)).toBe("");
 });

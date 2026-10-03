@@ -298,6 +298,12 @@ async def fetch_live_streams() -> dict:
         await sync_tournament_streams(db)
     except Exception:  # noqa: BLE001 - die Live-Erkennung darf daran nie scheitern
         logger.warning("[twitch] tournament streams", exc_info=True)
+    # Stream-Meldungen je Stream (#866): neue melden, laufende aktualisieren, beendete abschließen.
+    try:
+        from services.discord_streams import sync as sync_discord_streams
+        await sync_discord_streams(db)
+    except Exception:  # noqa: BLE001 - die Live-Erkennung darf daran nie scheitern
+        logger.warning("[twitch] discord stream posts", exc_info=True)
     return await record_poll("ok", checked=len(by_login), live=len(seen_logins))
 
 

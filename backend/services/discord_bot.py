@@ -235,6 +235,14 @@ CHANNEL_TEXTS = {
 }
 
 
+def allowed_mentions(role_ids: list[str] | None):
+    """Wen eine Nachricht erwähnen darf (#866): höchstens die gewählten Rollen - nie @everyone, @here oder Personen."""
+    import discord
+
+    roles = [discord.Object(id=int(role_id)) for role_id in role_ids or [] if str(role_id).isdigit()]
+    return discord.AllowedMentions(everyone=False, users=False, roles=roles, replied_user=False)
+
+
 def channel_row(channel, permissions) -> dict:
     """Ein Textkanal für die Kanalwahl im Admin - mit dem, was der Bot dort darf (#566)."""
     category = getattr(channel, "category", None)
@@ -644,6 +652,17 @@ class BotRunner:
                     out[str(guild_id)] = None
         return out
 
+    async def list_roles(self) -> dict:
+        """Die Rollen des Hauptservers für die Auswahl „Rolle erwähnen“ (#866) - ohne @everyone und ohne Rollen von
+        Bots und Integrationen. Offline: leer mit Grund."""
+        guild = self._guild() if self._client is not None and self.connected else None
+        if guild is None:
+            return {"ok": False, "reason": "offline", "roles": []}
+        rows = [{"id": str(role.id), "name": role.name, "color": int(getattr(role.colour, "value", 0) or 0)}
+                for role in sorted(guild.roles, key=lambda role: role.position, reverse=True)
+                if not role.is_default() and not getattr(role, "managed", False)]
+        return {"ok": True, "roles": rows}
+
     def _guild(self, view: dict | None = None):
         client = self._client
         view = view or self._view or {}
@@ -682,10 +701,12 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
 
-    async def send_embed(self, channel_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+    async def send_embed(self, channel_id: str, embed: dict, buttons: list[dict] | None = None, *, content: str | None = None,
+                         mention_role_ids: list[str] | None = None) -> dict:
         """Ein Embed in genau diesen Kanal (#566), auf Wunsch mit Link-Knöpfen darunter (#573). Kein Rückfall:
         ist der Bot aus oder darf er dort nicht schreiben, kommt der Grund zurück - den Text dazu kennt
-        discord_service.REASON_TEXTS."""
+        discord_service.REASON_TEXTS. ``content`` (#866) steht über dem Kasten; erwähnt wird darin höchstens
+        ``mention_role_ids`` - nie @everyone, @here oder einzelne Personen."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -701,7 +722,8 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
             await self._reopen(channel)
-            message = await channel.send(embed=discord.Embed.from_dict(embed), view=link_view(buttons))
+            message = await channel.send(content=content or None, embed=discord.Embed.from_dict(embed), view=link_view(buttons),
+                                         allowed_mentions=allowed_mentions(mention_role_ids))
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:
@@ -730,9 +752,11 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
 
-    async def edit_embed(self, channel_id: str, message_id: str, embed: dict, buttons: list[dict] | None = None) -> dict:
+    async def edit_embed(self, channel_id: str, message_id: str, embed: dict, buttons: list[dict] | None = None, *,
+                         content: str | None = None) -> dict:
         """Eine eigene Nachricht bearbeiten (#569). Ist sie weg, kommt ``unknown_message`` - dann wird neu gepostet.
-        Ohne ``buttons`` bleiben die Knöpfe, wie sie sind (#573)."""
+        Ohne ``buttons`` bleiben die Knöpfe, wie sie sind (#573); ohne ``content`` der Text darüber (#866) - ein
+        bearbeiteter Text erwähnt niemanden neu."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -747,6 +771,9 @@ class BotRunner:
             changes = {"embed": discord.Embed.from_dict(embed)}
             if buttons is not None:
                 changes["view"] = link_view(buttons)
+            if content is not None:
+                changes["content"] = content or None
+                changes["allowed_mentions"] = allowed_mentions(None)
             await message.edit(**changes)
         except (discord.NotFound, ValueError):
             return {"ok": False, "reason": "unknown_message"}

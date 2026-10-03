@@ -109,11 +109,13 @@ def test_the_week_embed_names_only_what_the_site_shows():
     doc = {"award": {"name": "Champion III", "material_name": "Gold", "material_color": "#FFD700", "group_name": "Turniersieger", "description": "Drei Turniere gewonnen.",
                      "holders": 1, "percent": 2.5, "user": {"username": "paula", "display_name": "Paula"}}}
     embed = discord_embeds.achievement_week_embed(doc, "https://lionsquad.at")
-    assert embed["title"] == "🏅 Erfolg der Woche: Champion III"
-    assert "Freigeschaltet von **Paula**" in embed["description"] and "Seltenheit: 2,5 % – nur diese Person" in embed["description"]
+    # Seit #866 im Aussehen der Gestaltung: Autorzeile „Erfolg der Woche“, Titel der Erfolg, Person/Material/Seltenheit als Felder.
+    assert embed["author"]["name"] == "🏅 Erfolg der Woche" and embed["title"] == "Champion III"
+    fields = {field["name"]: field["value"] for field in embed["fields"]}
+    assert fields == {"Freigeschaltet von": "Paula", "Material": "Gold", "Seltenheit": "2,5 % – nur diese Person"}
     assert embed["url"] == "https://lionsquad.at/u/paula" and embed["color"] == 0xFFD700
     empty = discord_embeds.achievement_week_embed({"award": None}, "https://lionsquad.at")
-    assert "kein Erfolg" in empty["description"] and empty["url"] == "https://lionsquad.at/achievements"
+    assert "kein Erfolg" in empty["description"] and empty["url"] == "https://lionsquad.at/achievements" and "fields" not in empty
     assert "achievement_week" in discord_embeds.KINDS
 
 

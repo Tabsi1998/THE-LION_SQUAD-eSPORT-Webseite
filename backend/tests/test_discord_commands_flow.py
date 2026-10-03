@@ -192,11 +192,11 @@ async def test_bracket_command_picks_from_running_public_tournaments(flow):
 @pytest.mark.asyncio
 async def test_ranking_and_streams_answer_like_the_pinned_embeds(flow):
     empty = await discord_commands.answer_rangliste(flow.db)
-    assert "Keine laufende Saison" in empty["embed"]["description"] and empty["buttons"][0]["label"] == "Rangliste ansehen"
+    assert "keine laufende Saison" in empty["embed"]["title"] and empty["buttons"][0]["label"] == "Rangliste ansehen"
     await flow.db.seasons.insert_one({"id": "s1", "slug": "2027", "title": "Saison 2027", "status": "active"})
     ranking = await discord_commands.answer_rangliste(flow.db)
     assert ranking["embed"]["title"] == "🏆 Rangliste – Saison 2027" and ranking["embed"]["url"].endswith("/seasons/2027")
-    assert "Gerade streamt niemand." in (await discord_commands.answer_wer_streamt(flow.db))["embed"]["description"]
+    assert "Gerade streamt niemand" in (await discord_commands.answer_wer_streamt(flow.db))["embed"]["description"]
 
 
 @pytest.mark.asyncio
