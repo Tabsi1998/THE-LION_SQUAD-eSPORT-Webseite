@@ -9,6 +9,11 @@ import { isGuestUser } from "../live";
 import { navigateToNotification, navigationRef } from "../navigation/rootNavigation";
 import { POPUP_AUTO_HIDE_MS, mergePopup, popupBody, popupTitle, suppressedByOpenChat, type PopupState } from "../lib/popups";
 import { announceAchievementUnlocked } from "../lib/achievements";
+
+/** Erfolge und Level-Aufstiege feiert die Zeremonie - sie kommen nicht zusätzlich als Banner. */
+export function isCeremonyKind(kind?: string): boolean {
+  return kind === "achievement" || kind === "level";
+}
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
 import type { UserNotification } from "../types";
@@ -62,8 +67,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       if (existing) return rows.map((row) => row.id === item.id ? { ...row, ...item, read: row.read } : row);
       return [item, ...rows].slice(0, 80);
     });
-    // Ein Erfolg bekommt seinen eigenen Moment (#218), keinen Banner obendrauf.
-    if (item.kind === "achievement") {
+    // Ein Erfolg oder ein neues Level bekommt seinen eigenen Moment (#218, Zeremonie E13 #623), keinen Banner obendrauf.
+    if (isCeremonyKind(item.kind)) {
       announceAchievementUnlocked();
       return;
     }
@@ -86,8 +91,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const nextUnread = rows.filter((item) => !item.read && item.id && !knownIds.current.has(item.id)).slice(0, 3);
       if (primed.current && nextUnread.length) {
         const route = navigationRef.isReady() ? navigationRef.getCurrentRoute() : null;
-        if (nextUnread.some((item) => item.kind === "achievement")) announceAchievementUnlocked();
-        const fresh = nextUnread.filter((item) => item.kind !== "achievement" && !suppressedByOpenChat(item, route));
+        if (nextUnread.some((item) => isCeremonyKind(item.kind))) announceAchievementUnlocked();
+        const fresh = nextUnread.filter((item) => !isCeremonyKind(item.kind) && !suppressedByOpenChat(item, route));
         if (fresh.length) setPopup((current) => fresh.reduceRight((state, item) => mergePopup(state, item), current));
       }
       knownIds.current = new Set(rows.map((item) => item.id).filter(Boolean));

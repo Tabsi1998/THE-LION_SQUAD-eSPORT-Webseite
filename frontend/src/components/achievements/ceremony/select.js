@@ -127,6 +127,8 @@ export function planCeremony(pkg) {
     autoAdvanceMs: sequence === "stack" ? meta.perItem : 0,
     tiers,
     top,
+    // Die Gruppe, die das Paket vollständig macht - Sockel und Überschrift zeigen sie, nicht die höchste Stufe.
+    groupCompleted: context.groupCompleted || null,
     points: tiers.reduce((sum, t) => sum + Number(t.points || 0), 0),
     levelUp,
     catchUp: Boolean(context.catchUp),
@@ -144,6 +146,11 @@ export function particleBudget(sequence, material) {
   const base = { single: 40, stack: 60, first: 80, group: 110, category: 120, diamond: 160, legendary: 160, levelup: 120 }[sequence] || 40;
   const bonus = material === "gold" ? 20 : material === "diamond" ? 30 : material === "legendary" ? 30 : 0;
   return Math.min(160, base + bonus);
+}
+
+/** Die Stufe, die für die abgeschlossene Gruppe steht - sonst die höchste. */
+export function groupTier(plan) {
+  return (plan?.groupCompleted && (plan.tiers || []).find((t) => t.group_code === plan.groupCompleted)) || plan?.top || null;
 }
 
 export function particleKind(material) {

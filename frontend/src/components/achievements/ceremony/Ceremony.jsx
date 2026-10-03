@@ -7,7 +7,7 @@ import { Badge } from "../Badge";
 import { MATERIAL_LOOKS } from "../materials";
 import { Motion, StageBadge } from "./motions";
 import { runParticles } from "./particles";
-import { particleKind } from "./select";
+import { groupTier, particleKind } from "./select";
 import { playCeremonySound, readSoundPrefs, writeSoundPrefs } from "./sounds";
 import "./ceremony.css";
 
@@ -61,7 +61,7 @@ function TierRow({ tier, material, index, active, onPick }) {
 
 // Gruppe abgeschlossen: der Sockel wächst, die sieben Stufen leuchten nacheinander auf.
 function GroupPedestal({ plan, reduced }) {
-  const top = plan.top;
+  const top = groupTier(plan);
   const ranks = [1, 2, 3, 4, 5, 6, 7];
   const ladder = ["wood", "iron", "bronze", "silver", "gold", "platinum", "diamond"];
   return (
@@ -172,7 +172,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
     if (plan.heading) return plan.heading;
     if (isLevelOnly) return `Level ${plan.levelUp?.level} erreicht`;
     if (plan.sequence === "first") return "Dein erster Erfolg";
-    if (plan.sequence === "group") return `${plan.top?.group_name || "Gruppe"} vollständig`;
+    if (plan.sequence === "group") return `${groupTier(plan)?.group_name || "Gruppe"} vollständig`;
     if (plan.sequence === "category") return "Kategorie abgeschlossen";
     if (plan.sequence === "legendary") return String(plan.top?.name || "Legendär").toUpperCase();
     if (plan.sequence === "diamond") return "Diamant";
