@@ -43,7 +43,8 @@ def _dt(value) -> datetime | None:
 
 def config(settings: dict | None) -> dict:
     raw = (settings or {}).get("streams") if isinstance((settings or {}).get("streams"), dict) else {}
-    on_end = raw.get("on_end") if raw.get("on_end") in END_MODES else "edit"
+    # Vorgabe „löschen“ (#883): dann zeigt der Kanal immer, wer gerade live ist.
+    on_end = raw.get("on_end") if raw.get("on_end") in END_MODES else "delete"
     role_id = str(raw.get("role_id") or "").strip()
     return {"enabled": bool(raw.get("enabled")), "channel_id": str(raw.get("channel_id") or "").strip(), "on_end": on_end,
             "role_id": role_id if role_id.isdigit() else ""}

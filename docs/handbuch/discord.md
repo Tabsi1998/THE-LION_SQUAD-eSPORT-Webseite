@@ -37,8 +37,8 @@ es gibt keinen eigenen Container und nichts in der `.env`.
 | **Meldungen** | News, Events, Turnier-Meldungen, Fast-Lap-Bestzeiten, Vereinsgeburtstag, Hinweise an den Vorstand, Betriebsalarme | Reiter „Meldungen“ | Turniere und Fast Lap an, der Rest aus |
 | **Turnier-Thread** | Je Turnier eine Meldung im Kanal, alles Weitere (Check-in, live, Streams, Bracket, Endstand) im Thread darunter | Reiter „Meldungen“ | an |
 | **Bracket im Discord** | Das Bracket eines laufenden Turniers, angeheftet und nach jedem Ergebnis aktualisiert | automatisch im Turnier-Thread | an |
-| **Einbettungen, die sich aktualisieren** | Je eine angeheftete Nachricht: Rangliste, Nächste Events, Live jetzt, Erfolg der Woche | Reiter „Einbettungen & Termine“ | aus |
-| **Stream-Meldungen** | Je Stream eine Meldung mit Vorschaubild, sobald jemand aus dem Verein live geht; am Ende „war live“ | Reiter „Einbettungen & Termine“ | aus |
+| **Einbettungen, die sich aktualisieren** | Je eine angeheftete Nachricht: Rangliste, Nächste Events, Erfolg der Woche | Reiter „Einbettungen & Termine“ | aus |
+| **Stream-Meldungen** | Je Stream eine Meldung mit Vorschaubild, sobald jemand aus dem Verein live geht; am Ende gelöscht – so zeigt der Kanal, wer gerade live ist | Reiter „Einbettungen & Termine“ | aus |
 | **Gestaltung** | Aussehen der Stream-Meldungen und Einbettungen frei gestalten – mit Live-Vorschau | Reiter „Gestaltung“ | Standard-Design |
 | **Discord-Termine** | Jedes öffentliche Event und Turnier als Discord-Event mit „Interessiert“-Knopf | Reiter „Einbettungen & Termine“ | aus |
 | **Willkommensnachricht** | Wer neu auf den Server kommt, bekommt eine Direktnachricht mit „Anmelden“ und „Konto verknüpfen“ | Reiter „Willkommen“ | aus |
@@ -233,12 +233,16 @@ und bearbeitet sie danach – statt immer neuer Nachrichten.
 | --- | --- |
 | Rangliste | Top 10 der Jahreswertung der laufenden Saison |
 | Nächste Events | die nächsten fünf Events und Turniere mit Zeit und Stand der Anmeldung |
-| Live jetzt | wer aus dem Verein gerade streamt, mit Link |
 | Erfolg der Woche | die seltenste Freischaltung der letzten Woche (nur öffentliche Profile) |
 
 Je Einbettung: Kanal wählen, einschalten, speichern. Aktualisiert wird bei Änderungen (höchstens
 einmal pro Minute), die Fußzeile „Stand: …“ alle zehn Minuten. Wird die Nachricht gelöscht, postet
-der Bot sie neu.
+der Bot sie neu. „Zuletzt geprüft“ zeigt, ob der Lauf noch kommt; kann er nichts schreiben (Bot aus,
+Discord aus, Fehler beim Aufbauen), steht dort der Grund.
+
+Wer gerade streamt, zeigt seit Oktober 2026 keine angeheftete Übersicht mehr, sondern die Stream-Meldungen (4.4):
+Mit „Meldung löschen“ steht im Kanal immer genau, wer live ist. Die alte Übersicht „Live jetzt“ hat der Bot
+einmal selbst gelöscht und ihren Kanal den Stream-Meldungen vorgeschlagen.
 
 Aussehen und Texte gestaltet ihr im Reiter „Gestaltung“ ([4.12](#412-gestaltung-der-meldungen)).
 
@@ -254,7 +258,8 @@ Vorschaubild, Fußzeile mit Uhrzeit, Knopf „Zuschauen“.
   eine Rolle nur, wenn sie erwähnt werden darf: Servereinstellungen → Rollen → die Rolle → „Jedem erlauben,
   diese Rolle zu @erwähnen“. Das Panel sagt es, wenn das fehlt.
 - **Alle zehn Minuten** aktualisiert: Zuschauer, Titel, Spiel, neues Vorschaubild.
-- **Wenn der Stream endet:** die Meldung wird zu „war live“ mit Dauer und Höchstzahl – oder gelöscht.
+- **Wenn der Stream endet:** die Meldung wird **gelöscht** (Vorgabe – dann zeigt der Kanal immer, wer gerade live ist)
+  oder zu „war live“ mit Dauer und Höchstzahl.
 - Gemeldet wird, wer auch auf der Startseite erscheint: aktive Mitgliedschaft und Mitgliederprofil mit
   verknüpftem Twitch. Höchstens fünf neue Meldungen auf einmal (etwa nach einem Ausfall).
 - Rechte im Kanal: wie bei allen Meldungen, dazu „Nachrichtenverlauf anzeigen“ zum Aktualisieren.
@@ -331,14 +336,14 @@ Den Stand zeigt **Reiter „Bot & Aktivität“ → „Discord auf der Website�
 ### 4.12 Gestaltung der Meldungen
 
 **Reiter „Gestaltung“.** Jede Meldungsart ist eine Vorlage – heute: *Stream gestartet*, *Stream beendet*,
-*Live jetzt*, *Nächste Events und Turniere*, *Rangliste*, *Erfolg der Woche* (News, Events und Turniere folgen).
+*Antwort auf /wer-streamt*, *Nächste Events und Turniere*, *Rangliste*, *Erfolg der Woche* (News, Events und Turniere folgen).
 
 - **Formular** (Farbe, Text über dem Kasten, Autorzeile mit Bild, Titel mit Link, Text, Felder, Bild rechts,
   großes Bild, Fußzeile mit Symbol, Uhrzeit) oder **JSON** im Discord-Format.
 - **Platzhalter** wie `{streamer}`, `{title}`, `{viewers}` anklicken – sie landen im zuletzt gewählten Feld.
   Was in `[[ … ]]` steht, erscheint nur, wenn jeder Platzhalter darin einen Wert hat:
   `🎮 {game}[[ · seit {started}]]`.
-- **Listen** (Live jetzt, Nächste Events, Rangliste): je Eintrag ein Feld oder eine Zeile im Text.
+- **Listen** (Antwort auf /wer-streamt, Nächste Events, Rangliste): je Eintrag ein Feld oder eine Zeile im Text.
 - **Vorschau** rechts – mit Beispieldaten oder den **echten Daten von jetzt**. So sieht es im Discord aus.
 - **Speichern** geht nur, wenn die Vorlage passt; was nicht passt, steht in Worten unter der Vorschau.
   **Testnachricht** schickt den Entwurf in den Testkanal (ohne jemanden zu erwähnen),

@@ -8,7 +8,7 @@ import { channelOptionLabel } from "./DiscordTargets";
 // pinnt sie und bearbeitet sie danach (höchstens einmal pro Minute, ein Sammler alle zehn Minuten).
 // Hier steht je Einbettung der Stand: gepostet, zuletzt aktualisiert, Fehler im Klartext.
 
-export const EMBED_ORDER = ["ranking", "events", "live", "achievement_week"];
+export const EMBED_ORDER = ["ranking", "events", "achievement_week"];
 
 export function whenText(value) {
   if (!value) return "";
@@ -16,13 +16,19 @@ export function whenText(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("de-DE");
 }
 
+// „zuletzt geprüft“ (#883): ob der Lauf überhaupt noch kommt - sonst stand „Nachricht steht“ tagelang still da.
+function checkedText(entry) {
+  return entry.checked_at ? ` · zuletzt geprüft ${whenText(entry.checked_at)}` : "";
+}
+
 export function stateText(entry) {
   if (!entry) return "";
-  if (entry.error) return `Fehler: ${entry.error}`;
+  if (entry.error) return `Fehler: ${entry.error}${checkedText(entry)}`;
   if (!entry.enabled) return "aus";
   if (!entry.channel_id) return "kein Kanal gewählt – es wird nichts gepostet";
+  if (entry.paused) return `Angehalten: ${entry.paused}${checkedText(entry)}`;
   if (!entry.message_id) return "eingeschaltet – die Nachricht kommt mit dem nächsten Lauf";
-  return `Nachricht steht${entry.updated_at ? ` · Stand ${whenText(entry.updated_at)}` : ""}${entry.pending ? " · Änderung vorgemerkt" : ""}`;
+  return `Nachricht steht${entry.updated_at ? ` · Stand ${whenText(entry.updated_at)}` : ""}${entry.pending ? " · Änderung vorgemerkt" : ""}${checkedText(entry)}`;
 }
 
 export function refreshResultText(result) {
