@@ -633,6 +633,15 @@ async def _prepare_tournament_transition(db, doc: dict, next_status: str) -> boo
         return next_status == "check_in"
 
 
+async def _discord_status_changed(db, doc: dict, status: str) -> None:
+    """Zeitgesteuerte Wechsel melden sich im Discord wie die von Hand (#572) - vorher blieben sie stumm."""
+    try:
+        from services.discord_threads import status_changed
+        await status_changed(db, doc, doc.get("status"), status)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[scheduler] discord status %s: %s", doc.get("id"), type(exc).__name__)
+
+
 async def _safe_status_transitions():
     try:
         from database import get_db
@@ -656,6 +665,8 @@ async def _safe_status_transitions():
                         {"$set": {"status": nxt, "updated_at": now_iso}},
                     )
                     changed += 1
+                    if kind == "tournament":
+                        await _discord_status_changed(db, doc, nxt)
         if changed:
             logger.info(f"[scheduler] status_transitions changed={changed}")
     except Exception as exc:

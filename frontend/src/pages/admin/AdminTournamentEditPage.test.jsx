@@ -130,6 +130,21 @@ test("Finanzen schaltet das Startgeld ein und Speichern schickt es mit den Turni
   })));
 });
 
+// „Ohne Discord“ (#572): keine Meldung, kein Thread, kein Bracket - der Haken geht beim Speichern mit.
+test("„Ohne Discord“ geht beim Speichern mit", async () => {
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByRole("heading", { name: "Winter Cup 2026" });
+  await user.click(screen.getByTestId("admin-tr-tab-edit"));
+
+  const skip = await screen.findByTestId("tr-edit-discord-skip");
+  expect(skip).not.toBeChecked();
+  expect(skip.closest("label")).toHaveTextContent("kein Thread, kein Bracket");
+  await user.click(skip);
+  await user.click(screen.getByTestId("tr-edit-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/tournaments/t-1", expect.objectContaining({ discord_skip: true })));
+});
+
 test("laedt das Turnier und zeigt Titel und Status", async () => {
   renderPage();
 

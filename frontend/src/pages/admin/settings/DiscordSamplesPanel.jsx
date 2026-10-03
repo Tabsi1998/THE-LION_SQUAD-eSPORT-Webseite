@@ -78,6 +78,7 @@ export function DiscordSamplesPanel() {
                   <div className="text-sm font-bold">{entry.label}</div>
                   <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
                     {entry.enabled === false && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-off`}>Ereignis aus</span>}
+                    {entry.place && <span className="text-[#b8c0ff]" data-testid={`discord-sample-${entry.key}-place`}>{entry.place}</span>}
                     <span>{entry.source_text}</span>
                   </div>
                 </div>

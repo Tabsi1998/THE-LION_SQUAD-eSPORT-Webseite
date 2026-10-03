@@ -55,6 +55,12 @@ test("wohin ein Ziel wirklich liefert, steht in Worten da", () => {
   expect(lastAttemptText(DATA.target_status.news.last)).toContain("Berechtigungen");
   expect(channelOptionLabel(CHANNELS.channels[2])).toBe("#vorstand (Intern) – ohne „Links einbetten“");
   expect(channelOptionLabel(CHANNELS.channels[3])).toBe("#regeln (Info) – Bot darf hier nicht schreiben");
+  // Turnier-Threads (#572): nur wo Turnier-Meldungen landen, zählt das Thread-Recht.
+  const noThreads = { name: "turniere", category: "", can_send: true, can_embed: true, can_thread: false };
+  expect(channelOptionLabel(noThreads, "events")).toBe("#turniere – ohne Threads: Turnier-Meldungen einzeln");
+  expect(channelOptionLabel(noThreads, "community")).toBe("#turniere – ohne Threads: Turnier-Meldungen einzeln");
+  expect(channelOptionLabel(noThreads, "board")).toBe("#turniere");
+  expect(channelOptionLabel({ ...noThreads, can_thread: undefined }, "events")).toBe("#turniere");
 });
 
 test("Vorstand ist als privat erkennbar; ein Kanal ohne Recht steht beim Ziel mit dem Klickweg", async () => {

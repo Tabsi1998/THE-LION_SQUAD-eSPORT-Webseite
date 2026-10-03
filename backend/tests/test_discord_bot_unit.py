@@ -90,12 +90,16 @@ def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
             self.id, self.name, self.category, self.position = cid, name, category, position
 
     class Permissions:
-        def __init__(self, view=True, send=True, embed=True):
+        def __init__(self, view=True, send=True, embed=True, threads=True, in_threads=True):
             self.view_channel, self.send_messages, self.embed_links = view, send, embed
+            self.create_public_threads, self.send_messages_in_threads = threads, in_threads
 
     row = discord_bot.channel_row(Channel(1, "news", Category("Community"), 2), Permissions(embed=False))
-    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False}
+    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False, "can_thread": True}
     assert discord_bot.channel_row(Channel(2, "regeln"), Permissions(send=False))["can_send"] is False
+    # Turnier-Threads (#572): öffnen und darin schreiben - beides nötig.
+    assert discord_bot.channel_row(Channel(3, "turniere"), Permissions(threads=False))["can_thread"] is False
+    assert discord_bot.channel_row(Channel(3, "turniere"), Permissions(in_threads=False))["can_thread"] is False
     rows = discord_bot.sorted_channels([
         {"id": "9", "name": "regeln", "category": "Info", "position": 0, "can_send": False},
         {"id": "2", "name": "news", "category": "Community", "position": 1, "can_send": True},

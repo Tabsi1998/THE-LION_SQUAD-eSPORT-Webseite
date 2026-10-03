@@ -9,9 +9,9 @@ import { api, formatApiError } from "@/lib/api";
 
 const TARGET_ORDER = ["community", "news", "events", "board", "ops", "test"];
 const TARGET_HINTS = {
-  community: "Standard für alles Öffentliche: Turnier-Meldungen, Fast-Lap-Bestzeiten – und News und Events ohne eigenen Kanal.",
+  community: "Standard für alles Öffentliche: Turnier-Meldungen (je Turnier ein Thread), Fast-Lap-Bestzeiten – und News und Events ohne eigenen Kanal.",
   news: "Veröffentlichte News.",
-  events: "Angekündigte Events, Turnier-Meldungen, Fast-Lap-Bestzeiten.",
+  events: "Angekündigte Events, Fast-Lap-Bestzeiten und Turnier-Meldungen: je Turnier eine Meldung im Kanal, alles Weitere im Thread darunter – Check-in, live, Bracket, Endstand.",
   board: "Privat: neue Mitgliedsanträge und Kontaktanfragen – ohne Namen. Ohne eigenen Kanal wird nichts gesendet.",
   ops: "Privat: rote Auto-Checks und neue Serverfehler (Betrieb & Logs → Alarme). Ohne eigenen Kanal wird nichts gesendet.",
   test: "Privat: Probe-Meldungen aus der Vorschau unten, mit Vermerk „Test“ (etwa #bot-test). Ohne eigenen Kanal wird nichts gesendet – nie in einen anderen Kanal.",
@@ -32,10 +32,14 @@ export function lastAttemptText(last) {
   return `zuletzt fehlgeschlagen · ${when}${last.error ? ` – ${last.error}` : ""}`;
 }
 
-export function channelOptionLabel(channel) {
+// Turnier-Threads (#572): wo Turnier-Meldungen landen können, sagt die Liste auch, ob der Bot Threads öffnen darf.
+const THREAD_TARGETS = new Set(["community", "events"]);
+
+export function channelOptionLabel(channel, target) {
   const base = `#${channel.name}${channel.category ? ` (${channel.category})` : ""}`;
   if (!channel.can_send) return `${base} – Bot darf hier nicht schreiben`;
   if (!channel.can_embed) return `${base} – ohne „Links einbetten“`;
+  if (THREAD_TARGETS.has(target) && channel.can_thread === false) return `${base} – ohne Threads: Turnier-Meldungen einzeln`;
   return base;
 }
 
@@ -141,7 +145,7 @@ export function DiscordTargets() {
                     data-testid={`discord-target-${target}-channel`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                     <option value="">– kein Kanal –</option>
                     {options.map((channel) => (
-                      <option key={channel.id} value={channel.id} disabled={!channel.can_send}>{channelOptionLabel(channel)}</option>
+                      <option key={channel.id} value={channel.id} disabled={!channel.can_send}>{channelOptionLabel(channel, target)}</option>
                     ))}
                   </select>
                 ) : (

@@ -93,6 +93,8 @@ async def _swiss_next_round_graph(db, tournament: dict, actor_id: str | None) ->
     await persist_competition_versions(db, tournament, "graph")
     if tournament.get("status") == "draft":
         await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+        from services.discord_threads import status_written
+        await status_written(db, tid, tournament.get("status"))
     await _audit_tournament_action(
         db, "tournament.swiss.next_round", actor_id, tid,
         {"engine": "graph", "stage_id": stage["id"], "round": round_number,
@@ -158,6 +160,8 @@ async def _groups_generate_graph(db, tournament: dict, group_count: int, actor_i
     )
     await persist_competition_versions(db, tournament, "graph")
     await db.tournaments.update_one({"id": tid}, {"$set": {"status": "live"}})
+    from services.discord_threads import status_written
+    await status_written(db, tid, tournament.get("status"))
     await _audit_tournament_action(
         db, "tournament.groups.generate", actor_id, tid,
         {"engine": "graph", "stage_id": stage["id"], "group_count": len(groups),

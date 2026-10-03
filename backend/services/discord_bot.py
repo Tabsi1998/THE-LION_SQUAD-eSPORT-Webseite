@@ -37,6 +37,8 @@ logger = logging.getLogger("tls.discord.bot")
 ROLE_KEYS = ("member", "board", "tournament")
 DEFAULT_ROLES = {"member": "Mitglied", "board": "Vorstand", "tournament": "Turnierleitung"}
 SYNC_LIMIT = 500
+# Turnier-Threads (#572): eine Woche - Discords längste Frist, bevor ein ruhiger Thread ins Archiv geht.
+THREAD_ARCHIVE_MINUTES = 10080
 
 
 # ---------------------------------------------------------------- reine Logik
@@ -179,6 +181,8 @@ def channel_row(channel, permissions) -> dict:
         "position": int(getattr(channel, "position", 0) or 0),
         "can_send": bool(getattr(permissions, "view_channel", False) and getattr(permissions, "send_messages", False)),
         "can_embed": bool(getattr(permissions, "embed_links", False)),
+        # Turnier-Threads (#572): öffnen und darin schreiben - fehlt eins, gehen Turnier-Meldungen einzeln in den Kanal.
+        "can_thread": bool(getattr(permissions, "create_public_threads", False) and getattr(permissions, "send_messages_in_threads", False)),
     }
 
 
@@ -464,6 +468,7 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
+            await self._reopen(channel)
             message = await channel.send(embed=discord.Embed.from_dict(embed))
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
@@ -473,6 +478,13 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         self.last_action = f"Meldung in #{getattr(channel, 'name', channel_id)} ({now_utc().strftime('%H:%M')} UTC)"
         return {"ok": True, "message_id": str(message.id), "channel_id": str(channel.id)}
+
+    @staticmethod
+    async def _reopen(channel) -> None:
+        """Ein Thread im Archiv (Discord: nach einer Woche Ruhe) wird vor dem Schreiben wieder geöffnet (#572) -
+        ein gesperrter bleibt zu, dann scheitert das Schreiben mit seinem Grund."""
+        if getattr(channel, "archived", False) and not getattr(channel, "locked", False):
+            await channel.edit(archived=False)
 
     async def _channel(self, client, channel_id: str):
         import discord
@@ -497,6 +509,7 @@ class BotRunner:
         if problem:
             return problem
         try:
+            await self._reopen(channel)
             message = await channel.fetch_message(int(message_id))
             await message.edit(embed=discord.Embed.from_dict(embed))
         except (discord.NotFound, ValueError):
@@ -521,10 +534,61 @@ class BotRunner:
         if problem:
             return problem
         try:
+            await self._reopen(channel)
             message = await channel.fetch_message(int(message_id))
             await message.pin(reason="LION Website: Einbettung")
         except (discord.NotFound, ValueError):
             return {"ok": False, "reason": "unknown_message"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        return {"ok": True}
+
+    async def create_thread(self, channel_id: str, message_id: str, name: str) -> dict:
+        """Einen öffentlichen Thread unter einer eigenen Nachricht öffnen (#572) - braucht „Öffentliche Threads erstellen“.
+        Hat die Nachricht schon einen, ist es dieser: Discord gibt einem Thread die ID der Nachricht, unter der er steht."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        channel, problem = await self._channel(client, channel_id)
+        if problem:
+            return problem
+        try:
+            message = await channel.fetch_message(int(message_id))
+            thread = await message.create_thread(name=name[:100], auto_archive_duration=THREAD_ARCHIVE_MINUTES, reason="LION Website: Turnier-Thread")
+        except (discord.NotFound, ValueError):
+            return {"ok": False, "reason": "unknown_message"}
+        except discord.Forbidden:
+            return {"ok": False, "reason": "thread_forbidden"}
+        except discord.HTTPException as exc:
+            if getattr(exc, "code", None) == 160004:  # „Für diese Nachricht gibt es schon einen Thread“
+                return {"ok": True, "thread_id": str(message_id)}
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Thread „{thread.name}“ geöffnet ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "thread_id": str(thread.id)}
+
+    async def delete_message(self, channel_id: str, message_id: str) -> dict:
+        """Eine eigene Nachricht löschen (#572: der Endstand wandert ans Ende des Threads). Schon weg zählt als erledigt."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        channel, problem = await self._channel(client, channel_id)
+        if problem:
+            return problem
+        try:
+            await self._reopen(channel)
+            await channel.get_partial_message(int(message_id)).delete()
+        except (discord.NotFound, ValueError):
+            return {"ok": True, "gone": True}
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:

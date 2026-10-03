@@ -1884,9 +1884,11 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
         raise HTTPException(409, "Nur fehlgeschlagene Meldungen lassen sich erneut senden.")
     payload = entry["payload"]
     # An das Ziel, an das sie ging - nie an ein anderes. Privat bleibt privat.
+    # Eine Meldung aus einem Turnier-Thread (#572) geht zurück in diesen Thread.
     result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
                            color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
-                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom")
+                           image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
+                           thread_id=entry.get("thread_id"))
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
     return result

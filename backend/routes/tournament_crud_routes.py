@@ -298,6 +298,10 @@ async def create_tournament(body: TournamentCreate, me: dict = Depends(require_a
                 apply_competition_version_read_defaults(existing)
                 return {**existing, "auto_generated_bracket": None, "idempotent_replay": True}
             auto_preview = await _create_initial_bracket_preview(db, doc, me.get("id"))
+            if doc.get("status") != "draft":
+                # Gleich mit „Anmeldung offen“ angelegt: angekündigt wie ein Statuswechsel (#572).
+                from services.discord_threads import status_written
+                await status_written(db, doc["id"], None)
             doc.pop("_id", None)
             doc.pop("creation_key", None)
             apply_competition_version_read_defaults(doc)
@@ -360,6 +364,10 @@ async def update_tournament(tid: str, body: TournamentUpdate, me: dict = Depends
             updates[k] = _iso(updates[k])
     updates["updated_at"] = now_utc().isoformat()
     await db.tournaments.update_one({"id": tid}, {"$set": updates})
+    if updates.get("status") and updates["status"] != existing.get("status"):
+        # Status im Formular geändert: im Discord wie über den Knopf der Turnierleitung (#572).
+        from services.discord_threads import status_written
+        await status_written(db, tid, existing.get("status"))
     t = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     t.pop("creation_key", None)
     apply_competition_version_read_defaults(t)

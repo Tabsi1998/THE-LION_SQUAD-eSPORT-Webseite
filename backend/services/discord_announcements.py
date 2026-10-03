@@ -180,15 +180,38 @@ async def announce_due(limit: int = 50) -> dict:
 
 TOURNAMENT_STATUS = {
     "registration_open": {"label": "Anmeldung offen", "color": 0x00FF88},
+    "check_in": {"label": "Check-in offen", "color": 0x00FF88},
     "live": {"label": "Jetzt live", "color": 0x29B6E8},
     "completed": {"label": "Beendet", "color": 0xFFD700},
     "results_published": {"label": "Ergebnisse veröffentlicht", "color": 0xFFD700},
 }
 
 
-def tournament_message(tournament: dict, status: str, *, game_name: str | None = None) -> dict:
-    """Die Turnier-Meldung je Statuswechsel - der Statuswechsel und die Vorschau bauen sie hiermit."""
+def thread_line(tournament: dict, status: str) -> str:
+    """Der eine Satz einer Meldung im Turnier-Thread (#572)."""
+    if status == "registration_open":
+        until = vienna(tournament.get("registration_open_until"))
+        return f"Die Anmeldung ist offen{f' – bis {until}' if until else ''}."
+    if status == "check_in":
+        until = vienna(tournament.get("check_in_until"))
+        return f"Jetzt einchecken{f' – bis {until}' if until else ''}: auf der Turnierseite oder in der App."
+    if status == "live":
+        return "Das Turnier läuft. Das Bracket steht hier im Thread und wird nach jedem Ergebnis aktualisiert."
+    if status == "completed":
+        return "Das Turnier ist beendet – der Endstand kommt gleich hier darunter."
+    if status == "results_published":
+        return "Die Ergebnisse sind veröffentlicht – Platzierungen und Auszeichnungen stehen auf der Turnierseite."
+    return ""
+
+
+def tournament_message(tournament: dict, status: str, *, game_name: str | None = None, in_thread: bool = False) -> dict:
+    """Die Turnier-Meldung je Statuswechsel - der Statuswechsel und die Vorschau bauen sie hiermit. Im Thread des
+    Turniers (#572) kurz: Spiel, Format, Beschreibung und Bild stehen schon in der Ankündigung darüber."""
     spec = TOURNAMENT_STATUS.get(status) or {"label": status, "color": 0x29B6E8}
+    if in_thread:
+        return {"event_key": f"tournament.{status}", "title": f"🏆 {tournament.get('title') or 'Turnier'} · {spec['label']}",
+                "description": thread_line(tournament, status), "color": spec["color"],
+                "url": f"/tournaments/{tournament.get('slug') or tournament.get('id')}", "fields": [], "image_url": None}
     fields = []
     if game_name:
         fields.append({"name": "Spiel", "value": game_name, "inline": True})

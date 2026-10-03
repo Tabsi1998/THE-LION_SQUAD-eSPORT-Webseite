@@ -31,12 +31,14 @@ TARGET_LABELS = {
     "board": "Vorstand (privat)", "ops": "Betrieb (privat)", "test": "Test (privat)",
 }
 # Ereignis → Ziel, Beschriftung, Standard. Neue Ereignisse sind aus, bis der Betreiber sie
-# einschaltet; was es vor #300 schon gab, bleibt an. Erfolge gehen seit #566 in keinen Kanal
+# einschaltet; was es vor #300 schon gab, bleibt an. Turnier-Meldungen sind an - seit #572 stehen
+# sie im Thread des Turniers, der Kanal bleibt ruhig. Erfolge gehen seit #566 in keinen Kanal
 # mehr - die Person selbst bekommt die Gratulation (#568).
 EVENTS = {
     "news.published": {"target": "news", "label": "News veröffentlicht", "default": False},
     "event.announced": {"target": "events", "label": "Event angekündigt", "default": False},
     "tournament.registration_open": {"target": "events", "label": "Turnier: Anmeldung offen", "default": True},
+    "tournament.check_in": {"target": "events", "label": "Turnier: Check-in offen", "default": True},
     "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True},
     "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True},
     "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True},
@@ -61,9 +63,12 @@ REASON_TEXTS = {
     # Vorschau und Testkanal (#583)
     "test_channel_missing": "Kein Testkanal gewählt (Verbindungen → Discord → Kanäle je Zweck → Test) – ein Test geht nie in einen anderen Kanal.",
     "not_linked": "Dein Discord-Konto ist nicht verknüpft (Profil → Socials → Discord verknüpfen).",
+    # Turnier-Threads (#572)
+    "thread_forbidden": ("Der Bot darf keine Threads öffnen oder darin schreiben – Turnier-Meldungen gehen bis dahin einzeln in den Kanal. "
+                         "Kanal → Bearbeiten → Berechtigungen → Bot-Rolle: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“."),
 }
 # Ein Ziel, dessen letzter Versuch so scheiterte, ist eine Aufgabe für die Tageszentrale (#303).
-BROKEN_REASONS = ("forbidden", "unknown_channel")
+BROKEN_REASONS = ("forbidden", "unknown_channel", "thread_forbidden")
 
 
 def event_field(event_key: str) -> str:
@@ -247,6 +252,8 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
     else:
         log["status"] = "failed"
         log["reason"] = result.get("reason") or "error"
+        if log.get("thread_id") and log["reason"] == "forbidden":
+            log["reason"] = "thread_forbidden"  # im Kanal darf er, im Thread nicht (#572)
         log["error"] = result.get("error") or REASON_TEXTS.get(log["reason"]) or log["reason"]
     await db.email_logs.insert_one(log)
     return {"ok": log["status"] == "sent", "reason": log.get("reason"), "error": log.get("error"), "target": log.get("target"),
@@ -255,8 +262,9 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
-                  footer: str | None = None, test: bool = False) -> dict:
-    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts."""
+                  footer: str | None = None, test: bool = False, thread_id: str | None = None) -> dict:
+    """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
+    ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst."""
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, target)
     log = _new_log(event_key, title, resolved["target"], test=test)
@@ -271,12 +279,15 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
         private = resolved["target"] in PRIVATE_TARGETS
         reason = f"{resolved['target']}_channel_missing" if private else "channel_missing"
         return await _skip(log, reason, REASON_TEXTS.get(reason) or REASON_TEXTS["channel_missing"])
-    return await _send_embed(resolved["channel_id"], title=title, description=description, color=color, url=url,
+    if thread_id:
+        log["thread_id"] = str(thread_id)
+    return await _send_embed(str(thread_id or resolved["channel_id"]), title=title, description=description, color=color, url=url,
                              fields=fields, image_url=image_url, log=log, footer=footer)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
-                     color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None) -> dict:
+                     color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
+                     thread_id: str | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if spec["target"] in PUBLIC_TARGETS and item is not None and not should_post_to_public_discord(item):
@@ -285,7 +296,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key)
+                         image_url=image_url, event_key=event_key, thread_id=thread_id)
 
 
 async def send_discord(title: str, description: str = "", *,
@@ -328,7 +339,8 @@ async def target_status(db=None) -> dict:
         last = await db.email_logs.find_one(
             {"channel": "discord", "target": target, "status": {"$in": ["sent", "failed"]}},
             {"_id": 0, "status": 1, "reason": 1, "error": 1, "event_key": 1, "created_at": 1, "channel_id": 1},
-            sort=[("created_at", -1)],
+            # Gleicher Zeitpunkt (Versand und gleich danach der Thread, #572): der später gespeicherte gilt.
+            sort=[("created_at", -1), ("_id", -1)],
         )
         channel_id = cfg["channels"].get(target) or ""
         status[target] = {

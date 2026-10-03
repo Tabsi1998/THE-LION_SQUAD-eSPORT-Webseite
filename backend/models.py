@@ -558,6 +558,8 @@ class TournamentCreate(BaseModel):
     season_weight: float = 2.0
     visibility: Literal["public", "community", "members", "internal"] = "public"
     site_banner_enabled: bool = False
+    # „Ohne Discord“ (#572): keine Meldung, kein Thread, kein Bracket, kein Termin im Discord.
+    discord_skip: bool = False
     # Optional initial status — admin can publish straight to 'scheduled'.
     status: Optional[TournamentStatus] = None
 
@@ -621,6 +623,7 @@ class TournamentUpdate(BaseModel):
     season_weight: Optional[float] = None
     visibility: Optional[Literal["public", "community", "members", "internal"]] = None
     site_banner_enabled: Optional[bool] = None
+    discord_skip: Optional[bool] = None
 
     _normalize_stream_platform = field_validator("stream_platform", mode="before")(_empty_stream_platform_to_none)
 

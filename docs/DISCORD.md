@@ -23,7 +23,7 @@ zeigt es.
 | --- | --- | --- |
 | **Community** | Standard für alles Öffentliche | – (ohne ihn geht nichts Öffentliches hinaus) |
 | **News** | veröffentlichte News | geht an Community |
-| **Events und Turniere** | angekündigte Events, Turnier-Meldungen, Fast-Lap-Bestzeiten | geht an Community |
+| **Events und Turniere** | angekündigte Events, Fast-Lap-Bestzeiten, Turnier-Meldungen – je Turnier eine im Kanal, alles Weitere im Thread darunter | geht an Community |
 | **Vorstand** (privat) | neuer Mitgliedsantrag, neue Kontaktanfrage – nur der Hinweis | **es wird nichts gesendet** |
 | **Betrieb** (privat) | rote Auto-Checks, neue Serverfehler | **es wird nichts gesendet** |
 
@@ -37,7 +37,10 @@ Test sagt dazu, wenn er mangels eigenem Kanal in der Community gelandet ist.
 Der Bot braucht im gewählten Kanal **„Kanal ansehen“, „Nachrichten senden“ und
 „Links einbetten“** (Kanal → Bearbeiten → Berechtigungen → Bot-Rolle). Fehlt
 ein Recht, steht das beim Ziel und in der Tageszentrale mit genau diesem
-Klickweg.
+Klickweg. Wo Turnier-Meldungen landen (Events und Turniere, ohne eigenen Kanal
+die Community), zusätzlich **„Öffentliche Threads erstellen“ und „Nachrichten
+in Threads senden“** – fehlt eins, sagt die Kanalliste „ohne Threads:
+Turnier-Meldungen einzeln“.
 
 Erfolge gehen seit #566 in keinen Kanal mehr; die Person selbst bekommt die
 Gratulation (Discord III Teil 3, #568).
@@ -45,8 +48,9 @@ Gratulation (Discord III Teil 3, #568).
 ## Schalter je Ereignis
 
 Neue Ereignisse sind **aus**, bis man sie einschaltet: *News veröffentlicht*,
-*Event angekündigt*, *Neuer Mitgliedsantrag*, *Neue Kontaktanfrage*. Was es
-schon gab, bleibt an: Turnier (Anmeldung offen, live, beendet, Ergebnisse),
+*Event angekündigt*, *Neuer Mitgliedsantrag*, *Neue Kontaktanfrage*. An sind
+die Turnier-Meldungen (Anmeldung offen, Check-in offen, live, Teilnehmer
+streamt, beendet, Ergebnisse) – sie stehen im Thread des Turniers – und die
 Fast-Lap-Bestzeit.
 
 Wer einen Schalter einschaltet, bekommt **nicht das Archiv** in den Kanal:
@@ -65,6 +69,30 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   kein Kanal, privat, Schalter aus). Der Haken **„Ohne Discord
   veröffentlichen“** gilt für genau diesen Eintrag.
 - Nie gemeldet: Entwürfe, Vergangenes, Inhalte für Mitglieder oder intern.
+
+## Turniere: ein Thread je Turnier (#572)
+
+- Die erste Meldung eines Turniers – meist „Anmeldung offen“ – steht im Kanal mit Spiel,
+  Format, Plätzen und Banner. Darunter öffnet der Bot einen Thread „🏆 Turniername“.
+- Alles Weitere steht im Thread, kurz und ohne Wiederholung: Check-in offen (mit Frist), jetzt
+  live, Streams von Teilnehmern, das Bracket (angepinnt, nach jedem Ergebnis bearbeitet),
+  beendet, Ergebnisse veröffentlicht. Der Kanal zeigt je Turnier genau eine Meldung.
+- Der **Endstand** ist die letzte Nachricht im Thread: Beim Ende setzt der Bot das Bracket mit
+  Podium neu ans Ende, die alte Fassung verschwindet; kommt danach noch „Ergebnisse
+  veröffentlicht“, wandert er wieder nach unten. Discord archiviert den Thread nach einer Woche
+  Ruhe; eine neue Meldung öffnet ihn wieder.
+- Gemeldet wird jeder Statuswechsel, egal woher: Knopf der Turnierleitung, Turnier-Formular,
+  Anlegen mit Status, Zeitplan (Anmeldung öffnet, Check-in, Start, Ende), Start an einer
+  Station, Gruppen- und Swiss-Runden. Vor #572 blieben die Wechsel aus dem Zeitplan stumm.
+- **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus: keine Meldung, kein
+  Thread, kein Bracket, kein Discord-Termin. Was nicht für alle sichtbar ist, geht ohnehin nie
+  hinein.
+- Darf der Bot keine Threads öffnen, geht nichts verloren: Die Meldungen stehen wie früher
+  einzeln im Kanal, der Grund beim Ziel, im Versand-Log und in der Tageszentrale. Ist das Recht
+  nachgetragen, öffnet die nächste Meldung den Thread. Wird der Thread gelöscht oder ein anderer
+  Kanal gewählt, beginnt die nächste Meldung einen neuen.
+- Die Vorschau unter Verbindungen → Discord zeigt je Turnier-Meldung, wo sie landet („im Kanal ·
+  öffnet den Turnier-Thread“ oder „im Turnier-Thread“), in der kurzen Fassung des Threads.
 
 ## Erfolge
 
@@ -157,7 +185,8 @@ Zählen, Rollen und Befehle gelten nur für Konten, die im Profil verknüpft sin
 2. Dort unter „Privileged Gateway Intents“ den **Server Members Intent** einschalten (für den
    Rollenabgleich). „Message Content“ bleibt aus – auch fürs Senden nicht nötig.
 3. OAuth2 → URL Generator: Scopes `bot` + `applications.commands`, Rechte „View Channels“,
-   „Send Messages“, „Embed Links“, „Read Message History“, „Manage Roles“ – mit der Adresse den
+   „Send Messages“, „Embed Links“, „Read Message History“, „Manage Roles“, für die
+   Turnier-Threads „Create Public Threads“ und „Send Messages in Threads“ – mit der Adresse den
    Bot auf den Server holen. Im Discord die Bot-Rolle in der Rollenliste **über**
    Mitglied/Vorstand/Turnierleitung ziehen, sonst darf er sie nicht vergeben.
 4. „Bot verbinden“ anhaken. Der Stand (online/aus, Servername, letzte Aktion, letzter Fehler)
@@ -187,6 +216,12 @@ Konto-Verknüpfung läuft unabhängig vom Bot weiter.
   Job `discord_bot_roles` alle zehn Minuten, Start im Lifespan.
 - `backend/services/discord_announcements.py`: `announce_due` (Job, jede Minute),
   `news_message`, `event_message`, `preview`, `notify_board`.
+- `backend/services/discord_threads.py` (#572): `status_changed` – die eine Stelle für jeden
+  Statuswechsel eines Turniers (Route, Formular, Anlegen, Zeitplan, Station, Gruppen/Swiss über
+  `status_written`) –, `deliver` (in den Thread, sonst in den Kanal und Thread öffnen),
+  `note_message`. Am Turnier `discord_thread` {`channel_id`, `message_id`, `thread_id`,
+  `last_message_id`, `error`}. `send_to`/`send_event` nehmen `thread_id`; im Log steht er mit.
+  Bot: `create_thread`, `delete_message`, archivierte Threads öffnet er vor dem Schreiben wieder.
 - `backend/services/achievement_queue.py`: `request_evaluation`, `process_queue`, `sweep`,
   `note_award`, `flush_awards` (nur noch Benachrichtigung an die Person).
 - Migration 3 (`services/migrations.py`) verwirft gespeicherte Webhook-Adressen, Absendername

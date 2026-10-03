@@ -28,6 +28,9 @@ GROUPS = (
 TEST_FOOTER = "Test · nicht an die Community"
 SAMPLE_NAME = "Paula"
 SOURCE_EXAMPLE = "Beispiel"
+# Turnier-Threads (#572): die erste Meldung steht im Kanal und öffnet den Thread, alles Weitere steht darin.
+PLACE_OPENS_THREAD = "im Kanal · öffnet den Turnier-Thread"
+PLACE_IN_THREAD = "im Turnier-Thread"
 
 
 def _example_news() -> dict:
@@ -95,11 +98,13 @@ async def sample_catalog(db=None) -> list[dict]:
     cfg = await _get_discord_config()
     entries: list[dict] = []
 
-    async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example"):
+    async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example", place: str | None = None):
         embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                                   fields=message.get("fields"), image_url=message.get("image_url"))
         entry = {"key": key, "label": label, "group": group, "target": target, "source": source, "source_text": source_text,
                  "embed": embed, "dm": target == "dm", "message": message}
+        if place:
+            entry["place"] = place
         if target != "dm":
             resolved = resolve_target(cfg, target)
             entry["delivers_to"] = resolved["target"] if resolved["channel_id"] else None
@@ -119,8 +124,10 @@ async def sample_catalog(db=None) -> list[dict]:
     game_name = (game or {}).get("name") or (None if tournament else "Rocket League")
     for status in TOURNAMENT_STATUS:
         key = f"tournament.{status}"
-        await add(key, EVENTS[key]["label"], "public", tournament_message(tournament or _example_tournament(), status, game_name=game_name), target="events",
-                  source="latest" if tournament else "example", source_text=f"aus dem Turnier „{tournament.get('title')}“" if tournament else SOURCE_EXAMPLE)
+        opens = status == "registration_open"
+        await add(key, EVENTS[key]["label"], "public", tournament_message(tournament or _example_tournament(), status, game_name=game_name, in_thread=not opens),
+                  target="events", source="latest" if tournament else "example", place=PLACE_OPENS_THREAD if opens else PLACE_IN_THREAD,
+                  source_text=f"aus dem Turnier „{tournament.get('title')}“" if tournament else SOURCE_EXAMPLE)
     challenge = await db.f1_challenges.find_one({}, {"_id": 0}, sort=[("created_at", -1)])
     await add("f1.new_leader", EVENTS["f1.new_leader"]["label"], "public",
               fast_lap_message(challenge or _example_challenge(), driver=SAMPLE_NAME, track="Spa-Francorchamps", time_text="1:42.318", previous_text="1:42.905"),
@@ -131,7 +138,7 @@ async def sample_catalog(db=None) -> list[dict]:
     await add("tournament.stream_live", EVENTS["tournament.stream_live"]["label"], "public",
               stream_live_message(tournament or _example_tournament(), {"display_name": SAMPLE_NAME, "title": "Finale – wir holen den Cup!", "game_name": game_name or "Rocket League",
                                                                          "viewer_count": 12, "stream_url": "https://www.twitch.tv/paula", "thumbnail_url": None}),
-              target="events", source_text=SOURCE_EXAMPLE)
+              target="events", source_text=SOURCE_EXAMPLE, place=PLACE_IN_THREAD)
 
     # Vorstand: nie Namen oder Texte - die stehen im Admin.
     await add("membership.application", EVENTS["membership.application"]["label"], "board",
