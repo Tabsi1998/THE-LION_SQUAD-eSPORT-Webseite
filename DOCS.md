@@ -3,6 +3,11 @@
 Einstieg: [README](README.md). Verbindliche Prioritäten und Abnahmen:
 [RESTPLAN](RESTPLAN.md). Die folgenden Unterseiten haben jeweils einen eigenen Zweck.
 
+## Handbuch für Betreiber
+
+Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohne Programmierkenntnisse:
+[Handbuch](docs/handbuch/README.md), zuerst das Kapitel [Discord](docs/handbuch/discord.md).
+
 ## Installation und Betrieb
 
 | Anleitung | Zweck |

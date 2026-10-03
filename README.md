@@ -4,7 +4,7 @@ Selbst gehostete Vereins- und eSports-Plattform für THE LION SQUAD: öffentlich
 Website, Mitgliederbereich, Teams, Turniere, Fast Lap, Jahreswertung, Nachrichten,
 Galerie, Dokumente und Administration.
 
-**[Dokumentation](DOCS.md) · [Installation](INSTALL.md) · [Updates und Fehlerhilfe](UPDATE.md) · [Restplan](RESTPLAN.md)**
+**[Handbuch](docs/handbuch/README.md) · [Dokumentation](DOCS.md) · [Installation](INSTALL.md) · [Updates und Fehlerhilfe](UPDATE.md) · [Restplan](RESTPLAN.md)**
 
 ## Stand und nächste Schritte
 
