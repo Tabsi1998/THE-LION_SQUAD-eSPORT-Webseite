@@ -141,6 +141,11 @@ function BallotCard({ ballot, busy, onVote }) {
           {ballot.status_label}
         </span>
       </div>
+      {ballot.secret ? (
+        <p className="mt-3 text-xs text-white/60" data-testid={`ballot-${id}-secret`}>
+          Geheime Wahl auf Papier: abgestimmt wird im Saal auf Stimmzetteln, nicht hier.
+        </p>
+      ) : null}
 
       <div className="mt-4 space-y-3">
         {ballot.rights.map((right) => (
@@ -151,9 +156,9 @@ function BallotCard({ ballot, busy, onVote }) {
             </div>
             {right.state === "used" ? (
               <div className="mt-1 inline-flex items-center gap-1.5 text-sm text-[#00FF88]" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
-                <CheckCircle2 className="w-4 h-4" /> abgestimmt: {right.option_label || right.option}
+                <CheckCircle2 className="w-4 h-4" /> {ballot.secret ? "Stimmzettel erhalten" : `abgestimmt: ${right.option_label || right.option}`}
               </div>
-            ) : open && right.can_use ? (
+            ) : open && right.can_use && !ballot.secret ? (
               <div className="mt-2 flex flex-wrap gap-2">
                 {ballot.options.map((option) => (
                   <button
@@ -170,7 +175,8 @@ function BallotCard({ ballot, busy, onVote }) {
               </div>
             ) : (
               <div className="mt-1 text-xs text-white/45">
-                {right.state === "none" ? "Mit diesem Stimmrecht kannst du hier nicht abstimmen." : open ? "" : "Abstimmen geht nur, solange die Abstimmung offen ist."}
+                {right.state === "none" ? "Mit diesem Stimmrecht kannst du hier nicht abstimmen." : ballot.secret ? "Den Stimmzettel bekommst du im Saal."
+                  : open ? "" : "Abstimmen geht nur, solange die Abstimmung offen ist."}
               </div>
             )}
           </div>

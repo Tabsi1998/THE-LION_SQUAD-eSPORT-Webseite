@@ -206,6 +206,34 @@ async def test_an_uninvited_or_non_voting_member_gets_the_reason_not_a_form(flow
     assert view["available"] is False and view["reason"] == "not_connected"
 
 
+
+@pytest.mark.asyncio
+async def test_a_secret_paper_ballot_never_takes_a_vote_over_the_website(flow, fake):
+    """Geheime Wahl auf Papier (Vereine 1.7): das Stimmrecht steht da, abgestimmt wird im Saal. Die Website bietet keine
+    Stimmabgabe an; versucht es jemand trotzdem, antwortet das Modul 409 „secret“ und die Website sagt es im Klartext."""
+    await connect(flow)
+    fake.add(member(12), email="paula@example.test")
+    fake.add_meeting(7, invited=[(12, True)])
+    fake.add_ballot(3, 7, status="open", secret=True)
+    fake.present.setdefault(7, set()).add(12)
+    fake.invite("ALL", 12, capabilities=("meetings", "votes"))
+    paula = await flow.add_user(role="player", name="paula")
+    paula["is_club_member"] = True
+    flow.act_as(paula)
+    await bind(flow, "ALL")
+
+    ballot = (await flow.get("/api/membership/me/meetings")).json()["ballots"][0]
+    assert ballot["secret"] is True and ballot["status"] == "open" and ballot["can_vote"] is False
+    assert ballot["rights"][0]["right_id"] == 1012 and ballot["rights"][0]["state"] == "open" and ballot["rights"][0]["can_use"] is False
+    refused = await flow.post("/api/membership/me/ballots/3/votes", json={"right_id": 1012, "option": "yes"})
+    assert refused.status_code == 409 and "auf Papier" in refused.json()["detail"] and fake.votes == {}
+
+    # Stimmzettel im Saal ausgegeben: das Recht ist genutzt, eine Antwort gibt es nicht.
+    fake.ballot_rights[3][12][0]["state"] = "used"
+    ballot = (await flow.get("/api/membership/me/meetings")).json()["ballots"][0]
+    assert ballot["rights"][0]["state"] == "used" and ballot["rights"][0]["option"] == "" and ballot["can_vote"] is False
+
+
 def test_frist_und_termin_gelten_nach_dem_tag_in_wien_nicht_nach_dem_des_servers(monkeypatch):
     """Der Server läuft in UTC: um 00:30 in Wien meldet er noch „gestern“. Die Antragsfrist vom 21.10. ist dann aber
     vorbei und die Sitzung vom 21.10. auch - gerechnet wird mit dem Tag am Ort des Vereins."""

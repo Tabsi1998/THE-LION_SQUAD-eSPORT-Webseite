@@ -91,6 +91,17 @@ test("Abstimmung: Stimme nur nach Bestätigung, genutzte Vollmacht zeigt die Ant
   expect(screen.getByTestId("ballot-3-result")).toHaveTextContent("Ja 41 · Nein 3 · Enthaltung 2 · gültig 44");
 });
 
+test("Geheime Wahl auf Papier: keine Knöpfe, ein ausgegebener Stimmzettel statt einer Antwort", async () => {
+  const secret = { ...BALLOT, secret: true, can_vote: false, rights: [{ ...BALLOT.rights[0], can_use: false }, { ...BALLOT.rights[1], option: "", option_label: "" }] };
+  apiMock.get.mockResolvedValue({ data: { ...VIEW, ballots: [secret] } });
+  render(<MemoryRouter><MemberMeetingsPage /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByTestId("ballot-3-secret")).toHaveTextContent("Geheime Wahl auf Papier"));
+  expect(screen.queryByTestId("ballot-3-vote-1012-yes")).toBeNull();
+  expect(screen.getByTestId("ballot-3-right-1012")).toHaveTextContent("Den Stimmzettel bekommst du im Saal.");
+  expect(screen.getByTestId("ballot-3-right-2020-used")).toHaveTextContent("Stimmzettel erhalten");
+  expect(screen.getByTestId("ballot-3-right-2020-used")).not.toHaveTextContent("abgestimmt");
+});
+
 test("ohne Weg zur Akte steht der Grund, mit Bindung ohne Fähigkeit der Grund je Teil", async () => {
   apiMock.get.mockResolvedValue({ data: { available: false, reason: "not_bound", text: "Dafür muss dein Konto verbunden sein.", meetings: [], ballots: [] } });
   const { unmount } = render(<MemoryRouter><MemberMeetingsPage /></MemoryRouter>);
