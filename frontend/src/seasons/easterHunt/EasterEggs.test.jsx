@@ -5,11 +5,12 @@ import { MemoryRouter } from "react-router-dom";
 // eingeladen, angemeldet zählt der Fund (Ansage für Screenreader, das Ei verschwindet); zu schnell und abgelaufene
 // Schlüssel werden freundlich behandelt.
 
-const apiMock = { fetchEggs: vi.fn(), findEgg: vi.fn(), emitHuntProgress: vi.fn() };
+const apiMock = { fetchEggs: vi.fn(), findEgg: vi.fn(), emitHuntProgress: vi.fn(), reportHuntActive: vi.fn() };
 vi.mock("./api", () => ({
   fetchEggs: (...args) => apiMock.fetchEggs(...args),
   findEgg: (...args) => apiMock.findEgg(...args),
   emitHuntProgress: (...args) => apiMock.emitHuntProgress(...args),
+  reportHuntActive: (...args) => apiMock.reportHuntActive(...args),
 }));
 const authState = { user: null };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
@@ -104,6 +105,8 @@ test("nur ungefundene Eier der Seite, als Knopf in der Ecke der Karte", async ()
   renderEggs();
   await settle();
   expect(apiMock.fetchEggs).toHaveBeenCalledWith("/news", null);
+  // Die Oster-Deko erfährt, dass die Suche wirklich läuft.
+  expect(apiMock.reportHuntActive).toHaveBeenCalledWith(true);
   const egg = await screen.findByTestId("easter-egg-1");
   expect(egg).toHaveAttribute("aria-label", "Osterei einsammeln");
   expect(egg.style.left).toBe(`${400 - 6 - 15}px`);

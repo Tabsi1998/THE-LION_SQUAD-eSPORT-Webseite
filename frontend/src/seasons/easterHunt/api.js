@@ -20,6 +20,34 @@ export function emitHuntProgress(progress) {
   });
 }
 
+// Läuft die Suche wirklich (ein freigegebenes Jahr, nicht nur das Zeitfenster)? Die Eier fragen den Server; die
+// Oster-Deko hört zu und legt dann keine Eier in ihre Reihe - zum Verwechseln ähnliche, die man nicht sammeln kann.
+let huntActive = null;
+const activeListeners = new Set();
+
+export function reportHuntActive(active) {
+  huntActive = Boolean(active);
+  activeListeners.forEach((listener) => {
+    try {
+      listener(huntActive);
+    } catch {
+      // ein kaputter Zuhörer hält die anderen nicht auf
+    }
+  });
+}
+
+/** Zuhören (mit dem letzten Stand, wenn es schon einen gibt); gibt eine Funktion zum Abmelden zurück. */
+export function onHuntActive(listener) {
+  activeListeners.add(listener);
+  if (huntActive !== null) listener(huntActive);
+  return () => activeListeners.delete(listener);
+}
+
+/** Nur für Tests: wieder „unbekannt“. */
+export function resetHuntActive() {
+  huntActive = null;
+}
+
 /** Die Eier einer Seite; mit `preview` (Token aus dem Admin) die Vorschau: Eier des Jahres zum Ansehen, ohne Schlüssel. */
 export async function fetchEggs(route, preview = null) {
   const params = preview ? { route, channel: "web", preview } : { route, channel: "web" };

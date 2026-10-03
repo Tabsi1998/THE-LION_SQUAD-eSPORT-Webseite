@@ -7,7 +7,7 @@ import { previewTokenFor } from "../preview";
 import { useSeason } from "../SeasonContext";
 import { hashString } from "../rng";
 import { EggShape } from "./EggShape";
-import { emitHuntProgress, fetchEggs, findEgg } from "./api";
+import { emitHuntProgress, fetchEggs, findEgg, reportHuntActive } from "./api";
 import { EGG_SIZE, placeEggs } from "./placement";
 import "./easter-hunt.css";
 
@@ -109,6 +109,7 @@ export function EasterEggs({ season }) {
     try {
       const data = await fetchEggs(route, previewToken);
       setPreviewing(Boolean(data?.preview));
+      reportHuntActive(data?.active);
       const fresh = data?.active ? (data.eggs || []).filter((egg) => !egg.found) : [];
       eggsRef.current = fresh;
       setEggs(fresh);

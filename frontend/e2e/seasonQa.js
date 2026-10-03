@@ -74,15 +74,29 @@ async function seasonOverlaps(page, config) {
       range.selectNodeContents(text);
       return [...range.getClientRects()].some((r) => x >= r.left - 4 && x <= r.right + 4 && y >= r.top - 4 && y <= r.bottom + 4);
     });
+    // Klebende Leisten (Kopfzeile, Navigation unten am Handy): liegt ein Stück darunter (kleinerer z-index), ist es
+    // dort verdeckt - ein Punkt unter der Leiste ist nicht „über Text“, auch wenn die Leiste selbst Schrift trägt.
+    const zOf = (node) => {
+      for (let n = node; n && n.nodeType === 1 && n !== document.body; n = n.parentElement) {
+        const style = getComputedStyle(n);
+        if (style.position !== "static" && style.zIndex !== "auto") return Number(style.zIndex) || 0;
+      }
+      return 0;
+    };
+    const bars = [...document.querySelectorAll("header, nav, [role='navigation']")]
+      .filter((bar) => ["fixed", "sticky"].includes(getComputedStyle(bar).position))
+      .map((bar) => ({ rect: bar.getBoundingClientRect(), z: zOf(bar) }));
     const found = [...document.querySelectorAll(pieces)];
     return found.map((el) => {
       const r = el.getBoundingClientRect();
       if (r.width === 0 || r.bottom < 0 || r.top > window.innerHeight) return null;
+      const z = zOf(el);
+      const covered = (x, y) => bars.some((bar) => bar.z > z && x >= bar.rect.left && x <= bar.rect.right && y >= bar.rect.top && y <= bar.rect.bottom);
       const points = [[r.left + r.width / 2, r.top + r.height / 2], [r.left + 2, r.top + 2], [r.right - 2, r.bottom - 2]];
       const hits = points.map(([x, y]) => document.elementsFromPoint(x, y).filter((n) => !n.closest(layers))[0] || null);
       const overText = points.some(([x, y], index) => {
         const hit = hits[index];
-        if (!hit || (exempt && hit.closest(exempt))) return false;
+        if (!hit || (exempt && hit.closest(exempt)) || covered(x, y)) return false;
         let node = hit;
         while (node && node.nodeType === 1 && node.tagName !== "BODY") {
           if (node.matches("[data-season-anchor], [data-season-perch]")) return false;
