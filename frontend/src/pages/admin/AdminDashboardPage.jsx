@@ -1,4 +1,5 @@
 import { opsDetail, opsTone } from "@/lib/ops";
+import { attentionLine, firstAttention } from "@/lib/billing";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -92,6 +93,9 @@ export default function AdminDashboardPage() {
   const scheduleDeadlines = Number(daily.schedule_deadlines || 0);
   const billingCases = Number(daily.billing_cases || 0);
   const sponsorsExpiring = Number(daily.sponsors_expiring || 0);
+  // Wo Belege hängen (#842): schickt der Server nur dem Bereich Finanzen.
+  const financeAttention = data?.finance_attention || null;
+  const financeFirst = firstAttention(financeAttention);
   const today = Array.isArray(data?.today) ? data.today : [];
   const taskItems = [
     {
@@ -148,6 +152,14 @@ export default function AdminDashboardPage() {
       icon: Wallet,
       tone: billingCases > 0 ? "#FF3B30" : "#00FF88",
       key: "billing-cases",
+    }] : []),
+    ...(canFinance && financeAttention ? [{
+      label: "Belege prüfen",
+      detail: attentionLine(financeAttention),
+      to: financeFirst ? `/admin/finance?attention=${financeFirst}` : "/admin/finance",
+      icon: Wallet,
+      tone: Number(financeAttention.overdue || 0) > 0 ? "#FF3B30" : financeFirst ? "#FFD700" : "#00FF88",
+      key: "finance-attention",
     }] : []),
     // Sponsoring läuft aus (#405): 30 Tage vorher, damit verlängert oder verabschiedet wird - nur für die Redaktion.
     ...(canContent ? [{

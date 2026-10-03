@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { csvFilename } from "@/lib/billing";
 
 // Finanzübersicht (#322, #370, #321): offene Aufträge zeigen den Rechnungstext und nehmen einen
 // Zusatz an; angelegte Belege zeigen den Zahlungsstand; Prüffälle werden mit Grund erledigt;
@@ -158,4 +159,37 @@ test("ohne offene PDFs gibt es keinen Knopf", async () => {
   render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
   await screen.findByTestId("finance-order-o1");
   expect(screen.queryByTestId("finance-pdfs")).toBeNull();
+});
+
+test("wo Belege hängen (#842): drei Knöpfe mit Zahl, ein Klick fragt nur diese ab, Beleg in Dolibarr, Export mit Blick im Namen", async () => {
+  const user = userEvent.setup();
+  const attention = { attention: { overdue: 2, pdf_missing: 1, draft_old: 0 }, attention_labels: { pdf_missing: "PDF fehlt", draft_old: "Entwurf seit mehr als 7 Tagen", overdue: "überfällig" } };
+  const linked = { ...OVERVIEW.invoiced[0], dolibarr_url: "https://erp.example.test/compta/facture/card.php?facid=2" };
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/finance/overview" ? { data: { ...OVERVIEW, ...attention, invoiced: [linked] } } : { data: DETAIL }));
+  render(<MemoryRouter><AdminFinancePage /></MemoryRouter>);
+  const bar = await screen.findByTestId("finance-attention");
+  expect(within(bar).getByTestId("finance-attention-overdue")).toHaveTextContent("Überfällig · 2");
+  expect(within(bar).getByTestId("finance-attention-pdf_missing")).toHaveTextContent("PDF fehlt · 1");
+  expect(within(bar).getByTestId("finance-attention-draft_old")).toHaveTextContent("Entwurf seit mehr als 7 Tagen · 0");
+  expect(screen.queryByTestId("finance-attention-ok")).toBeNull();
+  const link = screen.getByTestId("finance-dolibarr-o2");
+  expect(link).toHaveAttribute("href", "https://erp.example.test/compta/facture/card.php?facid=2");
+  expect(link).toHaveAttribute("target", "_blank");
+
+  await user.click(screen.getByTestId("finance-attention-overdue"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/finance/overview", { params: { attention: "overdue" } }));
+  expect(screen.getByTestId("finance-attention-overdue")).toHaveAttribute("aria-pressed", "true");
+  expect(csvFilename(new Date("2026-10-03T12:00:00Z"), "overdue")).toBe("abrechnung-überfällig-2026-10-03.csv");
+  await user.click(screen.getByTestId("finance-attention-overdue"));
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/finance/overview", { params: {} }));
+});
+
+test("ohne Treffer steht „alles in Ordnung“; aus der Tageszentrale kommt der Blick über die Adresse", async () => {
+  apiMock.get.mockImplementation(async (url) => (url === "/admin/finance/overview"
+    ? { data: { ...OVERVIEW, invoiced: [], attention: { overdue: 0, pdf_missing: 0, draft_old: 0 }, attention_labels: { pdf_missing: "PDF fehlt", draft_old: "Entwurf seit mehr als 7 Tagen", overdue: "überfällig" } } }
+    : { data: DETAIL }));
+  render(<MemoryRouter initialEntries={["/admin/finance?attention=overdue"]}><AdminFinancePage /></MemoryRouter>);
+  expect(await screen.findByTestId("finance-attention-ok")).toHaveTextContent("Alles in Ordnung");
+  expect(apiMock.get).toHaveBeenCalledWith("/admin/finance/overview", { params: { attention: "overdue" } });
+  expect(screen.getByTestId("finance-attention-empty")).toHaveTextContent("Kein Beleg in dieser Auswahl.");
 });
