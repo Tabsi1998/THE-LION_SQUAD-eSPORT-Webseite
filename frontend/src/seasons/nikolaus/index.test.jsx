@@ -13,7 +13,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (url) => url }));
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => authState }));
 vi.mock("../SeasonContext", () => ({ useSeason: () => seasonState }));
 
-const { BOOT_ID, Footer, HINT_DELAY_MS, HINT_MS, Toast, loadBootState, resetBootState, season } = await import("./index.jsx");
+const { BOOT_ID, Footer, HINT_DELAY_MS, HINT_MS, MenuEntry, OPEN_AFTER_MS, Toast, Widget, goToBoot, loadBootState, resetBootState, season } = await import("./index.jsx");
 const { CARD_MS, OPEN_MS } = await import("./boot");
 const { SeasonFooterSlot } = await import("../SeasonSlots");
 
@@ -53,10 +53,12 @@ afterEach(() => {
   document.querySelectorAll("footer").forEach((node) => node.remove());
 });
 
-test("das Modul: Stiefel im Footer, Hinweis als Gruß, der Footer-Platz versteckt ihn nicht", () => {
+test("das Modul: Stiefel im Footer, im Kopf und oben im Handy-Menü, Hinweis als Gruß, der Footer-Platz versteckt ihn nicht", () => {
   expect(season.key).toBe("nikolaus");
   expect(season.Footer).toBe(Footer);
   expect(season.Toast).toBe(Toast);
+  expect(season.Widget).toBe(Widget);
+  expect(season.MenuEntry).toBe(MenuEntry);
   expect(season.footerAccessible).toBe(true);
 });
 
@@ -252,4 +254,48 @@ test("im Footer-Platz bleibt der Stiefel für Screenreader sichtbar", async () =
   render(<MemoryRouter><SeasonFooterSlot /></MemoryRouter>);
   expect(await screen.findByTestId("nikolaus-boot")).toBeTruthy();
   expect(screen.getByTestId("season-footer-slot").getAttribute("aria-hidden")).toBeNull();
+});
+
+test("#852: der Stiefel im Kopf führt hinunter und öffnet ihn; ein benutzter Stiefel wird nicht noch einmal geklickt", async () => {
+  vi.useFakeTimers();
+  authState.user = { id: "u9" };
+  apiMock.get.mockResolvedValue({ data: { active: true, year: 2026, opened: false, sticker: null } });
+  apiMock.post.mockResolvedValue({ data: { year: 2026, new: true, sticker: STICKER } });
+  render(<MemoryRouter><Footer season={niko()} /><Widget season={niko()} /></MemoryRouter>);
+  await flush();
+  const boot = screen.getByTestId("nikolaus-boot");
+  boot.scrollIntoView = vi.fn();
+  const widget = screen.getByTestId("nikolaus-widget");
+  expect(widget.getAttribute("aria-label")).toBe("Nikolaus – zum Stiefel");
+  await act(async () => {
+    fireEvent.click(widget);
+  });
+  expect(boot.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+  expect(document.activeElement).toBe(boot);
+  expect(apiMock.post).not.toHaveBeenCalled();
+  await advance(OPEN_AFTER_MS);
+  expect(apiMock.post).toHaveBeenCalledWith("/seasonal/nikolaus/open", null, undefined);
+  await advance(10000);
+  apiMock.post.mockClear();
+  boot.classList.add("tls-nikolaus-boot--used");
+  await act(async () => {
+    fireEvent.click(widget);
+  });
+  await advance(OPEN_AFTER_MS);
+  expect(apiMock.post).not.toHaveBeenCalled();
+  expect(goToBoot("normal", { getElementById: () => null })).toBe(false);
+});
+
+test("#852: der Eintrag oben im Handy-Menü schließt das Menü und geht zum Stiefel", async () => {
+  vi.useFakeTimers();
+  const onClose = vi.fn();
+  render(<MemoryRouter><Footer season={niko({ effective: "subtle" })} /><MenuEntry season={niko({ effective: "subtle" })} onClose={onClose} /></MemoryRouter>);
+  await flush();
+  const boot = screen.getByTestId("nikolaus-boot");
+  boot.scrollIntoView = vi.fn();
+  fireEvent.click(screen.getByTestId("season-menu-nikolaus"));
+  expect(onClose).toHaveBeenCalled();
+  await advance(60);
+  expect(boot.scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "center" });
+  expect(screen.getByTestId("season-menu-nikolaus")).toHaveTextContent("Der Nikolaus war da – zum Stiefel");
 });

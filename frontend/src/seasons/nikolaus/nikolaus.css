@@ -5,6 +5,16 @@
 .tls-nikolaus-scene[data-line="1"] { bottom: auto; }
 .tls-nikolaus-art { display: block; max-width: none; overflow: visible; }
 
+/* Der kleine Stiefel im Kopf (#852): neben Kranz und Kalender; am Handy steht er oben im Menü, der Kopf bleibt frei. */
+.tls-nikolaus-widget { display: inline-flex; align-items: flex-end; justify-content: center; width: 2.1rem; height: 2.75rem; margin-left: 0.15rem; padding: 0; border: 0; background: none; cursor: pointer; flex: none; transition: transform 0.18s ease-out; }
+.tls-nikolaus-widget:hover { transform: translateY(-1px) rotate(-4deg); }
+.tls-nikolaus-widget:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; border-radius: 0.35rem; }
+@media (max-width: 640px) { .tls-nikolaus-widget { display: none; } }
+.tls-nikolaus-menu { display: grid; grid-template-columns: 2.4rem 1fr; grid-template-rows: auto auto; column-gap: 0.75rem; align-items: center; width: 100%; padding: 0.45rem 0.75rem; border-radius: 0.4rem; background: rgba(214, 69, 65, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); color: #fbe9d0; text-align: left; cursor: pointer; }
+.tls-nikolaus-menu__boot { grid-row: 1 / span 2; display: flex; justify-content: center; }
+.tls-nikolaus-menu__title { grid-column: 2; grid-row: 1; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-menu__text { grid-column: 2; grid-row: 2; font-size: 0.8rem; color: rgba(251, 233, 208, 0.8); }
+
 .tls-nikolaus-boot { display: block; padding: 0; margin: 0; border: 0; background: none; line-height: 0; cursor: pointer; transform-origin: 60% 100%; animation: tls-nikolaus-idle 9s ease-in-out 3s infinite; }
 .tls-nikolaus-boot:hover { filter: drop-shadow(0 0 8px rgba(255, 200, 140, 0.35)); }
 .tls-nikolaus-boot:focus-visible { outline: 2px solid #ffc857; outline-offset: 4px; border-radius: 6px; }

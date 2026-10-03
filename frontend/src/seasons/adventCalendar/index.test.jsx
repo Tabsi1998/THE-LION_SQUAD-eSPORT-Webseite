@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { Widget, calendarEntry, season } from "./index.jsx";
+import { MenuEntry, Widget, calendarEntry, season } from "./index.jsx";
 import { SEASON_MODULES, hasModule } from "../registry";
 
 // Adventkalender (#641): das kleine Türchen neben dem Logo - nur wenn für das Jahr Türchen angelegt sind.
@@ -49,6 +49,20 @@ test("dezent ohne Atmen, vor 6 Uhr ohne Licht", () => {
 test("im Register der Saisonen", async () => {
   expect(season.key).toBe("advent_calendar");
   expect(season.Widget).toBe(Widget);
+  expect(season.MenuEntry).toBe(MenuEntry);
   expect(hasModule("advent_calendar")).toBe(true);
   expect((await SEASON_MODULES.advent_calendar()).season).toBe(season);
+});
+
+test("#852: oben im Handy-Menü - Türchen, Name und Stand; ein Tipp führt zum Kalender und schließt das Menü", () => {
+  const onClose = vi.fn();
+  const { rerender } = render(<MemoryRouter><MenuEntry season={calendar()} onClose={onClose} /></MemoryRouter>);
+  const entry = screen.getByTestId("season-menu-advent-calendar");
+  expect(entry).toHaveAttribute("href", "/advent");
+  expect(entry).toHaveTextContent("Adventkalender");
+  expect(entry).toHaveTextContent("Türchen 12 ist offen");
+  entry.click();
+  expect(onClose).toHaveBeenCalled();
+  rerender(<MemoryRouter><MenuEntry season={calendar({ ready: false })} onClose={onClose} /></MemoryRouter>);
+  expect(screen.queryByTestId("season-menu-advent-calendar")).toBeNull();
 });

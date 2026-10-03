@@ -7,13 +7,14 @@ import { navigationRef } from "../navigation/rootNavigation";
 import { colors } from "../theme";
 import { AdventWidget } from "./advent/AdventWidget";
 import { BirthdayEdge, BirthdayGreeting, BirthdaySky } from "./birthday";
+import { AdventCalendarWidget } from "../advent/entry";
 import { CarnivalCorners, CarnivalGreeting, ConfettiSky, PartyHatTabIcon, PartyHatWidget } from "./carnival";
 import { ChristmasBackdrop, ChristmasEdge, ChristmasGreeting } from "./christmas";
 import { EasterBackdrop, EasterEdge, EasterGreeting, EasterSky, EasterTabIcon } from "./easter";
 import { HuntStage, HuntWidget } from "./easterHunt";
 import { HalloweenBats, HalloweenCorners, HalloweenWidget, Pumpkin } from "./halloween";
 import { FireworksSky, NewYearGreeting, NewYearWidget } from "./newYear";
-import { NikolausGreeting, NikolausShelf, NikolausTabIcon } from "./nikolaus";
+import { NikolausGreeting, NikolausShelf, NikolausTabIcon, NikolausWidget } from "./nikolaus";
 import { SnowSky, SnowflakeWidget } from "./snow";
 import { WinterSkyBackdrop } from "./snow/WinterSky";
 import { WeatherSky } from "./weather";
@@ -33,6 +34,8 @@ type SeasonModule = {
   skyOnly?: boolean;
   /** Steht das Widget bei mehreren oben (die Schneeflocke schwebt über dem Kranz)? */
   widgetOnTop?: boolean;
+  /** Ein kleines Widget (Türchen, Stiefel - #852): solche stehen nebeneinander in einer Reihe unter den großen. */
+  compactWidget?: boolean;
   /** An der Unterkante der Begrüßungskarte im Dashboard (Weihnachten: die Lichterkette). */
   Edge?: React.ComponentType<{ season: ActiveSeason; screen: string }>;
   /** Eine Gruß-Karte über der Tab-Leiste, auf jedem Screen (Weihnachten). */
@@ -47,6 +50,8 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   halloween: { Corners: HalloweenCorners, Sky: HalloweenBats, Widget: HalloweenWidget, TabIcon: ({ size }) => <Pumpkin size={size + 4} face="grin" /> },
   // Adventkranz (S6, W1, S11 #642): der Kranz im Dashboard-Kopf, derselbe wie neben dem Logo der Website.
   advent: { Widget: AdventWidget },
+  // Adventkalender (#641, #852): sein eigener Screen unter „Mehr“ - und klein unter dem Kranz das Türchen des Tages.
+  advent_calendar: { Widget: AdventCalendarWidget, compactWidget: true },
   // Schnee (S7, #642): Flocken in drei Tiefen mit Wind und Böen aus dem Wetter, die Schneeflocke zum Fangen im Kopf;
   // dahinter der Winterhimmel (W4 #730): Blauschein, Glühen und Sterne nach Sonnenzeiten und Wetter.
   snow: { Sky: SnowSky, Widget: SnowflakeWidget, widgetOnTop: true, Backdrop: WinterSkyBackdrop },
@@ -55,7 +60,7 @@ export const SEASON_MODULES: Record<string, SeasonModule> = {
   // Weihnachten (S8, S11 #642): Lichterkette an der Begrüßungskarte, warme Lichtinseln, der Gruß einmal je Tag.
   christmas: { Edge: ChristmasEdge, Greeting: ChristmasGreeting, Backdrop: ChristmasBackdrop },
   // Nikolaus (X3 #736, S11 „Stiefel im Tab Mehr“): der Stiefel im Kopf von „Mehr“, das Tab-Symbol, der Hinweis.
-  nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon },
+  nikolaus: { Shelf: NikolausShelf, Greeting: NikolausGreeting, TabIcon: NikolausTabIcon, Widget: NikolausWidget, compactWidget: true },
   // Silvester (S11 #642, wie #800 im Web): Feuerwerk mit Skia über allen Tabs, Hinweis im Kopf, Countdown und Gruß.
   new_year: { Sky: FireworksSky, Widget: NewYearWidget, Greeting: NewYearGreeting },
   // Fasching (S12 #643, F1–F3 #745–#747, wie im Web): Konfetti beim ersten Start des Tages (Skia), der Partyhut im
@@ -133,14 +138,19 @@ export function SeasonWidgetSlot() {
   const screen = useCurrentScreen();
   if (!mounted.length) return null;
   // Mehrere Widgets stehen übereinander: nebeneinander nahmen Kranz und Schneeflocke dem Namen den Platz (er
-  // brach mitten im Wort um). So ist die Spalte nur so breit wie das breiteste Widget.
+  // brach mitten im Wort um). So ist die Spalte nur so breit wie das breiteste Widget. Kleine (Türchen, Stiefel - #852)
+  // stehen darunter nebeneinander: unter dem Kranz ist dafür Breite genug, der Name behält seinen Platz.
   const ordered = [...mounted].sort((a, b) => Number(Boolean(b.module.widgetOnTop)) - Number(Boolean(a.module.widgetOnTop)));
+  const large = ordered.filter(({ module }) => !module.compactWidget);
+  const small = ordered.filter(({ module }) => module.compactWidget);
+  const render = ({ season, module }: { season: ActiveSeason; module: SeasonModule }) => {
+    const Widget = module.Widget as React.ComponentType<{ season: ActiveSeason; screen: string }>;
+    return <Widget key={season.key} season={season} screen={screen} />;
+  };
   return (
-    <View style={[styles.widgetSlot, ordered.length > 1 && styles.widgetStack]} testID="season-widget-slot">
-      {ordered.map(({ season, module }) => {
-        const Widget = module.Widget as React.ComponentType<{ season: ActiveSeason; screen: string }>;
-        return <Widget key={season.key} season={season} screen={screen} />;
-      })}
+    <View style={[styles.widgetSlot, large.length + (small.length ? 1 : 0) > 1 && styles.widgetStack]} testID="season-widget-slot">
+      {large.map(render)}
+      {small.length ? <View style={styles.widgetRow} testID="season-widget-row">{small.map(render)}</View> : null}
     </View>
   );
 }
@@ -201,6 +211,7 @@ const styles = StyleSheet.create({
   corners: { position: "absolute", left: 0, right: 0, bottom: 0 },
   widgetSlot: { flexDirection: "row", alignItems: "center" },
   widgetStack: { flexDirection: "column", gap: 2 },
+  widgetRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "center", gap: 6 },
   toast: { position: "absolute", alignSelf: "center", left: 24, right: 24, backgroundColor: "rgba(12, 10, 16, 0.94)", borderColor: "rgba(255, 179, 102, 0.55)", borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, shadowColor: "#000", shadowOpacity: 0.5, shadowRadius: 12, elevation: 6 },
   toastText: { color: "#FFB366", textAlign: "center", fontWeight: "700", fontSize: 15 },
 });

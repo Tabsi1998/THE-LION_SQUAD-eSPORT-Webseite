@@ -3,8 +3,9 @@ import { useSeason } from "./SeasonContext";
 import { isQuietPath, useSeasonModules } from "./SeasonStage";
 import { SoundToggle } from "./SoundToggle";
 
-// Zwei Plätze im Layout (#634): das Widget neben dem Logo (klickbar, mit Tastatur erreichbar) und die
-// Deko im Footer. Beide zeigen nur, was die Bühne auch zeigt.
+// Drei Plätze im Layout (#634, #852): das Widget neben dem Logo (klickbar, mit Tastatur erreichbar), die Deko im Footer
+// und ganz oben im Handy-Menü die Einstiege, für die im Kopf am Handy kein Platz ist (Adventkalender, Nikolaus). Alle
+// zeigen nur, was die Bühne auch zeigt.
 
 function useMountedSeasons() {
   const { seasons, ready, preview } = useSeason();
@@ -33,6 +34,20 @@ export function SeasonWidgetSlot() {
       {scareToggles.map(({ season, module }) => {
         const Toggle = module.ScareToggle;
         return <Toggle key={`${season.key}-scare`} />;
+      })}
+    </div>
+  );
+}
+
+/** Ganz oben im Handy-Menü (#852): je Saison mit `MenuEntry` ein Eintrag - ein Klick und man ist dort. */
+export function SeasonMenuSlot({ onClose }) {
+  const mounted = useMountedSeasons().filter(({ module }) => module.MenuEntry);
+  if (!mounted.length) return null;
+  return (
+    <div className="flex flex-col gap-1 pb-3 mb-2 border-b border-white/10" data-testid="season-menu-slot">
+      {mounted.map(({ season, module }) => {
+        const Entry = module.MenuEntry;
+        return <Entry key={season.key} season={season} onClose={onClose} />;
       })}
     </div>
   );

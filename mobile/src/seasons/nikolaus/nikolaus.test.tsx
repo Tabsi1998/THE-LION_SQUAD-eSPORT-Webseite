@@ -18,7 +18,7 @@ jest.mock("../SeasonProvider", () => ({ useSeason: () => mockSeasonState }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
 jest.mock("../../navigation/rootNavigation", () => ({ navigationRef: { isReady: () => true, getCurrentRoute: () => ({ name: "Dashboard" }), addListener: () => () => {}, navigate: (...args: unknown[]) => mockNavigate(...args) } }));
 
-const { HINT_DELAY_MS, HINT_MS, NikolausGreeting, NikolausShelf, NikolausTabIcon, resetBootState } = require("./index");
+const { HINT_DELAY_MS, HINT_MS, NikolausGreeting, NikolausShelf, NikolausTabIcon, NikolausWidget, OPEN_AFTER_MS, requestBootOpen, resetBootOpenRequest, resetBootState } = require("./index");
 const { CARD_MS, OPEN_MS } = require("./boot");
 const { SEASON_MODULES, SeasonShelfSlot, appNamesSeason } = require("../SeasonStage");
 
@@ -43,6 +43,7 @@ async function advance(ms: number) {
 
 beforeEach(() => {
   resetBootState();
+  resetBootOpenRequest();
   mockApi.get.mockReset();
   mockApi.post.mockReset();
   mockNavigate.mockReset();
@@ -58,7 +59,7 @@ afterEach(() => {
 });
 
 test("Nikolaus ist ein Modul der App: Stiefel im Kopf von „Mehr“, Hinweis, Tab-Symbol - und steht unter „Gerade läuft“", async () => {
-  expect(Object.keys(SEASON_MODULES.nikolaus).sort()).toEqual(["Greeting", "Shelf", "TabIcon"]);
+  expect(Object.keys(SEASON_MODULES.nikolaus).sort()).toEqual(["Greeting", "Shelf", "TabIcon", "Widget", "compactWidget"]);
   expect(appNamesSeason({ key: "nikolaus" })).toBe(true);
   await render(<NikolausTabIcon size={22} />);
   expect(screen.getByTestId("nikolaus-boot-svg")).toBeTruthy();
@@ -203,4 +204,40 @@ test("Platz im Kopf von „Mehr“: der Stiefel steht mit der Sohle auf der Kant
   mockSeasonState.seasons = [niko({ effective: "off" })];
   await render(<SeasonShelfSlot />);
   expect(screen.queryByTestId("nikolaus-shelf")).toBeNull();
+});
+
+test("#852: der Stiefel im Dashboard-Kopf führt zu „Mehr“ - dort öffnet er sich kurz danach von selbst, einmal", async () => {
+  jest.useFakeTimers();
+  mockAuthState.user = { id: "u3" };
+  mockApi.get.mockResolvedValue({ data: { active: true, year: 2026, opened: false, sticker: null } });
+  mockApi.post.mockResolvedValue({ data: { year: 2026, new: true, sticker: STICKER } });
+  await render(<NikolausWidget season={niko()} screen="Dashboard" />);
+  expect(screen.getByTestId("nikolaus-widget").props.accessibilityLabel).toBe("Der Nikolaus war da – zum Stiefel");
+  await fireEvent.press(screen.getByTestId("nikolaus-widget"));
+  expect(mockNavigate).toHaveBeenCalledWith("More", { screen: "MoreHub" });
+  await screen.unmount();
+  await render(<NikolausShelf season={niko()} screen="MoreHub" />);
+  await flush();
+  expect(mockApi.post).not.toHaveBeenCalled();
+  await advance(OPEN_AFTER_MS);
+  await flush();
+  expect(mockApi.post).toHaveBeenCalledTimes(1);
+  await screen.unmount();
+  // Die Bitte gilt einmal - beim nächsten Besuch steht der Stiefel einfach da.
+  mockApi.post.mockClear();
+  await render(<NikolausShelf season={niko()} screen="MoreHub" />);
+  await flush();
+  await advance(OPEN_AFTER_MS * 4);
+  expect(mockApi.post).not.toHaveBeenCalled();
+  expect(screen.queryByTestId("nikolaus-card")).toBeNull();
+  // Neue Bitte, während „Mehr“ offen ist: der Stiefel öffnet sich wieder und zeigt seine Karte.
+  await act(async () => {
+    requestBootOpen();
+  });
+  await advance(OPEN_AFTER_MS);
+  await flush();
+  await advance(OPEN_MS);
+  await flush();
+  expect(screen.getByTestId("nikolaus-card")).toBeTruthy();
+  expect(mockApi.post).toHaveBeenCalledTimes(1);
 });

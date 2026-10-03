@@ -14,7 +14,9 @@ import "./nikolaus.css";
 // steigt heraus, darüber erscheint die Karte mit dem Sticker, den der Nikolaus dieser Person bringt (einer je Person und
 // Jahr, der Server entscheidet). Danach steht der Stiefel ruhig und leicht gekippt da, ohne Gutschein. Ohne Anmeldung
 // sagt die Karte, dass Angemeldete einen Sticker finden. Weil kaum jemand bis zum Footer scrollt, kommt einmal am Tag
-// ein Hinweis mit „Zum Stiefel“. „dezent“ und „Bewegung reduzieren“: kein Wackeln, die Karte steht gleich da.
+// ein Hinweis mit „Zum Stiefel“, und seit #852 steht ein kleiner Stiefel im Kopf gleich neben Kranz und Kalender (am
+// Handy ganz oben im Menü): ein Klick führt hinunter und öffnet ihn. „dezent“ und „Bewegung reduzieren“: kein Wackeln,
+// die Karte steht gleich da.
 
 export const HINT_DELAY_MS = 1800;
 export const HINT_MS = 12000;
@@ -277,5 +279,48 @@ export function Toast({ season, now = null }) {
   );
 }
 
+/** Ab hier öffnet sich der Stiefel von selbst - so lange braucht das Scrollen hinunter ungefähr. */
+export const OPEN_AFTER_MS = 700;
+
+/**
+ * Zum Stiefel im Footer und ihn öffnen (#852): hinscrollen, Fokus darauf, kurz danach ein Klick - wie wenn man selbst
+ * hineinschaut. Ohne Stiefel (noch nicht gemessen) passiert nichts.
+ */
+export function goToBoot(effective, doc = typeof document === "undefined" ? null : document) {
+  const boot = doc?.getElementById(BOOT_ID);
+  if (!boot) return false;
+  boot.scrollIntoView?.({ behavior: effective === "subtle" ? "auto" : "smooth", block: "center" });
+  boot.focus?.({ preventScroll: true });
+  window.setTimeout(() => {
+    const current = doc.getElementById(BOOT_ID);
+    if (current && !current.classList.contains("tls-nikolaus-boot--used")) current.click();
+  }, effective === "subtle" ? 0 : OPEN_AFTER_MS);
+  return true;
+}
+
+/** Der kleine Stiefel im Kopf neben Kranz und Kalender (#852) - am Handy steht er stattdessen oben im Menü. */
+export function Widget({ season }) {
+  return (
+    <button type="button" className="tls-nikolaus-widget" onClick={() => goToBoot(season.effective)} aria-label="Nikolaus – zum Stiefel" title="Der Nikolaus war da – zum Stiefel" data-testid="nikolaus-widget">
+      <BootArt height={30} />
+    </button>
+  );
+}
+
+/** Der Eintrag ganz oben im Handy-Menü (#852): Menü zu, hinunter zum Stiefel, öffnen. */
+export function MenuEntry({ season, onClose }) {
+  const go = () => {
+    onClose?.();
+    window.setTimeout(() => goToBoot(season.effective), 50);
+  };
+  return (
+    <button type="button" onClick={go} className="tls-nikolaus-menu" data-testid="season-menu-nikolaus">
+      <span className="tls-nikolaus-menu__boot" aria-hidden="true"><BootArt height={34} /></span>
+      <span className="tls-nikolaus-menu__title">Nikolaus</span>
+      <span className="tls-nikolaus-menu__text">Der Nikolaus war da – zum Stiefel</span>
+    </button>
+  );
+}
+
 /** Eine Szene mit eigener Bedienung: der Footer-Platz versteckt den Stiefel nicht vor Screenreadern. */
-export const season = { key: "nikolaus", Footer, Toast, footerAccessible: true };
+export const season = { key: "nikolaus", Footer, Toast, Widget, MenuEntry, footerAccessible: true };

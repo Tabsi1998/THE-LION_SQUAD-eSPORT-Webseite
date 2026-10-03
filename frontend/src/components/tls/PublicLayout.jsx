@@ -13,7 +13,7 @@ import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
 import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
-import { SeasonFooterSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
+import { SeasonFooterSlot, SeasonMenuSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
 import { DiscordLiveLine, useDiscordNow } from "@/components/tls/DiscordNow";
 import { DecoSwitch } from "@/seasons/DecoSwitch";
 import { api } from "@/lib/api";
@@ -136,6 +136,7 @@ export function PublicLayout({ children }) {
         {mobileOpen && (
           <div id="mobile-navigation" className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-4 flex flex-col gap-1">
+              <SeasonMenuSlot onClose={closeMobile} />
               <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
                 {user && isClubMember && (

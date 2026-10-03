@@ -11,6 +11,11 @@
   50% { opacity: 0.7; transform: scale(1.04); }
 }
 @media (max-width: 640px) { .tls-advcal { width: 2.05rem; height: 2.5rem; margin-left: 0; } }
+/* Ganz oben im Handy-Menü (#852): Türchen links, darüber der Name, darunter der Stand. */
+.tls-advcal-menu { display: grid; grid-template-columns: 2.4rem 1fr; grid-template-rows: auto auto; column-gap: 0.75rem; align-items: center; padding: 0.45rem 0.75rem; border-radius: 0.4rem; background: rgba(233, 196, 106, 0.08); border: 1px solid rgba(233, 196, 106, 0.28); color: #f4e6c2; text-decoration: none; }
+.tls-advcal-menu__door { grid-row: 1 / span 2; width: 2.4rem; height: 2.75rem; display: block; }
+.tls-advcal-menu__title { grid-column: 2; grid-row: 1; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #e9c46a; }
+.tls-advcal-menu__text { grid-column: 2; grid-row: 2; font-size: 0.8rem; color: rgba(244, 230, 194, 0.78); }
 html[data-season-intensity~="subtle"] .tls-advcal__light, .tls-advcal--subtle .tls-advcal__light { animation: none; opacity: 0.4; }
 @media (prefers-reduced-motion: reduce) {
   .tls-advcal, .tls-advcal:hover { transition: none; transform: none; }
