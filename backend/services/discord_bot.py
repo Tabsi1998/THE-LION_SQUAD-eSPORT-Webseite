@@ -142,6 +142,15 @@ def command_targets(rows: dict[str, dict], guild_ids: list[str], main_id: str = 
     return wanted, unwanted
 
 
+def attachments(files: list[tuple[str, bytes]] | None) -> list:
+    """Anhänge für Discord (#575): (Name, Bytes) → ``discord.File`` - etwa das Bracket als Bild."""
+    import io
+
+    import discord
+
+    return [discord.File(io.BytesIO(data), filename=name) for name, data in files or []]
+
+
 def guild_row(guild) -> dict:
     """Ein Server für das Verzeichnis (#624) - Name, Symbol, Mitgliederzahl und was der Bot dort darf."""
     from services.discord_guilds import permission_snapshot
@@ -771,11 +780,12 @@ class BotRunner:
             return {"ok": False, "reason": "error", "text": f"{type(exc).__name__}: {exc}"[:200], "channels": cached}
 
     async def send_embed(self, channel_id: str, embed: dict, buttons: list[dict] | None = None, *, content: str | None = None,
-                         mention_role_ids: list[str] | None = None) -> dict:
+                         mention_role_ids: list[str] | None = None, files: list[tuple[str, bytes]] | None = None) -> dict:
         """Ein Embed in genau diesen Kanal (#566), auf Wunsch mit Link-Knöpfen darunter (#573). Kein Rückfall:
         ist der Bot aus oder darf er dort nicht schreiben, kommt der Grund zurück - den Text dazu kennt
         discord_service.REASON_TEXTS. ``content`` (#866) steht über dem Kasten; erwähnt wird darin höchstens
-        ``mention_role_ids`` - nie @everyone, @here oder einzelne Personen."""
+        ``mention_role_ids`` - nie @everyone, @here oder einzelne Personen. ``files`` (#575): Anhänge als (Name, Bytes),
+        im Embed über ``attachment://Name`` zu zeigen."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -791,8 +801,9 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         try:
             await self._reopen(channel)
+            extra = {"files": attachments(files)} if files else {}
             message = await channel.send(content=content or None, embed=discord.Embed.from_dict(embed), view=link_view(buttons),
-                                         allowed_mentions=allowed_mentions(mention_role_ids))
+                                         allowed_mentions=allowed_mentions(mention_role_ids), **extra)
         except discord.Forbidden:
             return {"ok": False, "reason": "forbidden"}
         except discord.HTTPException as exc:
@@ -822,10 +833,10 @@ class BotRunner:
             return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
 
     async def edit_embed(self, channel_id: str, message_id: str, embed: dict, buttons: list[dict] | None = None, *,
-                         content: str | None = None) -> dict:
+                         content: str | None = None, files: list[tuple[str, bytes]] | None = None) -> dict:
         """Eine eigene Nachricht bearbeiten (#569). Ist sie weg, kommt ``unknown_message`` - dann wird neu gepostet.
         Ohne ``buttons`` bleiben die Knöpfe, wie sie sind (#573); ohne ``content`` der Text darüber (#866) - ein
-        bearbeiteter Text erwähnt niemanden neu."""
+        bearbeiteter Text erwähnt niemanden neu. ``files`` (#575) ersetzt die Anhänge; ohne bleiben sie."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
@@ -843,6 +854,8 @@ class BotRunner:
             if content is not None:
                 changes["content"] = content or None
                 changes["allowed_mentions"] = allowed_mentions(None)
+            if files is not None:
+                changes["attachments"] = attachments(files)
             await message.edit(**changes)
         except (discord.NotFound, ValueError):
             return {"ok": False, "reason": "unknown_message"}
