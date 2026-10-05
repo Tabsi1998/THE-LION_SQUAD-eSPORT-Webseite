@@ -354,6 +354,12 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
   Mitgliederliste des Servers vollständig (`chunked`), fragt der Bot nie nach Leuten, die nicht dort sind.
   Stand je Server in `discord_guilds.roles_sync` (Änderungen, fehlende Vereinsrollen, Spiel-Rollen ohne
   Rolle, angelegt, Fehler).
+- **Spiel-Rolle anpingen (#629 Teil 2):** Schalter je Ereignis mit Spielbezug (`settings.discord.pings`,
+  `discord_service.ping_enabled` – nur wo `discord_routing.routable`). `send_event` hängt die Erwähnung an
+  jede **volle** Meldung (`game_ping` → `discord_roles.ping_role_name` → `bot.role_id` auf genau dem Server,
+  an den sie geht; `with_ping` setzt `content` und `mention_role_ids`). Der Querverweis am Hauptserver und
+  private Ziele pingen nie (`send_to` nimmt die Erwähnung in privaten Zielen heraus). Fehlt die Rolle auf dem
+  Server, geht die Meldung ohne Ping. „Erneut senden“ aus dem Versand-Log pingt nicht noch einmal.
 - **Befehle:** `/naechstes-event`, `/turniere` (offene Anmeldungen), `/meine-erfolge` (nur
   verknüpft), `/status` (nur Vorstand) und seit #573 `/rangliste` (Top 10 der Saison),
   `/bracket` (Auswahl aus den laufenden öffentlichen Turnieren), `/wer-streamt`, `/mitglied`

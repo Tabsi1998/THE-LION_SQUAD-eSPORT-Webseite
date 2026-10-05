@@ -108,6 +108,8 @@ export function DiscordTargets() {
   const toggleEvent = (key, enabled) => run(`event-${key}`, () => api.put("/settings/discord", { events: { [key]: enabled } }));
   // Versand-Routing (#627): je Meldung mit Spielbezug, wohin sie geht - Spielserver, Hauptserver oder beides.
   const setRouting = (key, rule) => run(`routing-${key}`, () => api.put("/settings/discord", { routing: { [key]: rule } }), "Regel gespeichert.");
+  // Spiel-Rolle anpingen (#629): die Meldung beginnt mit der Erwähnung der Rolle des Spiels, etwa „CoD-Spieler“.
+  const setPing = (key, on) => run(`ping-${key}`, () => api.put("/settings/discord", { pings: { [key]: on } }), on ? "Die Spiel-Rolle wird angepingt." : "Kein Ping mehr.");
 
   if (!data) return null;
   const status = data.target_status || {};
@@ -189,7 +191,7 @@ export function DiscordTargets() {
       <div>
         <div className="font-heading font-bold uppercase text-sm">Was gemeldet wird</div>
         {(data.events || []).some((event) => event.routable) ? (
-          <p className="mt-1 text-xs text-white/45">Meldungen mit Spielbezug gehen je nach Regel an den Server des Spiels, an den Hauptserver oder an beide. Ohne eigenen Spielserver bleibt alles am Hauptserver.</p>
+          <p className="mt-1 text-xs text-white/45">Meldungen mit Spielbezug gehen je nach Regel an den Server des Spiels, an den Hauptserver oder an beide. Ohne eigenen Spielserver bleibt alles am Hauptserver. Mit „Spiel-Rolle anpingen“ beginnt die Meldung mit der Rolle des Spiels (etwa „CoD-Spieler“) – wer sie trägt, bekommt eine Benachrichtigung. Der Querverweis am Hauptserver pingt nie.</p>
         ) : null}
         <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-3">
           {(data.events || []).map((event) => (
@@ -209,6 +211,11 @@ export function DiscordTargets() {
                     ))}
                   </select>
                   <div className="text-[11px] text-white/45" data-testid={`discord-routing-preview-${event.key}`}>{event.routing_preview}</div>
+                  <label className="flex items-center gap-2 text-xs text-white/70">
+                    <input type="checkbox" checked={!!event.ping} disabled={!!busy || !event.enabled} onChange={(e) => setPing(event.key, e.target.checked)}
+                      data-testid={`discord-ping-${event.key}`} className="accent-[#29B6E8]" />
+                    <span>Spiel-Rolle anpingen</span>
+                  </label>
                 </div>
               ) : null}
             </div>

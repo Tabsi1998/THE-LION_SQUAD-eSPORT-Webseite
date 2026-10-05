@@ -316,6 +316,8 @@ class DiscordSettings(BaseModel):
     events: Optional[dict[str, bool]] = None
     # Routing-Regel je Ereignis mit Spielbezug (#627): Ereignis → Regel aus discord_routing.RULES.
     routing: Optional[dict[str, str]] = None
+    # Spiel-Rolle anpingen je Ereignis mit Spielbezug (#629): Ereignis -> an oder aus.
+    pings: Optional[dict[str, bool]] = None
     # Discord-Bot (#302): Token verschlüsselt (leer lassen = behalten), Schalter, Server, Rollennamen.
     bot_token: Optional[str] = None
     clear_bot_token: Optional[bool] = None
@@ -1540,12 +1542,15 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     from services import discord_routing
     stored_routing = s.get("routing") or {}
     routing_cfg = {"routing": {key: stored_routing.get(event_field(key)) for key in EVENTS}}
+    stored_pings = s.get("pings") or {}
     example = await discord_routing.routing_example(db)
     s["events"] = []
     for key, spec in EVENTS.items():
         rule = discord_routing.rule_for(routing_cfg, key)
         s["events"].append({"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": switches}, key),
                             "routable": discord_routing.routable(key), "routing": rule, "routing_default": discord_routing.default_rule(key),
+                            # Spiel-Rolle anpingen (#629): nur mit Spielbezug, von Anfang an aus.
+                            "ping": discord_routing.routable(key) and bool(stored_pings.get(event_field(key))),
                             "routing_preview": discord_routing.preview_text(rule, TARGET_LABELS.get(spec["target"], spec["target"]), example)})
     s["routing"] = {"rules": [{"key": rule, "label": discord_routing.RULE_LABELS[rule]} for rule in discord_routing.RULES], "example": example}
     s["target_status"] = await target_status(db)
@@ -1636,6 +1641,16 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if not routable(key) and value != "main_only":
                 raise HTTPException(400, f"„{EVENTS[key]['label']}“ hat keinen Spielbezug oder ist privat – das geht nur an den Hauptserver.")
             updates[f"routing.{event_field(key)}"] = value
+    # Spiel-Rolle anpingen (#629): je Ereignis mit Spielbezug ein Schalter - Privates und Meldungen ohne Spiel nie.
+    incoming_pings = updates.pop("pings", None)
+    if incoming_pings is not None:
+        from services.discord_routing import routable as pingable
+        for key, value in incoming_pings.items():
+            if key not in EVENTS:
+                raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
+            if value and not pingable(key):
+                raise HTTPException(400, f"„{EVENTS[key]['label']}“ hat keinen Spielbezug oder ist privat – dort wird keine Spiel-Rolle angepingt.")
+            updates[f"pings.{event_field(key)}"] = bool(value)
     # Discord-Termine (#570): zwei Schalter.
     incoming_scheduled = updates.pop("scheduled_events", None)
     if incoming_scheduled is not None:
@@ -1685,6 +1700,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         flat_current[f"events.{key}"] = value
     for key, value in (current.get("routing") or {}).items():
         flat_current[f"routing.{key}"] = value
+    for key, value in (current.get("pings") or {}).items():
+        flat_current[f"pings.{key}"] = value
     for key, value in (current.get("bot_roles") or {}).items():
         flat_current[f"bot_roles.{key}"] = value
     for kind, state in (current.get("embeds") or {}).items():

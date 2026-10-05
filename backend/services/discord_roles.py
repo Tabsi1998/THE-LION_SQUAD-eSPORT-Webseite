@@ -40,6 +40,17 @@ async def load_games(db) -> tuple[dict[str, dict], dict[str, str | None]]:
     return {game["id"]: game for game in games}, {game["id"]: game.get("parent_game_id") for game in games}
 
 
+async def ping_role_name(db, item: dict | None) -> str | None:
+    """Welche Spiel-Rolle eine Meldung anpingen würde (#629): die des Hauptspiels - ein MW3-Turnier ruft die
+    „CoD-Spieler“. Ohne Spiel gibt es keine."""
+    game_id = (item or {}).get("game_id")
+    if not game_id:
+        return None
+    games, parents = await load_games(db)
+    game = games.get(top_game(game_id, parents)) or games.get(game_id)
+    return game_role_name(game) if game else None
+
+
 async def game_holders(db, user_ids: list[str], games: dict[str, dict], parents: dict[str, str | None]) -> dict[str, set[str]]:
     """Spiel-Rollen je Person: Spielprofil mit mindestens einer ID oder aktiver Team-Kader des Spiels - ohne die, die
     „Spiel-Rollen im Discord“ ausgeschaltet haben. Ergebnis: Hauptspiel-IDs."""

@@ -201,7 +201,35 @@ async def _get_discord_config() -> dict:
         "events": {key: (s.get("events") or {}).get(event_field(key)) for key in EVENTS},
         # Routing-Regel je Ereignis (#627); leer heißt Vorgabe.
         "routing": {key: (s.get("routing") or {}).get(event_field(key)) for key in EVENTS},
+        # „Spiel-Rolle anpingen“ je Ereignis (#629); von Anfang an aus.
+        "pings": {key: bool((s.get("pings") or {}).get(event_field(key))) for key in EVENTS},
     }
+
+
+def ping_enabled(cfg: dict, event_key: str) -> bool:
+    """Darf diese Ereignisart eine Spiel-Rolle anpingen? Nur mit Spielbezug und nie in privaten Zielen."""
+    from services.discord_routing import routable
+
+    return bool((cfg.get("pings") or {}).get(event_key)) and routable(event_key)
+
+
+async def game_ping(cfg: dict, event_key: str, item: dict | None, guild_id: str | None) -> str | None:
+    """Die Rolle, die diese Meldung auf diesem Server anpingt (#629) - ihre Kennung dort, oder nichts: Schalter aus,
+    kein Spiel, oder die Rolle gibt es auf dem Server nicht."""
+    if not ping_enabled(cfg, event_key):
+        return None
+    from services.discord_bot import bot
+    from services.discord_roles import ping_role_name
+
+    return bot.role_id(await ping_role_name(get_db(), item), guild_id)
+
+
+def with_ping(full: dict, role_id: str | None) -> dict:
+    """Die Meldung beginnt mit der Erwähnung - genau einer, und nur diese Rolle darf Discord anpingen."""
+    if not role_id:
+        return full
+    mention = f"<@&{role_id}>"
+    return {**full, "content": f"{mention}\n{full['content']}" if full.get("content") else mention, "mention_role_ids": [role_id]}
 
 
 def event_enabled(cfg: dict, event_key: str) -> bool:
@@ -288,7 +316,8 @@ async def _skip(log: dict, reason: str, error: str) -> dict:
 
 async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
                       fields: list | None, image_url: str | None, log: dict, footer: str | None = None,
-                      buttons: list | None = None, embed: dict | None = None, content: str | None = None) -> dict:
+                      buttons: list | None = None, embed: dict | None = None, content: str | None = None,
+                      mention_role_ids: list[str] | None = None) -> dict:
     """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID. ``embed``
     (#866 Teil 2): schon im Aussehen der Gestaltung gerendert - dann wird nichts mehr gebaut; ``content`` darüber."""
     from services.discord_bot import bot
@@ -299,6 +328,9 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
     links = await resolve_buttons(buttons)
     log["channel_id"] = channel_id
     extra = {"content": content} if content else {}
+    if mention_role_ids:
+        extra["mention_role_ids"] = mention_role_ids
+        log["mention_role_ids"] = mention_role_ids
     try:
         result = await bot.send_embed(channel_id, embed, buttons=links, **extra)  # Knöpfe als Link-Zeile darunter (#573)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
@@ -322,8 +354,9 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
                   fields: list = None, image_url: str = None, event_key: str = "custom",
                   footer: str | None = None, test: bool = False, thread_id: str | None = None,
                   buttons: list | None = None, guild_id: str | None = None, crossref_of: str | None = None,
-                  embed: dict | None = None, content: str | None = None) -> dict:
+                  embed: dict | None = None, content: str | None = None, mention_role_ids: list[str] | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
+    ``mention_role_ids`` (#629): die eine Rolle, die ``content`` erwähnt - in einem privaten Ziel fällt sie weg.
     ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst.
     ``guild_id`` (#625): an diesen Server - ohne ist der Hauptserver gemeint. Ein Unterserver muss eingeschaltet sein
     und kennt nur öffentliche Ziele; nie fällt etwas auf einen anderen Server zurück.
@@ -370,8 +403,12 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
         return await _skip(log, reason, REASON_TEXTS.get(reason) or REASON_TEXTS["channel_missing"])
     if thread_id:
         log["thread_id"] = str(thread_id)
+    if mention_role_ids and resolved["target"] in PRIVATE_TARGETS:
+        mention_role_ids = None  # privat wird nie gepingt - der Text der Erwähnung fällt mit weg
+        content = "\n".join(line for line in str(content or "").split("\n") if not line.startswith("<@&")) or None
     return await _send_embed(str(thread_id or resolved["channel_id"]), title=title, description=description, color=color, url=url,
-                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons, embed=embed, content=content)
+                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons, embed=embed, content=content,
+                             mention_role_ids=mention_role_ids)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
@@ -388,13 +425,17 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
     full = {"color": color, "url": url, "fields": fields, "image_url": image_url, "event_key": event_key, "buttons": buttons, "embed": embed, "content": content}
+    # Spiel-Rolle anpingen (#629): an jeder vollen Meldung, mit der Rolle des Servers, an den sie geht - der
+    # Querverweis am Hauptserver pingt nie, sonst klingelte es bei derselben Person zweimal.
     if guild_id or thread_id or not route:
-        return await send_to(spec["target"], title, description, thread_id=thread_id, guild_id=guild_id, **full)
+        return await send_to(spec["target"], title, description, thread_id=thread_id, guild_id=guild_id,
+                             **with_ping(full, await game_ping(cfg, event_key, item, guild_id)))
     from services import discord_routing
 
     plan = await discord_routing.plan(get_db(), cfg, event_key, item, spec["target"])
     game_guild = (plan["game"] or {}).get("guild_id")
-    sent = await send_to(spec["target"], title, description, guild_id=game_guild, **full)
+    sent = await send_to(spec["target"], title, description, guild_id=game_guild,
+                         **with_ping(full, await game_ping(cfg, event_key, item, game_guild)))
     if not game_guild:
         return sent
     main_kind = plan["main"]
@@ -406,7 +447,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
         main = await send_to(spec["target"], ref["title"], ref["description"], color=color, url=url, event_key=event_key,
                              footer=ref["footer"], buttons=ref["buttons"], crossref_of=game_guild)
     elif main_kind == "full":
-        main = await send_to(spec["target"], title, description, **full)
+        main = await send_to(spec["target"], title, description, **with_ping(full, await game_ping(cfg, event_key, item, None)))
     primary = sent if sent.get("ok") or not (main and main_kind == "full" and main.get("ok")) else main
     return {**primary, "routing": plan["rule"], "game_guild_id": game_guild, "main": main}
 
