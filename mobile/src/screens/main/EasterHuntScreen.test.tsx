@@ -5,7 +5,9 @@ import { act, fireEvent, render, screen } from "@testing-library/react-native";
 // Einladung (Anmelden), Preise, die Schnellsten und Regeln - kein Korb; angemeldet der Korb mit echten Mustern und
 // leeren Mulden, Hinweise ab Tag zwei; voller Korb mit Platz.
 
-const mockAuth: { user: Record<string, unknown> | null; logout: jest.Mock } = { user: null, logout: jest.fn(async () => {}) };
+const mockAuth: { user: Record<string, unknown> | null } = { user: null };
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
 jest.mock("react-native-safe-area-context", () => {
   const { View } = require("react-native");
@@ -34,7 +36,7 @@ async function renderScreen() {
 beforeEach(() => {
   mockPage.mockReset();
   mockAuth.user = null;
-  mockAuth.logout.mockClear();
+  mockOpenSignIn.mockClear();
 });
 
 test("Zeiten in Worten und die Phase", () => {
@@ -55,7 +57,7 @@ test("als Gast: Einladung zum Anmelden, Preise, Schnellste und Regeln - kein Kor
   expect(screen.getByTestId("hunt-fastest-1")).toHaveTextContent("1 Std. 2 Min.", { exact: false });
   expect(screen.getByTestId("hunt-terms")).toHaveTextContent("Karfreitag bis Ostermontag", { exact: false });
   await fireEvent.press(screen.getByText("Anmelden"));
-  expect(mockAuth.logout).toHaveBeenCalled();
+  expect(mockOpenSignIn).toHaveBeenCalled();
 });
 
 test("Hinweise ab Tag zwei - mit „(Website)“ für Eier auf der Website", async () => {

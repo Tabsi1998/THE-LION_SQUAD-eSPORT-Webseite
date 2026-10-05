@@ -27,6 +27,9 @@ type RegistrationResponse = {
 
 type LoginResult = { mfaRequired: boolean; ticket?: string };
 
+/** Nach einer Passwort-Anmeldung (#919): die App darf mit diesem Ticket ohne neue Passworteingabe einen Passkey anlegen. */
+export type PasskeyOffer = { ticket: string; userId: string };
+
 type AuthContextValue = {
   user: User | null;
   accessToken: string | null;
@@ -35,11 +38,13 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string, remember?: boolean) => Promise<LoginResult>;
   completeMfa: (ticket: string, code: string, remember?: boolean) => Promise<void>;
-  continueAsGuest: () => Promise<void>;
   register: (payload: RegisterPayload) => Promise<RegistrationResponse>;
   loginWithPasskey: (remember?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  /** Einladung zum Passkey (#919) - nur direkt nach einer Passwort-Anmeldung, sonst null. */
+  passkeyOffer: PasskeyOffer | null;
+  clearPasskeyOffer: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -52,6 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const rememberSessionRef = useRef(true);
   const activeUserIdRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passkeyOffer, setPasskeyOffer] = useState<PasskeyOffer | null>(null);
+
+  // Gast zuerst (#918): ohne Sitzung bleibt die App offen - mit allem Öffentlichen, ohne Anmeldebildschirm vorweg.
+  const enterGuest = useCallback(() => {
+    setUser(liveGuestUser);
+    activeUserIdRef.current = liveGuestUser.id;
+  }, []);
 
   const persistSession = useCallback(async (session: AuthResponse, remember?: boolean) => {
     const shouldRemember = remember ?? rememberSessionRef.current;
@@ -80,8 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearSession = useCallback(async () => {
-    setUser(null);
-    activeUserIdRef.current = null;
+    // Abgemeldet oder Sitzung abgelaufen (#918): zurück in den Gastmodus statt auf den Anmeldebildschirm.
+    enterGuest();
+    setPasskeyOffer(null);
     setAccessToken(null);
     setRefreshToken(null);
     await Promise.all([
@@ -89,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       SecureStore.deleteItemAsync(REFRESH_KEY),
       clearAllCache(),
     ]);
-  }, []);
+  }, [enterGuest]);
 
   useEffect(() => {
     configureAuthBridge({
@@ -143,7 +156,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             refresh_token: storedRefresh,
           });
           if (mounted) await persistSession(data, true);
+          return;
         }
+        // Nichts gespeichert (erster Start oder abgemeldet): Gastmodus (#918).
+        if (mounted) enterGuest();
       } catch {
         if (mounted) await clearSession();
       } finally {
@@ -154,7 +170,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [clearSession, persistSession]);
+  }, [clearSession, enterGuest, persistSession]);
+
+  const offerPasskey = useCallback((session: AuthResponse & { passkey_ticket?: string | null }) => {
+    setPasskeyOffer(session.passkey_ticket ? { ticket: session.passkey_ticket, userId: session.user.id } : null);
+  }, []);
 
   const login = useCallback(
     async (email: string, password: string, remember = true) => {
@@ -162,31 +182,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const challenge = data as AuthResponse & { mfa_required?: boolean; mfa_ticket?: string };
       if (challenge.mfa_required) return { mfaRequired: true, ticket: challenge.mfa_ticket };
       await persistSession(data, remember);
+      offerPasskey(data);
       return { mfaRequired: false };
     },
-    [persistSession]
+    [offerPasskey, persistSession]
   );
 
   // Passkey-Anmeldung (#217 Stufe 2): derselbe Passkey wie auf der Website, Gerätesperre statt Passwort.
   const loginWithPasskey = useCallback(async (remember = true) => {
     const session = await signInWithPasskey(remember);
     await persistSession(session, remember);
+    setPasskeyOffer(null);
   }, [persistSession]);
-
-  const continueAsGuest = useCallback(async () => {
-    setUser(liveGuestUser);
-    activeUserIdRef.current = liveGuestUser.id;
-    setAccessToken(null);
-    setRefreshToken(null);
-    setRememberSession(false);
-    rememberSessionRef.current = false;
-    await Promise.all([
-      SecureStore.deleteItemAsync(ACCESS_KEY),
-      SecureStore.deleteItemAsync(REFRESH_KEY),
-      SecureStore.setItemAsync(REMEMBER_KEY, "false"),
-      clearAllCache(),
-    ]);
-  }, []);
 
   const register = useCallback(
     async (payload: RegisterPayload) => {
@@ -199,7 +206,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const completeMfa = useCallback(async (ticket: string, code: string, remember = true) => {
     const { data } = await api.post<AuthResponse>("/auth/mfa/complete", { ticket, code, client: "mobile" });
     await persistSession(data, remember);
-  }, [persistSession]);
+    offerPasskey(data);
+  }, [offerPasskey, persistSession]);
+
+  const clearPasskeyOffer = useCallback(() => setPasskeyOffer(null), []);
 
   const logout = useCallback(async () => {
     try {
@@ -213,8 +223,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [clearSession, refreshToken, user]);
 
   const value = useMemo(
-    () => ({ user, accessToken, refreshToken, rememberSession, loading, login, loginWithPasskey, completeMfa, continueAsGuest, register, logout, refreshMe }),
-    [accessToken, completeMfa, continueAsGuest, loading, login, loginWithPasskey, logout, refreshMe, refreshToken, register, rememberSession, user]
+    () => ({ user, accessToken, refreshToken, rememberSession, loading, login, loginWithPasskey, completeMfa, register, logout, refreshMe,
+      passkeyOffer, clearPasskeyOffer }),
+    [accessToken, clearPasskeyOffer, completeMfa, loading, login, loginWithPasskey, logout, passkeyOffer, refreshMe, refreshToken, register,
+      rememberSession, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

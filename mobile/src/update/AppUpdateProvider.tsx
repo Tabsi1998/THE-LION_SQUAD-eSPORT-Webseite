@@ -18,6 +18,8 @@ type AppUpdateValue = {
   info: AppVersionInfo | null;
   check: (force?: boolean) => Promise<void>;
   openWhatsNew: () => void;
+  /** Ob „Was ist neu“ gerade offen ist - der Hinweis für Gäste (#918) wartet dann, bis die Karte zu ist. */
+  whatsNewOpen: boolean;
 };
 
 const AppUpdateContext = createContext<AppUpdateValue | null>(null);
@@ -113,7 +115,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
     void startPlayUpdate(decision.mandatory && play.immediateAllowed);
   }, [decision.mandatory, play]);
 
-  const value = useMemo<AppUpdateValue>(() => ({ info, check, openWhatsNew: () => setWhatsNewOpen(true) }), [check, info]);
+  const value = useMemo<AppUpdateValue>(() => ({ info, check, openWhatsNew: () => setWhatsNewOpen(true), whatsNewOpen }), [check, info, whatsNewOpen]);
 
   return (
     <AppUpdateContext.Provider value={value}>

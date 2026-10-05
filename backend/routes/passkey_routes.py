@@ -74,6 +74,12 @@ class MobileCredentialResponse(CredentialResponse):
     ticket: str = Field(min_length=20, max_length=200)
 
 
+class MobileRegistrationStart(RegistrationStart):
+    # Passkey in der App anlegen (#919): Nachweis ist das aktuelle Passwort - oder das Ticket, das die App direkt nach
+    # einer Passwort-Anmeldung bekommt (zehn Minuten, einmal), damit sie das Passwort nicht gleich noch einmal verlangt.
+    enroll_ticket: str = Field(default="", max_length=200)
+
+
 def passkey_configuration():
     if os.environ.get("PASSKEY_ENABLED", "true").lower() != "true":
         return None
@@ -320,6 +326,101 @@ async def mobile_login_verify(body: MobileCredentialResponse, request: Request):
     public = _public_user(user)
     await _attach_membership(public)
     return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+
+
+ENROLL_MINUTES = 10
+
+
+async def issue_enroll_ticket(db, user_id: str) -> str | None:
+    """Nach einer Passwort-Anmeldung in der App (#919): ein Ticket, mit dem die App gleich einen Passkey anlegen darf -
+    zehn Minuten, einmal, nur für dieses Konto. Ohne Passkeys für die App gibt es keins."""
+    if not passkey_configuration() or not mobile_origins():
+        return None
+    ticket = secrets.token_urlsafe(32)
+    await db.passkey_challenges.insert_one({"_id": hash_token(ticket), "kind": "mobile-enroll", "user_id": user_id,
+                                            "expires_at": now_utc() + timedelta(minutes=ENROLL_MINUTES)})
+    return ticket
+
+
+@router.post("/mobile/register/options")
+async def mobile_registration_options(body: MobileRegistrationStart, request: Request, user: dict = Depends(get_current_user)):
+    """Passkey in der App anlegen (#919): wie im Web, nur mit Ticket statt Cookie und der App als Herkunft."""
+    config = _mobile_config()
+    db = get_db()
+    await enforce_rate_limit(request, "passkey:manage", limit=8, window_seconds=900, subject=user["id"])
+    if body.enroll_ticket:
+        granted = await db.passkey_challenges.find_one_and_delete({
+            "_id": hash_token(body.enroll_ticket), "kind": "mobile-enroll", "user_id": user["id"], "expires_at": {"$gt": now_utc()},
+        })
+        if not granted:
+            raise HTTPException(401, "Bitte bestätige dein aktuelles Passwort.")
+        current = _eligible_session_user(await db.users.find_one({"id": user["id"]}))
+        if current.get("email_verified") is not True:
+            raise HTTPException(403, "Bitte zuerst deine E-Mail-Adresse bestätigen.")
+        if _requires_admin_mfa(current) and not user.get("auth_mfa_verified"):
+            raise HTTPException(403, "Bitte zuerst deine Admin-Anmeldung mit MFA bestätigen.")
+    else:
+        current = await _management_proof(db, user, body.current_password, request)
+    existing = await db.passkeys.find({"user_id": user["id"]}, {"_id": 1}).to_list(10)
+    if len(existing) >= 10:
+        raise HTTPException(400, "Bitte zuerst einen nicht mehr benötigten Passkey entfernen.")
+    options = generate_registration_options(
+        rp_id=config["rp_id"], rp_name="THE LION SQUAD", user_id=user["id"].encode(),
+        user_name=current["email"], user_display_name=current.get("display_name") or current.get("username"),
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.REQUIRED, require_resident_key=True,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ), exclude_credentials=[PublicKeyCredentialDescriptor(id=base64url_to_bytes(row["_id"])) for row in existing],
+    )
+    ticket = secrets.token_urlsafe(32)
+    await db.passkey_challenges.insert_one({
+        "_id": hash_token(ticket), "kind": "mobile-register", "challenge": bytes_to_base64url(options.challenge), "user_id": user["id"],
+        "rp_id": config["rp_id"], "name": body.name.strip() or "Mein Passkey", "expires_at": now_utc() + timedelta(minutes=5),
+    })
+    return {"ticket": ticket, "options": json.loads(options_to_json(options))}
+
+
+@router.post("/mobile/register/verify")
+async def mobile_registration_verify(body: MobileCredentialResponse, request: Request, user: dict = Depends(get_current_user)):
+    config = _mobile_config()
+    db = get_db()
+    await enforce_rate_limit(request, "passkey:register-verify", limit=15, window_seconds=900, subject=user["id"])
+    _credential_id(body)
+    challenge = await db.passkey_challenges.find_one_and_delete({
+        "_id": hash_token(body.ticket), "kind": "mobile-register", "user_id": user["id"], "expires_at": {"$gt": now_utc()},
+        "rp_id": config["rp_id"],
+    })
+    if not challenge:
+        raise HTTPException(401, "Passkey-Anfrage abgelaufen oder bereits verwendet. Bitte erneut starten.")
+    try:
+        verified = await run_in_threadpool(verify_registration_response, credential=body.credential,
+            expected_challenge=base64url_to_bytes(challenge["challenge"]), expected_rp_id=config["rp_id"],
+            expected_origin=mobile_origins(), require_user_verification=True)
+    except Exception as exc:
+        raise HTTPException(400, "Passkey konnte nicht bestätigt werden. Bitte erneut starten.") from exc
+    try:
+        await db.passkeys.insert_one({
+            "_id": bytes_to_base64url(verified.credential_id), "user_id": user["id"],
+            "public_key": bytes_to_base64url(verified.credential_public_key), "sign_count": verified.sign_count,
+            "rp_id": config["rp_id"], "name": challenge["name"], "created_at": now_utc(), "last_used_at": None,
+        })
+    except DuplicateKeyError as exc:
+        raise HTTPException(409, "Dieser Passkey ist bereits registriert.") from exc
+    await _security_audit(db, user["id"], "auth.passkey.registered", request)
+    return {"ok": True}
+
+
+@router.post("/mobile/{credential_id}/remove")
+async def mobile_remove_passkey(credential_id: str, body: PasswordProof, request: Request, user: dict = Depends(get_current_user)):
+    """Einen Passkey in der App entfernen (#919) - wie im Web nur mit dem aktuellen Passwort."""
+    _mobile_config()
+    db = get_db()
+    await _management_proof(db, user, body.current_password, request)
+    result = await db.passkeys.delete_one({"_id": credential_id, "user_id": user["id"]})
+    if not result.deleted_count:
+        raise HTTPException(404, "Passkey nicht gefunden.")
+    await _security_audit(db, user["id"], "auth.passkey.removed", request)
+    return {"ok": True}
 
 
 @router.post("/{credential_id}/remove")

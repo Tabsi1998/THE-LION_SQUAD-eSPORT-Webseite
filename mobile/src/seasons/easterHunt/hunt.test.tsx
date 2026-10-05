@@ -105,6 +105,10 @@ test("Gäste werden zum Anmelden eingeladen - gezählt wird nichts", async () =>
   await fireEvent.press(screen.getByTestId("hunt-egg-3"));
   expect(Alert.alert).toHaveBeenCalledWith("Ostereiersuche", expect.stringContaining("Melde dich an"), expect.any(Array));
   expect(mockApi.findEgg).not.toHaveBeenCalled();
+  // „Anmelden“ im Hinweis führt zur Anmeldung (#918) - nicht mehr übers Abmelden.
+  const buttons = (Alert.alert as jest.Mock).mock.calls[0][2] as Array<{ text: string; onPress?: () => void }>;
+  buttons.find((button) => button.text === "Anmelden")?.onPress?.();
+  expect(mockNavigate).toHaveBeenCalledWith("Login");
 });
 
 test("angemeldet zählt der Fund: Haptik, Ansage, Stand für das Widget, das Ei ist weg", async () => {

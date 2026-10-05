@@ -12,7 +12,10 @@ jest.mock("../../lib/api", () => ({
 }));
 const mockUser = { id: "u-1", username: "tabsi", is_club_member: true };
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: mockUser }) }));
-jest.mock("../../live", () => ({ isGuestUser: () => false }));
+const mockGuest = { value: false };
+jest.mock("../../live", () => ({ isGuestUser: () => mockGuest.value }));
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 const mockOpenWhatsNew = jest.fn();
 jest.mock("../../update/AppUpdateProvider", () => ({ useAppUpdate: () => ({ openWhatsNew: mockOpenWhatsNew, info: null, check: jest.fn() }) }));
@@ -28,6 +31,7 @@ const route = { key: "more", name: "MoreHub" } as never;
 beforeEach(() => {
   jest.clearAllMocks();
   mockAdvent.value = null;
+  mockGuest.value = false;
   mockGet.mockResolvedValue({
     data: {
       social_links: [
@@ -106,6 +110,25 @@ test("Adventkalender: die Zeile steht nur da, solange der Kalender läuft - als 
   const titles = (advent: boolean) => moreGroups(advent).map((group) => [group.title, group.entries.map((entry) => entry.title)]);
   expect(titles(true)).toEqual([["Gaming", ["Jahreswertung", "Achievements", "Spielerprofile"]], ["Verein", ["Adventkalender", "News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
   expect(titles(false)).toEqual([["Gaming", ["Jahreswertung", "Achievements", "Spielerprofile"]], ["Verein", ["News", "Galerie", "Referenzen", "Sponsoren", "Partner"]]]);
+});
+
+// Gast zuerst (#918): wo sonst der Mitgliederbereich steht, geht es zum Anmelden; „Konto“ gibt es erst mit Konto.
+test("als Gast: oben „Anmelden oder registrieren“, kein Konto-Block - alles Öffentliche bleibt", async () => {
+  mockGuest.value = true;
+  await render(<MoreScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalled());
+
+  expect(screen.getByText("Anmelden oder registrieren")).toBeTruthy();
+  expect(screen.queryByTestId("more-member-area")).toBeNull();
+  expect(screen.queryByTestId("more-join")).toBeNull();
+  for (const title of ["Konto", "Nachrichten", "Benachrichtigungen", "Meine Rechnungen", "Öffentliches Profil"]) {
+    expect(screen.queryByText(title)).toBeNull();
+  }
+  for (const title of ["Jahreswertung", "Achievements", "News", "Galerie", "Sponsoren"]) {
+    expect(screen.getAllByText(title)).toHaveLength(1);
+  }
+  await fireEvent.press(screen.getByTestId("more-sign-in"));
+  expect(mockOpenSignIn).toHaveBeenCalledTimes(1);
 });
 
 test("Symbole je Kanal, Unbekanntes als Link", () => {

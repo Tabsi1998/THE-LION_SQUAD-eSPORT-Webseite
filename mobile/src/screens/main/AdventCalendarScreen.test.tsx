@@ -10,7 +10,6 @@ import { AdventCalendarScreen, SHOW_AFTER_MS, closedState } from "./AdventCalend
 type Hook = { calendar: Calendar | null; loading: boolean; error: string; signedIn: boolean; reload: jest.Mock; open: jest.Mock; answer: jest.Mock; raffle: jest.Mock };
 const mockHook: { value: Hook | null; onAwarded?: (count: number) => void; changed?: () => void } = { value: null };
 const mockReduced = { value: false };
-const mockLogout = jest.fn(async () => {});
 const mockAnnounce = jest.fn();
 const mockOpenLink = jest.fn((_url?: string | null) => "browser");
 
@@ -23,7 +22,10 @@ jest.mock("../../advent/useAdventCalendar", () => ({
     return mockHook.value;
   },
 }));
-jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ logout: mockLogout }) }));
+// Der Bildschirm selbst fragt keine Anmeldung mehr ab; der Rest des Baums (Jahreszeiten) bekommt einen leeren Stand.
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: null }) }));
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("../../components/FadeIn", () => ({ useReduceMotion: () => mockReduced.value }));
 jest.mock("../../lib/achievements", () => ({ announceAchievementUnlocked: () => mockAnnounce() }));
 jest.mock("../../lib/api", () => ({
@@ -139,7 +141,7 @@ test("Gast: geöffnet statt gesammelt, mit dem Weg zur Anmeldung", async () => {
   expect(screen.getByText("GEÖFFNET")).toBeTruthy();
   expect(screen.getByText(/Du schaust als Gast\. Gesammelt wird mit Konto/)).toBeTruthy();
   await fireEvent.press(screen.getByTestId("advent-login"));
-  expect(mockLogout).toHaveBeenCalledTimes(1);
+  expect(mockOpenSignIn).toHaveBeenCalledTimes(1);
 });
 
 test("alle 24 offen: Glückwunsch, beim Nachholen ein anderer Satz", async () => {

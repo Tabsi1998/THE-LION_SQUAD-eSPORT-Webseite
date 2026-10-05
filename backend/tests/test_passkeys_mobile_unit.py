@@ -9,7 +9,7 @@ from fastapi import HTTPException, Response
 from webauthn.helpers import bytes_to_base64url
 
 from routes import passkey_routes as routes
-from test_passkeys_unit import authentication_credential, enroll, make_setup
+from test_passkeys_unit import authentication_credential, enroll, make_setup, registration_credential
 
 UPLOAD_HASH, PLAY_HASH = routes.DEFAULT_APK_KEY_HASHES.split(",")
 # Die APK vom Vereinsserver (Upload-Schlüssel) und die Play-Version (Googles App-Signaturschlüssel, #219).
@@ -107,3 +107,84 @@ def test_without_configuration_the_app_gets_a_clear_503(setup, monkeypatch):
     with pytest.raises(HTTPException) as error:
         asyncio.run(routes.mobile_login_options(request))
     assert error.value.status_code == 503
+
+
+def test_app_creates_a_passkey_after_the_password_login_and_signs_in_with_it(setup, monkeypatch):
+    """#919: Direkt nach der Passwort-Anmeldung legt die App mit dem Ticket einen Passkey an - ohne das Passwort noch einmal
+    zu verlangen. Das Ticket gilt einmal, zehn Minuten, nur für dieses Konto; ohne Ticket braucht es das Passwort."""
+    async def scenario():
+        db, user, request, _issue = setup
+        monkeypatch.setattr(routes, "_issue_mobile_session", AsyncMock(return_value=("zugang", "erneuerung")))
+        monkeypatch.setattr(routes, "_public_user", lambda row: {"id": row["id"]})
+        ticket = await routes.issue_enroll_ticket(db, "user-1")
+        assert len(ticket) >= 32 and db.passkey_challenges.rows[-1]["kind"] == "mobile-enroll" and "ticket" not in db.passkey_challenges.rows[-1]
+
+        start = await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket, name="Pixel 9"), request, user)
+        assert start["options"]["rp"]["id"] == "club.example" and start["options"]["authenticatorSelection"]["userVerification"] == "required"
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        credential = registration_credential(start["options"], private_key, origin=APP_ORIGIN)
+        done = await routes.mobile_registration_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"]), request, user)
+        assert done == {"ok": True} and db.passkeys.rows[0]["name"] == "Pixel 9" and db.passkeys.rows[0]["user_id"] == "user-1"
+
+        with pytest.raises(HTTPException) as again:
+            await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket), request, user)
+        assert again.value.status_code == 401, "das Ticket gilt genau einmal"
+        with pytest.raises(HTTPException) as wrong:
+            await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="falsch"), request, user)
+        assert wrong.value.status_code == 401
+        assert (await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="correct-password"), request, user))["ticket"]
+
+        # Der neue Passkey meldet in der App an - als zweiter Faktor wie jeder Passkey.
+        login = await routes.mobile_login_options(request)
+        session = await routes.mobile_login_verify(routes.MobileCredentialResponse(
+            credential=authentication_credential(login["options"], private_key, origin=APP_ORIGIN), ticket=login["ticket"]), request)
+        assert session["access_token"] == "zugang" and routes._issue_mobile_session.await_args.kwargs["mfa_verified"] is True
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("problem", ["other_account", "expired", "website_origin", "mfa_unconfirmed"])
+def test_app_enrollment_boundaries(setup, monkeypatch, problem):
+    async def scenario():
+        db, user, request, _issue = setup
+        ticket = await routes.issue_enroll_ticket(db, "user-2" if problem == "other_account" else "user-1")
+        if problem == "expired":
+            from datetime import timedelta
+
+            db.passkey_challenges.rows[-1]["expires_at"] = routes.now_utc() - timedelta(minutes=1)
+        if problem in ("other_account", "expired"):
+            with pytest.raises(HTTPException) as error:
+                await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket), request, user)
+            assert error.value.status_code == 401
+            return
+        if problem == "mfa_unconfirmed":
+            # Konto mit Zwei-Faktor, Sitzung ohne bestätigten zweiten Faktor: auch das Ticket hilft nicht.
+            db.users.rows[0]["mfa_enabled"] = True
+            with pytest.raises(HTTPException) as error:
+                await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket), request, user)
+            assert error.value.status_code == 403
+            return
+        start = await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket), request, user)
+        credential = registration_credential(start["options"], ec.generate_private_key(ec.SECP256R1()), origin="https://club.example")
+        with pytest.raises(HTTPException) as error:
+            await routes.mobile_registration_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"]), request, user)
+        assert error.value.status_code == 400 and db.passkeys.rows == [], "nur die App als Herkunft"
+    asyncio.run(scenario())
+
+
+def test_app_removes_a_passkey_only_with_the_password(setup):
+    async def scenario():
+        db, user, request, _issue = setup
+        await enroll(setup, ec.generate_private_key(ec.SECP256R1()))
+        identifier = db.passkeys.rows[0]["_id"]
+        with pytest.raises(HTTPException) as wrong:
+            await routes.mobile_remove_passkey(identifier, routes.PasswordProof(current_password="falsch"), request, user)
+        assert wrong.value.status_code == 401 and len(db.passkeys.rows) == 1
+        assert await routes.mobile_remove_passkey(identifier, routes.PasswordProof(current_password="correct-password"), request, user) == {"ok": True}
+        assert db.passkeys.rows == []
+    asyncio.run(scenario())
+
+
+def test_no_enroll_ticket_without_app_passkeys(setup, monkeypatch):
+    db, _user, _request, _issue = setup
+    monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "")
+    assert asyncio.run(routes.issue_enroll_ticket(db, "user-1")) is None

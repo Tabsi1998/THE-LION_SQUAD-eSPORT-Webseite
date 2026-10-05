@@ -7,6 +7,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import { EggArt } from "../../seasons/easter/art";
 import { fetchHuntPage, onHuntProgress, type HuntMe, type HuntPage } from "../../seasons/easterHunt/api";
 import { colors } from "../../theme";
@@ -87,7 +88,7 @@ function Basket({ me, total }: { me: HuntMe; total: number }) {
 }
 
 export function EasterHuntScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const signedIn = Boolean(user) && !isGuestUser(user);
   const [page, setPage] = useState<HuntPage | null>(null);
   const [failed, setFailed] = useState(false);
@@ -133,7 +134,7 @@ export function EasterHuntScreen() {
         {running && !signedIn ? (
           <Card style={styles.card} testID="hunt-guest">
             <Body>Mitsuchen kann, wer ein Konto hat – dann zählt jedes Ei, und ein voller Korb kommt in die Verlosung.</Body>
-            <Pressable onPress={() => void logout()} accessibilityRole="button" style={styles.cta}>
+            <Pressable onPress={() => { openSignIn(); }} accessibilityRole="button" style={styles.cta}>
               <Ionicons name="log-in-outline" color="#000" size={16} />
               <Body style={styles.ctaText}>Anmelden</Body>
             </Pressable>

@@ -1,5 +1,5 @@
-import { createNavigationContainerRef } from "@react-navigation/native";
-import type { MainTabParamList } from "./types";
+import { createNavigationContainerRef, type NavigationContainerRefWithCurrent } from "@react-navigation/native";
+import type { MainTabParamList, RootStackParamList } from "./types";
 import type { UserNotification } from "../types";
 
 export const navigationRef = createNavigationContainerRef<MainTabParamList>();
@@ -26,6 +26,24 @@ export function navigateToUrl(url?: string | null): boolean {
   if (!target) return false;
   openTarget(target);
   return true;
+}
+
+/**
+ * Gast zuerst (#918): Anmelden oder Registrieren öffnen - aus „Mehr“, dem Hinweis beim ersten Start, einem Turnier, dem
+ * Adventkalender ... Die Seiten liegen im Stapel über den Tabs; nach der Anmeldung geht es dorthin zurück, woher man kam.
+ */
+export function openSignIn(screen: "Login" | "Register" = "Login") {
+  if (!navigationRef.isReady()) return false;
+  // Die Tabs liegen unter „Main“ (RootStackParamList): der Aufruf geht von dort nach oben zum Stapel weiter.
+  (navigationRef as unknown as NavigationContainerRefWithCurrent<RootStackParamList>).navigate(screen);
+  return true;
+}
+
+/** Ob gerade Anmelden oder Registrieren offen ist (#918) - dann braucht es keinen Hinweis darauf. */
+export function signInOpen() {
+  if (!navigationRef.isReady()) return false;
+  const name = navigationRef.getCurrentRoute()?.name as string | undefined;
+  return name === "Login" || name === "Register";
 }
 
 function openTarget(target: NotificationTarget) {

@@ -94,9 +94,13 @@ Beispiel `play-review` mit der Rolle Spieler, **ohne** Vorstands- oder Admin-Rec
 mit Mitgliedschaft „aktiv“ in der Vereinsakte, damit der Mitgliederbereich sichtbar ist. In der Console unter
 „App-Zugriff“ → „Alle oder einige Funktionen sind eingeschränkt“ → Anleitung:
 
-> Anmelden mit Benutzername `play-review` und dem hinterlegten Passwort (Anmelden → E-Mail/Passwort; der
-> Passkey-Weg ist optional). Danach sind Turniere, Events, Chat, Profil und Mitgliederbereich erreichbar.
-> Zahlungen gibt es in der App nicht.
+> Die App startet ohne Konto; Öffentliches (Turniere, Events, News) ist sofort zu sehen. Anmelden: Tab
+> „Mehr“ → „Anmelden oder registrieren“ (oder Tab „Profil“ → „Anmelden“) mit `play-review` und dem
+> hinterlegten Passwort. Die Einladung zum Passkey danach mit „Später“ schließen. Danach sind Turniere,
+> Events, Chat, Profil und Mitgliederbereich erreichbar. Zahlungen gibt es in der App nicht.
+
+Seit 1.2.0 (#918) startet die App ohne Anmeldebildschirm – die Anleitung in der Console deshalb mit
+diesem Release ersetzen.
 
 Das Passwort nur in die Console eintragen, nie ins Repo oder in einen Chat; nach der Prüfung ändern.
 

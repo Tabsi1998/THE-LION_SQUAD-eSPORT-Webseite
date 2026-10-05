@@ -8,6 +8,7 @@ import { Card } from "../../components/Card";
 import { AwardCard } from "../../components/AwardCard";
 import { LINKABLE_PLATFORMS, PlatformLinkRows, type LinkedAccount } from "../../components/LinkedAccounts";
 import { BlockedUsersCard } from "../../components/BlockedUsersCard";
+import { PasskeysCard } from "../../components/PasskeysCard";
 import { FriendsCard } from "../../components/FriendsCard";
 import { HonoursCard } from "../../components/Honours";
 import { EmptyState, SkeletonList } from "../../components/ListState";
@@ -23,7 +24,7 @@ import { FadeIn } from "../../components/FadeIn";
 import { Badge } from "../../achievements/Badge";
 import { AchievementsTab } from "../../achievements/profile/AchievementsTab";
 import type { AchievementsMe } from "../../achievements/profile/model";
-import { navigateToUrl, targetFromUrl } from "../../navigation/rootNavigation";
+import { navigateToUrl, openSignIn, targetFromUrl } from "../../navigation/rootNavigation";
 import { onAchievementUnlocked } from "../../lib/achievements";
 import { sortAwards, type Award } from "../../lib/awards";
 import { API_BASE_URL } from "../../config";
@@ -94,7 +95,27 @@ const dmOptions = [
 ];
 
 
+// Gast zuerst (#918): ohne Konto zeigt der Profil-Tab den Weg zum Konto statt eines leeren Profils.
 export function ProfileScreen() {
+  const { user } = useAuth();
+  return isGuestUser(user) ? <GuestProfile /> : <AccountProfile />;
+}
+
+function GuestProfile() {
+  return (
+    <Screen>
+      <View style={styles.guestWrap} testID="profile-guest">
+        <View style={styles.guestIcon}><Ionicons name="person-circle-outline" color={colors.cyan} size={56} /></View>
+        <Title style={styles.guestTitle}>Dein Profil</Title>
+        <Body style={styles.guestText}>Mit einem Konto stehen hier dein Profil, deine Erfolge, Gewinne und Teams – dasselbe Konto wie auf der Website.</Body>
+        <Button label="Anmelden" onPress={() => openSignIn("Login")} testID="profile-guest-login" />
+        <Button label="Konto erstellen" variant="secondary" onPress={() => openSignIn("Register")} testID="profile-guest-register" />
+      </View>
+    </Screen>
+  );
+}
+
+function AccountProfile() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { user, logout, refreshMe } = useAuth();
@@ -513,7 +534,7 @@ export function ProfileScreen() {
               {avatar ? <Image source={{ uri: avatar }} style={styles.avatarImage} /> : <Body style={styles.avatarInitial}>{displayName(user).slice(0, 1).toUpperCase()}</Body>}
             </View>
             <View style={styles.identityText}>
-              <Muted>{guest ? "Live-Gastmodus" : `@${user?.username}`}</Muted>
+              <Muted>{`@${user?.username}`}</Muted>
               <Title>{displayName(user)}</Title>
               <View style={styles.pillRow}>
                 <Pill label={user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={user?.is_club_member ? "success" : "cyan"} />
@@ -762,6 +783,9 @@ export function ProfileScreen() {
           </Card>
         ) : null}
 
+        {/* Passkeys (#919): dieselben wie auf der Website - anlegen und entfernen mit dem aktuellen Passwort. */}
+        {!profileLoading && view === "settings" ? <PasskeysCard style={styles.card} /> : null}
+
         {!profileLoading && view === "settings" ? (
           <Card style={styles.card}>
             <Heading>Privatsphäre</Heading>
@@ -849,11 +873,7 @@ export function ProfileScreen() {
 
         </FadeIn>
 
-        {guest ? (
-          <Card style={styles.card}>
-            <Muted>Live-Gastmodus aktiv. Profilbearbeitung und persönliche Einstellungen sind nach Login verfügbar.</Muted>
-          </Card>
-        ) : view === "settings" ? (
+        {view === "settings" ? (
           <>
             <ActionRow icon="log-out-outline" label="Abmelden" detail="Dieses Gerät aus deinem Konto ausloggen." tone="danger" onPress={logout} />
             <ActionRow icon="trash-outline" label="Konto löschen" detail="Dauerhaft anonymisieren – wie auf der Website unter Datenschutz." tone="danger" onPress={deleteAccount} />
@@ -1047,6 +1067,21 @@ function Info({ label, value }: { label: string; value?: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  guestWrap: {
+    flex: 1,
+    gap: 14,
+    justifyContent: "center",
+  },
+  guestIcon: {
+    alignItems: "center",
+  },
+  guestTitle: {
+    textAlign: "center",
+  },
+  guestText: {
+    marginBottom: 8,
+    textAlign: "center",
+  },
   awardList: {
     gap: 10,
   },

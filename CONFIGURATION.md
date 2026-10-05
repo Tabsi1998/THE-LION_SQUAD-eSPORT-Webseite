@@ -47,6 +47,15 @@ Mit `false` lassen sich Einrichtung und Anmeldung abschalten.
    Entfernen ist im Profil mit Passwortbestätigung möglich; bestehende Sitzungen
    werden separat unter **Sitzungen** verwaltet.
 
+**In der App (#919)** gelten dieselben Passkeys. Die App fragt beim Öffnen von „Anmelden“ selbst
+nach einem vorhandenen Passkey; gibt es keinen, bleibt das Formular still. Nach einer Anmeldung mit
+Passwort lädt sie einmal ein, einen anzulegen – dafür bekommt sie mit der Anmeldung ein Ticket
+(zehn Minuten, einmal, nur für dieses Konto) und fragt das Passwort nicht noch einmal. Anlegen und
+Entfernen später unter **Profil → Einstellungen → Passkeys**, beides mit dem aktuellen Passwort.
+Die App-Herkünfte (Signaturschlüssel der Server-APK und der Play-Fassung) sind eingebaut;
+`PASSKEY_APK_KEY_HASHES` ersetzt sie, leer schaltet Passkeys nur in der App ab – dann bietet die App
+keine an.
+
 Wer bisher ausschließlich Google nutzt, richtet zunächst über den E-Mail-Passwortreset
 ein Passwort ein. Anmeldung und Einrichtung funktionieren nur auf derselben festen
 Domain. Ein Domainwechsel erfordert die erneute Einrichtung; RP-Daten deshalb nicht

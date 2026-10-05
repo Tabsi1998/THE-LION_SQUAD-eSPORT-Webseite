@@ -2,12 +2,14 @@ import React from "react";
 import { act, renderHook, waitFor } from "@testing-library/react-native";
 import * as SecureStore from "expo-secure-store";
 import { AuthProvider, useAuth } from "./AuthContext";
+import { isGuestUser } from "../live";
 
 // Der Anmeldepfad der App. Getestet werden die Zusagen, die man einem Nutzer
 // nicht stillschweigend brechen darf: Tokens nur speichern, wenn "angemeldet
 // bleiben" gewaehlt wurde, beim Abmelden wirklich alles loeschen, vor
 // abgeschlossener MFA nichts ablegen, und die Sitzung nach abgelaufenem
 // Access-Token ueber den Refresh-Token wiederherstellen statt auszusperren.
+// Gast zuerst (#918): ohne Sitzung ist man Gast - die App bleibt offen.
 
 const mockApi = { get: jest.fn(), post: jest.fn(), delete: jest.fn(), put: jest.fn() };
 const mockClearAllCache = jest.fn(async (..._args: unknown[]) => {});
@@ -92,7 +94,7 @@ describe("Anmelden", () => {
 
     expect(outcome?.mfaRequired).toBe(true);
     expect(outcome?.ticket).toBe("ticket-1");
-    expect(result.current.user).toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
   });
 
@@ -134,14 +136,14 @@ describe("Sitzung beim App-Start", () => {
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBe("access-neu");
   });
 
-  test("ein abgelehnter Refresh sperrt sauber aus, statt haengen zu bleiben", async () => {
+  test("ein abgelehnter Refresh meldet sauber ab - als Gast, statt haengen zu bleiben", async () => {
     await SecureStore.setItemAsync(REFRESH_KEY, "refresh-ungueltig");
     await SecureStore.setItemAsync(REMEMBER_KEY, "true");
     mockApi.post.mockRejectedValue(new Error("401"));
 
     const { result } = await renderAuth();
 
-    expect(result.current.user).toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
     expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
   });
 
@@ -152,7 +154,7 @@ describe("Sitzung beim App-Start", () => {
 
     const { result } = await renderAuth();
 
-    expect(result.current.user).toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
     expect(mockApi.get).not.toHaveBeenCalled();
   });
@@ -175,7 +177,7 @@ describe("Abmelden", () => {
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
     expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
     expect(mockClearAllCache).toHaveBeenCalled();
-    expect(result.current.user).toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
   });
 
   test("auch wenn das Backend nicht antwortet, ist man lokal abgemeldet", async () => {
@@ -190,22 +192,55 @@ describe("Abmelden", () => {
     });
 
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
-    expect(result.current.user).toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
   });
 });
 
-describe("Gastmodus", () => {
-  test("legt keine Tokens ab und leert den Cache", async () => {
+describe("Gast zuerst (#918)", () => {
+  test("ohne gespeicherte Sitzung startet die App als Gast - ohne Tokens und ohne Anfrage an den Server", async () => {
     const { result } = await renderAuth();
 
-    await act(async () => {
-      await result.current.continueAsGuest();
-    });
-
-    expect(result.current.user).not.toBeNull();
+    expect(isGuestUser(result.current.user)).toBe(true);
+    expect(result.current.accessToken).toBeNull();
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBeNull();
-    expect(await SecureStore.getItemAsync(REMEMBER_KEY)).toBe("false");
-    expect(mockClearAllCache).toHaveBeenCalled();
+    expect(mockApi.get).not.toHaveBeenCalled();
+    expect(mockApi.post).not.toHaveBeenCalled();
+  });
+});
+
+describe("Passkey-Angebot (#919)", () => {
+  test("nach der Passwort-Anmeldung mit Ticket bietet die App einen Passkey an; Abmelden nimmt das Angebot zurück", async () => {
+    mockApi.post.mockResolvedValue({ data: { ...SESSION, passkey_ticket: "enroll-1" } });
+    const { result } = await renderAuth();
+    expect(result.current.passkeyOffer).toBeNull();
+
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-1", userId: "u-1" });
+
+    await act(async () => {
+      await result.current.logout();
+    });
+    expect(result.current.passkeyOffer).toBeNull();
+  });
+
+  test("ohne Ticket (Server ohne App-Passkeys) kein Angebot; nach dem MFA-Schritt mit Ticket schon", async () => {
+    const { result } = await renderAuth();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    expect(result.current.passkeyOffer).toBeNull();
+
+    mockApi.post.mockResolvedValue({ data: { ...SESSION, passkey_ticket: "enroll-2" } });
+    await act(async () => {
+      await result.current.completeMfa("ticket-1", "123456", true);
+    });
+    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-2", userId: "u-1" });
+    await act(async () => {
+      result.current.clearPasskeyOffer();
+    });
+    expect(result.current.passkeyOffer).toBeNull();
   });
 });
 

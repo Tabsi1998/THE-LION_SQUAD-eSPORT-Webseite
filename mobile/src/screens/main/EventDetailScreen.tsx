@@ -22,6 +22,7 @@ import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { internalLabel } from "../../lib/memberArea";
 import { getRegistrationState } from "../../lib/registration";
 import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, EventRegistration, F1Challenge, NewsPost, Tournament } from "../../types";
@@ -306,7 +307,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 <Button label={busy ? "Wird abgemeldet ..." : "Vom Event abmelden"} variant="secondary" onPress={unregister} disabled={busy} />
               </>
             ) : guest ? (
-              <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
+              // Gast zuerst (#918): der Weg zum Konto gleich hier - nach der Anmeldung geht es zurück zu diesem Event.
+              <>
+                <Muted>Teilnehmen kannst du mit einem Konto.</Muted>
+                <Button label="Anmelden oder registrieren" variant="secondary" onPress={() => openSignIn()} testID="event-sign-in" />
+              </>
             ) : registration.canRegister && event.has_registration ? (
               <>
                 {event.allow_companions ? (

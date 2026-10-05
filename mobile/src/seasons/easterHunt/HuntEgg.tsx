@@ -52,7 +52,7 @@ export function eggPosition(corner: Corner, clip: boolean): Record<string, numbe
 
 /** Ein Ei an seiner Karte: antippen sammelt es ein (oder lädt Gäste zum Anmelden ein). */
 export function HuntEggView({ spot, clip = false }: { spot: EggSpot; clip?: boolean }) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { showToast, reducedMotion } = useSeason();
   const navigation = useNavigation<NavigationProp<MainTabParamList>>();
   const guest = !user || isGuestUser(user);
@@ -63,7 +63,8 @@ export function HuntEggView({ spot, clip = false }: { spot: EggSpot; clip?: bool
     if (guest || huntState().guest) {
       Alert.alert("Ostereiersuche", "Melde dich an, um Eier zu sammeln – gezählt wird nur mit Konto.", [
         { text: "Später", style: "cancel" },
-        { text: "Anmelden", onPress: () => void logout() },
+        // Gast zuerst (#918): „Anmelden“ liegt im Stapel über den Tabs - der Aufruf geht von hier nach oben dorthin.
+        { text: "Anmelden", onPress: () => navigation.navigate("Login" as never) },
       ]);
       return;
     }

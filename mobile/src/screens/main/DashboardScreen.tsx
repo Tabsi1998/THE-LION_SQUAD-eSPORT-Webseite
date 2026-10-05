@@ -194,11 +194,12 @@ export function DashboardScreen({ navigation }: Props) {
         <Card style={styles.heroCard} perch="dashboard-hero" perchKind="hero">
           <View style={styles.heroTop}>
             <View style={styles.heroMark}>
-              <Ionicons name={isGuest ? "radio-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
+              <Ionicons name={isGuest ? "shield-outline" : "shield-checkmark-outline"} color={colors.black} size={22} />
             </View>
             <View style={styles.flex}>
               <Muted style={styles.heroEyebrow}>{isGuest ? clubName : "Hallo"}</Muted>
-              <Title>{isGuest ? "Live Home" : displayName(user)}</Title>
+              {/* Gast zuerst (#918): die App startet ohne Konto - kein „Live“-Modus mehr, sondern ein Willkommen. */}
+              <Title>{isGuest ? "Willkommen" : displayName(user)}</Title>
             </View>
             <View style={styles.heroBadges}>
               <Badge label={isGuest ? "Gast" : user?.is_club_member ? "Vereinsmitglied" : "Community"} tone={isGuest || !user?.is_club_member ? "cyan" : "gold"} />
@@ -206,7 +207,7 @@ export function DashboardScreen({ navigation }: Props) {
             </View>
             <SeasonWidgetSlot />
           </View>
-          {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News aus der Website.</Body> : null}
+          {isGuest ? <Body style={styles.heroBody}>Aktuelle Turniere, Events und News des Vereins.</Body> : null}
           {/* Weihnachten (#642): die Lichterkette hängt an der Unterkante der Karte - dem Kopf der App. */}
           <SeasonEdgeSlot />
         </Card>
