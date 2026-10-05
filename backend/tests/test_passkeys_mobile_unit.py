@@ -46,6 +46,8 @@ def test_app_login_with_the_website_passkey_and_replay_rejection(setup, monkeypa
         monkeypatch.setattr(routes, "_public_user", lambda user: {"id": user["id"], "email": user["email"]})
         private_key = ec.generate_private_key(ec.SECP256R1())
         await enroll(setup, private_key)   # auf der Website angelegt
+        # Zwei-Faktor eingeschaltet (#919): der Passkey ist der zweite Faktor - auch in der App kommt kein Code.
+        db.users.rows[0]["mfa_enabled"] = True
 
         start = await routes.mobile_login_options(request)
         assert len(start["ticket"]) >= 32 and start["options"]["rpId"] == "club.example" and start["options"]["userVerification"] == "required"

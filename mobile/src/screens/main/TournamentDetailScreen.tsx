@@ -358,7 +358,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,
               } : null} />
-              {tournament.show_chat ? (
+              {/* Den Turnier-Chat gibt es mit Konto (#918) - Gäste finden „Anmelden oder registrieren“ oben bei der Teilnahme. */}
+              {tournament.show_chat && !guest ? (
                 <Button
                   label="Turnier-Chat öffnen"
                   onPress={() => navigation.navigate("TournamentChat", { id: tournament.id, title: `${tournament.title} Chat` })}

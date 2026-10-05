@@ -18,7 +18,10 @@ jest.mock("../../lib/api", () => ({
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: "u-1", username: "paula" } }) }));
-jest.mock("../../live", () => ({ isGuestUser: () => false }));
+const mockGuest = { value: false };
+jest.mock("../../live", () => ({ isGuestUser: () => mockGuest.value }));
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 jest.mock("../../components/MediaImage", () => ({ MediaImage: () => null }));
 jest.mock("../../components/AddToCalendarButton", () => ({ AddToCalendarButton: () => null }));
@@ -58,8 +61,20 @@ const EVENT = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGuest.value = false;
   mockPost.mockResolvedValue({ data: {} });
   mockPatch.mockResolvedValue({ data: {} });
+});
+
+// Gast zuerst (#918): statt „bitte einloggen“ gleich der Weg zum Konto - danach geht es zurück zu diesem Event.
+test("als Gast: „Anmelden oder registrieren“ statt der Anmeldung zum Event", async () => {
+  mockGuest.value = true;
+  mockGet.mockResolvedValue({ data: { ...EVENT, visibility: "public" } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-sign-in")).toBeTruthy());
+  expect(screen.getByText("Teilnehmen kannst du mit einem Konto.")).toBeTruthy();
+  await fireEvent.press(screen.getByTestId("event-sign-in"));
+  expect(mockOpenSignIn).toHaveBeenCalledTimes(1);
 });
 
 test("Kosten vor dem Absenden: Zusatz per Haken, Summe live, ohne Kostenhaken kein Absenden", async () => {
