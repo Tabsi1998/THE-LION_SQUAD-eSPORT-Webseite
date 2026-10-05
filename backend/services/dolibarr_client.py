@@ -76,7 +76,7 @@ CAPABILITIES_V1 = {
     "membership_fees": True,
     "webhook_member_changed": True,
     "verified_identities": True,    # dolibarr-vereine#153 - seit Vereine 0.11: identities/claim, me/*
-    "change_feed": False,           # dolibarr-vereine#154 - kann das Modul seit 0.8.0-beta; die Website liest ihn mit #844
+    "change_feed": True,            # dolibarr-vereine#154 - seit 0.8.0-beta; die Website liest Abstimmungen und Versammlungen (#844)
     "signed_webhooks": False,       # dolibarr-vereine#155 - kann das Modul; die Website hat keinen Empfänger
     "documents": True,              # dolibarr-vereine#157 - seit Vereine 0.11: me/documents, documents
 }
@@ -839,6 +839,18 @@ class DolibarrClient:
         if not isinstance(data, list):
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
+
+    async def changes(self, cursor: str = "", *, types: str = "", limit: int = 100) -> dict:
+        """Der Änderungsfeed (Recht „Änderungsfeed verfolgen“): nur Art, Kennung, Zustand und Zeitpunkt, nie Inhalte."""
+        params: dict = {"limit": max(1, min(int(limit), 500))}
+        if cursor:
+            params["cursor"] = cursor
+        if types:
+            params["types"] = types
+        data = await self._get("/vereine/changes", params)
+        if not isinstance(data, dict) or not isinstance(data.get("events"), list):
+            raise DolibarrError("invalid_response", 200)
+        return data
 
     async def lookup_by_email(self, email: str) -> dict:
         return await self._get("/vereine/members/lookup", {"email": str(email or "").strip()})

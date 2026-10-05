@@ -595,6 +595,12 @@ async def submit_meeting_motion(meeting_id: int, body: MotionBody, request: Requ
         raise HTTPException(exc.status, exc.detail)
 
 
+@router.get("/me/ballots/open")
+async def my_open_ballots(user: dict = Depends(get_current_user)):
+    """Für das Abstimmungs-Popup (#844): offene Abstimmungen mit eigenem Stimmrecht, und wie oft nachgefragt wird."""
+    return await dolibarr_meetings.open_ballots(get_db(), user)
+
+
 @router.post("/me/ballots/{ballot_id}/votes")
 async def cast_ballot_vote(ballot_id: int, body: VoteBody, request: Request, user: dict = Depends(get_current_user)):
     """Bewusst ohne Audit-Eintrag: welche Antwort jemand gibt, schreibt die Website nirgends hin."""

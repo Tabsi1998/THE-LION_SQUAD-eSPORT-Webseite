@@ -9,6 +9,7 @@
     "used_paths": [
       "/vereine/status",
       "/vereine/members",
+      "/vereine/changes",
       "/vereine/members/{id}/summary",
       "/vereine/members/{id}/participations",
       "/vereine/members/{id}/participations/{external_id}",
@@ -62,7 +63,6 @@
       "/status"
     ],
     "not_used_yet": {
-      "change_feed": "Modul seit 0.8.0-beta (dolibarr-vereine#154), meldet seit 1.7.0 auch Versammlungen und Abstimmungen - die Website nutzt ihn mit #844",
       "signed_webhooks": "Modul seit 0.8.0-beta (dolibarr-vereine#155) - die Website hat keinen Empfaenger"
     }
   }

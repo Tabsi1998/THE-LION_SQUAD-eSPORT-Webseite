@@ -175,6 +175,8 @@ NOTIFICATION_KIND_CATEGORY = {
     "news_board": "club_internal",
     "event_member": "club_internal",
     "event_board": "club_internal",
+    # Abstimmung offen (#844): einmal je Abstimmung, nur mit offenem Stimmrecht.
+    "ballot_open": "club_internal",
     "membership_update": "membership_updates",
     "invoice_ready": "billing_updates",
 }

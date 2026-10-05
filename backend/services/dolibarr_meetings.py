@@ -43,7 +43,7 @@ VOTE_CONFLICTS = {
     "closed": "Die Abstimmung ist schon geschlossen.",
     "channel": "Diese Abstimmung läuft nicht über die Website.",
     "used": "Dieses Stimmrecht ist schon genutzt – jede Stimme zählt einmal.",
-    "not_present": "Du stehst nicht auf der Anwesenheitsliste der Versammlung – erst dort eintragen lassen, dann abstimmen.",
+    "not_present": "Du stehst nicht auf der Anwesenheitsliste der Versammlung – am Eingang die Mitgliedskarte scannen lassen, dann abstimmen.",
     "external_id": "Für dieses Stimmrecht liegt schon eine andere Stimme von dir vor – sie bleibt, eine Stimme lässt sich nicht ändern.",
 }
 VOTE_RIGHT_LABEL = "Über die API im Namen jedes Mitglieds abstimmen"
@@ -222,6 +222,29 @@ async def overview(db, user: dict, *, today: date | None = None) -> dict:
             else:
                 out["ballots_reason"], out["ballots_text"] = exc.kind, f"Dolibarr antwortet gerade nicht ({exc.text})."
     return out
+
+
+async def open_ballots(db, user: dict, *, today: date | None = None) -> dict:
+    """Was das Abstimmungs-Popup braucht (#844): offene Abstimmungen mit eigenem Stimmrecht - geheime auf Papier nur als
+    Hinweis, und nur für wen ein Stimmzettel bereitliegt -, ob heute abgestimmt wird, und wie oft die Seite selbst
+    nachfragen soll: ohne gelesenen Feed am Versammlungstag alle 15 Sekunden, mit Feed jede Minute als Sicherheitsnetz."""
+    empty = {"available": False, "ballots": [], "live": False, "poll_seconds": 0}
+    settings, access, client, reason = await _access(db, user)
+    if reason or _lacks(access, "votes"):
+        return empty
+    try:
+        rows = await client.my_ballots(access["params"])
+    except DolibarrError:
+        return empty
+    now = _iso(today)
+    views = [ballot_view(row) for row in rows]
+    shown = [ballot for ballot in views if ballot["status"] == "open"
+             and (ballot["can_vote"] or (ballot["secret"] and any(right["state"] == "open" for right in ballot["rights"])))]
+    live = any(ballot["day"] == now and ballot["status"] in ("released", "open") for ballot in views)
+    from services import dolibarr_ballot_watch
+
+    poll = (60 if await dolibarr_ballot_watch.feed_state(db) == "ok" else 15) if live else 0
+    return {"available": True, "ballots": shown, "live": live, "poll_seconds": poll}
 
 
 # ---------------------------------------------------------------- Schreiben

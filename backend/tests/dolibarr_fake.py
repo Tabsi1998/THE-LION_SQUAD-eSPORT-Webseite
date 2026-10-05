@@ -253,6 +253,9 @@ class FakeDolibarr:
         # Ehrungen (#848, Vereine 1.8.0): je Mitglied, mit „darf veröffentlicht werden“; me/honours braucht die Fähigkeit record.
         self.honours: dict[int, list[dict]] = {}
         self.today = "2026-09-25"
+        # Änderungsfeed (#844): Abstimmungen und Versammlungen mit Zustand (seit Vereine 1.7.0); Recht „Änderungsfeed verfolgen“.
+        self.feed: list[dict] = []
+        self.feed_right = True
         # Veranstaltungen und Helferdienste (#331, Vereine 1.4): Schichten mit Plätzen, Stand je Mitglied.
         self.events: dict[int, dict] = {}
         self.shift_states: dict[tuple[int, int, int], str] = {}   # (event, shift, member) → requested|confirmed|done|cancelled
@@ -467,6 +470,20 @@ class FakeDolibarr:
 
     def set_ballot_status(self, ballot_id: int, status: str) -> None:
         self.ballots[ballot_id]["status"] = status
+        state = {"released": "released", "open": "opened", "closed": "closed", "evaluated": "confirmed", "cancelled": "cancelled"}.get(status)
+        if state:
+            self.feed_event("ballot", ballot_id, state)
+
+    def feed_event(self, object_type: str, object_id: int, state: str | None = None, *, change: str = "updated",
+                   occurred_at: str = "2026-09-25T17:00:00Z") -> dict:
+        """Ein Vermerk im Änderungsfeed: nur Art, Kennung, Zustand und Zeitpunkt - nie Stimmen."""
+        revision = 1 + sum(1 for row in self.feed if row["object_type"] == object_type and row["object_id"] == object_id)
+        row = {"event_id": f"ev-{len(self.feed) + 1}", "object_type": object_type, "object_id": object_id, "revision": revision,
+               "change": change, "occurred_at": occurred_at}
+        if state:
+            row["state"] = state
+        self.feed.append(row)
+        return row
 
     def confirm_result(self, ballot_id: int, *, outcome: str = "passed", passed: bool = True, counts: dict | None = None, valid: int = 0,
                        abstain: int = 0, winner: str = "") -> None:
@@ -1362,6 +1379,16 @@ class FakeDolibarr:
                 assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", since), "changed_since braucht eine Zeitzone"
                 rows = [m for m in rows if m["updated_at"] >= since]
             return self._json("/vereine/members", rows[page * limit:(page + 1) * limit])
+        if path == "/vereine/changes" and request.method == "GET":
+            if not self.feed_right:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to follow the change feed"}})
+            cursor = str(params.get("cursor") or "")
+            start = int(cursor) if cursor.isdigit() else 0
+            types = {kind for kind in str(params.get("types") or "").split(",") if kind}
+            limit = int(params.get("limit") or 100)
+            rows = [row for row in self.feed[start:] if not types or row["object_type"] in types][:limit]
+            return self._json("/vereine/changes", {"events": rows, "next_cursor": str(len(self.feed)), "resync_required": False,
+                                                   "has_more": False, "retention_days": 90})
         if path == "/vereine/members/lookup":
             if "email" in params:
                 ids = self.emails.get(params["email"].lower(), [])

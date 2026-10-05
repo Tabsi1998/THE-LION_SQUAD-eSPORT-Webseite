@@ -9,6 +9,7 @@ import { UnderHeaderContext } from "../components/Screen";
 import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
+import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ConsentScreen } from "../screens/auth/ConsentScreen";
@@ -102,6 +103,8 @@ export function AppNavigator() {
       ) : <AuthScreens />}
       {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}
+      {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht über jedem Screen. */}
+      {signedIn && !user?.consent_required ? <BallotPopupOverlay /> : null}
     </NavigationContainer>
   );
 }
