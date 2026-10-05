@@ -3446,7 +3446,7 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   gespeichert hat; sie müssen im Passwortmanager des Handys gelöscht werden.
 - Startseite (#947; PR #948; nur Web; `update.sh`): die Zeile `hero-join` („Mitglied wird, wer sich
   einbringt …“) im Hero ist weg, `HomePage.jsx` braucht `useAuth` nicht mehr.
-- CLAUDE.md gekürzt (#929; nur Doku und `scripts/check-doc-links.py`): `CLAUDE.md` von 365 KB auf Regeln,
+- CLAUDE.md gekürzt (#929; PR #950; nur Doku und `scripts/check-doc-links.py`): `CLAUDE.md` von 365 KB auf Regeln,
   Kurzkarte, Prüfen, Release, Deployment und letzten Stand; die alten Abschnitte 5 und 9 sind diese Datei,
   6.4 ist `docs/STOLPERSTEINE.md`. `check-doc-links.py` prüft die Obergrenze (`SIZE_BUDGETS`, 60 000 Bytes
   mit LF gezählt) lokal und auf GitHub. Neuer Abschnitt 0 in `CLAUDE.md`: sparsam lesen und suchen.
