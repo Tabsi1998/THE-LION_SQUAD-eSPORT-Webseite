@@ -96,6 +96,13 @@ was hilft.
   in regulären Ausdrücken – längere Skripte und Texte als Datei schreiben und dann ausführen. Pythons
   `write_text` schreibt unter Windows CRLF; Dateien als Bytes lesen und schreiben und die Zeilenenden der
   Datei beibehalten. `git merge-tree … | head` verdeckt Konflikte – die Ausgabe ohne Pipe prüfen.
+- **Ein Backend-Test scheitert nur im vollen Lauf unter Windows:**
+  `test_media_scan_flow.py::test_blocked_public_upload_clears_avatar_and_settings_are_checked` endete am 5.10.
+  einmal mit `PermissionError: [WinError 32]` – der Bau der kleineren Bildfassungen hält die Datei noch offen,
+  während die Quarantäne sie verschiebt (unter Linux geht das Umbenennen trotzdem). Allein läuft der Test
+  grün; kein Befund des PRs.
+- **Unit-Tests mit nachgebauter Datenbank** (`FakeDb` in `test_dsgvo_competition_unit.py`): liest eine Route
+  eine neue Sammlung, braucht die Attrappe sie auch – sonst `AttributeError: 'FakeDb' object has no attribute …`.
 - **Firefox und WebKit:** der Check installiert nur Chromium (wie GitHub). Für die anderen in `frontend/`:
   `npx playwright install firefox webkit`, dann `CI=true E2E_WORKERS=2 E2E_EXTRA_BROWSERS=1 yarn test:e2e`.
   Mit mehr als zwei Workern hängen Firefox-Admin-Seiten bei „Lade …“ – das ist Last, kein Fehler; WebKit

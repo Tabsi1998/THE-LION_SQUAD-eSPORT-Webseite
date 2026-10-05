@@ -71,11 +71,11 @@ einem dafür vorbereiteten Teststack.
 
 **Lokal zuerst, GitHub bestätigt.** Die [CI-Workflows](.github/workflows/ci.yml)
 enthalten die verbindlichen automatischen Prüfungen. Sie laufen vor dem Push auf dem
-Entwicklungsrechner, denn GitHub rechnet für dieses private Repo jede Minute ab. Auf
-GitHub startet die CI deshalb nur für Pull Requests, die kein Entwurf sind, und nur mit
-den Jobs, deren Bereich der PR berührt ([Regeln](scripts/ci-changed-areas.py)). Der
-Geheimnis-Scan läuft bei jeder Änderung. CodeQL wird nur manuell gestartet, solange
-Code Scanning für das private Repo nicht aktiviert ist.
+Entwicklungsrechner. Auf GitHub startet die CI nur für Pull Requests, die kein Entwurf
+sind, und nur mit den Jobs, deren Bereich der PR berührt
+([Regeln](scripts/ci-changed-areas.py)). Der Geheimnis-Scan läuft bei jeder Änderung.
+CodeQL wird derzeit nur manuell gestartet. Das Repository ist öffentlich: in Issues, PRs
+und Doku stehen deshalb keine Daten von Mitgliedern und keine Zugänge.
 [Releases](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/releases)
 dokumentieren veröffentlichte Artefakte.
 

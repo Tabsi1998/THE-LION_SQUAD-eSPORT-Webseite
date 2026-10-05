@@ -3450,6 +3450,13 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   Kurzkarte, Prüfen, Release, Deployment und letzten Stand; die alten Abschnitte 5 und 9 sind diese Datei,
   6.4 ist `docs/STOLPERSTEINE.md`. `check-doc-links.py` prüft die Obergrenze (`SIZE_BUDGETS`, 60 000 Bytes
   mit LF gezählt) lokal und auf GitHub. Neuer Abschnitt 0 in `CLAUDE.md`: sparsam lesen und suchen.
+- Entschieden am 5.10. abends (Betreiber): der Online-Spiegel des Umbauplans (Artifact) ist gelöscht und aus
+  den Regeln gestrichen – er war seit 15.09. nicht nachgezogen und jedes Nachziehen kostete Tokens. Das
+  Repository ist bewusst öffentlich (wegen der Updates); `README.md` und `mobile/RELEASES.md` sagen das jetzt,
+  die Kommentare in `codeql.yml` und `app_releases.py` noch nicht. Aufgeräumt auf GitHub: Meilensteine 33–37,
+  40, 43, 44, 47 und 3 („App 1.0.0“, mit #219 – die App ist bei Google Play) geschlossen; neu 49 „App 1.3.0“ (#921, #949) und 50 „Klammern: Messlatten und
+  Daueraufgaben“ (#658, #677, #772); #729, #733, #738, #744 in „Jahreszeiten II“, #748, #752, #759 in
+  „Jahreszeiten III“, #775 in „Prüfung Oktober 2026“; die sieben Abnahme-Issues tragen jetzt Labels.
 
 ---
 
