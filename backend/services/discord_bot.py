@@ -127,6 +127,21 @@ async def answer_kwargs(answer: dict) -> dict:
     return kwargs
 
 
+def command_targets(rows: dict[str, dict], guild_ids: list[str], main_id: str = "") -> tuple[list[str], list[str]]:
+    """Welche Server die Slash-Befehle bekommen (#630): der Hauptserver und jeder eingeschaltete Unterserver, auf dem der
+    Bot ist - und welche sie nicht (mehr) haben sollen. Ohne Verzeichnis (allererster Start) nur der Hauptserver."""
+    wanted: list[str] = []
+    unwanted: list[str] = []
+    for guild_id in guild_ids:
+        row = rows.get(guild_id)
+        if row is None:
+            ok = not rows and (guild_id == main_id or (not main_id and guild_id == guild_ids[0]))
+        else:
+            ok = row.get("role") == "main" or (bool(row.get("enabled")) and not row.get("left_at"))
+        (wanted if ok else unwanted).append(guild_id)
+    return wanted, unwanted
+
+
 def guild_row(guild) -> dict:
     """Ein Server für das Verzeichnis (#624) - Name, Symbol, Mitgliederzahl und was der Bot dort darf."""
     from services.discord_guilds import permission_snapshot
@@ -339,6 +354,8 @@ class BotRunner:
         self.last_error = ""
         self.last_action = ""
         self._view: dict = {}
+        self._tree = None
+        self._commands_lock = asyncio.Lock()
 
     async def start_if_enabled(self) -> bool:
         db = get_db()
@@ -399,6 +416,7 @@ class BotRunner:
         client = discord.Client(intents=intents)
         tree = app_commands.CommandTree(client)
         self._client = client
+        self._tree = tree
         self._view = view
         runner = self
         db = get_db()
@@ -415,19 +433,17 @@ class BotRunner:
                     await runner._cache_channels(guild)
                 except Exception as exc:  # noqa: BLE001 - die Kanalliste ist Komfort, kein Muss
                     logger.warning("[discord-bot] Kanalliste: %s", exc)
-            try:
-                if guild:
-                    tree.copy_global_to(guild=guild)
-                    await tree.sync(guild=guild)
-                else:
-                    await tree.sync()
-                runner.last_action = f"verbunden, Befehle registriert ({now_utc().strftime('%H:%M')} UTC)"
-            except Exception as exc:
-                runner.last_error = f"Befehle: {exc}"
+            # Erst das Server-Verzeichnis (#624), dann die Befehle je Server (#630): auf dem Hauptserver und jedem
+            # eingeschalteten Unterserver als Server-Befehle - sofort da, ohne die Stunde globaler Befehle.
+            await runner._sync_guilds(client, view)
+            synced = await runner.sync_commands()
+            if synced.get("registered"):
+                runner.last_action = f"verbunden, Befehle auf {len(synced['registered'])} Server(n) registriert ({now_utc().strftime('%H:%M')} UTC)"
+            if synced.get("errors"):
+                runner.last_error = ("Befehle: " + "; ".join(synced["errors"]))[:300]
             # Die Server-ID merken: das Server-Widget für die Website (#581) braucht sie, auch ohne eingetragene ID.
             await record_state(db, connected=True, guild_name=runner.guild_name, guild_id=str(guild.id) if guild else "", last_error=runner.last_error,
                                last_action=runner.last_action, started_at=now_utc().isoformat())
-            await runner._sync_guilds(client, view)
 
         # Server-Verzeichnis (#624): beitreten, verlassen, umbenennen - das Verzeichnis zieht nach.
         @client.event
@@ -488,17 +504,24 @@ class BotRunner:
 
         # Antworten auf Slash-Befehle sieht nur die fragende Person (Wunsch des Betreibers, 25.09.): sie
         # gelten nur ihr, und die Kanäle bleiben frei - was für alle gilt, steht in den gepinnten Einbettungen (#569).
+        # Seit #630 je Server: auf einem Spielserver zeigen /turniere, /naechstes-event und /bracket nur dessen Spiele;
+        # `spiel:` wählt ein anderes, `alle: True` zeigt alles. Die Antworten rechnet services/discord_commands.py.
+        from services import discord_commands
+
+        async def spiele(interaction, current: str):
+            return [app_commands.Choice(name=row["name"], value=row["value"]) for row in await discord_commands.game_choices(db, current)]
+
         @tree.command(name="naechstes-event", description="Wann ist das nächste Event?")
-        async def naechstes_event(interaction):
-            events = await db.events.find({"status": {"$nin": ["draft", "cancelled"]}, "visibility": "public", "start_date": {"$gte": now_utc().isoformat()}},
-                                          {"_id": 0, "name": 1, "title": 1, "slug": 1, "start_date": 1, "location": 1, "city": 1}).sort("start_date", 1).to_list(5)
-            await interaction.response.send_message(next_event_text(events, base_url), ephemeral=True)
+        @app_commands.describe(spiel="Nur Events mit einem Turnier dieses Spiels", alle="Alle Spiele statt nur die dieses Servers")
+        @app_commands.autocomplete(spiel=spiele)
+        async def naechstes_event(interaction, spiel: str | None = None, alle: bool = False):
+            await runner._reply(interaction, lambda: discord_commands.answer_naechstes_event(db, interaction.guild_id, spiel, alle, base_url))
 
         @tree.command(name="turniere", description="Welche Turnier-Anmeldungen sind offen?")
-        async def turniere(interaction):
-            rows = await db.tournaments.find({"status": "registration_open", "is_public": {"$ne": False}, "visibility": "public"},
-                                             {"_id": 0, "title": 1, "slug": 1, "start_date": 1, "status": 1}).to_list(20)
-            await interaction.response.send_message(open_tournaments_text(rows, base_url), ephemeral=True)
+        @app_commands.describe(spiel="Nur dieses Spiel", alle="Alle Spiele statt nur die dieses Servers")
+        @app_commands.autocomplete(spiel=spiele)
+        async def turniere(interaction, spiel: str | None = None, alle: bool = False):
+            await runner._reply(interaction, lambda: discord_commands.answer_turniere(db, interaction.guild_id, spiel, alle, base_url))
 
         @tree.command(name="meine-erfolge", description="Deine Erfolge auf der Website (nur mit verknüpftem Konto)")
         async def meine_erfolge(interaction):
@@ -515,8 +538,6 @@ class BotRunner:
 
         # Seit #573: die Antworten rechnet services/discord_commands.py; Discord wartet nur drei Sekunden, darum erst
         # „denkt nach“ und dann die Antwort - auch sie nur für die fragende Person.
-        from services import discord_commands
-
         @tree.command(name="rangliste", description="Die Top 10 der laufenden Saison")
         async def rangliste(interaction):
             await runner._reply(interaction, lambda: discord_commands.answer_rangliste(db))
@@ -524,11 +545,12 @@ class BotRunner:
         @tree.command(name="bracket", description="Das Bracket eines laufenden Turniers")
         @app_commands.describe(turnier="Welches laufende Turnier")
         async def bracket(interaction, turnier: str | None = None):
-            await runner._reply(interaction, lambda: discord_commands.answer_bracket(db, turnier))
+            await runner._reply(interaction, lambda: discord_commands.answer_bracket(db, turnier, guild_id=interaction.guild_id))
 
         @bracket.autocomplete("turnier")
         async def bracket_turniere(interaction, current: str):
-            return [app_commands.Choice(name=row["name"], value=row["value"]) for row in await discord_commands.bracket_choices(db, current)]
+            return [app_commands.Choice(name=row["name"], value=row["value"])
+                    for row in await discord_commands.bracket_choices(db, current, guild_id=interaction.guild_id)]
 
         @tree.command(name="wer-streamt", description="Wer aus dem Verein gerade live ist")
         async def wer_streamt(interaction):
@@ -553,7 +575,9 @@ class BotRunner:
                 await interaction.response.send_message("Nur für den Vorstand.", ephemeral=True)
                 return
             state = {**await read_state(db), **runner.status(), "linked_count": len(links)}
-            await interaction.response.send_message(status_text(state), ephemeral=True)
+            # Je Server (#630): welcher Server das ist, seine Spiele, Kanäle und die letzte Aktualisierung der Einbettungen.
+            lines = await discord_commands.server_status_lines(db, interaction.guild_id)
+            await interaction.response.send_message("\n".join([status_text(state), *lines]), ephemeral=True)
 
         try:
             await client.start(token)
@@ -576,6 +600,46 @@ class BotRunner:
             logger.warning("[discord-bot] Befehl: %s", type(exc).__name__)
             kwargs = {"content": "Das hat gerade nicht geklappt – versuch es gleich noch einmal.", "ephemeral": True}
         await interaction.followup.send(**kwargs)
+
+    async def sync_commands(self) -> dict:
+        """Slash-Befehle je Server (#630): auf dem Hauptserver und jedem eingeschalteten Unterserver registriert; ein
+        ausgeschalteter oder zum Unterserver ohne Haken gewordener Server verliert sie wieder (nur, wo sie standen -
+        ``commands_at`` am Server-Eintrag). Ein Server ohne Recht hält die anderen nicht auf."""
+        client, tree = self._client, self._tree
+        if client is None or tree is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline", "registered": [], "removed": [], "errors": []}
+        from services.discord_guilds import COLLECTION
+
+        db = get_db()
+        fields = {"_id": 0, "guild_id": 1, "role": 1, "enabled": 1, "left_at": 1, "commands_at": 1}
+        rows = {row["guild_id"]: row for row in await db[COLLECTION].find({}, fields).to_list(500)}
+        guilds = {str(guild.id): guild for guild in client.guilds}
+        wanted, unwanted = command_targets(rows, list(guilds), str((self._view or {}).get("guild_id") or ""))
+        registered: list[str] = []
+        removed: list[str] = []
+        errors: list[str] = []
+        async with self._commands_lock:
+            for guild_id in wanted:
+                try:
+                    tree.copy_global_to(guild=guilds[guild_id])
+                    await tree.sync(guild=guilds[guild_id])
+                    registered.append(guild_id)
+                except Exception as exc:  # noqa: BLE001 - ein Server ohne Recht hält die anderen nicht auf
+                    errors.append(f"{getattr(guilds[guild_id], 'name', guild_id)}: {exc}"[:200])
+            for guild_id in unwanted:
+                if not (rows.get(guild_id) or {}).get("commands_at"):
+                    continue
+                try:
+                    tree.clear_commands(guild=guilds[guild_id])
+                    await tree.sync(guild=guilds[guild_id])
+                    removed.append(guild_id)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"{getattr(guilds[guild_id], 'name', guild_id)}: {exc}"[:200])
+        if registered:
+            await db[COLLECTION].update_many({"guild_id": {"$in": registered}}, {"$set": {"commands_at": now_utc().isoformat()}})
+        if removed:
+            await db[COLLECTION].update_many({"guild_id": {"$in": removed}}, {"$unset": {"commands_at": ""}})
+        return {"ok": not errors, "registered": registered, "removed": removed, "errors": errors}
 
     async def _sync_guilds(self, client, view: dict) -> None:
         """Die Server des Bots ins Verzeichnis (#624) - ein Fehler hier hält den Bot nie auf."""

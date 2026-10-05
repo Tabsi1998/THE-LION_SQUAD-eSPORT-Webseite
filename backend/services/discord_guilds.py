@@ -226,6 +226,11 @@ async def health(db, guild_id: str, *, connected_ids: set[str] | None = None) ->
         checks.append({"key": "permissions", "ok": False, "text": f"Dem Bot fehlen: {names}. Einstellen unter {PERMISSION_FIX}."})
     elif row.get("bot_permissions"):
         checks.append({"key": "permissions", "ok": True, "text": "Der Bot hat alle nötigen Rechte."})
+    # Slash-Befehle je Server (#630): auf dem Hauptserver und jedem eingeschalteten Unterserver.
+    if row.get("role") == "main" or (row.get("enabled") and not row.get("left_at")):
+        checks.append({"key": "commands", "ok": bool(row.get("commands_at")), "text": "Die Slash-Befehle (/turniere, /bracket …) sind hier registriert."
+                       if row.get("commands_at") else "Die Slash-Befehle sind hier noch nicht registriert – das passiert beim Verbinden des Bots "
+                       "und beim Einschalten; fehlt die Einladung mit „applications.commands“, den Bot mit dem Link oben neu einladen."})
     if row.get("role") == "main":
         status = await target_status(db)
         for target, entry in status.items():

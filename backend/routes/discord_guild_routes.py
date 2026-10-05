@@ -1,6 +1,8 @@
 """Server-Verzeichnis im Admin (#624): Liste, Haupt/Unter, Ein/Aus, Einladungslink, Notiz, Gesundheitsprüfung, Test."""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from auth import require_club_admin
@@ -37,6 +39,13 @@ async def update_discord_guild(guild_id: str, body: dict = Body(...), me: dict =
     except discord_guilds.GuildError as exc:
         raise HTTPException(400, str(exc))
     await _audit_settings_change(db, "settings.discord.guild.update", "discord", me["id"], [f"guilds.{guild_id}.{key}" for key in sorted(body or {})])
+    if {"enabled", "role"} & set(body or {}):
+        # Befehle je Server (#630): ein eingeschalteter Server hat sie sofort, ein ausgeschalteter verliert sie.
+        from services.discord_bot import bot
+        try:
+            await bot.sync_commands()
+        except Exception as exc:  # noqa: BLE001 - die Einstellung ist gespeichert; der nächste Start registriert nach
+            logging.getLogger("tls.discord.guilds").warning("[discord-guilds] Befehle: %s", type(exc).__name__)
     return row
 
 

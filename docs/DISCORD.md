@@ -301,6 +301,16 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
   (eigener Stand mit Art und „seit“, nur verknüpft – nie Beitrag, Nummer oder Zahlungsdaten) und
   `/verknuepfen` (der Weg zum Verknüpfen). **Jede Antwort sieht nur die fragende Person**; was
   für alle gilt, steht in den angepinnten Einbettungen.
+- **Befehle je Server (#630):** registriert als Server-Befehle auf dem Hauptserver und jedem
+  eingeschalteten Unterserver (`BotRunner.sync_commands`, nie global; `command_targets` rechnet, wer
+  sie bekommt). Beim Verbinden erst das Server-Verzeichnis, dann die Befehle; Ein/Aus oder Rollenwechsel
+  im Admin registriert sofort nach, ein ausgeschalteter Server verliert sie (nur, wo sie standen:
+  `discord_guilds.commands_at`; die Gesundheitsprüfung zeigt es). Ein Server ohne Recht hält die anderen
+  nicht auf. Auf einem Spielserver filtern `/turniere`, `/naechstes-event` (Events mit einem Turnier
+  dieser Spiele) und die Auswahl von `/bracket` auf dessen Spiele; `spiel:` (Autovervollständigung,
+  mit Editionen) und `alle: True` überschreiben das. `/status` nennt Server, Spiele, Kanäle und die
+  letzte Aktualisierung der Einbettungen. Code: `discord_commands.server_scope`, `answer_turniere`,
+  `answer_naechstes_event`, `server_status_lines`, `game_choices`.
 
 Zählen, Rollen und Befehle gelten nur für Konten, die im Profil verknüpft sind (Abschnitt oben).
 
