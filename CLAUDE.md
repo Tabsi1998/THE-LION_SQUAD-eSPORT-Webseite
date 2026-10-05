@@ -3329,6 +3329,62 @@ Seit dem 15. September gilt:
   (die Prüfsumme), persönliche Dateien bleiben `no-store`. App `memberDocuments.ts` (`fetchChecked`):
   Cache unter der Prüfsumme, Nachfrage bei jedem Öffnen (offline öffnet sie bewusst nicht), Fortsetzen
   über Expos `resumeData`. Die Attrappe `tests/dolibarr_fake.py` kann `…/file` nach den Regeln des Moduls.
+- Vertrag Vereinsmodul 1.9.0 (#882; PR #886): `tests/contracts/vereine-openapi.json` ist Byte für Byte
+  `docs/openapi.json` von dolibarr-vereine `v1.9.0`; `manifest.json` führt unter `used_paths` jeden
+  `/vereine/…`-Pfad, den der Code aufruft – `test_manifest_lists_every_vereine_path_the_backend_calls`
+  fällt sonst sofort (jeder neue Aufruf braucht seinen Eintrag; parallele PRs tragen an verschiedenen
+  Stellen ein, damit sie unabhängig mergen). `waiting_for` heißt `not_used_yet`. Geheime Wahl auf Papier
+  (`Ballot.secret`): kein `can_use`/`can_vote`, 409 `secret` mit eigenem Satz.
+- „Live jetzt“ entfällt (#883; PR #887): `discord_embeds.KINDS` ohne `live`, `RETIRED` + `retire()` im
+  Zehn-Minuten-Lauf (löscht die eigene Nachricht einmal, schlägt den Kanal den Stream-Meldungen vor,
+  `on_end = delete`); `refresh()` hält `checked_at` fest, Grund in `paused` (Discord/Bot aus) bzw. `error`
+  (`build_failed`). Die Vorlage „live“ bleibt für `/wer-streamt`.
+- Level-Rahmen Sechseck (#888; PR #890): `max-width: none` für das Sechseck – die allgemeine Regel
+  `img, svg { max-width: 100% }` kappte es; Browser-Test misst Breite, Höhe und Mitte.
+- PSN verlinkt (#891; PR #892): gültige Online-ID (3–16 Zeichen, Buchstabe vorne) → `profile.playstation.com/<ID>`
+  in Web und App; eingefügte Profiladressen nur von dieser Domain werden zur ID. Nintendo/EA kopieren weiter.
+- Partner-Bilder aus dem Vereinsmodul (#880; PR #893): `services/sponsor_images.py` (`pick(doc, kind,
+  surface)` – dunkle Fassung für die Website, helle für Mail und PDF; `apply`, `admin_summary`, `sync` mit
+  Prüfsumme und nur eigenen Dateien `dolibarr-partner-…`), aufgerufen aus `dolibarr_sponsors.refresh` ab
+  Vereine 1.9.0. Client `partners()`, `partner_image()` über `_file_get` (gemeinsam mit #849).
+- Konten in der Mitgliederakte (#846; PR #894): `services/dolibarr_accounts.py` (`overview`, `share` mit
+  `confirmed`/`external_id`, `follow_platform` beim Verknüpfen und Trennen), `GET/PUT
+  /api/membership/me/accounts…`; Fähigkeit `accounts` auch im Mitgliedsmodus. Web
+  `MemberFileAccountsCard`, App `components/MemberFileAccounts.tsx`.
+- Teilnahmen melden (#847; PR #895): `services/dolibarr_participations.py` (`entries_between` – Check-ins und
+  Turniere mit Zuordnung; `run` mit höchstens 60 Aufrufen, 409 ersetzt die eigene Meldung, nur ausdrücklich
+  Widerrufenes wird zurückgenommen; `request_backfill` zwölf Monate; `admin_view`). Kennungen
+  `ev.{event}.{member}`/`tn.{turnier}.{member}`. Job alle 10 min, Schalter `participations_enabled` unter
+  Dolibarr → Funktionen, `POST /api/admin/dolibarr/participations/backfill`.
+- Ehrungen (#848; PR #896): `services/dolibarr_honours.py` (`overview` über `me/honours`, `set_public`,
+  `refresh_user` über `members/{id}/honours`, `public_honours` aus dem Zwischenstand `dolibarr_honours`,
+  stündlich im Job `dolibarr_public`), `routes/honour_routes.py`. Erfolg `membership_jubilee` (Zähler
+  `membership_years`, Motiv `jubilee`). Web `profile/HonoursPanel.jsx` (Reiter nur für Mitglieder),
+  App `components/Honours.tsx`.
+- Dependabot (PRs #897–#899, #901): #898 hält die Tiptap-Menüs per `resolutions` auf 3.31.4, #899 Skia
+  2.6.2 und SVG 15.15.4 (passend zum Expo-SDK). Seit #901 hebt Dependabot `@shopify/react-native-skia`,
+  `react-native-svg` und `jest-expo` nicht mehr einzeln – nur mit dem Expo-Update.
+- Einlass bei der Generalversammlung (#845 Teil; PR #900): `services/dolibarr_admission.py` (`overview`,
+  `admit` per Prüfcode der Karte oder Mitgliedsnummer → `PUT meetings/{id}/attendance/{member}` im Namen
+  des scannenden Vorstandsmitglieds, `undo` mit Grund und neuer Runde; Kennungen `in-{v}-{m}-{runde}`),
+  `routes/admission_routes.py` (`/api/admin/admission…`, Bereich „Verein“). Web `components/tls/QrScanner.jsx`
+  (BarcodeDetector, sonst `jsqr` erst auf der Seite geladen), `pages/admin/AdminAdmissionPage.jsx`
+  (`/admin/einlass`). Offen: Scanner in der App (A: Handy-Browser, B: Kamera in der App) – Frage an den Betreiber.
+- Abstimmung live (#844; PR #902): `services/dolibarr_ballot_watch.py` liest den Änderungsfeed
+  (`/vereine/changes?types=ballot,meeting`; 5 s während einer Versammlung, sonst 60 s; beim ersten Lesen
+  nur die letzten zehn Minuten), meldet `publish_user_change(…, "ballots")` und einmal `ballot_open`
+  (Kategorie „Vereinsintern“). `GET /api/membership/me/ballots/open` mit `poll_seconds` (15 ohne Feed, 60
+  mit, 0 außerhalb des Versammlungstags). Web `components/tls/BallotPopup.jsx`, App
+  `components/BallotPopupOverlay.tsx` (fragt selbst nach, auch mit Live-Kanal).
+- Einmalige Freigabe (#329 Teil; PR #904): `direct_once` aus `me/profile` an Web (`SelfServiceCard`) und
+  App (`MyMembershipScreen`); die Attrappe setzt sie nach einer Änderung zurück wie das Modul.
+- Versand je Spiel (#627; PR #905): `services/discord_routing.py` (Regeln `game_server_plus_crossref`,
+  `both_full`, `game_server_only`, `main_only`; `plan`, `crossref_message`, `preview_text`), `send_event`
+  sendet nach Plan; ein Querverweis trägt nie den vollen Inhalt; scheitert der Spielserver, geht die
+  Meldung voll an den Hauptserver. Privates nur am Hauptserver (`PUT` mit anderer Regel → 400).
+  Versandprotokoll mit `guild_id`/`crossref`, Filter `guild` in den Ereignissen.
+- Entschieden am 5.10. (#850 verworfen): Dolibarr wird **sinnvoll** eingebunden, nicht erzwungen – Events
+  bleiben von der Website geführt (dort stehen mehr Angaben), kein Abgleich von Dolibarr-Events.
 
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
@@ -3355,7 +3411,7 @@ Seit dem 15. September gilt:
   die Irre). Vorlagen: `MoreScreen.test.tsx`, `TeamsScreen.test.tsx`,
   `InfoCenterScreen.test.tsx`.
 - Der e2e-Test `frontend/e2e/admin-navigation.spec.js` zählt die
-  Admin-Menüeinträge (**80** seit #648 Jahreszeiten; 79 seit #561, 77 mit #556) – jeder neue Menüpunkt braucht
+  Admin-Menüeinträge (**83** seit #900 Einlass; 82 mit #646 Ostereiersuche, 80 seit #648 Jahreszeiten) – jeder neue Menüpunkt braucht
   die neue Zahl. **Falle:** zwei parallele PRs, die je eine Zahl setzen, ergeben nach dem
   zweiten Merge eine dritte (24.09.: #550 setzte 60, #552 setzte 73, richtig war 69) – den
   zweiten nach dem Merge des ersten rebasen und die Zahl neu rechnen.
