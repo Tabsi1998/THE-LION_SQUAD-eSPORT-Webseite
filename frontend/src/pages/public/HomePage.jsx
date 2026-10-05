@@ -6,7 +6,6 @@ import { newsCategoryLabel } from "@/lib/newsCategories";
 import { applyCspNonce } from "@/lib/csp";
 import { boardContacts } from "@/lib/memberArea";
 import { useCountUp } from "@/hooks/useCountUp";
-import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { Reveal } from "@/components/tls/Reveal";
@@ -38,7 +37,6 @@ const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Vere
 export default function HomePage() {
   const [state, setState] = useState(null);
   const [board, setBoard] = useState([]);
-  const { isClubMember } = useAuth() || {};
   const [heroRef, glowRef] = useHeroGlow();
   useDocumentTitle("Startseite", HOME_DESCRIPTION);
 
@@ -85,13 +83,8 @@ export default function HomePage() {
               <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">
                 Gaming- und eSports-Verein aus Tirol. Bei uns geht es um Gemeinschaft: gemeinsam zocken, Turniere spielen, Events erleben — auf Discord und vor Ort. Wer mitspielt und sich einbringt, gehört dazu.
               </p>
-              {/* Keine Knöpfe im Hero (#425); Mitglieder sehen auch keine Zeile (#431) - ihr Weg in
-                  den Mitgliederbereich steht im Benutzermenü. */}
-              {!isClubMember && (
-                <p className="mt-6 text-sm text-white/45" data-testid="hero-join">
-                  Mitglied wird, wer sich einbringt — <Link to="/membership/join" className="text-[#FFD700] hover:underline">so läuft das bei uns</Link>.
-                </p>
-              )}
+              {/* Keine Knöpfe im Hero (#425) und keine Extrazeile mehr (#947): der Weg zum Mitglied steht an
+                  einer Stelle - „Mitglied werden“ in der Kopfzeile; Mitglieder finden ihren Bereich im Benutzermenü. */}
             </div>
             <div className="lg:col-span-5 flex items-center justify-center min-w-0 tls-hero-enter tls-hero-enter-delay">
               <div className="relative" data-season-anchor="lion">
