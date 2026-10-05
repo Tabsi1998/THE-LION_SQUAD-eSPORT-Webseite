@@ -41,8 +41,9 @@ export const TABS = [
   { k: "teams", label: "Teams", icon: Users },
   { k: "friends", label: "Freunde", icon: UserPlus },
   { k: "achievements", label: "Achievements", icon: Medal },
-  // Ehrungen aus der Mitgliederakte (#848): nur für Vereinsmitglieder - eigener Reiter, keine Auszeichnungen aus Turnieren.
-  { k: "honours", label: "Ehrungen", icon: Award, membersOnly: true },
+  // Ehrungen aus der Mitgliederakte (#848) und eigene Teilnahmen (#906): nur für Vereinsmitglieder - eigener Reiter,
+  // keine Auszeichnungen aus Turnieren.
+  { k: "honours", label: "Ehrungen & Teilnahmen", icon: Award, membersOnly: true },
   // Rechnungen gehören zum Konto, nicht zum Vereinsbereich (#320, Entscheidung vom 23.09.).
   { k: "invoices", label: "Rechnungen", icon: Receipt },
   { k: "privacy", label: "Privatsphäre", icon: Eye },

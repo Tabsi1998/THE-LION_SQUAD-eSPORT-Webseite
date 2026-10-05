@@ -314,8 +314,8 @@ steht, was Sache ist.
 ## Ehrungen im Profil (Vereine ab 1.8.0, #848)
 
 Ehrenmitgliedschaft, Verdienstnadel, Jubiläum: Was der Vorstand in Dolibarr an der Mitgliedskarte unter
-*Ehrungen* einträgt, sieht das Mitglied im eigenen Profil – auf der Website unter *Profil → Ehrungen*, in
-der App in der Übersicht des Profils. Dort stehen **alle** eigenen Ehrungen, jeweils mit dem Hinweis, ob
+*Ehrungen* einträgt, sieht das Mitglied im eigenen Profil – auf der Website unter *Profil → Ehrungen &
+Teilnahmen*, in der App in der Übersicht des Profils. Dort stehen **alle** eigenen Ehrungen, jeweils mit dem Hinweis, ob
 der Verein sie veröffentlichen lässt.
 
 **Öffentlich nur mit beidem:** Aufs öffentliche Profil (Reiter *Ehrungen*) kommt eine Ehrung nur, wenn
@@ -393,6 +393,13 @@ Wer bei einem Vereinsevent eingecheckt wurde oder ein Turnier gespielt hat, steh
 in Dolibarr (Mitgliedskarte → Teilnahmen) – für Ehrungen, den Jahresbericht und „aktive Mitglieder“.
 Helferdienste trägt das Vereinsmodul selbst ein, sobald der Vorstand sie bestätigt hat; die meldet die
 Website nicht noch einmal.
+
+**Das Mitglied sieht sie selbst (#906):** Unter den Ehrungen steht „Meine Teilnahmen“ – alles, was die Akte
+als Teilnahme führt, neueste zuerst und je Jahr gruppiert, mit der Herkunft in Worten („vom Verein
+eingetragen“, „von der Website gemeldet“, „Helferdienst“). Web: *Profil → Ehrungen & Teilnahmen*; App: in
+der Übersicht des Profils. Dafür braucht es nichts Neues: dieselbe Zuordnung bzw. Fähigkeit
+„Mitgliederakte“ wie bei den Ehrungen (`GET /vereine/me/participations`). Die Liste sieht nur die Person
+selbst, aufs öffentliche Profil kommt davon nichts.
 
 **Einrichten:**
 

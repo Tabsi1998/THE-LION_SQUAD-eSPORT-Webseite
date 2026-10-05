@@ -8,8 +8,11 @@ import { colors } from "../theme";
 
 // Ehrungen aus der Mitgliederakte (#848) - wie im Web: alle eigenen mit dem Hinweis, welche der Verein freigibt;
 // aufs öffentliche Profil nur mit dem eigenen Schalter. HonourList zeigt dieselben Karten auf fremden Profilen.
+// Darunter die eigenen Teilnahmen (#906) - nur für die Person selbst, nie öffentlich.
 
 export type Honour = { kind: string; kind_label: string; title: string; years: number; label: string; given_on: string; publishable?: boolean };
+
+export type Participation = { kind: string; kind_label: string; title: string; day: string; hours: number | null; source: string; source_label: string };
 
 export type HonoursView = {
   available: boolean;
@@ -18,6 +21,8 @@ export type HonoursView = {
   public: boolean;
   shown?: number;
   honours: Honour[];
+  participations?: Participation[];
+  participations_text?: string;
 };
 
 export function honourDay(day: string): string {
@@ -26,6 +31,51 @@ export function honourDay(day: string): string {
 
 export function honourLine(honour: Honour): string {
   return [honour.given_on ? `Verliehen am ${honourDay(honour.given_on)}` : "", honour.years ? `${honour.years} Jahre im Verein` : ""].filter(Boolean).join(" · ");
+}
+
+/** „14.03.2026 · Wettbewerb · 2,5 Std. · von der Website gemeldet“ - wie im Web. */
+export function participationLine(row: Participation): string {
+  const hours = typeof row.hours === "number" && row.hours > 0 ? `${String(row.hours).replace(".", ",")} Std.` : "";
+  return [honourDay(row.day), row.kind_label, hours, row.source_label].filter(Boolean).join(" · ");
+}
+
+/** Neueste zuerst, je Jahr eine Gruppe. */
+export function participationsByYear(rows: Participation[]): { year: string; rows: Participation[] }[] {
+  const groups: { year: string; rows: Participation[] }[] = [];
+  for (const row of rows) {
+    const year = String(row.day || "").slice(0, 4) || "ohne Datum";
+    const last = groups[groups.length - 1];
+    if (last && last.year === year) last.rows.push(row);
+    else groups.push({ year, rows: [row] });
+  }
+  return groups;
+}
+
+function ParticipationsCard({ view }: { view: HonoursView }) {
+  const groups = participationsByYear(view.participations || []);
+  return (
+    <Card style={styles.card} testID="profile-participations">
+      <Heading>Meine Teilnahmen</Heading>
+      <Muted>Was deine Mitgliederakte als Teilnahme führt: Vereinsevents mit Check-in, Turniere, Helferdienste und was der Vorstand einträgt. Nur du siehst das.</Muted>
+      {view.participations_text ? (
+        <Muted testID="profile-participations-reason">{view.participations_text}</Muted>
+      ) : groups.length ? (
+        groups.map((group) => (
+          <View key={group.year} style={styles.list} testID={`profile-participations-${group.year}`}>
+            <Muted style={styles.year}>{`${group.year} · ${group.rows.length} ${group.rows.length === 1 ? "Teilnahme" : "Teilnahmen"}`}</Muted>
+            {group.rows.map((row, index) => (
+              <View key={`${row.day}-${row.title}-${index}`} style={styles.participation} testID="participation-row">
+                <Body style={styles.title}>{row.title}</Body>
+                <Muted style={styles.meta}>{participationLine(row)}</Muted>
+              </View>
+            ))}
+          </View>
+        ))
+      ) : (
+        <Muted testID="profile-participations-empty">In deiner Mitgliederakte steht noch keine Teilnahme.</Muted>
+      )}
+    </Card>
+  );
 }
 
 export function HonourList({ honours, showReach = false }: { honours: Honour[]; showReach?: boolean }) {
@@ -89,24 +139,27 @@ export function HonoursCard() {
   };
 
   return (
-    <Card style={styles.card} testID="profile-honours">
-      <Heading>Meine Ehrungen</Heading>
-      {!view.available ? (
-        <Muted testID="profile-honours-reason">{view.text}</Muted>
-      ) : (
-        <>
-          <View style={styles.switchRow}>
-            <View style={styles.text}>
-              <Body style={styles.switchLabel}>Auf meinem öffentlichen Profil zeigen</Body>
-              <Muted>Nur Ehrungen, die der Verein veröffentlichen lässt.{view.public ? ` Gerade öffentlich: ${view.shown || 0}.` : ""}</Muted>
+    <>
+      <Card style={styles.card} testID="profile-honours">
+        <Heading>Meine Ehrungen</Heading>
+        {!view.available ? (
+          <Muted testID="profile-honours-reason">{view.text}</Muted>
+        ) : (
+          <>
+            <View style={styles.switchRow}>
+              <View style={styles.text}>
+                <Body style={styles.switchLabel}>Auf meinem öffentlichen Profil zeigen</Body>
+                <Muted>Nur Ehrungen, die der Verein veröffentlichen lässt.{view.public ? ` Gerade öffentlich: ${view.shown || 0}.` : ""}</Muted>
+              </View>
+              <Switch value={!!view.public} disabled={busy} onValueChange={toggle} accessibilityLabel="Ehrungen auf meinem öffentlichen Profil zeigen" testID="profile-honours-public" />
             </View>
-            <Switch value={!!view.public} disabled={busy} onValueChange={toggle} accessibilityLabel="Ehrungen auf meinem öffentlichen Profil zeigen" testID="profile-honours-public" />
-          </View>
-          {view.honours.length ? <HonourList honours={view.honours} showReach /> : <Muted testID="profile-honours-empty">In deiner Mitgliederakte steht noch keine Ehrung.</Muted>}
-          {error ? <Muted style={styles.error}>{error}</Muted> : null}
-        </>
-      )}
-    </Card>
+            {view.honours.length ? <HonourList honours={view.honours} showReach /> : <Muted testID="profile-honours-empty">In deiner Mitgliederakte steht noch keine Ehrung.</Muted>}
+            {error ? <Muted style={styles.error}>{error}</Muted> : null}
+          </>
+        )}
+      </Card>
+      {view.available ? <ParticipationsCard view={view} /> : null}
+    </>
   );
 }
 
@@ -141,4 +194,13 @@ const styles = StyleSheet.create({
   switchRow: { alignItems: "center", flexDirection: "row", gap: 12 },
   switchLabel: { fontWeight: "700" },
   error: { color: "#FF8A80" },
+  year: { fontSize: 11, fontWeight: "800", letterSpacing: 1.2, textTransform: "uppercase" },
+  participation: {
+    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderRadius: 6,
+    borderWidth: 1,
+    gap: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
 });

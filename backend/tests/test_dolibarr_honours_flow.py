@@ -123,3 +123,40 @@ async def test_jubilee_years_from_the_start_of_membership(flow, monkeypatch):
     assert (await counters.compute(me["id"], {"membership_years"}))["membership_years"] == 10
     await flow.db.memberships.update_one({"user_id": me["id"]}, {"$set": {"member_status": "former"}})
     assert (await counters.compute(me["id"], {"membership_years"}))["membership_years"] == 0, "nur aktive Mitglieder feiern"
+
+
+@pytest.mark.asyncio
+async def test_own_participations_newest_first_only_for_the_person(flow, fake):
+    """#906: Unter den Ehrungen stehen die eigenen Teilnahmen aus der Akte - neueste zuerst, mit Herkunft in Worten.
+    Scheitert nur dieser Teil, bleiben die Ehrungen stehen; aufs öffentliche Profil kommt davon nichts."""
+    await paula_with_honours(flow, fake)
+    fake.participations[12] = [
+        {"kind": "competition", "kind_label": "Wettbewerb", "title": "Sommer-Cup", "day": "2026-07-12", "hours": None, "source": "api", "external_id": "tn.t1.12"},
+        {"kind": "shift", "kind_label": "Helferdienst", "title": "Sommerfest – Ausschank", "day": "2026-07-04", "hours": 3.5, "source": "shift", "external_id": ""},
+        {"kind": "event", "kind_label": "Veranstaltung", "title": "Weihnachtsfeier", "day": "2025-12-19", "hours": 2.5, "source": "dolibarr", "external_id": ""},
+    ]
+    mine = (await flow.get("/api/me/honours")).json()
+    assert mine["available"] is True and mine["participations_text"] == ""
+    assert [(row["title"], row["day"], row["hours"], row["source_label"]) for row in mine["participations"]] == [
+        ("Sommer-Cup", "2026-07-12", None, "von der Website gemeldet"),
+        ("Sommerfest – Ausschank", "2026-07-04", 3.5, "Helferdienst"),
+        ("Weihnachtsfeier", "2025-12-19", 2.5, "vom Verein eingetragen"),
+    ]
+    assert "external_id" not in mine["participations"][0], "die Kennung der Meldung bleibt intern"
+
+    # Der Schalter fürs Profil gilt nur für Ehrungen: Teilnahmen erscheinen nie öffentlich.
+    await flow.put("/api/me/honours/public", json={"on": True})
+    public = await flow.get("/api/users/public/paula")
+    assert "Sommer-Cup" not in public.text and "Weihnachtsfeier" not in public.text
+
+    # Nur die Teilnahmen scheitern: Ehrungen bleiben, ein Satz sagt warum.
+    fake.fail_with, fake.fail_paths = 500, {"/vereine/me/participations"}
+    broken = (await flow.get("/api/me/honours")).json()
+    assert broken["available"] is True and len(broken["honours"]) == 2 and broken["participations"] == []
+    assert broken["participations_text"].startswith("Deine Teilnahmen sind gerade nicht lesbar")
+    fake.fail_with, fake.fail_paths = None, set()
+
+    # Ohne Bindung: derselbe Satz wie bei den Ehrungen, keine Liste.
+    flow.act_as(await flow.add_user(role="player", name="gast"))
+    guest = (await flow.get("/api/me/honours")).json()
+    assert guest["reason"] == "not_bound" and guest["participations"] == []

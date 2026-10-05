@@ -858,6 +858,13 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
+    async def my_participations(self, who: dict) -> list[dict]:
+        """Die eigenen Teilnahmen samt bestätigten Helferdiensten, neueste zuerst (#906) - dieselbe Fähigkeit `record`."""
+        data = await self._get("/vereine/me/participations", dict(who))
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict)]
+
     async def changes(self, cursor: str = "", *, types: str = "", limit: int = 100) -> dict:
         """Der Änderungsfeed (Recht „Änderungsfeed verfolgen“): nur Art, Kennung, Zustand und Zeitpunkt, nie Inhalte."""
         params: dict = {"limit": max(1, min(int(limit), 500))}
