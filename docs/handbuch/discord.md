@@ -246,6 +246,19 @@ einmal selbst gelöscht und ihren Kanal den Stream-Meldungen vorgeschlagen.
 
 Aussehen und Texte gestaltet ihr im Reiter „Gestaltung“ ([4.12](#412-gestaltung-der-meldungen)).
 
+**Auf Spielservern** (Unterserver, Kapitel 5) gibt es die **Rangliste** und die **nächsten Termine**
+noch einmal – nur mit den Spielen dieses Servers. Sie stehen im selben Reiter unter „Spielserver“, je
+Server mit eigener Kanal-Liste:
+
+- **Rangliste:** nur Saisonpunkte aus Turnieren und Fast-Lap-Challenges dieser Spiele; der Name des
+  Spiels steht hinter dem Saisonnamen („Saison 2026 · Call of Duty“).
+- **Nächste Termine:** nur Turniere und Fast-Lap-Challenges dieser Spiele. Vereins-Events tragen kein
+  Spiel – sie stehen nur am Hauptserver.
+- Der **Erfolg der Woche** gilt für den ganzen Verein und bleibt am Hauptserver.
+- Ist dem Server noch kein Spiel zugeordnet, postet der Bot nichts und sagt es: „Diesem Server ist noch
+  kein Spiel zugeordnet“ (Spiele → Spiel bearbeiten → Discord-Server).
+- Der Hauptserver zeigt weiter alles.
+
 ### 4.4 Stream-Meldungen je Stream
 
 **Reiter „Einbettungen & Termine“ → „Stream-Meldungen“.** Sobald jemand aus dem Verein live geht, postet der
@@ -273,6 +286,13 @@ oder auf „Ohne Discord“ gesetzt, wird er abgesagt. Abgleich alle fünf Minut
 
 „Auch interne Events“ nur einschalten, wenn der Server selbst intern ist – Discord-Termine sieht
 jeder auf dem Server.
+
+**Spielserver:** Ein Turnier, dessen Spiel einen eigenen, eingeschalteten Server hat, bekommt seinen
+Termin **dort**. Am Hauptserver steht er zusätzlich, solange beim Server **„Auch am Hauptserver“**
+angehakt ist (Vorgabe; im selben Reiter unter „Spielserver“, mit der Zahl der Termine je Server).
+Änderungen und Absagen gehen an beide. Hakt ihr „Auch am Hauptserver“ ab, sagt der nächste Abgleich
+die Termine am Hauptserver ab; wird ein Spielserver ausgeschaltet, wandern seine Termine zurück an den
+Hauptserver. Vereins-Events und alles, was nur für Mitglieder ist, kommt nie auf einen Spielserver.
 
 ### 4.6 Willkommensnachricht
 
@@ -364,7 +384,7 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
 | --- | --- | --- |
 | Meldungen (News, Events, Turniere …) | ja | **mit Spielbezug** – je Meldung einstellbar, siehe 5.4 |
 | Private Kanäle (Mitglieder, Vorstand, Betrieb, Test) | ja | gibt es dort nie |
-| Einbettungen und Discord-Termine | ja | nein |
+| Einbettungen und Discord-Termine | ja | Rangliste, nächste Termine und Turnier-Termine – nur seine Spiele (4.3, 4.5) |
 | Rollen Mitglied/Vorstand/Turnierleitung | ja | nein |
 | Befehle (`/turniere` …) | ja | nein |
 | Willkommensnachricht | ja | ja (einmal je Person, egal über welchen Server) |
@@ -446,6 +466,8 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 | Kanal in der Auswahl ausgegraut | Bot darf dort nicht schreiben | Kanal → Bearbeiten → Berechtigungen → Rolle des Bots: Kanal ansehen, Nachrichten senden, Links einbetten |
 | Privater Kanal fehlt in der Auswahl | Bot sieht den Kanal nicht | Rolle des Bots dem Kanal hinzufügen (2.4) |
 | Turnier-Meldungen stehen einzeln im Kanal statt im Thread | Thread-Rechte fehlen | „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“ |
+| Einbettung am Spielserver: „Diesem Server ist noch kein Spiel zugeordnet“ | kein Spiel zeigt auf diesen Server | Spiele → Spiel bearbeiten → „Discord-Server“ |
+| Kein Termin am Spielserver | Recht „Events verwalten“ fehlt dort, oder der Server ist aus | Reiter „Server“ → „Prüfen“; Haken „an“ |
 | Rollen werden nicht vergeben | Bot-Rolle steht unter den Rollen / Rollenname weicht ab / Person nicht verknüpft | Bot-Rolle nach oben ziehen; Namen im Reiter „Bot & Aktivität“ angleichen; Person verknüpft ihr Konto |
 | Befehle erscheinen nicht | nur am Hauptserver; Einladung ohne `applications.commands` | Bot mit dem Link aus dem Reiter „Server“ neu einladen |
 | Direktnachrichten kommen nicht an | Datenschutz-Einstellung der Person | Discord → Einstellungen → Datenschutz → „Direktnachrichten von Servermitgliedern erlauben“ |

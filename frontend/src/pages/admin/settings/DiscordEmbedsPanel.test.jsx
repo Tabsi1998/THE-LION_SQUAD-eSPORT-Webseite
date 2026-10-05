@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 // Live-Einbettungen (#569): Schalter und Kanal je Einbettung speichern sofort; der Stand steht in Worten;
 // „Jetzt aktualisieren“ sagt, ob gepostet, bearbeitet oder unverändert.
 
-const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn() };
+const apiMock = { get: vi.fn(), put: vi.fn(), post: vi.fn(), patch: vi.fn() };
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "Fehler" }));
 vi.mock("sonner", () => ({ toast: toastMock }));
@@ -74,4 +74,42 @@ test("ohne Kanal-Liste das ID-Feld", async () => {
   const field = await screen.findByTestId("discord-embed-ranking-id");
   await user.type(field, "1234abc");
   expect(field).toHaveValue("1234");
+});
+
+test("Spielserver (#628): Rangliste und Termine je Server mit eigener Kanal-Liste; Erfolg der Woche nur am Hauptserver", async () => {
+  const COD = "700000000000000002";
+  const guilds = [
+    { guild_id: "700000000000000001", name: "LION", role: "main", enabled: true },
+    { guild_id: COD, name: "CoD-Server", role: "sub", enabled: true, games: [{ id: "g-cod", name: "Call of Duty" }],
+      embeds: { events: { enabled: true, channel_id: "100000000000000021", message_id: "m5", updated_at: "2026-10-05T10:00:00+00:00" } } },
+    { guild_id: "700000000000000003", name: "Aus", role: "sub", enabled: false },
+    { guild_id: "700000000000000004", name: "Weg", role: "sub", enabled: true, left_at: "2026-10-01T00:00:00+00:00" },
+  ];
+  const codChannels = { ok: true, channels: [{ id: "100000000000000021", name: "cod-termine", category: "", can_send: true, can_embed: true }, { id: "100000000000000022", name: "cod-rangliste", category: "", can_send: true, can_embed: true }] };
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/settings/discord/channels") return { data: CHANNELS };
+    if (url === "/settings/discord/guilds") return { data: { guilds } };
+    if (url === `/settings/discord/guilds/${COD}/channels`) return { data: codChannels };
+    return { data: DATA };
+  });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  const user = userEvent.setup();
+  render(<DiscordEmbedsPanel />);
+  expect(await screen.findByTestId(`discord-embeds-guild-${COD}`)).toBeInTheDocument();
+  expect(screen.queryByTestId("discord-embeds-guild-700000000000000003")).toBeNull();
+  expect(screen.queryByTestId("discord-embeds-guild-700000000000000004")).toBeNull();
+  expect(screen.getByTestId(`discord-embeds-guild-${COD}-games`)).toHaveTextContent("nur Call of Duty");
+  expect(screen.getByTestId(`discord-embeds-guild-${COD}-events-state`)).toHaveTextContent("Nachricht steht");
+  expect(screen.queryByTestId(`discord-embeds-guild-${COD}-achievement_week`)).toBeNull();
+
+  await user.click(screen.getByTestId(`discord-embeds-guild-${COD}-ranking-enabled`));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/settings/discord/guilds/${COD}`, { embeds: { ranking: { enabled: true } } }));
+  await waitFor(() => expect(screen.getByTestId(`discord-embeds-guild-${COD}-ranking-channel`)).toBeEnabled());
+  await user.selectOptions(screen.getByTestId(`discord-embeds-guild-${COD}-ranking-channel`), "100000000000000022");
+  await user.click(screen.getByTestId(`discord-embeds-guild-${COD}-ranking-save`));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith(`/settings/discord/guilds/${COD}`, { embeds: { ranking: { channel_id: "100000000000000022" } } }));
+
+  await user.click(screen.getByTestId(`discord-embeds-guild-${COD}-events-refresh`));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith(`/settings/discord/guilds/${COD}/embeds/events/refresh`));
+  expect(toastMock.success).toHaveBeenCalledWith("Nachricht gepostet und angepinnt.");
 });

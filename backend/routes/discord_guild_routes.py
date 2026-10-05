@@ -89,3 +89,16 @@ async def test_discord_guild(guild_id: str, body: dict = Body(default={}), me: d
         raise HTTPException(404, "Diesen Server kennt die Website nicht.")
     except discord_guilds.GuildError as exc:
         raise HTTPException(409, str(exc))
+
+
+@router.post("/{guild_id}/embeds/{kind}/refresh")
+async def refresh_discord_guild_embed(guild_id: str, kind: str, me: dict = Depends(require_club_admin())):
+    """„Jetzt aktualisieren“ je Server (#628): die Einbettung dieses Unterservers sofort neu schreiben - die Bremse gilt trotzdem."""
+    from services.discord_embeds import refresh
+
+    try:
+        return await refresh(get_db(), kind, force=True, guild_id=guild_id)
+    except KeyError:
+        raise HTTPException(404, "Diese Einbettung gibt es auf Unterservern nicht.")
+    except LookupError:
+        raise HTTPException(404, "Diesen Unterserver kennt die Website nicht.")
