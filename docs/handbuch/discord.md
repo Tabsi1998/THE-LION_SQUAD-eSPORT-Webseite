@@ -311,8 +311,8 @@ Server er beitritt.
 
 ### 4.7 Befehle
 
-Tippt man `/` im Hauptserver, erscheinen die Befehle des Bots. **Jede Antwort sieht nur, wer
-fragt.**
+Tippt man `/` auf dem Hauptserver oder einem eingeschalteten Spielserver, erscheinen die Befehle des
+Bots. **Jede Antwort sieht nur, wer fragt.**
 
 | Befehl | Antwort | Für |
 | --- | --- | --- |
@@ -325,6 +325,20 @@ fragt.**
 | `/meine-erfolge` | eigene Erfolge | verknüpfte Konten |
 | `/mitglied` | eigener Stand im Verein (Art, seit wann – nie Beitrag oder Zahlungsdaten) | verknüpfte Konten |
 | `/status` | Stand des Bots | Vorstand |
+
+**Auf einem Spielserver** zeigen `/turniere`, `/naechstes-event` und `/bracket` nur die Spiele dieses
+Servers (wie im Reiter „Server“ unter „Spiele auf diesem Server“):
+
+- `/turniere spiel: Rocket League` zeigt ein anderes Spiel, `/turniere alle: True` alles – beides geht
+  auf jedem Server. Gefilterte Antworten sagen klein darunter, wofür sie gelten.
+- `/naechstes-event` nennt dort das nächste Event, bei dem ein Turnier dieser Spiele dabei ist (Events
+  selbst haben kein Spiel).
+- `/bracket` bietet die laufenden Turniere des Servers an; ein ausdrücklich gewähltes geht überall.
+- `/status` nennt zusätzlich, welcher Server das ist, seine Spiele, seine Kanäle und wann die
+  Einbettungen zuletzt aktualisiert wurden.
+- Alle anderen Befehle antworten auf jedem Server gleich.
+- Schaltest du einen Unterserver ein, hat er die Befehle sofort; schaltest du ihn aus, verschwinden sie
+  dort. „Prüfen“ im Reiter „Server“ sagt, ob sie registriert sind.
 
 ### 4.8 Aktivität zählen
 
@@ -391,7 +405,7 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
 | Private Kanäle (Mitglieder, Vorstand, Betrieb, Test) | ja | gibt es dort nie |
 | Einbettungen und Discord-Termine | ja | Rangliste, nächste Termine und Turnier-Termine – nur seine Spiele (4.3, 4.5) |
 | Rollen Mitglied/Vorstand/Turnierleitung | ja | nein |
-| Befehle (`/turniere` …) | ja | nein |
+| Befehle (`/turniere` …) | ja | ja, sobald eingeschaltet – mit seinen Spielen als Vorgabe (4.7) |
 | Willkommensnachricht | ja | ja (einmal je Person, egal über welchen Server) |
 | Aktivität zählen | ja | ja |
 | Auf der Website gezeigt | im Footer und auf der Kontaktseite | bei seinen Spielen („Über uns“), auf Turnierseiten, im Mitgliederbereich |
@@ -475,7 +489,7 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 | Einbettung am Spielserver: „Diesem Server ist noch kein Spiel zugeordnet“ | kein Spiel zeigt auf diesen Server | Spiele → Spiel bearbeiten → „Discord-Server“ |
 | Kein Termin am Spielserver | Recht „Events verwalten“ fehlt dort, oder der Server ist aus | Reiter „Server“ → „Prüfen“; Haken „an“ |
 | Rollen werden nicht vergeben | Bot-Rolle steht unter den Rollen / Rollenname weicht ab / Person nicht verknüpft | Bot-Rolle nach oben ziehen; Namen im Reiter „Bot & Aktivität“ angleichen; Person verknüpft ihr Konto |
-| Befehle erscheinen nicht | nur am Hauptserver; Einladung ohne `applications.commands` | Bot mit dem Link aus dem Reiter „Server“ neu einladen |
+| Befehle erscheinen nicht | Unterserver aus; Einladung ohne `applications.commands` | Reiter „Server“: Haken „an“; „Prüfen“ sagt, ob sie registriert sind; sonst den Bot mit dem Link aus dem Reiter neu einladen |
 | Direktnachrichten kommen nicht an | Datenschutz-Einstellung der Person | Discord → Einstellungen → Datenschutz → „Direktnachrichten von Servermitgliedern erlauben“ |
 | Auf der Website keine Discord-Zahl | Server-Widget aus, oder niemand online | Servereinstellungen → Widget → aktivieren; „Jetzt prüfen“ |
 | Unterserver bekommt keine Meldungen | Regel „nur Hauptserver“, Spiel ohne eigenen Server, Server aus oder ohne Kanal | Regel unter „Was gemeldet wird“, Spiel → „Discord-Server“, Kanäle im Reiter „Server“ (5.4) |
