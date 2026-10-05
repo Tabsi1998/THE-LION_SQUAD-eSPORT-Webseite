@@ -12,6 +12,8 @@ Seit #572 steht die Nachricht im Thread des Turniers, sobald es einen gibt. Dort
 Nachricht: Steht beim Ende schon etwas darunter (etwa „Beendet“), postet der Bot ihn neu ans Ende und löscht
 die alte Fassung - kommt danach noch eine Meldung („Ergebnisse veröffentlicht“), wandert er wieder nach unten.
 Eine Nachricht, die schon vor dem Thread im Kanal stand, bleibt dort und wird weiter bearbeitet.
+
+Turniere nur für Mitglieder (#910): das Bracket steht im Thread des Turniers im Mitglieder-Kanal - nie öffentlich.
 """
 from __future__ import annotations
 
@@ -241,7 +243,7 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“."""
     from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons, resolve_target
     from services.discord_bot import bot
-    from services.discord_threads import FIELD as THREAD_FIELD, thread_of
+    from services.discord_threads import MEMBERS_FIELD, FIELD as PUBLIC_THREAD_FIELD, members_only, thread_of
 
     current = now or now_utc()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
@@ -254,9 +256,11 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     if tournament.get("discord_skip"):
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "author_opt_out"}
-    if tournament.get("is_public") is False or (tournament.get("visibility") or "public") != "public":
+    members = members_only(tournament)
+    if not members and (tournament.get("is_public") is False or (tournament.get("visibility") or "public") != "public"):
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "private_visibility"}
+    thread_field = MEMBERS_FIELD if members else PUBLIC_THREAD_FIELD
     if state.get("final") and not force:
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "final", "message_id": state.get("message_id")}
@@ -265,8 +269,12 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
         return {"ok": False, "reason": "disabled", "error": REASON_TEXTS["disabled"]}
     if not cfg["bot"]["enabled"]:
         return {"ok": False, "reason": "bot_off", "error": REASON_TEXTS["bot_off"]}
-    resolved = resolve_target(cfg, "events")
-    thread_id = thread_of(tournament, resolved["channel_id"])
+    resolved = resolve_target(cfg, "members" if members else "events")
+    thread_id = thread_of(tournament, resolved["channel_id"], members=members)
+    if members and str(state.get("channel_id") or "") not in ("", thread_id, str(resolved["channel_id"] or "")):
+        # War das Turnier vorher öffentlich: die Bracket-Nachricht beginnt im Mitglieder-Thread neu - die Fassung für
+        # Mitglieder landet nie in der alten, öffentlichen Nachricht.
+        state = {}
     channel_id = str(state.get("channel_id") or thread_id or resolved["channel_id"] or "")
     in_thread = bool(thread_id) and channel_id == thread_id
     if not channel_id:
@@ -286,7 +294,7 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     message_id = str(state.get("message_id") or "")
     # Endstand als letzte Nachricht im Thread (#572): steht etwas darunter, kommt er neu ans Ende.
     replaced = ""
-    if final and in_thread and message_id and str((tournament.get(THREAD_FIELD) or {}).get("last_message_id") or "") != message_id:
+    if final and in_thread and message_id and str((tournament.get(thread_field) or {}).get("last_message_id") or "") != message_id:
         replaced, message_id = message_id, ""
     action = "edited"
     result: dict = {"ok": False, "reason": "error"}
@@ -314,8 +322,8 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
             patch["posted_at"] = stamp
         updates = {FIELD: {**state, **patch}}
         if in_thread and action == "posted":
-            updates[f"{THREAD_FIELD}.last_message_id"] = patch["message_id"]
-            updates[f"{THREAD_FIELD}.last_message_at"] = stamp
+            updates[f"{thread_field}.last_message_id"] = patch["message_id"]
+            updates[f"{thread_field}.last_message_at"] = stamp
         await db.tournaments.update_one({"id": tournament_id}, {"$set": updates})
         _dirty.pop(tournament_id, None)
         return {"ok": True, "reason": action, "message_id": patch["message_id"], "final": bool(final), "pinned": result.get("pinned"),

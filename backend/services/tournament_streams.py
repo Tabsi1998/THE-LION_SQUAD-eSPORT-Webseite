@@ -7,7 +7,8 @@ Die Live-Erkennung (``twitch_service``) weiß, welche verknüpften Konten gerade
 - meldet der Bot es **einmal je Stream-Start** im Thread des Turniers (#572) im Kanal „Events und Turniere“
   („🔴 Paula streamt den Sommer-Cup – zuschauen“) - festgehalten je Turnier und Stream-ID.
 
-Nur öffentliche Turniere, nur Teilnehmer mit öffentlichem Profil (und Twitch nicht auf „privat“).
+Nur öffentliche Turniere, nur Teilnehmer mit öffentlichem Profil (und Twitch nicht auf „privat“). Ein Turnier nur für
+Mitglieder (#910) bekommt die Meldung in seinem Thread im Mitglieder-Kanal; die Turnierseite bleibt wie bisher.
 """
 from __future__ import annotations
 
@@ -31,11 +32,19 @@ def public_tournament(tournament: dict | None) -> bool:
         and (tournament.get("visibility") or "public") == "public"
 
 
-async def live_streams_for_tournament(db, tournament: dict) -> list[dict]:
-    """Die laufenden Streams der Teilnehmer - nur Personen mit öffentlichem Profil."""
+def discord_tournament(tournament: dict | None) -> bool:
+    """Für die Stream-Meldung im Discord: öffentlich - oder nur für Mitglieder, dann im Mitglieder-Kanal (#910)."""
+    from services.discord_threads import members_only
+
+    return public_tournament(tournament) or (bool(tournament) and tournament.get("status") != "draft" and members_only(tournament))
+
+
+async def live_streams_for_tournament(db, tournament: dict, *, for_discord: bool = False) -> list[dict]:
+    """Die laufenden Streams der Teilnehmer - nur Personen mit öffentlichem Profil. ``for_discord``: auch Turniere nur
+    für Mitglieder (die Meldung geht dann in den Mitglieder-Kanal)."""
     from services.match_notifications import _participant_user_ids
 
-    if not public_tournament(tournament):
+    if not (discord_tournament(tournament) if for_discord else public_tournament(tournament)):
         return []
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament["id"], "status": {"$nin": ["cancelled", "rejected", "withdrawn", "no_show"]}},
@@ -71,9 +80,9 @@ async def sync(db) -> dict:
     announced = 0
     tournaments = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}}, {"_id": 0}).to_list(200)
     for tournament in tournaments:
-        if not public_tournament(tournament):
+        if not discord_tournament(tournament):
             continue
-        for stream in await live_streams_for_tournament(db, tournament):
+        for stream in await live_streams_for_tournament(db, tournament, for_discord=True):
             key = {"tournament_id": tournament["id"], "stream_id": stream.get("stream_id")}
             if not stream.get("stream_id") or await db[ANNOUNCEMENTS].find_one(key, {"_id": 0, "id": 1}):
                 continue

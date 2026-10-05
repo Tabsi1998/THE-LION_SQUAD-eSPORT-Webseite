@@ -115,8 +115,12 @@ async def test_discord_announces_each_stream_start_once(flow, posted):
     await live(flow, hidden, "s-2")
 
     first = await tournament_streams.sync(flow.db)
-    assert first["announced"] == 1, first
+    # Zwei Starts: der öffentliche im Kanal, der des Mitglieder-Turniers ginge in den Mitglieder-Kanal (#910) - hier ist
+    # keiner gewählt, also kommt nichts an (kein Rückfall), und gemerkt ist er trotzdem: genau einmal je Stream-Start.
+    assert first["announced"] == 2, first
     assert len(posted) == 1 and posted[0]["channel_id"] == EVENTS_CHANNEL
+    member_start = await flow.db.tournament_stream_announcements.find_one({"tournament_id": "t4"}, {"_id": 0})
+    assert member_start["outcome"] == "members_channel_missing"
     embed = posted[0]["embed"]
     assert embed["title"] == "🔴 Paula streamt den Sommer-Cup" and "Finale!" in embed["description"] and embed["url"] == "https://twitch.tv/paula"
     assert "Leon" not in str(posted), "kein öffentliches Profil = keine Meldung"
@@ -124,8 +128,8 @@ async def test_discord_announces_each_stream_start_once(flow, posted):
     assert (await tournament_streams.sync(flow.db))["announced"] == 0, "genau einmal je Stream-Start"
     assert len(posted) == 1
     await flow.db.live_streams.update_one({"user_id": paula["id"]}, {"$set": {"stream_id": "s-9"}})
-    assert (await tournament_streams.sync(flow.db))["announced"] == 1, "ein neuer Stream ist ein neuer Start"
-    records = await flow.db.tournament_stream_announcements.find({}, {"_id": 0}).to_list(10)
+    assert (await tournament_streams.sync(flow.db))["announced"] == 2, "ein neuer Stream ist ein neuer Start - in beiden Turnieren"
+    records = await flow.db.tournament_stream_announcements.find({"tournament_id": "t1"}, {"_id": 0}).to_list(10)
     assert sorted(r["stream_id"] for r in records) == ["s-1", "s-9"] and all(r["outcome"] == "sent" for r in records)
 
     samples = (await flow.get("/api/settings/discord/samples")).json()

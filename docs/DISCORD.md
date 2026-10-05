@@ -96,8 +96,16 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
   Anlegen mit Status, Zeitplan (Anmeldung öffnet, Check-in, Start, Ende), Start an einer
   Station, Gruppen- und Swiss-Runden. Vor #572 blieben die Wechsel aus dem Zeitplan stumm.
 - **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus: keine Meldung, kein
-  Thread, kein Bracket, kein Discord-Termin. Was nicht für alle sichtbar ist, geht ohnehin nie
-  hinein.
+  Thread, kein Bracket, kein Discord-Termin. Was nicht für alle sichtbar ist, geht nie in einen
+  öffentlichen Kanal.
+- **Turniere „nur Mitglieder“ (#910)** melden sich im Kanal „Mitglieder (privat)“ am Hauptserver:
+  Ankündigung, eigener Thread (`discord_thread_members`), darin Check-in, live, Streams und das
+  Bracket. Keine Routing-Regel, kein Spielserver, kein Querverweis; ohne Mitgliederkanal
+  `members_channel_missing` im Log und keine Nachricht. War das Turnier vorher öffentlich, bearbeitet
+  der Bot die öffentliche Bracket-Nachricht nicht weiter – das Bracket beginnt im Mitgliederkanal
+  neu. `/bracket` bietet nur öffentliche Turniere an. „Intern“ und versteckte Turniere bleiben draußen.
+  Code: `discord_threads.members_only` und der Parameter `members` in `_deliver_on`/`_send`,
+  `discord_bracket.refresh`, `tournament_streams.discord_tournament`.
 - Darf der Bot keine Threads öffnen, geht nichts verloren: Die Meldungen stehen wie früher
   einzeln im Kanal, der Grund beim Ziel, im Versand-Log und in der Tageszentrale. Ist das Recht
   nachgetragen, öffnet die nächste Meldung den Thread. Wird der Thread gelöscht oder ein anderer

@@ -203,8 +203,13 @@ async def test_without_discord_or_not_public_nothing_reaches_discord(flow, disco
 
     await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"discord_skip": False, "visibility": "members"}})
     tournament = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
-    assert (await discord_threads.status_changed(flow.db, tournament, "live", "completed"))["reason"] == "private_visibility"
+    # Nur Mitglieder (#910): ohne Mitglieder-Kanal kommt nichts an - kein Rückfall auf einen öffentlichen Kanal.
+    assert (await discord_threads.status_changed(flow.db, tournament, "live", "completed"))["reason"] == "members_channel_missing"
     assert discord.messages == {}, "nur Mitglieder: nie in einen öffentlichen Kanal"
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"visibility": "internal"}})
+    tournament = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    assert (await discord_threads.status_changed(flow.db, tournament, "completed", "results_published"))["reason"] == "private_visibility"
+    assert discord.messages == {}, "intern (nur Vorstand): gar nicht"
 
 
 @pytest.mark.asyncio
@@ -263,3 +268,77 @@ async def test_the_preview_says_where_each_tournament_message_goes(flow):
         assert entries[key]["place"] == "im Turnier-Thread", key
     assert "fields" not in entries["tournament.live"]["embed"] and entries["tournament.check_in"]["enabled"] is True
     assert "place" not in entries["news.published"]
+
+
+MEMBERS = "100000000000000004"
+MAIN_GUILD, GAME_GUILD, GAME_EVENTS = "500000000000000091", "500000000000000092", "100000000000000077"
+
+
+async def with_game_server(flow):
+    """Rocket League hat einen eigenen, eingeschalteten Server mit Kanal - öffentliche Turniere gingen dorthin (#627)."""
+    await flow.db.discord_guilds.insert_many([
+        {"guild_id": MAIN_GUILD, "name": "LION", "role": "main", "enabled": True},
+        {"guild_id": GAME_GUILD, "name": "RL-Server", "role": "sub", "enabled": True, "channels": {"community": GAME_EVENTS, "events": GAME_EVENTS}},
+    ])
+    await flow.db.games.update_one({"id": "g1"}, {"$set": {"discord_guild_id": GAME_GUILD}})
+
+
+@pytest.mark.asyncio
+async def test_member_tournaments_post_in_the_members_channel_with_their_own_thread_and_bracket(flow, discord):
+    """#910: Ein Turnier nur für Mitglieder meldet sich im Kanal „Mitglieder (privat)“ am Hauptserver - die Ankündigung
+    öffnet einen eigenen Thread, Check-in, live, Streams und das Bracket stehen darin. Nie in „Events und Turniere“,
+    nie auf dem Spielserver, auch wenn das Spiel einen hat."""
+    await configure(flow, channels={"events": EVENTS, "members": MEMBERS})
+    await with_game_server(flow)
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"visibility": "members"}})
+
+    response = await flow.post("/api/tournaments/t1/status", json={"status": "registration_open"})
+    assert response.status_code == 200, response.text
+    assert discord.titles(MEMBERS) == ["🏆 Sommer-Cup · Anmeldung offen"]
+    stored = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    thread = stored["discord_thread_members"]["thread_id"]
+    assert discord.threads[thread]["parent"] == MEMBERS and "discord_thread" not in stored and "discord_thread_by_guild" not in stored
+
+    assert (await flow.patch("/api/tournaments/t1", json={"status": "check_in"})).status_code == 200
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "live"}})
+    await discord_threads.status_written(flow.db, "t1", "check_in")
+    paula = await flow.add_user(role="player", name="paula")
+    await flow.db.users.update_one({"id": paula["id"]}, {"$set": {"privacy_public_profile": True}})
+    await flow.db.tournament_registrations.update_one({"id": "r1"}, {"$set": {"user_id": paula["id"]}})
+    await flow.db.live_streams.insert_one({"user_id": paula["id"], "username": "paula", "display_name": "Paula", "stream_id": "s1", "title": "Finale!",
+                                           "stream_url": "https://twitch.tv/paula", "viewer_count": 3})
+    assert (await tournament_streams.sync(flow.db))["announced"] == 1
+    posted = await discord_bracket.refresh(flow.db, "t1")
+    assert posted["reason"] == "posted" and posted["message_id"] in discord.pinned
+    assert discord.titles(thread) == ["🏆 Sommer-Cup · Check-in offen", "🏆 Sommer-Cup · Jetzt live", "🔴 Paula streamt den Sommer-Cup",
+                                      "🏆 Sommer-Cup – Bracket"]
+    assert (await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0}))["discord_thread_members"]["last_message_id"] == posted["message_id"]
+
+    # Nichts davon öffentlich: kein Kanal „Events und Turniere“, kein Spielserver, kein Querverweis.
+    assert EVENTS not in discord.messages and GAME_EVENTS not in discord.messages
+    logs = await flow.db.email_logs.find({"channel": "discord"}, {"_id": 0, "target": 1, "status": 1, "guild_id": 1}).to_list(50)
+    assert logs and all(log["target"] == "members" and log["status"] == "sent" and log.get("guild_id") == MAIN_GUILD for log in logs), logs
+    # /bracket bietet es nicht an - die Antwort sähe auch, wer kein Mitglied ist.
+    from services import discord_commands
+    assert await discord_commands.bracket_choices(flow.db) == []
+
+
+@pytest.mark.asyncio
+async def test_a_public_bracket_message_never_gets_the_members_version(flow, discord):
+    """Wird ein öffentliches Turnier nachträglich „nur für Mitglieder“, bearbeitet der Bot die öffentliche Bracket-Nachricht
+    nicht weiter - das Bracket beginnt im Mitglieder-Kanal neu."""
+    await configure(flow, channels={"events": EVENTS, "members": MEMBERS})
+    assert (await flow.post("/api/tournaments/t1/status", json={"status": "registration_open"})).status_code == 200
+    public_thread = (await thread_state(flow))["thread_id"]
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "live"}})
+    t0 = now_utc()
+    first = await discord_bracket.refresh(flow.db, "t1", now=t0)
+    assert first["reason"] == "posted" and discord.titles(public_thread)[-1] == "🏆 Sommer-Cup – Bracket"
+    before = [dict(row) for row in discord.messages[public_thread]]
+
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"visibility": "members"}})
+    await flow.db.matches_v2.update_one({"id": "f"}, {"$set": final_match("live", (1, 0))})
+    moved = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=2))
+    assert moved["reason"] == "posted" and moved["message_id"] != first["message_id"]
+    assert discord.titles(MEMBERS) == ["🏆 Sommer-Cup – Bracket"]
+    assert discord.messages[public_thread] == before, "die öffentliche Nachricht bleibt, wie sie war"
