@@ -43,30 +43,30 @@ test("eine Adresse der Website öffnet ihren Screen - sonst sagt die App, dass s
 
   mockRef.ready = true;
   expect(navigateToUrl("/news/advent-gruss")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "NewsDetail", params: { id: "advent-gruss" } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "NewsDetail", params: { id: "advent-gruss" }, initial: false });
   expect(navigateToUrl("/events/weihnachts-lan")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Tournaments", { screen: "EventDetail", params: { id: "weihnachts-lan" } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Tournaments", { screen: "EventDetail", params: { id: "weihnachts-lan" }, initial: false });
   expect(navigateToUrl("/teams/t-1")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Teams", { screen: "TeamDetail", params: { id: "t-1" } });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Teams", { screen: "TeamDetail", params: { id: "t-1" }, initial: false });
   expect(navigateToUrl("/me/prizes")).toBe(true);
   expect(mockRef.navigate).toHaveBeenLastCalledWith("Profile", { tab: "prizes" });
 
   // Adressen ohne Kennung führen in die Liste.
   expect(navigateToUrl("/events")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Tournaments", { screen: "TournamentList", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Tournaments", { screen: "TournamentList", params: undefined, initial: false });
   expect(navigateToUrl("/teams")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("Teams", { screen: "TeamList", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Teams", { screen: "TeamList", params: undefined, initial: false });
   expect(targetFromUrl("/community")).toBeNull();
   expect(navigateToUrl("/achievements")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "AchievementShowcase", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "AchievementShowcase", params: undefined, initial: false });
   expect(navigateToUrl("/news")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "NewsList", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "NewsList", params: undefined, initial: false });
   expect(navigateToUrl("/gallery")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "Gallery", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "Gallery", params: undefined, initial: false });
   expect(navigateToUrl("/fastlap")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "FastLapList", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "FastLapList", params: undefined, initial: false });
   expect(navigateToUrl("/advent")).toBe(true);
-  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "AdventCalendar", params: undefined });
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("More", { screen: "AdventCalendar", params: undefined, initial: false });
 
   mockRef.navigate.mockClear();
   for (const url of ["/servers", "/about", "", null, undefined]) expect(navigateToUrl(url)).toBe(false);

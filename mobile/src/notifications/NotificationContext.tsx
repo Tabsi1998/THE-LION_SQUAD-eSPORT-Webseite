@@ -165,7 +165,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const openPopup = useCallback((state: PopupState) => {
     setPopup(null);
     if (state.items.length > 1) {
-      if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "Notifications" });
+      if (navigationRef.isReady()) navigationRef.navigate("More", { screen: "Notifications", initial: false });
       return;
     }
     if (state.items[0]) void openNotification(state.items[0]);

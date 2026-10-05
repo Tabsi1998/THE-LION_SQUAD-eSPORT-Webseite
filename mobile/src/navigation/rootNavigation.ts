@@ -12,7 +12,7 @@ export function navigateToNotification(item: UserNotification) {
   }
   const target = targetFromNotification(item);
   if (!target) {
-    navigationRef.navigate("More", { screen: "Notifications" });
+    navigationRef.navigate("More", { screen: "Notifications", initial: false });
     return false;
   }
   openTarget(target);
@@ -56,14 +56,15 @@ function openTarget(target: NotificationTarget) {
     return;
   }
   if (target.area === "teams") {
-    navigationRef.navigate("Teams", { screen: target.screen, params: target.params } as never);
+    navigationRef.navigate("Teams", { screen: target.screen, params: target.params, initial: false } as never);
     return;
   }
   if (target.area === "tournaments") {
-    navigationRef.navigate("Tournaments", { screen: target.screen, params: target.params } as never);
+    navigationRef.navigate("Tournaments", { screen: target.screen, params: target.params, initial: false } as never);
     return;
   }
-  navigationRef.navigate("More", { screen: target.screen, params: target.params } as never);
+  // `initial: false` (Build 86): die Übersicht des Tabs bleibt darunter - Zurück und ein Tipp auf den Tab führen dorthin.
+  navigationRef.navigate("More", { screen: target.screen, params: target.params, initial: false } as never);
 }
 
 export function flushPendingNotification() {

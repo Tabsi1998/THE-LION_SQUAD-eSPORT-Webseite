@@ -33,6 +33,7 @@ test("Aufgabe vom Server, Unterschrift vom Gerät, Prüfung mit Ticket - zurück
     .mockResolvedValueOnce({ data: { user: { id: "u-1" }, access_token: "zugang", refresh_token: "erneuerung", token_type: "bearer" } });
   const session = await signInWithPasskey(false);
   expect(Passkey.get).toHaveBeenCalledWith(OPTIONS);
+  expect(Passkey.getImmediate).not.toHaveBeenCalled();
   expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/login/options", {});
   expect(mockPost).toHaveBeenNthCalledWith(2, "/auth/passkeys/mobile/login/verify", {
     ticket: "t-1",
@@ -92,4 +93,15 @@ test("still bleiben: kein Passkey auf dem Gerät oder keine App-Passkeys am Serv
   expect(passkeyCreateError({ error: "UserCancelled" })).toContain("im Profil unter „Einstellungen“");
   expect(passkeyCreateError({ response: { data: { detail: "Bitte bestätige dein aktuelles Passwort." } } })).toBe("Bitte bestätige dein aktuelles Passwort.");
   expect(passkeyCreateError(new Error("kaputt"))).toBe("Der Passkey konnte nicht angelegt werden. Bitte erneut versuchen.");
+});
+
+// Still beim Öffnen der Anmeldung (#919): nur sofort verfügbare Passkeys - ohne Passkey keine Leiste von Android.
+test("still fragt die App nur nach sofort verfügbaren Passkeys", async () => {
+  mockPost
+    .mockResolvedValueOnce({ data: { ticket: "t-2", options: OPTIONS } })
+    .mockResolvedValueOnce({ data: { user: { id: "u-1" }, access_token: "zugang", refresh_token: "erneuerung", token_type: "bearer" } });
+  (Passkey.getImmediate as jest.Mock).mockResolvedValueOnce(RESULT);
+  await signInWithPasskey(true, true);
+  expect(Passkey.getImmediate).toHaveBeenCalledWith(OPTIONS);
+  expect(Passkey.get).not.toHaveBeenCalled();
 });

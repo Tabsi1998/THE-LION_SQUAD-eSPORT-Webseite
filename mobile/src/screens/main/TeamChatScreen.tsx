@@ -22,7 +22,7 @@ export function TeamChatScreen({ navigation, route }: Props) {
         lockedDetail="Team-Chat ist nur für Teammitglieder sichtbar."
         listUrl={`/teams/${route.params.id}/chat`}
         mentionSearchUrl={`/teams/${route.params.id}/mention-candidates`}
-        onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })}
+        onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username }, initial: false })}
         onReportMessage={(message) => {
           const sender = senderOf(message);
           if (sender) setReport({ targetUserId: sender.id, targetName: sender.name, message });

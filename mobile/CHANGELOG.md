@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.2.0 - 2026-10-05
+
+- Mobile: Ohne Konto gleich hinein: Die App startet auf der Startseite mit allem Öffentlichen. Beim ersten Start kommt nach ein paar Sekunden einmal der Hinweis zum Anmelden, unter „Mehr“ steht „Anmelden oder registrieren“, und nach dem Anmelden geht es zurück, wo du warst (#918).
+- Mobile: Passkeys ohne eigenen Knopf: „Anmelden“ fragt dein Handy selbst nach dem Passkey. Nach einer Anmeldung mit Passwort lädt die App einmal ein, einen anzulegen, und unter Profil → Einstellungen → Passkeys verwaltest du sie (#919).
+- Mobile: Abstimmung live: Geht bei der Versammlung eine Abstimmung auf, kommt sofort ein Fenster – wer Stimmrecht hat, stimmt gleich ab (#844).
+- Mobile: Ehrungen und „Meine Teilnahmen“ aus der Mitgliederakte im Profil; 5, 10 und 25 Jahre im Verein gibt es als Erfolg (#848, #906).
+- Mobile: Meine Mitgliedschaft: Welche geprüften Konten in die Mitgliederakte gehen, entscheidest du selbst. Gibt der Vorstand eine Änderung einmalig frei, gilt sie sofort (#846).
+- Mobile: „Deine Rechnung ist da“ öffnet den Beleg gleich unter Meine Rechnungen (#841).
+- Mobile: Turniere, die eine Event-Anmeldung brauchen, zeigen zuerst den Weg zum Event (#875).
+- Mobile: Vereinsdokumente laden schneller, und ein abgebrochener Download macht dort weiter (#849).
+- Mobile: Geheime Wahl auf Papier: Die Versammlungsseite sagt „abgestimmt wird im Saal“ statt Knöpfe zu zeigen (#882).
+- Mobile: Ein Tipp auf die PSN-ID öffnet das PlayStation-Profil; Partner-Logos kommen aus dem Vereinsmodul (#891, #880).
+- Mobile: Discord-Spiel-Rollen wie „RL-Spieler“ lassen sich im Profil abwählen (#629).
+- Mobile: Jahreszeiten: Silvester mit verschiedenen Kalibern, um Mitternacht steht die Jahreszahl aus Funken am Himmel; Vereinsgeburtstag mit Mütze, Ballons und Zahlkerzen; Adventkalender und Nikolaus gleich unter dem Kranz; der Faschingshut sitzt gerade (#853, #856, #852, #855).
+- Mobile: Seiten, die du von der Startseite, aus einer News oder einer Benachrichtigung öffnest, haben jetzt einen Zurück-Pfeil, und ein Tipp auf den Tab führt wieder zur Übersicht.
+- Mobile: Auf Tablets und aufgeklappten Faltgeräten dreht die App mit, Handys bleiben hochkant. Die App ist kleiner geworden (#917).
+
 ## 1.1.0 - 2026-10-03
 
 - Mobile: Erfolge in der App wie auf der Website: jede Gruppe mit ihrem Abzeichen von Holz bis Diamant (dazu Legendär und Geheim), ein Fortschrittsring zur nächsten Stufe und „So schaffst du es“. Neue Erfolge und Level-Aufstiege kommen mit einer Zeremonie – elf Auftritte mit Partikeln, Klang und Vibration je Material (#623).

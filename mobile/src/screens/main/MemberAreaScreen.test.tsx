@@ -72,7 +72,7 @@ test("zeigt nur Internes, mit Kacheln zu Mitgliedschaft, Karte, Dokumenten und V
   expect(navigate).toHaveBeenCalledWith("InfoCenter", { section: "benefits" });
 
   await fireEvent.press(screen.getByText("LAN im Vereinsheim"));
-  expect(parentNavigate).toHaveBeenCalledWith("Tournaments", { screen: "EventDetail", params: { id: "lan" } });
+  expect(parentNavigate).toHaveBeenCalledWith("Tournaments", { screen: "EventDetail", params: { id: "lan" }, initial: false });
   await fireEvent.press(screen.getByText("Obfrau Otti"));
   expect(navigate).toHaveBeenCalledWith("PublicProfile", { username: "otti" });
 

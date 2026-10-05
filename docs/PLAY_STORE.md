@@ -104,6 +104,20 @@ diesem Release ersetzen.
 
 Das Passwort nur in die Console eintragen, nie ins Repo oder in einen Chat; nach der Prüfung ändern.
 
+## Hinweise der Play Console (Build 85, #917)
+
+- **DEX-Codeoptimierung, Verschleierung 1 %** (Frist Februar 2027): Seit 1.2.0 (Build 86) verkleinert und
+  verschleiert R8 den Release-Build (`plugins/withReleaseOptimization.js`). Die Zuordnung der gekürzten Namen
+  (`mapping.txt`) legt das Release-Skript neben das Bundle und lädt sie mit `--play` zu Google, damit Abstürze
+  in der Console lesbar bleiben; Crashlytics bekommt sie beim Bauen über sein Gradle-Plugin.
+- **Einschränkungen für Größe und Ausrichtung:** Im Manifest steht keine Hochkant-Sperre mehr. Die App sperrt
+  Handys zur Laufzeit hochkant (kürzere Seite unter 600 dp, `src/lib/orientation.ts`); Tablets und aufgeklappte
+  Faltgeräte drehen frei – Android 16 erzwingt das auf großen Bildschirmen ohnehin.
+- **Nicht mehr unterstützte APIs für die randlose Anzeige** (`setStatusBarColor`, `setNavigationBarColor`,
+  `LAYOUT_IN_DISPLAY_CUTOUT_MODE_*`): Die Aufrufe stecken in React Native (`StatusBarModule`, `WindowUtilKt`) und
+  in Googles Material-Bibliothek (`BottomSheetDialog`, `EdgeToEdgeUtils`), nicht im Code der App; die App
+  läuft schon randlos (`edgeToEdgeEnabled`). Der Hinweis verschwindet mit deren Updates – nichts zu tun.
+
 ## Ablauf je Version
 
 Seit 1.0.0 (#593) kommen Updates von Google Play; die App hat keinen eigenen Installer mehr (Google

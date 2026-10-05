@@ -19,6 +19,7 @@ import { compareByNearestDate } from "../../lib/contentSort";
 import { seasonLine, splitHomeTimeline, type HomeItem } from "../../lib/dashboard";
 import { displayName, formatDate, formatEventType, formatNewsCategory, formatStatus, placeParts } from "../../lib/format";
 import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { MainTabParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -81,14 +82,17 @@ export function DashboardScreen({ navigation }: Props) {
   // Events-Tab, News und Jahreswertung haben unten eigene Abschnitte (#212).
   const quickActions = useMemo(() => {
     const actions: QuickActionItem[] = [
-      { icon: "chatbubbles-outline", label: "Nachrichten", onPress: () => navigation.navigate("More", { screen: "DirectMessages" }) },
-      { icon: "flash-outline", label: "Fast Laps", onPress: () => navigation.navigate("More", { screen: "FastLapList" }) },
+      // Gast zuerst (#918): Nachrichten gibt es mit Konto - Gäste sehen hier den Weg dorthin.
+      isGuest
+        ? { icon: "log-in-outline", label: "Anmelden", onPress: () => { openSignIn(); } }
+        : { icon: "chatbubbles-outline", label: "Nachrichten", onPress: () => navigation.navigate("More", { screen: "DirectMessages", initial: false }) },
+      { icon: "flash-outline", label: "Fast Laps", onPress: () => navigation.navigate("More", { screen: "FastLapList", initial: false }) },
     ];
     if (user?.is_club_member) {
-      actions.push({ icon: "shield-checkmark-outline", label: "Verein", onPress: () => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" } }) });
+      actions.push({ icon: "shield-checkmark-outline", label: "Verein", onPress: () => navigation.navigate("More", { screen: "InfoCenter", params: { section: "benefits" }, initial: false }) });
     }
     return actions;
-  }, [navigation, user?.is_club_member]);
+  }, [isGuest, navigation, user?.is_club_member]);
 
   const load = useCallback(async () => {
     setError("");
@@ -134,7 +138,7 @@ export function DashboardScreen({ navigation }: Props) {
 
   const openTournament = useCallback((id?: string | null) => {
     if (!id) return;
-    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id } });
+    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id }, initial: false });
   }, [navigation]);
 
   const openAction = useCallback((action: DashboardAction) => {
@@ -143,11 +147,11 @@ export function DashboardScreen({ navigation }: Props) {
       return;
     }
     if (action.target_type === "match" && action.target_id) {
-      navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: action.target_id } });
+      navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: action.target_id }, initial: false });
       return;
     }
     if (action.target_type === "event" && action.target_id) {
-      navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: action.target_id } });
+      navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: action.target_id }, initial: false });
     }
   }, [navigation, openTournament]);
 
@@ -156,7 +160,7 @@ export function DashboardScreen({ navigation }: Props) {
       openTournament(item.targetId);
       return;
     }
-    navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id } });
+    navigation.navigate("Tournaments", { screen: "EventDetail", params: { id: item.targetId || item.id }, initial: false });
   }, [navigation, openTournament]);
 
   if (loading) {
@@ -233,7 +237,7 @@ export function DashboardScreen({ navigation }: Props) {
               <MatchOverviewCard
                 key={match.id}
                 match={match}
-                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })}
+                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
               />
             ))}
           </Section>
@@ -246,7 +250,7 @@ export function DashboardScreen({ navigation }: Props) {
                 key={`staff-${match.id}`}
                 match={match}
                 staff
-                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id } })}
+                onPress={() => navigation.navigate("Tournaments", { screen: "MatchDetail", params: { id: match.id }, initial: false })}
               />
             ))}
           </Section>
@@ -311,7 +315,7 @@ export function DashboardScreen({ navigation }: Props) {
 
         {data.season ? (
           <Pressable
-            onPress={() => navigation.navigate("More", { screen: "SeasonPass" })}
+            onPress={() => navigation.navigate("More", { screen: "SeasonPass", initial: false })}
             style={({ pressed }) => [pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel={`${data.season.name || "Jahreswertung"}: ${seasonLine(data.season)}`}
@@ -329,13 +333,13 @@ export function DashboardScreen({ navigation }: Props) {
           </Pressable>
         ) : null}
 
-        <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("More", { screen: "NewsList" })}>
+        <Section title="News" actionLabel="Alle News" onAction={() => navigation.navigate("More", { screen: "NewsList", initial: false })}>
           {data.news.length ? (
             data.news.slice(0, 3).map((post) => (
               <NewsCard
                 key={post.id}
                 post={post}
-                onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })}
+                onPress={() => navigation.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id }, initial: false })}
               />
             ))
           ) : (

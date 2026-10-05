@@ -6,6 +6,7 @@ import { BrandingProvider } from "./src/branding/BrandingProvider";
 import { AppErrorBoundary } from "./src/components/AppErrorBoundary";
 import { installCrashReporting } from "./src/lib/crashReports";
 import { installMobileLogHandlers } from "./src/lib/mobileLog";
+import { usePhonePortrait } from "./src/lib/orientation";
 import { AppLockProvider } from "./src/lock/AppLockProvider";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { NotificationProvider } from "./src/notifications/NotificationContext";
@@ -17,6 +18,8 @@ installMobileLogHandlers();
 void installCrashReporting();
 
 export default function App() {
+  // Handys bleiben hochkant, Tablets und aufgeklappte Faltgeräte drehen frei (#917).
+  usePhonePortrait();
   return (
     <SafeAreaProvider>
       <KeyboardProvider navigationBarTranslucent statusBarTranslucent>

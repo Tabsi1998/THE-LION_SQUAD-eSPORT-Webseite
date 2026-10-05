@@ -158,3 +158,22 @@ test("Dienstkonto-Datei: fehlt → null, ohne Schlüssel → klare Meldung, sons
   await writeFile(complete, JSON.stringify({ type: "service_account", client_email: account.clientEmail, private_key: account.privateKey }));
   assert.deepEqual(play.loadServiceAccount(complete), { clientEmail: account.clientEmail, privateKey: account.privateKey, tokenUri: play.DEFAULT_TOKEN_URI });
 });
+
+test("mit R8-Zuordnung (#917): nach dem Bundle geht mapping.txt als Deobfuskation zum Build, dann Track und Commit", async () => {
+  const { fetch, calls } = fakeFetch({ [`POST /applications/${PACKAGE}/edits/edit-1/apks/78/deobfuscationFiles/proguard`]: reply(200, { deobfuscationFile: { symbolType: "proguard" } }) });
+  const aabPath = await bundleFile();
+  const mappingPath = `${aabPath}.mapping.txt`;
+  await writeFile(mappingPath, "at.lionsquad.app.MainActivity -> a.b:\n");
+  await play.publishBundle({ account, packageName: PACKAGE, aabPath, mappingPath, versionCode: 78, track: "internal", fetch });
+
+  const routes = calls.slice(1).map((call) => `${call.method} ${call.url.replace(play.UPLOAD_API, "upload:").replace(play.API, "")}`);
+  assert.deepEqual(routes, [
+    `POST /applications/${PACKAGE}/edits`,
+    `POST upload:/applications/${PACKAGE}/edits/edit-1/bundles?uploadType=media`,
+    `POST upload:/applications/${PACKAGE}/edits/edit-1/apks/78/deobfuscationFiles/proguard?uploadType=media`,
+    `PUT /applications/${PACKAGE}/edits/edit-1/tracks/internal`,
+    `POST /applications/${PACKAGE}/edits/edit-1:commit`,
+  ]);
+  assert.equal(calls[3].headers["Content-Type"], "application/octet-stream");
+  assert.equal(calls[3].body.toString(), "at.lionsquad.app.MainActivity -> a.b:\n");
+});

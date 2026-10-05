@@ -103,7 +103,7 @@ export function MemberAreaScreen({ navigation }: Props) {
   }, [load]);
   useLiveRefresh(load, ["membership", "documents", "news", "events", "board", "settings"], { fallbackMs: 60000 });
 
-  const openEvent = (event: ClubEvent) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id } });
+  const openEvent = (event: ClubEvent) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id }, initial: false });
   const nothingYet = !loading && !events.length && !docs.length && !benefits.length && !news.length;
   const serverList = (discordServers?.servers || []).filter((server) => server.available);
   const openInvite = (url?: string | null) => { if (url) Linking.openURL(url).catch(() => {}); };

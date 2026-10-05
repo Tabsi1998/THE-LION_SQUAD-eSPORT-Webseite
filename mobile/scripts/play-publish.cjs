@@ -92,6 +92,8 @@ function client({ token, packageName, fetch = globalThis.fetch }) {
     deleteEdit: (editId) => call("DELETE", `${base}/edits/${editId}`),
     listTracks: (editId) => call("GET", `${base}/edits/${editId}/tracks`),
     uploadBundle: (editId, bytes) => call("POST", `${UPLOAD_API}/applications/${app}/edits/${editId}/bundles?uploadType=media`, { body: bytes, contentType: "application/octet-stream" }),
+    // R8-Zuordnung (#917): gehört zum Build, damit Abstürze in der Play Console lesbare Namen tragen.
+    uploadMapping: (editId, versionCode, bytes) => call("POST", `${UPLOAD_API}/applications/${app}/edits/${editId}/apks/${versionCode}/deobfuscationFiles/proguard?uploadType=media`, { body: bytes, contentType: "application/octet-stream" }),
     updateTrack: (editId, track, release) => call("PUT", `${base}/edits/${editId}/tracks/${encodeURIComponent(track)}`, { body: { track, releases: [release] } }),
     commitEdit: (editId) => call("POST", `${base}/edits/${editId}:commit`),
   };
@@ -132,7 +134,7 @@ function trackNotes(notes) {
  * Tracks bekommen es). Ein Fehler verwirft den Edit; in der Play Console bleibt
  * dann nichts Halbfertiges liegen.
  */
-async function publishBundle({ account, packageName, aabPath, versionCode, track, notes, fetch }) {
+async function publishBundle({ account, packageName, aabPath, mappingPath, versionCode, track, notes, fetch }) {
   const trackName = resolveTrack(track);
   const token = await accessToken(account, { fetch });
   const api = client({ token, packageName, fetch });
@@ -142,6 +144,7 @@ async function publishBundle({ account, packageName, aabPath, versionCode, track
     if (Number(bundle.versionCode) !== Number(versionCode)) {
       throw new Error(`Das hochgeladene Bundle trägt Build ${bundle.versionCode}, erwartet war ${versionCode}.`);
     }
+    if (mappingPath) await api.uploadMapping(edit.id, versionCode, fs.readFileSync(mappingPath));
     await api.updateTrack(edit.id, trackName, { versionCodes: [String(versionCode)], status: "completed", releaseNotes: trackNotes(notes) });
     const committed = await api.commitEdit(edit.id);
     return { editId: committed.id || edit.id, track: trackName, versionCode: Number(versionCode) };

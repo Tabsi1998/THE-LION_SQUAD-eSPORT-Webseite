@@ -80,6 +80,7 @@ jest.mock("react-native-passkey", () => ({
   Passkey: {
     isSupported: jest.fn(() => true),
     get: jest.fn(async () => ({ id: "cred-1", rawId: "cred-1", type: "public-key", response: { clientDataJSON: "c", authenticatorData: "a", signature: "s", userHandle: "u" } })),
+    getImmediate: jest.fn(async () => ({ id: "cred-1", rawId: "cred-1", type: "public-key", response: { clientDataJSON: "c", authenticatorData: "a", signature: "s", userHandle: "u" } })),
     create: jest.fn(async () => ({ id: "cred-1", rawId: "cred-1", type: "public-key", response: { clientDataJSON: "c", attestationObject: "o" } })),
   },
 }));

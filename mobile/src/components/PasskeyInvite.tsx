@@ -4,7 +4,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "./Button";
 import { Body, Heading, Muted } from "./Text";
 import { useAuth } from "../auth/AuthContext";
-import { createPasskey, listPasskeys, passkeyCreateError, passkeysSupported } from "../lib/passkeys";
+import { createPasskey, listPasskeys, passkeyCreateError, passkeysSupported, silentPasskeyMiss } from "../lib/passkeys";
 import { colors } from "../theme";
 
 // Passkey-Einladung (#919): direkt nach einer Anmeldung mit Passwort - hat das Konto noch keinen Passkey und kann das Gerät
@@ -20,6 +20,7 @@ export function PasskeyInvite() {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [cancelled, setCancelled] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export function PasskeyInvite() {
       clearPasskeyOffer();
     } catch (error) {
       setMessage(passkeyCreateError(error));
+      setCancelled(silentPasskeyMiss(error) === "cancelled");
     } finally {
       setBusy(false);
     }
@@ -75,7 +77,7 @@ export function PasskeyInvite() {
             <>
               <Heading>Nächstes Mal nur mit Fingerabdruck?</Heading>
               <Body>Mit einem Passkey meldest du dich ohne Passwort an – mit Fingerabdruck, Gesicht oder Displaysperre. Er zählt auch als zweiter Faktor.</Body>
-              {message ? <Text style={styles.error}>{message}</Text> : null}
+              {message ? <Text style={cancelled ? styles.hint : styles.error}>{message}</Text> : null}
               <Button label={busy ? "Wird angelegt ..." : "Passkey anlegen"} onPress={create} disabled={busy} testID="passkey-invite-create" />
               <Pressable onPress={later} disabled={busy} style={styles.later} testID="passkey-invite-later">
                 <Muted>Später</Muted>
@@ -92,5 +94,6 @@ const styles = StyleSheet.create({
   backdrop: { alignItems: "center", backgroundColor: "rgba(0,0,0,0.6)", flex: 1, justifyContent: "center", padding: 20 },
   card: { backgroundColor: colors.card, borderColor: "rgba(41,182,232,0.35)", borderRadius: 10, borderWidth: 1, gap: 12, maxWidth: 420, padding: 20, width: "100%" },
   error: { color: colors.live, fontWeight: "700" },
+  hint: { color: colors.muted },
   later: { alignItems: "center", paddingVertical: 6 },
 });

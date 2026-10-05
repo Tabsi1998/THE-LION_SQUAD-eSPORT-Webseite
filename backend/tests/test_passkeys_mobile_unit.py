@@ -113,7 +113,8 @@ def test_without_configuration_the_app_gets_a_clear_503(setup, monkeypatch):
 
 def test_app_creates_a_passkey_after_the_password_login_and_signs_in_with_it(setup, monkeypatch):
     """#919: Direkt nach der Passwort-Anmeldung legt die App mit dem Ticket einen Passkey an - ohne das Passwort noch einmal
-    zu verlangen. Das Ticket gilt einmal, zehn Minuten, nur für dieses Konto; ohne Ticket braucht es das Passwort."""
+    zu verlangen. Das Ticket gilt bis zum fertigen Passkey (ein Abbruch am Gerät darf noch einmal), zehn Minuten, nur für
+    dieses Konto; danach und ohne Ticket braucht es das Passwort."""
     async def scenario():
         db, user, request, _issue = setup
         monkeypatch.setattr(routes, "_issue_mobile_session", AsyncMock(return_value=("zugang", "erneuerung")))
@@ -121,6 +122,8 @@ def test_app_creates_a_passkey_after_the_password_login_and_signs_in_with_it(set
         ticket = await routes.issue_enroll_ticket(db, "user-1")
         assert len(ticket) >= 32 and db.passkey_challenges.rows[-1]["kind"] == "mobile-enroll" and "ticket" not in db.passkey_challenges.rows[-1]
 
+        await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket, name="Pixel 9"), request, user)
+        # Am Gerät abgebrochen: derselbe Weg noch einmal - das Ticket gilt noch.
         start = await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket, name="Pixel 9"), request, user)
         assert start["options"]["rp"]["id"] == "club.example" and start["options"]["authenticatorSelection"]["userVerification"] == "required"
         private_key = ec.generate_private_key(ec.SECP256R1())
@@ -130,7 +133,7 @@ def test_app_creates_a_passkey_after_the_password_login_and_signs_in_with_it(set
 
         with pytest.raises(HTTPException) as again:
             await routes.mobile_registration_options(routes.MobileRegistrationStart(enroll_ticket=ticket), request, user)
-        assert again.value.status_code == 401, "das Ticket gilt genau einmal"
+        assert again.value.status_code == 401, "nach dem fertigen Passkey ist das Ticket verbraucht"
         with pytest.raises(HTTPException) as wrong:
             await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="falsch"), request, user)
         assert wrong.value.status_code == 401

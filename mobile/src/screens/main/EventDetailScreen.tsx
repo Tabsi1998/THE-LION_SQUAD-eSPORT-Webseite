@@ -116,14 +116,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
       return;
     }
     if (target.type === "news") {
-      navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: target.id } });
+      navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: target.id }, initial: false });
       return;
     }
     if (target.type === "team") {
-      navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id } });
+      navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: target.id }, initial: false });
       return;
     }
-    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username: target.id } });
+    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username: target.id }, initial: false });
   }, [navigation]);
 
   const register = useCallback(async () => {
@@ -506,7 +506,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 image={post.banner_url}
                 date={post.published_at || post.created_at}
                 description={post.excerpt || post.summary}
-                onPress={() => navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id } })}
+                onPress={() => navigation.getParent()?.navigate("More", { screen: "NewsDetail", params: { id: post.slug || post.id }, initial: false })}
               />
             ))}
           </Card>
