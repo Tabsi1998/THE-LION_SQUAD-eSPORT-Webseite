@@ -263,6 +263,11 @@ class FakeDolibarr:
         self.profile_requests: dict[str, list[dict]] = {}
         self.direct_fields = ["phone", "phone_mobile"]
         self.exit_rule_last_day = "2026-12-31"
+        # Einlass bei der Generalversammlung (#845, Vereine 1.7.0): wer am Versammlungstag im Vorstand ist, lässt ein.
+        self.board_today: set[int] = set()
+        self.admit_right = True              # „Mitglieder bei einer Generalversammlung einlassen“ (member_id-Modus)
+        self.admissions: dict[str, dict] = {}   # Kennung → Anfrage und Antwort: dieselbe Kennung, dieselbe Antwort
+        self.admission_log: list[dict] = []
         # Website-Profil je Mitglied (#255): was der Verein in Dolibarr pflegt, und das Foto der Mitgliedskarte.
         self.website_profile_consent = ""
         self.member_profiles: dict[int, dict] = {}
@@ -557,6 +562,67 @@ class FakeDolibarr:
             if other["day"] == shift["day"] and shift["start"] < other["end"] and other["start"] < shift["end"]:
                 return "overlap"
         return None
+
+    def _check_in(self, meeting_id: int, member_id: int, arrived: str) -> dict:
+        invites = self.meeting_invites.get(meeting_id, {})
+        present = self.present.get(meeting_id, set())
+        here = member_id in present
+        voting = here and invites.get(member_id, False)
+        eligible = sum(1 for allowed in invites.values() if allowed)
+        quorum_from = eligible // 2 + 1
+        present_voting = sum(1 for mid in present if invites.get(mid))
+        return {"member_id": member_id, "state": "present" if here else "absent", "arrived": arrived if here else "", "voting": voting,
+                "reason": ("own" if voting else "no_voting_right") if here else "absent", "present": len(present), "eligible": eligible,
+                "quorum_from": quorum_from, "quorum_reached": present_voting >= quorum_from}
+
+    def _attendance(self, request: httpx.Request, params: dict, meeting_id: int, member_id: int) -> httpx.Response:
+        """Einlass (Vereine 1.7.0): im Namen eines Vorstandsmitglieds - über die Mitgliedsnummer mit dem Recht „einlassen“
+        oder über eine Bindung mit der Fähigkeit attendance; nur am Tag einer eingeladenen Generalversammlung, nur für
+        Eingeladene. Dieselbe Kennung ist dieselbe Antwort, eine andere Änderung unter ihr 409."""
+        template = "/vereine/meetings/{id}/attendance/{member}"
+        if params.get("member_id"):
+            if not self.admit_right:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed: the user needs the right to admit members"}})
+            acting = int(params["member_id"])
+        else:
+            ident = self._identity(params, "attendance")
+            if ident is None:
+                return httpx.Response(403, json={"error": {"code": 403, "message": "Not allowed"}})
+            acting = ident["member_id"]
+        if acting not in self.board_today:
+            return httpx.Response(403, json={"error": {"code": 403, "message": "Not on the board today"}})
+        meeting = self.meetings.get(meeting_id)
+        if not meeting or meeting["kind"] == "board":
+            return httpx.Response(404, json={"error": {"code": 404, "message": "No general meeting"}})
+        if meeting["status"] != "invited" or meeting["day"] != self.today:
+            return httpx.Response(409, json={"error": {"code": 409, "message": "not_today"}})
+        if member_id not in self.meeting_invites.get(meeting_id, {}):
+            return httpx.Response(404, json={"error": {"code": 404, "message": "Not invited"}})
+        if request.method == "PUT":
+            body = json.loads(request.content.decode("utf-8"))
+            validate(body, request_schema(template, "put"))
+            external_id, change = body["external_id"], ("in", meeting_id, member_id)
+        else:
+            external_id, reason = str(params.get("external_id") or ""), str(params.get("reason") or "").strip()
+            if not external_id or not reason:
+                return httpx.Response(400, json={"error": {"code": 400, "message": "external_id and reason are needed", "field": "reason"}})
+            change = ("out", meeting_id, member_id)
+        earlier = self.admissions.get(external_id)
+        if earlier:
+            if earlier["change"] != change:
+                return httpx.Response(409, json={"error": {"code": 409, "message": "external_id"}})
+            return self._json_method(template, request.method.lower(), earlier["answer"])
+        if change[0] == "in":
+            self.present.setdefault(meeting_id, set()).add(member_id)
+            arrived = body.get("arrived") or "18:58"
+        else:
+            self.present.setdefault(meeting_id, set()).discard(member_id)
+            arrived = ""
+        answer = self._check_in(meeting_id, member_id, arrived)
+        self.admissions[external_id] = {"change": change, "answer": answer}
+        self.admission_log.append({"external_id": external_id, "change": change[0], "member_id": member_id, "by": acting,
+                                   "reason": "" if change[0] == "in" else reason})
+        return self._json_method(template, request.method.lower(), answer)
 
     def _statutes_payload(self, visible: bool) -> dict:
         return self.statutes if visible else {"state": "not_published", "current": None, "versions": []}
@@ -1201,6 +1267,9 @@ class FakeDolibarr:
                    "received_at": f"{self.today}T10:05:00Z", "late": bool(deadline) and self.today > deadline, "status": "received"}
             rows.append(row)
             return self._json_method("/vereine/me/meetings/{id}/motions", "post", {key: value for key, value in row.items() if key != "member_id"})
+        match = re.fullmatch(r"/vereine/meetings/(\d+)/attendance/(\d+)", path)
+        if match and request.method in ("PUT", "DELETE"):
+            return self._attendance(request, params, int(match.group(1)), int(match.group(2)))
         if path == "/vereine/me/ballots" and request.method == "GET":
             ident, denied = self._vote_person(params)
             if denied:

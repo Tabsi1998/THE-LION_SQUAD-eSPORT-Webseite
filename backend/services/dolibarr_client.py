@@ -715,6 +715,24 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return data
 
+    # ------------------------------------------------ Einlass bei der Generalversammlung (#845, Vereine ab 1.7)
+    async def admit(self, meeting_id: int, member_id: int, who: dict, *, external_id: str) -> dict:
+        """„Anwesend“ im Namen des Vorstandsmitglieds ``who``. Dieselbe Kennung gibt dieselbe Antwort - darum darf
+        ein abgebrochener Aufruf wiederholt werden."""
+        data = await self._request("PUT", f"/vereine/meetings/{int(meeting_id)}/attendance/{int(member_id)}", params=dict(who),
+                                   payload={"external_id": external_id}, key=self._write_key)
+        if not isinstance(data, dict) or "state" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
+    async def admit_undo(self, meeting_id: int, member_id: int, who: dict, *, external_id: str, reason: str) -> dict:
+        """Einlass zurücknehmen, mit Grund - steht in Dolibarr auf der Sitzung."""
+        data = await self._request("DELETE", f"/vereine/meetings/{int(meeting_id)}/attendance/{int(member_id)}",
+                                   params={**dict(who), "external_id": external_id, "reason": reason}, key=self._write_key)
+        if not isinstance(data, dict) or "state" not in data:
+            raise DolibarrError("invalid_response", 200)
+        return data
+
     # ------------------------------------------------ Veranstaltungen und Helferdienste (#331), über die Bindung
     async def my_events(self, who: dict) -> list[dict]:
         """Veranstaltungen ab heute mit Helferdiensten und eigenem Stand (Fähigkeit events)."""

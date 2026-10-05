@@ -38,7 +38,7 @@ test("Finanzen sind eine eigene Gruppe; Dolibarr liegt bei den Mitgliedern (#512
   expect(group("Finanzen").items[0].areas).toEqual(["finance"]);
   expect(group("Content").items.some((item) => item.to === "/admin/downloads")).toBe(true);
   expect(group("System").items.some((item) => item.to === "/admin/downloads")).toBe(false);
-  expect(group("Mitglieder").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(["Mitglieder", "Mitgliederprofile", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Alle Benutzer", "Dolibarr"]);
+  expect(group("Mitglieder").items.filter((item) => !item.searchOnly).map((item) => item.label)).toEqual(["Mitglieder", "Mitgliederprofile", "Bewerbungen", "Mitgliedervorteile", "Dokumente", "Einlass (Versammlung)", "Alle Benutzer", "Dolibarr"]);
   expect(group("Mitglieder").items.find((item) => item.to === "/admin/dolibarr").areas).toEqual(["club", "system"]);
   // Menüname = Seitentitel (#512): Jahreswertung, Gewinne, Fast Lap, App-Logs, Push-Tests.
   expect(group("eSports").items.map((item) => item.label)).toEqual(expect.arrayContaining(["Fast Lap", "Jahreswertung", "Gewinne"]));
