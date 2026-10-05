@@ -112,6 +112,25 @@ async def test_own_data_change_and_exit_run_through_the_binding(flow, fake):
 
 
 @pytest.mark.asyncio
+async def test_a_one_time_release_lets_the_next_change_apply_at_once(flow, fake):
+    """Einmalige Freigabe (#329, Vereine 1.8.0): Gibt der Vorstand das Mitglied in Dolibarr frei, gilt die nächste
+    Änderung sofort - auch eine neue E-Mail-Adresse; danach liegt wieder alles beim Vorstand."""
+    await connect(flow)
+    await paula_bound(flow, fake)
+    assert (await flow.get("/api/membership/me/self-service")).json()["profile"]["direct_once"] is False
+    fake.profile_for(12)["direct_once"] = True
+    view = (await flow.get("/api/membership/me/self-service")).json()
+    assert view["profile"]["direct_once"] is True
+    applied = (await flow.post("/api/membership/me/self-service/changes", json={"version": "v1", "changes": {"email": "paula.neu@example.test", "town": "Imst"}})).json()
+    assert applied["status"] == "applied" and applied["status_label"] == "übernommen"
+    view = (await flow.get("/api/membership/me/self-service")).json()
+    assert (view["profile"]["email"], view["profile"]["town"], view["profile"]["direct_once"]) == ("paula.neu@example.test", "Imst", False)
+    # Die Freigabe ist verbraucht: die nächste E-Mail-Änderung liegt wieder beim Vorstand.
+    later = (await flow.post("/api/membership/me/self-service/changes", json={"version": view["profile"]["version"], "changes": {"email": "p@example.test"}})).json()
+    assert later["status"] == "received"
+
+
+@pytest.mark.asyncio
 async def test_a_revoked_binding_closes_the_self_service(flow, fake):
     await connect(flow)
     paula = await paula_bound(flow, fake)

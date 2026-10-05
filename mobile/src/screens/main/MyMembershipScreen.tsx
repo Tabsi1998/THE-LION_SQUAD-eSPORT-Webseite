@@ -322,8 +322,15 @@ export function MyMembershipScreen({ navigation }: Props) {
             <Muted testID="membership-self-identity">
               {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
             </Muted>
+            {/* Einmalige Freigabe (#329, Vereine 1.8.0): der Vorstand gibt das Mitglied in Dolibarr für eine direkte Änderung frei. */}
+            {profile.direct_once ? (
+              <Muted style={styles.once} testID="membership-self-once">
+                Der Vorstand hat dich für eine Änderung freigegeben: Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.
+              </Muted>
+            ) : null}
             <Muted style={styles.hint}>
-              Name und Geburtsdatum ändert nur der Vorstand.{profile.direct?.length ? ` ${profile.direct.map(fieldLabel).join(" und ")} übernimmt der Verein sofort;` : ""} alles andere prüft der Vorstand.
+              Name und Geburtsdatum ändert nur der Vorstand.
+              {profile.direct_once ? "" : `${profile.direct?.length ? ` ${profile.direct.map(fieldLabel).join(" und ")} übernimmt der Verein sofort;` : ""} alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht den Vorstand.`}
             </Muted>
             {changeable.map((key) => (
               <View key={key} style={styles.field}>
@@ -562,6 +569,14 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 12,
+  },
+  once: {
+    backgroundColor: "rgba(0, 255, 136, 0.1)",
+    borderColor: "rgba(0, 255, 136, 0.4)",
+    borderRadius: 6,
+    borderWidth: 1,
+    color: "#00FF88",
+    padding: 10,
   },
   field: {
     gap: 4,

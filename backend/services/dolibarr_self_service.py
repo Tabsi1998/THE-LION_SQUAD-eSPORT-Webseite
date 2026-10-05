@@ -4,7 +4,8 @@ Baut auf der persönlichen Bindung (#324 Teil 1, ``dolibarr_identity``) auf: nur
 Einladungscode an sein Mitglied gebunden ist **und** dessen Bindung die Fähigkeit ``profile`` trägt,
 sieht seine Daten aus Dolibarr und darf Änderungen einreichen. Die Website führt dabei keine zweite
 Wahrheit: Was übernommen ist, sagt ``GET /vereine/me/profile`` (mit ``version``, dem Stand der
-Kontaktdaten, und ``direct``, den Feldern, die der Verein sofort übernimmt); was eingereicht ist, sagt
+Kontaktdaten, ``direct``, den Feldern, die der Verein sofort übernimmt, und ``direct_once``: der Vorstand hat genau
+eine Änderung freigegeben, die dann sofort gilt, auch eine neue E-Mail-Adresse - Vereine 1.8.0, #329); was eingereicht ist, sagt
 ``GET /vereine/me/profile/changes``. Eine Änderung nennt die ``version``, die die Person gesehen hat -
 hat sich der Stand seither geändert, antwortet das Modul 409, und die Website überschreibt nichts still.
 Der Austritt geht mit heutigem Eingang ein; den letzten Tag ergibt die Kündigungsregel des Vereins,
@@ -24,7 +25,7 @@ from services.dolibarr_client import DolibarrClient, DolibarrError, load_setting
 
 CHANGEABLE = ("address", "zip", "town", "country_code", "phone", "phone_mobile", "email")
 PROFILE_FIELDS = ("member_id", "ref", "firstname", "lastname", "birth", "address", "zip", "town", "country_code", "phone", "phone_mobile", "email",
-                  "member_type", "status", "version", "direct", "exit")
+                  "member_type", "status", "version", "direct", "direct_once", "exit")
 REQUEST_FIELDS = ("external_id", "kind", "changes", "status", "reason", "received_at", "decided_at", "notice_day", "last_day", "wished_last_day", "wished_too_early")
 STATUS_LABELS = {"received": "beim Vorstand", "applied": "übernommen", "rejected": "abgelehnt"}
 WEBSITE_TYPES = ("text", "textarea", "number", "date", "boolean", "select", "multi")

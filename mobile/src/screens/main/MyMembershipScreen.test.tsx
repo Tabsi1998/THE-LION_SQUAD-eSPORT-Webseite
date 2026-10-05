@@ -145,6 +145,21 @@ test("Meine Daten: nur Geändertes geht mit dem Stand raus; Eingereichtes steht 
   alert.mockRestore();
 });
 
+test("Meine Daten (#329): mit der einmaligen Freigabe gilt die nächste Änderung sofort, auch die E-Mail", async () => {
+  const bound = { available: true, status: "bound", capabilities: ["documents", "profile"], capability_labels: ["Dokumente", "eigene Daten"], linked_at: "2026-09-24T10:00:00Z" };
+  mockAkte(bound, SELF);
+  const first = await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-self")).toBeTruthy());
+  expect(screen.queryByTestId("membership-self-once")).toBeNull();
+  expect(screen.getByText(/Eine neue E-Mail-Adresse braucht den Vorstand\./)).toBeTruthy();
+  await first.unmount();
+
+  mockAkte(bound, { ...SELF, profile: { ...SELF.profile, direct_once: true } });
+  await render(<MyMembershipScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("membership-self-once")).toBeTruthy());
+  expect(screen.queryByText(/braucht den Vorstand/)).toBeNull();
+});
+
 test("Austritt: erst die Rückfrage, dann die Erklärung; geplant heißt nur noch der Stand", async () => {
   mockAkte({ available: true, status: "bound", capabilities: ["profile"] }, SELF);
   mockPost.mockResolvedValue({ data: { kind: "exit", last_day: "2026-12-31", wished_too_early: true } });

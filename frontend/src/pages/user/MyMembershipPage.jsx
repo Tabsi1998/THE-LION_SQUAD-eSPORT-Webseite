@@ -398,7 +398,13 @@ function SelfServiceCard() {
       <p className="mt-2 text-sm text-white/70" data-testid="membership-self-identity">
         {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
       </p>
-      <p className="mt-1 text-xs text-white/45">Name und Geburtsdatum ändert nur der Vorstand. {directLabels.length ? `${directLabels.join(" und ")} übernimmt der Verein sofort; ` : ""}alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht immer den Vorstand.</p>
+      {/* Einmalige Freigabe (#329, Vereine 1.8.0): der Vorstand gibt das Mitglied in Dolibarr für eine direkte Änderung frei. */}
+      {profile.direct_once ? (
+        <p className="mt-3 text-sm border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] rounded-sm p-3" data-testid="membership-self-once">
+          Der Vorstand hat dich für eine Änderung freigegeben: Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.
+        </p>
+      ) : null}
+      <p className="mt-1 text-xs text-white/45">Name und Geburtsdatum ändert nur der Vorstand. {profile.direct_once ? "" : `${directLabels.length ? `${directLabels.join(" und ")} übernimmt der Verein sofort; ` : ""}alles andere prüft der Vorstand. Eine neue E-Mail-Adresse braucht den Vorstand.`}</p>
       <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-self-form">
         {changeable.map((key) => (
           <label key={key} className={`block ${key === "address" ? "sm:col-span-2" : ""}`}>
