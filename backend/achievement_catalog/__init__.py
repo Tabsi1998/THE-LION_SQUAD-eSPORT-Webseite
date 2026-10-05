@@ -50,6 +50,8 @@ COUNTER_KEYS_V2 = (
     "member_since_founding_year", "pioneer_account", "distinct_game_wins_one_season", "all_visible_achievements",
     "witching_hour_matches", "lucky_seven_days", "palindrome_laps", "echo_results", "night_shift_nights", "full_moon_wins",
     "leap_day_logins", "member_documents_opened", "board_days", "profile_completed_fast", "membership_years",
+    # Katalog D, Rest (#615): Zahlen aus der Vereinsakte - und die Stufe für „Überall dabei“ (#614)
+    "meetings_attended", "member_votes_cast", "helper_shifts_completed", "helper_hours", "discord_servers_stage",
     # Katalog E (#678): Saison-Fundstücke
     "halloween_bats_scared", "season_collectibles_total",
 )

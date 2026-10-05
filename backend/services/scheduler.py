@@ -367,6 +367,14 @@ async def _safe_dolibarr_public():
             logger.info(f"[scheduler] dolibarr_honours {res}")
     except Exception as exc:
         _log_task_failure("dolibarr_honours", exc)
+    try:
+        # Helferdienste für die Erfolge (#615): die Teilnahmen je Mitglied höchstens einmal am Tag, wenige je Lauf.
+        from services.member_activity import refresh_due as refresh_helper_counts
+        res = await refresh_helper_counts()
+        if res.get("refreshed") or res.get("error"):
+            logger.info(f"[scheduler] helper_counts {res}")
+    except Exception as exc:
+        _log_task_failure("helper_counts", exc)
 
 
 async def _safe_billing_reconcile():

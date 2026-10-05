@@ -11,7 +11,9 @@ Eine Stimme ist bewusst: die Website fragt vor dem Senden nach, und die ``extern
 hängt an Konto, Abstimmung und Stimmrecht - nicht an der Antwort. Ein Doppelklick, ein zweites Gerät
 oder ein Verbindungsabbruch ergeben so dieselbe Anfrage; eine andere Antwort unter demselben Stimmrecht
 weist das Modul mit 409 ab, und die Website behauptet nie, sie hätte abgestimmt, wenn sie es nicht weiß.
-Welche Antwort jemand gegeben hat, schreibt die Website nirgends hin: kein Audit, kein Log.
+Welche Antwort jemand gegeben hat, schreibt die Website nirgends hin: kein Audit, kein Log. Für die Erfolge (#615) merkt
+sie sich beim Lesen der Abstimmungen nur zwei Zahlen - bei wie vielen jemand abgestimmt hat und bei wie vielen
+Versammlungen (``member_activity.note_ballots``).
 """
 from __future__ import annotations
 
@@ -19,7 +21,7 @@ import hashlib
 import json
 from datetime import date
 
-from services import dolibarr_identity, dolibarr_policy
+from services import dolibarr_identity, dolibarr_policy, member_activity
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
 
 KIND_LABELS = {"board": "Vorstandssitzung", "general": "Generalversammlung", "extraordinary": "Außerordentliche Generalversammlung"}
@@ -215,6 +217,7 @@ async def overview(db, user: dict, *, today: date | None = None) -> dict:
         try:
             rows = await client.my_ballots(access["params"])
             out["ballots"] = [ballot_view(row) for row in rows]
+            await member_activity.note_ballots(db, user["id"], rows, access.get("member_id"))
         except DolibarrError as exc:
             if exc.kind == "forbidden":
                 out["ballots_reason"] = await _denied(db, access, votes=True)
@@ -236,6 +239,8 @@ async def open_ballots(db, user: dict, *, today: date | None = None) -> dict:
         rows = await client.my_ballots(access["params"])
     except DolibarrError:
         return empty
+    # Das Popup lädt nach jeder Stimme neu - hier steht die Zahl für „Mitgliederstimme“ also Sekunden später (#615).
+    await member_activity.note_ballots(db, user["id"], rows, access.get("member_id"))
     now = _iso(today)
     views = [ballot_view(row) for row in rows]
     shown = [ballot for ballot in views if ballot["status"] == "open"

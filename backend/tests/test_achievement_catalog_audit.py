@@ -177,9 +177,10 @@ def test_katalog_b_ziele_steigen_material_passt_texte_da_schluessel_live():
 from achievement_catalog import GROUPS_C, MATERIALS, REDEFINED_C, REPLACED_C, TIERS_C  # noqa: E402
 
 
-def test_katalog_c_hat_42_gruppen_je_kategorie_und_loest_alte_ab():
-    assert len(GROUPS_C) == 42
-    assert len([g for g in GROUPS_C if g["category"] == "community"]) == 17
+def test_katalog_c_hat_43_gruppen_je_kategorie_und_loest_alte_ab():
+    # Seit dem Rest aus #615: „Überall dabei“ (Community) - die Quelle kam mit Discord VI.
+    assert len(GROUPS_C) == 43
+    assert len([g for g in GROUPS_C if g["category"] == "community"]) == 18
     assert len([g for g in GROUPS_C if g["category"] == "creator"]) == 10
     assert len([g for g in GROUPS_C if g["category"] == "profile"]) == 15
     assert len(TIERS_C) == sum(len([t for t in TIERS_C if t["group_code"] == g["code"]]) for g in GROUPS_C)
@@ -226,10 +227,10 @@ def test_katalog_c_ziele_material_texte_und_schluessel():
 from achievement_catalog import GROUPS_D, REDEFINED_D, REPLACED_D, TIERS_D  # noqa: E402
 
 
-def test_katalog_d_hat_37_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
+def test_katalog_d_hat_42_gruppen_und_die_kataloge_zusammen_keinen_doppelten_code():
     # Nachtrag #615: Papierkram (3 Stufen), Vorstandsarbeit (5) und Sprinter (geheim) sind messbar; seit #646 „Eierkönig“,
-    # seit #848 „Vereinsjubiläum“ (3).
-    assert len(GROUPS_D) == 38 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1 + 3 + 5 + 3) + 16 + 14  # Verein 30, Besonders 16, Geheim 14
+    # seit #848 „Vereinsjubiläum“ (3). Rest aus #615: Versammlungsbesucher (5), Mitgliederstimme (5), Helfer (7), Helferstunden (5).
+    assert len(GROUPS_D) == 42 and len(TIERS_D) == (7 + 1 + 5 + 5 + 1 + 3 + 5 + 3) + (5 + 5 + 7 + 5) + 16 + 14  # Verein 52, Besonders 16, Geheim 14
     codes = [g["code"] for g in GROUPS_A + GROUPS_B + GROUPS_C + GROUPS_D]
     assert len(codes) == len(set(codes)), "kein Code doppelt über die Kataloge"
     tier_codes = [t["code"] for t in TIERS_A + TIERS_B + TIERS_C + TIERS_D]

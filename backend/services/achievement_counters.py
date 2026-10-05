@@ -125,6 +125,24 @@ class Context:
             return {row["name"]: row for row in rows}
         return await self._memo("signals", load)
 
+    async def club_record(self) -> dict:
+        """Was die Website zuletzt aus der Vereinsakte gezählt hat (#615, services/member_activity.py): Abstimmungen,
+        Versammlungen, Helferdienste, Stunden - nur Zahlen und Zeitpunkte, im Stand der Zähler selbst."""
+        async def load():
+            doc = await self.db[STATS].find_one({"user_id": self.user_id}, {"_id": 0, "club": 1}) or {}
+            return doc.get("club") or {}
+        return await self._memo("club_record", load)
+
+    async def club_servers(self) -> tuple[int, int]:
+        """(Discord-Server des Vereins, auf denen die Person ist; eingeschaltete Server insgesamt) - wie der Bot es
+        zuletzt gesehen hat (#626). Ausgeschaltete und verlassene Server zählen auf keiner Seite."""
+        async def load():
+            enabled = [row["guild_id"] async for row in self.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
+            if not enabled:
+                return 0, 0
+            return await self.db.discord_memberships.count_documents({"user_id": self.user_id, "member": True, "guild_id": {"$in": enabled}}), len(enabled)
+        return await self._memo("club_servers", load)
+
     async def links(self) -> set[str]:
         async def load():
             rows = await self.db.platform_links.find({"user_id": self.user_id}, {"_id": 0, "platform": 1}).to_list(100)
@@ -391,10 +409,17 @@ async def _discord_linked(ctx):
 @counter("discord_guilds_joined", "discord")
 async def _discord_guilds_joined(ctx):
     """Auf wie vielen eingeschalteten Servern des Vereins die Person ist (#626) - wie der Bot es zuletzt gesehen hat."""
-    enabled = [row["guild_id"] async for row in ctx.db.discord_guilds.find({"enabled": True}, {"_id": 0, "guild_id": 1, "left_at": 1}) if not row.get("left_at")]
-    if not enabled:
-        return 0
-    return await ctx.db.discord_memberships.count_documents({"user_id": ctx.user_id, "member": True, "guild_id": {"$in": enabled}})
+    return (await ctx.club_servers())[0]
+
+
+@counter("discord_servers_stage", "discord")
+async def _discord_servers_stage(ctx):
+    """Überall dabei (#614, #615): 1 = auf einem Server des Vereins, 2 = auf drei, 3 = auf allen eingeschalteten.
+    „Alle“ ist kein festes Ziel - kommt ein Server dazu, wächst es mit; mit weniger als drei Servern bleibt es bei 1."""
+    joined, enabled = await ctx.club_servers()
+    if joined >= 3:
+        return 3 if joined >= enabled else 2
+    return 1 if joined else 0
 
 
 @counter("twitch_linked", "profile")
@@ -1514,3 +1539,35 @@ async def _full_moon(ctx):
 async def _leap_day(ctx):
     """Tages-Logins an einem 29. Februar."""
     return await ctx.db.xp_events.count_documents({"user_id": ctx.user_id, "source": "daily_login", "day": {"$regex": "-02-29$"}})
+
+
+# ------------------------------------------------------------------ Katalog D, Rest (#615): Zahlen aus der Vereinsakte
+# Abstimmungen und Helferdienste führt das Vereinsmodul. Gezählt wird, wo die Website die Daten der Person ohnehin liest
+# (services/member_activity.py); hier steht nur der zuletzt gesehene Stand - fällt Dolibarr aus, bleibt er.
+
+@counter("meetings_attended", "club")
+async def _meetings_attended(ctx):
+    """Versammlungsbesucher: Generalversammlungen, bei denen die Person da war - am Eingang eingelassen (#845) oder mit
+    abgegebener Stimme (ohne Anwesenheit nimmt das Vereinsmodul keine an). Die Akte selbst nennt je Mitglied nur Zu-
+    oder Absage, keine Anwesenheit."""
+    from services.member_activity import admitted_meetings, member_id_of
+    admitted = await admitted_meetings(ctx.db, ctx.user_id, await member_id_of(ctx.db, ctx.user_id))
+    return max(len(admitted), int((await ctx.club_record()).get("meetings") or 0))
+
+
+@counter("member_votes_cast", "club")
+async def _member_votes(ctx):
+    """Mitgliederstimme: Abstimmungen, bei denen die Person eine Stimme abgegeben hat - nur die Anzahl, nie die Antwort."""
+    return int((await ctx.club_record()).get("votes") or 0)
+
+
+@counter("helper_shifts_completed", "club")
+async def _helper_shifts(ctx):
+    """Helfer: bestätigte Helferdienste aus der Mitgliederakte, deren Tag vorbei ist."""
+    return int((await ctx.club_record()).get("shifts") or 0)
+
+
+@counter("helper_hours", "club")
+async def _helper_hours(ctx):
+    """Helferstunden: die Stunden dieser Dienste (notiert oder die Länge der Schicht) - volle Stunden zählen."""
+    return int(float((await ctx.club_record()).get("hours") or 0))
