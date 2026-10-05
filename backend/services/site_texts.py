@@ -346,12 +346,18 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   f"oder auf der Website nach der Anmeldung unter {link('Datenschutz → Meine Daten → „Account anonymisieren“', '/privacy-account')}. "
                   "Ein Login ist dafür nötig, damit niemand ein fremdes Konto löscht; wer sich nicht mehr anmelden kann, schreibt an "
                   f"{_contact_or_form(legal)}."),
-                p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, Bilder, verknüpfte Konten, Push-Geräte, Freundschaften, "
-                  "die Zählerstände hinter den Erfolgen und Anmeldedaten; eigene Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben "
-                  "Turnier-Ergebnisse ohne Namen "
-                  "(sportliche Integrität) und – wenn du Rechnungen hattest – die Belege in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
+                p("Gelöscht bzw. überschrieben werden Name, E-Mail-Adresse, Profiltexte, deine Bilder (Avatar, Banner und was du sonst für dein "
+                  "Profil hochgeladen hast), verknüpfte Konten, Push-Geräte, Freundschaften, XP und Level, die Zählerstände hinter den Erfolgen, "
+                  "ein selbst angelegter Eintrag im Mitgliederverzeichnis, die Angaben in Mitgliedsanträgen und Anmeldedaten; eigene "
+                  "Chatnachrichten werden als „gelöscht“ markiert. Erhalten bleiben "
+                  "Turnier-Ergebnisse, Rundenzeiten und Anmeldungen ohne Namen "
+                  "(sportliche Integrität und Zählung), der Nachweis über einen übergebenen Gewinn und – wenn du Rechnungen hattest – die Belege "
+                  "in der Vereinsbuchhaltung, weil das Steuerrecht sieben "
                   "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
-                  "lässt sich nicht rückgängig machen.")),
+                  "lässt sich nicht rückgängig machen."),
+                p("Was der Verein in seiner Mitgliederverwaltung über dich als Mitglied führt, berührt die Löschung des Kontos nicht – auch nicht "
+                  "einen Eintrag im Mitgliederverzeichnis, der von dort kommt. Dafür und für den Widerruf einer Einwilligung wendest du dich an "
+                  f"{_contact_or_form(legal)}.")),
         section("rights", "Betroffenenrechte",
                 p("Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Information, Auskunft, Berichtigung, Löschung, Einschränkung, "
                   f"Datenübertragbarkeit, Widerspruch sowie Widerruf erteilter Einwilligungen. Zur Ausübung nutze bitte {_contact_or_form(legal)}."),

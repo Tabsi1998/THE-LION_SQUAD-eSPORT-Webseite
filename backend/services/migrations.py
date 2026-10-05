@@ -41,10 +41,26 @@ async def migrate_discord_webhooks_to_bot(db) -> str:
     return f"removed {', '.join(sorted(unset))}"
 
 
+async def migrate_deleted_account_leftovers(db) -> str:
+    """Konto löschen (#928): Konten, die vor diesem Stand gelöscht wurden, haben Reste hinterlassen - Eintrag im
+    Mitgliederverzeichnis, Anträge, Kopien in Anmeldungen, XP, Bilder. Einmal nachziehen, auf demselben Weg wie
+    beim Löschen selbst. (Die frühere E-Mail-Adresse ist schon überschrieben; gesucht wird über die Kennung.)"""
+    from services import account_erasure
+
+    now = datetime.now(timezone.utc).isoformat()
+    accounts = images = 0
+    async for user in db.users.find({"anonymized_at": {"$exists": True, "$ne": None}}, {"_id": 0, "id": 1}):
+        result = await account_erasure.erase_related(db, user, now)
+        accounts += 1
+        images += result["images"]
+    return f"{accounts} deleted accounts cleaned, {images} images removed"
+
+
 MIGRATIONS = (
     (1, "encrypt_legacy_integration_credentials", migrate_plaintext_secrets),
     (2, "team_leader_role_to_player", migrate_team_leader_role),
     (3, "discord_webhooks_to_bot", migrate_discord_webhooks_to_bot),
+    (4, "deleted_account_leftovers", migrate_deleted_account_leftovers),
 )
 
 
