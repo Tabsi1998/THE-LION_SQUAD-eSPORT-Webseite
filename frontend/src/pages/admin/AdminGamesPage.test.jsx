@@ -12,7 +12,7 @@ vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => async () =>
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const { default: AdminGamesPage, inheritedServerText, serverOptionLabel } = await import("./AdminGamesPage");
+const { default: AdminGamesPage, inheritedServerText, roleNamePlaceholder, serverOptionLabel } = await import("./AdminGamesPage");
 
 const GAMES = [
   { id: "g1", name: "Mario Kart 8 Deluxe", slug: "mario-kart-8", kind: "standalone", platforms: ["Switch"], supports_solo: true, supports_teams: false },
@@ -76,4 +76,22 @@ test("Bearbeiten öffnet das Seitenblatt mit den Werten; Speichern schickt das S
   fireEvent.submit(screen.getByTestId("game-sheet"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ slug: "mario-kart-8", platforms: ["Switch", "Switch 2"] })));
   await waitFor(() => expect(screen.queryByTestId("game-sheet")).toBeNull());
+});
+
+// Spiel-Rolle im Discord (#629): je Hauptspiel ein Name, leer heißt „<Kurzname>-Spieler“; Editionen haben keine eigene.
+test("Discord-Rolle: Vorgabe in Worten, Speichern schickt den Namen, leer heißt Vorgabe", async () => {
+  expect(roleNamePlaceholder({ name: "Call of Duty", short_name: "CoD" })).toBe("Discord-Rolle (leer: „CoD-Spieler“)");
+  expect(roleNamePlaceholder({ name: "Rocket League", short_name: "" })).toBe("Discord-Rolle (leer: „Rocket League-Spieler“)");
+  render(<MemoryRouter><AdminGamesPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  fireEvent.change(screen.getByTestId("game-edit-role"), { target: { value: "  MK-Crew " } });
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ discord_role_name: "MK-Crew" })));
+
+  fireEvent.click(await screen.findByTestId("game-edit-mario-kart-8"));
+  fireEvent.change(screen.getByTestId("game-edit-role"), { target: { value: "" } });
+  fireEvent.submit(screen.getByTestId("game-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenLastCalledWith("/games/g1", expect.objectContaining({ discord_role_name: null })));
+  fireEvent.change(screen.getByTestId("game-kind"), { target: { value: "edition" } });
+  expect(screen.queryByTestId("game-role")).toBeNull();
 });

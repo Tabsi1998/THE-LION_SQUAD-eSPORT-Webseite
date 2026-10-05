@@ -97,3 +97,18 @@ test("Plattformen mit Eingabe: Instanz oder Handle vor dem Start, der Wert geht 
   await user.click(screen.getByTestId("profile-bluesky-link"));
   expect(props.onLink).toHaveBeenCalledWith("bluesky", "");
 });
+
+// Spiel-Rollen im Discord (#629): nur mit verknüpftem Discord; Vorgabe an, der Schalter meldet „aus“ nach oben.
+test("Spiel-Rollen-Schalter nur mit verknüpftem Discord", async () => {
+  const user = userEvent.setup();
+  const props = renderTab();
+  expect(screen.getByTestId("profile-discord-game-roles-row")).toHaveTextContent("Vereinsrollen wie „Mitglied“ bleiben");
+  expect(screen.getByTestId("profile-discord-game-roles")).toHaveAttribute("aria-checked", "true");
+  await user.click(screen.getByTestId("profile-discord-game-roles"));
+  expect(props.set).toHaveBeenCalledWith("discord_game_roles", false);
+});
+
+test("ohne verknüpftes Discord kein Spiel-Rollen-Schalter", () => {
+  renderTab({ links: { ...LINKS, links: [] } });
+  expect(screen.queryByTestId("profile-discord-game-roles-row")).toBeNull();
+});

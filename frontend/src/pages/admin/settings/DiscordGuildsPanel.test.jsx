@@ -11,7 +11,7 @@ vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail |
 const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { DiscordGuildsPanel, guildStatusText } = await import("./DiscordGuildsPanel");
+const { DiscordGuildsPanel, guildStatusText, rolesSyncText } = await import("./DiscordGuildsPanel");
 
 const MAIN = { guild_id: "1", name: "THE LION SQUAD", role: "main", enabled: true, member_count: 120, missing_permissions: [], invite_url: "https://discord.gg/lions", note: "", games: [] };
 const SUB = { guild_id: "2", name: "Rocket League", role: "sub", enabled: false, member_count: 30, invite_url: null, note: "",
@@ -111,4 +111,28 @@ test("Unterserver: Kanäle aus seiner Liste wählen und speichern; der Hauptserv
   await user.selectOptions(select, "200000000000000001");
   await user.click(screen.getByTestId("discord-guild-2-channels-save"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/settings/discord/guilds/2", { channels: { community: "200000000000000001", news: "", events: "" } }));
+});
+
+// Rollen je Server (#629): Stand in Worten, was fehlt, Schalter „Fehlende Rollen anlegen“ - nur, wo abgeglichen wird.
+test("Rollen je Server: Stand, Fehlendes und der Schalter zum Anlegen", async () => {
+  expect(rolesSyncText(null)).toContain("noch kein Abgleich");
+  expect(rolesSyncText({ at: "2026-10-05T10:00:00Z", changes: 3, limited: true, created: ["CoD-Spieler"] })).toMatch(/^zuletzt .* · 3 Änderungen · Rest im nächsten Lauf · angelegt: CoD-Spieler$/);
+  const main = { ...MAIN, roles_sync: { at: "2026-10-05T10:00:00Z", changes: 2, missing: ["Turnierleitung"], missing_games: ["CoD-Spieler"], error: "403 Missing Permissions" } };
+  const sub = { ...SUB, enabled: true, create_roles: true };
+  apiMock.get.mockResolvedValue({ data: { guilds: [main, sub, GONE], connected: true } });
+  const user = userEvent.setup();
+  renderPanel();
+  expect(await screen.findByTestId("discord-guild-1-roles-missing")).toHaveTextContent("Fehlt im Discord: „Turnierleitung“");
+  expect(screen.getByTestId("discord-guild-1-roles-games")).toHaveTextContent("„CoD-Spieler“ – nur nötig, wenn ihr sie hier wollt");
+  expect(screen.getByTestId("discord-guild-1-roles-error")).toHaveTextContent("Missing Permissions");
+  expect(screen.getByTestId("discord-guild-2-create-roles")).toBeChecked();
+  expect(screen.queryByTestId("discord-guild-3-roles")).toBeNull();
+  await user.click(screen.getByTestId("discord-guild-1-create-roles"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/settings/discord/guilds/1", { create_roles: true }));
+});
+
+test("ausgeschalteter Unterserver: kein Rollenabgleich, also kein Rollen-Kasten", async () => {
+  renderPanel();
+  expect(await screen.findByTestId("discord-guild-1-roles")).toBeInTheDocument();
+  expect(screen.queryByTestId("discord-guild-2-roles")).toBeNull();
 });

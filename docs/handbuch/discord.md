@@ -116,9 +116,26 @@ Wer welche Rolle bekommt:
 Club-Admins und der Superadmin haben alle Bereiche – sie bekommen im Discord deshalb sowohl
 „Vorstand“ als auch „Turnierleitung“.
 
-Der Bot fasst **nur diese drei Rollen** an, nur bei **verknüpften** Konten und nur auf dem
-**Hauptserver**. Alle anderen Rollen (Spiele, Farben, Moderation …) vergebt ihr wie gewohnt selbst
-oder mit Discords eigenem „Onboarding“.
+Der Bot gleicht diese drei Rollen auf dem **Hauptserver und jedem eingeschalteten Unterserver** ab –
+überall, wo die verknüpfte Person ist. Er fasst **nur diese Rollen und die Spiel-Rollen** (unten) an,
+nur bei **verknüpften** Konten. Alle anderen Rollen (Farben, Moderation …) vergebt ihr wie gewohnt
+selbst oder mit Discords eigenem „Onboarding“.
+
+**Spiel-Rollen** (seit Oktober 2026): Wer ein Spielprofil mit Spieler-ID hat oder in einem aktiven
+Team-Kader eines Spiels steht, bekommt dessen Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels
+und am Hauptserver.
+
+- Der Name steht im Spielformular (Admin → Spiele → „Discord-Rolle“); leer heißt „<Kurzname>-Spieler“.
+  Editionen zählen für ihr Hauptspiel – es gibt eine Rolle je Hauptspiel.
+- Vergeben wird nur, was es im Discord gibt: Legt die Rolle mit genau diesem Namen an, oder hakt beim
+  Server **„Fehlende Rollen anlegen“** an (Reiter „Server“, Vorgabe aus). Dann legt der Bot fehlende
+  Vereinsrollen und die Spiel-Rollen an, die jemand bekäme – Spiel-Rollen erwähnbar.
+- Wer keine Spiel-Rollen will, schaltet sie im Profil aus (Profil → Socials → „Spiel-Rollen im
+  Discord“, in der App unter Konten). Die Vereinsrollen bleiben.
+- Der Reiter „Server“ zeigt je Server den letzten Abgleich, was fehlt und was angelegt wurde. Ein Lauf
+  ändert höchstens 500 Rollen; der Rest kommt im nächsten.
+- Achtung: Eine Rolle mit dem Namen einer Spiel-Rolle gilt als verwaltet – von Hand vergebene passt der
+  Bot beim nächsten Abgleich an.
 
 ### 2.4 Kanäle anlegen und zuordnen
 
@@ -404,7 +421,8 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
 | Meldungen (News, Events, Turniere …) | ja | **mit Spielbezug** – je Meldung einstellbar, siehe 5.4 |
 | Private Kanäle (Mitglieder, Vorstand, Betrieb, Test) | ja | gibt es dort nie |
 | Einbettungen und Discord-Termine | ja | Rangliste, nächste Termine und Turnier-Termine – nur seine Spiele (4.3, 4.5) |
-| Rollen Mitglied/Vorstand/Turnierleitung | ja | nein |
+| Rollen Mitglied/Vorstand/Turnierleitung | ja | ja, sobald eingeschaltet (2.3) |
+| Spiel-Rollen (z. B. „CoD-Spieler“) | alle Spiele | die Spiele dieses Servers (2.3) |
 | Befehle (`/turniere` …) | ja | ja, sobald eingeschaltet – mit seinen Spielen als Vorgabe (4.7) |
 | Willkommensnachricht | ja | ja (einmal je Person, egal über welchen Server) |
 | Aktivität zählen | ja | ja |
@@ -488,7 +506,8 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 | Turnier-Meldungen stehen einzeln im Kanal statt im Thread | Thread-Rechte fehlen | „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“ |
 | Einbettung am Spielserver: „Diesem Server ist noch kein Spiel zugeordnet“ | kein Spiel zeigt auf diesen Server | Spiele → Spiel bearbeiten → „Discord-Server“ |
 | Kein Termin am Spielserver | Recht „Events verwalten“ fehlt dort, oder der Server ist aus | Reiter „Server“ → „Prüfen“; Haken „an“ |
-| Rollen werden nicht vergeben | Bot-Rolle steht unter den Rollen / Rollenname weicht ab / Person nicht verknüpft | Bot-Rolle nach oben ziehen; Namen im Reiter „Bot & Aktivität“ angleichen; Person verknüpft ihr Konto |
+| Rollen werden nicht vergeben | Bot-Rolle steht unter den Rollen / Rollenname weicht ab / Person nicht verknüpft / Unterserver aus | Bot-Rolle nach oben ziehen; Namen im Reiter „Bot & Aktivität“ angleichen; Person verknüpft ihr Konto; Reiter „Server“: Haken „an“ und der Stand unter „Rollen“ |
+| Spiel-Rolle fehlt | keine Rolle mit dem Namen im Discord / Person hat Spiel-Rollen ausgeschaltet | Rolle anlegen oder „Fehlende Rollen anlegen“; Name unter Admin → Spiele |
 | Befehle erscheinen nicht | Unterserver aus; Einladung ohne `applications.commands` | Reiter „Server“: Haken „an“; „Prüfen“ sagt, ob sie registriert sind; sonst den Bot mit dem Link aus dem Reiter neu einladen |
 | Direktnachrichten kommen nicht an | Datenschutz-Einstellung der Person | Discord → Einstellungen → Datenschutz → „Direktnachrichten von Servermitgliedern erlauben“ |
 | Auf der Website keine Discord-Zahl | Server-Widget aus, oder niemand online | Servereinstellungen → Widget → aktivieren; „Jetzt prüfen“ |
