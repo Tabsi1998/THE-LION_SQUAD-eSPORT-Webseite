@@ -12,10 +12,13 @@ from webauthn.helpers import bytes_to_base64url
 from routes import passkey_routes as routes
 from test_passkeys_unit import authentication_credential, enroll, make_setup, registration_credential
 
-UPLOAD_HASH, PLAY_HASH = routes.DEFAULT_APK_KEY_HASHES.split(",")
-# Die APK vom Vereinsserver (Upload-Schlüssel) und die Play-Version (Googles App-Signaturschlüssel, #219).
+UPLOAD_HASH, PLAY_HASH, PLAY_SIGNING_HASH = routes.DEFAULT_APK_KEY_HASHES.split(",")
+# Die APK vom Vereinsserver (Upload-Schlüssel), der am 23.09. eingetragene Play-Schlüssel (#394) und der Schlüssel,
+# den ein Handy mit der Play-Fassung wirklich meldet (#945, genau so aus dem Server-Log).
 APP_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(UPLOAD_HASH.replace(":", "")))
 PLAY_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(PLAY_HASH.replace(":", "")))
+# So stand sie im Server-Log (#945): "android:apk-key-hash:waL_NWwF…" - aus dem Fingerabdruck berechnet, nicht als Text.
+PLAY_SIGNING_ORIGIN = "android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(PLAY_SIGNING_HASH.replace(":", "")))
 
 
 @pytest.fixture
@@ -24,7 +27,7 @@ def setup(monkeypatch):
 
 
 def test_app_origins_come_from_the_signing_key_hashes(monkeypatch):
-    assert routes.mobile_origins() == [APP_ORIGIN, PLAY_ORIGIN], "Server-APK und Play-Version sind beide erlaubt"
+    assert routes.mobile_origins() == [APP_ORIGIN, PLAY_ORIGIN, PLAY_SIGNING_ORIGIN], "Server-APK und Play-Version sind erlaubt"
     assert APP_ORIGIN.startswith("android:apk-key-hash:b2mi") and "=" not in APP_ORIGIN, "base64url ohne Füllzeichen"
     assert PLAY_ORIGIN.startswith("android:apk-key-hash:HRB6") and PLAY_ORIGIN != APP_ORIGIN
     monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98, " + "ab" * 32 + ",kaputt")
@@ -240,3 +243,33 @@ def test_app_passkey_from_a_foreign_key_is_rejected_with_the_reason(setup, monke
         assert db.passkeys.rows == []
     asyncio.run(scenario())
     assert any("App-Passkey abgelehnt" in line and "client data origin" in line for line in warnings)
+
+
+def test_the_play_version_creates_and_uses_a_passkey_with_the_key_google_signs_with(setup, monkeypatch):
+    """#945: Die Play-Fassung meldet den Schlüssel C1:A2…, mit dem Google sie signiert - genau diese Herkunft aus dem
+    Server-Log legt einen Passkey an und meldet mit ihm an."""
+    async def scenario():
+        _db, user, request, _issue = setup
+        monkeypatch.setattr(routes, "_issue_mobile_session", AsyncMock(return_value=("zugang", "erneuerung")))
+        monkeypatch.setattr(routes, "_public_user", lambda row: {"id": row["id"]})
+        assert PLAY_SIGNING_ORIGIN.startswith("android:apk-key-hash:waL_NWwF") and PLAY_SIGNING_ORIGIN.endswith("lfULqE"), "wie im Log"
+        start = await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="correct-password", name="Galaxy"), request, user)
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        credential = registration_credential(start["options"], private_key, origin=PLAY_SIGNING_ORIGIN)
+        assert await routes.mobile_registration_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"]), request, user) == {"ok": True}
+        login = await routes.mobile_login_options(request)
+        session = await routes.mobile_login_verify(routes.MobileCredentialResponse(
+            credential=authentication_credential(login["options"], private_key, origin=PLAY_SIGNING_ORIGIN), ticket=login["ticket"]), request)
+        assert session["access_token"] == "zugang"
+    asyncio.run(scenario())
+
+
+def test_assetlinks_names_every_app_key():
+    """#945: Android prüft beim Google Passwortmanager die Verbindung App ↔ Domain über assetlinks.json - jeder Schlüssel
+    der App muss dort stehen, sonst scheitert der Passkey schon am Handy."""
+    import json
+    import pathlib
+
+    links = json.loads((pathlib.Path(__file__).resolve().parents[2] / "frontend" / "public" / ".well-known" / "assetlinks.json").read_text(encoding="utf-8"))
+    fingerprints = {item for entry in links for item in entry["target"]["sha256_cert_fingerprints"]}
+    assert set(routes.DEFAULT_APK_KEY_HASHES.split(",")) <= fingerprints

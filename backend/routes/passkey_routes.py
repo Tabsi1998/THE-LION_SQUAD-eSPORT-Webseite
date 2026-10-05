@@ -38,15 +38,19 @@ router = APIRouter(prefix="/api/auth/passkeys", tags=["passkeys"])
 logger = logging.getLogger("tls.passkeys")
 
 # App-Herkunft (#217 Stufe 2): Android nennt statt einer https-Adresse den SHA-256 des
-# Signaturschlüssels der App (base64url, ohne Füllzeichen). Standard sind zwei Schlüssel: der
-# Upload-Schlüssel seit Build 57 (APK vom Vereinsserver) und seit 23.09. der Schlüssel, mit dem
-# Google Play die App für die Nutzer signiert (Play App Signing, #219). Weitere Hashes (etwa ein
-# Debug-Zertifikat auf einem Testserver) kommen über die Umgebung, mit oder ohne Doppelpunkte.
-# (Die Fingerabdrücke sind öffentlich - sie stehen in assetlinks.json; die Doppelpunkte sind die
-# Schreibweise der Android-Werkzeuge.)
+# Signaturschlüssels der App (base64url, ohne Füllzeichen). Standard sind:
+# - der Upload-Schlüssel seit Build 57 (APK vom Vereinsserver),
+# - der am 23.09. als Play-Schlüssel eingetragene Fingerabdruck (#394) - bleibt, bis die Play Console
+#   zeigt, ob er ein älterer Schlüssel ist,
+# - der Schlüssel, mit dem Google Play die App tatsächlich signiert: so meldet ihn ein Handy mit der
+#   Play-Fassung (Server-Log vom 05.10., #945).
+# Weitere Hashes (etwa ein Debug-Zertifikat auf einem Testserver) kommen über die Umgebung, mit oder
+# ohne Doppelpunkte. (Die Fingerabdrücke sind öffentlich - sie stehen in assetlinks.json; die
+# Doppelpunkte sind die Schreibweise der Android-Werkzeuge.)
 DEFAULT_APK_KEY_HASHES = (
     "6F:69:A2:89:E8:A4:C7:3E:21:53:35:5A:9F:24:90:64:D1:2B:2F:98:E7:8A:30:72:E9:84:D1:18:0E:1D:CB:98,"
-    "1D:10:7A:DD:2E:64:AF:1B:04:E4:87:5D:A9:26:6B:F9:65:63:2A:91:F8:54:AF:B8:90:8F:FB:56:A2:EC:BA:26"
+    "1D:10:7A:DD:2E:64:AF:1B:04:E4:87:5D:A9:26:6B:F9:65:63:2A:91:F8:54:AF:B8:90:8F:FB:56:A2:EC:BA:26,"
+    "C1:A2:FF:35:6C:05:CB:FB:F8:A3:7F:92:6D:A2:6E:DB:4F:E4:61:83:F1:96:08:9C:E2:A1:15:9A:57:D4:2E:A1"
 )
 
 
