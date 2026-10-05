@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 
 from services.ops_alerts import alert_due
 from services.ops_checks import (
+    behind_proxy,
+    rate_client_ip,
     rate_database,
     rate_disk,
     rate_error_groups,
@@ -127,3 +129,14 @@ def test_aggregation_gives_median_p75_and_the_good_share_per_route():
     assert galerie["worst"] == "needs-improvement"
     assert out["overall"]["LCP"]["count"] == 5
     assert out["samples"] == 8
+
+
+def test_the_client_address_check_turns_yellow_when_only_the_proxy_is_seen():
+    """#941: alle Sitzungen von einer Adresse oder nur aus Proxy-Netzen - dann gelten die Bremsen je Adresse für alle."""
+    assert rate_client_ip(4, 1, 4) == "ok", "wenige Sitzungen sagen nichts"
+    assert rate_client_ip(13, 1, 0) == "warn", "13 Geräte, eine Adresse"
+    assert rate_client_ip(13, 4, 13) == "warn", "mehrere Adressen, aber alle aus dem Netz eines Proxys"
+    assert rate_client_ip(13, 9, 2) == "ok"
+    assert behind_proxy("192.168.2.100") and behind_proxy("172.18.0.3") and behind_proxy("127.0.0.1")
+    assert behind_proxy("104.16.1.1") and behind_proxy("2606:4700::1111"), "Cloudflare"
+    assert not behind_proxy("88.117.10.20") and not behind_proxy("2a02:8388::1") and not behind_proxy("unknown")

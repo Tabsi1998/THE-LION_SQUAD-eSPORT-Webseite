@@ -9,7 +9,7 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 | System → Betrieb & Logs → **Fehler** | Gruppen unbehandelter Serverfehler und Antworten mit Status 5xx (ohne Namen, Adressen, Tokens) | `ops_errors`, 30 Tage |
 | System → Betrieb & Logs → **Tempo** | Anfragen über der Schwelle (Route, Dauer) | `ops_slow_requests` |
 | System → Betrieb & Logs → **Vitals** | Ladezeiten aus dem Browser je Route (LCP, INP, CLS, TTFB), anonym | `ops_vitals` |
-| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen | `ops_check_runs` |
+| System → Betrieb & Logs → **Checks** | Auto-Checks alle fünf Minuten: Datenbank, Speicher, Mail-Queue, Twitch, Dolibarr, Fehlergruppen, Besucher-Adresse | `ops_check_runs` |
 | System → Betrieb & Logs → **Alarme** | Wer bei welchem Ereignis eine Meldung bekommt, Sperrfrist, Testalarm, Aufbewahrung, letzte Alarme | `settings/ops_alerts`, `ops_alert_log` |
 | System → Betrieb & Logs → **Überblick** | Je Quelle Zähler und Auffälligkeiten, die neuesten Probleme der letzten sieben Tage | Sammelsicht |
 | System → Betrieb & Logs → **Ereignisse** | Alle Quellen in einer Liste: Serverfehler, Auto-Checks, Alarme, App-Logs, E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot – Filter nach Quelle, Schwere, Zeitraum, Text; „Als CSV“ | `GET /api/admin/ops/events` |
@@ -19,6 +19,26 @@ Was die Website über sich selbst festhält, wo es steht und wann sie sich melde
 Die früheren Seiten Logs, Audit Logs, App-Logs und Versandlogs leiten auf die passenden Reiter um
 (`/admin/logs` → Ereignisse, `/admin/audit` → Ereignisse mit Quelle Adminaktionen, `/admin/mobile-logs`
 → App-Logs, `/admin/settings/mail-logs` → Ereignisse mit Quelle E-Mail).
+
+## Besucher-Adresse: sieht der Server die Besucher oder nur den Proxy? (#941)
+
+Die Prüfung „Besucher-Adresse“ unter Checks liest die Sitzungen der letzten 24 Stunden. Kommen alle von
+einer einzigen Adresse oder nur aus privaten Netzen bzw. denen von Cloudflare, steht sie auf Gelb: der
+Server sieht dann den Proxy statt der Besucher, und jede Bremse je Adresse (Registrierung fünfmal je
+Stunde, Passwort vergessen, Zwei-Faktor) gilt für alle gemeinsam. In der Sitzungsliste im Profil steht
+in dem Fall bei jedem Gerät dieselbe Adresse.
+
+So wird es richtig, wenn der Nginx Proxy Manager auf einem anderen Rechner läuft:
+
+1. Server-`.env`: `TRUSTED_PROXY_CIDRS` um die Adresse des Proxy-Rechners ergänzen
+   (`…,172.16.0.0/12,<Adresse des Proxys>/32`), danach `docker compose up -d backend`.
+2. Nur mit Cloudflare davor (orange Wolke): Proxy Manager → Host → Advanced →
+   `real_ip_header CF-Connecting-IP;` und je Netz von Cloudflare eine Zeile `set_real_ip_from …;`
+   (Liste: cloudflare.com/ips). Mit grauer Wolke braucht es den Block nicht.
+
+Gelb ist kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa am Vereinsabend.
+Cloudflare lässt je Anfrage höchstens 100 MB durch – größere Uploads enden mit 413, egal was im Proxy
+Manager eingestellt ist (Ausweg: der Upload-Host ohne Cloudflare, `OPERATIONS.md`).
 
 ## Alarme (#517)
 
