@@ -5,6 +5,7 @@ import {
   listPasskeys,
   passkeyCreateError,
   passkeyError,
+  passkeyName,
   passkeysAvailable,
   passkeysSupported,
   removePasskey,
@@ -64,7 +65,7 @@ test("Gerätefehler in Sätzen; Serverantworten wörtlich; sonst der Rückfall",
 test("anlegen mit Ticket oder Passwort, entfernen mit Passwort, Liste und Verfügbarkeit vom Server", async () => {
   mockPost.mockResolvedValueOnce({ data: { ticket: "reg-1", options: { challenge: "c" } } }).mockResolvedValueOnce({ data: { ok: true } });
   await createPasskey({ enrollTicket: "enroll-1" });
-  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "enroll-1", current_password: "", name: "LionsAPP (Android)" });
+  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "enroll-1", current_password: "", name: "LionsAPP · Android" });
   expect(Passkey.create).toHaveBeenCalledWith({ challenge: "c" });
   expect(mockPost).toHaveBeenNthCalledWith(2, "/auth/passkeys/mobile/register/verify", {
     ticket: "reg-1",
@@ -104,4 +105,12 @@ test("still fragt die App nur nach sofort verfügbaren Passkeys", async () => {
   await signInWithPasskey(true, true);
   expect(Passkey.getImmediate).toHaveBeenCalledWith(OPTIONS);
   expect(Passkey.get).not.toHaveBeenCalled();
+});
+
+// Gerätename im Passkey (#939): man sieht in der Liste, welches Handy welcher ist.
+test("der Name des Passkeys nennt das Gerät; ohne Gerätenamen „Android“", () => {
+  expect(passkeyName("Galaxy S26 Ultra")).toBe("LionsAPP · Galaxy S26 Ultra");
+  expect(passkeyName("  Pixel   9 ")).toBe("LionsAPP · Pixel 9");
+  expect(passkeyName(null)).toBe("LionsAPP · Android");
+  expect(passkeyName("x".repeat(100)).length).toBeLessThanOrEqual(80);
 });

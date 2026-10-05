@@ -1,6 +1,7 @@
 """Passkey-Anmeldung aus der App (#217 Stufe 2): derselbe Passkey wie auf der Website, die Herkunft ist
 der Signaturschlüssel der App, das Ticket ersetzt den Cookie, die Antwort ist eine App-Sitzung."""
 import asyncio
+import base64
 from unittest.mock import AsyncMock
 
 import pytest
@@ -193,3 +194,49 @@ def test_no_enroll_ticket_without_app_passkeys(setup, monkeypatch):
     db, _user, _request, _issue = setup
     monkeypatch.setenv("PASSKEY_APK_KEY_HASHES", "")
     assert asyncio.run(routes.issue_enroll_ticket(db, "user-1")) is None
+
+
+@pytest.mark.parametrize("spelling", ["standard_padded", "urlsafe_padded", "standard"])
+def test_app_passkey_accepts_other_spellings_of_the_signing_key_hash(setup, monkeypatch, spelling):
+    """#938: Google schreibt den Schlüssel-Hash der App base64url ohne Füllzeichen; andere Anbieter (etwa Samsung Pass)
+    womöglich mit Füllzeichen oder im Standard-Base64, dazu die Kennung anders. Dieselben Bytes zählen - beim Anlegen und
+    beim Anmelden."""
+    async def scenario():
+        _db, user, request, _issue = setup
+        monkeypatch.setattr(routes, "_issue_mobile_session", AsyncMock(return_value=("zugang", "erneuerung")))
+        monkeypatch.setattr(routes, "_public_user", lambda row: {"id": row["id"]})
+        raw = bytes.fromhex(PLAY_HASH.replace(":", ""))
+        text = {"standard_padded": base64.b64encode(raw).decode(), "urlsafe_padded": base64.urlsafe_b64encode(raw).decode(),
+                "standard": base64.b64encode(raw).decode().rstrip("=")}[spelling]
+        origin = "android:apk-key-hash:" + text
+        assert origin != PLAY_ORIGIN
+        start = await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="correct-password", name="Galaxy"), request, user)
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        credential = registration_credential(start["options"], private_key, origin=origin)
+        identifier = credential["rawId"]
+        credential["rawId"] = base64.b64encode(base64.urlsafe_b64decode(identifier + "=" * (-len(identifier) % 4))).decode()
+        done = await routes.mobile_registration_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"]), request, user)
+        assert done == {"ok": True}
+        login = await routes.mobile_login_options(request)
+        session = await routes.mobile_login_verify(routes.MobileCredentialResponse(
+            credential=authentication_credential(login["options"], private_key, origin=origin), ticket=login["ticket"]), request)
+        assert session["access_token"] == "zugang"
+    asyncio.run(scenario())
+
+
+def test_app_passkey_from_a_foreign_key_is_rejected_with_the_reason(setup, monkeypatch):
+    """#938: Ein fremder Signaturschlüssel bleibt draußen - der Grund steht im Log und kurz in der Meldung."""
+    warnings = []
+    monkeypatch.setattr(routes.logger, "warning", lambda message, *args: warnings.append(message % args))
+
+    async def scenario():
+        db, user, request, _issue = setup
+        start = await routes.mobile_registration_options(routes.MobileRegistrationStart(current_password="correct-password"), request, user)
+        foreign = "android:apk-key-hash:" + bytes_to_base64url(b"" * 32)
+        credential = registration_credential(start["options"], ec.generate_private_key(ec.SECP256R1()), origin=foreign)
+        with pytest.raises(HTTPException) as error:
+            await routes.mobile_registration_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"]), request, user)
+        assert error.value.status_code == 400 and "(Herkunft der App passt nicht)" in error.value.detail
+        assert db.passkeys.rows == []
+    asyncio.run(scenario())
+    assert any("App-Passkey abgelehnt" in line and "client data origin" in line for line in warnings)

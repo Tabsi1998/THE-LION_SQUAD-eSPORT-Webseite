@@ -1,3 +1,4 @@
+import * as Device from "expo-device";
 import { Passkey, type PasskeyCreateRequest, type PasskeyGetRequest, type PasskeyGetResult } from "react-native-passkey";
 import { api } from "./api";
 import type { AuthResponse } from "../types";
@@ -63,9 +64,10 @@ export type PasskeyRow = { id: string; name: string; created_at?: string | null;
 
 export type PasskeyProof = { enrollTicket?: string; password?: string };
 
-/** Ein Gerätename für den neuen Passkey - damit man ihn unter Sicherheit wiedererkennt. */
-export function passkeyName(): string {
-  return "LionsAPP (Android)";
+/** Ein Name für den neuen Passkey mit dem Gerät (#939) - in der Liste sieht man, welches Handy welcher ist. */
+export function passkeyName(model: string | null | undefined = Device.modelName): string {
+  const device = String(model || "").replace(/\s+/g, " ").trim().slice(0, 60);
+  return `LionsAPP · ${device || "Android"}`;
 }
 
 /** Ob es Passkeys in der App gibt: das Gerät kann sie und der Server bietet sie für die App an (sonst 503). */

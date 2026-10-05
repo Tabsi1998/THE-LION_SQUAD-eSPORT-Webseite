@@ -1,6 +1,9 @@
 """Website passkey enrollment and login using verified WebAuthn ceremonies."""
+import base64
+import binascii
 import json
 import ipaddress
+import logging
 import os
 import re
 import secrets
@@ -32,6 +35,7 @@ from routes.auth_routes import (
 from services.rate_limit import enforce_rate_limit
 
 router = APIRouter(prefix="/api/auth/passkeys", tags=["passkeys"])
+logger = logging.getLogger("tls.passkeys")
 
 # App-Herkunft (#217 Stufe 2): Android nennt statt einer https-Adresse den SHA-256 des
 # Signaturschlüssels der App (base64url, ohne Füllzeichen). Standard sind zwei Schlüssel: der
@@ -46,13 +50,69 @@ DEFAULT_APK_KEY_HASHES = (
 )
 
 
+APK_ORIGIN_PREFIX = "android:apk-key-hash:"
+
+
 def mobile_origins() -> list[str]:
     origins = []
     for item in os.environ.get("PASSKEY_APK_KEY_HASHES", DEFAULT_APK_KEY_HASHES).split(","):
         clean = item.strip().lower().replace(":", "")
         if re.fullmatch(r"[0-9a-f]{64}", clean):
-            origins.append("android:apk-key-hash:" + bytes_to_base64url(bytes.fromhex(clean)))
+            origins.append(APK_ORIGIN_PREFIX + bytes_to_base64url(bytes.fromhex(clean)))
     return origins
+
+
+def accepted_mobile_origins() -> list[str]:
+    """Jede Schreibweise der App-Herkunft (#938): Google schreibt den Schlüssel-Hash base64url ohne Füllzeichen, andere
+    Passkey-Anbieter (etwa Samsung Pass) womöglich mit Füllzeichen oder im Standard-Base64. py_webauthn vergleicht
+    Zeichen für Zeichen - dieselben 32 Bytes sollen zählen, egal wie geschrieben."""
+    accepted = []
+    for origin in mobile_origins():
+        raw = base64url_to_bytes(origin[len(APK_ORIGIN_PREFIX):])
+        standard = base64.b64encode(raw).decode()
+        urlsafe = base64.urlsafe_b64encode(raw).decode()
+        for text in (urlsafe.rstrip("="), urlsafe, standard, standard.rstrip("=")):
+            if APK_ORIGIN_PREFIX + text not in accepted:
+                accepted.append(APK_ORIGIN_PREFIX + text)
+    return accepted
+
+
+def _b64_any(value) -> bytes:
+    """base64 oder base64url, mit oder ohne Füllzeichen."""
+    text = str(value or "").strip().replace("-", "+").replace("_", "/")
+    return base64.b64decode(text + "=" * (-len(text) % 4), validate=True)
+
+
+def _normalized_credential(credential: dict) -> dict:
+    """Die Antwort eines Geräts so, wie py_webauthn sie erwartet (#938): Kennung und rawId aus denselben Bytes in
+    base64url, eine unbekannte authenticatorAttachment fällt weg. Der Inhalt bleibt unberührt."""
+    fixed = dict(credential or {})
+    try:
+        raw = _b64_any(fixed.get("rawId") or fixed.get("id"))
+    except (binascii.Error, ValueError):
+        return fixed
+    if raw:
+        fixed["id"] = fixed["rawId"] = bytes_to_base64url(raw)
+    if fixed.get("authenticatorAttachment") not in (None, "platform", "cross-platform"):
+        fixed.pop("authenticatorAttachment", None)
+    return fixed
+
+
+REJECTION_REASONS = (
+    ("client data origin", "Herkunft der App passt nicht"),
+    ("RP ID hash", "Domain passt nicht"),
+    ("User verification", "Fingerabdruck oder Displaysperre fehlt"),
+    ("challenge", "Anfrage passt nicht"),
+    ("id and raw_id", "Kennung passt nicht"),
+)
+
+
+def _rejected(kind: str, exc: Exception) -> str:
+    """Den Grund einer Ablehnung ins Server-Log (#938) und kurz für die Meldung - sonst sieht man nur „nicht bestätigt“."""
+    cause = exc.__cause__
+    logger.warning("[passkeys] %s abgelehnt: %s%s", kind, exc, f" | {cause}" if cause else "")
+    text = str(exc)
+    return next((f" ({reason})" for needle, reason in REJECTION_REASONS if needle in text), "")
 
 
 class PasswordProof(BaseModel):
@@ -253,6 +313,7 @@ async def _verified_login_user(db, body: CredentialResponse, challenge: dict, rp
         if handle and base64url_to_bytes(handle) != key["user_id"].encode():
             raise ValueError("User handle mismatch")
     except Exception as exc:
+        _rejected("Anmeldung", exc)
         raise HTTPException(401, "Passkey-Anmeldung fehlgeschlagen.") from exc
     updated = await db.passkeys.update_one({"_id": identifier, "sign_count": key["sign_count"]}, {
         "$set": {"sign_count": verified.new_sign_count, "last_used_at": now_utc()},
@@ -319,7 +380,8 @@ async def mobile_login_verify(body: MobileCredentialResponse, request: Request):
     })
     if not challenge:
         raise HTTPException(401, "Passkey-Anfrage abgelaufen oder bereits verwendet. Bitte erneut starten.")
-    user = await _verified_login_user(db, body, challenge, config["rp_id"], mobile_origins())
+    body.credential = _normalized_credential(body.credential)
+    user = await _verified_login_user(db, body, challenge, config["rp_id"], accepted_mobile_origins())
     await _security_audit(db, user["id"], "auth.passkey.login", request)
     # Gerätesperre vorgezeigt (require_user_verification) - wie im Web zählt das als zweiter Faktor (#358).
     access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)
@@ -389,6 +451,7 @@ async def mobile_registration_verify(body: MobileCredentialResponse, request: Re
     config = _mobile_config()
     db = get_db()
     await enforce_rate_limit(request, "passkey:register-verify", limit=15, window_seconds=900, subject=user["id"])
+    body.credential = _normalized_credential(body.credential)
     _credential_id(body)
     challenge = await db.passkey_challenges.find_one_and_delete({
         "_id": hash_token(body.ticket), "kind": "mobile-register", "user_id": user["id"], "expires_at": {"$gt": now_utc()},
@@ -399,9 +462,10 @@ async def mobile_registration_verify(body: MobileCredentialResponse, request: Re
     try:
         verified = await run_in_threadpool(verify_registration_response, credential=body.credential,
             expected_challenge=base64url_to_bytes(challenge["challenge"]), expected_rp_id=config["rp_id"],
-            expected_origin=mobile_origins(), require_user_verification=True)
+            expected_origin=accepted_mobile_origins(), require_user_verification=True)
     except Exception as exc:
-        raise HTTPException(400, "Passkey konnte nicht bestätigt werden. Bitte erneut starten.") from exc
+        reason = _rejected("App-Passkey", exc)
+        raise HTTPException(400, f"Passkey konnte nicht bestätigt werden{reason}. Bitte erneut starten.") from exc
     try:
         await db.passkeys.insert_one({
             "_id": bytes_to_base64url(verified.credential_id), "user_id": user["id"],

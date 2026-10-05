@@ -8,7 +8,9 @@ import { createPasskey, listPasskeys, passkeyCreateError, passkeysSupported, sil
 import { colors } from "../theme";
 
 // Passkey-Einladung (#919): direkt nach einer Anmeldung mit Passwort - hat das Konto noch keinen Passkey und kann das Gerät
-// welche, lädt die App einmal ein. Angelegt wird mit dem Ticket der Anmeldung, ohne das Passwort noch einmal zu verlangen.
+// welche, lädt die App einmal ein. Hat das Konto schon welche anderswo (etwa am PC mit Windows Hello), aber dieses Handy
+// keinen, lädt sie auch ein (#939).
+// Angelegt wird mit dem Ticket der Anmeldung, ohne das Passwort noch einmal zu verlangen.
 // „Später“ blendet die Einladung für dieses Konto auf diesem Gerät aus; anlegen geht dann im Profil unter „Einstellungen“.
 
 export function inviteKey(userId: string) {
@@ -22,6 +24,7 @@ export function PasskeyInvite() {
   const [message, setMessage] = useState("");
   const [cancelled, setCancelled] = useState(false);
   const [done, setDone] = useState(false);
+  const [elsewhere, setElsewhere] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -29,8 +32,13 @@ export function PasskeyInvite() {
     (async () => {
       try {
         if ((await SecureStore.getItemAsync(inviteKey(passkeyOffer.userId))) === "true") return;
-        if ((await listPasskeys()).length) return;
-        if (alive) setVisible(true);
+        const rows = await listPasskeys();
+        // Mehrere Passkeys (#939): mit Passkeys anderswo nur, wenn die stille Abfrage auf diesem Gerät keinen fand.
+        if (rows.length && !passkeyOffer.deviceWithout) return;
+        if (alive) {
+          setElsewhere(rows.length > 0);
+          setVisible(true);
+        }
       } catch {
         // Ohne Antwort keine Einladung - sie kommt beim nächsten Anmelden wieder.
       }
@@ -75,8 +83,12 @@ export function PasskeyInvite() {
             </>
           ) : (
             <>
-              <Heading>Nächstes Mal nur mit Fingerabdruck?</Heading>
-              <Body>Mit einem Passkey meldest du dich ohne Passwort an – mit Fingerabdruck, Gesicht oder Displaysperre. Er zählt auch als zweiter Faktor.</Body>
+              <Heading>{elsewhere ? "Auch auf diesem Handy mit Fingerabdruck?" : "Nächstes Mal nur mit Fingerabdruck?"}</Heading>
+              <Body>
+                {elsewhere
+                  ? "Dein Konto hat schon einen Passkey auf einem anderen Gerät. Leg auch für dieses Handy einen an – dann meldest du dich hier ohne Passwort an, mit Fingerabdruck, Gesicht oder Displaysperre."
+                  : "Mit einem Passkey meldest du dich ohne Passwort an – mit Fingerabdruck, Gesicht oder Displaysperre. Er zählt auch als zweiter Faktor."}
+              </Body>
               {message ? <Text style={cancelled ? styles.hint : styles.error}>{message}</Text> : null}
               <Button label={busy ? "Wird angelegt ..." : "Passkey anlegen"} onPress={create} disabled={busy} testID="passkey-invite-create" />
               <Pressable onPress={later} disabled={busy} style={styles.later} testID="passkey-invite-later">

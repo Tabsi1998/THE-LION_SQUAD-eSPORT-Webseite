@@ -30,7 +30,7 @@ test("ohne Passkey lädt die App ein; „Passkey anlegen“ nimmt das Ticket der
 
   await fireEvent.press(screen.getByTestId("passkey-invite-create"));
   await waitFor(() => expect(screen.getByText("Passkey angelegt")).toBeTruthy());
-  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "enroll-1", current_password: "", name: "LionsAPP (Android)" });
+  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "enroll-1", current_password: "", name: "LionsAPP · Android" });
   expect(Passkey.create).toHaveBeenCalledWith({ challenge: "c" });
   expect(mockPost).toHaveBeenNthCalledWith(2, "/auth/passkeys/mobile/register/verify", expect.objectContaining({ ticket: "reg-1" }));
   expect(mockAuth.clearPasskeyOffer).toHaveBeenCalled();
@@ -86,4 +86,13 @@ test("abgebrochen am Gerät: ein ruhiger Satz mit dem Weg ins Profil; ohne Offer
   await render(<PasskeyInvite />);
   expect(mockGet).not.toHaveBeenCalled();
   expect(screen.queryByTestId("passkey-invite")).toBeNull();
+});
+
+// Mehrere Passkeys (#939): Passkey am PC, keiner auf diesem Handy - dann trotzdem einladen, mit eigenem Satz.
+test("Passkey anderswo, keiner auf diesem Handy: „Auch auf diesem Handy …“", async () => {
+  mockGet.mockResolvedValue({ data: [{ id: "cred-pc", name: "Windows Hello" }] });
+  mockAuth.passkeyOffer = { ticket: "enroll-3", userId: "u-1", deviceWithout: true } as never;
+  await render(<PasskeyInvite />);
+  await waitFor(() => expect(screen.getByText("Auch auf diesem Handy mit Fingerabdruck?")).toBeTruthy());
+  expect(screen.getByText(/schon einen Passkey auf einem anderen Gerät/)).toBeTruthy();
 });

@@ -24,7 +24,7 @@ beforeEach(() => {
   mockPost.mockImplementation(async (url: string) => {
     if (url.endsWith("/register/options")) return { data: { ticket: "reg-1", options: { challenge: "c" } } };
     if (url.endsWith("/register/verify")) {
-      rows = [{ id: "cred-app", name: "LionsAPP (Android)", created_at: "2026-10-05T10:00:00Z", last_used_at: null }, WEB];
+      rows = [{ id: "cred-app", name: "LionsAPP · Android", created_at: "2026-10-05T10:00:00Z", last_used_at: null }, WEB];
     }
     if (url.endsWith("/remove")) rows = rows.filter((row) => !url.includes(row.id));
     return { data: { ok: true } };
@@ -49,8 +49,8 @@ test("anlegen: erst das Passwort, dann der Fingerabdruck - der neue Passkey steh
   await fireEvent.changeText(screen.getByLabelText("Aktuelles Passwort"), "geheim-42");
   await fireEvent.press(screen.getByTestId("passkey-confirm"));
 
-  await waitFor(() => expect(screen.getByText("LionsAPP (Android)")).toBeTruthy());
-  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "", current_password: "geheim-42", name: "LionsAPP (Android)" });
+  await waitFor(() => expect(screen.getByText("LionsAPP · Android")).toBeTruthy());
+  expect(mockPost).toHaveBeenNthCalledWith(1, "/auth/passkeys/mobile/register/options", { enroll_ticket: "", current_password: "geheim-42", name: "LionsAPP · Android" });
   expect(Passkey.create).toHaveBeenCalledWith({ challenge: "c" });
   expect(screen.getByTestId("passkeys-message").props.children).toMatch(/Passkey angelegt/);
   expect(screen.queryByLabelText("Aktuelles Passwort")).toBeNull();

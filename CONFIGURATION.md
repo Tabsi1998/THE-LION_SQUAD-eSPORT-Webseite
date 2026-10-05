@@ -49,8 +49,11 @@ Mit `false` lassen sich Einrichtung und Anmeldung abschalten.
 
 **In der App (#919)** gelten dieselben Passkeys. Die App fragt beim Öffnen von „Anmelden“ selbst
 nach einem vorhandenen Passkey; gibt es keinen, bleibt das Formular still. Nach einer Anmeldung mit
-Passwort lädt sie einmal ein, einen anzulegen – dafür bekommt sie mit der Anmeldung ein Ticket
-(zehn Minuten, einmal, nur für dieses Konto) und fragt das Passwort nicht noch einmal. Anlegen und
+Passwort lädt sie einmal ein, einen anzulegen – auch wenn das Konto schon einen auf einem anderen
+Gerät hat, dieses Handy aber keinen (#939). Dafür bekommt sie mit der Anmeldung ein Ticket (zehn
+Minuten, gilt bis zum fertigen Passkey, nur für dieses Konto) und fragt das Passwort nicht noch einmal.
+Lehnt der Server einen Passkey ab, steht der Grund im Backend-Log (`[passkeys] … abgelehnt: …`) und kurz in
+der Meldung; jede Schreibweise des Schlüssel-Hashes (Google, Samsung Pass …) zählt (#938). Anlegen und
 Entfernen später unter **Profil → Einstellungen → Passkeys**, beides mit dem aktuellen Passwort.
 Die App-Herkünfte (Signaturschlüssel der Server-APK und der Play-Fassung) sind eingebaut;
 `PASSKEY_APK_KEY_HASHES` ersetzt sie, leer schaltet Passkeys nur in der App ab – dann bietet die App

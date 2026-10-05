@@ -58,7 +58,20 @@ test("Passwort-Anmeldung geht zurück, woher man kam; ohne Passkey-Unterstützun
   await fireEvent.changeText(screen.getByLabelText("Passwort"), "geheim");
   await fireEvent.press(screen.getByText("Anmelden"));
   await waitFor(() => expect(navigation.goBack).toHaveBeenCalledTimes(1));
-  expect(mockLogin).toHaveBeenCalledWith("paula@club-mail.at", "geheim", true);
+  expect(mockLogin).toHaveBeenCalledWith("paula@club-mail.at", "geheim", true, false);
   await fireEvent.press(screen.getByText("Noch keinen Account? Registrieren"));
   expect(navigation.navigate).toHaveBeenCalledWith("Register");
+});
+
+// Mehrere Passkeys (#939): fand die stille Abfrage auf diesem Handy keinen, sagt die Anmeldung das weiter - die App lädt
+// dann ein, auch wenn das Konto anderswo schon einen hat.
+test("kein Passkey auf diesem Gerät: die Passwort-Anmeldung meldet es für die Einladung", async () => {
+  mockLoginWithPasskey.mockRejectedValueOnce({ error: "NoCredentials" });
+  mockLogin.mockResolvedValueOnce({ mfaRequired: false });
+  await render(<LoginScreen navigation={navigation} />);
+  await waitFor(() => expect(mockLoginWithPasskey).toHaveBeenCalledWith(true, true));
+  await fireEvent.changeText(screen.getByLabelText("E-Mail"), "paula@club-mail.at");
+  await fireEvent.changeText(screen.getByLabelText("Passwort"), "geheim");
+  await fireEvent.press(screen.getByText("Anmelden"));
+  await waitFor(() => expect(mockLogin).toHaveBeenCalledWith("paula@club-mail.at", "geheim", true, true));
 });

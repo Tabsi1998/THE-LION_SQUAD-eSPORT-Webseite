@@ -29,6 +29,9 @@ export function LoginScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false);
   // Erst nach einem Abbruch (oder Fehler) gibt es den kleinen Link - ohne Passkey auf dem Gerät gar nichts.
   const [passkeyLink, setPasskeyLink] = useState(false);
+  // Was die stille Abfrage auf diesem Gerät fand (#939): „none“ = kein Passkey hier - dann lädt die App nach der
+  // Passwort-Anmeldung ein, auch wenn das Konto anderswo (etwa am PC) schon einen hat.
+  const [deviceMiss, setDeviceMiss] = useState<"none" | "cancelled" | "failed" | null>(null);
   const asked = useRef(false);
 
   function done() {
@@ -40,10 +43,10 @@ export function LoginScreen({ navigation }: Props) {
     setError("");
     try {
       if (mfaTicket) {
-        await completeMfa(mfaTicket, mfaCode.trim(), remember);
+        await completeMfa(mfaTicket, mfaCode.trim(), remember, deviceMiss === "none");
         done();
       } else {
-        const result = await login(email.trim(), password, remember);
+        const result = await login(email.trim(), password, remember, deviceMiss === "none");
         if (result.mfaRequired && result.ticket) setMfaTicket(result.ticket);
         else done();
       }
@@ -65,6 +68,7 @@ export function LoginScreen({ navigation }: Props) {
       done();
     } catch (err) {
       const miss = silentPasskeyMiss(err);
+      if (silent) setDeviceMiss(miss);
       if (!silent) setError(passkeyError(err));
       setPasskeyLink(miss !== "none" || !silent);
     } finally {
