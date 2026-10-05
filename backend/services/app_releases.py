@@ -1,10 +1,12 @@
 """App-Releases am Vereinsserver (#250).
 
-Die LionsAPP wird über GitHub-Releases verteilt, aber das Repo ist privat:
-vom Handy aus kommt niemand ohne GitHub-Login an die APK. Deshalb hält der
-Server je Build eine Kopie im Upload-Volume (``uploads/app-releases``) und
-liefert sie an angemeldete Nutzer. Die App fragt ``/api/mobile/app-version``
-und lädt ``/api/mobile/app-download/{build}``.
+Die LionsAPP wird über GitHub-Releases verteilt. Der Server hält je Build
+zusätzlich eine Kopie im Upload-Volume (``uploads/app-releases``) und liefert
+sie an angemeldete Nutzer: so prüft die App ihr Update gegen den eigenen
+Server (Mindest-Build, Prüfsumme, „Was ist neu“) statt gegen GitHub. Entstanden
+ist das, als das Repo noch privat war und vom Handy aus niemand ohne
+GitHub-Login an die APK kam. Die App fragt ``/api/mobile/app-version`` und
+lädt ``/api/mobile/app-download/{build}``.
 
 Hochladen darf der Vereinsadmin (Web) oder das Release-Skript mit dem
 Upload-Token aus der Server-Umgebung (``APP_RELEASE_UPLOAD_TOKEN``) - das

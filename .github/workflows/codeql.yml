@@ -1,11 +1,29 @@
 name: CodeQL
 
-# Nur manuell. Das Repo ist privat; Code Scanning braucht dort GitHub Code
-# Security. Ohne das läuft die Analyse jeweils rund acht Minuten und scheitert
-# erst beim Hochladen, ohne verwertbares Ergebnis.
-# Wieder automatisch (pull_request, wöchentlich), sobald das Repo öffentlich ist
-# oder Code Security aktiviert wurde.
+# Code Scanning verfolgt Daten durch den Code (Eingabe -> Datenbank, Dateipfad,
+# Antwort) und findet Lücken, die Lint, Paket-Audits und der Geheimnis-Scan
+# nicht sehen. Das Repo ist seit Oktober 2026 öffentlich, damit kostet es
+# nichts mehr (#954); davor lief es nur von Hand.
+# Auslöser: Pull Requests und Merges nach main, die Code berühren, dazu einmal
+# die Woche (frische Regeln von GitHub) und von Hand. Reine Doku-Änderungen
+# und Entwürfe starten nichts.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "mobile/**"
+      - ".github/workflows/codeql.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "mobile/**"
+      - ".github/workflows/codeql.yml"
+  schedule:
+    - cron: "23 3 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -16,10 +34,17 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# Ein neuer Push löst den laufenden Lauf desselben Zweigs ab.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
     name: Analyze ${{ matrix.language }}
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
