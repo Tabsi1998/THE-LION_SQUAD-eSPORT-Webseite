@@ -217,7 +217,7 @@ describe("Passkey-Angebot (#919)", () => {
     await act(async () => {
       await result.current.login("fan@lionsquad.at", "geheim", true);
     });
-    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-1", userId: "u-1" });
+    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-1", userId: "u-1", deviceWithout: false });
 
     await act(async () => {
       await result.current.logout();
@@ -233,10 +233,11 @@ describe("Passkey-Angebot (#919)", () => {
     expect(result.current.passkeyOffer).toBeNull();
 
     mockApi.post.mockResolvedValue({ data: { ...SESSION, passkey_ticket: "enroll-2" } });
+    // Kein Passkey auf diesem Gerät (#939): das Angebot sagt es weiter - die Einladung gilt dann auch bei Passkeys anderswo.
     await act(async () => {
-      await result.current.completeMfa("ticket-1", "123456", true);
+      await result.current.completeMfa("ticket-1", "123456", true, true);
     });
-    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-2", userId: "u-1" });
+    expect(result.current.passkeyOffer).toEqual({ ticket: "enroll-2", userId: "u-1", deviceWithout: true });
     await act(async () => {
       result.current.clearPasskeyOffer();
     });

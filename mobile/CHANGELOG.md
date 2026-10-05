@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 - 2026-10-05
+
+- Mobile: Mehrere Passkeys: Hast du schon einen auf einem anderen Gerät (etwa am PC mit Windows Hello), lädt die App nach der Anmeldung mit Passwort ein, auch für dieses Handy einen anzulegen. Neue Passkeys tragen den Namen deines Handys, damit du sie in der Liste auseinanderhältst (#939).
+
 ## 1.2.1 - 2026-10-05
 
 - Mobile: Aus Google Play installiert, kommen Updates nur noch über Google Play – kein eigenes Update-Fenster mehr, auch wenn unser Server einen neuen Build schon kennt (#926).

@@ -27,8 +27,11 @@ type RegistrationResponse = {
 
 type LoginResult = { mfaRequired: boolean; ticket?: string };
 
-/** Nach einer Passwort-Anmeldung (#919): die App darf mit diesem Ticket ohne neue Passworteingabe einen Passkey anlegen. */
-export type PasskeyOffer = { ticket: string; userId: string };
+/**
+ * Nach einer Passwort-Anmeldung (#919): die App darf mit diesem Ticket ohne neue Passworteingabe einen Passkey anlegen.
+ * `deviceWithout` (#939): die stille Abfrage beim Öffnen von „Anmelden“ fand auf diesem Gerät keinen Passkey.
+ */
+export type PasskeyOffer = { ticket: string; userId: string; deviceWithout?: boolean };
 
 type AuthContextValue = {
   user: User | null;
@@ -36,8 +39,9 @@ type AuthContextValue = {
   refreshToken: string | null;
   rememberSession: boolean;
   loading: boolean;
-  login: (email: string, password: string, remember?: boolean) => Promise<LoginResult>;
-  completeMfa: (ticket: string, code: string, remember?: boolean) => Promise<void>;
+  /** `noDevicePasskey` (#939): auf diesem Gerät gab es keinen Passkey - die Einladung gilt dann auch bei Passkeys anderswo. */
+  login: (email: string, password: string, remember?: boolean, noDevicePasskey?: boolean) => Promise<LoginResult>;
+  completeMfa: (ticket: string, code: string, remember?: boolean, noDevicePasskey?: boolean) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<RegistrationResponse>;
   /** `silent`: beim Öffnen der Anmeldung nur sofort verfügbare Passkeys, ohne Auswahl von Android (#919). */
   loginWithPasskey: (remember?: boolean, silent?: boolean) => Promise<void>;
@@ -173,17 +177,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [clearSession, enterGuest, persistSession]);
 
-  const offerPasskey = useCallback((session: AuthResponse & { passkey_ticket?: string | null }) => {
-    setPasskeyOffer(session.passkey_ticket ? { ticket: session.passkey_ticket, userId: session.user.id } : null);
+  const offerPasskey = useCallback((session: AuthResponse & { passkey_ticket?: string | null }, deviceWithout = false) => {
+    setPasskeyOffer(session.passkey_ticket ? { ticket: session.passkey_ticket, userId: session.user.id, deviceWithout } : null);
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string, remember = true) => {
+    async (email: string, password: string, remember = true, noDevicePasskey = false) => {
       const { data } = await api.post<AuthResponse>("/auth/mobile/login", { email, password });
       const challenge = data as AuthResponse & { mfa_required?: boolean; mfa_ticket?: string };
       if (challenge.mfa_required) return { mfaRequired: true, ticket: challenge.mfa_ticket };
       await persistSession(data, remember);
-      offerPasskey(data);
+      offerPasskey(data, noDevicePasskey);
       return { mfaRequired: false };
     },
     [offerPasskey, persistSession]
@@ -204,10 +208,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const completeMfa = useCallback(async (ticket: string, code: string, remember = true) => {
+  const completeMfa = useCallback(async (ticket: string, code: string, remember = true, noDevicePasskey = false) => {
     const { data } = await api.post<AuthResponse>("/auth/mfa/complete", { ticket, code, client: "mobile" });
     await persistSession(data, remember);
-    offerPasskey(data);
+    offerPasskey(data, noDevicePasskey);
   }, [offerPasskey, persistSession]);
 
   const clearPasskeyOffer = useCallback(() => setPasskeyOffer(null), []);
