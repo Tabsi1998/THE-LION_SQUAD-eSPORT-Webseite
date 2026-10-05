@@ -33,6 +33,8 @@ export type SelfProfile = {
   status?: string;
   version?: string;
   direct?: string[];
+  // Einmalige Freigabe (#329, Vereine 1.8.0): die nächste Änderung gilt sofort, auch eine neue E-Mail-Adresse.
+  direct_once?: boolean;
   exit?: { status: "planned" | "done" | string; reason?: string; notice_day?: string; last_day?: string } | null;
 };
 

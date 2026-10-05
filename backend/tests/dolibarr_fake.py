@@ -1147,11 +1147,16 @@ class FakeDolibarr:
             if any(key not in allowed for key in body["changes"]) or not body["changes"]:
                 return httpx.Response(400, json={"error": {"code": 400, "message": "field not allowed"}})
             direct = {key: value for key, value in body["changes"].items() if key in profile["direct"]}
+            # Einmalige Freigabe (Vereine 1.8.0): diese eine Änderung gilt sofort, auch eine neue E-Mail-Adresse.
+            once = bool(profile.get("direct_once"))
+            if once:
+                direct = dict(body["changes"])
             applied = bool(direct) and len(direct) == len(body["changes"])
             row = {"external_id": body["external_id"], "kind": "change", "changes": dict(body["changes"]), "status": "applied" if applied else "received",
                    "received_at": "2026-09-24T12:00:00Z"}
             if applied:
                 profile.update(direct)
+                profile["direct_once"] = False
                 profile["version"] = f"v{int(profile['version'][1:]) + 1}"
                 row["decided_at"] = "2026-09-24T12:00:00Z"
             rows.append(row)

@@ -446,6 +446,11 @@ die Person lädt neu. Der Austritt geht mit heutigem Eingang ein; den letzten Ta
 ergibt eure Kündigungsregel im Modul – ein früheres Wunschdatum wird nicht übernommen, ein späteres
 schon. Einmal erklärt, lässt er sich auf der Website nicht zurücknehmen (das macht der Vorstand).
 
+**Einmalige Freigabe (ab Vereine 1.8.0):** Soll ein Mitglied seine Daten ausnahmsweise selbst richtigstellen,
+gibt der Vorstand es in Dolibarr an der Mitgliedskarte für **eine** direkte Änderung frei. Im Kasten „Meine
+Daten“ steht dann grün: „Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.“ Diese eine
+Änderung ist gleich übernommen; danach liegt wieder alles beim Vorstand.
+
 ## Sponsoren und Partner: Logo und Banner aus Dolibarr (Vereine ab 1.9.0, #880)
 
 Sind Sponsoren und Partner aus Dolibarr eingeschaltet (*Dolibarr → Funktionen*, #405), holt die Website

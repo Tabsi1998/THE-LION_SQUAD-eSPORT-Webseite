@@ -246,6 +246,20 @@ test("Austritt (#329): nach der Rückfrage geht die Erklärung raus, der letzte 
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Wunschdatum lag vor der Kündigungsfrist"));
 });
 
+test("Meine Daten (#329): mit der einmaligen Freigabe gilt die nächste Änderung sofort, auch die E-Mail", async () => {
+  mockSelf(SELF);
+  const { unmount } = renderPage();
+  const card = await screen.findByTestId("membership-self-card");
+  expect(screen.queryByTestId("membership-self-once")).toBeNull();
+  expect(card).toHaveTextContent("Eine neue E-Mail-Adresse braucht den Vorstand.");
+  unmount();
+
+  mockSelf({ ...SELF, profile: { ...SELF.profile, direct_once: true } });
+  renderPage();
+  expect(await screen.findByTestId("membership-self-once")).toHaveTextContent("Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.");
+  expect(screen.getByTestId("membership-self-card")).not.toHaveTextContent("braucht den Vorstand");
+});
+
 test("Austritt geplant: nur noch der Stand, kein Knopf", async () => {
   mockSelf({ ...SELF, profile: { ...SELF.profile, exit: { status: "planned", reason: "", notice_day: "2026-09-24", last_day: "2026-12-31" } } });
   renderPage();
