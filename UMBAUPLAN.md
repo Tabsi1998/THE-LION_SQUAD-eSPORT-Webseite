@@ -2812,6 +2812,33 @@ der Verwaltung.
   hat er nur Dinge ohne Wirkung für euch: erfundene Testwerte, die wie Passwörter aussehen, zwei Lücken in
   Entwicklungswerkzeugen, für die es noch keine Reparatur gibt (sie stecken nicht in Website oder App), und
   angesammelte Formatierungsabweichungen im Code.
+- **Am Abend gemergt:** Die Website prüft gegen das Vereinsmodul 1.9.0, das bei euch läuft; eine geheime
+  Wahl auf Papier zeigt jetzt „abgestimmt wird im Saal“ statt Knöpfe, die nicht gehen. „Live jetzt“ ist
+  weg – wer streamt, zeigen die Stream-Meldungen –, und eine Einbettung, die nicht mehr aktualisiert
+  wird, sagt warum. Das Sechseck bei Level 9 und 24 sitzt wieder rund ums Bild. Ein Klick auf die
+  PSN-ID öffnet das PlayStation-Profil. Partner-Logos und -Banner kommen aus Dolibarr, in einer dunklen
+  Fassung für die Website und einer hellen für Mails und PDFs. Mitglieder entscheiden selbst, welche
+  geprüften Konten in ihre Akte kommen. Check-ins und Turniere landen als Teilnahmen beim Mitglied in
+  Dolibarr. Ehrungen stehen im Profil, öffentlich nur, wenn Verein und Mitglied zustimmen; 5, 10 und 25
+  Jahre im Verein gibt es als Erfolg.
+
+## Neu aufgenommen am 5. Oktober
+
+- **Vereinsmodul 1.5 ist fertig.** Am Eingang der Generalversammlung scannt der Vorstand die
+  Mitgliedskarte (Admin → Einlass), und die Anwesenheit steht sofort in Dolibarr. Geht dort eine
+  Abstimmung auf, bekommt jedes Mitglied mit Stimmrecht binnen Sekunden ein Popup in App und Website.
+  Gibt der Vorstand eine Änderung einmalig frei, gilt die nächste Änderung der eigenen Daten sofort,
+  auch die E-Mail-Adresse.
+- **Discord je Spiel:** Meldungen mit Spielbezug (Turnier, Stream, Fast Lap) können auf den Server des
+  Spiels gehen; am Hauptserver steht dann ein kurzer Querverweis. Das stellt ihr je Meldung ein.
+  Private Meldungen bleiben immer am Hauptserver.
+- **Aktualisierungen der Werkzeuge** sind eingespielt. Die Zeichen- und SVG-Bibliothek der App hebt
+  Dependabot nicht mehr einzeln, nur zusammen mit dem Expo-Update, weil sie sonst nicht zusammenpassen.
+- **Entschieden:** Events aus Dolibarr zu übernehmen (#850) fällt weg. Dolibarr wird sinnvoll eingebunden,
+  nicht erzwungen; die Events führt die Website, weil sie dort viel mehr Angaben haben.
+- **Als Nächstes:** Discord je Server weiter: Termine und Einbettungen je Spielserver (PR #907), Brackets
+  je Server, Slash-Befehle mit dem Spielfilter des Servers, Rollen je Server. Dazu „Meine Teilnahmen“ im
+  Profil (PR #908) und danach die mehrtägigen Events (Events II).
 
 ## Noch offen und bewusst getrennt
 
@@ -2841,6 +2868,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Discord nach dem Update** | Bot-Rolle im Kanal „Events und Turniere“: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“. Server-Widget einschalten (Servereinstellungen → Widget). Willkommenstext lesen und einschalten. Kanal „Mitglieder (privat)“ wählen. Weitere Server im Reiter „Server“ einschalten. |
 | **Nach dem Update vom 3.10. Nachmittag** | Finanzen → „Fehlende PDFs nachziehen“ einmal drücken (alte Rechnungen ohne PDF). Discord → „Gestaltung“: Vorlagen ansehen, Stream-Meldungen einschalten und Kanal wählen. Soll eine Rolle bei Streams gepingt werden, muss sie in Discord „erwähnbar“ sein (Servereinstellungen → Rollen). |
 | **Gutschrift-Entwurf: ja oder nein?** | Admin → Finanzen: Schalter „Gutschrift-Entwurf bei Abmeldung anlegen“. Ist er an, legt die Website einen Entwurf über den ganzen Betrag in Dolibarr an, sobald sich jemand nach der Freigabe der Rechnung abmeldet. Du prüfst ihn dort (Teilbetrag?) und gibst ihn frei – die Website gibt nie frei. Anfangs ist er aus. |
+| **Nach dem Update vom 5.10.** | In Dolibarr dem API-Benutzer der Website drei Rechte geben (Benutzer → Rechte → Vereine): „Teilnahmen von Mitgliedern erfassen und lesen“, „Mitglieder bei einer Generalversammlung einlassen“ und „Änderungen abholen (Änderungsfeed)“. Dann auf der Website unter Dolibarr → Funktionen „Teilnahmen in die Mitgliederakte“ einschalten (auf Wunsch „Letzte 12 Monate nachtragen“) und bei „Sponsoren und Partner“ einmal „Jetzt nachlesen“. |
+| **Einlass in der App: A oder B?** | A (empfohlen): Die App bekommt kein Kamerarecht; gescannt wird im Handy-Browser unter Admin → Einlass. B: Scanner in der App, mit Kamerarecht, im nächsten Build. |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 
 Zum Testen ohne Livesystem gibt es seit Block 6 den Weg über die echte Anwendung gegen
