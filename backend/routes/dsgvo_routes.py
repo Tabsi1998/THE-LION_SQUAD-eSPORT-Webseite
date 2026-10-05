@@ -25,7 +25,7 @@ async def _user_data_export(db, user_id: str) -> dict:
 
     registrations = await rows(db.tournament_registrations, {"user_id": user_id})
     return {
-        "format_version": 3,
+        "format_version": 4,
         "exported_at": now_utc().isoformat(),
         "user": user,
         "consent_records": await rows(db.consent_records, {"user_id": user_id}),
@@ -78,6 +78,12 @@ async def _user_data_export(db, user_id: str) -> dict:
         "moderation_items": await rows(db.moderation_items, {"user_id": user_id}),
         "discord_activity": await rows(db.discord_activity, {"user_id": user_id}),
         "discord_memberships": await rows(db.discord_memberships, {"user_id": user_id}),
+        # Seit Fassung 4: der Einlass bei der Generalversammlung (#845) - die eigene Anwesenheit, und wo man als
+        # Vorstand selbst eingelassen hat (nur der Vorgang, nie der Name der anderen Person).
+        "meeting_admissions": [{key: row.get(key) for key in ("meeting_id", "name", "state", "voting", "reason", "arrived", "updated_at")}
+                               for row in await rows(db.meeting_admissions, {"user_id": user_id})],
+        "meeting_admissions_recorded": [{key: row.get(key) for key in ("meeting_id", "state", "updated_at")}
+                                        for row in await rows(db.meeting_admissions, {"by": user_id})],
         "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
     }
 

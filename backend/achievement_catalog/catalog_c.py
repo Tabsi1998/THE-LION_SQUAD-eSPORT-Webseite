@@ -70,9 +70,9 @@ COMMUNITY = [
     _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Wird von der Vereinsleitung vergeben, wenn du Neue einarbeitest oder coachst.",
        "graduation-cap", "mentor", None, [1, 3, 7, 15, 30], "{n} Menschen begleitet.", sort_order=626, manual=True),
     # „Überall dabei“ (#614, nachgezogen mit #615): eine Stufe je Schritt wie beim App-Nutzer, weil „alle Server“ kein
-    # festes Ziel ist. Als Motiv dient das der Plattformen - der Katalog darf nur nennen, was das Web schon zeichnet.
+    # festes Ziel ist. Das Motiv: drei verbundene Server (motifs/people.jsx).
     _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich.",
-       "server", "platforms", "discord_servers_stage", [1, 2, 3], "", sort_order=627,
+       "server", "server-ring", "discord_servers_stage", [1, 2, 3], "", sort_order=627,
        steps=["Auf einem Discord-Server des Vereins dabei.", "Auf drei Discord-Servern des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
 ]
 

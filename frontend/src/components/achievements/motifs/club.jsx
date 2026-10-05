@@ -196,6 +196,44 @@ export const CLUB = {
       <path d="M22 6 L26 14 L32 7 L38 14 L42 6 L41 16 H23 Z" fill="currentColor" stroke="none" />
     </>
   ),
+  // Aus der Vereinsakte (#615): Versammlung, Abstimmung, Helferdienst, Helferstunden.
+  assembly: (
+    <>
+      <circle cx="32" cy="13" r="6" fill="currentColor" stroke="none" />
+      <path d="M21 24 H43 L40 40 H24 Z" fill="currentColor" stroke="none" />
+      <path d="M27 30 H37" stroke="#000" strokeOpacity="0.45" strokeWidth="3" />
+      <circle cx="12" cy="43" r="5" fill="currentColor" stroke="none" opacity="0.8" />
+      <path d="M3 59 C3 49 21 49 21 59 Z" fill="currentColor" stroke="none" opacity="0.8" />
+      <circle cx="52" cy="43" r="5" fill="currentColor" stroke="none" opacity="0.8" />
+      <path d="M43 59 C43 49 61 49 61 59 Z" fill="currentColor" stroke="none" opacity="0.8" />
+      <circle cx="32" cy="48" r="5" fill="currentColor" stroke="none" />
+      <path d="M23 62 C23 54 41 54 41 62 Z" fill="currentColor" stroke="none" />
+    </>
+  ),
+  "ballot-box": (
+    <>
+      <path d="M23 6 H41 V34 H23 Z" fill="currentColor" stroke="none" opacity="0.7" />
+      <path d="M27 15 L31 19 L37 11" stroke="#000" strokeOpacity="0.55" strokeWidth="3" />
+      <rect x="8" y="30" width="48" height="27" rx="4" fill="currentColor" stroke="none" />
+      <path d="M19 30 H45" stroke="#000" strokeOpacity="0.6" strokeWidth="4" />
+      <path d="M24 46 H40" stroke="#000" strokeOpacity="0.35" strokeWidth="3" />
+    </>
+  ),
+  "helper-vest": (
+    <>
+      <path d="M21 7 H27 C27 15 37 15 37 7 H43 L53 16 L47 25 V57 H17 V25 L11 16 Z" fill="currentColor" stroke="none" />
+      <path d="M19 36 H45 M19 46 H45" stroke="#000" strokeOpacity="0.5" strokeWidth="4" />
+      <path d="M32 15 V57" stroke="#000" strokeOpacity="0.35" strokeWidth="2" />
+    </>
+  ),
+  "helper-hours": (
+    <>
+      <circle cx="27" cy="29" r="20" />
+      <path d="M27 17 V29 L35 34" />
+      <circle cx="46" cy="46" r="13" fill="currentColor" stroke="none" />
+      <path d="M40 46 L44 51 L53 41" stroke="#000" strokeOpacity="0.55" strokeWidth="3" />
+    </>
+  ),
   negative: (
     <>
       <path d="M32 8 L58 54 H6 Z" fill="currentColor" stroke="none" />

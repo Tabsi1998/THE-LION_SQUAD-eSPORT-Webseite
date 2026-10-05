@@ -51,17 +51,16 @@ CLUB = [
     # Jubiläen (#848): runde Jahre ab dem Mitgliedsbeginn aus der Mitgliederverwaltung - mit eigenem Abzeichen.
     _d("membership_jubilee", "Vereinsjubiläum", "club", "Feiere runde Jahre im Verein.", "Volle Jahre seit deinem Mitgliedsbeginn - 5, 10 und 25 Jahre sind ein Jubiläum.",
        "award", "jubilee", "membership_years", [5, 10, 25], "{n} im Verein.", sort_order=917, unit=" Jahre"),
-    # Rest aus #615: was die Mitgliederverwaltung je Mitglied führt. Als Motiv dient je ein Verwandter aus einer anderen
-    # Kategorie (Liste, Haken, Handschlag, Sanduhr): der Katalog darf nur Motive nennen, die das Web schon zeichnet
-    # (tests/test_badge_art_keys.py).
+    # Rest aus #615: was die Mitgliederverwaltung je Mitglied führt - jede Gruppe mit eigenem Motiv
+    # (frontend/src/components/achievements/motifs/club.jsx).
     _d("meetings", "Versammlungsbesucher", "club", "Komm zur Generalversammlung.", "Bei der Generalversammlung am Eingang die Mitgliedskarte scannen lassen oder dort abstimmen - jede Versammlung zählt einmal.",
-       "users-round", "roster", "meetings_attended", [1, 3, 5, 10, 20], "{n}-mal bei der Generalversammlung dabei.", sort_order=918),
+       "users-round", "assembly", "meetings_attended", [1, 3, 5, 10, 20], "{n}-mal bei der Generalversammlung dabei.", sort_order=918),
     _d("member_votes", "Mitgliederstimme", "club", "Bestimm mit, wohin der Verein geht.", "Bei den Abstimmungen der Generalversammlung deine Stimme abgeben - jede Abstimmung zählt einmal. Gezählt wird nur, dass du abgestimmt hast, nie wie.",
-       "check-check", "checkmark", "member_votes_cast", [1, 5, 15, 40, 100], "{n}-mal abgestimmt.", sort_order=919),
+       "check-check", "ballot-box", "member_votes_cast", [1, 5, 15, 40, 100], "{n}-mal abgestimmt.", sort_order=919),
     _d("helper_shifts", "Helfer", "club", "Pack bei Veranstaltungen des Vereins mit an.", "Im Mitgliederbereich unter „Helfen“ einen Dienst anfragen - er zählt, sobald der Vorstand ihn bestätigt hat und der Tag vorbei ist.",
-       "hand-helping", "handshake-team", "helper_shifts_completed", [1, 3, 7, 15, 30, 60, 100], "{n}-mal Helferdienst geleistet.", sort_order=920),
+       "hand-helping", "helper-vest", "helper_shifts_completed", [1, 3, 7, 15, 30, 60, 100], "{n}-mal Helferdienst geleistet.", sort_order=920),
     _d("helper_hours", "Helferstunden", "club", "Sammle Stunden im Einsatz für den Verein.", "Die Stunden deiner bestätigten Helferdienste zählen zusammen - vom Vorstand notiert oder die Länge der Schicht.",
-       "timer", "hourglass", "helper_hours", [5, 20, 50, 100, 250], "{n} Helferstunden geleistet.", sort_order=921),
+       "timer", "helper-hours", "helper_hours", [5, 20, 50, 100, 250], "{n} Helferstunden geleistet.", sort_order=921),
 ]
 
 SPECIAL = [

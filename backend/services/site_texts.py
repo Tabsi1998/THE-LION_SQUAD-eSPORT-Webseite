@@ -356,7 +356,8 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "Jahre Aufbewahrung verlangt; der Auftrag auf der Website behält dann nur Betrag und Belegnummer. Die Löschung wirkt sofort und "
                   "lässt sich nicht rückgängig machen."),
                 p("Was der Verein in seiner Mitgliederverwaltung über dich als Mitglied führt, berührt die Löschung des Kontos nicht – auch nicht "
-                  "einen Eintrag im Mitgliederverzeichnis, der von dort kommt. Dafür und für den Widerruf einer Einwilligung wendest du dich an "
+                  "einen Eintrag im Mitgliederverzeichnis, der von dort kommt, und nicht deine Anwesenheit bei einer Generalversammlung. "
+                  "Dafür und für den Widerruf einer Einwilligung wendest du dich an "
                   f"{_contact_or_form(legal)}.")),
         section("rights", "Betroffenenrechte",
                 p("Betroffene Personen haben nach Maßgabe der DSGVO Rechte auf Information, Auskunft, Berichtigung, Löschung, Einschränkung, "

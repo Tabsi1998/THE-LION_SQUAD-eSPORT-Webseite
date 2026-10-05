@@ -27,6 +27,7 @@ kann es für jemanden tun. Die Entscheidung je Art von Daten (`backend/routes/ds
 | XP und Level, Zählerstände und Signale der Erfolge, Adventkalender, Ostereier, Verlosungen, Discord-Aktivität | gelöscht |
 | Selbst angelegter Eintrag im Mitgliederverzeichnis | gelöscht |
 | Eintrag im Mitgliederverzeichnis aus der Mitgliederverwaltung oder von der Redaktion, Vorstandsposten | bleibt beim Verein, verliert nur die Verknüpfung zum Konto |
+| Einlass bei der Generalversammlung (Anwesenheit am Eingang) | bleibt beim Verein, verliert nur die Verknüpfung zum Konto; wer als Vorstand selbst eingelassen hat, steht dort danach ohne Namen |
 | Mitgliedsanträge | Motivation und Angaben zur Person gelöscht, ein laufender Antrag gilt als zurückgezogen; der Datensatz in der Mitgliederverwaltung bleibt Sache des Vereins |
 | Einladungen zur Mitgliedschaft, Tokens der Mitgliedskarte, Zugangslinks, Aufgaben im Turnier-Team | gelöscht bzw. abgeschaltet |
 | Anmeldungen zu Events und Turnieren | bleiben als Zählung und für den Turnierbaum – ohne Name, E-Mail, Notiz, Discord- und Plattform-Kennung |
