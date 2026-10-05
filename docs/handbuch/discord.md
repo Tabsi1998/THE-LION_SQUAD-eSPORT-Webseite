@@ -223,6 +223,10 @@ Einladungslink aus dem Reiter „Server“ enthält ihn.
 - Discord archiviert den Thread nach einer Woche Ruhe; die nächste Meldung öffnet ihn wieder.
 - **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus (keine Meldung, kein Thread,
   kein Termin).
+- **Spielserver:** Hat das Spiel einen eigenen Server, steht das Bracket im Turnier-Thread **dort**. Am
+  Hauptserver steht es nur, wenn die Meldung „Turnier: jetzt live“ auf **„Spielserver und Hauptserver“**
+  steht (Reiter „Meldungen“ → „Was gemeldet wird“) – sonst hat der Hauptserver den Querverweis. Nimmt der
+  Spielserver das Bracket nicht an (Kanal weg, kein Recht), kommt es voll an den Hauptserver.
 - **Turniere „nur Mitglieder“** melden sich genauso, aber im Kanal **„Mitglieder (privat)“** am
   Hauptserver – mit eigenem Thread, darin Check-in, live, Streams und das Bracket. Nie in „Events und
   Turniere“, nie auf einem Spielserver, kein Querverweis. Ist kein Mitgliederkanal gewählt, kommt

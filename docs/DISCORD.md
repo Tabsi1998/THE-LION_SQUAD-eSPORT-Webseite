@@ -98,6 +98,11 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
 - **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus: keine Meldung, kein
   Thread, kein Bracket, kein Discord-Termin. Was nicht für alle sichtbar ist, geht nie in einen
   öffentlichen Kanal.
+- **Bracket je Server (#628):** Bahnen statt eines Ziels (`discord_bracket._lanes`): mit Spielserver nach der Regel
+  von „Turnier: jetzt live“ (`ROUTE_KEY`) im Turnier-Thread dort (`discord_bracket_by_guild.<Server>`), am Hauptserver
+  (`discord_bracket_embed`) nur bei „beide voll“; nimmt der Spielserver nicht an, voll am Hauptserver. Jede Bahn hat
+  eigene Bremse und eigenen Endstand (`note_message` kennt den Stand je Server); der Sammler holt auch Beendete,
+  deren Bracket nur auf einem Spielserver steht.
 - **Turniere „nur Mitglieder“ (#910)** melden sich im Kanal „Mitglieder (privat)“ am Hauptserver:
   Ankündigung, eigener Thread (`discord_thread_members`), darin Check-in, live, Streams und das
   Bracket. Keine Routing-Regel, kein Spielserver, kein Querverweis; ohne Mitgliederkanal

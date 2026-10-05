@@ -342,3 +342,51 @@ async def test_a_public_bracket_message_never_gets_the_members_version(flow, dis
     assert moved["reason"] == "posted" and moved["message_id"] != first["message_id"]
     assert discord.titles(MEMBERS) == ["🏆 Sommer-Cup – Bracket"]
     assert discord.messages[public_thread] == before, "die öffentliche Nachricht bleibt, wie sie war"
+
+
+@pytest.mark.asyncio
+async def test_the_bracket_lives_on_the_game_server_and_on_main_only_with_both_full(flow, discord):
+    """#628: Hat das Spiel einen eigenen Server, steht das Bracket im Turnier-Thread dort; am Hauptserver steht nur der
+    Querverweis - es sei denn, „Turnier: jetzt live“ steht auf „beide voll“. Der Endstand ist in jedem Thread der letzte."""
+    await configure(flow)
+    await with_game_server(flow)
+    assert (await flow.post("/api/tournaments/t1/status", json={"status": "registration_open"})).status_code == 200
+    stored = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    game_thread = stored["discord_thread_by_guild"][GAME_GUILD]["thread_id"]
+    main_thread = stored["discord_thread"]["thread_id"]
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "live"}})
+    await discord_threads.status_written(flow.db, "t1", "registration_open")
+
+    t0 = now_utc()
+    posted = await discord_bracket.refresh(flow.db, "t1", now=t0)
+    assert posted["reason"] == "posted" and list(posted["lanes"]) == [GAME_GUILD]
+    assert discord.titles(game_thread)[-1] == "🏆 Sommer-Cup – Bracket" and "🏆 Sommer-Cup – Bracket" not in discord.titles(main_thread)
+    stored = await flow.db.tournaments.find_one({"id": "t1"}, {"_id": 0})
+    assert stored["discord_bracket_by_guild"][GAME_GUILD]["channel_id"] == game_thread and "discord_bracket_embed" not in stored
+
+    # „Beide voll“: das Bracket kommt auch an den Hauptserver - in seinen Turnier-Thread.
+    assert (await flow.put("/api/settings/discord", json={"routing": {"tournament.live": "both_full"}})).status_code == 200
+    await flow.db.matches_v2.update_one({"id": "f"}, {"$set": final_match("live", (1, 0))})
+    both = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=2))
+    assert set(both["lanes"]) == {GAME_GUILD, "main"} and both["lanes"]["main"]["reason"] == "posted" and both["lanes"][GAME_GUILD]["reason"] == "edited"
+    assert discord.titles(main_thread)[-1] == "🏆 Sommer-Cup – Bracket"
+
+    # Ende: „Beendet“ in beiden Threads, danach wandert der Endstand in beiden ans Ende.
+    await flow.db.matches_v2.update_one({"id": "f"}, {"$set": final_match("completed", (3, 1))})
+    assert (await flow.post("/api/tournaments/t1/status", json={"status": "completed"})).status_code == 200
+    final = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=3))
+    assert all(lane["moved"] is True and lane["final"] is True for lane in final["lanes"].values()), final
+    assert discord.titles(game_thread)[-1] == "🏆 Sommer-Cup – Endstand" and discord.titles(main_thread)[-1] == "🏆 Sommer-Cup – Endstand"
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=9)))["reason"] == "final"
+    assert (await discord_bracket.sweep(flow.db, full=True))["checked"] == 0, "alles im Endstand: der Sammler lässt das Turnier in Ruhe"
+
+
+@pytest.mark.asyncio
+async def test_a_game_server_that_refuses_the_bracket_hands_it_to_main(flow, discord):
+    await configure(flow)
+    await with_game_server(flow)
+    discord.gone.add(GAME_EVENTS)
+    await flow.db.tournaments.update_one({"id": "t1"}, {"$set": {"status": "live"}})
+    result = await discord_bracket.refresh(flow.db, "t1")
+    assert result["lanes"][GAME_GUILD]["reason"] == "unknown_channel" and result["lanes"]["main"]["reason"] == "posted"
+    assert discord.titles(EVENTS) == ["🏆 Sommer-Cup – Bracket"], "voll am Hauptserver statt nirgends"

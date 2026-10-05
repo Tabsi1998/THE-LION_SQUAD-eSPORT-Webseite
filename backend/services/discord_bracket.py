@@ -14,6 +14,10 @@ die alte Fassung - kommt danach noch eine Meldung („Ergebnisse veröffentlicht
 Eine Nachricht, die schon vor dem Thread im Kanal stand, bleibt dort und wird weiter bearbeitet.
 
 Turniere nur für Mitglieder (#910): das Bracket steht im Thread des Turniers im Mitglieder-Kanal - nie öffentlich.
+
+Mehrere Server (#628): Hat das Spiel einen eigenen Server, steht das Bracket im Turnier-Thread dort; am Hauptserver nur, wenn
+die Regel von „Turnier: jetzt live“ „beide voll“ sagt - sonst steht dort der Querverweis. Nimmt der Spielserver es nicht an,
+kommt es voll an den Hauptserver.
 """
 from __future__ import annotations
 
@@ -28,6 +32,9 @@ from models import now_utc
 logger = logging.getLogger("tls.discord.bracket")
 
 FIELD = "discord_bracket_embed"
+# Spielserver (#628): je Server derselbe Stand wie am Hauptserver; welcher Server, sagt die Regel von „Turnier: jetzt live“.
+GUILD_FIELD = "discord_bracket_by_guild"
+ROUTE_KEY = "tournament.live"
 MIN_EDIT_SECONDS = 60
 MAX_FIELDS = 12
 FIELD_LIMIT = 1000
@@ -239,18 +246,54 @@ async def build(db, tournament: dict, now: datetime | None = None, *, final: boo
     return bracket_embed(tournament, matches, read_model.stages, registrations, origin, now, final=final)
 
 
+def _state_at(tournament: dict, field: str) -> dict:
+    """Der gespeicherte Stand einer Bahn - ``discord_bracket_embed`` oder ``discord_bracket_by_guild.<Server>``."""
+    value = tournament
+    for part in field.split("."):
+        value = (value or {}).get(part) if isinstance(value, dict) else None
+    return value if isinstance(value, dict) else {}
+
+
+async def _lanes(db, cfg: dict, tournament: dict, members: bool) -> tuple[list[dict], dict | None]:
+    """Wo das Bracket steht (#628): Mitglieder-Turniere im Mitglieder-Thread (#910); sonst nach der Regel von „Turnier:
+    jetzt live“ - auf dem Spielserver im Turnier-Thread dort, am Hauptserver nur bei „beide voll“ (sonst steht dort der
+    Querverweis); ohne Spielserver am Hauptserver wie bisher. Zweiter Wert: der Hauptserver als Rückfall, wenn der
+    Spielserver das Bracket nicht annimmt."""
+    from discord_service import resolve_target
+    from services import discord_routing
+    from services.discord_threads import FIELD as THREAD_FIELD, GUILD_FIELD as THREAD_GUILD_FIELD, MEMBERS_FIELD, thread_of
+
+    if members:
+        channel = resolve_target(cfg, "members")["channel_id"]
+        return [{"key": "members", "guild_id": None, "field": FIELD, "thread_field": MEMBERS_FIELD, "channel": channel,
+                 "thread_id": thread_of(tournament, channel, members=True), "members": True}], None
+    channel = resolve_target(cfg, "events")["channel_id"]
+    main = {"key": "main", "guild_id": None, "field": FIELD, "thread_field": THREAD_FIELD, "channel": channel,
+            "thread_id": thread_of(tournament, channel)}
+    plan = await discord_routing.plan(db, cfg, ROUTE_KEY, tournament, "events")
+    if not plan["game"]:
+        return [main], None
+    row = plan["game"]
+    guild_id = str(row["guild_id"])
+    game_channel = resolve_target(cfg, "events", row)["channel_id"]
+    game = {"key": guild_id, "guild_id": guild_id, "field": f"{GUILD_FIELD}.{guild_id}", "thread_field": f"{THREAD_GUILD_FIELD}.{guild_id}",
+            "channel": game_channel, "thread_id": thread_of(tournament, game_channel, guild_id)}
+    return ([game, main], None) if plan["main"] == "full" else ([game], main)
+
+
 async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | None = None, now: datetime | None = None) -> dict:
-    """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“."""
-    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons, resolve_target
-    from services.discord_bot import bot
-    from services.discord_threads import MEMBERS_FIELD, FIELD as PUBLIC_THREAD_FIELD, members_only, thread_of
+    """Die Bracket-Nachricht eines Turniers aktuell halten - posten, pinnen, bearbeiten; nach dem Ende einmal „Endstand“.
+    Je Bahn (#628): Spielserver, Hauptserver, Mitglieder-Thread - jede mit eigenem Stand und eigener Bremse. Das
+    Ergebnis ist das der ersten Bahn, dazu ``lanes`` mit allen."""
+    from discord_service import REASON_TEXTS, _get_discord_config, build_embed, resolve_buttons
+    from services import discord_routing
+    from services.discord_threads import members_only
 
     current = now or now_utc()
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "unknown_tournament"}
-    state = tournament.get(FIELD) or {}
     if final is None:
         final = str(tournament.get("status") or "") in FINAL_STATUSES
     if tournament.get("discord_skip"):
@@ -260,41 +303,67 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     if not members and (tournament.get("is_public") is False or (tournament.get("visibility") or "public") != "public"):
         _dirty.pop(tournament_id, None)
         return {"ok": False, "reason": "private_visibility"}
-    thread_field = MEMBERS_FIELD if members else PUBLIC_THREAD_FIELD
-    if state.get("final") and not force:
-        _dirty.pop(tournament_id, None)
-        return {"ok": False, "reason": "final", "message_id": state.get("message_id")}
     cfg = await _get_discord_config()
     if not cfg["master"]:
         return {"ok": False, "reason": "disabled", "error": REASON_TEXTS["disabled"]}
     if not cfg["bot"]["enabled"]:
         return {"ok": False, "reason": "bot_off", "error": REASON_TEXTS["bot_off"]}
-    resolved = resolve_target(cfg, "members" if members else "events")
-    thread_id = thread_of(tournament, resolved["channel_id"], members=members)
-    if members and str(state.get("channel_id") or "") not in ("", thread_id, str(resolved["channel_id"] or "")):
+    lanes, fallback = await _lanes(db, cfg, tournament, members)
+    content: dict = {}
+
+    async def message():
+        # Einmal bauen, für alle Bahnen gleich - und nur, wenn eine Bahn ihn wirklich braucht.
+        if not content:
+            raw = await build(db, tournament, current, final=bool(final))
+            content.update(raw=raw, digest=content_hash(raw),
+                           embed=await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"],
+                                                   footer=raw["footer"]),
+                           buttons=await resolve_buttons([{"label": "Bracket ansehen", "url": raw["url"]}]))  # #573
+        return content
+
+    results: dict[str, dict] = {}
+    for lane in lanes:
+        results[lane["key"]] = await _refresh_lane(db, tournament, lane, message, force=force, final=bool(final), current=current)
+    first = results[lanes[0]["key"]]
+    if fallback and not first.get("ok") and first.get("reason") in discord_routing.FALLBACK_REASONS + ("channel_missing", "unknown_channel"):
+        # Der Spielserver nimmt das Bracket nicht an: voll am Hauptserver statt nirgends.
+        results[fallback["key"]] = await _refresh_lane(db, tournament, fallback, message, force=force, final=bool(final), current=current)
+    if any(result.get("reason") == "throttled" for result in results.values()):
+        _dirty[tournament_id] = bool(_dirty.get(tournament_id)) or bool(final)
+    elif all(result.get("ok") or result.get("reason") in ("final",) for result in results.values()):
+        _dirty.pop(tournament_id, None)
+    return {**first, "lanes": results}
+
+
+async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: bool, final: bool, current: datetime) -> dict:
+    """Eine Bahn: posten, pinnen, bearbeiten - der Endstand als letzte Nachricht im Thread (#572)."""
+    from discord_service import REASON_TEXTS
+    from services.discord_bot import bot
+
+    tournament_id = tournament["id"]
+    field, thread_id = lane["field"], lane["thread_id"]
+    state = _state_at(tournament, field)
+    if lane.get("members") and str(state.get("channel_id") or "") not in ("", thread_id, str(lane["channel"] or "")):
         # War das Turnier vorher öffentlich: die Bracket-Nachricht beginnt im Mitglieder-Thread neu - die Fassung für
-        # Mitglieder landet nie in der alten, öffentlichen Nachricht.
+        # Mitglieder landet nie in der alten, öffentlichen Nachricht (#910).
         state = {}
-    channel_id = str(state.get("channel_id") or thread_id or resolved["channel_id"] or "")
+    if state.get("final") and not force:
+        return {"ok": False, "reason": "final", "message_id": state.get("message_id")}
+    channel_id = str(state.get("channel_id") or thread_id or lane["channel"] or "")
     in_thread = bool(thread_id) and channel_id == thread_id
     if not channel_id:
         return {"ok": False, "reason": "channel_missing", "error": REASON_TEXTS["channel_missing"]}
     last = _dt(state.get("updated_at"))
     if last and current - last < timedelta(seconds=MIN_EDIT_SECONDS) and not (final and not state.get("final")):
-        _dirty[tournament_id] = bool(_dirty.get(tournament_id)) or bool(final)
         return {"ok": False, "reason": "throttled"}
-
-    raw = await build(db, tournament, current, final=bool(final))
-    digest = content_hash(raw)
+    built = await message()
+    digest, embed, buttons = built["digest"], built["embed"], built["buttons"]
     if state.get("message_id") and state.get("hash") == digest and not force and not final:
-        _dirty.pop(tournament_id, None)
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
-    embed = await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"], footer=raw["footer"])
-    buttons = await resolve_buttons([{"label": "Bracket ansehen", "url": raw["url"]}])  # #573
     message_id = str(state.get("message_id") or "")
     # Endstand als letzte Nachricht im Thread (#572): steht etwas darunter, kommt er neu ans Ende.
     replaced = ""
-    if final and in_thread and message_id and str((tournament.get(thread_field) or {}).get("last_message_id") or "") != message_id:
+    if final and in_thread and message_id and str(_state_at(tournament, lane["thread_field"]).get("last_message_id") or "") != message_id:
         replaced, message_id = message_id, ""
     action = "edited"
     result: dict = {"ok": False, "reason": "error"}
@@ -320,31 +389,32 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
                  "error": None, "final": bool(final), "last_action": action}
         if action == "posted":
             patch["posted_at"] = stamp
-        updates = {FIELD: {**state, **patch}}
+        updates = {field: {**state, **patch}}
         if in_thread and action == "posted":
-            updates[f"{thread_field}.last_message_id"] = patch["message_id"]
-            updates[f"{thread_field}.last_message_at"] = stamp
+            updates[f"{lane['thread_field']}.last_message_id"] = patch["message_id"]
+            updates[f"{lane['thread_field']}.last_message_at"] = stamp
         await db.tournaments.update_one({"id": tournament_id}, {"$set": updates})
-        _dirty.pop(tournament_id, None)
         return {"ok": True, "reason": action, "message_id": patch["message_id"], "final": bool(final), "pinned": result.get("pinned"),
                 "moved": bool(replaced)}
     error = result.get("error") or REASON_TEXTS.get(result.get("reason") or "", "") or str(result.get("reason") or "error")
     if result.get("reason") == "unknown_channel" and state.get("channel_id"):
         # Kanal oder Thread gelöscht: beim nächsten Mal neu - im heutigen Thread oder Kanal.
-        await db.tournaments.update_one({"id": tournament_id}, {"$set": {FIELD: {"error": error}}})
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": {field: {"error": error}}})
     else:
-        await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{FIELD}.error": error}})
+        await db.tournaments.update_one({"id": tournament_id}, {"$set": {f"{field}.error": error}})
     return {"ok": False, "reason": result.get("reason") or "error", "error": error}
 
 
 async def sweep(db, *, full: bool = False) -> dict:
-    """Job: die vorgemerkten Turniere; alle zehn Minuten jedes laufende Turnier (und Beendete ein letztes Mal)."""
+    """Job: die vorgemerkten Turniere; alle zehn Minuten jedes laufende Turnier (und Beendete ein letztes Mal - auch die,
+    deren Bracket nur auf einem Spielserver steht, #628)."""
     outcome = {"checked": 0, "edited": 0, "posted": 0, "errors": 0, "throttled": 0}
     if full:
         live = await db.tournaments.find({"status": "live", "is_public": {"$ne": False}}, {"_id": 0, "id": 1}).to_list(200)
-        ended = await db.tournaments.find({"status": {"$in": list(FINAL_STATUSES)}, f"{FIELD}.message_id": {"$exists": True}, f"{FIELD}.final": {"$ne": True}}, {"_id": 0, "id": 1}).to_list(200)
+        unfinished = [{f"{FIELD}.message_id": {"$exists": True}, f"{FIELD}.final": {"$ne": True}}, {GUILD_FIELD: {"$exists": True}}]
+        ended = await db.tournaments.find({"status": {"$in": list(FINAL_STATUSES)}, "$or": unfinished}, {"_id": 0, "id": 1, FIELD: 1, GUILD_FIELD: 1}).to_list(200)
         targets = {row["id"]: False for row in live}
-        targets.update({row["id"]: True for row in ended})
+        targets.update({row["id"]: True for row in ended if _open_lanes(row)})
     else:
         targets = dict(_dirty)
     for tournament_id, final in targets.items():
@@ -357,3 +427,9 @@ async def sweep(db, *, full: bool = False) -> dict:
         elif not result.get("ok") and result.get("reason") not in ("unchanged", "final", "private_visibility", "author_opt_out", "unknown_tournament"):
             outcome["errors"] += 1
     return outcome
+
+
+def _open_lanes(row: dict) -> bool:
+    """Steht irgendwo noch ein Bracket, das noch nicht „Endstand“ ist?"""
+    states = [row.get(FIELD) or {}] + list((row.get(GUILD_FIELD) or {}).values())
+    return any(state.get("message_id") and not state.get("final") for state in states if isinstance(state, dict))
