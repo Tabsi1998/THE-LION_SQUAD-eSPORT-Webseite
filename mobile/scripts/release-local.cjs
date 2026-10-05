@@ -215,11 +215,11 @@ async function playCheck(config) {
  * Nach dem GitHub-Release: das Bundle in den Test-Track (#412). Scheitert es, bleibt das
  * Release gültig - das Skript sagt es laut, endet mit Code 1 und nennt das Bundle zum Hochladen von Hand.
  */
-async function publishToPlay({ account, aabPath, version, versionCode, changelog }) {
+async function publishToPlay({ account, aabPath, mappingPath, version, versionCode, changelog }) {
   const { whatsNewEntries } = require("./whats-new.cjs");
   const notes = whatsNewEntries(changelog, version).map((item) => `- ${item}`).join("\n");
   try {
-    const result = await play.publishBundle({ account, packageName: readJson("app.json").expo.android.package, aabPath, versionCode, track: playTrack, notes });
+    const result = await play.publishBundle({ account, packageName: readJson("app.json").expo.android.package, aabPath, mappingPath, versionCode, track: playTrack, notes });
     console.log(`In der Play Console: Build ${result.versionCode} im Track „${result.track}“ (Edit ${result.editId}). Tester bekommen ihn nach Googles Prüfung.`);
     return true;
   } catch (error) {
@@ -502,6 +502,7 @@ async function main() {
   // Das Bundle ist mit demselben Schlüssel signiert (Upload-Key bei Play App Signing) und wird
   // von Hand in die Play Console geladen - hier nur ablegen, prüfen und ans Release hängen.
   let aabPath = "";
+  let mappingPath = "";
   if (wantBundle) {
     const aab = release.aabName(version, versionCode, head.slice(0, 7));
     aabPath = path.join(buildsDir, aab);
@@ -510,6 +511,13 @@ async function main() {
     fs.writeFileSync(`${aabPath}.sha256`, `${aabSha256}  ${aab}\n`);
     console.log(`AAB: ${aabPath}`);
     console.log(`AAB SHA-256: ${aabSha256}`);
+    // R8 (#917): die Zuordnung der gekürzten Namen gehört zum Bundle - mit --play geht sie mit zu Google.
+    const mapping = path.join(buildAndroid, "app", "build", "outputs", "mapping", "release", "mapping.txt");
+    if (fs.existsSync(mapping)) {
+      mappingPath = `${aabPath}.mapping.txt`;
+      fs.copyFileSync(mapping, mappingPath);
+      console.log(`R8-Zuordnung: ${mappingPath}`);
+    }
   }
 
   if (mode === "dry-run") {
@@ -535,7 +543,7 @@ async function main() {
   const uploaded = await uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
   if (playTrack) {
     step(`App Bundle in den Play-Test-Track „${play.resolveTrack(playTrack)}“ laden`);
-    await publishToPlay({ account: playAccount, aabPath, version, versionCode, changelog });
+    await publishToPlay({ account: playAccount, aabPath, mappingPath, version, versionCode, changelog });
   }
   return uploaded;
 }

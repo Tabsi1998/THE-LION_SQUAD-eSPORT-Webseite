@@ -1,6 +1,6 @@
 {
   "name": "mobile",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
@@ -15,7 +15,7 @@
     "test:security": "node --no-warnings --test scripts/cache-security.test.mjs scripts/logging-security.test.mjs",
     "release:preflight": "node scripts/release-preflight.cjs",
     "release:local": "node scripts/release-local.cjs",
-    "test:release": "node --no-warnings --test scripts/release-version.test.mjs scripts/whats-new.test.mjs scripts/play-publish.test.mjs",
+    "test:release": "node --no-warnings --test scripts/release-version.test.mjs scripts/whats-new.test.mjs scripts/play-publish.test.mjs scripts/release-plugins.test.mjs",
     "whatsnew": "node scripts/whats-new.cjs"
   },
   "dependencies": {
@@ -42,6 +42,7 @@
     "expo-intent-launcher": "~57.0.1",
     "expo-local-authentication": "~57.0.3",
     "expo-notifications": "~57.0.21",
+    "expo-screen-orientation": "~57.0.2",
     "expo-secure-store": "~57.0.4",
     "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
