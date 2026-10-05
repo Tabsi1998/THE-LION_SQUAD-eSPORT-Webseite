@@ -99,12 +99,15 @@ async def note_message(db, tournament_id: str, message_id: str | None, guild_id:
     if not message_id:
         return
     field = state_field(guild_id, members)
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, FIELD: 1, GUILD_FIELD: 1, MEMBERS_FIELD: 1, discord_bracket.FIELD: 1}) or {}
+    projection = {"_id": 0, FIELD: 1, GUILD_FIELD: 1, MEMBERS_FIELD: 1, discord_bracket.FIELD: 1, discord_bracket.GUILD_FIELD: 1}
+    tournament = await db.tournaments.find_one({"id": tournament_id}, projection) or {}
     updates = {f"{field}.last_message_id": str(message_id), f"{field}.last_message_at": now_utc().isoformat()}
-    bracket = tournament.get(discord_bracket.FIELD) or {}
+    # Das Bracket dieses Threads (#628): am Spielserver sein eigener Stand, sonst der des Hauptservers.
+    bracket_field = f"{discord_bracket.GUILD_FIELD}.{guild_id}" if guild_id else discord_bracket.FIELD
+    bracket = discord_bracket._state_at(tournament, bracket_field)
     thread_id = str(thread_state(tournament, guild_id, members).get("thread_id") or "")
     if bracket.get("final") and thread_id and str(bracket.get("channel_id") or "") == thread_id and str(bracket.get("message_id") or "") != str(message_id):
-        updates[f"{discord_bracket.FIELD}.final"] = False
+        updates[f"{bracket_field}.final"] = False
         discord_bracket.request_refresh(tournament_id, final=True)
     await db.tournaments.update_one({"id": tournament_id}, {"$set": updates})
 
