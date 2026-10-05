@@ -1,5 +1,6 @@
 """App-Anmeldung mit Passwort (#919) durch die echte Anwendung: die Antwort bringt das Anlege-Ticket für einen Passkey mit,
-das Ticket öffnet genau einmal die Passkey-Anlage dieses Kontos - ohne Passwort; ohne Passkeys für die App gibt es keins."""
+das Ticket öffnet die Passkey-Anlage dieses Kontos ohne Passwort, bis ein Passkey fertig ist; ohne Passkeys für die App
+gibt es keins."""
 import pathlib
 import sys
 
@@ -45,8 +46,11 @@ async def test_password_login_in_the_app_brings_a_one_time_passkey_ticket(flow, 
     start = await flow.post("/api/auth/passkeys/mobile/register/options", json={"enroll_ticket": body["passkey_ticket"], "name": "Mein Handy"})
     assert start.status_code == 200, start.text
     assert start.json()["options"]["rp"]["id"] == "club.example"
+    # Abbruch am Gerät: noch ein Versuch mit demselben Ticket - verbraucht wird es erst vom fertigen Passkey.
     again = await flow.post("/api/auth/passkeys/mobile/register/options", json={"enroll_ticket": body["passkey_ticket"]})
-    assert again.status_code == 401, "einmal"
+    assert again.status_code == 200, again.text
+    other = await flow.post("/api/auth/passkeys/mobile/register/options", json={"enroll_ticket": "x" * 43})
+    assert other.status_code == 401, "ein fremdes Ticket öffnet nichts"
 
 
 @pytest.mark.asyncio

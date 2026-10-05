@@ -298,7 +298,7 @@ function NotificationBellOverlay() {
       accessibilityRole="button"
       onPress={() => {
         load();
-        navigationRef.navigate("More", { screen: "Notifications" });
+        navigationRef.navigate("More", { screen: "Notifications", initial: false });
       }}
       style={({ pressed }) => [styles.bell, { right: Math.max(insets.right + 14, 14), top: Math.max(insets.top + 6, 12) }, pressed && styles.pressed]}
       hitSlop={8}

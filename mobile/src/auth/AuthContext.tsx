@@ -39,7 +39,8 @@ type AuthContextValue = {
   login: (email: string, password: string, remember?: boolean) => Promise<LoginResult>;
   completeMfa: (ticket: string, code: string, remember?: boolean) => Promise<void>;
   register: (payload: RegisterPayload) => Promise<RegistrationResponse>;
-  loginWithPasskey: (remember?: boolean) => Promise<void>;
+  /** `silent`: beim Öffnen der Anmeldung nur sofort verfügbare Passkeys, ohne Auswahl von Android (#919). */
+  loginWithPasskey: (remember?: boolean, silent?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   /** Einladung zum Passkey (#919) - nur direkt nach einer Passwort-Anmeldung, sonst null. */
@@ -189,8 +190,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   // Passkey-Anmeldung (#217 Stufe 2): derselbe Passkey wie auf der Website, Gerätesperre statt Passwort.
-  const loginWithPasskey = useCallback(async (remember = true) => {
-    const session = await signInWithPasskey(remember);
+  const loginWithPasskey = useCallback(async (remember = true, silent = false) => {
+    const session = await signInWithPasskey(remember, silent);
     await persistSession(session, remember);
     setPasskeyOffer(null);
   }, [persistSession]);

@@ -447,21 +447,21 @@ function AccountProfile() {
   }, []);
   const openPrivacy = useCallback(() => setView("settings"), []);
   const openShowcase = useCallback(() => {
-    navigation.getParent()?.navigate("More", { screen: "AchievementShowcase" });
+    navigation.getParent()?.navigate("More", { screen: "AchievementShowcase", initial: false });
   }, [navigation]);
 
   const openReference = useCallback((item: PersonalReferenceItem) => {
     if (!item.target_id) return;
     if (item.kind === "fastlap") {
-      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.target_id } });
+      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.target_id }, initial: false });
       return;
     }
     if (item.kind === "season") {
-      navigation.navigate("More", { screen: "SeasonPass" });
+      navigation.navigate("More", { screen: "SeasonPass", initial: false });
       return;
     }
     if (item.kind === "tournament") {
-      navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id } });
+      navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.target_id }, initial: false });
     }
   }, [navigation]);
 
@@ -469,10 +469,10 @@ function AccountProfile() {
     const target = prizeTarget(item);
     if (!target.id) return;
     if (target.kind === "fastlap") {
-      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id } });
+      navigation.navigate("Tournaments", { screen: "FastLapDetail", params: { id: target.id }, initial: false });
       return;
     }
-    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id } });
+    navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target.id }, initial: false });
   }, [navigation]);
 
   const refreshProfile = useCallback(async () => {
@@ -486,7 +486,7 @@ function AccountProfile() {
   const openPublicProfile = useCallback(() => {
     const username = user?.username;
     if (!username) return;
-    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } });
+    navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username }, initial: false });
   }, [navigation, user?.username]);
 
   const sharePublicProfile = useCallback(() => {
@@ -551,7 +551,7 @@ function AccountProfile() {
           <ActionTile icon="share-social-outline" label="Teilen" onPress={guest ? undefined : sharePublicProfile} />
           <ActionTile icon="open-outline" label="Öffentlich" onPress={guest ? undefined : openPublicProfile} />
           {/* Rechnungen gehören zum Konto (#320): Beitrag, Events, Turniere unter Mehr → Meine Rechnungen. */}
-          <ActionTile icon="receipt-outline" label="Rechnungen" onPress={guest ? undefined : () => navigation.navigate("More", { screen: "MyInvoices" })} />
+          <ActionTile icon="receipt-outline" label="Rechnungen" onPress={guest ? undefined : () => navigation.navigate("More", { screen: "MyInvoices", initial: false })} />
           <ActionTile icon="settings-outline" label="Einstellungen" onPress={() => setView("settings")} />
         </View>
 
@@ -612,7 +612,7 @@ function AccountProfile() {
             {/* Ehrungen (#848): aus der Mitgliederakte, nur für Mitglieder; der Schalter bringt freigegebene aufs öffentliche Profil. */}
             {user?.is_club_member ? <HonoursCard /> : null}
             {/* Freunde (#240): offene Anfragen oben, darunter die Liste - live über den Änderungsstrom. */}
-            <FriendsCard onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username } })} />
+            <FriendsCard onOpenProfile={(username) => navigation.getParent()?.navigate("More", { screen: "PublicProfile", params: { username }, initial: false })} />
             <Card style={styles.card} perch="profile-gaming">
               <Heading>Gaming</Heading>
               <Info label="Lieblingsspiele" value={form.favorite_games || "-"} />
@@ -677,7 +677,7 @@ function AccountProfile() {
                     key={award.id}
                     award={award}
                     featured={awards.featured_award_id === award.id}
-                    onPress={() => { const target = award.tournament?.slug || award.tournament?.id; if (target) navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target } }); }}
+                    onPress={() => { const target = award.tournament?.slug || award.tournament?.id; if (target) navigation.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target }, initial: false }); }}
                     action={
                       <Pressable onPress={() => featureAward(awards.featured_award_id === award.id ? null : award.id)} accessibilityRole="button" testID={`award-feature-${award.id}`} style={styles.awardAction}>
                         <Muted style={styles.awardActionText}>{awards.featured_award_id === award.id ? "Profilbanner ✓" : "Als Profilbanner"}</Muted>

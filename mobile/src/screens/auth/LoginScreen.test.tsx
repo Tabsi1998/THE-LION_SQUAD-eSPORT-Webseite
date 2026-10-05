@@ -25,7 +25,9 @@ beforeEach(() => {
 test("ohne Passkey auf dem Gerät: still das Formular - kein Link, keine Meldung, kein „Live-Daten ansehen“", async () => {
   mockLoginWithPasskey.mockRejectedValueOnce({ error: "NoCredentials" });
   await render(<LoginScreen navigation={navigation} />);
-  await waitFor(() => expect(mockLoginWithPasskey).toHaveBeenCalledWith(true));
+  // Still: nur sofort verfügbare Passkeys (getImmediate), das Formular bleibt frei.
+  await waitFor(() => expect(mockLoginWithPasskey).toHaveBeenCalledWith(true, true));
+  expect(screen.getByText("Anmelden")).toBeTruthy();
   expect(screen.queryByTestId("login-passkey-link")).toBeNull();
   expect(screen.queryByText(/kein Passkey/)).toBeNull();
   expect(screen.queryByText("Live-Daten ansehen")).toBeNull();

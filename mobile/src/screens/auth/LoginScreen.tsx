@@ -55,17 +55,20 @@ export function LoginScreen({ navigation }: Props) {
   }
 
   async function passkeyLogin(silent: boolean) {
-    setSubmitting(true);
-    if (!silent) setError("");
+    // Die stille Abfrage beim Öffnen sperrt das Formular nicht - man kann gleich tippen.
+    if (!silent) {
+      setSubmitting(true);
+      setError("");
+    }
     try {
-      await loginWithPasskey(remember);
+      await loginWithPasskey(remember, silent);
       done();
     } catch (err) {
       const miss = silentPasskeyMiss(err);
       if (!silent) setError(passkeyError(err));
       setPasskeyLink(miss !== "none" || !silent);
     } finally {
-      setSubmitting(false);
+      if (!silent) setSubmitting(false);
     }
   }
 

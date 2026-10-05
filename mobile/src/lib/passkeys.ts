@@ -42,9 +42,11 @@ export function credentialPayload(result: PasskeyGetResult) {
   };
 }
 
-export async function signInWithPasskey(remember: boolean): Promise<AuthResponse> {
+export async function signInWithPasskey(remember: boolean, silent = false): Promise<AuthResponse> {
   const { data: start } = await api.post<PasskeyStart>("/auth/passkeys/mobile/login/options", {});
-  const result = await Passkey.get(start.options);
+  // Still beim Öffnen der Anmeldung (#919): nur ein Passkey, der sofort da ist. Ohne ihn zeigt Android sonst eine eigene
+  // Leiste („Sign in another way“) und hält die Anfrage offen; so kommt gleich „NoCredentials“ und das Formular bleibt.
+  const result = silent ? await Passkey.getImmediate(start.options) : await Passkey.get(start.options);
   const { data } = await api.post<AuthResponse>("/auth/passkeys/mobile/login/verify", {
     ticket: start.ticket,
     credential: credentialPayload(result),

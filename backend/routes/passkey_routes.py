@@ -348,9 +348,12 @@ async def mobile_registration_options(body: MobileRegistrationStart, request: Re
     config = _mobile_config()
     db = get_db()
     await enforce_rate_limit(request, "passkey:manage", limit=8, window_seconds=900, subject=user["id"])
+    enroll = ""
     if body.enroll_ticket:
-        granted = await db.passkey_challenges.find_one_and_delete({
-            "_id": hash_token(body.enroll_ticket), "kind": "mobile-enroll", "user_id": user["id"], "expires_at": {"$gt": now_utc()},
+        # Erst der fertige Passkey verbraucht das Ticket (Verify) - bricht man am Gerät ab, geht es noch einmal.
+        enroll = hash_token(body.enroll_ticket)
+        granted = await db.passkey_challenges.find_one({
+            "_id": enroll, "kind": "mobile-enroll", "user_id": user["id"], "expires_at": {"$gt": now_utc()},
         })
         if not granted:
             raise HTTPException(401, "Bitte bestätige dein aktuelles Passwort.")
@@ -376,6 +379,7 @@ async def mobile_registration_options(body: MobileRegistrationStart, request: Re
     await db.passkey_challenges.insert_one({
         "_id": hash_token(ticket), "kind": "mobile-register", "challenge": bytes_to_base64url(options.challenge), "user_id": user["id"],
         "rp_id": config["rp_id"], "name": body.name.strip() or "Mein Passkey", "expires_at": now_utc() + timedelta(minutes=5),
+        **({"enroll": enroll} if enroll else {}),
     })
     return {"ticket": ticket, "options": json.loads(options_to_json(options))}
 
@@ -406,6 +410,8 @@ async def mobile_registration_verify(body: MobileCredentialResponse, request: Re
         })
     except DuplicateKeyError as exc:
         raise HTTPException(409, "Dieser Passkey ist bereits registriert.") from exc
+    if challenge.get("enroll"):
+        await db.passkey_challenges.delete_one({"_id": challenge["enroll"], "kind": "mobile-enroll"})
     await _security_audit(db, user["id"], "auth.passkey.registered", request)
     return {"ok": True}
 

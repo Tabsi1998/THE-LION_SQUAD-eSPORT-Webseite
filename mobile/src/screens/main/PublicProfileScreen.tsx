@@ -220,7 +220,7 @@ export function PublicProfileScreen({ navigation, route }: Props) {
   // Auszeichnung antippen (#230): zum Turnier.
   const openAward = (award: Award) => {
     const target = award.tournament?.slug || award.tournament?.id;
-    if (target) navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target } });
+    if (target) navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: target }, initial: false });
   };
 
   return (
@@ -340,9 +340,9 @@ export function PublicProfileScreen({ navigation, route }: Props) {
         ) : null}
 
         {tab === "achievements" ? <PublicAchievementsTab data={achievements} displayName={display} /> : null}
-        {tab === "tournaments" ? <TournamentTab items={profile.tournaments || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.slug || item.id } })} /> : null}
-        {tab === "fastlaps" ? <FastLapTab items={profile.f1_bests || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.challenge?.slug || item.challenge?.id } })} /> : null}
-        {tab === "teams" ? <TeamTab items={profile.teams || []} onOpen={(item) => navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: item.id } })} /> : null}
+        {tab === "tournaments" ? <TournamentTab items={profile.tournaments || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "TournamentDetail", params: { id: item.slug || item.id }, initial: false })} /> : null}
+        {tab === "fastlaps" ? <FastLapTab items={profile.f1_bests || []} onOpen={(item) => navigation.getParent()?.navigate("Tournaments", { screen: "FastLapDetail", params: { id: item.challenge?.slug || item.challenge?.id }, initial: false })} /> : null}
+        {tab === "teams" ? <TeamTab items={profile.teams || []} onOpen={(item) => navigation.getParent()?.navigate("Teams", { screen: "TeamDetail", params: { id: item.id }, initial: false })} /> : null}
       </ScrollView>
     </Screen>
   );

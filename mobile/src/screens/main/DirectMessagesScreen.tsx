@@ -2,11 +2,14 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
+import { SignInRequired } from "../../components/SignInRequired";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted, Title } from "../../components/Text";
+import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
+import { isGuestUser } from "../../live";
 import { formatDate } from "../../lib/format";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -15,6 +18,8 @@ import type { DirectConversation } from "../../types";
 type Props = NativeStackScreenProps<MoreStackParamList, "DirectMessages">;
 
 export function DirectMessagesScreen({ navigation }: Props) {
+  // Gast zuerst (#918): ohne Konto keine Anfrage und kein „Not authenticated“, sondern der Weg zum Konto.
+  const guest = isGuestUser(useAuth().user);
   const [items, setItems] = useState<DirectConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -22,6 +27,11 @@ export function DirectMessagesScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     setError("");
+    if (guest) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
     try {
       const { data } = await api.get<DirectConversation[]>("/messages/conversations");
       setItems(Array.isArray(data) ? data : []);
@@ -31,7 +41,7 @@ export function DirectMessagesScreen({ navigation }: Props) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [guest]);
 
   const refresh = useCallback(() => {
     setRefreshing(true);
@@ -55,9 +65,10 @@ export function DirectMessagesScreen({ navigation }: Props) {
           <Title>Nachrichten</Title>
           <Muted>Direkte Unterhaltungen mit Spielern, Freunden und Teammitgliedern.</Muted>
         </View>
+        {guest ? <SignInRequired text="Direktnachrichten schreibst du mit einem Konto – an Spieler, Freunde und dein Team." testID="messages-sign-in" /> : null}
         {loading ? <SkeletonList count={5} hasImage={false} /> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
-        {!loading && !items.length ? <EmptyState title="Keine Nachrichten" detail="Neue Chats entstehen, sobald du einem Profil eine Nachricht schreibst." /> : null}
+        {!guest && !loading && !items.length ? <EmptyState title="Keine Nachrichten" detail="Neue Chats entstehen, sobald du einem Profil eine Nachricht schreibst." /> : null}
         {items.map((item) => {
           const name = item.user.display_name || item.user.username || "Spieler";
           return (

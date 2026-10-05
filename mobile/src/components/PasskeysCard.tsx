@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
-import { createPasskey, listPasskeys, passkeyCreateError, passkeysAvailable, passkeysSupported, removePasskey, type PasskeyRow } from "../lib/passkeys";
+import { createPasskey, listPasskeys, passkeyCreateError, passkeysAvailable, passkeysSupported, removePasskey, silentPasskeyMiss, type PasskeyRow } from "../lib/passkeys";
 import { colors } from "../theme";
 import { Button } from "./Button";
 import { Card } from "./Card";
@@ -68,7 +68,8 @@ export function PasskeysCard({ style }: { style?: object }) {
       setPassword("");
       await load();
     } catch (error) {
-      setFailed(true);
+      // Abgebrochen am Gerät ist kein Fehler - ruhig statt rot.
+      setFailed(pending.kind !== "create" || silentPasskeyMiss(error) !== "cancelled");
       setMessage(pending.kind === "create" ? passkeyCreateError(error) : errorMessage(error, "Der Passkey konnte nicht entfernt werden."));
     } finally {
       setBusy(false);
@@ -119,7 +120,7 @@ export function PasskeysCard({ style }: { style?: object }) {
       ) : (
         <Muted>Dieses Gerät kann keine Passkeys anlegen.</Muted>
       )}
-      {message ? <Muted style={failed ? styles.error : styles.success} testID="passkeys-message">{message}</Muted> : null}
+      {message ? <Muted style={failed ? styles.error : pending ? undefined : styles.success} testID="passkeys-message">{message}</Muted> : null}
     </Card>
   );
 }
