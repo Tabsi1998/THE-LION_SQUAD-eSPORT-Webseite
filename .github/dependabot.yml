@@ -87,6 +87,9 @@ updates:
           - "react-native-safe-area-context"
           - "react-native-screens"
           - "react-native-worklets"
+          - "@shopify/react-native-skia"
+          - "react-native-svg"
+          - "jest-expo"
         update-types:
           - minor
           - patch
@@ -104,5 +107,10 @@ updates:
       - dependency-name: "react-native-safe-area-context"
       - dependency-name: "react-native-screens"
       - dependency-name: "react-native-worklets"
+      # Diese drei gibt das Expo-SDK vor (bundledNativeModules): Skia 2.14 statt 2.6.2 brach den TypeScript-Lauf (#899).
+      # Sie kommen mit `npx expo install --fix` beim nächsten Expo-Update.
+      - dependency-name: "@shopify/react-native-skia"
+      - dependency-name: "react-native-svg"
+      - dependency-name: "jest-expo"
     commit-message:
       prefix: chore
