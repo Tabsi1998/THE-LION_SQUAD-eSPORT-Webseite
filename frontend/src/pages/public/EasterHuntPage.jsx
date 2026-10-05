@@ -8,7 +8,7 @@ import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { EggShape } from "@/seasons/easterHunt/EggShape";
 import { fetchHuntPage, onHuntProgress } from "@/seasons/easterHunt/api";
 import "@/seasons/easterHunt/easter-hunt.css";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // Die Seite der Ostereiersuche (#646, Korb #758): der eigene Korb mit den gefundenen Eiern in ihrem echten Muster,
 // leere Plätze für die fehlenden (ohne etwas zu verraten), Hinweise ab dem zweiten Tag, Preise, die Schnellsten
@@ -17,13 +17,13 @@ import { viennaDate, viennaDateTime } from "@/lib/vienna";
 const SERIF = { fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' };
 
 function dayLabel(iso) {
-  const day = new Date(iso || "");
+  const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
   return viennaDate(day, { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
 }
 
 function timeLabel(iso) {
-  const day = new Date(iso || "");
+  const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
   return viennaDateTime(day, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Vienna" });
 }

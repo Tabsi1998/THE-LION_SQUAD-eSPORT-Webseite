@@ -1,9 +1,11 @@
+import { asInstant, viennaDay } from "@/lib/vienna";
+
 const DONE_STATUSES = ["completed", "results_published", "archived", "cancelled", "beendet", "archiv"];
 const ACTIVE_TERMS = ["live", "check", "open", "registration", "anmeldung", "aktiv", "running", "progress"];
 
 function timestamp(value) {
   if (!value) return null;
-  const time = new Date(value).getTime();
+  const time = asInstant(value).getTime();
   return Number.isNaN(time) ? null : time;
 }
 
@@ -17,10 +19,9 @@ function statusText(status, phase) {
   return `${status || ""} ${phaseText(phase)}`.toLowerCase();
 }
 
+// Derselbe Wiener Tag - "heute" richtet sich nach dem Verein, nicht nach dem Gerät.
 function isSameDay(time, now = Date.now()) {
-  const a = new Date(time);
-  const b = new Date(now);
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return viennaDay(time) === viennaDay(now);
 }
 
 function sortBucket(date, status, phase) {

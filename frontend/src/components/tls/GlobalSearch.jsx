@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { CalendarDays, Newspaper, Search, Trophy, UserRound, Users, X } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 const KIND_META = {
   tournament: { label: "Turnier", icon: Trophy },
@@ -22,7 +22,7 @@ const QUICK_LINKS = [
 
 function formatDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { dateStyle: "medium" });
 }

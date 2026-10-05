@@ -19,7 +19,7 @@ import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { ClubEvent, F1Challenge, Tournament } from "../../types";
-import { viennaDate } from "../../lib/vienna";
+import { dayNoon, viennaDate } from "../../lib/vienna";
 
 const TOURNAMENT_LIST_LIVE_RESOURCES = ["tournaments", "events", "f1"];
 
@@ -215,7 +215,7 @@ export function TournamentsScreen({ navigation }: Props) {
             {selectedDay ? (
               dayItems.length ? (
                 <View style={styles.section} testID="calendar-day-items">
-                  <Heading>{viennaDate(parseDay(selectedDay), { weekday: "long", day: "numeric", month: "long" })}</Heading>
+                  <Heading>{viennaDate(dayNoon(selectedDay), { weekday: "long", day: "numeric", month: "long" })}</Heading>
                   {dayItems.map((item) => <HubContentCard key={`${item.kind}-${item.id}`} item={item} onPress={() => open(item)} />)}
                 </View>
               ) : (

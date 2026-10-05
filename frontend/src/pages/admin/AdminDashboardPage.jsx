@@ -381,7 +381,7 @@ export default function AdminDashboardPage() {
             <ul className="divide-y divide-white/5">
               {today.map((item, index) => (
                 <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 text-sm">
-                  <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? viennaTime(new Date(item.at), { timeStyle: "short" }) : "–"}</span>
+                  <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? viennaTime(item.at, { timeStyle: "short" }) : "–"}</span>
                   <span className="shrink-0 text-[10px] uppercase tracking-widest font-bold" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
@@ -529,7 +529,7 @@ export default function AdminDashboardPage() {
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
             <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
               <span className="text-white/80 min-w-0 truncate">{l.action}</span>
-              <span className="text-white/40 text-xs shrink-0">{l.created_at && viennaDateTime(new Date(l.created_at))}</span>
+              <span className="text-white/40 text-xs shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
             </div>
           ))}
           {(!data || data.recent_audit_logs?.length === 0) && <div className="text-white/40">Keine Einträge.</div>}

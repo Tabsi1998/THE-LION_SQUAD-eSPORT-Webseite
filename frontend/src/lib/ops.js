@@ -49,7 +49,7 @@ export function ratingTone(rating) {
 /** Eine Zeile zum letzten Lauf: Zeitpunkt und die Namen der nicht grünen Prüfungen. */
 export function describeRun(run) {
   if (!run) return "Noch kein Lauf.";
-  const when = run.at ? viennaDateTime(new Date(run.at)) : "";
+  const when = run.at ? viennaDateTime(run.at) : "";
   if (run.status === "ok") return `Alle Prüfungen grün${when ? ` (${when})` : ""}.`;
   const failing = (run.checks || []).filter((c) => c.status !== "ok").map((c) => `${c.label}: ${STATUS_LABELS[c.status] || c.status}`);
   return `${failing.join(" · ")}${when ? ` (${when})` : ""}`;

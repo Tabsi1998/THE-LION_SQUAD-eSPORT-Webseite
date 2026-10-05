@@ -54,7 +54,7 @@ export default function MemberCardVerifyPage() {
                 <div><dt className="text-[10px] uppercase tracking-widest text-white/40">Mitglied</dt><dd className="text-lg font-bold text-white">{result.name}</dd></div>
                 <div><dt className="text-[10px] uppercase tracking-widest text-white/40">Mitgliedsart</dt><dd className="text-white/85">{result.type_label}</dd></div>
                 <div><dt className="text-[10px] uppercase tracking-widest text-white/40">Gültig</dt><dd className="text-white/85">{result.valid_until ? `bis ${formatDate(result.valid_until)}` : "solange die Mitgliedschaft besteht"}</dd></div>
-                {result.checked_at && <div className="pt-2 text-xs text-white/40">Geprüft am {viennaDateTime(new Date(result.checked_at))}</div>}
+                {result.checked_at && <div className="pt-2 text-xs text-white/40">Geprüft am {viennaDateTime(result.checked_at)}</div>}
               </dl>
             ) : result ? (
               <p className="mt-3 text-sm text-white/70">Dieser Code ist nicht (mehr) gültig. Das Mitglied kann in der App oder auf der Website einen frischen Code anzeigen.</p>

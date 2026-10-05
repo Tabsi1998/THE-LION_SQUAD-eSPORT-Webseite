@@ -37,7 +37,7 @@ export function deliveryText(target, status) {
 
 export function lastAttemptText(last) {
   if (!last) return "";
-  const when = viennaDateTime(new Date(last.created_at));
+  const when = viennaDateTime(last.created_at);
   if (last.status === "sent") return `zuletzt gesendet · ${when}`;
   return `zuletzt fehlgeschlagen · ${when}${last.error ? ` – ${last.error}` : ""}`;
 }

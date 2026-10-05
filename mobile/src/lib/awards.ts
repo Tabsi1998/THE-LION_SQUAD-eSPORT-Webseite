@@ -1,4 +1,4 @@
-import { viennaDate } from "./vienna";
+import { asInstant, viennaDate } from "./vienna";
 // Auszeichnungen (#230): Banner und Trophäen aus veröffentlichten Turnieren. Der Server liefert
 // die Daten (Platz, Bilanz, Turnier, Spiel, Saison, Team, optional ein Bild für Platz 1-3); die
 // Karte entsteht daraus - dieselben Zeilen wie im Web (AwardBanner.jsx).
@@ -33,7 +33,7 @@ export function awardTone(award: Pick<Award, "rank"> | null | undefined, fallbac
 /** Nur der Tag im Vereins-Kalender - die Uhrzeit des Turnierstarts gehört nicht aufs Banner. */
 export function awardDay(value?: string | null): string {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Vienna" });
 }

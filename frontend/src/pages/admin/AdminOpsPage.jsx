@@ -34,7 +34,7 @@ const VITAL_COLUMNS = ["LCP", "INP", "CLS", "TTFB"];
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(new Date(value));
+    return viennaDateTime(value);
   } catch {
     return value;
   }

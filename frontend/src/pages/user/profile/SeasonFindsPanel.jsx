@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { FindIcon } from "./SeasonFindIcons";
 import "./season-finds.css";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Saison-Fundstücke (#678): was du über die Jahreszeiten gesammelt hast - verscheuchte Fledermäuse, befreite Geister,
 // gefangene Schneeflocken, Türchen, Eier. Was gerade läuft, steht groß und oben, mit dem Stand von heute und dem
@@ -16,7 +16,7 @@ const DAY = { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit" };
 
 export function dayText(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   return Number.isNaN(date.getTime()) ? "" : viennaDate(date, DAY);
 }
 

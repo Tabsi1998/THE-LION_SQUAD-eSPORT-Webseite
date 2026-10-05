@@ -238,7 +238,7 @@ export default function AdminEventsPage() {
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#9F7AEA] font-bold">{eventTypeLabel(e.event_type, meta.types)}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/70 font-bold">{meta.statuses.find((s) => s.k === e.status)?.l || e.status}</td>
                     <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-white/60">{e.visibility}</td>
-                    <td className="px-4 py-3 text-xs text-white/70">{e.start_date ? viennaDate(new Date(e.start_date)) : "—"}</td>
+                    <td className="px-4 py-3 text-xs text-white/70">{e.start_date ? viennaDate(e.start_date) : "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/55">{e.location || "—"}</td>
                     <td className="px-4 py-3 text-xs text-white/65">
                       {e.has_registration ? (
@@ -363,7 +363,7 @@ function EventRegistrationsModal({ event, onClose, onChanged }) {
                         </select>
                       </td>
                       <td className="px-4 py-3 text-xs text-white/55 max-w-xs truncate">{registration.note || "—"}</td>
-                      <td className="px-4 py-3 text-xs text-white/45">{registration.created_at ? viennaDateTime(new Date(registration.created_at), { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
+                      <td className="px-4 py-3 text-xs text-white/45">{registration.created_at ? viennaDateTime(registration.created_at, { dateStyle: "medium", timeStyle: "short" }) : "—"}</td>
                     </tr>
                   ))}
                   {!loading && registrations.length === 0 && (

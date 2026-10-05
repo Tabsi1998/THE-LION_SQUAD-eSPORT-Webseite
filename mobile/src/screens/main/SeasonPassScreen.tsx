@@ -322,7 +322,7 @@ function formatPoints(value: number) {
 
 function formatDate(iso: string) {
   try {
-    return viennaDate(new Date(iso), { day: "2-digit", month: "2-digit", year: "numeric" });
+    return viennaDate(iso, { day: "2-digit", month: "2-digit", year: "numeric" });
   } catch {
     return iso;
   }

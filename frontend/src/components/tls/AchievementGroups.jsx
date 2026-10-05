@@ -460,7 +460,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
         {tier.earned ? (
           <div className="text-[10px] uppercase tracking-widest text-white/70">
             +{tier.points} Pkt.
-            {tier.earned_at && <div className="text-white/45">{viennaDate(new Date(tier.earned_at))}</div>}
+            {tier.earned_at && <div className="text-white/45">{viennaDate(tier.earned_at)}</div>}
           </div>
         ) : (
           <div className="text-[10px] uppercase tracking-widest text-white/50">+{tier.points}</div>

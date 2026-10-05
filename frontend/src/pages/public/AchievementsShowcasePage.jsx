@@ -398,7 +398,7 @@ function WeekTile({ week, loading }) {
             <Link to={award.user?.username ? `/u/${award.user.username}` : "#"} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
-              {award.earned_at && <span className="text-white/35 text-xs">{viennaDate(new Date(award.earned_at))}</span>}
+              {award.earned_at && <span className="text-white/35 text-xs">{viennaDate(award.earned_at)}</span>}
             </Link>
             {award.award_id && (
               <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color }} data-testid="week-award-card">

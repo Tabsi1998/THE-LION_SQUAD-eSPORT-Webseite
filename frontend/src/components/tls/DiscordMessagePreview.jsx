@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { ExternalLink } from "lucide-react";
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
 
 // Discord-Nachbildung (#583, #866): so sieht eine Nachricht des Bots ungefähr im Discord aus - Bot-Name mit
 // APP-Plakette, Text über dem Kasten, Kasten mit Farbleiste, Autorzeile mit Bild, Titel, Text, Felder, Bild rechts,
@@ -74,10 +74,10 @@ export function renderDiscordText(text, options = {}) {
 
 /** „Heute um 19:15 Uhr“ oder „03.10.2026 19:15“ - wie Discord die Zeit in der Fußzeile zeigt. */
 export function discordTime(value, now = new Date()) {
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   const time = viennaTime(date, { hour: "2-digit", minute: "2-digit" });
-  return date.toDateString() === now.toDateString() ? `Heute um ${time} Uhr` : `${viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" })} ${time}`;
+  return viennaDay(date) === viennaDay(now) ? `Heute um ${time} Uhr` : `${viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" })} ${time}`;
 }
 
 export function DiscordMessagePreview({ embed, content = "", buttons = [], botName = "Vereins-Bot", avatarUrl = "", time = "heute um 18:00", roles = {}, testId = "discord-message", embedTestId = "" }) {

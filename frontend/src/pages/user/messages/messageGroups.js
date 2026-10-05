@@ -1,31 +1,24 @@
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { asInstant, dayBefore, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
 // Reine Logik der Unterhaltung (#254): Datum-Trenner („Heute“, „Gestern“,
 // „12.09.2026“), zusammengefasste Köpfe wie in der App (#220) und das
 // Zusammenführen von nachgeladenen oder neu eingetroffenen Nachrichten.
-// Ohne React, damit es sich ohne Oberfläche testen lässt.
+// Ohne React, damit es sich ohne Oberfläche testen lässt. Die Tage sind
+// Wiener Tage - wie die Uhrzeit in der Sprechblase.
 
-const DAY_MS = 24 * 60 * 60 * 1000;
 // Nachrichten desselben Absenders innerhalb dieser Spanne teilen einen Kopf.
 export const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
-function startOfDay(date) {
-  const copy = new Date(date);
-  copy.setHours(0, 0, 0, 0);
-  return copy.getTime();
-}
-
 export function dayLabel(value, now = new Date()) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const day = startOfDay(date);
-  const today = startOfDay(now);
+  const day = viennaDay(value);
+  if (!day) return "";
+  const today = viennaDay(now);
   if (day === today) return "Heute";
-  if (day === today - DAY_MS) return "Gestern";
-  return viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" });
+  if (day === dayBefore(today)) return "Gestern";
+  return viennaDate(value, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function timeLabel(value) {
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
 }
@@ -37,8 +30,8 @@ export function buildTimeline(messages, meId, now = new Date()) {
   let lastDay = null;
   let previous = null;
   for (const message of messages || []) {
-    const stamp = new Date(message.created_at || 0).getTime();
-    const day = Number.isNaN(stamp) ? null : startOfDay(stamp);
+    const stamp = asInstant(message.created_at || 0).getTime();
+    const day = Number.isNaN(stamp) ? null : viennaDay(stamp);
     if (day !== lastDay) {
       items.push({ type: "day", key: `day-${day}`, label: dayLabel(message.created_at, now) });
       lastDay = day;

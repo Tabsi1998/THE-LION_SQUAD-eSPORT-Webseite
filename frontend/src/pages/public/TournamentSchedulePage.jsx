@@ -18,7 +18,7 @@ import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
-  return viennaDateTime(new Date(value), { dateStyle: "medium", timeStyle: "short" });
+  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 // Ein Spieltag ist eine Woche. Die Kopfzeile nennt deshalb den Zeitraum, nicht
@@ -26,8 +26,8 @@ function formatDateTime(value) {
 function formatWeekRange(startsAt, endsAt) {
   if (!startsAt || !endsAt) return "";
   const day = { day: "2-digit", month: "2-digit" };
-  const start = viennaDate(new Date(startsAt), day);
-  const end = viennaDate(new Date(endsAt), { ...day, year: "numeric" });
+  const start = viennaDate(startsAt, day);
+  const end = viennaDate(endsAt, { ...day, year: "numeric" });
   return `${start} – ${end}`;
 }
 

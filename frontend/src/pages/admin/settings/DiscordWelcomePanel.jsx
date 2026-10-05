@@ -15,7 +15,7 @@ export function statsText(stats) {
   if (!stats) return "";
   const parts = [`${stats.sent || 0} gesendet`, `${stats.dm_closed || 0} mit geschlossenen Direktnachrichten`];
   if (stats.error) parts.push(`${stats.error} Fehler`);
-  const last = stats.last_at ? ` · zuletzt ${viennaDateTime(new Date(stats.last_at))}` : "";
+  const last = stats.last_at ? ` · zuletzt ${viennaDateTime(stats.last_at)}` : "";
   return `${parts.join(" · ")}${last}`;
 }
 

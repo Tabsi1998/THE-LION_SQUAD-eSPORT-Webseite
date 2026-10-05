@@ -1,6 +1,6 @@
 import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
 const configuredUploadBackendUrl = (import.meta.env.VITE_UPLOAD_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -232,7 +232,7 @@ export function formatMs(ms) {
 
 export function formatMemberSince(value, precision = "day") {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   if (precision === "year") return String(date.getFullYear());
   if (precision === "month") {

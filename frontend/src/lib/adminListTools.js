@@ -1,4 +1,4 @@
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 export function normalizeSearch(value) {
   return String(value || "")
     .toLowerCase()
@@ -28,7 +28,7 @@ export function downloadCsv(filename, header, rows) {
 
 export function formatAdminDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date);
 }

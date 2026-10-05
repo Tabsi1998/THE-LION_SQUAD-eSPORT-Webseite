@@ -75,8 +75,8 @@ export default function CurrentSeasonRedirect() {
                   {(season.start_date || season.end_date) && (
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-white/45">
                       <CalendarDays className="w-3.5 h-3.5" />
-                      {season.start_date ? viennaDate(new Date(season.start_date)) : "Start offen"}
-                      {season.end_date ? ` - ${viennaDate(new Date(season.end_date))}` : ""}
+                      {season.start_date ? viennaDate(season.start_date) : "Start offen"}
+                      {season.end_date ? ` - ${viennaDate(season.end_date)}` : ""}
                     </div>
                   )}
                 </div>

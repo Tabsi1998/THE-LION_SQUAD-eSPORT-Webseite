@@ -1,7 +1,7 @@
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 export function formatDateTime(value, options = {}) {
   if (!value) return options.fallback || "TBD";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return viennaDateTime(date, {
     day: "2-digit",
@@ -14,7 +14,7 @@ export function formatDateTime(value, options = {}) {
 
 export function formatDate(value, options = {}) {
   if (!value) return options.fallback || "TBD";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return viennaDate(date, {
     day: "2-digit",
@@ -23,6 +23,7 @@ export function formatDate(value, options = {}) {
   });
 }
 
+// Die beiden Wandler für Eingabefelder (datetime-local) rechnen in der Zeit des Geräts - so zeigt der Browser das Feld.
 export function fromDateTimeLocal(value) {
   if (!value) return null;
   const date = new Date(value);

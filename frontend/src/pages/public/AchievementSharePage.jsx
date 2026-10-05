@@ -96,7 +96,7 @@ export default function AchievementSharePage() {
                     <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 text-xs">{person.trim().charAt(0).toUpperCase()}</span>
                   )}
                   <span className="font-semibold">{person}</span>
-                  {card.earned_at && <span className="text-white/35 text-xs">{viennaDate(new Date(card.earned_at))}</span>}
+                  {card.earned_at && <span className="text-white/35 text-xs">{viennaDate(card.earned_at)}</span>}
                 </Link>
               </div>
               <div className="flex md:flex-col gap-2 shrink-0">

@@ -4,7 +4,7 @@ import { Activity, AlertTriangle, Bot, Bug, CheckCircle2, Clock, Download, Exter
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 // Ereignisse (#517 Teil 2): alle Quellen in einer Liste - Serverfehler, Auto-Checks, Alarme, App-Logs,
 // E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot. Gefiltert wird
@@ -18,7 +18,7 @@ const AUDIT_QUICK = [["", "Alle Aktionen"], ["user.role", "Rollen"], ["tournamen
 
 export function formatEventTime(value) {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return viennaDateTime(date);
 }

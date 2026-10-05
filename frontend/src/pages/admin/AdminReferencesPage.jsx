@@ -178,7 +178,7 @@ function buildReferenceSuggestions(items, helpers) {
 
 function formatDate(value) {
   if (!value) return "—";
-  return viennaDate(new Date(value), { dateStyle: "medium" });
+  return viennaDate(value, { dateStyle: "medium" });
 }
 
 function entryPeople(entry) {

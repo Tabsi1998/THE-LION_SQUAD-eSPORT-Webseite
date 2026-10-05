@@ -125,7 +125,7 @@ export default function PrivacyAccountPage() {
               <dt className="text-white/40">Benutzername</dt><dd>{user?.username}</dd>
               <dt className="text-white/40">E-Mail</dt><dd>{user?.email}</dd>
               <dt className="text-white/40">Rolle</dt><dd className="text-[#29B6E8] uppercase text-xs tracking-widest">{user?.role}</dd>
-              <dt className="text-white/40">Registriert</dt><dd>{user?.created_at && viennaDate(new Date(user.created_at))}</dd>
+              <dt className="text-white/40">Registriert</dt><dd>{user?.created_at && viennaDate(user.created_at)}</dd>
             </dl>
           </div>
         </div>

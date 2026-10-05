@@ -3,7 +3,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Laptop, LogOut, ShieldCheck, Smartphone } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 function parseSessionDevice(userAgent = "", client = "web") {
   if (client === "mobile") return { browser: "Lion Squad App", os: "Mobile", mobile: true };
@@ -25,7 +25,7 @@ function parseSessionDevice(userAgent = "", client = "web") {
 
 function formatSessionTime(value) {
   if (!value) return "—";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "—";
   return viennaDateTime(date, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }

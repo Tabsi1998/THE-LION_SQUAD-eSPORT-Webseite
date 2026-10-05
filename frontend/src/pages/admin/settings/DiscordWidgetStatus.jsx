@@ -11,7 +11,7 @@ import { viennaTime } from "@/lib/vienna";
 export function widgetText(widget) {
   if (!widget) return "";
   if (widget.available) {
-    const when = widget.fetched_at ? ` · Stand ${viennaTime(new Date(widget.fetched_at), { hour: "2-digit", minute: "2-digit" })}` : "";
+    const when = widget.fetched_at ? ` · Stand ${viennaTime(widget.fetched_at, { hour: "2-digit", minute: "2-digit" })}` : "";
     return `Läuft: ${widget.online || 0} online, ${widget.in_voice || 0} im Voice${when}.`;
   }
   return widget.reason_text || "Noch nicht abgefragt – das passiert jede Minute von selbst.";

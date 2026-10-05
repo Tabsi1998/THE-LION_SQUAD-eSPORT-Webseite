@@ -10,7 +10,7 @@ import { safeResourceUrl, serverResourceLabels } from "@/lib/serverResources";
 import { ruleFacts, serverTags } from "@/lib/serverFacts";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
@@ -42,14 +42,14 @@ function accessText(server) {
 
 function formatDateTime(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return viennaDateTime(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function formatRemainingTime(target, now) {
   if (!target) return "";
-  const date = new Date(target);
+  const date = asInstant(target);
   if (Number.isNaN(date.getTime())) return "";
   const diff = date.getTime() - now;
   if (diff <= 0) return "Ende erreicht";

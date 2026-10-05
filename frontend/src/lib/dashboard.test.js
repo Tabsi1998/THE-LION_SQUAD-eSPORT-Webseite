@@ -3,7 +3,7 @@ import { dashboardActions, registrationLabel, seasonLine, splitHomeTimeline, tim
 // Das Dashboard als persoenliche Startseite (#256): nur Termine von heute an,
 // heute und live zuerst, Aktionen mit Ziel, eine Zeile Jahreswertung.
 
-const NOW = new Date("2026-09-16T10:00:00");
+const NOW = new Date("2026-09-16T10:00:00+02:00");
 
 function payload() {
   return {
@@ -11,7 +11,7 @@ function payload() {
       tournaments: [
         { id: "t-past", slug: "summer-cup", title: "Summer Cup", status: "results_published", start_date: "2026-05-20T18:00:00Z", public_phase: { state: "finished", label: "Beendet" }, my_registration: { status: "approved" } },
         { id: "t-next", slug: "autumn-cup", title: "Autumn Cup", status: "registration_open", start_date: "2026-11-01T18:00:00Z", public_phase: { state: "registration", label: "Anmeldung offen" }, my_registration: { status: "pending" }, game: { display_name: "Rocket League" } },
-        { id: "t-today", slug: "heute-cup", title: "Heute-Cup", status: "live", start_date: "2026-09-16T08:00:00", public_phase: { state: "live", label: "Live" }, my_registration: { status: "checked_in" } },
+        { id: "t-today", slug: "heute-cup", title: "Heute-Cup", status: "live", start_date: "2026-09-16T08:00:00+02:00", public_phase: { state: "live", label: "Live" }, my_registration: { status: "checked_in" } },
         { id: "t-cancelled", slug: "champ", title: "Championship", status: "cancelled", start_date: "2026-09-19T18:00:00Z", my_registration: { status: "approved" } },
       ],
       events: [
@@ -40,11 +40,21 @@ test("vergangene und abgesagte Termine fallen weg, heute und live stehen vorne",
 
 test("ein Termin ohne Ende zaehlt den ganzen Tag, ein beendeter nicht mehr", () => {
   const items = timelineItems({ me: { tournaments: [
-    { id: "a", title: "Frühcup", status: "live", start_date: "2026-09-16T06:00:00" },
-    { id: "b", title: "Gestern", status: "registration_open", start_date: "2026-09-15T20:00:00" },
+    { id: "a", title: "Frühcup", status: "live", start_date: "2026-09-16T06:00:00+02:00" },
+    { id: "b", title: "Gestern", status: "registration_open", start_date: "2026-09-15T20:00:00+02:00" },
   ], events: [] } });
   const { live, next } = splitHomeTimeline(items, NOW);
   expect(live.map((item) => item.title)).toEqual(["Frühcup"]);
+  expect(next).toEqual([]);
+});
+
+test("heute ist der Wiener Tag: ein Termin kurz nach Mitternacht zählt schon, einer kurz davor nicht mehr", () => {
+  const items = timelineItems({ me: { tournaments: [
+    { id: "nacht", title: "Nachtcup", status: "registration_open", start_date: "2026-09-16T00:20:00+02:00" },
+    { id: "spaet", title: "Spätcup", status: "registration_open", start_date: "2026-09-15T23:40:00+02:00" },
+  ], events: [] } });
+  const { live, next } = splitHomeTimeline(items, NOW);
+  expect(live.map((item) => item.title)).toEqual(["Nachtcup"]);
   expect(next).toEqual([]);
 });
 

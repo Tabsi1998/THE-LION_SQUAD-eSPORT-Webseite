@@ -77,7 +77,7 @@ export default function AdminBoardPage() {
           <p className="text-sm text-white/70">
             Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>).
             Die Vorstandsseite, „Über uns“ und die Ansprechpartner auf der Startseite zeigen die Funktionen und Inhaber aus dem Vereinsmodul
-            (Stand {source.fetched_at ? viennaDateTime(new Date(source.fetched_at), { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
+            (Stand {source.fetched_at ? viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
             Funktionen und Inhaber pflegst du in Dolibarr; ein Name erscheint nur, wenn die Person der Nennung zugestimmt hat; Foto und Profil-Link kommen über den eigenen Eintrag der Person im Mitgliederverzeichnis.
             Die Liste unten gilt nur, wenn der Schalter aus ist.
           </p>

@@ -97,7 +97,7 @@ export default function AdminMembershipApplicationsPage() {
             <tbody className="divide-y divide-white/5">
               {list.map(a => (
                 <tr key={a.id} data-testid={`app-row-${a.id}`}>
-                  <td className="px-4 py-3 text-xs text-white/45 whitespace-nowrap">{viennaDate(new Date(a.created_at))}</td>
+                  <td className="px-4 py-3 text-xs text-white/45 whitespace-nowrap">{viennaDate(a.created_at)}</td>
                   <td className="px-4 py-3"><div className="font-semibold">{a.user_display_name || a.user_username}</div><div className="text-xs text-white/40">@{a.user_username}</div></td>
                   <td className="px-4 py-3 text-xs uppercase tracking-wider">{a.coupled ? (a.type_label || "Mitgliedsart aus Dolibarr") : (PREF_LABEL[a.contribution_pref] || a.contribution_pref)}</td>
                   <td className="px-4 py-3 max-w-md text-white/60 truncate">{a.motivation}</td>
@@ -148,7 +148,7 @@ export default function AdminMembershipApplicationsPage() {
                 {selected.dolibarr?.member_url && <a href={selected.dolibarr.member_url} target="_blank" rel="noreferrer" className="block mt-2 text-[#29B6E8] underline">Mitgliedskarte in Dolibarr öffnen</a>}
               </div>
             )}
-            <Row k="Eingereicht" v={viennaDateTime(new Date(selected.created_at))} />
+            <Row k="Eingereicht" v={viennaDateTime(selected.created_at)} />
             <div>
               <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Motivation</div>
               <p className="mt-1 whitespace-pre-wrap text-white/80">{selected.motivation}</p>

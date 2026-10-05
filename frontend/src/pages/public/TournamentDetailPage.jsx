@@ -474,7 +474,7 @@ function TournamentChat({ tournament, user }) {
                     <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
                       <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
                         <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
-                        {message.created_at && <span>{viennaDateTime(new Date(message.created_at), { dateStyle: "short", timeStyle: "short" })}</span>}
+                        {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
                       </div>
                       {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
                       <ChatMessageAttachments attachments={message.attachments} />

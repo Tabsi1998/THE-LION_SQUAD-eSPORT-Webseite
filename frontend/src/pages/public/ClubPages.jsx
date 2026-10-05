@@ -215,7 +215,7 @@ function BoardCard({ p, compact = false, featured = false }) {
                 <div className="font-heading text-xl font-black text-white group-hover:text-[#FFD700] transition uppercase truncate">{personGamertag(u)}</div>
                 {personRealName(u) && <div className="mt-0.5 text-xs text-white/55 truncate">{personRealName(u)}</div>}
                 {u.role_title && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">{u.role_title}</div>}
-                {p.since && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">seit {viennaDate(new Date(p.since), { month: "long", year: "numeric" })}</div>}
+                {p.since && <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45">seit {viennaDate(p.since, { month: "long", year: "numeric" })}</div>}
               </div>
             </div>
           )}

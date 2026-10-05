@@ -236,7 +236,7 @@ export default function MemberAreaPage() {
                 <div className="space-y-3">
                   {internalNews.map((n) => (
                     <Link key={n.id} to={`/news/${n.slug}`} className="block border-l-2 border-[#FFD700]/50 pl-3 hover:border-[#FFD700] transition">
-                      <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(new Date(n.created_at))}</div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.created_at)}</div>
                       <div className="font-bold text-white mt-0.5">{n.title}</div>
                     </Link>
                   ))}

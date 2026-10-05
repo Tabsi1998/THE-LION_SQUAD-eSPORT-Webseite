@@ -4,18 +4,18 @@ import { isLiveOrToday, seasonLine, splitHomeTimeline, type HomeItem } from "./d
 // Die Startseite zeigte Halloween am 15. September unter "Heute und Live" und
 // gleich darunter noch einmal unter "Meine nächsten Termine" (#212).
 
-const now = new Date(2026, 8, 15, 18, 0); // 15.09.2026, 18:00 Ortszeit
+const now = new Date("2026-09-15T18:00:00+02:00"); // 15.09.2026, 18:00 in Wien
 const item = (overrides: Partial<HomeItem>): HomeItem => ({ id: "x", kind: "event", title: "Termin", ...overrides });
 
 // Der Events-Tab zeigte Beendetes und Abgesagtes zwischen dem, was ansteht (#241).
 describe("Offen und vergangen", () => {
   test("beendet, abgesagt oder gestern ist vergangen; heute und später ist offen", () => {
     expect(isStillRelevant({ status: "registration_open", date: "2026-10-31T18:00:00Z" }, now)).toBe(true);
-    expect(isStillRelevant({ status: "scheduled", date: "2026-09-15T09:00:00" }, now)).toBe(true);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-15T09:00:00+02:00" }, now)).toBe(true);
     expect(isStillRelevant({ status: "cancelled", date: "2026-09-12T18:00:00Z" }, now)).toBe(false);
     expect(isStillRelevant({ status: "completed", date: "2026-10-31T18:00:00Z" }, now)).toBe(false);
-    expect(isStillRelevant({ status: "scheduled", date: "2026-09-14T23:00:00" }, now)).toBe(false);
-    expect(isStillRelevant({ status: "scheduled", date: "2026-09-10T09:00:00", endDate: "2026-09-16T09:00:00" }, now)).toBe(true);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-14T23:00:00+02:00" }, now)).toBe(false);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-10T09:00:00+02:00", endDate: "2026-09-16T09:00:00+02:00" }, now)).toBe(true);
     expect(isStillRelevant({ status: "scheduled" }, now)).toBe(true);
   });
 
@@ -39,7 +39,11 @@ describe("Heute und Live", () => {
     expect(isLiveOrToday(item({ date: "2026-10-31T18:00:00Z", phaseState: "live" }), now)).toBe(true);
     expect(isLiveOrToday(item({ date: "2026-10-31T18:00:00Z", phaseState: "check_in" }), now)).toBe(true);
     expect(isLiveOrToday(item({ date: "2026-10-31T18:00:00Z", status: "in_progress" }), now)).toBe(true);
-    expect(isLiveOrToday(item({ date: new Date(2026, 8, 15, 20, 0).toISOString(), status: "registration_open" }), now)).toBe(true);
+    expect(isLiveOrToday(item({ date: "2026-09-15T20:00:00+02:00", status: "registration_open" }), now)).toBe(true);
+    // Der Wiener Tag zählt: zehn nach Mitternacht ist schon heute, zehn davor war gestern.
+    expect(isLiveOrToday(item({ date: "2026-09-15T00:10:00+02:00", status: "registration_open" }), now)).toBe(true);
+    expect(isLiveOrToday(item({ date: "2026-09-14T23:50:00+02:00", status: "registration_open" }), now)).toBe(false);
+    expect(isStillRelevant({ status: "scheduled", date: "2026-09-15T00:10:00+02:00" }, now)).toBe(true);
   });
 
   test("ohne Datum und ohne Status nicht live", () => {
@@ -49,7 +53,7 @@ describe("Heute und Live", () => {
 
 describe("Aufteilen der Termine", () => {
   const halloween = item({ id: "h", title: "Halloween", date: "2026-10-31T18:00:00Z", phaseState: "registration_open" });
-  const tonight = item({ id: "t", kind: "tournament", title: "Heute-Cup", date: new Date(2026, 8, 15, 20, 0).toISOString() });
+  const tonight = item({ id: "t", kind: "tournament", title: "Heute-Cup", date: "2026-09-15T20:00:00+02:00" });
   const xmas = item({ id: "x", title: "Weihnachtsfeier", date: "2026-11-28T15:00:00Z" });
 
   test("jeder Termin steht nur in einer Liste", () => {

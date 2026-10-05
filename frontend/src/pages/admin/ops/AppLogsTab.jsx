@@ -12,7 +12,7 @@ const PRIORITIES = ["", "critical", "high", "normal", "low"];
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(new Date(value));
+    return viennaDateTime(value);
   } catch {
     return value;
   }

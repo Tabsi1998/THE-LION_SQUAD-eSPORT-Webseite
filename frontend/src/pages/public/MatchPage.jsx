@@ -44,7 +44,7 @@ const scheduleModeLabels = {
 
 function formatDateTime(value) {
   if (!value) return "Noch kein Termin";
-  return viennaDateTime(new Date(value), { dateStyle: "medium", timeStyle: "short" });
+  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function stationLabel(match) {

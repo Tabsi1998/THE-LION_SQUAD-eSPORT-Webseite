@@ -201,7 +201,7 @@ export default function EventLivePage() {
               <div className="mt-4 flex flex-wrap gap-4 text-sm text-white/60">
                 {event.start_date && <span className="inline-flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#29B6E8]" />{formatDateTime(event.start_date)}</span>}
                 {(event.location || event.city) && <span className="inline-flex items-center gap-2"><MapPin className="w-4 h-4 text-[#FFD700]" />{[event.location, event.city].filter(Boolean).join(", ")}</span>}
-                {lastUpdated && <span className="inline-flex items-center gap-2"><RotateCw className="w-4 h-4 text-white/35" />Aktualisiert {viennaTime(new Date(lastUpdated), { hour: "2-digit", minute: "2-digit" })}</span>}
+                {lastUpdated && <span className="inline-flex items-center gap-2"><RotateCw className="w-4 h-4 text-white/35" />Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">

@@ -58,7 +58,7 @@ export function PasskeysPanel() {
           <ul className="space-y-2">
             {items.map((item) => (
               <li key={item.id} className="border-t border-white/10 pt-3 flex flex-wrap gap-3 items-center justify-between">
-                <div><p className="text-sm font-bold">{item.name}</p><p className="text-xs text-white/55">{item.last_used_at ? `Zuletzt verwendet: ${viennaDate(new Date(item.last_used_at))}` : "Noch nicht zur Anmeldung verwendet"}</p></div>
+                <div><p className="text-sm font-bold">{item.name}</p><p className="text-xs text-white/55">{item.last_used_at ? `Zuletzt verwendet: ${viennaDate(item.last_used_at)}` : "Noch nicht zur Anmeldung verwendet"}</p></div>
                 <button type="button" disabled={submitting || !password} className="min-h-11 px-3 text-sm text-[#FF6B62] disabled:opacity-50"
                   onClick={async () => {
                     if (!await confirm({ title: "Passkey entfernen?", description: "Dieser Passkey kann dich anschließend nicht mehr anmelden. Passwort und andere Passkeys bleiben verfügbar.", confirmText: "Entfernen", variant: "danger" })) return;

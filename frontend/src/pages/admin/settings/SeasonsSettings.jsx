@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { SeasonsWeatherCard } from "./SeasonsWeatherCard";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // Jahreszeiten (#632/#633): Halloween, Advent, Weihnachten, Silvester, Fasching, Geburtstag, Ostern - alles
 // an einem Ort. Ein Hauptschalter, je Saison Ein/Aus, automatisch nach Datum oder erzwungen (bis wann),
@@ -19,7 +19,7 @@ export const TEXT_LABELS = { greeting: "Gruß", farewell: "Abschied am 6. Jänne
 
 export function dateText(value, { withTime = true } = {}) {
   if (!value) return "–";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return withTime
     ? viennaDateTime(date, { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -42,6 +42,7 @@ export function runningSeasons(data) {
   return (data.seasons || []).filter((season) => season.active_now).map((season) => ({ key: season.key, effective: season.intensity || "normal" }));
 }
 
+// Für das Eingabefeld: in der Zeit des Geräts - so zeigt der Browser das Feld.
 export function toLocalInput(value) {
   if (!value) return "";
   const date = new Date(value);

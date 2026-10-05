@@ -3,7 +3,8 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Muted } from "./Text";
 import { colors } from "../theme";
-import { WEEKDAY_LABELS, dayKey, itemsByDay, monthLabel, monthMatrix, type CalendarItem, type CalendarKind } from "../lib/calendar";
+import { WEEKDAY_LABELS, itemsByDay, monthLabel, monthMatrix, type CalendarItem, type CalendarKind } from "../lib/calendar";
+import { viennaDay } from "../lib/vienna";
 
 // Monatsansicht (#216): Punkte je Tag in der Farbe der Art, ein Ring um Tage mit eigener
 // Anmeldung. Der Tag antippen zeigt seine Termine darunter - das macht der Aufrufer.
@@ -22,7 +23,7 @@ export function MonthCalendar({ year, month, items, selected, onSelect, onShift,
 }) {
   const weeks = useMemo(() => monthMatrix(year, month), [month, year]);
   const byDay = useMemo(() => itemsByDay(items), [items]);
-  const todayKey = dayKey(today);
+  const todayKey = viennaDay(today);
   return (
     <View style={styles.wrap} testID="month-calendar">
       <View style={styles.head}>

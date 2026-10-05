@@ -59,7 +59,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         </div>
         <div>
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
-          <div className="text-white/80">{viennaDateTime(new Date(item.mtime))}</div>
+          <div className="text-white/80">{viennaDateTime(item.mtime)}</div>
         </div>
         <div>
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>

@@ -31,7 +31,7 @@ import {
   Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award,
 } from "lucide-react";
 import { toast } from "sonner";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste, fünf Reiter (Übersicht, Achievements,
@@ -86,9 +86,7 @@ function copyText(value, successMessage = "Kopiert.") {
 function formatPublicDate(value) {
   if (!value) return "";
   const raw = String(value).trim();
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? new Date(`${raw}T12:00:00`)
-    : new Date(raw);
+  const date = asInstant(raw);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
@@ -366,7 +364,7 @@ export default function PublicProfilePage() {
   const s = profile.stats || {};
   const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
-  const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
+  const joinedDate = profile.created_at ? asInstant(profile.created_at) : null;
   const twitchChannel = normalizeTwitchChannel(profile.twitch_handle);
   const twitchUrl = twitchChannel ? `https://www.twitch.tv/${twitchChannel}` : "";
   const liveStream = twitchChannel
@@ -1222,7 +1220,7 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
 }
 
 function TournamentRow({ t, expanded = false }) {
-  const date = t.start_date ? new Date(t.start_date) : null;
+  const date = t.start_date ? asInstant(t.start_date) : null;
   return (
     <Link to={`/tournaments/${t.slug || t.id}`} data-testid={`profile-tournament-${t.slug}`} className="flex items-center justify-between gap-3 px-4 py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition">
       <div className="min-w-0 flex-1">

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CloudSun, Eye, MapPin, RefreshCw } from "lucide-react";
 import { describeWeather } from "../../../seasons/weather";
-import { viennaTime } from "@/lib/vienna";
+import { asInstant, viennaTime } from "@/lib/vienna";
 
 // Wetter am Vereinsort (#666): was der Server alle zehn Minuten von Open-Meteo holt (ohne Schlüssel), in Worten -
 // und der Ort selbst (Breite, Länge, Name), den der Verein hier ändert. Die Deko nimmt Wind, Regen, Schnee und
@@ -36,7 +36,7 @@ export function skyText(code) {
 
 function timeText(value) {
   if (!value) return "–";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return viennaTime(date, { timeZone: "Europe/Vienna", hour: "2-digit", minute: "2-digit" });
 }

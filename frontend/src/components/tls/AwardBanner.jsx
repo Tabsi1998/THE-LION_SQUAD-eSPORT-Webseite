@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import { Medal, Trophy, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 /** Nur der Tag im Vereins-Kalender – die Uhrzeit des Turnierstarts gehört nicht aufs Banner. */
 export function awardDay(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDate(date, { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Vienna" });
 }

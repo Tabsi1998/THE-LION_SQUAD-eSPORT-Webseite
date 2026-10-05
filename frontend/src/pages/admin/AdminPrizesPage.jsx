@@ -7,7 +7,7 @@ import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 const STATUS_LABEL = {
   pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
@@ -18,14 +18,14 @@ const STATUS_LABEL = {
 
 function formatDate(value) {
   if (!value) return "—";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "—";
   return viennaDate(date);
 }
 
 function daysUntil(value) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return null;
   return Math.ceil((date.getTime() - Date.now()) / 86400000);
 }

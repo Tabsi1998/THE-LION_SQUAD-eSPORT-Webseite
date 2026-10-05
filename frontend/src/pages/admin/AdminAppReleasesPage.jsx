@@ -14,7 +14,7 @@ import { viennaDateTime } from "@/lib/vienna";
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(new Date(value));
+    return viennaDateTime(value);
   } catch {
     return value;
   }

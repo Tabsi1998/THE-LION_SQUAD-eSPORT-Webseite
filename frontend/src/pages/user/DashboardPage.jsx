@@ -359,7 +359,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         <StatusBadge status={match.status} />
       </div>
       {details.length > 0 && <div className="text-xs text-white/50 mt-1">{details.join(" · ")}</div>}
-      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{viennaDateTime(new Date(match.scheduled_at))}</div>}
+      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
       <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
     </Link>
   );

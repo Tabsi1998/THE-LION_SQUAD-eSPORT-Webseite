@@ -14,7 +14,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // News-Detail (Rückmeldung des Betreibers, 24.09.: „sieht am PC aus wie am Handy, nichts ist
 // ausgenutzt“): am PC und Tablet ein breites Raster - links der Artikel in Lesebreite mit großem
@@ -45,7 +45,7 @@ export function readingMinutes(text) {
 }
 
 function formatDate(value, style = "long") {
-  const date = new Date(value || 0);
+  const date = asInstant(value || 0);
   return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { dateStyle: style });
 }
 

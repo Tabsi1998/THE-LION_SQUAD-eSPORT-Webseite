@@ -58,7 +58,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="dolibarr-source-state">
         {source.fetched_at ? (
-          <span className="text-white/60">Stand {viennaDateTime(new Date(source.fetched_at), { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
+          <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
         ) : (
           <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
         )}

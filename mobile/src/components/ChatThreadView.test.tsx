@@ -2,6 +2,7 @@ import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ChatThreadView } from "./ChatThreadView";
+import { viennaDay, viennaTime } from "../lib/vienna";
 
 // Der gemeinsame Chat der App (Direktnachricht, Team, Turnier). Geprüft wird,
 // was man am Gerät nicht sieht: dass Bilder mit der Anmeldung geladen werden -
@@ -124,7 +125,12 @@ test("der Chat lädt beim Öffnen einmal - auch wenn jede Antwort ein neues Arra
 });
 
 test("Nachrichten zeigen die Uhrzeit, und kurz aufeinanderfolgende teilen sich den Kopf", async () => {
-  const today = (hour: number, minute: number) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
+  // Heute um diese Uhrzeit in Wien - als Zeitpunkt mit Zone, egal wo der Prüfrechner steht und ob Sommerzeit ist.
+  const today = (hour: number, minute: number) => {
+    const clock = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const moments = ["+02:00", "+01:00"].map((offset) => new Date(`${viennaDay(new Date())}T${clock}:00${offset}`));
+    return (moments.find((moment) => viennaTime(moment, { hour: "2-digit", minute: "2-digit" }) === clock) as Date).toISOString();
+  };
   mockGet.mockImplementation(async (url: string) => (url === "/stickers" ? stickerResponse : {
     data: [
       { id: "g-1", user_id: "u-2", message: "Erste", created_at: today(10, 0), author: { id: "u-2", display_name: "Mitspieler" } },

@@ -147,7 +147,7 @@ function EventCard({ e, meta }) {
         {e.start_date && (
           <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
             <Calendar className="w-3 h-3" />
-            <span className="min-w-0 truncate">{viennaDateTime(new Date(e.start_date), { dateStyle: "medium", timeStyle: "short" })}</span>
+            <span className="min-w-0 truncate">{viennaDateTime(e.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>
           </div>
         )}
         {e.location && (

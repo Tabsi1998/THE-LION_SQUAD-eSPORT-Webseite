@@ -275,8 +275,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
               </div>
               <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
                 {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Aktionen
-                {link.expires_at ? ` · bis ${viennaDate(new Date(link.expires_at))}` : " · ohne Ablauf"}
-                {link.last_used_at ? ` · zuletzt ${viennaDate(new Date(link.last_used_at))}` : " · nie geöffnet"}
+                {link.expires_at ? ` · bis ${viennaDate(link.expires_at)}` : " · ohne Ablauf"}
+                {link.last_used_at ? ` · zuletzt ${viennaDate(link.last_used_at)}` : " · nie geöffnet"}
                 {link.user_id ? " · usergebunden" : ""}
                 {link.email ? ` · ${link.email}` : ""}
               </div>

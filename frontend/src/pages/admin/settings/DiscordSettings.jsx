@@ -146,7 +146,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
         {discord.last_status && (
           <div className={`border rounded-sm p-3 text-xs ${discord.last_status === "sent" ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`} data-testid="discord-last-status">
             <div className="font-bold uppercase tracking-widest mb-1">Letzte Meldung: {discord.last_status}</div>
-            <div>{discord.last_checked_at ? viennaDateTime(new Date(discord.last_checked_at)) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
+            <div>{discord.last_checked_at ? viennaDateTime(discord.last_checked_at) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
             {discord.last_error && <div className="mt-1 text-[#FF3B30] break-words">{discord.last_error}</div>}
           </div>
         )}

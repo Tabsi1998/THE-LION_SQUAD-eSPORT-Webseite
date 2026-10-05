@@ -72,7 +72,7 @@ export default function MyPenaltiesPage() {
 function PenaltyCard({ p }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
-  const date = p.issued_at ? viennaDateTime(new Date(p.issued_at), {
+  const date = p.issued_at ? viennaDateTime(p.issued_at, {
     dateStyle: "medium", timeStyle: "short",
   }) : "—";
   return (

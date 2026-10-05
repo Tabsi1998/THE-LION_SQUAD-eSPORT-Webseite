@@ -47,7 +47,7 @@ export function formToPayload(form) {
 /** Ein Gründungstag zum Lesen: „1. März 2019“. */
 export function foundedLabel(day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
-  return viennaDate(new Date(`${day}T12:00:00`), { day: "numeric", month: "long", year: "numeric" });
+  return viennaDate(`${day}T12:00:00`, { day: "numeric", month: "long", year: "numeric" });
 }
 
 export function numberValueText(key, numbers) {

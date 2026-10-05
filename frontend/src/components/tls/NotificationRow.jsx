@@ -11,7 +11,7 @@ import { viennaDateTime } from "@/lib/vienna";
 export function notificationDate(value) {
   if (!value) return "";
   try {
-    return viennaDateTime(new Date(value), { dateStyle: "short", timeStyle: "short" });
+    return viennaDateTime(value, { dateStyle: "short", timeStyle: "short" });
   } catch {
     return "";
   }

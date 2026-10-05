@@ -153,7 +153,7 @@ export default function GalleryAlbumPage() {
         </Link>
         <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
-          {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(new Date(a.taken_at), { dateStyle: "long" })}</span>}
+          {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}
           {a.event && <Link to={`/events/${a.event.slug}`} className="text-[#9F7AEA] hover:underline">→ {a.event.name}</Link>}
           <span>{items.length} Medien</span>
           {hasSections && <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> {sectionGroups.filter((group) => group.section).length} Abschnitte</span>}

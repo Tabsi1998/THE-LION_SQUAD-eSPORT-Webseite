@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
-import { viennaDateTime } from "@/lib/vienna";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 /**
  * Turnierbaum (#399): K.-o.-Runden als Spalten mit gemessenen Verbindungslinien, Mehrspieler-
@@ -437,7 +437,7 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
 
 function formatNodeDateTime(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   return viennaDateTime(date, { dateStyle: "short", timeStyle: "short" });
 }

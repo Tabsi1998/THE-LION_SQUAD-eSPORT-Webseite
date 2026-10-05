@@ -68,7 +68,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
             <tbody className="divide-y divide-white/5">
               {filteredQueue.map((j) => (
                 <tr key={j.id} data-testid={`queue-row-${j.id}`}>
-                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{viennaDateTime(new Date(j.created_at))}</td>
+                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{viennaDateTime(j.created_at)}</td>
                   <td className="px-4 py-3">{j.to}</td>
                   <td className="px-4 py-3 text-xs">
                     <div className="text-[#29B6E8] font-bold">{mailTemplateLabel(j)}</div>
@@ -83,7 +83,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
                     {j.status === "skipped" && <span className="text-white/50">{STATUS_LABELS.skipped}</span>}
                   </td>
                   <td className="px-4 py-3 text-xs">{j.attempts}</td>
-                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{j.next_attempt_at ? viennaDateTime(new Date(j.next_attempt_at)) : "—"}</td>
+                  <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{j.next_attempt_at ? viennaDateTime(j.next_attempt_at) : "—"}</td>
                   <td className="px-4 py-3 text-white/40 text-xs truncate max-w-xs">{j.last_error || "—"}</td>
                   <td className="px-4 py-3 text-right whitespace-nowrap">
                     <button onClick={() => retryJob(j.id)} data-testid={`queue-retry-${j.id}`} className="text-[#29B6E8] hover:underline mr-3 text-xs"><RefreshCw className="w-3 h-3 inline mr-1" />Erneut senden</button>

@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api } from "@/lib/api";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Rechtstexte kommen fertig als Abschnitte vom Backend (#545, eine Quelle für Website und Crawler-Vorschau):
 // Datenschutz aus den Schaltern, die wirklich an sind, Impressum aus den öffentlichen Vereinsdaten. Hier wird
@@ -22,9 +23,9 @@ const PAGE_META = {
 
 function formatLegalDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" }).format(date);
+  return viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function Inline({ text }) {
