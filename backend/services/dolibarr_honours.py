@@ -6,6 +6,7 @@ lässt. Aufs öffentliche Profil kommt eine Ehrung nur, wenn beides stimmt: Der 
 werden“ angehakt, und das Mitglied hat „Ehrungen auf meinem Profil zeigen“ eingeschaltet (Standard aus).
 
 - Eigene Liste: ``GET /vereine/me/honours`` (Fähigkeit „Mitgliederakte“, ``record``) - live, wie Unterlagen und Daten.
+- Eigene Teilnahmen (#906): ``GET /vereine/me/participations`` mit derselben Fähigkeit - nur für die Person selbst, nie öffentlich.
 - Öffentlich: ``GET /vereine/members/{id}/honours`` liefert nur Veröffentlichbares. Der Stand liegt je Konto in
   ``dolibarr_honours`` und wird stündlich für alle mit Schalter aufgefrischt - das öffentliche Profil fragt Dolibarr
   nie selbst. Schalter aus oder Zuordnung weg: Die Liste ist sofort leer.
@@ -33,6 +34,17 @@ def honour_view(row: dict) -> dict:
     return {"kind": str(row.get("kind") or ""), "kind_label": str(row.get("kind_label") or ""), "title": str(row.get("title") or ""),
             "years": int(row.get("years") or 0), "label": str(row.get("label") or ""), "given_on": str(row.get("given_on") or ""),
             "publishable": bool(row.get("publishable"))}
+
+
+# Woher eine Teilnahme kommt - in Worten für die Person (#906).
+SOURCE_LABELS = {"dolibarr": "vom Verein eingetragen", "api": "von der Website gemeldet", "shift": "Helferdienst"}
+
+
+def participation_view(row: dict) -> dict:
+    hours = row.get("hours")
+    return {"kind": str(row.get("kind") or ""), "kind_label": str(row.get("kind_label") or ""), "title": str(row.get("title") or ""),
+            "day": str(row.get("day") or ""), "hours": float(hours) if isinstance(hours, (int, float)) else None,
+            "source": str(row.get("source") or ""), "source_label": SOURCE_LABELS.get(str(row.get("source") or ""), "")}
 
 
 def _public(rows: list[dict]) -> list[dict]:
@@ -70,7 +82,8 @@ async def _mine(db, user_id: str) -> dict:
 async def overview(db, user: dict) -> dict:
     """Alle eigenen Ehrungen und der Schalter fürs Profil - oder warum es hier nichts gibt."""
     mine = await _mine(db, user["id"])
-    base = {"public": bool(mine.get("public")), "shown": len(mine.get("items") or []) if mine.get("public") else 0, "honours": []}
+    base = {"public": bool(mine.get("public")), "shown": len(mine.get("items") or []) if mine.get("public") else 0, "honours": [],
+            "participations": [], "participations_text": ""}
     access, client, reason = await _access(db, user["id"])
     if reason:
         return {**base, "available": False, "reason": reason, "text": REASON_TEXTS.get(reason, f"Dolibarr antwortet gerade nicht ({reason}).")}
@@ -84,6 +97,11 @@ async def overview(db, user: dict) -> dict:
         return {**base, "available": False, "reason": exc.kind, "text": f"Dolibarr antwortet gerade nicht ({exc.text})."}
     await dolibarr_identity.member_call_ok(db, access)
     honours = [honour_view(row) for row in rows]
+    # Teilnahmen (#906): scheitert nur dieser Teil, bleiben die Ehrungen stehen - ein Satz sagt, warum die Liste fehlt.
+    try:
+        base["participations"] = [participation_view(row) for row in await client.my_participations(access["params"])]
+    except DolibarrError as exc:
+        base["participations_text"] = f"Deine Teilnahmen sind gerade nicht lesbar ({exc.text})."
     if base["public"]:
         # Was das Mitglied gerade sieht, gilt auch öffentlich - nicht erst nach dem nächsten stündlichen Lauf.
         await _store(db, user["id"], _public(honours))

@@ -1344,6 +1344,12 @@ class FakeDolibarr:
             if denied:
                 return denied
             return self._json("/vereine/me/honours", self._honours_of(ident["member_id"], publishable_only=False))
+        if path == "/vereine/me/participations" and request.method == "GET":
+            ident, denied = self._person(params, "record")
+            if denied:
+                return denied
+            rows = sorted(self.participations.get(ident["member_id"], []), key=lambda row: row["day"], reverse=True)
+            return self._json("/vereine/me/participations", rows)
         if path == "/vereine/me/events" and request.method == "GET":
             ident, denied = self._person(params, "events")
             if denied:

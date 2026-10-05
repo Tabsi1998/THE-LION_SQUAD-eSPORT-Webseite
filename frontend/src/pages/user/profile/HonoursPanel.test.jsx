@@ -8,7 +8,7 @@ const toastMock = { success: vi.fn(), error: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => detail || "" }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const { HonoursPanel, HonourCard, honourDay } = await import("./HonoursPanel");
+const { HonoursPanel, HonourCard, honourDay, participationLine, participationsByYear } = await import("./HonoursPanel");
 
 const HONORARY = { kind: "honorary", kind_label: "Ehrenmitgliedschaft", title: "Ehrenmitglied", years: 0, label: "Aufbau der Jugendarbeit", given_on: "2026-05-01", publishable: true };
 const MERIT = { kind: "merit", kind_label: "Verdienstnadel", title: "Verdienstnadel in Silber", years: 0, label: "", given_on: "2026-03-14", publishable: false };
@@ -49,4 +49,43 @@ test("ohne Fähigkeit der Grund, ohne Ehrung ein klarer Satz", async () => {
   apiMock.get.mockResolvedValue({ data: { available: true, public: false, honours: [] } });
   render(<HonoursPanel />);
   expect(await screen.findByTestId("honours-empty")).toHaveTextContent("noch keine Ehrung");
+});
+
+// Eigene Teilnahmen (#906): unter den Ehrungen, nach Jahr, mit Herkunft in Worten - nur für die Person selbst.
+const CUP = { kind: "competition", kind_label: "Wettbewerb", title: "Sommer-Cup", day: "2026-07-12", hours: null, source: "api", source_label: "von der Website gemeldet" };
+const SHIFT = { kind: "shift", kind_label: "Helferdienst", title: "Sommerfest – Ausschank", day: "2026-07-04", hours: 3.5, source: "shift", source_label: "Helferdienst" };
+const XMAS = { kind: "event", kind_label: "Veranstaltung", title: "Weihnachtsfeier", day: "2025-12-19", hours: 2.5, source: "dolibarr", source_label: "vom Verein eingetragen" };
+
+test("Teilnahme in einer Zeile, Gruppen je Jahr", () => {
+  expect(participationLine(SHIFT)).toBe("04.07.2026 · Helferdienst · 3,5 Std. · Helferdienst");
+  expect(participationLine(CUP)).toBe("12.07.2026 · Wettbewerb · von der Website gemeldet");
+  expect(participationsByYear([CUP, SHIFT, XMAS]).map((group) => [group.year, group.rows.length])).toEqual([["2026", 2], ["2025", 1]]);
+  expect(participationsByYear(undefined)).toEqual([]);
+});
+
+test("Meine Teilnahmen unter den Ehrungen; scheitert nur dieser Teil, steht der Grund da", async () => {
+  apiMock.get.mockResolvedValue({ data: { available: true, public: false, honours: [HONORARY], participations: [CUP, SHIFT, XMAS], participations_text: "" } });
+  const { unmount } = render(<HonoursPanel />);
+  expect(await screen.findByTestId("participations-2026")).toHaveTextContent("2026 · 2 Teilnahmen");
+  expect(screen.getByTestId("participations-2025")).toHaveTextContent("2025 · 1 TeilnahmeWeihnachtsfeier19.12.2025 · Veranstaltung · 2,5 Std. · vom Verein eingetragen");
+  expect(screen.getAllByTestId("participation-row")).toHaveLength(3);
+  expect(screen.getByTestId("honours-panel")).toHaveTextContent("Ehrenmitglied");
+  unmount();
+
+  apiMock.get.mockResolvedValue({ data: { available: true, public: false, honours: [HONORARY], participations: [], participations_text: "Deine Teilnahmen sind gerade nicht lesbar (Zeitüberschreitung)." } });
+  const second = render(<HonoursPanel />);
+  expect(await screen.findByTestId("participations-reason")).toHaveTextContent("gerade nicht lesbar");
+  expect(screen.getAllByTestId("honour-card")).toHaveLength(1);
+  second.unmount();
+
+  apiMock.get.mockResolvedValue({ data: { available: true, public: false, honours: [], participations: [] } });
+  const third = render(<HonoursPanel />);
+  expect(await screen.findByTestId("participations-empty")).toHaveTextContent("noch keine Teilnahme");
+  third.unmount();
+
+  // Ohne Verbindung zur Akte: nur der Grund, keine leere Teilnahmen-Liste.
+  apiMock.get.mockResolvedValue({ data: { available: false, reason: "not_bound", text: "Dafür muss dein Konto verbunden sein.", public: false, honours: [], participations: [] } });
+  render(<HonoursPanel />);
+  expect(await screen.findByTestId("honours-reason")).toBeInTheDocument();
+  expect(screen.queryByTestId("participations-panel")).toBeNull();
 });

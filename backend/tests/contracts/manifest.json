@@ -37,6 +37,7 @@
       "/vereine/members/{id}/photo",
       "/vereine/members/{id}/honours",
       "/vereine/me/honours",
+      "/vereine/me/participations",
       "/vereine/me/website-profile",
       "/vereine/me/invoices",
       "/vereine/me/invoices/{invoice}/pdf",
