@@ -399,8 +399,18 @@ Den Stand zeigt **Reiter „Bot & Aktivität“ → „Discord auf der Website�
 
 ### 4.12 Gestaltung der Meldungen
 
-**Reiter „Gestaltung“.** Jede Meldungsart ist eine Vorlage – heute: *Stream gestartet*, *Stream beendet*,
-*Antwort auf /wer-streamt*, *Nächste Events und Turniere*, *Rangliste*, *Erfolg der Woche* (News, Events und Turniere folgen).
+**Reiter „Gestaltung“.** Jede Meldungsart ist eine Vorlage:
+
+| Gruppe | Vorlagen |
+| --- | --- |
+| Streams | *Stream gestartet*, *Stream beendet*, *Antwort auf /wer-streamt* |
+| Angeheftete Einbettungen | *Nächste Events und Turniere*, *Rangliste*, *Erfolg der Woche* |
+| Meldungen | *News*, *Event*, *Turnier: Ankündigung* (die erste Meldung im Kanal), *Turnier: im Thread* (Check-in, live, beendet, Ergebnisse) |
+
+Die Meldungen gehen genau so hinaus, wie die Vorschau sie zeigt – im News-, Events- und Mitgliederkanal, im
+Turnier-Thread und auf Spielservern; „erneut senden“ schickt dieselbe Fassung. Der Standard sieht aus wie früher,
+dazu Autorzeile, Fußzeile mit Logo und Uhrzeit; Felder ohne Wert (etwa „Plätze“ ohne Anmeldung) fallen weg.
+Interne Meldungen an den Vorstand haben keine Vorlage: dort steht nie Text, nur Titel und Link.
 
 - **Formular** (Farbe, Text über dem Kasten, Autorzeile mit Bild, Titel mit Link, Text, Felder, Bild rechts,
   großes Bild, Fußzeile mit Symbol, Uhrzeit) oder **JSON** im Discord-Format.

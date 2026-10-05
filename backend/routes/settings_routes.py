@@ -1955,7 +1955,8 @@ async def discord_resend(log_id: str, me: dict = Depends(require_club_admin())):
     result = await send_to(entry.get("target") or "community", payload.get("title") or "", payload.get("description") or "",
                            color=payload.get("color") or 0x29B6E8, url=payload.get("url"), fields=payload.get("fields"),
                            image_url=payload.get("image_url"), event_key=entry.get("event_key") or "custom",
-                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"))
+                           thread_id=entry.get("thread_id"), buttons=payload.get("buttons"), guild_id=entry.get("guild_id"),
+                           embed=payload.get("embed"), content=payload.get("content"))
     if result.get("ok"):
         await db.email_logs.update_one({"id": log_id}, {"$set": {"status": "resent", "resent_at": now_utc().isoformat()}})
     return result

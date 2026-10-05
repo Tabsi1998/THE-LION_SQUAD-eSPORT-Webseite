@@ -288,8 +288,14 @@ Server mit Beispielwerten oder echten Daten, „Standard wiederherstellen“, Te
 niemanden). Gespeichert wird nur, was die Prüfung besteht (Platzhalter, Adressen, Farbe, Discord-Grenzen, nie
 `@everyone`/`@here`). Werte aus der Website werden dort, wo Discord Markdown zeigt, entschärft.
 
-Heute gestaltbar: Stream gestartet, Stream beendet und die vier angehefteten Einbettungen (Live jetzt, Nächste Events,
-Rangliste, Erfolg der Woche). News-, Event- und Turnier-Meldungen folgen im zweiten Teil.
+Gestaltbar: Stream gestartet, Stream beendet, die Antwort auf /wer-streamt, die angehefteten Einbettungen (Nächste
+Events, Rangliste, Erfolg der Woche) und seit Teil 2 die **Meldungen**: News, Event, Turnier-Ankündigung und Turnier im
+Thread. Für sie liefern `discord_announcements.news_values`/`event_values`/`tournament_values` die Werte (volle
+öffentliche Adressen), `designed_news`/`designed_event`/`designed_tournament` hängen die gerenderte Einbettung an die
+Meldung (`discord_design.designed`), und `send_event`/`send_to` senden sie unverändert (`embed=`, `content=`; das Log
+hält sie für „erneut senden“ fest). Dieselben Funktionen bauen die Vorschau im Formular, die Beispiele unter
+„Meldungen“ und die Vorschau mit echten Daten (`_message_values`). Interne Meldungen an den Vorstand bleiben ohne
+Vorlage. Querverweise am Hauptserver (#627) sind absichtlich nicht gestaltbar - sie tragen nie den Inhalt.
 
 **Stream-Meldungen je Stream** (Reiter „Einbettungen & Termine“ → „Stream-Meldungen“): Sobald jemand aus dem Verein
 live geht – dieselbe Regel wie die Startseite (aktive Mitgliedschaft, Mitgliederprofil) –, postet der Bot eine Meldung
