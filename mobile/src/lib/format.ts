@@ -1,3 +1,4 @@
+import { viennaDate, viennaDateTime, viennaTime } from "./vienna";
 export function displayName(user?: { display_name?: string | null; username?: string } | null) {
   return user?.display_name || user?.username || "Spieler";
 }
@@ -6,7 +7,7 @@ export function formatDate(value?: string | null) {
   if (!value) return "Noch offen";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("de-AT", {
+  return viennaDate(date, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -17,7 +18,7 @@ export function formatDateTime(value?: string | null) {
   if (!value) return "Noch offen";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("de-AT", {
+  return viennaDateTime(date, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -91,7 +92,7 @@ export function formatChatTime(value?: string | null, now: Date = new Date()) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const time = date.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+  const time = viennaTime(date, { hour: "2-digit", minute: "2-digit" });
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const stamp = date.getTime();
   if (stamp >= dayStart && stamp < dayStart + DAY_MS) return time;

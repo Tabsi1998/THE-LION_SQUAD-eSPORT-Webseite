@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Pin, ArrowLeft, Newspaper, Crown } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 export default function MemberNewsPage() {
   const [list, setList] = useState([]);
@@ -53,7 +54,7 @@ export default function MemberNewsPage() {
                 <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
                   <span className="text-[#FFD700]">{newsCategoryLabel(n.category)}</span>
                   {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
-                  <span className="text-white/30 ml-auto">{new Date(n.created_at).toLocaleDateString("de-DE")}</span>
+                  <span className="text-white/30 ml-auto">{viennaDate(new Date(n.created_at))}</span>
                 </div>
                 <h3 className="mt-2 font-heading font-black text-xl group-hover:text-[#FFD700] transition">{n.title}</h3>
                 {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-2">{n.excerpt}</p>}

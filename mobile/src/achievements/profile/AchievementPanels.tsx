@@ -9,6 +9,7 @@ import { colors, radius } from "../../theme";
 import { Badge } from "../Badge";
 import { materialColor, materialName } from "../badgeArt";
 import { type AchievementLevel, type CategoryRow, MATERIAL_OPTIONS, MAX_PINS, type NextUpItem, type PinnedAward, movePin, prestigeUndoUntil } from "./model";
+import { viennaDateTime } from "../../lib/vienna";
 
 // Die Bausteine des Erfolge-Reiters im App-Profil (E13, #623) - wie im Web (#619): Kopf mit Level, Titel, Sternen und
 // XP-Leiste samt Prestige, Zahlen, „Als Nächstes“, Angeheftete, Vitrinen je Kategorie, Material-Filter und die
@@ -150,7 +151,7 @@ export function PrestigePanel({ level, onLevelChange }: { level: AchievementLeve
     const ok = await confirm("Prestige zurücknehmen?", "Der letzte Stern geht wieder weg, Level und XP kommen zurück – samt allem, was du seitdem gesammelt hast.", "Zurücknehmen");
     if (ok) await run("/users/me/prestige/undo", ["Prestige zurückgenommen", "Level und XP sind wieder da."]);
   };
-  const untilText = undoUntil?.toLocaleString("de-AT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const untilText = viennaDateTime(undoUntil, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return (
     <View style={styles.prestige} testID="achievement-prestige-panel">
       <Ionicons name="star" size={16} color={colors.gold} />

@@ -3,6 +3,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FileText, Trash2, Copy, ExternalLink, RotateCcw, RotateCw, Download } from "lucide-react";
 import { MediaImage } from "./parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./shared";
+import { viennaDateTime } from "@/lib/vienna";
 
 export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete }) {
   const isImg = IMG_EXT.has(item.ext);
@@ -58,7 +59,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         </div>
         <div>
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
-          <div className="text-white/80">{new Date(item.mtime).toLocaleString("de-DE")}</div>
+          <div className="text-white/80">{viennaDateTime(new Date(item.mtime))}</div>
         </div>
         <div>
           <div className="uppercase text-[10px] text-white/40 tracking-widest">Scope</div>

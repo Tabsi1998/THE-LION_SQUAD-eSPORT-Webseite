@@ -23,6 +23,7 @@ import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio, Handshake } from "lucide-react";
+import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
 
 // Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
 function eventKindLabel(value) {
@@ -52,8 +53,8 @@ function mapLinkUrl(query) {
 
 function placeTimeLine(place) {
   if (!place.start_date) return "";
-  const start = new Date(place.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
-  const end = place.end_date ? new Date(place.end_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "";
+  const start = viennaDateTime(new Date(place.start_date), { dateStyle: "medium", timeStyle: "short" });
+  const end = place.end_date ? viennaDateTime(new Date(place.end_date), { dateStyle: "medium", timeStyle: "short" }) : "";
   return end ? `${start} – ${end}` : start;
 }
 
@@ -137,7 +138,7 @@ export default function EventDetailPage() {
           <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
           {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
           <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70 min-w-0">
-            {e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{new Date(e.start_date).toLocaleString("de-DE", { dateStyle: "long", timeStyle: "short" })}</span></span>}
+            {e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{viennaDateTime(new Date(e.start_date), { dateStyle: "long", timeStyle: "short" })}</span></span>}
             {(e.locations?.length || 0) > 1
               ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
               : (e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
@@ -203,7 +204,7 @@ export default function EventDetailPage() {
                     <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Standort {index + 1}</div>
                     {place.name && <div className="font-heading text-xl font-black uppercase">{place.name}</div>}
                     {placeTimeLine(place) && <div className="text-sm text-white/75 inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" /> {placeTimeLine(place)}</div>}
-                    {place.door_time && <div className="text-xs text-white/50">Einlass {new Date(place.door_time).toLocaleTimeString("de-DE", { timeStyle: "short" })}</div>}
+                    {place.door_time && <div className="text-xs text-white/50">Einlass {viennaTime(new Date(place.door_time), { timeStyle: "short" })}</div>}
                     {place.address_line && <div className="text-sm text-white/65 inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0 mt-0.5" /> <span>{place.address_line}</span></div>}
                     {place.max_participants != null && <div className="text-xs text-white/50 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5" /> {place.max_participants} Plätze</div>}
                     {place.note && <div className="text-sm text-white/60">{place.note}</div>}
@@ -269,7 +270,7 @@ export default function EventDetailPage() {
             <div className="grid sm:grid-cols-2 gap-4">
               {e.news.map((n) => (
                 <Link key={n.id} to={`/news/${n.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition">
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(new Date(n.published_at || n.created_at))}</div>
                   <div className="font-heading font-bold mt-1">{n.title}</div>
                   {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
                 </Link>
@@ -399,8 +400,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
         </div>
       )}
       <div className="mt-4 space-y-1 text-sm text-white/65">
-        {event.registration_opens_at && <div>Öffnet: {new Date(event.registration_opens_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
-        {event.registration_closes_at && <div>Schließt: {new Date(event.registration_closes_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+        {event.registration_opens_at && <div>Öffnet: {viennaDateTime(new Date(event.registration_opens_at), { dateStyle: "medium", timeStyle: "short" })}</div>}
+        {event.registration_closes_at && <div>Schließt: {viennaDateTime(new Date(event.registration_closes_at), { dateStyle: "medium", timeStyle: "short" })}</div>}
         {summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (
@@ -529,7 +530,7 @@ function EventTournamentEmbed({ tournament, accessToken = "" }) {
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
-          {tournament.start_date && <span className="text-xs text-white/45">{new Date(tournament.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
+          {tournament.start_date && <span className="text-xs text-white/45">{viennaDateTime(new Date(tournament.start_date), { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
         <div className="mt-2 flex flex-wrap gap-3 text-xs text-white/55">
@@ -587,7 +588,7 @@ function EventFastLapEmbed({ challenge, accessToken = "" }) {
         <div className="flex flex-wrap items-center gap-2">
           <Flag className="w-4 h-4 text-[#29B6E8]" />
           <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
-          {challenge.start_date && <span className="text-xs text-white/45">{new Date(challenge.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</span>}
+          {challenge.start_date && <span className="text-xs text-white/45">{viennaDateTime(new Date(challenge.start_date), { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition break-words">{challenge.title}</h3>
         {challenge.description && <p className="mt-2 text-sm text-white/55 line-clamp-2">{challenge.description}</p>}

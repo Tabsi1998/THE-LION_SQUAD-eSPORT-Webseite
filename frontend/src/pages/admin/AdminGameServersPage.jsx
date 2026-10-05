@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { Link } from "react-router-dom";
 import { GameServerIcon } from "@/components/tls/GameServerIcon";
 import { serverResourceLabels } from "@/lib/serverResources";
+import { viennaDateTime } from "@/lib/vienna";
 
 const emptyForm = {
   name: "",
@@ -526,7 +527,7 @@ export default function AdminGameServersPage() {
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
               <Info label="Sync" value={syncText(server)} />
-              <Info label="Letzter Sync" value={server.last_sync_at ? new Date(server.last_sync_at).toLocaleString("de-DE") : "noch nie"} />
+              <Info label="Letzter Sync" value={server.last_sync_at ? viennaDateTime(new Date(server.last_sync_at)) : "noch nie"} />
             </div>
             <div className="mt-3 grid grid-cols-3 sm:flex sm:flex-wrap gap-2">
               {Object.entries(modeLabels).map(([mode, label]) => (

@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Gift, ExternalLink, ArrowLeft } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 export default function MemberBenefitsPage() {
   const [benefits, setBenefits] = useState([]);
@@ -52,7 +53,7 @@ export default function MemberBenefitsPage() {
                     <h3 className="mt-1 font-heading font-black text-lg">{b.title}</h3>
                     {b.description && <p className="mt-2 text-sm text-white/65 flex-1">{b.description}</p>}
                     {b.valid_until && (
-                      <div className="mt-3 text-xs text-white/40">Gültig bis {new Date(b.valid_until).toLocaleDateString("de-DE")}</div>
+                      <div className="mt-3 text-xs text-white/40">Gültig bis {viennaDate(new Date(b.valid_until))}</div>
                     )}
                     {b.link_url && (
                       <a href={b.link_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-[#FFD700] hover:underline">

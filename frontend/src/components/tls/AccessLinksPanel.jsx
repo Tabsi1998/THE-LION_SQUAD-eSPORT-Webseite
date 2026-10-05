@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatRequestError } from "@/lib/api";
 import { Copy, Link2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { viennaDate } from "@/lib/vienna";
 
 const TARGET_LABELS = {
   event: "Event",
@@ -274,8 +275,8 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
               </div>
               <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/35">
                 {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Aktionen
-                {link.expires_at ? ` · bis ${new Date(link.expires_at).toLocaleDateString("de-DE")}` : " · ohne Ablauf"}
-                {link.last_used_at ? ` · zuletzt ${new Date(link.last_used_at).toLocaleDateString("de-DE")}` : " · nie geöffnet"}
+                {link.expires_at ? ` · bis ${viennaDate(new Date(link.expires_at))}` : " · ohne Ablauf"}
+                {link.last_used_at ? ` · zuletzt ${viennaDate(new Date(link.last_used_at))}` : " · nie geöffnet"}
                 {link.user_id ? " · usergebunden" : ""}
                 {link.email ? ` · ${link.email}` : ""}
               </div>

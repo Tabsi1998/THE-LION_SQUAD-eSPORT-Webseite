@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarClock } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Discord-Termine (#570): öffentliche Events und Turniere erscheinen als Termine im Discord-Server
 // (mit „Interessiert“-Knopf und Erinnerung durch Discord). Zwei Schalter: an/aus und „auch interne“.
@@ -11,7 +12,7 @@ import { api, formatApiError } from "@/lib/api";
 export function whenText(value) {
   if (!value) return "noch nie";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("de-DE");
+  return Number.isNaN(date.getTime()) ? String(value) : viennaDateTime(date);
 }
 
 export function resultText(result) {

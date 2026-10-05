@@ -11,6 +11,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
+import { viennaDate } from "../../lib/vienna";
 
 type Props = NativeStackScreenProps<MoreStackParamList, "SeasonPass">;
 
@@ -321,7 +322,7 @@ function formatPoints(value: number) {
 
 function formatDate(iso: string) {
   try {
-    return new Date(iso).toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return viennaDate(new Date(iso), { day: "2-digit", month: "2-digit", year: "numeric" });
   } catch {
     return iso;
   }

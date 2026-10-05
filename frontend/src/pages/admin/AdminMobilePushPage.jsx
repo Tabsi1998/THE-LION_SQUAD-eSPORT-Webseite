@@ -3,11 +3,12 @@ import { BellRing, CheckCircle2, RefreshCw, Search, Send, Smartphone } from "luc
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
+import { viennaDateTime } from "@/lib/vienna";
 
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return new Date(value).toLocaleString("de-DE");
+    return viennaDateTime(new Date(value));
   } catch {
     return value;
   }

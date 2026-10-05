@@ -63,6 +63,16 @@ function sendClientLog(payload) {
   }).catch(() => {});
 }
 
+/** Ein Fehler, den eine Fehlergrenze gefangen hat (#944) - der Browser meldet ihn nicht mehr von selbst. */
+export function reportCaughtError(error, componentStack = "") {
+  sendClientLog({
+    level: "error",
+    message: error?.message || "Seite konnte nicht angezeigt werden",
+    error_name: error?.name || "Error",
+    stack: `${error?.stack || ""}\n${componentStack || ""}`,
+  });
+}
+
 export function startWebClientLogging() {
   if (!CLIENT_LOGGING_ENABLED || typeof window === "undefined" || window.__tlsWebClientLoggingStarted) return;
   window.__tlsWebClientLoggingStarted = true;

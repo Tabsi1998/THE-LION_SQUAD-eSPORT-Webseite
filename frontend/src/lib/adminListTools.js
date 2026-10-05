@@ -1,3 +1,4 @@
+import { viennaDate } from "@/lib/vienna";
 export function normalizeSearch(value) {
   return String(value || "")
     .toLowerCase()
@@ -29,5 +30,5 @@ export function formatAdminDate(value) {
   if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE");
+  return viennaDate(date);
 }

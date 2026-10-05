@@ -3,6 +3,7 @@ import { Bug, CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
+import { viennaDateTime } from "@/lib/vienna";
 
 const LEVELS = ["", "fatal", "error", "warn", "info", "debug"];
 const STATUSES = ["", "open", "info", "resolved", "ignored"];
@@ -11,7 +12,7 @@ const PRIORITIES = ["", "critical", "high", "normal", "low"];
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return new Date(value).toLocaleString("de-DE");
+    return viennaDateTime(new Date(value));
   } catch {
     return value;
   }

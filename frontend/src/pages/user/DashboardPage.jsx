@@ -13,6 +13,7 @@ import { bundleNotifications } from "@/lib/notifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Bell, Crown, Gift, AlertTriangle, UserCheck, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, Settings } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -358,7 +359,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         <StatusBadge status={match.status} />
       </div>
       {details.length > 0 && <div className="text-xs text-white/50 mt-1">{details.join(" · ")}</div>}
-      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{new Date(match.scheduled_at).toLocaleString("de-DE")}</div>}
+      {match.scheduled_at && <div className="text-xs text-white/45 mt-1">{viennaDateTime(new Date(match.scheduled_at))}</div>}
       <div className={`mt-2 text-[10px] font-bold uppercase tracking-wider ${attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
     </Link>
   );

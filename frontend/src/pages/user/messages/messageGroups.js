@@ -1,3 +1,4 @@
+import { viennaDate, viennaTime } from "@/lib/vienna";
 // Reine Logik der Unterhaltung (#254): Datum-Trenner („Heute“, „Gestern“,
 // „12.09.2026“), zusammengefasste Köpfe wie in der App (#220) und das
 // Zusammenführen von nachgeladenen oder neu eingetroffenen Nachrichten.
@@ -20,13 +21,13 @@ export function dayLabel(value, now = new Date()) {
   const today = startOfDay(now);
   if (day === today) return "Heute";
   if (day === today - DAY_MS) return "Gestern";
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
 export function timeLabel(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 // Aus der zeitlich sortierten Liste wird eine Folge aus Tages-Trennern und

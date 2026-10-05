@@ -3,6 +3,7 @@ import { Bot, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { DiscordWidgetStatus } from "./DiscordWidgetStatus";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Discord-Bot (#302): Token, Schalter, Server-ID und Rollennamen - alles hier, nichts in der .env.
 // Der Token verlässt den Server nie; „gespeichert“ ist alles, was die Seite davon sieht.
@@ -119,7 +120,7 @@ export function DiscordBotPanel({ canSystem = false }) {
       {(data.last_action || data.last_error || data.last_sync_at) && (
         <div className={`border rounded-sm p-3 text-xs ${data.last_error ? "border-[#FF3B30]/25 bg-[#FF3B30]/5" : "border-white/10"} text-white/60`} data-testid="discord-bot-log">
           {data.last_action && <div>Letzte Aktion: {data.last_action}</div>}
-          {data.last_sync_at && <div>Letzter Rollenabgleich: {new Date(data.last_sync_at).toLocaleString("de-DE")} · {data.last_sync_changes || 0} Änderungen{data.last_sync_errors ? ` · ${data.last_sync_errors} Fehler` : ""}</div>}
+          {data.last_sync_at && <div>Letzter Rollenabgleich: {viennaDateTime(new Date(data.last_sync_at))} · {data.last_sync_changes || 0} Änderungen{data.last_sync_errors ? ` · ${data.last_sync_errors} Fehler` : ""}</div>}
           {data.last_error && <div className="text-[#FF3B30] break-words">Letzter Fehler: {data.last_error}</div>}
           {data.enabled && !online && <div className="text-white/45" data-testid="discord-bot-retry">Der Bot versucht es alle fünf Minuten von selbst wieder – nach dem Speichern hier sofort.</div>}
         </div>

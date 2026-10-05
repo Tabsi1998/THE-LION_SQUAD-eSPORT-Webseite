@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { BellRing, Send } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Alarme (#517): je Ereignisart, ob eine Meldung per Discord (Bot → Betriebskanal) und/oder per E-Mail an
 // den Vorstand geht; Sperrfrist je Schlüssel; Testalarm; Aufbewahrung der Versandlogs und Adminaktionen.
@@ -12,7 +13,7 @@ const RETENTION_LABELS = { email_logs: "Versandlogs (Tage)", audit_logs: "Admina
 function formatTime(value) {
   if (!value) return "–";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("de-DE");
+  return Number.isNaN(date.getTime()) ? String(value) : viennaDateTime(date);
 }
 
 export function OpsAlertsPanel() {

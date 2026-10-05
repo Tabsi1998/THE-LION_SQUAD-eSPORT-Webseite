@@ -1,3 +1,4 @@
+import { viennaDateTime } from "@/lib/vienna";
 // Finanzübersicht (#321, #322) - reine Helfer ohne React: Beträge, Zahlungsstand, Filterquellen,
 // der CSV-Export für den Kassier (ohne Formel-Injektion) und die Summenzeile je Veranstaltung.
 
@@ -102,5 +103,5 @@ export function syncLine(row) {
   if (row?.sync_error) return { tone: "text-[#FF3B30]", text: `Dolibarr nicht lesbar: ${row.sync_error_text || row.sync_error}` };
   if (!row?.synced_at) return { tone: "text-white/40", text: "noch nicht nachgelesen" };
   const at = new Date(row.synced_at);
-  return { tone: "text-white/40", text: `Stand ${Number.isNaN(at.getTime()) ? row.synced_at : at.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}` };
+  return { tone: "text-white/40", text: `Stand ${Number.isNaN(at.getTime()) ? row.synced_at : viennaDateTime(at, { dateStyle: "short", timeStyle: "short" })}` };
 }

@@ -9,6 +9,7 @@ import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { CATEGORY_META, STATUS_FILTERS, formatPercent } from "@/components/tls/AchievementGroups";
 import { AccountLevelProgress } from "@/components/tls/AccountLevel";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Der Reiter „Achievements“ im Profil (#619): Kopf mit Level, Titel, Prestige und XP-Leiste; „Als Nächstes“
 // mit „So schaffst du es“ und Link; Angeheftete (bis zu sechs, per Drag sortierbar); Kategorien als
@@ -132,7 +133,7 @@ export function PrestigePanel({ level, onLevelChange }) {
     });
     if (ok) await run("/users/me/prestige/undo", "Prestige zurückgenommen.");
   };
-  const untilText = undoUntil?.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const untilText = viennaDateTime(undoUntil, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return (
     <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
       <Star className="w-4 h-4 text-[#FFD700] fill-current shrink-0" aria-hidden="true" />

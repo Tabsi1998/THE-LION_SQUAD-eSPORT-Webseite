@@ -7,6 +7,7 @@ import { Crown, Search, X } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Legendär" };
 // Erfolge II (#611): Material statt Level - Holz bis Diamant, dazu Legendär und Geheim.
@@ -74,7 +75,7 @@ export function formatWhen(value, withTime = true) {
   if (!value) return "–";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "–";
-  return withTime ? date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" }) : date.toLocaleDateString("de-DE");
+  return withTime ? viennaDateTime(date, { dateStyle: "short", timeStyle: "short" }) : viennaDate(date);
 }
 
 export function personName(person) {

@@ -1,3 +1,4 @@
+import { viennaDate } from "@/lib/vienna";
 // Plattform-Konten verknüpfen (#260): welches Profilfeld zu welcher Plattform gehört, und was
 // ein Fehlercode aus dem Rückruf (?link_error=) in Worten heißt.
 
@@ -75,7 +76,7 @@ export function linkErrorText(code, detail = "") {
 export function formatLinkedAt(value) {
   if (!value) return "";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("de-DE", { dateStyle: "medium" });
+  return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { dateStyle: "medium" });
 }
 
 export function linkedText(platform) {

@@ -10,6 +10,7 @@ import { clipEmbedSrc } from "@/components/tls/TwitchClips";
 import { KIND_ICONS } from "./Door";
 import { opensLabel } from "./doors";
 import { errorText } from "./useAdventCalendar";
+import { viennaDate } from "@/lib/vienna";
 
 // Der Inhalt eines Türchens (#641) im Fenster: Text, Bild, Video, Clip, Karte (News, Event, Mitglied), Sticker,
 // Quiz oder Gewinn. Videos und Clips laden erst nach der Zustimmung zu externen Medien. Das Quiz zeigt die
@@ -41,7 +42,7 @@ function SmartLink({ url, className, children, testId }) {
 
 function dateText(value) {
   const date = new Date(value || "");
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("de-AT", { day: "numeric", month: "long", year: "numeric" });
+  return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { day: "numeric", month: "long", year: "numeric" });
 }
 
 function ClipEmbed({ clip, title }) {

@@ -5,6 +5,7 @@ import { Download, Share2, X, Trophy, Medal, Zap, Flag } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { LevelAvatarFrame, CROWN_LABELS } from "@/components/tls/LevelAvatarFrame";
 import { accountLevelTier } from "@/components/tls/AccountLevel";
+import { viennaDate } from "@/lib/vienna";
 
 function topAwards(awards, limit = 3) {
   return [...(awards || [])]
@@ -139,7 +140,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
 
           <div className="relative mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
             <span className="text-[9px] uppercase tracking-[0.25em] text-white/35 font-bold">lionsquad · esports</span>
-            <span className="text-[9px] text-white/30">{new Date().toLocaleDateString("de-DE")}</span>
+            <span className="text-[9px] text-white/30">{viennaDate(new Date())}</span>
           </div>
         </div>
 

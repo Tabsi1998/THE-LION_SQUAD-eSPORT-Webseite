@@ -9,6 +9,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ArrowRight, Pin, Newspaper, Crown, Lock, Search, X } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 const CATEGORY_COLORS = {
   club: "#29B6E8",
@@ -43,7 +44,7 @@ export default function NewsPage() {
     const params = new URLSearchParams({ compact: "true", limit: "90" });
     if (activeCat) params.set("category", activeCat);
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
-    api.get(`/news?${params.toString()}`).then(({ data }) => setList(data)).catch(() => {}).finally(() => setLoading(false));
+    api.get(`/news?${params.toString()}`).then(({ data }) => setList(Array.isArray(data) ? data : data?.items || [])).catch(() => {}).finally(() => setLoading(false));
   }, [activeCat, searchQuery]);
 
   useEffect(() => {
@@ -186,7 +187,7 @@ function NewsCard({ n, featured = false }) {
           <span style={{ color: c }}>{newsCategoryLabel(n.category)}</span>
           {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
-          <span className="text-white/30 ml-auto">{new Date(n.published_at || n.created_at).toLocaleDateString("de-DE")}</span>
+          <span className="text-white/30 ml-auto">{viennaDate(new Date(n.published_at || n.created_at))}</span>
         </div>
         <h3 className={`mt-2 font-heading font-black leading-tight break-words line-clamp-3 ${featured ? "text-xl md:text-2xl" : "text-lg"} group-hover:text-[#29B6E8] transition`}>
           {n.title}

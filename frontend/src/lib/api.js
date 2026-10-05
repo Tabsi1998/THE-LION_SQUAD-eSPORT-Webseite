@@ -1,5 +1,6 @@
 import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
+import { viennaDate } from "@/lib/vienna";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
 const configuredUploadBackendUrl = (import.meta.env.VITE_UPLOAD_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -235,9 +236,9 @@ export function formatMemberSince(value, precision = "day") {
   if (Number.isNaN(date.getTime())) return String(value);
   if (precision === "year") return String(date.getFullYear());
   if (precision === "month") {
-    return date.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+    return viennaDate(date, { month: "long", year: "numeric" });
   }
-  return date.toLocaleDateString("de-DE", { dateStyle: "long" });
+  return viennaDate(date, { dateStyle: "long" });
 }
 
 export function parseTimeStr(str) {

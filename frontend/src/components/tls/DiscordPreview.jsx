@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MessageSquare } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { DiscordMessagePreview, embedColor } from "./DiscordMessagePreview";
+import { viennaDateTime, viennaTime } from "@/lib/vienna";
 
 // „So sieht die Meldung aus“ (#303): dasselbe Embed, das der Server später an
 // Discord schickt, plus die ehrliche Auskunft, ob und wohin es ginge. Dazu der
@@ -24,8 +25,8 @@ const TARGET_NAMES = { community: "Community", news: "News", events: "Events und
 export function scheduledEventText(entry) {
   if (!entry) return "";
   if (entry.would_create && entry.payload) {
-    const start = new Date(entry.payload.start).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
-    const end = new Date(entry.payload.end).toLocaleTimeString("de-DE", { timeStyle: "short" });
+    const start = viennaDateTime(new Date(entry.payload.start), { dateStyle: "short", timeStyle: "short" });
+    const end = viennaTime(new Date(entry.payload.end), { timeStyle: "short" });
     return `${entry.existing_id ? "Discord-Termin wird nachgezogen" : "Erscheint als Discord-Termin"}: „${entry.payload.name}“, ${start} – ${end} Uhr, ${entry.payload.location}.`;
   }
   return entry.reason_text || "Kein Discord-Termin.";

@@ -9,6 +9,7 @@ import { Badge } from "@/components/achievements/Badge";
 import { formatPercent } from "@/components/tls/AchievementGroups";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { shareAchievement } from "@/lib/shareAchievement";
+import { viennaDate } from "@/lib/vienna";
 
 // Die Teilen-Seite eines Erfolgs (#619): /achievements/a/<award_id>. Zeigt die serverseitig gezeichnete
 // Karte (dieselbe, die Discord als Vorschau bekommt), die Person und die Seltenheit - mit Teilen,
@@ -95,7 +96,7 @@ export default function AchievementSharePage() {
                     <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 text-xs">{person.trim().charAt(0).toUpperCase()}</span>
                   )}
                   <span className="font-semibold">{person}</span>
-                  {card.earned_at && <span className="text-white/35 text-xs">{new Date(card.earned_at).toLocaleDateString("de-DE")}</span>}
+                  {card.earned_at && <span className="text-white/35 text-xs">{viennaDate(new Date(card.earned_at))}</span>}
                 </Link>
               </div>
               <div className="flex md:flex-col gap-2 shrink-0">

@@ -11,6 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { BarChart3, Calculator, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 const DEFAULT_POINTS = "25,18,15,12,10,8,6,4,2,1";
 const STATUS_OPTIONS = ["draft", "active", "completed", "archived"];
@@ -141,7 +142,7 @@ function formatDate(value) {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
-  return d.toLocaleDateString("de-AT", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  return viennaDate(d, { day: "2-digit", month: "2-digit", year: "2-digit" });
 }
 
 function formatDateRange(start, end) {

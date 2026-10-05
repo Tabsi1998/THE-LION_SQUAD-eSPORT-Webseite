@@ -1,3 +1,4 @@
+import { viennaDateTime } from "@/lib/vienna";
 // Was das Dashboard aus den eigenen Terminen macht (#256) - dieselben Regeln
 // wie die App-Startseite (mobile/src/lib/dashboard.ts) und das Backend
 // (_still_relevant in mobile_routes.py): offen ist, was nicht beendet oder
@@ -106,7 +107,7 @@ export function formatVienna(value, { withTime = true } = {}) {
   if (Number.isNaN(date.getTime())) return "";
   const options = { weekday: "short", day: "2-digit", month: "2-digit", timeZone: VIENNA };
   if (withTime) Object.assign(options, { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleString("de-AT", options);
+  return viennaDateTime(date, options);
 }
 
 // Eine Zeile zur Jahreswertung: die eigene Platzierung, sonst die Spitze.

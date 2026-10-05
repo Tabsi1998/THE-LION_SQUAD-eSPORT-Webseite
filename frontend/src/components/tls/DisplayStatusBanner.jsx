@@ -1,9 +1,10 @@
 import { AlertTriangle, RefreshCw, Wifi } from "lucide-react";
+import { viennaTime } from "@/lib/vienna";
 
 export function DisplayStatusBanner({ error, lastUpdated, label = "Live-Daten", onRetry, compact = false }) {
   if (!error && !lastUpdated) return null;
   const timeLabel = lastUpdated
-    ? new Date(lastUpdated).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    ? viennaTime(new Date(lastUpdated), { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : null;
 
   return (

@@ -1,3 +1,4 @@
+import { viennaDate, viennaTime } from "@/lib/vienna";
 // Kalender auf der Website (#402): Monatsraster, Termine je Tag und der Abo-Link - dieselbe
 // Rechnung wie in der App (mobile/src/lib/calendar.ts), ohne React, damit sie sich testen lässt.
 // Tage sind lokale Gerätetage; die Termine kommen vom Server als ISO-Zeit mit Zone.
@@ -115,9 +116,9 @@ export function feedUrls(origin, feedPath = "/api/calendar/feed.ics") {
 export function timeLabel(value) {
   const date = parseIso(value);
   if (!date) return "";
-  return date.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+  return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function dayLabel(key) {
-  return parseDay(key).toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
+  return viennaDate(parseDay(key), { weekday: "long", day: "numeric", month: "long" });
 }

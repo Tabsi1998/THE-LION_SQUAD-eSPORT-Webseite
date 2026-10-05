@@ -5,6 +5,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ArrowRight, CalendarDays, Trophy } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 export default function CurrentSeasonRedirect() {
   const nav = useNavigate();
@@ -74,8 +75,8 @@ export default function CurrentSeasonRedirect() {
                   {(season.start_date || season.end_date) && (
                     <div className="mt-2 inline-flex items-center gap-2 text-xs text-white/45">
                       <CalendarDays className="w-3.5 h-3.5" />
-                      {season.start_date ? new Date(season.start_date).toLocaleDateString("de-DE") : "Start offen"}
-                      {season.end_date ? ` - ${new Date(season.end_date).toLocaleDateString("de-DE")}` : ""}
+                      {season.start_date ? viennaDate(new Date(season.start_date)) : "Start offen"}
+                      {season.end_date ? ` - ${viennaDate(new Date(season.end_date))}` : ""}
                     </div>
                   )}
                 </div>

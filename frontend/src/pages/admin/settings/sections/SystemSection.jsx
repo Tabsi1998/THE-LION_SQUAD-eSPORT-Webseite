@@ -1,6 +1,7 @@
 // Einstellungen (#223): Abschnitt „Systemstatus“ – nur Darstellung; Zustand und Handler bleiben in AdminSettingsPage.
 import { SystemCard } from "../fields";
 import { RefreshCw } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 export function SystemSection({ systemStatus, load }) {
   return (
@@ -14,7 +15,7 @@ export function SystemSection({ systemStatus, load }) {
         <SystemCard title="SMTP / Mail" ok={systemStatus?.smtp?.ok} detail={`${systemStatus?.smtp?.provider || "-"} ${systemStatus?.smtp?.host || ""}`} problem={systemStatus?.smtp?.latest_problem?.error} />
         <SystemCard title="Discord" ok={systemStatus?.discord?.ok} detail={systemStatus?.discord?.configured ? (systemStatus?.discord?.bot_enabled ? "Bot sendet in gewählte Kanäle" : "Kanäle gewählt, Bot aus") : "Kein Kanal gewählt"} problem={systemStatus?.discord?.latest?.error} />
         <SystemCard title="Uploads" ok={systemStatus?.uploads?.ok} detail={(systemStatus?.uploads?.checks || []).map((c) => `${c.label}: ${c.ok ? "OK" : "NO"}`).join(" · ")} />
-        <SystemCard title="Scheduler" ok={systemStatus?.scheduler?.running} detail={(systemStatus?.scheduler?.jobs || []).map((j) => `${j.id}: ${j.next_run_time ? new Date(j.next_run_time).toLocaleString("de-DE") : "-"}`).join(" · ")} />
+        <SystemCard title="Scheduler" ok={systemStatus?.scheduler?.running} detail={(systemStatus?.scheduler?.jobs || []).map((j) => `${j.id}: ${j.next_run_time ? viennaDateTime(new Date(j.next_run_time)) : "-"}`).join(" · ")} />
         <SystemCard title="Mail-Queue" ok={(systemStatus?.mail_queue?.failed || 0) === 0} detail={systemStatus?.mail_queue ? `pending ${systemStatus.mail_queue.pending || 0} · failed ${systemStatus.mail_queue.failed || 0} · sent ${systemStatus.mail_queue.sent || 0}` : "-"} />
       </div>
       {systemStatus?.uploads?.checks?.length > 0 && (

@@ -5,6 +5,7 @@ import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
 import { Link } from "react-router-dom";
+import { viennaDate } from "@/lib/vienna";
 
 const STATUS = {
   pending: { label: "Wird vorbereitet", color: "text-[#FFD700]", icon: Clock },
@@ -17,7 +18,7 @@ function formatDate(value) {
   if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("de-DE");
+  return viennaDate(date);
 }
 
 function daysUntil(value) {

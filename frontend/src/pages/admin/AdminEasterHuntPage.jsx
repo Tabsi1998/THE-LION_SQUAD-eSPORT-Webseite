@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { rememberPreview } from "@/pages/admin/settings/SeasonsSettings";
 import { EggShape, PATTERN_LABELS } from "@/seasons/easterHunt/EggShape";
+import { viennaDate } from "@/lib/vienna";
 
 // Ostereiersuche pflegen (#646, #757): je Jahr ein Vorschlag mit Saat aus dem Jahr (jedes Jahr andere Seiten, Kanten
 // und Muster), danach jedes Ei von Hand: Seite, Kante, Ecke, Muster, Hinweis. Dazu Preise, Freigabe, die Zahlen und
@@ -31,7 +32,7 @@ export function easterYear(now = new Date()) {
 
 function dateText(iso) {
   const day = new Date(iso || "");
-  return Number.isNaN(day.getTime()) ? "" : day.toLocaleDateString("de-AT", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Vienna" });
+  return Number.isNaN(day.getTime()) ? "" : viennaDate(day, { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Vienna" });
 }
 
 function Tile({ label, value, tone = "text-white", testId }) {

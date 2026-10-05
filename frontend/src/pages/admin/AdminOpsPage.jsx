@@ -10,6 +10,7 @@ import { OpsOverview } from "./ops/OpsOverview";
 import { AppLogsTab } from "./ops/AppLogsTab";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ratingTone } from "@/lib/ops";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Betrieb (#233, #265): Server-Fehler als Gruppen mit Zähler, die langsamsten
 // Routen, Web Vitals je Seite von echten Besuchern und die Ampel der
@@ -33,7 +34,7 @@ const VITAL_COLUMNS = ["LCP", "INP", "CLS", "TTFB"];
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return new Date(value).toLocaleString("de-DE");
+    return viennaDateTime(new Date(value));
   } catch {
     return value;
   }
