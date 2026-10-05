@@ -2870,9 +2870,18 @@ der Verwaltung.
   Check auf dem Stand vom Abend ist in allen Gruppen grün, die auch GitHub rechnet.
 - **Neu notiert (#949):** bleibt am Handy ein Passkey liegen, den der Server nicht kennt, sagt die App
   künftig, was zu tun ist. Kommt mit App 1.3.0, zusammen mit den Links in die App (#921).
-- **Als Nächstes:** aus der Prüfung zuerst #931 und #928, dann der Rest des Meilensteins; danach App 1.3.0
-  (#921, #949), Discord Teil 2 der Rollen (Pings bei Meldungen, #576) und D8, die mehrtägigen Events
-  (Events II).
+- **Spät am Abend entschieden und erledigt:** Der Online-Spiegel dieses Plans ist gelöscht – der Plan steht
+  nur noch hier. Das Repository auf GitHub ist bewusst öffentlich (wegen der Updates); in Issues und PRs
+  stehen deshalb keine Daten von Mitgliedern. Auf GitHub ist aufgeräumt: zehn fertige Meilensteine sind
+  geschlossen (zuletzt „App 1.0.0“ – die App ist bei Google Play), jedes offene Issue hat einen Meilenstein.
+  Deine Reihenfolge für alles Weitere: erst das Offene fertig machen, dann Neues.
+- **Zwei PRs aus der Prüfung warten auf deinen Merge:** #951 bremst die Zähler der Banner und liest den
+  YouTube-Feed mit einem sicheren XML-Leser (#931). #952 räumt beim Löschen eines Kontos auch den Eintrag
+  im Mitgliederverzeichnis, Anträge, Anmeldungen, XP und die eigenen Bilder weg – und holt das einmal für
+  alle Konten nach, die schon gelöscht sind (#928).
+- **Als Nächstes:** der Rest des Meilensteins „Prüfung Oktober 2026“, dann die offenen Meilensteine der Reihe
+  nach (Vereinsmodul 1.5, Discord VI, Erfolge II, Jahreszeiten II und III, Dolibarr III) und App 1.3.0 (#921,
+  #949). Erst danach Neues wie die mehrtägigen Events (Events II).
 
 ## Noch offen und bewusst getrennt
 
@@ -2904,6 +2913,7 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Gutschrift-Entwurf: ja oder nein?** | Admin → Finanzen: Schalter „Gutschrift-Entwurf bei Abmeldung anlegen“. Ist er an, legt die Website einen Entwurf über den ganzen Betrag in Dolibarr an, sobald sich jemand nach der Freigabe der Rechnung abmeldet. Du prüfst ihn dort (Teilbetrag?) und gibst ihn frei – die Website gibt nie frei. Anfangs ist er aus. |
 | **Nach dem Update vom 5.10.** | In Dolibarr dem API-Benutzer der Website drei Rechte geben (Benutzer → Rechte → Vereine): „Teilnahmen von Mitgliedern erfassen und lesen“, „Mitglieder bei einer Generalversammlung einlassen“ und „Änderungen abholen (Änderungsfeed)“. Dann auf der Website unter Dolibarr → Funktionen „Teilnahmen in die Mitgliederakte“ einschalten (auf Wunsch „Letzte 12 Monate nachtragen“) und bei „Sponsoren und Partner“ einmal „Jetzt nachlesen“. |
 | **Discord nach dem Update vom 5.10. Mittag** | Damit der Bot auf den Spielservern Rollen vergeben kann, braucht er dort „Rollen verwalten“, und seine Rolle muss über den Vereins- und Spiel-Rollen stehen (Servereinstellungen → Rollen). Der Reiter „Server“ zeigt je Server, was fehlt. Fehlende Rollen legt die Website nur an, wenn du dort „Fehlende Rollen anlegen“ einschaltest. |
+| **Datenschutzerklärung lesen (nach #952)** | Abschnitt „Konto löschen“: zwei Absätze sind neu gefasst – was gelöscht wird, was ohne Namen bleibt, und dass die Mitgliederverwaltung des Vereins davon unberührt ist. Passt der Text für euch, ist nichts zu tun. |
 | **Nach dem Update vom 5.10. Abend** | `update.sh` ausführen (Passkey in der Fassung aus Google Play #946, Startseite #948). Danach am Handy: Einstellungen → Passwörter und Passkeys (Samsung Pass oder Google Passwortmanager) → die Einträge für lionsquad.at löschen – sie stammen von den fehlgeschlagenen Versuchen. Dann in der App mit Passwort anmelden und den Passkey neu anlegen. |
 | **Play Console: Fingerabdrücke der App-Signatur** | Play Console → Testen und veröffentlichen → App-Integrität → App-Signatur: beim Zertifikat des App-Signaturschlüssels und beim Zertifikat des Upload-Schlüssels jeweils die Zeile SHA-256 schicken. Damit ist klar, welcher der drei am Server eingetragenen Schlüssel überflüssig ist. |
 | **Abfrage zu „App meldet sich täglich ab“ (#942)** | Am Server die Zeile aus dem Issue #942 ausführen und die Ausgabe schicken – sie enthält keine Tokens, nur Gründe und Zeiten. Ohne sie lässt sich die Ursache nicht eingrenzen. |

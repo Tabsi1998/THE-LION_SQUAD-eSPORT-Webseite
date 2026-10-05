@@ -134,7 +134,7 @@ neueren Build einen Banner mit „Was ist neu“ und „Später“, startet Goog
 öffnet die Store-Seite. Liegt der eigene Build unter `min_build`, ist das Update Pflicht und der Banner
 nicht wegdrückbar. Den eigenen APK-Download mit Installer gibt es nicht mehr: Google erlaubt die
 Berechtigung `REQUEST_INSTALL_PACKAGES` nur App-Stores. Geräte ohne Google Play holen die APK vom
-GitHub-Release im Browser (das Repo ist privat – Vorstand schickt den Link oder die Datei).
+GitHub-Release im Browser (das Repository ist öffentlich – der Link zum Release genügt).
 
 Der Vereinsserver hält je Build weiter eine Kopie (`uploads/app-releases`, Sammlung `app_releases`,
 Download für angemeldete Nutzer über `GET /api/mobile/app-download/{build}`) – für den Admin und als
