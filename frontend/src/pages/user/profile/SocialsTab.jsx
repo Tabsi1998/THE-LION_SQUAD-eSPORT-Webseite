@@ -148,6 +148,8 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
   const twitchLinked = Boolean(linkForField(linkedRows, "twitch_handle"));
   // „Gerade in Steam“ (#584): der Schalter erscheint nur mit verknüpftem Steam-Konto - von Hand eingetragene IDs zählen nicht.
   const steamLinked = Boolean(linkForField(linkedRows, "steam_id"));
+  // Spiel-Rollen (#629): nur mit verknüpftem Discord - ohne Verknüpfung vergibt der Bot ohnehin nichts.
+  const discordLinked = Boolean(linkForField(linkedRows, "discord_name"));
   return (
     <Section>
       <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/65" data-testid="profile-links-hint">
@@ -200,6 +202,22 @@ export function SocialsTab({ form, set, links = null, onLink = () => {}, onUnlin
             checked={!!form.show_steam_status}
             onCheckedChange={(checked) => set("show_steam_status", checked)}
             testId="profile-steam-status"
+            className="mt-0.5"
+          />
+        </div>
+      ) : null}
+
+      {discordLinked ? (
+        <div className="flex items-start justify-between gap-4 p-3 border border-[#5865F2]/30 bg-[#5865F2]/5 rounded-sm" data-testid="profile-discord-game-roles-row">
+          <div className="text-sm">
+            <div className="font-bold text-white">Spiel-Rollen im Discord</div>
+            <div className="text-white/60 text-xs mt-1">Hast du ein Spielprofil (Spieler-ID) oder stehst in einem Team-Kader, gibt dir der Bot die passende Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels und am Hauptserver. Aus: keine Spiel-Rollen; Vereinsrollen wie „Mitglied“ bleiben.</div>
+          </div>
+          <ProfileSwitch
+            label="Spiel-Rollen im Discord"
+            checked={form.discord_game_roles !== false}
+            onCheckedChange={(checked) => set("discord_game_roles", checked)}
+            testId="profile-discord-game-roles"
             className="mt-0.5"
           />
         </div>

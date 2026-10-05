@@ -1057,43 +1057,100 @@ class BotRunner:
         return {"ok": True, "message_id": str(message.id)}
 
     async def sync_roles(self) -> dict:
-        """Rollen abgleichen - idempotent: nur die drei verwalteten Rollen, nur verknüpfte Konten."""
+        """Rollen abgleichen - idempotent, je Server (#629): die drei Vereinsrollen auf dem Hauptserver und jedem
+        eingeschalteten Unterserver, dazu Spiel-Rollen; nur verknüpfte Konten, nur die verwalteten Rollen, höchstens
+        ``SYNC_LIMIT`` Änderungen je Lauf über alle Server (der Rest kommt im nächsten)."""
+        from services import discord_roles
+
         db = get_db()
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "offline", "changes": 0, "text": SYNC_TEXTS["offline"]}
         settings = await db.settings.find_one({"id": "discord"}, {"_id": 0}) or {}
         view = bot_settings(settings)
-        guild = client.get_guild(int(view["guild_id"])) if view["guild_id"].isdigit() else (client.guilds[0] if client.guilds else None)
-        if guild is None:
+        guilds = {str(guild.id): guild for guild in client.guilds}
+        targets = await discord_roles.targets(db, list(guilds), view["guild_id"])
+        if not targets:
             return {"ok": False, "reason": "no_guild", "changes": 0, "text": no_guild_text(view, client)}
-        roles_by_key = {key: next((r for r in guild.roles if r.name == name), None) for key, name in view["roles"].items()}
-        missing = [view["roles"][key] for key, role in roles_by_key.items() if role is None]
         links = await linked_discord_ids(db)
-        wanted = await wanted_roles_by_user(db, list(set(links.values())))
-        changes = 0
-        errors = 0
+        user_ids = list(set(links.values()))
+        club = await wanted_roles_by_user(db, user_ids)
+        games, parents = await discord_roles.load_games(db)
+        holders = await discord_roles.game_holders(db, user_ids, games, parents)
+        budget = SYNC_LIMIT
+        servers: dict[str, dict] = {}
+        for guild_id, row in targets:
+            names = discord_roles.role_names(view["roles"], games, await discord_roles.scope_games(db, row, games, parents))
+            result = await self._sync_guild_roles(guilds[guild_id], names, links, club, holders, budget, create=bool((row or {}).get("create_roles")))
+            budget -= result["changes"]
+            servers[guild_id] = result
+            if row is not None:
+                await discord_roles.record(db, guild_id, result)
+        main = servers[targets[0][0]]
+        changes = sum(result["changes"] for result in servers.values())
+        errors = sum(result["errors"] for result in servers.values())
+        if any(result.get("error") for result in servers.values()):
+            self.last_error = "Rollen: " + "; ".join(f"{guilds[gid].name}: {result['error']}" for gid, result in servers.items() if result.get("error"))[:280]
+        self.last_action = f"Rollenabgleich ({changes} Änderungen{', Rest im nächsten Lauf' if budget <= 0 else ''})"
+        await record_state(db, last_sync_at=now_utc().isoformat(), last_sync_changes=changes, last_sync_errors=errors, missing_roles=main["missing"],
+                           last_action=self.last_action)
+        return {"ok": True, "changes": changes, "errors": errors, "missing_roles": main["missing"], "linked": len(links), "servers": servers}
+
+    async def _sync_guild_roles(self, guild, names: dict, links: dict[str, str], club: dict[str, set], holders: dict[str, set], budget: int,
+                                *, create: bool = False) -> dict:
+        """Ein Server: Rollen über den Namen finden (mit „Fehlende Rollen anlegen“ auch anlegen), dann je verknüpfter Person,
+        die dort ist, hinzufügen und entfernen. Ein fehlendes Recht zählt als Fehler und steht in Worten da."""
+        from services import discord_roles
+
+        roles = {key: next((role for role in guild.roles if role.name == name), None) for key, name in names.items()}
+        held = {game_id for games in holders.values() for game_id in games}
+        needed = {key for key in names if key[0] == "club" or key[1] in held}
+        created: list[str] = []
+        error = ""
+        if create:
+            for key in sorted(needed, key=str):
+                if roles.get(key) is not None:
+                    continue
+                try:
+                    roles[key] = await guild.create_role(name=names[key], mentionable=key[0] == "game", reason="LION Website: Rolle angelegt")
+                    created.append(names[key])
+                except Exception as exc:  # noqa: BLE001 - ohne „Rollen verwalten“ legt der Bot nichts an
+                    error = f"Rolle „{names[key]}“ nicht angelegt: {exc}"[:200]
+                    break
+        # Fehlende Vereinsrollen sind eine Aufgabe; Spiel-Rollen gibt es nur, wo ihr sie anlegt - sie stehen getrennt.
+        missing = [names[key] for key in sorted(needed, key=str) if key[0] == "club" and roles.get(key) is None]
+        missing_games = [names[key] for key in sorted(needed, key=str) if key[0] == "game" and roles.get(key) is None]
+        available = {key for key, role in roles.items() if role is not None}
+        chunked = bool(getattr(guild, "chunked", False))
+        changes = errors = 0
+        limited = False
         for discord_id, user_id in links.items():
+            if changes >= budget:
+                limited = True
+                break
             member = guild.get_member(int(discord_id)) if discord_id.isdigit() else None
-            if member is None:
+            if member is None and not chunked and discord_id.isdigit():
+                # Nur ohne vollständige Mitgliederliste fragen - sonst hieße jede Person, die nicht dort ist, ein Aufruf je Lauf.
                 try:
                     member = await guild.fetch_member(int(discord_id))
-                except Exception:
-                    continue
-            current = {key for key, role in roles_by_key.items() if role is not None and role in member.roles}
-            add, remove = role_diff(current, wanted.get(user_id, set()))
+                except Exception:  # noqa: BLE001 - nicht auf dem Server
+                    member = None
+            if member is None:
+                continue
+            wanted = {("club", key) for key in club.get(user_id, set())} | {("game", game_id) for game_id in holders.get(user_id, set())}
+            current = {key for key in available if roles[key] in member.roles}
+            add, remove = discord_roles.member_plan(current, wanted & set(names), available)
             try:
                 if add:
-                    await member.add_roles(*[roles_by_key[key] for key in add if roles_by_key[key] is not None], reason="LION Website: Rollenabgleich")
+                    await member.add_roles(*[roles[key] for key in sorted(add, key=str)], reason="LION Website: Rollenabgleich")
                 if remove:
-                    await member.remove_roles(*[roles_by_key[key] for key in remove if roles_by_key[key] is not None], reason="LION Website: Rollenabgleich")
+                    await member.remove_roles(*[roles[key] for key in sorted(remove, key=str)], reason="LION Website: Rollenabgleich")
                 changes += len(add) + len(remove)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - eine Person ohne Erfolg hält die anderen nicht auf
                 errors += 1
-                self.last_error = f"Rollen: {exc}"[:300]
-        self.last_action = f"Rollenabgleich ({changes} Änderungen)"
-        await record_state(db, last_sync_at=now_utc().isoformat(), last_sync_changes=changes, last_sync_errors=errors, missing_roles=missing, last_action=self.last_action)
-        return {"ok": True, "changes": changes, "errors": errors, "missing_roles": missing, "linked": len(links)}
+                error = f"{exc}"[:200]
+        return {"changes": changes, "errors": errors, "missing": missing, "missing_games": missing_games, "created": created, "error": error,
+                "limited": limited}
 
 
 bot = BotRunner()

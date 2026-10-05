@@ -83,6 +83,7 @@ class UserUpdate(BaseModel):
     # Public profile features
     show_twitch_embed: Optional[bool] = None  # show live twitch on public profile
     show_steam_status: Optional[bool] = None  # „Gerade in Steam“ im Mitgliederbereich (#584), Opt-in
+    discord_game_roles: Optional[bool] = None  # Spiel-Rollen im Discord (#629): aus heißt keine „CoD-Spieler“-Rollen
     seasonal_decorations: Optional[Literal["on", "subtle", "off"]] = None  # Saisonale Deko für mich (#632): an, dezent, aus
     # Zeremonien (E8, #618): Ton an/aus, Lautstärke 0–100, volle Bewegung oder dezent.
     ceremony_sound: Optional[bool] = None
@@ -290,6 +291,8 @@ class GameCreate(BaseModel):
     player_id_fields: List[dict] = []
     # Discord-Server dieses Spiels (#626) - leer: der des Hauptspiels, sonst der Hauptserver.
     discord_guild_id: Optional[str] = None
+    # Spiel-Rolle im Discord (#629) - leer: „<Kurzname>-Spieler“.
+    discord_role_name: Optional[str] = Field(default=None, max_length=100)
 
 
 class GameUpdate(BaseModel):
@@ -313,6 +316,7 @@ class GameUpdate(BaseModel):
     default_format: Optional[str] = None
     player_id_fields: Optional[List[dict]] = None
     discord_guild_id: Optional[str] = None
+    discord_role_name: Optional[str] = Field(default=None, max_length=100)
 
 
 # ---------- Events ----------

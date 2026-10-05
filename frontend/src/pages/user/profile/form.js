@@ -34,6 +34,8 @@ export function profileToForm(user) {
     twitch_handle: user.twitch_handle || "",
     show_twitch_embed: user.show_twitch_embed ?? false,
     show_steam_status: user.show_steam_status ?? false,
+    // Spiel-Rollen im Discord (#629): Vorgabe an - aus heißt keine „CoD-Spieler“-Rollen.
+    discord_game_roles: user.discord_game_roles !== false,
     youtube_handle: user.youtube_handle || "",
     tiktok_handle: user.tiktok_handle || "",
     instagram_handle: user.instagram_handle || "",

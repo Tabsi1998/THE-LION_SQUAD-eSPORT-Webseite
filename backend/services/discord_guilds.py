@@ -135,7 +135,7 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
     row = await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0})
     if not row:
         raise LookupError(guild_id)
-    unknown = set(patch) - {"role", "enabled", "invite_url", "note", "channels", "mirror_events", "embeds"}
+    unknown = set(patch) - {"role", "enabled", "invite_url", "note", "channels", "mirror_events", "embeds", "create_roles"}
     if unknown:
         raise GuildError(f"Unbekannte Einstellung: {', '.join(sorted(unknown))}")
     if "channels" in patch and patch.get("role") == "main":
@@ -175,6 +175,9 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
     if "mirror_events" in patch:
         # Termine auf dem Spielserver auch am Hauptserver (#628) - Vorgabe an; gilt nur für Unterserver.
         updates["mirror_events"] = bool(patch["mirror_events"])
+    if "create_roles" in patch:
+        # Fehlende Rollen anlegen (#629) - Vorgabe aus; braucht „Rollen verwalten“.
+        updates["create_roles"] = bool(patch["create_roles"])
     if updates:
         updates["updated_at"] = now_utc().isoformat()
         await db[COLLECTION].update_one({"guild_id": row["guild_id"]}, {"$set": updates})

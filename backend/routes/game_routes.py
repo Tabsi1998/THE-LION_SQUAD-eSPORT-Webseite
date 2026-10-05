@@ -158,7 +158,8 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     current = await db.games.find_one({"id": game_id}, {"_id": 0})
     if not current:
         raise HTTPException(status_code=404, detail="Spiel nicht gefunden")
-    nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id", "discord_guild_id"}
+    nullable_fields = {"short_name", "logo_url", "cover_url", "genre", "parent_game_id", "identity_source_game_id", "discord_guild_id",
+                       "discord_role_name"}
     raw = body.model_dump(exclude_unset=True)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     slug_source = slug_source_for_update(raw, current, "name", fallback="spiel")

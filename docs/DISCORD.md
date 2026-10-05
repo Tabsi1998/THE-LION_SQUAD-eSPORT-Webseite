@@ -334,8 +334,20 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
   zu lesen. Nicht verknüpfte Konten und andere Bots zählen nicht.
 - **Rollen:** Aktives Mitglied ↔ Rolle „Mitglied“, Vorstand ↔ „Vorstand“, Turnierleitung ↔
   „Turnierleitung“. Der Abgleich läuft alle zehn Minuten und auf Knopfdruck („Rollen jetzt
-  abgleichen“). Der Bot fasst **nur diese drei Rollen** an – andere Rollen bleiben, wie sie sind.
-  Die Namen lassen sich in den Einstellungen ändern; fehlt eine Rolle im Discord, steht das dort.
+  abgleichen“). Der Bot fasst **nur diese drei Rollen und die Spiel-Rollen** an – andere Rollen
+  bleiben, wie sie sind. Die Namen lassen sich in den Einstellungen ändern; fehlt eine Rolle im
+  Discord, steht das dort.
+- **Rollen je Server (#629):** der Abgleich läuft auf dem Hauptserver und jedem eingeschalteten
+  Unterserver (`services/discord_roles.py`: `targets`, `scope_games`, `role_names`, `member_plan`;
+  Laufzeit `BotRunner.sync_roles`/`_sync_guild_roles`). Spiel-Rollen je Hauptspiel (`game_role_name`:
+  `discord_role_name` am Spiel, sonst „<Kurzname>-Spieler“) für alle mit Spielprofil (`game_ids` mit einer
+  ID; Editionen zählen fürs Hauptspiel) oder aktivem Team-Kader (`team_squads`); am Hauptserver alle
+  Hauptspiele, am Unterserver dessen Spiele. Abwahl `users.discord_game_roles = false`. Rollen über den
+  Namen; „Fehlende Rollen anlegen“ (`discord_guilds.create_roles`) legt Vereinsrollen und benötigte
+  Spiel-Rollen (erwähnbar) an. Höchstens `SYNC_LIMIT` (500) Änderungen je Lauf über alle Server. Ist die
+  Mitgliederliste des Servers vollständig (`chunked`), fragt der Bot nie nach Leuten, die nicht dort sind.
+  Stand je Server in `discord_guilds.roles_sync` (Änderungen, fehlende Vereinsrollen, Spiel-Rollen ohne
+  Rolle, angelegt, Fehler).
 - **Befehle:** `/naechstes-event`, `/turniere` (offene Anmeldungen), `/meine-erfolge` (nur
   verknüpft), `/status` (nur Vorstand) und seit #573 `/rangliste` (Top 10 der Saison),
   `/bracket` (Auswahl aus den laufenden öffentlichen Turnieren), `/wer-streamt`, `/mitglied`

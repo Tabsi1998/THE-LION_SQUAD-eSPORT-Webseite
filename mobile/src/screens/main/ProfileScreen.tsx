@@ -252,6 +252,8 @@ export function ProfileScreen() {
       privacy_achievements_public: u.privacy_achievements_public ?? true,
       newsletter_consent: Boolean(u.newsletter_consent),
       show_twitch_embed: Boolean(u.show_twitch_embed),
+      // Spiel-Rollen im Discord (#629): Vorgabe an - wie im Web.
+      discord_game_roles: u.discord_game_roles !== false,
       dm_privacy: u.dm_privacy || "everyone",
       notification_preferences: { ...(u.notification_preferences || {}) },
     });
@@ -717,6 +719,15 @@ export function ProfileScreen() {
             <Heading>Konten</Heading>
             <Muted>Verknüpfen läuft im Browser: die Plattform bestätigt dein Konto, der Name kommt von dort. Wer welches Konto sieht, regelst du unter Privatsphäre.</Muted>
             <PlatformLinkRows links={links} available={linkAvailable} disabled={linkDisabled} onLink={startPlatformLink} onUnlink={unlinkPlatform} />
+            {/* Spiel-Rollen im Discord (#629): wie im Web nur mit verknüpftem Discord; der Schalter speichert sofort. */}
+            {linkedPlatforms.has("discord") ? (
+              <Toggle
+                label="Spiel-Rollen im Discord"
+                detail="Mit Spielprofil (Spieler-ID) oder Team-Kader gibt dir der Bot die passende Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels und am Hauptserver. Aus: keine Spiel-Rollen; Vereinsrollen wie „Mitglied“ bleiben."
+                value={form.discord_game_roles !== false}
+                onValueChange={(v) => { setField(setForm, "discord_game_roles", v); scheduleSave(); }}
+              />
+            ) : null}
             <Muted>Von Hand – diese Plattformen bieten keine Anmeldung:</Muted>
             {manualSocialKeys.map((key) => (
               <Field key={key} label={labelFor(key)} value={form[key]} onChangeText={(v) => setField(setForm, key, v)} />

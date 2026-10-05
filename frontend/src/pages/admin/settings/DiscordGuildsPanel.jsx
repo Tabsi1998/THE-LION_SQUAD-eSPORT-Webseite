@@ -76,6 +76,51 @@ function GuildGames({ guild }) {
   );
 }
 
+function when(value) {
+  const date = value ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString("de-DE") : "";
+}
+
+/** Rollen je Server (#629): letzter Abgleich in Worten - Änderungen, was fehlt, was angelegt wurde. */
+export function rolesSyncText(sync) {
+  if (!sync?.at) return "noch kein Abgleich – er läuft alle zehn Minuten, sobald der Bot verbunden ist";
+  const parts = [`zuletzt ${when(sync.at)}`, `${sync.changes || 0} Änderungen`];
+  if (sync.limited) parts.push("Rest im nächsten Lauf");
+  if (sync.created?.length) parts.push(`angelegt: ${sync.created.join(", ")}`);
+  return parts.join(" · ");
+}
+
+/** Vereinsrollen und Spiel-Rollen je Server (#629): Stand, was fehlt, und der Schalter „Fehlende Rollen anlegen“. */
+function GuildRoles({ guild, busy, onToggle }) {
+  const sync = guild.roles_sync || {};
+  return (
+    <div className="space-y-1 text-xs" data-testid={`discord-guild-${guild.guild_id}-roles`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 mr-2">Rollen</span>
+          <span className="text-white/60" data-testid={`discord-guild-${guild.guild_id}-roles-state`}>{rolesSyncText(sync)}</span>
+        </span>
+        <label className="inline-flex items-center gap-2">
+          <input type="checkbox" checked={!!guild.create_roles} disabled={busy} className="accent-[#5865F2]" data-testid={`discord-guild-${guild.guild_id}-create-roles`}
+            onChange={(event) => onToggle(event.target.checked)} />
+          Fehlende Rollen anlegen
+        </label>
+      </div>
+      {sync.missing?.length ? (
+        <div className="text-[#FFD700]" data-testid={`discord-guild-${guild.guild_id}-roles-missing`}>
+          Fehlt im Discord: {sync.missing.map((name) => `„${name}“`).join(", ")} – anlegen (gleicher Name) oder „Fehlende Rollen anlegen“.
+        </div>
+      ) : null}
+      {sync.missing_games?.length ? (
+        <div className="text-white/45" data-testid={`discord-guild-${guild.guild_id}-roles-games`}>
+          Spiel-Rollen ohne Rolle hier: {sync.missing_games.map((name) => `„${name}“`).join(", ")} – nur nötig, wenn ihr sie hier wollt.
+        </div>
+      ) : null}
+      {sync.error ? <div className="text-[#FF6B6B]" data-testid={`discord-guild-${guild.guild_id}-roles-error`}>{sync.error}</div> : null}
+    </div>
+  );
+}
+
 export function guildStatusText(guild) {
   if (guild.left_at) return "Bot nicht mehr auf dem Server";
   if (guild.role === "main") return "Hauptserver · an";
@@ -247,6 +292,10 @@ export function DiscordGuildsPanel() {
                   </div>
                 </div>
                 {!guild.left_at && <GuildGames guild={guild} />}
+                {!guild.left_at && (guild.role === "main" || guild.enabled) && (
+                  <GuildRoles guild={guild} busy={!!busy}
+                    onToggle={(on) => patch(guild, { create_roles: on }, on ? `„${guild.name}“: fehlende Rollen legt der Bot beim nächsten Abgleich an.` : "Der Bot legt hier keine Rollen mehr an.")} />
+                )}
                 {guild.role !== "main" && !guild.left_at && (
                   <GuildChannels guild={guild} busy={!!busy} onSave={(channels) => patch(guild, { channels }, "Kanäle gespeichert.")} />
                 )}

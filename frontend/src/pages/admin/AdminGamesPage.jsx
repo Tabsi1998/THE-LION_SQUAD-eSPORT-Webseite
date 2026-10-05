@@ -31,8 +31,13 @@ const GAME_KIND_OPTIONS = [
 const emptyGameForm = {
   name: "", slug: "", short_name: "", genre: "", platforms: "", cover_url: "", logo_url: "",
   kind: "standalone", parent_game_id: "", identity_source_game_id: "", inherit_player_ids: true,
-  player_id_fields: [], discord_guild_id: "",
+  player_id_fields: [], discord_guild_id: "", discord_role_name: "",
 };
+
+// Spiel-Rolle im Discord (#629): je Hauptspiel eine; leer heißt „<Kurzname>-Spieler“. Editionen zählen fürs Hauptspiel.
+export function roleNamePlaceholder(form) {
+  return `Discord-Rolle (leer: „${(form.short_name || form.name || "Spiel").trim()}-Spieler“)`;
+}
 
 // Discord-Server je Spiel (#626): leer heißt erben - vom Hauptspiel, sonst der Hauptserver.
 export function inheritedServerText(form, games, servers) {
@@ -129,6 +134,7 @@ export default function AdminGamesPage() {
             </>
           )}
           <DiscordServerField form={form} games={list} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-discord" />
+          {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-role" />}
           <Input placeholder="Kurzname (z.B. MK8DX)" value={form.short_name} onChange={(v) => set("short_name", v)} testId="game-short" />
           <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-genre" />
           <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-platforms" />
@@ -210,6 +216,7 @@ function toForm(game) {
     default_format: game.default_format || "single_elim",
     player_id_fields: game.player_id_fields || [],
     discord_guild_id: game.discord_guild_id || "",
+    discord_role_name: game.discord_role_name || "",
   };
 }
 
@@ -236,6 +243,7 @@ function gamePayload(form) {
     default_team_size: Number(form.default_team_size) || 1,
     player_id_fields: normalizePlayerIdFields(form.player_id_fields),
     discord_guild_id: form.discord_guild_id || null,
+    discord_role_name: isEdition ? null : ((form.discord_role_name || "").trim() || null),
   };
 }
 
@@ -270,6 +278,7 @@ function EditGameModal({ game, games, servers = [], onClose, onSaved }) {
         <Input placeholder="Genre" value={form.genre} onChange={(v) => set("genre", v)} testId="game-edit-genre" />
         <Input placeholder="Plattformen (komma-getrennt)" value={form.platforms} onChange={(v) => set("platforms", v)} testId="game-edit-platforms" />
         <DiscordServerField form={form} games={games} servers={servers} onChange={(v) => set("discord_guild_id", v)} testId="game-edit-discord" />
+        {form.kind !== "edition" && <Input placeholder={roleNamePlaceholder(form)} value={form.discord_role_name} onChange={(v) => set("discord_role_name", v)} testId="game-edit-role" />}
       </FormGrid>
       {form.kind === "edition" && (
         <div className="grid md:grid-cols-2 gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
