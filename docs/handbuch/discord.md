@@ -220,6 +220,10 @@ Einladungslink aus dem Reiter „Server“ enthält ihn.
 - Alles Weitere steht im Thread: Check-in offen, live, Streams von Teilnehmern, **das Bracket**
   (angeheftet, nach jedem Ergebnis aktualisiert), beendet, Ergebnisse. Der **Endstand** mit Podium
   ist die letzte Nachricht im Thread. Der Kanal zeigt je Turnier genau eine Meldung.
+- **Das Bracket als Bild:** Hat das Turnier eine K.-o.-Phase, hängt der ganze Turnierbaum als Bild an der
+  Nachricht – wie auf der Website: Runden als Spalten, Sieger in Gold, die laufende Partie cyan umrandet,
+  Termine darunter. Die Felder darüber zeigen weiter die aktuelle Runde in Worten. Gruppen, Liga und Swiss
+  bleiben eine Tabelle in Textform; sehr große Bäume (mehr als 32 Partien in einer Runde) ebenfalls.
 - Discord archiviert den Thread nach einer Woche Ruhe; die nächste Meldung öffnet ihn wieder.
 - **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus (keine Meldung, kein Thread,
   kein Termin).

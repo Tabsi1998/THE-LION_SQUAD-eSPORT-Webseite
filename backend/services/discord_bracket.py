@@ -15,6 +15,9 @@ Eine Nachricht, die schon vor dem Thread im Kanal stand, bleibt dort und wird we
 
 Turniere nur für Mitglieder (#910): das Bracket steht im Thread des Turniers im Mitglieder-Kanal - nie öffentlich.
 
+Als Bild (#575): Hat das Turnier eine K.-o.-Phase, hängt der ganze Baum als PNG an der Nachricht (``services/bracket_image``);
+die Felder zeigen weiter die aktuelle Runde. Ein neues Bild kommt nur, wenn sich am Baum etwas ändert.
+
 Mehrere Server (#628): Hat das Spiel einen eigenen Server, steht das Bracket im Turnier-Thread dort; am Hauptserver nur, wenn
 die Regel von „Turnier: jetzt live“ „beide voll“ sagt - sonst steht dort der Querverweis. Nimmt der Spielserver es nicht an,
 kommt es voll an den Hauptserver.
@@ -234,7 +237,7 @@ def content_hash(embed: dict) -> str:
     return hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
 
-async def build(db, tournament: dict, now: datetime | None = None, *, final: bool = False) -> dict:
+async def _load(db, tournament: dict) -> tuple[list[dict], list[dict], list[dict], str]:
     from services.competition_read import load_competition_read_model
     from services.competition_snapshot import adapt_stage_matches
     from services.platform_links import frontend_url
@@ -243,7 +246,29 @@ async def build(db, tournament: dict, now: datetime | None = None, *, final: boo
     matches = adapt_stage_matches(read_model.stage_matches)
     registrations = await db.tournament_registrations.find({"tournament_id": tournament["id"]}, {"_id": 0, "id": 1, "display_name": 1, "ingame_name": 1, "user_id": 1}).to_list(500)
     origin = (frontend_url() or "https://lionsquad.at").rstrip("/")
-    return bracket_embed(tournament, matches, read_model.stages, registrations, origin, now, final=final)
+    return read_model.stages, matches, registrations, origin
+
+
+async def build(db, tournament: dict, now: datetime | None = None, *, final: bool = False) -> dict:
+    stages, matches, registrations, origin = await _load(db, tournament)
+    return bracket_embed(tournament, matches, stages, registrations, origin, now, final=final)
+
+
+async def build_with_image(db, tournament: dict, now: datetime | None = None, *, final: bool = False) -> tuple[dict, bytes | None]:
+    """Einbettung und Bild (#575) aus denselben Daten. Gibt es ein Bild, steht seine Prüfsumme im Inhalt - so kommt ein
+    neues Bild auch, wenn sich nur eine frühere Runde ändert. Scheitert die Zeichnung, bleibt es bei der Einbettung."""
+    from services import bracket_image
+
+    stages, matches, registrations, origin = await _load(db, tournament)
+    raw = bracket_embed(tournament, matches, stages, registrations, origin, now, final=final)
+    try:
+        image = bracket_image.render(tournament, matches, stages, registrations, final=final, now=now)
+    except Exception as exc:  # noqa: BLE001 - ohne Bild geht die Einbettung trotzdem hinaus
+        logger.warning("[discord-bracket] %s: Bild nicht gezeichnet: %s", tournament.get("id"), type(exc).__name__)
+        image = None
+    if image:
+        raw["image_signature"] = bracket_image.signature(bracket_image.bracket_sections(matches, stages))
+    return raw, image
 
 
 def _state_at(tournament: dict, field: str) -> dict:
@@ -314,10 +339,14 @@ async def refresh(db, tournament_id: str, *, force: bool = False, final: bool | 
     async def message():
         # Einmal bauen, für alle Bahnen gleich - und nur, wenn eine Bahn ihn wirklich braucht.
         if not content:
-            raw = await build(db, tournament, current, final=bool(final))
-            content.update(raw=raw, digest=content_hash(raw),
-                           embed=await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"],
-                                                   footer=raw["footer"]),
+            from services import bracket_image
+
+            raw, image = await build_with_image(db, tournament, current, final=bool(final))
+            embed = await build_embed(raw["title"], raw["description"], color=raw["color"], url=raw["url"], fields=raw["fields"], footer=raw["footer"])
+            if image:
+                # Das Bild (#575) hängt an der Nachricht; die Einbettung zeigt es groß unter dem Text.
+                embed["image"] = {"url": f"attachment://{bracket_image.FILENAME}"}
+            content.update(raw=raw, digest=content_hash(raw), embed=embed, files=[(bracket_image.FILENAME, image)] if image else None,
                            buttons=await resolve_buttons([{"label": "Bracket ansehen", "url": raw["url"]}]))  # #573
         return content
 
@@ -358,6 +387,7 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
         return {"ok": False, "reason": "throttled"}
     built = await message()
     digest, embed, buttons = built["digest"], built["embed"], built["buttons"]
+    attach = {"files": built["files"]} if built.get("files") else {}
     if state.get("message_id") and state.get("hash") == digest and not force and not final:
         return {"ok": True, "reason": "unchanged", "message_id": state.get("message_id")}
     message_id = str(state.get("message_id") or "")
@@ -369,12 +399,12 @@ async def _refresh_lane(db, tournament: dict, lane: dict, message, *, force: boo
     result: dict = {"ok": False, "reason": "error"}
     try:
         if message_id:
-            result = await bot.edit_embed(channel_id, message_id, embed, buttons=buttons)
+            result = await bot.edit_embed(channel_id, message_id, embed, buttons=buttons, **attach)
             if not result.get("ok") and result.get("reason") == "unknown_message":
                 message_id = ""
         if not message_id:
             action = "posted"
-            result = await bot.send_embed(channel_id, embed, buttons=buttons)
+            result = await bot.send_embed(channel_id, embed, buttons=buttons, **attach)
             if result.get("ok"):
                 pinned = await bot.pin_message(channel_id, str(result.get("message_id")))
                 result["pinned"] = bool(pinned.get("ok"))

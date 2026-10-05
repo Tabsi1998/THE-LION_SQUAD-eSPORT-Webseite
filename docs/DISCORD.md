@@ -88,6 +88,13 @@ Gemeldet wird nur, was ab dann veröffentlicht wird (und nichts, was älter als
 - Alles Weitere steht im Thread, kurz und ohne Wiederholung: Check-in offen (mit Frist), jetzt
   live, Streams von Teilnehmern, das Bracket (angepinnt, nach jedem Ergebnis bearbeitet),
   beendet, Ergebnisse veröffentlicht. Der Kanal zeigt je Turnier genau eine Meldung.
+- **Bracket als Bild (#575):** `services/bracket_image.py` zeichnet mit Pillow (ohne Browser) jede K.-o.-Phase:
+  Abschnitte (Winner, Loser, Grand Final), Runden als Spalten, Karten mit Namen und Ergebnis, Linien im Baum.
+  `discord_bracket.build_with_image` baut Einbettung und Bild aus denselben Daten; das PNG hängt als
+  `attachment://bracket.png` an der Nachricht (`send_embed`/`edit_embed` mit `files`, Bearbeiten ersetzt den
+  Anhang). Die Prüfsumme des Baums (`signature`, auch frühere Runden) steht im Inhalt - ein neues Bild nur bei
+  Änderung. Tabellenphasen und Bäume mit mehr als 32 Partien je Runde bleiben ohne Bild; scheitert die
+  Zeichnung, geht die Einbettung trotzdem hinaus. Schrift: DejaVu im Container (`fonts-dejavu-core`).
 - Der **Endstand** ist die letzte Nachricht im Thread: Beim Ende setzt der Bot das Bracket mit
   Podium neu ans Ende, die alte Fassung verschwindet; kommt danach noch „Ergebnisse
   veröffentlicht“, wandert er wieder nach unten. Discord archiviert den Thread nach einer Woche
