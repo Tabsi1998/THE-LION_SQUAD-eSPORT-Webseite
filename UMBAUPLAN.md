@@ -2836,9 +2836,26 @@ der Verwaltung.
   Dependabot nicht mehr einzeln, nur zusammen mit dem Expo-Update, weil sie sonst nicht zusammenpassen.
 - **Entschieden:** Events aus Dolibarr zu übernehmen (#850) fällt weg. Dolibarr wird sinnvoll eingebunden,
   nicht erzwungen; die Events führt die Website, weil sie dort viel mehr Angaben haben.
-- **Als Nächstes:** Discord je Server weiter: Termine und Einbettungen je Spielserver (PR #907), Brackets
-  je Server, Slash-Befehle mit dem Spielfilter des Servers, Rollen je Server. Dazu „Meine Teilnahmen“ im
-  Profil (PR #908) und danach die mehrtägigen Events (Events II).
+- **Im Lauf des Tages gemergt – Discord je Server:** Spielserver bekommen ihre eigenen Discord-Termine,
+  ihre eigene Rangliste und „Nächste Termine“, nur mit ihren Spielen; das Bracket steht im Turnier-Thread
+  des Spielservers, und am Bracket hängt jetzt der ganze Turnierbaum als Bild. Die Slash-Befehle gibt es
+  auf jedem eingeschalteten Server, dort mit dessen Spielen als Vorgabe. Mitglied, Vorstand und
+  Turnierleitung bekommen ihre Rollen auf jedem Server, dazu Spiel-Rollen wie „RL-Spieler“ für alle mit
+  Spielprofil oder im Team – im Profil abwählbar. Turniere „nur für Mitglieder“ melden sich im
+  Mitglieder-Kanal statt gar nicht. News, Events und Turnier-Meldungen lassen sich unter „Gestaltung“
+  selbst gestalten, mit Vorschau so, wie sie hinausgehen.
+- **Meine Teilnahmen:** Unter den Ehrungen im Profil steht, was die Mitgliederakte als Teilnahme führt –
+  in Website und App.
+- **App:** Die App startet ohne Anmeldung gleich auf der Startseite; nach ein paar Sekunden kommt einmal
+  der Hinweis zum Anmelden, und unter „Mehr“ steht „Anmelden oder registrieren“. Passkeys bietet die App
+  beim Anmelden von selbst an, lädt nach einer Anmeldung mit Passwort einmal zum Anlegen ein und
+  verwaltet sie unter Profil → Einstellungen. Das kommt mit der App 1.2.0 (Build 86) zu Google.
+- **Neu notiert (#921):** Links auf Turniere, Events & Co. sollen in der App den passenden Bildschirm öffnen –
+  aus News, Chat und Laufbanner und mit installierter App auch aus Discord oder WhatsApp. Kommt mit einem
+  der nächsten App-Builds.
+- **Als Nächstes:** App 1.2.0 (Build 86) mit den Hinweisen aus der Play Console (#917: Code-Optimierung,
+  Ausrichtung auf Tablets), dann Discord Teil 2 der Rollen (Pings bei Meldungen, #576) und D8, danach die
+  mehrtägigen Events (Events II).
 
 ## Noch offen und bewusst getrennt
 
@@ -2869,6 +2886,8 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Nach dem Update vom 3.10. Nachmittag** | Finanzen → „Fehlende PDFs nachziehen“ einmal drücken (alte Rechnungen ohne PDF). Discord → „Gestaltung“: Vorlagen ansehen, Stream-Meldungen einschalten und Kanal wählen. Soll eine Rolle bei Streams gepingt werden, muss sie in Discord „erwähnbar“ sein (Servereinstellungen → Rollen). |
 | **Gutschrift-Entwurf: ja oder nein?** | Admin → Finanzen: Schalter „Gutschrift-Entwurf bei Abmeldung anlegen“. Ist er an, legt die Website einen Entwurf über den ganzen Betrag in Dolibarr an, sobald sich jemand nach der Freigabe der Rechnung abmeldet. Du prüfst ihn dort (Teilbetrag?) und gibst ihn frei – die Website gibt nie frei. Anfangs ist er aus. |
 | **Nach dem Update vom 5.10.** | In Dolibarr dem API-Benutzer der Website drei Rechte geben (Benutzer → Rechte → Vereine): „Teilnahmen von Mitgliedern erfassen und lesen“, „Mitglieder bei einer Generalversammlung einlassen“ und „Änderungen abholen (Änderungsfeed)“. Dann auf der Website unter Dolibarr → Funktionen „Teilnahmen in die Mitgliederakte“ einschalten (auf Wunsch „Letzte 12 Monate nachtragen“) und bei „Sponsoren und Partner“ einmal „Jetzt nachlesen“. |
+| **Discord nach dem Update vom 5.10. Mittag** | Damit der Bot auf den Spielservern Rollen vergeben kann, braucht er dort „Rollen verwalten“, und seine Rolle muss über den Vereins- und Spiel-Rollen stehen (Servereinstellungen → Rollen). Der Reiter „Server“ zeigt je Server, was fehlt. Fehlende Rollen legt die Website nur an, wenn du dort „Fehlende Rollen anlegen“ einschaltest. |
+| **App 1.2.0 bei Google** | Wenn Build 86 im Test ist: Play Console → App-Zugriff → Anleitung für Googles Prüfer ersetzen, die App startet jetzt ohne Anmeldebildschirm. Der neue Text steht in `docs/PLAY_STORE.md`. |
 | **Einlass in der App: A oder B?** | A (empfohlen): Die App bekommt kein Kamerarecht; gescannt wird im Handy-Browser unter Admin → Einlass. B: Scanner in der App, mit Kamerarecht, im nächsten Build. |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
 

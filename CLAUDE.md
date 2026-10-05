@@ -3385,6 +3385,56 @@ Seit dem 15. September gilt:
   Versandprotokoll mit `guild_id`/`crossref`, Filter `guild` in den Ereignissen.
 - Entschieden am 5.10. (#850 verworfen): Dolibarr wird **sinnvoll** eingebunden, nicht erzwungen – Events
   bleiben von der Website geführt (dort stehen mehr Angaben), kein Abgleich von Dolibarr-Events.
+- Discord je Server, Termine und Einbettungen (#628 Teil; PR #907): `discord_scheduled.targets` – ein
+  öffentliches Turnier mit Spielserver bekommt den Termin dort, am Hauptserver zusätzlich, solange der
+  Server `mirror_events` hat (Vorgabe an); Stand je Server in `discord_scheduled_guilds`. Nicht Öffentliches
+  nie auf einen Unterserver; ein Server ohne Recht wird je Lauf nur einmal versucht. Einbettungen
+  (`discord_embeds`) je Unterserver mit dessen Spielen (`embeds` in `discord_guilds`, Saisonpunkte nur aus
+  deren Turnieren und Fast Laps); ohne Spiel kein Post mit Grund. Admin `DiscordEmbedsPanel` je Server.
+- Meine Teilnahmen (#906; PR #908): `dolibarr_honours.overview` holt dazu `me/participations` (eigene
+  Kennungen bleiben intern, nichts aufs öffentliche Profil); scheitert nur dieser Abruf, bleiben die
+  Ehrungen. Reiter „Ehrungen & Teilnahmen“ in Web (`HonoursPanel.jsx`) und App (`Honours.tsx`).
+- Turniere nur für Mitglieder (#910; PR #911): `discord_threads`/`discord_bracket` melden sie wie
+  öffentliche, nur im Kanal „Mitglieder (privat)“ am Hauptserver (Ankündigung, Thread, Check-in, live,
+  Streams, Bracket); keine Routing-Regel, kein Spielserver, kein Querverweis; ohne Mitglieder-Kanal
+  nichts (kein öffentlicher Rückfall). Ein vorher öffentliches Turnier behält seine öffentliche Fassung.
+- Slash-Befehle je Server (#630; PR #912): Server-Befehle auf Hauptserver und jedem eingeschalteten
+  Unterserver, nie global (`commands_at` je Server; Ein/Aus registriert sofort nach).
+  `discord_commands.server_scope` filtert `/turniere`, `/naechstes-event` und die `/bracket`-Auswahl auf
+  die Spiele des Servers; `spiel:` (Autovervollständigung) und `alle: True` überschreiben das; `/status`
+  nennt Server, Spiele, Kanäle, letzte Aktualisierung. Antworten bleiben ephemeral.
+- Bracket je Server (#628; PR #914): `discord_bracket._lanes` – je Bahn (Spielserver, Hauptserver,
+  Mitglieder-Thread) eigener Stand in `discord_bracket_by_guild`, eigene Bremse, eigener Endstand; Regel
+  wie „Turnier: jetzt live“ (Spielserver-Thread, Hauptserver nur bei `both_full`), Rückfall voll an den
+  Hauptserver.
+- Bracket als Bild (#575; PR #915): `services/bracket_image.py` zeichnet mit Pillow (Runden als Spalten,
+  Sieger Gold, live Cyan, Linien im K.-o.-Baum; Tabellenphasen und Riesenbäume ohne Bild);
+  `discord_bracket.build_with_image`, Bot sendet/ersetzt Anhänge (`files=`). Die Prüfsumme des Baums
+  steht im Inhalt – neues Bild nur bei Änderung; scheitert die Zeichnung, geht die Einbettung trotzdem.
+- Rollen je Server (#629 Teil 1; PR #913): `services/discord_roles.py` – Vereinsrollen auf Hauptserver
+  und jedem eingeschalteten Unterserver; Spiel-Rollen „<Kurzname>-Spieler“ (`game_role_name`, änderbar
+  über `discord_role_name` am Spiel) für Spielprofil mit ID oder aktiven Kader, auf dem Spielserver und
+  am Hauptserver, Editionen zählen fürs Hauptspiel (`top_game`); abwählbar `discord_game_roles` im Profil.
+  `create_roles` je Server (Vorgabe aus), höchstens 500 Änderungen je Lauf, Stand `roles_sync` im
+  Reiter „Server“. Teil 2 (Ping-Rollen bei Meldungen, #576) offen.
+- Gestaltung Teil 2 (#866; PR #916): `discord_design.KINDS` + `news`, `event`, `tournament`,
+  `tournament_thread` (Gruppe „Meldungen“); `discord_announcements.news_values`/`event_values`/
+  `tournament_values` und `designed_*`; `send_event`, `send_to`, `_send_embed` nehmen `embed=`/`content=`,
+  „Erneut senden“ nutzt `payload.embed`. Interne Vorstandsmeldungen ohne Vorlage.
+- App Gast zuerst und Passkey (#918, #919; PR #920): `AppNavigator` – `RootStack` (`Main` = Tabs,
+  `Login`, `Register` darüber; `RootStackParamList` ersetzt `AuthStackParamList`), `openSignIn()` und
+  `signInOpen()` in `rootNavigation.ts` (von überall, danach `goBack` an den Ursprung; `Register` →
+  `popTo("Login")`). `AuthContext` startet ohne Sitzung als `liveGuestUser`, Abmelden → Gast;
+  `continueAsGuest` entfällt. `SignInNudge` (12 s, einmal, `tls.mobile.signInNudgeSeen`, wartet auf
+  `whatsNewOpen` aus `AppUpdateProvider`), `PasskeyInvite` (nach Passwort-Anmeldung, je Konto
+  `tls.mobile.passkeyInviteDismissed.<id>`), `PasskeysCard` (Profil → Einstellungen; nur wenn
+  `/auth/passkeys/status` `app: true`). `LoginScreen` fragt beim Öffnen still (`silentPasskeyMiss`: kein
+  Passkey oder 503 → nichts). Backend: `issue_enroll_ticket` (Art `mobile-enroll`, 10 min, einmal, Hash)
+  aus `/auth/mobile/login` und `/auth/mfa/complete` (App) als `passkey_ticket`;
+  `/auth/passkeys/mobile/register/options|verify` (Ticket oder Passwort; mit Ticket trotzdem bestätigte
+  E-Mail und bei 2FA `auth_mfa_verified`), `/auth/passkeys/mobile/{id}/remove` (Passwort).
+  **Falle Gitleaks:** erfundene Test-Passwörter ab 10 Zeichen (`geheim-123456`) meldet `generic-api-key` –
+  in Tests kurz halten (`geheim-42`) oder in `.gitleaks.toml` mit Pfad und Wert eintragen.
 
 **App**
 - Logik ohne UI: `mobile/src/lib/dashboard.ts` (`splitHomeTimeline`,
