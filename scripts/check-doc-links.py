@@ -1,4 +1,7 @@
-"""Check repository-local Markdown link targets; remote URLs need separate review."""
+"""Check repository-local Markdown link targets; remote URLs need separate review.
+
+Also holds the size budget of the files every Claude session loads at start.
+"""
 import os
 import re
 from pathlib import Path
@@ -6,6 +9,24 @@ from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
 IGNORED = {".git", "node_modules", ".pytest_cache", "dist", "test-results", "playwright-report", ".venv", "__pycache__"}
+# CLAUDE.md is read by every Claude session and every agent before the first line of code (#929): what
+# stands there is paid for at every start. Details belong in docs/HISTORIE.md, pitfalls in
+# docs/STOLPERSTEINE.md. Bytes are counted with LF line endings, so Windows and the CI agree.
+SIZE_BUDGETS = {"CLAUDE.md": 60_000}
+
+
+def over_budget(root=ROOT, budgets=None):
+    """The files that outgrew their budget, as lines to print."""
+    found = []
+    for name, limit in (SIZE_BUDGETS if budgets is None else budgets).items():
+        path = Path(root) / name
+        if not path.is_file():
+            continue
+        size = len(path.read_bytes().replace(b"\r\n", b"\n"))
+        if size > limit:
+            found.append(f"{name}: {size} bytes, the budget is {limit} - move details to docs/HISTORIE.md "
+                         "and replace the last state instead of appending to it")
+    return found
 
 
 def main():
@@ -29,7 +50,10 @@ def main():
     for entry in broken:
         print(entry)
     print(f"Checked {checked} Markdown files; {len(broken)} missing local link targets.")
-    return int(bool(broken))
+    heavy = over_budget()
+    for entry in heavy:
+        print(entry)
+    return int(bool(broken or heavy))
 
 
 if __name__ == "__main__":

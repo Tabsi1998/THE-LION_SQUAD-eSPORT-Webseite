@@ -176,7 +176,7 @@ Verbindlich für jede Saison, Web und App:
 5. Große Bewegungen als `EFFECTS`-Klasse anmelden und über `requestMotion` starten; Reduced Motion still.
 6. Effektklassen übersetzen: Eintrag in `SEASON_CAPABILITIES` (Web) und `intensity.ts` (App).
 7. Abnahme: `defineSeasonQa` im Web, `acceptance.test.tsx` in der App; Screenshots an den PR.
-8. Doku: dieser Stand wird im Doku-PR nach dem Merge fortgeschrieben (CLAUDE.md §5/§9).
+8. Doku: dieser Stand wird im Doku-PR nach dem Merge fortgeschrieben (`docs/HISTORIE.md` Teil A, `CLAUDE.md` Abschnitt 9).
 9. App-Gegenstück: jeder Web-PR einer Jahreszeit nennt das Issue, in dem die App nachzieht (#772). Reine Rechnung
    (Mengen, Wege, Zeiten, Zufall) ohne Browser schreiben, damit die App sie übernehmen kann.
 
@@ -324,8 +324,8 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
 | Öffnen | wackeln, der Gutschein steigt, Karte mit dem Sticker; danach gekippt und leer | gleich, dazu leichtes Tippen beim Öffnen und ein Erfolgs-Tippen beim neuen Sticker |
 | Hinweis | `Toast` einmal am Tag mit „Zum Stiefel“ (scrollt hin) | `Greeting` einmal am Tag mit „Zum Stiefel“ (führt in „Mehr“), Tab-Symbol Stiefel |
 
-- Der Sticker kommt vom Server: einer je Person und Jahr aus dem Saison-Paket „Vom Nikolaus“ (Abschnitt 5 in
-  CLAUDE.md). Ohne Anmeldung sagt die Karte, dass Angemeldete einen Sticker finden.
+- Der Sticker kommt vom Server: einer je Person und Jahr aus dem Saison-Paket „Vom Nikolaus“ (`docs/HISTORIE.md`,
+  Teil A). Ohne Anmeldung sagt die Karte, dass Angemeldete einen Sticker finden.
 - Gleiche Form: Fingerabdruck `102233374` in `nikolaus/boot.test.js` und `boot.test.ts`.
 
 ## 17. Silvester im Web (#800)

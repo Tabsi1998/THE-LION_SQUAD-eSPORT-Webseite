@@ -36,8 +36,18 @@ Was die Funktionen können und was ihr dafür einrichtet – zum Durchlesen, ohn
 Prüfungen: [CI](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/ci.yml),
 [CodeQL](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions/workflows/codeql.yml),
 [alle Workflows](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/actions).
-Lokale Markdown-Linkziele werden mit `python scripts/check-doc-links.py` geprüft.
+Lokale Markdown-Linkziele werden mit `python scripts/check-doc-links.py` geprüft; dasselbe Skript hält
+die Obergrenze von `CLAUDE.md` (60 KB).
 Das ersetzt keine manuelle Prüfung externer Links oder der fachlichen Abnahme.
+
+## Arbeit mit Claude Code
+
+| Datei | Zweck |
+| --- | --- |
+| [CLAUDE](CLAUDE.md) | Arbeitsregeln, Kurzkarte, Prüfen, Release, Deployment, letzter Stand – wird bei jedem Sitzungsstart geladen und bleibt deshalb kurz |
+| [HISTORIE](docs/HISTORIE.md) | Nachschlagewerk: was jeder PR gebaut hat und wo es liegt; der Stand-Verlauf bis 5. Oktober 2026 |
+| [STOLPERSTEINE](docs/STOLPERSTEINE.md) | Fallen und ihre Abhilfe, nach Gebiet |
+| [UMBAUPLAN](UMBAUPLAN.md) | Fahrplan in der Sprache des Betreibers und „Was von dir kommen muss“ |
 
 ## Turniere und Entwicklungshistorie
 

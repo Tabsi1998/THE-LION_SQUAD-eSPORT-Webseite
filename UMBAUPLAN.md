@@ -2853,9 +2853,26 @@ der Verwaltung.
 - **Neu notiert (#921):** Links auf Turniere, Events & Co. sollen in der App den passenden Bildschirm öffnen –
   aus News, Chat und Laufbanner und mit installierter App auch aus Discord oder WhatsApp. Kommt mit einem
   der nächsten App-Builds.
-- **Als Nächstes:** App 1.2.0 (Build 86) mit den Hinweisen aus der Play Console (#917: Code-Optimierung,
-  Ausrichtung auf Tablets), dann Discord Teil 2 der Rollen (Pings bei Meldungen, #576) und D8, danach die
-  mehrtägigen Events (Events II).
+- **App 1.2.0, 1.2.1 und 1.2.2 sind gebaut** (Build 86, 87, 88 – am GitHub-Release und am Vereinsserver).
+  1.2.0: die App ist kleiner und startet schneller (Code-Optimierung, #917), Tablets dürfen quer, ohne Konto
+  geht es gleich hinein. 1.2.1: wer die App aus Google Play hat, bekommt Updates nur noch über Google Play –
+  das eigene Update-Fenster kommt dort nicht mehr (#926). 1.2.2: scheitert ein Passkey, nennt die Meldung den
+  Grund; hat dein Konto schon einen Passkey am PC, lädt die App trotzdem einmal ein, auch am Handy einen
+  anzulegen (#938, #939).
+- **Passkey in der Fassung aus Google Play (#945):** Google signiert die App aus dem Play Store mit einem
+  eigenen Schlüssel. Den kannte der Server nicht – daher „Herkunft der App passt nicht“. Er ist jetzt
+  eingetragen; nach dem nächsten `update.sh` lässt sich der Passkey anlegen.
+- **Startseite:** die Zeile „Mitglied wird, wer sich einbringt – so läuft das bei uns.“ im Kopf ist weg (#947).
+- **Vollprüfung vom 5.10.:** 14 Aufgaben im Meilenstein „Prüfung Oktober 2026“ (#928–#937, #941–#944) – das
+  Löschen eines Kontos räumt noch nicht alles weg, fehlende Indizes, tote Routen, zwei kleine
+  Sicherheitsnachbesserungen, Aufräumarbeiten. Als Erstes erledigt: die Arbeitsdatei für Claude ist von
+  365 KB auf 30 KB gekürzt (#929) – jede Sitzung startet damit deutlich billiger. Der vollständige lokale
+  Check auf dem Stand vom Abend ist in allen Gruppen grün, die auch GitHub rechnet.
+- **Neu notiert (#949):** bleibt am Handy ein Passkey liegen, den der Server nicht kennt, sagt die App
+  künftig, was zu tun ist. Kommt mit App 1.3.0, zusammen mit den Links in die App (#921).
+- **Als Nächstes:** aus der Prüfung zuerst #931 und #928, dann der Rest des Meilensteins; danach App 1.3.0
+  (#921, #949), Discord Teil 2 der Rollen (Pings bei Meldungen, #576) und D8, die mehrtägigen Events
+  (Events II).
 
 ## Noch offen und bewusst getrennt
 
@@ -2881,12 +2898,15 @@ Software kann keine Zugänge, echten Vereinsdaten oder einen Serverzugriff erfin
 | **Eigene Sticker anlegen** | Nach dem Ausrollen unter *Admin → Content → Sticker* ein Paket „Lion Squad“ anlegen und Löwe oder Maskottchen als PNG mit durchsichtigem Hintergrund hochladen. Ein leeres Paket erscheint im Chat nicht. |
 | **Medienbericht nach Block 12** | `docker compose exec backend python3 scripts/media-report.py` (nur lesend). Zeigt, was eure Bilder und ihre Fassungen wiegen, und ob 400/800/1600 px die richtigen Breiten sind. |
 | **Rechtstexte lesen (Oktober 2026)** | Datenschutzerklärung: der Absatz zu den Zählern der Fundstücke (#773), der Satz zum Adventkalender und der Absatz zu Verlosungen (#785); dazu die fünf Sätze der Teilnahmebedingungen. Ergänzungen wie ein Mindestalter oder Versand statt Abholung sind ein paar Zeilen. |
-| **Build 85 in die Play Console** | Das Bundle `LionsAPP-v1.1.0-build85-ee67572.aab` liegt auf deinem Desktop. Du hast den Zugang für Releases beantragt; sobald Google ihn freigibt: hochladen und den Versionshinweis (459 Zeichen) aus PR #851 einfügen. |
+| **App 1.2.2 (Build 88) in den offenen Test** | Play Console → Testen und veröffentlichen → Offene Tests → Neuen Release erstellen → `LionsAPP-v1.2.2-build88-d6e50e5.aab` aus `mobile/builds` hochladen (die Datei `…mapping.txt` braucht es nicht, sie steckt im Bundle) → Versionshinweis einfügen → speichern und einführen. Build 87 kannst du auslassen. Versionshinweis: „Neu in 1.2.2: Mehrere Passkeys – hast du schon einen am PC, lädt die App ein, auch für dein Handy einen anzulegen. Neue Passkeys tragen den Namen deines Handys. Aus Google Play installiert? Dann kommen Updates nur noch über Google Play.“ |
 | **Discord nach dem Update** | Bot-Rolle im Kanal „Events und Turniere“: „Öffentliche Threads erstellen“ und „Nachrichten in Threads senden“. Server-Widget einschalten (Servereinstellungen → Widget). Willkommenstext lesen und einschalten. Kanal „Mitglieder (privat)“ wählen. Weitere Server im Reiter „Server“ einschalten. |
 | **Nach dem Update vom 3.10. Nachmittag** | Finanzen → „Fehlende PDFs nachziehen“ einmal drücken (alte Rechnungen ohne PDF). Discord → „Gestaltung“: Vorlagen ansehen, Stream-Meldungen einschalten und Kanal wählen. Soll eine Rolle bei Streams gepingt werden, muss sie in Discord „erwähnbar“ sein (Servereinstellungen → Rollen). |
 | **Gutschrift-Entwurf: ja oder nein?** | Admin → Finanzen: Schalter „Gutschrift-Entwurf bei Abmeldung anlegen“. Ist er an, legt die Website einen Entwurf über den ganzen Betrag in Dolibarr an, sobald sich jemand nach der Freigabe der Rechnung abmeldet. Du prüfst ihn dort (Teilbetrag?) und gibst ihn frei – die Website gibt nie frei. Anfangs ist er aus. |
 | **Nach dem Update vom 5.10.** | In Dolibarr dem API-Benutzer der Website drei Rechte geben (Benutzer → Rechte → Vereine): „Teilnahmen von Mitgliedern erfassen und lesen“, „Mitglieder bei einer Generalversammlung einlassen“ und „Änderungen abholen (Änderungsfeed)“. Dann auf der Website unter Dolibarr → Funktionen „Teilnahmen in die Mitgliederakte“ einschalten (auf Wunsch „Letzte 12 Monate nachtragen“) und bei „Sponsoren und Partner“ einmal „Jetzt nachlesen“. |
 | **Discord nach dem Update vom 5.10. Mittag** | Damit der Bot auf den Spielservern Rollen vergeben kann, braucht er dort „Rollen verwalten“, und seine Rolle muss über den Vereins- und Spiel-Rollen stehen (Servereinstellungen → Rollen). Der Reiter „Server“ zeigt je Server, was fehlt. Fehlende Rollen legt die Website nur an, wenn du dort „Fehlende Rollen anlegen“ einschaltest. |
+| **Nach dem Update vom 5.10. Abend** | `update.sh` ausführen (Passkey in der Fassung aus Google Play #946, Startseite #948). Danach am Handy: Einstellungen → Passwörter und Passkeys (Samsung Pass oder Google Passwortmanager) → die Einträge für lionsquad.at löschen – sie stammen von den fehlgeschlagenen Versuchen. Dann in der App mit Passwort anmelden und den Passkey neu anlegen. |
+| **Play Console: Fingerabdrücke der App-Signatur** | Play Console → Testen und veröffentlichen → App-Integrität → App-Signatur: beim Zertifikat des App-Signaturschlüssels und beim Zertifikat des Upload-Schlüssels jeweils die Zeile SHA-256 schicken. Damit ist klar, welcher der drei am Server eingetragenen Schlüssel überflüssig ist. |
+| **Abfrage zu „App meldet sich täglich ab“ (#942)** | Am Server die Zeile aus dem Issue #942 ausführen und die Ausgabe schicken – sie enthält keine Tokens, nur Gründe und Zeiten. Ohne sie lässt sich die Ursache nicht eingrenzen. |
 | **App 1.2.0 bei Google** | Wenn Build 86 im Test ist: Play Console → App-Zugriff → Anleitung für Googles Prüfer ersetzen, die App startet jetzt ohne Anmeldebildschirm. Der neue Text steht in `docs/PLAY_STORE.md`. |
 | **Einlass in der App: A oder B?** | A (empfohlen): Die App bekommt kein Kamerarecht; gescannt wird im Handy-Browser unter Admin → Einlass. B: Scanner in der App, mit Kamerarecht, im nächsten Build. |
 | **Adventkalender befüllen** | Verwaltung → Content → Adventkalender, Jahr 2026: Türchen anlegen. Ohne Türchen zeigen Website und App keinen Einstieg. Offen: 6 Uhr oder Mitternacht, Vorstand und Verwaltung in Verlosungen, wer zieht, Hauptgewinn unter allen mit 24 Türchen. |
