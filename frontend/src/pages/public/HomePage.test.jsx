@@ -87,7 +87,9 @@ test("Hero führt zur Community, Zahlen und Ansprechpartner kommen aus echten Da
   // Keine Knöpfe im Hero (#425) - nur die leise Zeile.
   expect(screen.queryByTestId("hero-cta-community")).toBeNull();
   expect(screen.queryByTestId("hero-cta-tournaments")).toBeNull();
-  expect(screen.getByTestId("hero-join")).toHaveTextContent("Mitglied wird, wer sich einbringt");
+  // Keine Extrazeile „Mitglied wird, wer sich einbringt“ mehr (#947) - „Mitglied werden“ steht in der Kopfzeile.
+  expect(screen.queryByTestId("hero-join")).toBeNull();
+  expect(screen.queryByText(/Mitglied wird, wer sich einbringt/)).toBeNull();
   // Ohne matchMedia (jsdom) steht sofort der Endwert.
   expect(screen.getByTestId("home-number-members")).toHaveTextContent("42");
   expect(screen.getByTestId("home-number-tournaments")).toHaveTextContent("Veranstaltete Turniere");
