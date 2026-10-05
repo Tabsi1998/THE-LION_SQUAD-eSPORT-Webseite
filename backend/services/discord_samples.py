@@ -90,8 +90,8 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
     """Jede Meldungsart mit Embed, Ziel, Herkunft der Daten und ob das Ereignis eingeschaltet ist. Mit ``guild_id``
     (#625): wohin sie auf diesem Server ginge - auf einem Unterserver nur öffentliche Ziele."""
     from discord_service import EVENTS, _get_discord_config, build_embed, event_enabled, resolve_buttons, resolve_target
-    from services.discord_announcements import (EVENT_PUBLIC_STATUSES, TOURNAMENT_STATUS, board_message, event_message, fast_lap_message,
-                                                news_message, stream_live_message, tournament_message)
+    from services.discord_announcements import (EVENT_PUBLIC_STATUSES, TOURNAMENT_STATUS, board_message, designed_event, designed_news,
+                                                designed_tournament, event_message, fast_lap_message, news_message, stream_live_message)
     from services.discord_dm import dm_buttons, dm_content
     from services.notification_preferences import NOTIFICATION_KIND_CATEGORY
     from services.ops_alerts import RED, check_red_message, error_group_message
@@ -102,8 +102,9 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
     entries: list[dict] = []
 
     async def add(key: str, label: str, group: str, message: dict, *, target: str, source_text: str, source: str = "example", place: str | None = None):
-        embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
-                                  fields=message.get("fields"), image_url=message.get("image_url"))
+        # Gestaltet (#866 Teil 2): so, wie es hinausgeht - eigene Fassung oder Standard der Gestaltung.
+        embed = message.get("embed") or await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8,
+                                                          url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"))
         entry = {"key": key, "label": label, "group": group, "target": target, "source": source, "source_text": source_text,
                  "embed": embed, "buttons": await resolve_buttons(message.get("buttons")), "dm": target == "dm", "message": message}
         if place:
@@ -119,18 +120,19 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
 
     # Öffentliche Kanäle: aus den letzten echten Daten, wenn es welche gibt.
     post = await _latest_public(db.news_posts, {"published": True}, [("published_at", -1)])
-    await add("news.published", EVENTS["news.published"]["label"], "public", news_message(post or _example_news()), target="news",
+    await add("news.published", EVENTS["news.published"]["label"], "public", await designed_news(db, post or _example_news()), target="news",
               source="latest" if post else "example", source_text=f"aus der letzten News „{post.get('title')}“" if post else SOURCE_EXAMPLE)
     event = await _latest_public(db.events, {"status": {"$in": list(EVENT_PUBLIC_STATUSES)}, "start_date": {"$gte": now_utc().isoformat()}}, [("start_date", 1)])
-    await add("event.announced", EVENTS["event.announced"]["label"], "public", event_message(event or _example_event()), target="events",
+    await add("event.announced", EVENTS["event.announced"]["label"], "public", await designed_event(db, event or _example_event()), target="events",
               source="latest" if event else "example", source_text=f"aus dem nächsten Event „{event.get('name') or event.get('title')}“" if event else SOURCE_EXAMPLE)
     tournament = await _latest_public(db.tournaments, {}, [("created_at", -1)])
-    game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0, "name": 1}) if tournament and tournament.get("game_id") else None
-    game_name = (game or {}).get("name") or (None if tournament else "Rocket League")
+    game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0, "name": 1, "logo_url": 1}) if tournament and tournament.get("game_id") else None
+    if not game and not tournament:
+        game = {"name": "Rocket League"}
     for status in TOURNAMENT_STATUS:
         key = f"tournament.{status}"
         opens = status == "registration_open"
-        await add(key, EVENTS[key]["label"], "public", tournament_message(tournament or _example_tournament(), status, game_name=game_name, in_thread=not opens),
+        await add(key, EVENTS[key]["label"], "public", await designed_tournament(db, tournament or _example_tournament(), status, game, in_thread=not opens),
                   target="events", source="latest" if tournament else "example", place=PLACE_OPENS_THREAD if opens else PLACE_IN_THREAD,
                   source_text=f"aus dem Turnier „{tournament.get('title')}“" if tournament else SOURCE_EXAMPLE)
     challenge = await db.f1_challenges.find_one({}, {"_id": 0}, sort=[("created_at", -1)])
@@ -141,7 +143,7 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
 
     # „Turnier live“ (#579): ein Teilnehmer streamt - Beispielstream, das Turnier wie oben.
     await add("tournament.stream_live", EVENTS["tournament.stream_live"]["label"], "public",
-              stream_live_message(tournament or _example_tournament(), {"display_name": SAMPLE_NAME, "title": "Finale – wir holen den Cup!", "game_name": game_name or "Rocket League",
+              stream_live_message(tournament or _example_tournament(), {"display_name": SAMPLE_NAME, "title": "Finale – wir holen den Cup!", "game_name": (game or {}).get("name") or "Rocket League",
                                                                          "viewer_count": 12, "stream_url": "https://www.twitch.tv/paula", "thumbnail_url": None}),
               target="events", source_text=SOURCE_EXAMPLE, place=PLACE_IN_THREAD)
 
@@ -164,11 +166,11 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
 
     # Nur für Mitglieder (#605): in den Mitgliederkanal - die letzte Mitglieder-News, das nächste Mitglieder-Event.
     members_post = await db.news_posts.find_one({"published": True, "visibility": "members"}, {"_id": 0}, sort=[("published_at", -1)])
-    await add("news.members", EVENTS["news.members"]["label"], "members", news_message(members_post or {**_example_news(), "visibility": "members"}),
+    await add("news.members", EVENTS["news.members"]["label"], "members", await designed_news(db, members_post or {**_example_news(), "visibility": "members"}),
               target="members", source="latest" if members_post else "example",
               source_text=f"aus der Mitglieder-News „{members_post.get('title')}“" if members_post else SOURCE_EXAMPLE)
     members_event = await db.events.find_one({"visibility": "members", "start_date": {"$gte": now_utc().isoformat()}}, {"_id": 0}, sort=[("start_date", 1)])
-    await add("event.members", EVENTS["event.members"]["label"], "members", event_message(members_event or {**_example_event(), "visibility": "members"}),
+    await add("event.members", EVENTS["event.members"]["label"], "members", await designed_event(db, members_event or {**_example_event(), "visibility": "members"}),
               target="members", source="latest" if members_event else "example",
               source_text=f"aus dem Mitglieder-Event „{members_event.get('name') or members_event.get('title')}“" if members_event else SOURCE_EXAMPLE)
 
@@ -214,9 +216,10 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
         raise KeyError(key)
     message = entry["message"]
     if via == "test":
+        designed = {**message["embed"], "footer": {"text": TEST_FOOTER}} if message.get("embed") else None
         result = await send_to("test", message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
                                fields=message.get("fields"), image_url=message.get("image_url"), event_key=f"test.{key}", footer=TEST_FOOTER, test=True,
-                               buttons=message.get("buttons"))
+                               buttons=message.get("buttons"), embed=designed)
         if result.get("ok"):
             from discord_service import target_status
             result["channel_name"] = (await target_status(db)).get("test", {}).get("channel_name")
@@ -237,8 +240,11 @@ async def send_sample(key: str, via: str, admin: dict) -> dict:
         log["reason"], log["error"] = reason, REASON_TEXTS[reason]
         await db.email_logs.insert_one(log)
         return {"ok": False, "reason": reason, "error": REASON_TEXTS[reason], "target": "dm"}
-    embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
-                              fields=message.get("fields"), image_url=message.get("image_url"), footer=TEST_FOOTER)
+    if message.get("embed"):
+        embed = {**message["embed"], "footer": {"text": TEST_FOOTER}}
+    else:
+        embed = await build_embed(message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8, url=message.get("url"),
+                                  fields=message.get("fields"), image_url=message.get("image_url"), footer=TEST_FOOTER)
     try:
         result = await bot.send_dm(discord_id, embed, buttons=entry.get("buttons") or [])
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen

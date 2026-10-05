@@ -191,7 +191,107 @@ KINDS: dict[str, dict] = {
         },
     },
 }
-FALLBACK_COLORS = {"stream_live": 0x9146FF, "stream_ended": 0x4E5058, "live": 0x9146FF, "events": 0x29B6E8, "ranking": 0xFFD700, "achievement_week": 0xA66BFF}
+# Meldungen (#866 Teil 2): News, Events und Turniere - Werte aus discord_announcements (*_values), dieselben wie gesendet.
+AUDIENCE = ("Für wen: leer bei öffentlich, sonst „nur für Mitglieder“", "text", "")
+TOURNAMENT = {
+    "title": ("Name des Turniers", "text", "Sommer-Cup"),
+    "status": ("Stand, z. B. Anmeldung offen", "text", "Anmeldung offen"),
+    "status_color": ("Farbe des Stands", "color", "#00FF88"),
+    "link": ("Link zum Turnier", "url", "{origin}/tournaments/sommer-cup"),
+}
+KINDS.update({
+    "news": {
+        "label": "News", "group": "Meldungen",
+        "hint": "Sobald eine News veröffentlicht ist – öffentliche in „News“, solche nur für Mitglieder im Mitgliederkanal. Interne News gehen "
+                "ohne Text an den Vorstand; dafür gibt es keine Vorlage.",
+        "placeholders": {
+            "title": ("Titel der News", "text", "Neuer Vereinsrekord bei der LAN"),
+            "text": ("Anrisstext (bis 400 Zeichen)", "text", "120 Leute, 14 Turniere – ein Wochenende zum Merken."),
+            "link": ("Link zur News", "url", "{origin}/news/vereinsrekord"),
+            "image": ("Titelbild der News", "url", "{origin}/assets/brand/og-default.png"),
+            "audience": AUDIENCE,
+        },
+        "default": {
+            "color": "#29B6E8",
+            "author": {"name": "{club} · News", "url": "{site}/news", "icon_url": "{logo}"},
+            "title": "📰 {title}",
+            "url": "{link}",
+            "description": "{text}",
+            "image": {"url": "{image}"},
+            "footer": {"text": "{club}[[ · {audience}]]", "icon_url": "{logo}"},
+            "timestamp": True,
+        },
+    },
+    "event": {
+        "label": "Event", "group": "Meldungen",
+        "hint": "Sobald ein Event veröffentlicht ist – öffentliche in „Events und Turniere“, solche nur für Mitglieder im Mitgliederkanal. Interne "
+                "Events gehen ohne Text an den Vorstand.",
+        "placeholders": {
+            "name": ("Name des Events", "text", "LAN-Party im Vereinsheim"),
+            "text": ("Kurzbeschreibung (bis 400 Zeichen)", "text", "Zwei Tage zocken, Turniere und Pizza."),
+            "when": ("Wann, z. B. 10.10.2026, 18:00 Uhr – 11.10.2026", "text", "10.10.2026, 18:00 Uhr – 11.10.2026"),
+            "where": ("Wo", "text", "Vereinsheim, Telfs"),
+            "registration_until": ("Anmeldung bis (nur mit Anmeldung)", "text", "08.10.2026, 23:59 Uhr"),
+            "places": ("Plätze (nur mit Anmeldung)", "text", "24"),
+            "link": ("Link zum Event", "url", "{origin}/events/lan-party"),
+            "image": ("Bild des Events", "url", "{origin}/assets/brand/og-default.png"),
+            "audience": AUDIENCE,
+        },
+        "default": {
+            "color": "#00FF88",
+            "author": {"name": "{club} · Event", "url": "{site}/events", "icon_url": "{logo}"},
+            "title": "📅 {name}",
+            "url": "{link}",
+            "description": "{text}",
+            "fields": [{"name": "Wann", "value": "{when}", "inline": True}, {"name": "Wo", "value": "{where}", "inline": True},
+                       {"name": "Anmeldung bis", "value": "{registration_until}", "inline": True}, {"name": "Plätze", "value": "{places}", "inline": True}],
+            "image": {"url": "{image}"},
+            "footer": {"text": "{club}[[ · {audience}]]", "icon_url": "{logo}"},
+            "timestamp": True,
+        },
+    },
+    "tournament": {
+        "label": "Turnier: Ankündigung", "group": "Meldungen",
+        "hint": "Die erste Meldung eines Turniers im Kanal (meist „Anmeldung offen“) – darunter öffnet der Bot den Thread des Turniers.",
+        "placeholders": {
+            **TOURNAMENT,
+            "text": ("Beschreibung des Turniers", "text", "Das Vereinsturnier der Saison."),
+            "game": ("Spiel", "text", "Rocket League"),
+            "format": ("Format", "text", "Double Elimination"),
+            "participants": ("Teilnehmer, z. B. max. 16", "text", "max. 16"),
+            "banner": ("Banner des Turniers", "url", "{origin}/assets/brand/og-default.png"),
+            "game_logo": ("Logo des Spiels", "url", "{origin}/assets/brand/tls-favicon.png"),
+        },
+        "default": {
+            "color": "{status_color}",
+            "author": {"name": "{club} · Turnier", "url": "{site}/tournaments", "icon_url": "{logo}"},
+            "title": "🏆 {title} · {status}",
+            "url": "{link}",
+            "description": "{text}",
+            "fields": [{"name": "Spiel", "value": "{game}", "inline": True}, {"name": "Format", "value": "{format}", "inline": True},
+                       {"name": "Teilnehmer", "value": "{participants}", "inline": True}],
+            "thumbnail": {"url": "{game_logo}"},
+            "image": {"url": "{banner}"},
+            "footer": {"text": "{club}", "icon_url": "{logo}"},
+            "timestamp": True,
+        },
+    },
+    "tournament_thread": {
+        "label": "Turnier: im Thread", "group": "Meldungen",
+        "hint": "Alles nach der Ankündigung, kurz im Thread des Turniers: Check-in offen, jetzt live, beendet, Ergebnisse veröffentlicht.",
+        "placeholders": {**TOURNAMENT, "line": ("Der Satz zum Stand", "text", "Jetzt einchecken – bis 12.10.2026, 17:45 Uhr: auf der Turnierseite oder in der App.")},
+        "default": {
+            "color": "{status_color}",
+            "title": "🏆 {title} · {status}",
+            "url": "{link}",
+            "description": "{line}",
+            "footer": {"text": "{club}", "icon_url": "{logo}"},
+            "timestamp": True,
+        },
+    },
+})
+FALLBACK_COLORS = {"stream_live": 0x9146FF, "stream_ended": 0x4E5058, "live": 0x9146FF, "events": 0x29B6E8, "ranking": 0xFFD700, "achievement_week": 0xA66BFF,
+                   "news": 0x29B6E8, "event": 0x00FF88, "tournament": 0x29B6E8, "tournament_thread": 0x29B6E8}
 
 
 # ---------------------------------------------------------------- Platzhalter
@@ -512,6 +612,11 @@ def vienna_time(value) -> str:
     except (TypeError, ValueError):
         return ""
     return parsed.astimezone(VIENNA).strftime("%H:%M Uhr")
+
+
+async def designed(db, kind: str, values: dict, *, now: datetime | None = None) -> dict:
+    """Eine Meldung im Aussehen der Gestaltung (#866 Teil 2): eigene Fassung oder Standard, mit den gemeinsamen Werten."""
+    return render(kind, await template_for(db, kind), {**await common_values(db, now), **values}, now=now)
 
 
 async def common_values(db, now: datetime | None = None) -> dict:

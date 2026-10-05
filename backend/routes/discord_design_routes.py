@@ -103,6 +103,9 @@ async def _live_context(db, kind: str) -> tuple[dict, list[dict], str | None]:
     if kind in EMBED_KINDS:
         values, rows = await context(db, kind, current)
         return {**common, **values}, rows, None
+    live = await _message_values(db, kind)
+    if live is not None:
+        return {**common, **live}, [], None
     streams = await discord_streams._visible_streams(db)
     if kind == "stream_live" and streams:
         stream, verdict = streams[0]
@@ -110,6 +113,29 @@ async def _live_context(db, kind: str) -> tuple[dict, list[dict], str | None]:
     values, rows = discord_design.sample(kind, origin)
     note = "Gerade streamt niemand aus dem Verein – die Vorschau zeigt Beispielwerte." if kind == "stream_live" else "Die Vorschau zeigt Beispielwerte."
     return {**values, **common}, rows, note
+
+
+async def _message_values(db, kind: str) -> dict | None:
+    """Meldungen (#866 Teil 2): die letzte öffentliche News, das nächste Event, das jüngste Turnier - None ohne Daten."""
+    from models import now_utc
+    from services import discord_announcements as announce
+
+    if kind == "news":
+        post = await db.news_posts.find_one({"published": True, "visibility": {"$in": [None, "public", "community"]}}, {"_id": 0}, sort=[("published_at", -1)])
+        return await announce.news_values(post) if post else None
+    if kind == "event":
+        event = await db.events.find_one({"status": {"$in": list(announce.EVENT_PUBLIC_STATUSES)}, "visibility": {"$in": [None, "public"]},
+                                          "start_date": {"$gte": now_utc().isoformat()}}, {"_id": 0}, sort=[("start_date", 1)])
+        return await announce.event_values(event) if event else None
+    if kind in ("tournament", "tournament_thread"):
+        tournament = await db.tournaments.find_one({"status": {"$ne": "draft"}, "is_public": {"$ne": False}, "visibility": {"$in": [None, "public"]}},
+                                                   {"_id": 0}, sort=[("created_at", -1)])
+        if not tournament:
+            return None
+        game = await db.games.find_one({"id": tournament.get("game_id")}, {"_id": 0, "name": 1, "logo_url": 1}) if tournament.get("game_id") else None
+        status = tournament.get("status") if tournament.get("status") in announce.TOURNAMENT_STATUS else ("check_in" if kind == "tournament_thread" else "registration_open")
+        return await announce.tournament_values(tournament, status, game)
+    return None
 
 
 @router.post("/design/{kind}/preview")

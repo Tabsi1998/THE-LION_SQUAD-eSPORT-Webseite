@@ -149,7 +149,7 @@ async def _send(message: dict, tournament: dict, thread_id: str | None = None, g
         # Mitglieder-Turnier (#910): der private Kanal am Hauptserver; der Schalter je Meldung galt schon in ``deliver``.
         return await send_to("members", message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8,
                              url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"), event_key=message["event_key"],
-                             thread_id=thread_id, buttons=message.get("buttons"))
+                             thread_id=thread_id, buttons=message.get("buttons"), embed=message.get("embed"), content=message.get("content"))
     if crossref_of:
         # Querverweis (#627): Titel, ein Satz, Knöpfe - nie der volle Inhalt; der Schalter galt schon für die volle Meldung.
         return await send_to(EVENTS[message["event_key"]]["target"], message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8,
@@ -157,7 +157,7 @@ async def _send(message: dict, tournament: dict, thread_id: str | None = None, g
                              thread_id=thread_id, crossref_of=crossref_of)
     return await send_event(message["event_key"], message["title"], message.get("description") or "", item=tournament, color=message.get("color") or 0x29B6E8,
                             url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"), thread_id=thread_id,
-                            buttons=message.get("buttons"), guild_id=guild_id, route=False)
+                            buttons=message.get("buttons"), guild_id=guild_id, route=False, embed=message.get("embed"), content=message.get("content"))
 
 
 async def _deliver_on(db, tournament: dict, message: dict, in_thread: dict | None, guild: dict | None = None, crossref_of: str | None = None,
@@ -225,7 +225,7 @@ async def status_changed(db, tournament: dict, prev: str | None, status: str) ->
     """Ein Statuswechsel eines Turniers: die Meldung (in den Thread), danach das Bracket (#571).
     Ein Fehler im Discord hält den Wechsel nie auf."""
     from services import discord_bracket
-    from services.discord_announcements import TOURNAMENT_STATUS, tournament_message
+    from services.discord_announcements import TOURNAMENT_STATUS, designed_tournament
 
     if not status or prev == status or not tournament.get("id"):
         return {"ok": False, "reason": "unchanged"}
@@ -233,10 +233,10 @@ async def status_changed(db, tournament: dict, prev: str | None, status: str) ->
     if status in TOURNAMENT_STATUS:
         try:
             current = {**(await db.tournaments.find_one({"id": tournament["id"]}, {"_id": 0}) or tournament), "status": status}
-            game = await db.games.find_one({"id": current.get("game_id")}, {"_id": 0, "name": 1}) if current.get("game_id") else None
-            game_name = (game or {}).get("name")
-            outcome = await deliver(db, current, tournament_message(current, status, game_name=game_name),
-                                    in_thread=tournament_message(current, status, game_name=game_name, in_thread=True))
+            game = await db.games.find_one({"id": current.get("game_id")}, {"_id": 0, "name": 1, "logo_url": 1}) if current.get("game_id") else None
+            # Im Aussehen der Gestaltung (#866 Teil 2): Ankündigung und kurze Fassung im Thread.
+            outcome = await deliver(db, current, await designed_tournament(db, current, status, game),
+                                    in_thread=await designed_tournament(db, current, status, game, in_thread=True))
         except Exception:  # noqa: BLE001
             logger.warning("[discord-threads] %s: Meldung „%s“ gescheitert", tournament.get("id"), status, exc_info=True)
             outcome = {"ok": False, "reason": "error"}

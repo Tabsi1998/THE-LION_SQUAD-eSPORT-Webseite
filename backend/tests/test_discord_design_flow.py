@@ -126,8 +126,9 @@ async def admin_with_bot(flow, **extra):
 async def test_design_api_saves_previews_tests_and_resets(flow, bot):
     admin = await admin_with_bot(flow)
     listing = (await flow.get("/api/settings/discord/design")).json()
-    assert [kind["key"] for kind in listing["kinds"]] == ["stream_live", "stream_ended", "live", "events", "ranking", "achievement_week"]
-    assert listing["groups"] == ["Streams", "Angeheftete Einbettungen"] and listing["limits"]["total"] == 6000
+    assert [kind["key"] for kind in listing["kinds"]] == ["stream_live", "stream_ended", "live", "events", "ranking", "achievement_week", "news", "event",
+                                                         "tournament", "tournament_thread"]
+    assert listing["groups"] == ["Streams", "Angeheftete Einbettungen", "Meldungen"] and listing["limits"]["total"] == 6000
     live = listing["kinds"][0]
     assert live["customized"] is False and live["preview"]["embed"]["author"]["name"] == "TheLostFriday"
     assert any(row["name"] == "role" for row in live["placeholders"]) and live["preview"]["content"].startswith("🔴 **TheLostFriday**")

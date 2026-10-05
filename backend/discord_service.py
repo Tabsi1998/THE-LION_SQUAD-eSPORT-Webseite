@@ -288,16 +288,19 @@ async def _skip(log: dict, reason: str, error: str) -> dict:
 
 async def _send_embed(channel_id: str, *, title: str, description: str, color: int, url: str | None,
                       fields: list | None, image_url: str | None, log: dict, footer: str | None = None,
-                      buttons: list | None = None) -> dict:
-    """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID."""
+                      buttons: list | None = None, embed: dict | None = None, content: str | None = None) -> dict:
+    """Ein Embed über den Bot in genau diesen Kanal; das Log landet in email_logs - mit Nachrichten-ID. ``embed``
+    (#866 Teil 2): schon im Aussehen der Gestaltung gerendert - dann wird nichts mehr gebaut; ``content`` darüber."""
     from services.discord_bot import bot
 
     db = get_db()
-    embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url, footer=footer)
+    if embed is None:
+        embed = await build_embed(title, description, color=color, url=url, fields=fields, image_url=image_url, footer=footer)
     links = await resolve_buttons(buttons)
     log["channel_id"] = channel_id
+    extra = {"content": content} if content else {}
     try:
-        result = await bot.send_embed(channel_id, embed, buttons=links)  # Knöpfe als Link-Zeile darunter (#573)
+        result = await bot.send_embed(channel_id, embed, buttons=links, **extra)  # Knöpfe als Link-Zeile darunter (#573)
     except Exception as exc:  # noqa: BLE001 - ein Discord-Fehler darf nichts abbrechen
         logger.error("[discord] %s", type(exc).__name__)
         result = {"ok": False, "reason": "error", "error": type(exc).__name__}
@@ -318,7 +321,8 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
                   footer: str | None = None, test: bool = False, thread_id: str | None = None,
-                  buttons: list | None = None, guild_id: str | None = None, crossref_of: str | None = None) -> dict:
+                  buttons: list | None = None, guild_id: str | None = None, crossref_of: str | None = None,
+                  embed: dict | None = None, content: str | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
     ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst.
     ``guild_id`` (#625): an diesen Server - ohne ist der Hauptserver gemeint. Ein Unterserver muss eingeschaltet sein
@@ -343,6 +347,10 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     if resolved["fallback"]:
         log["wanted_target"] = target
     log["payload"] = _payload(title, description, color, url, fields, image_url, buttons)
+    if embed is not None:
+        # Gestaltet (#866 Teil 2): „erneut senden“ schickt genau diese Einbettung noch einmal.
+        log["payload"]["embed"] = embed
+        log["payload"]["content"] = content
     if not cfg["master"]:
         return await _skip(log, "disabled", REASON_TEXTS["disabled"])
     if not cfg["bot"]["enabled"]:
@@ -363,13 +371,13 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     if thread_id:
         log["thread_id"] = str(thread_id)
     return await _send_embed(str(thread_id or resolved["channel_id"]), title=title, description=description, color=color, url=url,
-                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons)
+                             fields=fields, image_url=image_url, log=log, footer=footer, buttons=buttons, embed=embed, content=content)
 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
                      color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
                      thread_id: str | None = None, buttons: list | None = None, guild_id: str | None = None,
-                     route: bool = True) -> dict:
+                     route: bool = True, embed: dict | None = None, content: str | None = None) -> dict:
     """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle.
     Mit Spielbezug entscheidet die Routing-Regel (#627), welcher Server die Meldung voll bekommt und ob am
     Hauptserver ein Querverweis steht. Ein ausdrücklicher Server, ein Thread oder ``route=False`` heißt: genau dorthin."""
@@ -379,7 +387,7 @@ async def send_event(event_key: str, title: str, description: str = "", *, item:
     cfg = await _get_discord_config()
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
-    full = {"color": color, "url": url, "fields": fields, "image_url": image_url, "event_key": event_key, "buttons": buttons}
+    full = {"color": color, "url": url, "fields": fields, "image_url": image_url, "event_key": event_key, "buttons": buttons, "embed": embed, "content": content}
     if guild_id or thread_id or not route:
         return await send_to(spec["target"], title, description, thread_id=thread_id, guild_id=guild_id, **full)
     from services import discord_routing

@@ -11,6 +11,11 @@ Vorstandskanal - dort ohne Text, nur Titel, Zeit, Ort und Link. Jede Art hat ihr
 eigenen Schalter; `send_event` prüft die Grenze noch einmal selbst. Nie gesendet
 wird, was der Autor mit „Ohne Discord“ markiert hat, Entwürfe, und Altes: Wer den
 Schalter heute einschaltet, bekommt nicht das Archiv der letzten Jahre in den Kanal.
+
+Aussehen (#866 Teil 2): News, Events und Turniere gehen im Aussehen der Gestaltung hinaus (Verbindungen → Discord →
+„Gestaltung“, Gruppe „Meldungen“) - eigene Fassung oder Standard. Die ``*_values`` liefern dieselben Werte für Versand,
+Vorschau und Beispiele; ``designed_*`` hängt die gerenderte Einbettung an die Meldung. Interne Meldungen an den Vorstand
+bleiben ohne Vorlage (nur Titel und Link - kein Text im fremden Dienst).
 """
 from __future__ import annotations
 
@@ -118,6 +123,79 @@ def event_message(event: dict) -> dict:
     }
 
 
+def _hex(color: int) -> str:
+    return f"#{int(color) & 0xFFFFFF:06X}"
+
+
+async def _public(link: str | None, image: bool = False) -> str:
+    from discord_service import _public_avatar_url, _public_link_url
+
+    return (await (_public_avatar_url(link) if image else _public_link_url(link))) or ""
+
+
+def _audience_text(item: dict) -> str:
+    return "nur für Mitglieder" if audience(item) == "members" else ""
+
+
+async def news_values(post: dict) -> dict:
+    """Die Werte der Vorlage „News“ (#866 Teil 2) - dieselben für Versand, Vorschau und Beispiel."""
+    return {"title": str(post.get("title") or "News"), "text": plain_text(post.get("excerpt") or post.get("content"), 400),
+            "link": await _public(f"/news/{post.get('slug') or post.get('id')}"),
+            "image": await _public(post.get("banner_url") or post.get("cover_url"), image=True), "audience": _audience_text(post)}
+
+
+async def event_values(event: dict) -> dict:
+    """Die Werte der Vorlage „Event“: Wann (mit Ende an einem anderen Tag), Wo, Anmeldeschluss und Plätze nur mit Anmeldung."""
+    when = vienna(event.get("start_date")) if event.get("start_date") else ""
+    start, end = _parse(event.get("start_date")), _parse(event.get("end_date"))
+    if when and start and end and end.astimezone(VIENNA).date() != start.astimezone(VIENNA).date():
+        when = f"{when} – {vienna(end, with_time=False)}"
+    registration = bool(event.get("has_registration"))
+    return {"name": str(event.get("name") or event.get("title") or "Event"),
+            "text": plain_text(event.get("short_description") or event.get("description"), 400), "when": when,
+            "where": ", ".join(part for part in (event.get("location"), event.get("city")) if part),
+            "registration_until": vienna(event.get("registration_closes_at")) if registration and event.get("registration_closes_at") else "",
+            "places": str(event["max_participants"]) if registration and event.get("max_participants") else "",
+            "link": await _public(f"/events/{event.get('slug') or event.get('id')}"),
+            "image": await _public(event.get("banner_url") or event.get("poster_url"), image=True), "audience": _audience_text(event)}
+
+
+async def tournament_values(tournament: dict, status: str, game: dict | None = None) -> dict:
+    """Die Werte der Vorlagen „Turnier: Ankündigung“ und „Turnier: im Thread“."""
+    spec = TOURNAMENT_STATUS.get(status) or {"label": status, "color": 0x29B6E8}
+    format_text = tournament.get("format_label") or (str(tournament["format"]).replace("_", " ").title() if tournament.get("format") else "")
+    return {"title": str(tournament.get("title") or "Turnier"), "status": spec["label"], "status_color": _hex(spec["color"]),
+            "text": plain_text(tournament.get("description"), 1500), "game": str((game or {}).get("name") or ""), "format": format_text,
+            "participants": f"max. {tournament['max_participants']}" if tournament.get("max_participants") else "",
+            "link": await _public(f"/tournaments/{tournament.get('slug') or tournament.get('id')}"),
+            "banner": await _public(tournament.get("banner_url"), image=True), "game_logo": await _public((game or {}).get("logo_url"), image=True),
+            "line": thread_line(tournament, status)}
+
+
+async def _design(db, kind: str, message: dict, values: dict) -> dict:
+    from services import discord_design
+
+    rendered = await discord_design.designed(db, kind, values)
+    return {**message, "embed": rendered["embed"], "content": rendered.get("content")}
+
+
+async def designed_news(db, post: dict) -> dict:
+    """Die News-Meldung im Aussehen der Gestaltung - interne bleiben ohne Vorlage (nur Titel und Link)."""
+    message = news_message(post)
+    return message if audience(post) == "internal" else await _design(db, "news", message, await news_values(post))
+
+
+async def designed_event(db, event: dict) -> dict:
+    message = event_message(event)
+    return message if audience(event) == "internal" else await _design(db, "event", message, await event_values(event))
+
+
+async def designed_tournament(db, tournament: dict, status: str, game: dict | None = None, *, in_thread: bool = False) -> dict:
+    """Die Turnier-Meldung im Aussehen der Gestaltung: die Ankündigung im Kanal oder die kurze Fassung im Thread."""
+    message = tournament_message(tournament, status, game_name=(game or {}).get("name"), in_thread=in_thread)
+    return await _design(db, "tournament_thread" if in_thread else "tournament", message, await tournament_values(tournament, status, game))
+
+
 def skip_reason(item: dict, *, published_at, now: datetime | None = None) -> str | None:
     """Warum diese News / dieses Event nicht gemeldet wird - oder None. Wohin es nach seiner Sichtbarkeit
     darf, entscheidet send_event (#605)."""
@@ -135,7 +213,9 @@ async def preview(kind: str, item: dict) -> dict:
 
     from discord_service import allowed_in_target
 
-    message = news_message(item) if kind == "news" else event_message(item)
+    from database import get_db as _db
+
+    message = await (designed_news(_db(), item) if kind == "news" else designed_event(_db(), item))
     cfg = await _get_discord_config()
     resolved = resolve_target(cfg, EVENTS[message["event_key"]]["target"])
     reason = skip_reason(item, published_at=None)
@@ -149,9 +229,9 @@ async def preview(kind: str, item: dict) -> dict:
         reason = "bot_off"
     if not reason and not resolved["channel_id"]:
         reason = "no_channel"
-    embed = await build_embed(message["title"], message["description"], color=message["color"], url=message["url"],
-                              fields=message["fields"], image_url=message["image_url"])
-    out = {"embed": embed, "buttons": await resolve_buttons(message["buttons"]), "would_send": reason is None, "reason": reason, "target": resolved["target"]}
+    embed = message.get("embed") or await build_embed(message["title"], message["description"], color=message["color"], url=message["url"],
+                                                      fields=message["fields"], image_url=message["image_url"])
+    out = {"embed": embed, "content": message.get("content"), "buttons": await resolve_buttons(message["buttons"]), "would_send": reason is None, "reason": reason, "target": resolved["target"]}
     if kind == "event":
         # Discord-Termin (#570): so erscheint der Termin - oder warum nicht.
         from database import get_db
@@ -168,7 +248,7 @@ async def _announce(collection, item: dict, message: dict, published_at) -> str:
     if not reason:
         result = await send_event(message["event_key"], message["title"], message["description"], item=item,
                                   color=message["color"], url=message["url"], fields=message["fields"], image_url=message["image_url"],
-                                  buttons=message["buttons"])
+                                  buttons=message["buttons"], embed=message.get("embed"), content=message.get("content"))
         outcome = "sent" if result.get("ok") else (result.get("reason") or "failed")
     await collection.update_one({"id": item["id"]}, {"$set": {"discord_checked_at": now_utc().isoformat(), "discord_outcome": outcome}})
     return outcome
@@ -182,7 +262,7 @@ async def announce_due(limit: int = 50) -> dict:
         {"published": True, "published_at": {"$lte": now_iso}, "discord_checked_at": {"$exists": False}}, {"_id": 0}
     ).sort("published_at", 1).to_list(limit)
     for post in posts:
-        outcome = await _announce(db.news_posts, post, news_message(post), post.get("published_at"))
+        outcome = await _announce(db.news_posts, post, await designed_news(db, post), post.get("published_at"))
         outcomes[outcome] = outcomes.get(outcome, 0) + 1
     events = await db.events.find(
         {"status": {"$in": list(EVENT_PUBLIC_STATUSES)}, "discord_checked_at": {"$exists": False}}, {"_id": 0}
@@ -193,7 +273,7 @@ async def announce_due(limit: int = 50) -> dict:
             await db.events.update_one({"id": event["id"]}, {"$set": {"discord_checked_at": now_iso, "discord_outcome": "past_event"}})
             outcomes["past_event"] = outcomes.get("past_event", 0) + 1
             continue
-        outcome = await _announce(db.events, event, event_message(event), event.get("published_at") or event.get("updated_at") or event.get("created_at"))
+        outcome = await _announce(db.events, event, await designed_event(db, event), event.get("published_at") or event.get("updated_at") or event.get("created_at"))
         outcomes[outcome] = outcomes.get(outcome, 0) + 1
     return {"news": len(posts), "events": len(events), "outcomes": outcomes}
 
