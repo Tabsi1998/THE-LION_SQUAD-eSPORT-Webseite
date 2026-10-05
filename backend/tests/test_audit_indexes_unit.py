@@ -51,7 +51,7 @@ def test_every_index_of_the_audit_exists_and_the_list_has_no_strays():
     async def scenario():
         db = fresh()
         summary = await database.init_audit_indexes(db)
-        assert summary == {"unique": 7, "blocked": [], "plain": len(database.AUDIT_INDEXES)}
+        assert summary == {"unique": len(database.AUDIT_UNIQUE_INDEXES), "blocked": [], "plain": len(database.AUDIT_INDEXES)}
         for collection, wanted in EXPECTED.items():
             assert wanted <= await names(db, collection), collection
         listed = {row[0] for row in database.AUDIT_UNIQUE_INDEXES} | {row[0] for row in database.AUDIT_INDEXES}
@@ -83,7 +83,7 @@ def test_old_duplicates_do_not_stop_the_start_and_the_unique_index_follows_once_
         await db.user_xp.insert_one({"user_id": "u1", "total": 5})
         with caplog.at_level(logging.WARNING, logger="database"):
             summary = await database.init_audit_indexes(db)
-        assert summary["blocked"] == ["user_xp.user"] and summary["unique"] == 6
+        assert summary["blocked"] == ["user_xp.user"] and summary["unique"] == len(database.AUDIT_UNIQUE_INDEXES) - 1
         assert "user_plain" in await names(db, "user_xp") and "user_unique" not in await names(db, "user_xp")
         assert any("user_xp" in record.getMessage() and "Dubletten" in record.getMessage() for record in caplog.records)
         # Ein zweiter Start mit denselben Dubletten ändert nichts und scheitert nicht.
@@ -93,7 +93,7 @@ def test_old_duplicates_do_not_stop_the_start_and_the_unique_index_follows_once_
         assert (await database.init_audit_indexes(db))["blocked"] == []
         found = await names(db, "user_xp")
         assert "user_unique" in found and "user_plain" not in found, "der gewöhnliche Index macht dem eindeutigen Platz"
-        assert (await database.init_audit_indexes(db))["unique"] == 7, "ein weiterer Start lässt alles stehen"
+        assert (await database.init_audit_indexes(db))["unique"] == len(database.AUDIT_UNIQUE_INDEXES), "ein weiterer Start lässt alles stehen"
     asyncio.run(scenario())
 
 
