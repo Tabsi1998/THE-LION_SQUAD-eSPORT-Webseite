@@ -69,6 +69,8 @@ export function OpsEventsTab() {
   const source = searchParams.get("source") || "all";
   const [severity, setSeverity] = useState("all");
   const [hours, setHours] = useState("168");
+  // Versand-Routing (#627): Discord-Meldungen nach Server filtern - erst ab zwei Servern.
+  const [guild, setGuild] = useState("");
   const [q, setQ] = useState("");
   const [needle, setNeedle] = useState("");
   const [data, setData] = useState(null);
@@ -80,7 +82,7 @@ export function OpsEventsTab() {
     return () => clearTimeout(timer);
   }, [q]);
 
-  const params = useMemo(() => ({ source, severity, hours: Number(hours), q: needle, limit: 300 }), [source, severity, hours, needle]);
+  const params = useMemo(() => ({ source, severity, hours: Number(hours), q: needle, limit: 300, ...(guild ? { guild } : {}) }), [source, severity, hours, needle, guild]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,6 +157,13 @@ export function OpsEventsTab() {
         <select value={hours} onChange={(event) => setHours(event.target.value)} data-testid="ops-events-range" className="h-[34px] rounded-sm border border-white/10 bg-[#121212] px-3 text-xs font-bold uppercase tracking-wider text-white">
           {RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
+        {(data?.guilds || []).length > 1 ? (
+          <select value={guild} onChange={(event) => setGuild(event.target.value)} data-testid="ops-events-guild" aria-label="Discord-Server"
+            className="h-[34px] rounded-sm border border-white/10 bg-[#121212] px-3 text-xs font-bold uppercase tracking-wider text-white">
+            <option value="">Alle Discord-Server</option>
+            {data.guilds.map((row) => <option key={row.guild_id} value={row.guild_id}>{row.name}</option>)}
+          </select>
+        ) : null}
         <label className="relative min-w-[220px] flex-1 max-w-lg">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
           <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Ereignisse suchen …" data-testid="ops-events-search"

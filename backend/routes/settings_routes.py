@@ -313,6 +313,8 @@ class DiscordSettings(BaseModel):
     channels: Optional[dict[str, str]] = None
     # Schalter je Ereignis; die Schlüssel stehen in discord_service.EVENTS.
     events: Optional[dict[str, bool]] = None
+    # Routing-Regel je Ereignis mit Spielbezug (#627): Ereignis → Regel aus discord_routing.RULES.
+    routing: Optional[dict[str, str]] = None
     # Discord-Bot (#302): Token verschlüsselt (leer lassen = behalten), Schalter, Server, Rollennamen.
     bot_token: Optional[str] = None
     clear_bot_token: Optional[bool] = None
@@ -1519,10 +1521,19 @@ async def get_discord(me: dict = Depends(require_club_admin())):
     s["configured"] = any(s["channels"].values())
     stored_events = s.get("events") or {}
     switches = {key: stored_events.get(event_field(key)) for key in EVENTS}
-    s["events"] = [
-        {"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": switches}, key)}
-        for key, spec in EVENTS.items()
-    ]
+    # Routing je Ereignis (#627): Regel, Vorgabe und „geht an: …“ mit einem Spielserver als Beispiel.
+    from discord_service import TARGET_LABELS
+    from services import discord_routing
+    stored_routing = s.get("routing") or {}
+    routing_cfg = {"routing": {key: stored_routing.get(event_field(key)) for key in EVENTS}}
+    example = await discord_routing.routing_example(db)
+    s["events"] = []
+    for key, spec in EVENTS.items():
+        rule = discord_routing.rule_for(routing_cfg, key)
+        s["events"].append({"key": key, "label": spec["label"], "target": spec["target"], "enabled": event_enabled({"events": switches}, key),
+                            "routable": discord_routing.routable(key), "routing": rule, "routing_default": discord_routing.default_rule(key),
+                            "routing_preview": discord_routing.preview_text(rule, TARGET_LABELS.get(spec["target"], spec["target"]), example)})
+    s["routing"] = {"rules": [{"key": rule, "label": discord_routing.RULE_LABELS[rule]} for rule in discord_routing.RULES], "example": example}
     s["target_status"] = await target_status(db)
     # Discord-Bot (#302): Stand ohne Token.
     from services import discord_bot
@@ -1599,6 +1610,18 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
             if key not in EVENTS:
                 raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
             updates[f"events.{event_field(key)}"] = bool(value)
+    # Routing-Regel je Ereignis (#627): nur bei Ereignissen mit Spielbezug; Privates bleibt am Hauptserver.
+    incoming_routing = updates.pop("routing", None)
+    if incoming_routing is not None:
+        from services.discord_routing import RULES, routable
+        for key, value in incoming_routing.items():
+            if key not in EVENTS:
+                raise HTTPException(400, f"Unbekanntes Discord-Ereignis: {key}")
+            if value not in RULES:
+                raise HTTPException(400, f"Unbekannte Regel: {value}")
+            if not routable(key) and value != "main_only":
+                raise HTTPException(400, f"„{EVENTS[key]['label']}“ hat keinen Spielbezug oder ist privat – das geht nur an den Hauptserver.")
+            updates[f"routing.{event_field(key)}"] = value
     # Discord-Termine (#570): zwei Schalter.
     incoming_scheduled = updates.pop("scheduled_events", None)
     if incoming_scheduled is not None:
@@ -1646,6 +1669,8 @@ async def update_discord(body: DiscordSettings, me: dict = Depends(require_club_
         flat_current[f"channels.{name}"] = value
     for key, value in (current.get("events") or {}).items():
         flat_current[f"events.{key}"] = value
+    for key, value in (current.get("routing") or {}).items():
+        flat_current[f"routing.{key}"] = value
     for key, value in (current.get("bot_roles") or {}).items():
         flat_current[f"bot_roles.{key}"] = value
     for kind, state in (current.get("embeds") or {}).items():

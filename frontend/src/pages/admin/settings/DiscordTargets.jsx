@@ -106,6 +106,8 @@ export function DiscordTargets() {
       : `Nicht gesendet: ${result?.error || result?.reason || "unbekannt"}`
   ));
   const toggleEvent = (key, enabled) => run(`event-${key}`, () => api.put("/settings/discord", { events: { [key]: enabled } }));
+  // Versand-Routing (#627): je Meldung mit Spielbezug, wohin sie geht - Spielserver, Hauptserver oder beides.
+  const setRouting = (key, rule) => run(`routing-${key}`, () => api.put("/settings/discord", { routing: { [key]: rule } }), "Regel gespeichert.");
 
   if (!data) return null;
   const status = data.target_status || {};
@@ -186,13 +188,30 @@ export function DiscordTargets() {
       </div>
       <div>
         <div className="font-heading font-bold uppercase text-sm">Was gemeldet wird</div>
-        <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-2">
+        {(data.events || []).some((event) => event.routable) ? (
+          <p className="mt-1 text-xs text-white/45">Meldungen mit Spielbezug gehen je nach Regel an den Server des Spiels, an den Hauptserver oder an beide. Ohne eigenen Spielserver bleibt alles am Hauptserver.</p>
+        ) : null}
+        <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-3">
           {(data.events || []).map((event) => (
-            <label key={event.key} className="flex items-center gap-2 text-sm" data-testid={`discord-event-${event.key}`}>
-              <input type="checkbox" checked={!!event.enabled} disabled={!!busy} onChange={(e) => toggleEvent(event.key, e.target.checked)} className="accent-[#29B6E8]" />
-              <span>{event.label}</span>
-              <span className="text-[10px] uppercase tracking-widest text-white/35">{status[event.target]?.label || event.target}</span>
-            </label>
+            <div key={event.key} className="space-y-1" data-testid={`discord-event-${event.key}`}>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={!!event.enabled} disabled={!!busy} onChange={(e) => toggleEvent(event.key, e.target.checked)} className="accent-[#29B6E8]" />
+                <span>{event.label}</span>
+                <span className="text-[10px] uppercase tracking-widest text-white/35">{status[event.target]?.label || event.target}</span>
+              </label>
+              {event.routable ? (
+                <div className="pl-6 space-y-1">
+                  <select value={event.routing} disabled={!!busy || !event.enabled} onChange={(e) => setRouting(event.key, e.target.value)}
+                    aria-label={`Regel für ${event.label}`} data-testid={`discord-routing-${event.key}`}
+                    className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs disabled:opacity-50">
+                    {(data.routing?.rules || []).map((rule) => (
+                      <option key={rule.key} value={rule.key}>{rule.label}{rule.key === event.routing_default ? " (Vorgabe)" : ""}</option>
+                    ))}
+                  </select>
+                  <div className="text-[11px] text-white/45" data-testid={`discord-routing-preview-${event.key}`}>{event.routing_preview}</div>
+                </div>
+              ) : null}
+            </div>
           ))}
         </div>
       </div>

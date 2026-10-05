@@ -112,3 +112,35 @@ test("Bot aus steht dran; ohne Kanal-Liste gibt es das ID-Feld", async () => {
   await user.click(screen.getByTestId("discord-target-ops-save"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { channels: { ops: "10000000000000004" } }));
 });
+
+// Versand-Routing (#627): je Meldung mit Spielbezug eine Regel mit „geht an: …“; Privates und Meldungen ohne Spiel
+// haben keine Auswahl - sie bleiben am Hauptserver.
+test("Meldungen mit Spielbezug haben eine Regel samt Vorschau, private keine", async () => {
+  const user = userEvent.setup();
+  const RULES = [
+    { key: "game_server_plus_crossref", label: "Spielserver + Querverweis am Hauptserver" },
+    { key: "both_full", label: "Spielserver und Hauptserver (beide voll)" },
+    { key: "game_server_only", label: "nur Spielserver" },
+    { key: "main_only", label: "nur Hauptserver" },
+  ];
+  const routed = {
+    ...DATA,
+    events: [
+      { key: "tournament.live", label: "Turnier: jetzt live", target: "events", enabled: true, routable: true, routing: "game_server_plus_crossref",
+        routing_default: "game_server_plus_crossref", routing_preview: "geht an: CoD-Server (Events und Turniere), Hauptserver (Querverweis)" },
+      { key: "membership.application", label: "Neuer Mitgliedsantrag", target: "board", enabled: true, routable: false, routing: "main_only", routing_default: "main_only" },
+    ],
+    routing: { rules: RULES, example: { game_name: "Call of Duty", server_name: "CoD-Server" } },
+  };
+  apiMock.get.mockImplementation(async (url) => (url === "/settings/discord/channels" ? { data: CHANNELS } : { data: routed }));
+  render(<DiscordTargets />);
+  const select = await screen.findByTestId("discord-routing-tournament.live");
+  expect(select).toHaveValue("game_server_plus_crossref");
+  expect(screen.getByRole("option", { name: "Spielserver + Querverweis am Hauptserver (Vorgabe)" })).toBeInTheDocument();
+  expect(screen.getByTestId("discord-routing-preview-tournament.live")).toHaveTextContent("geht an: CoD-Server (Events und Turniere), Hauptserver (Querverweis)");
+  expect(screen.queryByTestId("discord-routing-membership.application")).toBeNull();
+  await user.selectOptions(select, "both_full");
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { routing: { "tournament.live": "both_full" } }));
+  expect(toastMock.success).toHaveBeenLastCalledWith("Regel gespeichert.");
+});
+
