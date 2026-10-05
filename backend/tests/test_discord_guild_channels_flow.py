@@ -159,7 +159,8 @@ def test_every_send_to_caller_names_its_server_or_means_the_main_server():
         # send_event: ausdrücklicher Server oder Thread; nach der Regel (#627) Spielserver oder Hauptserver, Querverweis,
         # voll am Hauptserver; send_discord und send_ops_discord meinen den Hauptserver.
         "discord_service.py": 6,
-        "services/discord_threads.py": 1,  # Querverweis im Turnier-Thread am Hauptserver (#627)
+        # Querverweis im Turnier-Thread am Hauptserver (#627); Mitglieder-Turnier im Mitglieder-Kanal am Hauptserver (#910)
+        "services/discord_threads.py": 2,
         "routes/settings_routes.py": 2,   # erneut senden (guild_id aus dem Log), Test je Ziel (Hauptserver)
         "services/discord_guilds.py": 1,  # Test am Hauptserver (Unterserver gehen direkt in den Systemkanal)
         "services/discord_samples.py": 1, # Vorschau-Test in den Testkanal des Hauptservers

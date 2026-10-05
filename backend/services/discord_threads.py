@@ -19,6 +19,10 @@ Turnier (``discord_skip``) hält alles zurück, ebenso alles, was nicht öffentl
 Spielserver sie voll, hat das Turnier dort seinen eigenen Thread (``discord_thread_by_guild.<Server>``); am
 Hauptserver (``discord_thread`` wie bisher) stehen dann die Querverweise - die erste Ankündigung im Kanal, alles
 Weitere im Thread darunter. So zeigt auch der Hauptserver je Turnier genau eine Meldung.
+
+**Turniere nur für Mitglieder (#910):** dieselben Meldungen gehen in den Kanal „Mitglieder (privat)“ am Hauptserver,
+mit eigenem Thread (``discord_thread_members``) - nie öffentlich, nie auf einen Spielserver, kein Querverweis. Ohne
+Mitglieder-Kanal kommt nichts an (kein Rückfall). „Intern“ und versteckte Turniere bleiben draußen.
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ logger = logging.getLogger("tls.discord.threads")
 
 FIELD = "discord_thread"
 GUILD_FIELD = "discord_thread_by_guild"
+MEMBERS_FIELD = "discord_thread_members"
 BRACKET_STATUSES = ("live", "completed", "results_published")
 FINAL_STATUSES = ("completed", "results_published")
 # Scheitert der Versand in den Thread so, geht die Meldung in den Kanal - sie geht nie verloren.
@@ -48,49 +53,63 @@ def wants_discord(tournament: dict | None) -> bool:
     return (tournament.get("visibility") or "public") == "public"
 
 
-def state_field(guild_id: str | None = None) -> str:
-    """Wo der Thread-Stand eines Servers am Turnier steht: der Hauptserver wie bisher, jeder andere darunter (#627)."""
+def members_only(tournament: dict | None) -> bool:
+    """Ein Turnier nur für Mitglieder (#910): seine Meldungen gehen in den Mitglieder-Kanal - nie öffentlich."""
+    tournament = tournament or {}
+    if tournament.get("discord_skip") or tournament.get("is_public") is False:
+        return False
+    return (tournament.get("visibility") or "public") == "members"
+
+
+def state_field(guild_id: str | None = None, members: bool = False) -> str:
+    """Wo der Thread-Stand eines Servers am Turnier steht: der Hauptserver wie bisher, jeder andere darunter (#627);
+    der Thread im Mitglieder-Kanal für sich (#910)."""
+    if members:
+        return MEMBERS_FIELD
     return f"{GUILD_FIELD}.{guild_id}" if guild_id else FIELD
 
 
-def thread_state(tournament: dict, guild_id: str | None = None) -> dict:
+def thread_state(tournament: dict, guild_id: str | None = None, members: bool = False) -> dict:
+    if members:
+        return tournament.get(MEMBERS_FIELD) or {}
     if guild_id:
         return ((tournament.get(GUILD_FIELD) or {}).get(str(guild_id))) or {}
     return tournament.get(FIELD) or {}
 
 
-def thread_of(tournament: dict, channel_id: str, guild_id: str | None = None) -> str:
+def thread_of(tournament: dict, channel_id: str, guild_id: str | None = None, members: bool = False) -> str:
     """Der Thread des Turniers auf diesem Server - nur, wenn er im heute gewählten Kanal liegt."""
-    state = thread_state(tournament, guild_id)
+    state = thread_state(tournament, guild_id, members)
     if state.get("thread_id") and channel_id and str(state.get("channel_id") or "") == str(channel_id):
         return str(state["thread_id"])
     return ""
 
 
-async def events_channel(guild: dict | None = None) -> str:
+async def events_channel(guild: dict | None = None, members: bool = False) -> str:
+    """Der Kanal der Turnier-Meldungen: „Events und Turniere“ - für Mitglieder-Turniere „Mitglieder (privat)“ (#910)."""
     from discord_service import _get_discord_config, resolve_target
 
-    return resolve_target(await _get_discord_config(), "events", guild)["channel_id"]
+    return resolve_target(await _get_discord_config(), "members" if members else "events", guild)["channel_id"]
 
 
-async def note_message(db, tournament_id: str, message_id: str | None, guild_id: str | None = None) -> None:
+async def note_message(db, tournament_id: str, message_id: str | None, guild_id: str | None = None, members: bool = False) -> None:
     """Eine neue Nachricht des Bots im Thread. Stand bis eben der Endstand zuletzt, muss er wieder nach unten."""
     from services import discord_bracket
 
     if not message_id:
         return
-    field = state_field(guild_id)
-    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, FIELD: 1, GUILD_FIELD: 1, discord_bracket.FIELD: 1}) or {}
+    field = state_field(guild_id, members)
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0, FIELD: 1, GUILD_FIELD: 1, MEMBERS_FIELD: 1, discord_bracket.FIELD: 1}) or {}
     updates = {f"{field}.last_message_id": str(message_id), f"{field}.last_message_at": now_utc().isoformat()}
     bracket = tournament.get(discord_bracket.FIELD) or {}
-    thread_id = str(thread_state(tournament, guild_id).get("thread_id") or "")
+    thread_id = str(thread_state(tournament, guild_id, members).get("thread_id") or "")
     if bracket.get("final") and thread_id and str(bracket.get("channel_id") or "") == thread_id and str(bracket.get("message_id") or "") != str(message_id):
         updates[f"{discord_bracket.FIELD}.final"] = False
         discord_bracket.request_refresh(tournament_id, final=True)
     await db.tournaments.update_one({"id": tournament_id}, {"$set": updates})
 
 
-async def _open_thread(db, tournament: dict, sent: dict, guild_id: str | None = None) -> dict:
+async def _open_thread(db, tournament: dict, sent: dict, guild_id: str | None = None, members: bool = False) -> dict:
     """Unter der Ankündigung im Kanal den Thread öffnen und am Turnier festhalten - je Server (#627)."""
     from discord_service import REASON_TEXTS
     from services.discord_bot import bot
@@ -114,14 +133,20 @@ async def _open_thread(db, tournament: dict, sent: dict, guild_id: str | None = 
             if guild_id:
                 log["guild_id"] = str(guild_id)
             await db.email_logs.insert_one(log)
-    await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {state_field(guild_id): state}})
+    await db.tournaments.update_one({"id": tournament["id"]}, {"$set": {state_field(guild_id, members): state}})
     return state
 
 
-async def _send(message: dict, tournament: dict, thread_id: str | None = None, guild_id: str | None = None, crossref_of: str | None = None) -> dict:
+async def _send(message: dict, tournament: dict, thread_id: str | None = None, guild_id: str | None = None, crossref_of: str | None = None,
+                members: bool = False) -> dict:
     """Genau an diesen Server - die Routing-Regel hat ``deliver`` schon angewandt."""
     from discord_service import send_event, send_to, EVENTS
 
+    if members:
+        # Mitglieder-Turnier (#910): der private Kanal am Hauptserver; der Schalter je Meldung galt schon in ``deliver``.
+        return await send_to("members", message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8,
+                             url=message.get("url"), fields=message.get("fields"), image_url=message.get("image_url"), event_key=message["event_key"],
+                             thread_id=thread_id, buttons=message.get("buttons"))
     if crossref_of:
         # Querverweis (#627): Titel, ein Satz, Knöpfe - nie der volle Inhalt; der Schalter galt schon für die volle Meldung.
         return await send_to(EVENTS[message["event_key"]]["target"], message["title"], message.get("description") or "", color=message.get("color") or 0x29B6E8,
@@ -132,23 +157,25 @@ async def _send(message: dict, tournament: dict, thread_id: str | None = None, g
                             buttons=message.get("buttons"), guild_id=guild_id, route=False)
 
 
-async def _deliver_on(db, tournament: dict, message: dict, in_thread: dict | None, guild: dict | None = None, crossref_of: str | None = None) -> dict:
-    """Eine Meldung auf einem Server: in den Thread des Turniers dort; gibt es keinen, in den Kanal, der ihn öffnet."""
+async def _deliver_on(db, tournament: dict, message: dict, in_thread: dict | None, guild: dict | None = None, crossref_of: str | None = None,
+                      members: bool = False) -> dict:
+    """Eine Meldung auf einem Server: in den Thread des Turniers dort; gibt es keinen, in den Kanal, der ihn öffnet.
+    ``members`` (#910): im Mitglieder-Kanal am Hauptserver, mit eigenem Thread."""
     guild_id = str(guild["guild_id"]) if guild else None
-    thread_id = thread_of(tournament, await events_channel(guild), guild_id)
+    thread_id = thread_of(tournament, await events_channel(guild, members), guild_id, members)
     reopen = not thread_id
     if thread_id:
-        result = await _send(in_thread or message, tournament, thread_id, guild_id, crossref_of)
+        result = await _send(in_thread or message, tournament, thread_id, guild_id, crossref_of, members)
         if result.get("ok"):
-            await note_message(db, tournament["id"], result.get("message_id"), guild_id)
+            await note_message(db, tournament["id"], result.get("message_id"), guild_id, members)
             return {**result, "thread_id": thread_id}
         if result.get("reason") not in FALLBACK_REASONS:
             return result
         # Thread gelöscht: neu im Kanal. Darf der Bot im Thread nicht schreiben: einzeln in den Kanal, ohne neuen Thread.
         reopen = result.get("reason") == "unknown_channel"
-    result = await _send(message, tournament, None, guild_id, crossref_of)
+    result = await _send(message, tournament, None, guild_id, crossref_of, members)
     if result.get("ok") and reopen:
-        state = await _open_thread(db, tournament, result, guild_id)
+        state = await _open_thread(db, tournament, result, guild_id, members)
         result = {**result, "thread_id": state.get("thread_id")}
     return result
 
@@ -162,12 +189,16 @@ async def deliver(db, tournament: dict, message: dict, *, in_thread: dict | None
 
     if tournament.get("discord_skip"):
         return {"ok": False, "reason": "author_opt_out"}
-    if not wants_discord(tournament):
+    members = members_only(tournament)
+    if not members and not wants_discord(tournament):
         return {"ok": False, "reason": "private_visibility"}
     cfg = await _get_discord_config()
     event_key = message["event_key"]
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
+    if members:
+        # Nur für Mitglieder (#910): Mitglieder-Kanal am Hauptserver - keine Routing-Regel, kein Spielserver, kein Querverweis.
+        return await _deliver_on(db, tournament, message, in_thread, members=True)
     plan = await discord_routing.plan(db, cfg, event_key, tournament, (EVENTS.get(event_key) or {}).get("target") or "events")
     if not plan["game"]:
         return await _deliver_on(db, tournament, message, in_thread)

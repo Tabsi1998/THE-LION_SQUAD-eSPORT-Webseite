@@ -223,6 +223,11 @@ Einladungslink aus dem Reiter „Server“ enthält ihn.
 - Discord archiviert den Thread nach einer Woche Ruhe; die nächste Meldung öffnet ihn wieder.
 - **„Ohne Discord“** im Turnier-Formular hält das Turnier ganz heraus (keine Meldung, kein Thread,
   kein Termin).
+- **Turniere „nur Mitglieder“** melden sich genauso, aber im Kanal **„Mitglieder (privat)“** am
+  Hauptserver – mit eigenem Thread, darin Check-in, live, Streams und das Bracket. Nie in „Events und
+  Turniere“, nie auf einem Spielserver, kein Querverweis. Ist kein Mitgliederkanal gewählt, kommt
+  nichts an (kein Rückfall auf einen öffentlichen Kanal). Turniere „intern“ (nur Vorstand) und
+  versteckte Turniere bleiben ganz draußen.
 
 ### 4.3 Einbettungen, die sich aktualisieren
 
@@ -442,6 +447,7 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 | Bot bleibt „offline“, Fehler nennt den Token | Token falsch oder zurückgesetzt | neuen Token erzeugen und im Reiter „Bot & Aktivität“ eintragen |
 | Keine Meldung, Log: „Der Bot ist aus“ | „Bot verbinden“ nicht angehakt | Reiter „Bot & Aktivität“ |
 | Keine Meldung, Log: „Kein Kanal gewählt“ | Zweck ohne Kanal | Reiter „Meldungen“ → Kanäle je Zweck |
+| Mitglieder-Turnier wird nicht gemeldet, Log: „Kein Mitgliederkanal gewählt“ | Kanal „Mitglieder (privat)“ fehlt | Reiter „Meldungen“ → Kanäle je Zweck → Mitglieder (4.2) |
 | Keine Meldung, kein Eintrag im Log | Schalter für das Ereignis aus | Reiter „Meldungen“ → Was gemeldet wird |
 | Kanal in der Auswahl ausgegraut | Bot darf dort nicht schreiben | Kanal → Bearbeiten → Berechtigungen → Rolle des Bots: Kanal ansehen, Nachrichten senden, Links einbetten |
 | Privater Kanal fehlt in der Auswahl | Bot sieht den Kanal nicht | Rolle des Bots dem Kanal hinzufügen (2.4) |
