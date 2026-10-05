@@ -14,6 +14,7 @@
 - Mobile: Ein Tipp auf die PSN-ID öffnet das PlayStation-Profil; Partner-Logos kommen aus dem Vereinsmodul (#891, #880).
 - Mobile: Discord-Spiel-Rollen wie „RL-Spieler“ lassen sich im Profil abwählen (#629).
 - Mobile: Jahreszeiten: Silvester mit verschiedenen Kalibern, um Mitternacht steht die Jahreszahl aus Funken am Himmel; Vereinsgeburtstag mit Mütze, Ballons und Zahlkerzen; Adventkalender und Nikolaus gleich unter dem Kranz; der Faschingshut sitzt gerade (#853, #856, #852, #855).
+- Mobile: Seiten, die du von der Startseite, aus einer News oder einer Benachrichtigung öffnest, haben jetzt einen Zurück-Pfeil, und ein Tipp auf den Tab führt wieder zur Übersicht.
 - Mobile: Auf Tablets und aufgeklappten Faltgeräten dreht die App mit, Handys bleiben hochkant. Die App ist kleiner geworden (#917).
 
 ## 1.1.0 - 2026-10-03
