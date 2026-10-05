@@ -16,6 +16,7 @@
       "/vereine/members/{id}/invoices",
       "/vereine/members/{id}/invoices/{invoice}/pdf",
       "/vereine/organization",
+      "/vereine/events",
       "/vereine/board",
       "/vereine/applicationform",
       "/vereine/membershipfees",

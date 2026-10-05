@@ -523,6 +523,13 @@ class DolibarrClient:
             raise DolibarrError("invalid_response", 200)
         return [row for row in data if isinstance(row, dict)]
 
+    async def public_events(self) -> list[dict]:
+        """Öffentliche Veranstaltungen ab heute (#850): Name, Tage, Ort, Stand, Anmeldeweg - nie Teilnehmer oder Geld."""
+        data = await self._get("/vereine/events")
+        if not isinstance(data, list):
+            raise DolibarrError("invalid_response", 200)
+        return [row for row in data if isinstance(row, dict) and row.get("id")]
+
     async def statutes(self) -> dict:
         """Die Statuten, wie der Verein sie im Modul für die Öffentlichkeit freigibt (#326 Teil 3): Stand,
         geltende Fassung und alle beschlossenen Fassungen - nie der Entwurf. Ein älteres Modul antwortet 404."""

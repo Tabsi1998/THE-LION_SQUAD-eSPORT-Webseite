@@ -1253,6 +1253,11 @@ class FakeDolibarr:
             if denied:
                 return denied
             return self._json("/vereine/me/honours", self._honours_of(ident["member_id"], publishable_only=False))
+        if path == "/vereine/events" and request.method == "GET":
+            # Öffentliche Veranstaltungen ab heute (#850) - ohne Schichten, Teilnehmer oder Geld.
+            rows = [{key: value for key, value in row.items() if key != "shifts"} for row in sorted(self.events.values(), key=lambda e: (e["day"], e["id"]))
+                    if row["visibility"] == "public" and (row["end_day"] or row["day"]) >= self.today]
+            return self._json("/vereine/events", rows)
         if path == "/vereine/me/events" and request.method == "GET":
             ident, denied = self._person(params, "events")
             if denied:

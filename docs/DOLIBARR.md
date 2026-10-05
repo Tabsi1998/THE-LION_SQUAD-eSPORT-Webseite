@@ -105,6 +105,23 @@ Mitglieder → Nummerierung*) – die Website übernimmt, was dort steht.
 Ein zugeordnetes Konto, dessen Mitgliedschaft in Dolibarr beendet ist, wird im
 Live-Betrieb „ehemalig“ und verliert den Mitgliederzugang.
 
+## Öffentliche Events aus Dolibarr als Entwurf (#850)
+
+Plant der Vorstand in Dolibarr ein **öffentliches** Event, muss es niemand auf der Website doppelt anlegen.
+Unter *Admin → Events* steht oben der Kasten **„Aus Dolibarr“**:
+
+- **Vorschläge:** jedes öffentliche Event ab heute, das auf der Website noch fehlt – mit Tagen, Ort und
+  Anmeldeweg. **„Als Entwurf übernehmen“** legt einen Entwurf an und öffnet ihn. Uhrzeiten kennt Dolibarr
+  hier nicht: Der Entwurf beginnt um 0:00 und wird vor dem Veröffentlichen ergänzt. **„Ausblenden“** nimmt
+  einen Vorschlag weg, der nicht auf die Website soll.
+- **In Dolibarr geändert:** Ändert der Vorstand danach Tag, Ende oder Ort oder sagt das Event ab, steht das
+  hier als Unterschied – mit dem Wert von vorher und dem auf der Website. **„Übernehmen“** setzt ihn auf der
+  Website (die Uhrzeit bleibt), **„Ignorieren“** lässt die Website, wie sie ist. Still überschrieben wird nie.
+
+Gelesen wird stündlich und mit „Jetzt nachlesen“. Interne Events („nur für Mitglieder“) und vergangene kommen
+nicht; Teilnehmer, Aufgaben oder Geld liefert Dolibarr hier nie. Nichts einzurichten – das Lese-Recht der
+Website reicht.
+
 ## Eigene Rechnungen (Dolibarr II)
 
 Jedes Konto sieht unter **Profil → Rechnungen** (auch im Konto-Menü und unter

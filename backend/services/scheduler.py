@@ -367,6 +367,14 @@ async def _safe_dolibarr_public():
             logger.info(f"[scheduler] dolibarr_honours {res}")
     except Exception as exc:
         _log_task_failure("dolibarr_honours", exc)
+    try:
+        # Öffentliche Events als Vorschläge (#850): nur lesen, nie selbst anlegen oder überschreiben.
+        from services.dolibarr_events import refresh_due as refresh_events
+        res = await refresh_events()
+        if res.get("ok") and res.get("count"):
+            logger.info(f"[scheduler] dolibarr_events {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_events", exc)
 
 
 async def _safe_billing_reconcile():

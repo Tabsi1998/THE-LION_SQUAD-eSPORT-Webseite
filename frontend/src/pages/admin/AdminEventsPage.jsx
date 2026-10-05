@@ -8,6 +8,7 @@ import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTools";
 import { sortByNearestDate } from "@/lib/contentSort";
+import { EventSuggestionsPanel } from "@/pages/admin/EventSuggestionsPanel";
 import { toast } from "sonner";
 import { Plus, X, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
 
@@ -170,6 +171,9 @@ export default function AdminEventsPage() {
           <Plus className="w-3.5 h-3.5" /> Neues Event
         </Link>
       </div>
+
+      {/* Öffentliche Events aus Dolibarr (#850): Vorschläge und Änderungen, nur mit Anbindung. */}
+      <EventSuggestionsPanel />
 
       {list.length > 0 && (
         <div className="mb-4 rounded-sm border border-white/10 bg-[#121212] p-3">
