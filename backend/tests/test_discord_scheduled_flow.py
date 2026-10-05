@@ -11,34 +11,43 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import discord_bot, discord_scheduled  # noqa: E402
+from services import discord_bot, discord_guilds, discord_scheduled  # noqa: E402
 
 TOKEN = "test" * 6 + ".fake." + "token" * 8
+MAIN, COD = "600000000000000001", "600000000000000002"
+ALL = {key: True for key, _, _ in discord_guilds.PERMISSIONS}
 
 
 class FakeBot:
+    """Termine je Server (#628): ``guild`` None ist der Hauptserver. Bearbeiten und Absagen finden einen Termin nur auf
+    dem Server, auf dem er angelegt wurde - so fällt auf, wenn der Abgleich den falschen Server nennt."""
+
     def __init__(self):
         self.events: dict[str, dict] = {}
         self.calls: list[tuple[str, str]] = []
         self.counter = 0
+        self.forbidden: set = set()
 
-    async def create_scheduled_event(self, payload):
+    async def create_scheduled_event(self, payload, guild_id=None):
+        if guild_id in self.forbidden:
+            self.calls.append(("forbidden", str(guild_id)))
+            return {"ok": False, "reason": "forbidden", "error": "Der Bot darf keine Termine anlegen."}
         self.counter += 1
         event_id = f"ev{self.counter}"
-        self.events[event_id] = dict(payload, status="scheduled")
+        self.events[event_id] = dict(payload, status="scheduled", guild=guild_id)
         self.calls.append(("create", event_id))
         return {"ok": True, "event_id": event_id}
 
-    async def edit_scheduled_event(self, event_id, payload):
+    async def edit_scheduled_event(self, event_id, payload, guild_id=None):
         self.calls.append(("edit", event_id))
-        if event_id not in self.events:
+        if event_id not in self.events or self.events[event_id]["guild"] != guild_id:
             return {"ok": False, "reason": "unknown_event"}
         self.events[event_id].update(payload)
         return {"ok": True, "event_id": event_id}
 
-    async def cancel_scheduled_event(self, event_id):
+    async def cancel_scheduled_event(self, event_id, guild_id=None):
         self.calls.append(("cancel", event_id))
-        if event_id not in self.events:
+        if event_id not in self.events or self.events[event_id]["guild"] != guild_id:
             return {"ok": False, "reason": "unknown_event"}
         self.events[event_id]["status"] = "cancelled"
         return {"ok": True}
@@ -171,3 +180,97 @@ async def test_disabled_switch_and_preview_in_the_form(flow, bot):
     assert skipped["scheduled_event"]["reason"] == "author_opt_out" and "Ohne Discord" in skipped["scheduled_event"]["reason_text"]
     news = (await flow.post("/api/settings/discord/preview", json={"kind": "news", "item": {"title": "x"}})).json()
     assert news.get("scheduled_event") is None
+
+
+def seen(guild_id, name):
+    return {"guild_id": guild_id, "name": name, "icon_url": None, "member_count": 10, "bot_permissions": dict(ALL)}
+
+
+def on(bot, guild):
+    """Was auf diesem Server als Termin steht (None = Hauptserver)."""
+    return sorted(event["name"] for event in bot.events.values() if event["guild"] == guild and event["status"] == "scheduled")
+
+
+async def game_server(flow):
+    """Hauptserver LION und ein eingeschalteter CoD-Server; Call of Duty gehört dorthin, Schach hat keinen eigenen."""
+    db = flow.db
+    await discord_guilds.reconcile(db, [seen(MAIN, "LION"), seen(COD, "CoD-Server")], configured_main=MAIN)
+    await discord_guilds.update_guild(db, COD, {"enabled": True})
+    await db.games.insert_many([{"id": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-chess", "name": "Schach"}])
+
+
+@pytest.mark.asyncio
+async def test_game_server_gets_its_tournaments_and_main_mirrors_them_until_switched_off(flow, bot):
+    """#628: Ein Turnier mit eigenem Spielserver steht dort als Termin - und, solange „Termine auch am Hauptserver“ an
+    ist, auch am Hauptserver. Änderung und Absage gehen an beide; ohne eigenen Server nur der Hauptserver."""
+    await configure(flow)
+    await game_server(flow)
+    db = flow.db
+    await db.tournaments.insert_many([
+        {"id": "t-cod", "slug": "cod-cup", "title": "CoD-Cup", "game_id": "g-cod", "status": "registration_open", "visibility": "public", "is_public": True,
+         "start_date": _at(4)},
+        {"id": "t-chess", "slug": "schach", "title": "Schach-Abend", "game_id": "g-chess", "status": "registration_open", "visibility": "public", "is_public": True,
+         "start_date": _at(5)},
+    ])
+    await db.events.insert_one({"id": "e1", "slug": "lan", "name": "LAN-Party", "status": "scheduled", "visibility": "public", "start_date": _at(3)})
+
+    first = await discord_scheduled.sync(db)
+    assert first["created"] == 4 and first["errors"] == 0, first
+    assert on(bot, None) == ["CoD-Cup", "LAN-Party", "Schach-Abend"] and on(bot, COD) == ["CoD-Cup"]
+    assert (await discord_scheduled.sync(db))["created"] == 0, "kein Doppel"
+
+    await db.tournaments.update_one({"id": "t-cod"}, {"$set": {"title": "CoD-Cup 2026"}})
+    edited = await discord_scheduled.sync(db)
+    assert edited["updated"] == 2 and edited["created"] == 0 and "CoD-Cup 2026" in on(bot, None) and on(bot, COD) == ["CoD-Cup 2026"]
+
+    # „Termine auch am Hauptserver“ aus: dort abgesagt, am Spielserver bleibt er.
+    assert (await flow.patch(f"/api/settings/discord/guilds/{COD}", json={"mirror_events": False})).status_code == 200
+    mirror_off = await discord_scheduled.sync(db)
+    assert mirror_off["cancelled"] == 1 and on(bot, None) == ["LAN-Party", "Schach-Abend"] and on(bot, COD) == ["CoD-Cup 2026"]
+    stored = await db.tournaments.find_one({"id": "t-cod"}, {"_id": 0})
+    assert stored["discord_scheduled_event"]["cancel_reason"] == "mirror_off" and stored["discord_scheduled_guilds"][COD]["cancelled_at"] is None
+    status = (await flow.get("/api/settings/discord")).json()["scheduled_events"]
+    assert status["active"] == 2 and status["servers"] == [{"guild_id": COD, "name": "CoD-Server", "active": 1, "mirror_events": False}]
+
+    # Server aus: das Turnier fällt auf den Hauptserver zurück, der Termin am Spielserver wird abgesagt.
+    await discord_guilds.update_guild(db, COD, {"enabled": False})
+    moved = await discord_scheduled.sync(db)
+    assert moved["created"] == 1 and moved["cancelled"] == 1 and "CoD-Cup 2026" in on(bot, None) and on(bot, COD) == []
+    assert (await db.tournaments.find_one({"id": "t-cod"}, {"_id": 0}))["discord_scheduled_guilds"][COD]["cancel_reason"] == "moved"
+
+    # Wieder an, Spiegelung an: der Spielserver bekommt ihn neu, am Hauptserver bleibt der eine.
+    await discord_guilds.update_guild(db, COD, {"enabled": True, "mirror_events": True})
+    back = await discord_scheduled.sync(db)
+    assert back["created"] == 1 and back["cancelled"] == 0 and on(bot, None).count("CoD-Cup 2026") == 1 and on(bot, COD) == ["CoD-Cup 2026"]
+
+    # Absage: an beiden Servern, und nur einmal.
+    await db.tournaments.update_one({"id": "t-cod"}, {"$set": {"status": "cancelled"}})
+    gone = await discord_scheduled.sync(db)
+    assert gone["cancelled"] == 2 and "CoD-Cup 2026" not in on(bot, None) and on(bot, COD) == []
+    assert (await discord_scheduled.sync(db))["cancelled"] == 0
+
+
+@pytest.mark.asyncio
+async def test_member_tournaments_stay_on_main_and_a_blocked_game_server_does_not_starve_it(flow, bot):
+    """Nur-Mitglieder-Turniere (mit „auch interne“) kommen nie auf einen Spielserver. Darf der Bot dort keine Termine
+    anlegen, versucht der Lauf es einmal und überspringt den Server dann - der Hauptserver kommt trotzdem dran."""
+    await configure(flow, internal=True)
+    await game_server(flow)
+    db = flow.db
+    await db.tournaments.insert_many(
+        [{"id": "t-intern", "slug": "vm", "title": "Vereinsmeisterschaft", "game_id": "g-cod", "status": "registration_open", "visibility": "members",
+          "is_public": True, "start_date": _at(4)}]
+        + [{"id": f"t{i}", "slug": f"abend-{i}", "title": f"CoD-Abend {i}", "game_id": "g-cod", "status": "registration_open", "visibility": "public",
+            "is_public": True, "start_date": _at(5 + i)} for i in range(3)])
+    bot.forbidden.add(COD)
+
+    result = await discord_scheduled.sync(db)
+    assert on(bot, COD) == [] and on(bot, None) == ["CoD-Abend 0", "CoD-Abend 1", "CoD-Abend 2", "Vereinsmeisterschaft"]
+    assert [call for call in bot.calls if call[0] == "forbidden"] == [("forbidden", COD)], "einmal versucht, dann übersprungen"
+    assert result["created"] == 4 and result["errors"] == 1
+    assert "discord_scheduled_guilds" not in await db.tournaments.find_one({"id": "t-intern"}, {"_id": 0})
+
+    bot.forbidden.clear()
+    healed = await discord_scheduled.sync(db)
+    assert healed["created"] == 3 and on(bot, COD) == ["CoD-Abend 0", "CoD-Abend 1", "CoD-Abend 2"]
+    assert (await flow.patch(f"/api/settings/discord/guilds/{MAIN}", json={"mirror_events": False})).status_code == 400, "nur für Unterserver"

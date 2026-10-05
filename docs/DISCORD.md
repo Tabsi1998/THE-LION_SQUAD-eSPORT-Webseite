@@ -234,7 +234,28 @@ Der Reiter „Server“ zeigt umgekehrt je Server die **Spiele auf diesem Server
   `GET /api/games/discord-servers` (Auswahl im Formular), `GET /api/membership/discord-servers`, Bot
   `member_status`, `on_member_join`/`on_member_remove`.
 
-Versand je Spiel, Einbettungen, Rollen und Befehle je Server folgen in den weiteren Teilen.
+**Einbettungen und Termine je Server (#628).** Ein eingeschalteter Unterserver zeigt nur seine Spiele
+(eigene und geerbte, wie im Reiter „Server“):
+
+- **Einbettungen** Rangliste und Nächste Termine je Unterserver (Reiter „Einbettungen & Termine“ →
+  „Spielserver“, Kanal aus der Liste dieses Servers). Rangliste = Saisonpunkte aus Turnieren und
+  Fast-Lap-Challenges dieser Spiele (`aggregate_leaderboard(source_ids=…)`), das Spiel hinter dem
+  Saisonnamen; Termine = deren Turniere und Challenges (Events tragen kein Spiel). Der Erfolg der Woche
+  bleibt am Hauptserver. Zustand am Server-Eintrag (`discord_guilds.embeds.<art>`), dieselbe Bremse
+  (eine Bearbeitung je Minute und Nachricht), der Sammler alle zehn Minuten fasst alle Server an. Ohne
+  zugeordnetes Spiel postet der Bot nichts und nennt den Grund.
+- **Discord-Termine:** ein öffentliches Turnier, dessen Spiel einen eigenen Server hat, bekommt den Termin
+  dort (`discord_scheduled_guilds.<server>`); am Hauptserver (`discord_scheduled_event`) zusätzlich,
+  solange der Server „Auch am Hauptserver“ (`mirror_events`, Vorgabe an) hat. Änderung und Absage an beide;
+  Spiegelung aus → Absage am Hauptserver; Server aus/verlassen → Termin zurück an den Hauptserver, der am
+  Unterserver wird abgesagt. Nicht Öffentliches nie auf einen Unterserver. Darf der Bot auf einem Server
+  nichts (fehlendes Recht, Server nicht gefunden), versucht der Lauf es dort einmal und überspringt ihn –
+  so verbraucht ein falsch eingestellter Server nicht die Aufrufe der anderen.
+- Code: `services/discord_embeds.py` (`refresh(…, guild_id=)`, `server_games`, `_targets`),
+  `services/discord_scheduled.py` (`targets`, `sync`), `update_guild` nimmt `embeds` und `mirror_events`
+  (nur Unterserver), Route `POST /api/settings/discord/guilds/{server}/embeds/{art}/refresh`.
+
+Versand je Spiel (#627), Brackets, Rollen und Befehle je Server folgen in den weiteren Teilen.
 
 ## Gestaltung und Stream-Meldungen (#866)
 

@@ -135,11 +135,15 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
     row = await db[COLLECTION].find_one({"guild_id": str(guild_id)}, {"_id": 0})
     if not row:
         raise LookupError(guild_id)
-    unknown = set(patch) - {"role", "enabled", "invite_url", "note", "channels"}
+    unknown = set(patch) - {"role", "enabled", "invite_url", "note", "channels", "mirror_events", "embeds"}
     if unknown:
         raise GuildError(f"Unbekannte Einstellung: {', '.join(sorted(unknown))}")
     if "channels" in patch and patch.get("role") == "main":
         raise GuildError("Erst zum Hauptserver machen, dann die Kanäle unter „Kanäle je Zweck“ wählen.")
+    if "mirror_events" in patch and (patch.get("role") or row.get("role")) == "main":
+        raise GuildError("Nur für Unterserver: Termine des Hauptservers stehen immer dort.")
+    if "embeds" in patch and (patch.get("role") or row.get("role")) == "main":
+        raise GuildError("Die Einbettungen des Hauptservers stehen im Reiter „Einbettungen“ oben.")
     updates: dict = {}
     if "role" in patch:
         if patch["role"] not in ROLES:
@@ -166,6 +170,11 @@ async def update_guild(db, guild_id: str, patch: dict) -> dict:
         updates["note"] = str(patch["note"] or "").strip()[:300]
     if "channels" in patch:
         updates["channels"] = _checked_channels(row, patch["channels"])
+    if "embeds" in patch:
+        updates.update(_checked_embeds(row, patch["embeds"]))
+    if "mirror_events" in patch:
+        # Termine auf dem Spielserver auch am Hauptserver (#628) - Vorgabe an; gilt nur für Unterserver.
+        updates["mirror_events"] = bool(patch["mirror_events"])
     if updates:
         updates["updated_at"] = now_utc().isoformat()
         await db[COLLECTION].update_one({"guild_id": row["guild_id"]}, {"$set": updates})
@@ -194,6 +203,32 @@ def _checked_channels(row: dict, incoming) -> dict:
         else:
             channels.pop(target, None)
     return channels
+
+
+def _checked_embeds(row: dict, incoming) -> dict:
+    """Einbettungen eines Unterservers (#628): Schalter und Kanal je Art (Rangliste, nächste Termine). Ein neuer Kanal
+    heißt eine neue Nachricht - die alte bleibt im alten Kanal stehen, wie am Hauptserver."""
+    from discord_service import channel_id_valid
+    from services.discord_embeds import SUB_KINDS
+
+    if not isinstance(incoming, dict):
+        raise GuildError("Einbettungen kommen als Art → Schalter und Kanal.")
+    current = row.get("embeds") if isinstance(row.get("embeds"), dict) else {}
+    updates: dict = {}
+    for kind, patch in incoming.items():
+        if kind not in SUB_KINDS or not isinstance(patch, dict) or set(patch) - {"enabled", "channel_id"}:
+            raise GuildError(f"Diese Einbettung gibt es auf Unterservern nicht: {kind}")
+        if "enabled" in patch:
+            updates[f"embeds.{kind}.enabled"] = bool(patch["enabled"])
+        if "channel_id" in patch:
+            channel_id = str(patch.get("channel_id") or "").strip()
+            if channel_id and not channel_id_valid(channel_id):
+                raise GuildError("Eine Kanal-ID ist eine Zahl mit 17 bis 20 Stellen (Rechtsklick auf den Kanal → „Kanal-ID kopieren“).")
+            updates[f"embeds.{kind}.channel_id"] = channel_id or None
+            if channel_id != str((current.get(kind) or {}).get("channel_id") or ""):
+                for field in ("message_id", "hash", "posted_at", "updated_at", "error", "paused"):
+                    updates[f"embeds.{kind}.{field}"] = None
+    return updates
 
 
 async def _switch_main(db, new_main: dict) -> None:

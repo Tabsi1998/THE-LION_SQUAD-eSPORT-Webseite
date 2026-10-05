@@ -14,7 +14,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
-from services import discord_bot, discord_embeds  # noqa: E402
+from services import discord_bot, discord_embeds, discord_guilds  # noqa: E402
 
 CHANNEL = "100000000000000011"
 TOKEN = "test" * 6 + ".fake." + "token" * 8
@@ -264,3 +264,80 @@ async def test_a_stalled_embed_says_why_instead_of_standing_still(flow, bot, mon
     assert healed["reason"] == "edited"
     state = (await flow.db.settings.find_one({"id": "discord"}, {"_id": 0}))["embeds"]["events"]
     assert "paused" not in state and state["error"] is None and state["checked_at"] == (t0 + timedelta(minutes=30)).isoformat()
+
+
+MAIN, COD, EMPTY = "700000000000000001", "700000000000000002", "700000000000000003"
+COD_CHANNEL, EMPTY_CHANNEL = "100000000000000021", "100000000000000031"
+
+
+def seen(guild_id, name):
+    return {"guild_id": guild_id, "name": name, "icon_url": None, "member_count": 10, "bot_permissions": {key: True for key, _, _ in discord_guilds.PERMISSIONS}}
+
+
+@pytest.mark.asyncio
+async def test_a_game_server_shows_only_its_games_and_main_shows_everything(flow, bot):
+    """#628: Rangliste und nächste Termine je Unterserver - nur Turniere und Punkte der Spiele dieses Servers, das Spiel
+    steht hinter dem Saisonnamen; der Hauptserver zeigt alles. Ohne Spiel am Server: angehalten mit Grund."""
+    await configure(flow, {"events": {"enabled": True, "channel_id": CHANNEL}, "ranking": {"enabled": True, "channel_id": CHANNEL}})
+    db = flow.db
+    await discord_guilds.reconcile(db, [seen(MAIN, "LION"), seen(COD, "CoD-Server"), seen(EMPTY, "Leer")], configured_main=MAIN)
+    for guild_id in (COD, EMPTY):
+        await discord_guilds.update_guild(db, guild_id, {"enabled": True})
+    await db.games.insert_many([{"id": "g-cod", "name": "Call of Duty", "discord_guild_id": COD}, {"id": "g-rl", "name": "Rocket League"}])
+    soon = (now_utc() + timedelta(days=3)).isoformat()
+    await db.tournaments.insert_many([
+        {"id": "t-cod", "slug": "cod", "title": "CoD-Cup", "game_id": "g-cod", "status": "registration_open", "visibility": "public", "start_date": soon},
+        {"id": "t-rl", "slug": "rl", "title": "RL-Cup", "game_id": "g-rl", "status": "registration_open", "visibility": "public", "start_date": soon},
+    ])
+    await db.events.insert_one({"id": "e1", "slug": "lan", "name": "LAN-Party", "status": "scheduled", "visibility": "public", "start_date": soon})
+    await db.seasons.insert_one({"id": "s1", "slug": "2026", "title": "Saison 2026", "status": "active"})
+    paula, otto = await flow.add_user(name="Paula"), await flow.add_user(name="Otto")
+    await db.season_points.insert_many([
+        {"id": "p1", "season_id": "s1", "user_id": paula["id"], "source_type": "tournament", "source_id": "t-cod", "total_points": 50, "raw_points": 50, "rank": 1},
+        {"id": "p2", "season_id": "s1", "user_id": otto["id"], "source_type": "tournament", "source_id": "t-rl", "total_points": 80, "raw_points": 80, "rank": 1},
+    ])
+
+    both = {"events": {"enabled": True, "channel_id": COD_CHANNEL}, "ranking": {"enabled": True, "channel_id": COD_CHANNEL}}
+    saved = await flow.patch(f"/api/settings/discord/guilds/{COD}", json={"embeds": both})
+    assert saved.status_code == 200 and saved.json()["embeds"]["events"]["channel_id"] == COD_CHANNEL
+    assert (await flow.patch(f"/api/settings/discord/guilds/{EMPTY}", json={"embeds": {"events": {"enabled": True, "channel_id": EMPTY_CHANNEL}}})).status_code == 200
+    assert (await flow.patch(f"/api/settings/discord/guilds/{COD}", json={"embeds": {"achievement_week": {"enabled": True}}})).status_code == 400
+    assert (await flow.patch(f"/api/settings/discord/guilds/{COD}", json={"embeds": {"events": {"channel_id": "123"}}})).status_code == 400
+    assert (await flow.patch(f"/api/settings/discord/guilds/{MAIN}", json={"embeds": {"events": {"enabled": True}}})).status_code == 400
+
+    outcome = await discord_embeds.sweep(db, full=True)
+    assert outcome["checked"] == 5 and outcome["posted"] == 4 and outcome["errors"] == 1, outcome
+    texts: dict[str, str] = {}
+    for sent in bot.sent:
+        texts[sent["channel_id"]] = texts.get(sent["channel_id"], "") + json.dumps(sent["embed"], ensure_ascii=False)
+    assert "CoD-Cup" in texts[COD_CHANNEL] and "RL-Cup" not in texts[COD_CHANNEL] and "LAN-Party" not in texts[COD_CHANNEL]
+    assert "Paula" in texts[COD_CHANNEL] and "Otto" not in texts[COD_CHANNEL] and "Saison 2026 · Call of Duty" in texts[COD_CHANNEL]
+    assert all(word in texts[CHANNEL] for word in ("CoD-Cup", "RL-Cup", "LAN-Party", "Paula", "Otto")) and "· Call of Duty" not in texts[CHANNEL]
+    assert EMPTY_CHANNEL not in texts, "ohne Spiel keine leere Nachricht"
+
+    rows = {row["guild_id"]: row for row in (await flow.get("/api/settings/discord/guilds")).json()["guilds"]}
+    assert rows[COD]["embeds"]["events"]["message_id"] and rows[COD]["embeds"]["events"]["last_action"] == "posted"
+    assert rows[EMPTY]["embeds"]["events"]["paused"].startswith("Diesem Server ist noch kein Spiel")
+
+    # Änderung am CoD-Turnier: der nächste Lauf bearbeitet die Nachrichten (nach der Bremse), keine neuen.
+    await db.tournaments.update_one({"id": "t-cod"}, {"$set": {"title": "CoD-Cup 2026"}})
+    discord_embeds.request_refresh("events")
+    later = now_utc() + timedelta(minutes=2)
+    edited = await discord_embeds.refresh(db, "events", guild_id=COD, now=later)
+    assert edited["reason"] == "edited" and "CoD-Cup 2026" in json.dumps(bot.edited[-1]["embed"], ensure_ascii=False) and bot.edited[-1]["channel_id"] == COD_CHANNEL
+    assert "events" in discord_embeds.pending(), "die Merkliste führt der Sammler, nicht der Unterserver"
+    forced = (await flow.post(f"/api/settings/discord/guilds/{COD}/embeds/ranking/refresh")).json()
+    assert forced["reason"] in ("edited", "throttled", "unchanged")
+    assert (await flow.post(f"/api/settings/discord/guilds/{COD}/embeds/achievement_week/refresh")).status_code == 404
+    assert (await flow.post(f"/api/settings/discord/guilds/{MAIN}/embeds/events/refresh")).status_code == 404
+
+    # Server aus: nichts wird mehr angefasst.
+    await discord_guilds.update_guild(db, COD, {"enabled": False})
+    assert (await discord_embeds.refresh(db, "events", guild_id=COD, force=True, now=later + timedelta(minutes=5)))["reason"] == "server_off"
+
+    def cod_calls():
+        return sum(1 for item in bot.sent + bot.edited if item["channel_id"] == COD_CHANNEL)
+
+    before = cod_calls()
+    swept = await discord_embeds.sweep(db, full=True)
+    assert swept["checked"] == 3 and cod_calls() == before, swept   # Hauptserver zwei, „Leer“ angehalten, CoD aus

@@ -169,6 +169,7 @@ async def _leaderboard_breakdowns(
     teams: bool,
     source_type: str | None,
     drop_worst: int,
+    source_ids: list[str] | None = None,
 ) -> dict[str, dict]:
     if not ids:
         return {}
@@ -179,6 +180,8 @@ async def _leaderboard_breakdowns(
     }
     if source_type:
         match["source_type"] = source_type
+    if source_ids is not None:
+        match["source_id"] = {"$in": list(source_ids)}
     projection = {
         "_id": 0,
         "id": 1,
@@ -355,9 +358,12 @@ async def aggregate_leaderboard(
     rookie_only: bool = False,
     teams: bool = False,
     source_type: str | None = None,
+    source_ids: list[str] | None = None,
     limit: int = 100,
 ) -> list[dict]:
-    """Aggregate season points into a ranked leaderboard."""
+    """Aggregate season points into a ranked leaderboard.
+
+    ``source_ids`` (#628): only points from these tournaments/challenges - the ranking of one Discord server's games."""
     db = get_db()
     if not season_id:
         season = await _active_season(db)
@@ -375,6 +381,8 @@ async def aggregate_leaderboard(
     match: dict = {"season_id": season_id}
     if source_type:
         match["source_type"] = source_type
+    if source_ids is not None:
+        match["source_id"] = {"$in": list(source_ids)}
     if teams:
         match["team_id"] = {"$ne": None}
     else:
@@ -430,6 +438,7 @@ async def aggregate_leaderboard(
             ids=team_ids,
             teams=True,
             source_type=source_type,
+            source_ids=source_ids,
             drop_worst=drop_worst,
         )
         out = []
@@ -459,6 +468,7 @@ async def aggregate_leaderboard(
         ids=user_ids,
         teams=False,
         source_type=source_type,
+        source_ids=source_ids,
         drop_worst=drop_worst,
     )
     achievement_summaries = await _achievement_summaries(db, user_ids)

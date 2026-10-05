@@ -665,13 +665,16 @@ class BotRunner:
                 if not role.is_default() and not getattr(role, "managed", False)]
         return {"ok": True, "roles": rows}
 
-    def _guild(self, view: dict | None = None):
+    def _guild(self, view: dict | None = None, guild_id: str | None = None):
+        """Der Hauptserver - oder, mit ``guild_id`` (#628), genau dieser Server (Termine auf Unterservern)."""
         client = self._client
         view = view or self._view or {}
         if client is None:
             return None
-        guild_id = str(view.get("guild_id") or "")
-        return client.get_guild(int(guild_id)) if guild_id.isdigit() else (client.guilds[0] if client.guilds else None)
+        wanted = str(guild_id or view.get("guild_id") or "")
+        if guild_id:
+            return client.get_guild(int(wanted)) if wanted.isdigit() else None
+        return client.get_guild(int(wanted)) if wanted.isdigit() else (client.guilds[0] if client.guilds else None)
 
     async def _cache_channels(self, guild) -> list[dict]:
         rows = sorted_channels([channel_row(channel, channel.permissions_for(guild.me)) for channel in guild.text_channels])
@@ -862,15 +865,16 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         return {"ok": True}
 
-    async def create_scheduled_event(self, payload: dict) -> dict:
-        """Einen Discord-Termin anlegen (#570) - „extern“ mit Ort oder Link; braucht „Events verwalten“."""
+    async def create_scheduled_event(self, payload: dict, guild_id: str | None = None) -> dict:
+        """Einen Discord-Termin anlegen (#570) - „extern“ mit Ort oder Link; braucht „Events verwalten“.
+        ``guild_id`` (#628): auf diesem Server statt dem Hauptserver."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
         import discord
         from services.discord_scheduled import _dt
 
-        guild = self._guild()
+        guild = self._guild(guild_id=guild_id)
         if guild is None:
             return {"ok": False, "reason": "no_guild"}
         try:
@@ -888,10 +892,10 @@ class BotRunner:
         self.last_action = f"Termin „{payload['name'][:40]}“ angelegt ({now_utc().strftime('%H:%M')} UTC)"
         return {"ok": True, "event_id": str(event.id)}
 
-    async def _scheduled_event(self, event_id: str):
+    async def _scheduled_event(self, event_id: str, guild_id: str | None = None):
         import discord
 
-        guild = self._guild()
+        guild = self._guild(guild_id=guild_id)
         if guild is None:
             return None, {"ok": False, "reason": "no_guild"}
         try:
@@ -903,7 +907,7 @@ class BotRunner:
         except Exception as exc:  # noqa: BLE001
             return None, {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
 
-    async def edit_scheduled_event(self, event_id: str, payload: dict) -> dict:
+    async def edit_scheduled_event(self, event_id: str, payload: dict, guild_id: str | None = None) -> dict:
         """Einen Discord-Termin nachziehen (#570); ist er weg, kommt ``unknown_event`` - dann wird neu angelegt."""
         client = self._client
         if client is None or not self.connected:
@@ -911,7 +915,7 @@ class BotRunner:
         import discord
         from services.discord_scheduled import _dt
 
-        event, problem = await self._scheduled_event(event_id)
+        event, problem = await self._scheduled_event(event_id, guild_id)
         if problem:
             return problem
         try:
@@ -925,14 +929,14 @@ class BotRunner:
             return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
         return {"ok": True, "event_id": str(event.id)}
 
-    async def cancel_scheduled_event(self, event_id: str) -> dict:
+    async def cancel_scheduled_event(self, event_id: str, guild_id: str | None = None) -> dict:
         """Einen Discord-Termin absagen (#570); läuft er schon, wird er beendet bzw. gelöscht."""
         client = self._client
         if client is None or not self.connected:
             return {"ok": False, "reason": "bot_offline"}
         import discord
 
-        event, problem = await self._scheduled_event(event_id)
+        event, problem = await self._scheduled_event(event_id, guild_id)
         if problem:
             return problem
         try:
