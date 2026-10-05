@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 - 2026-10-05
+
+- Mobile: Aus Google Play installiert, kommen Updates nur noch über Google Play – kein eigenes Update-Fenster mehr, auch wenn unser Server einen neuen Build schon kennt (#926).
+
 ## 1.2.0 - 2026-10-05
 
 - Mobile: Ohne Konto gleich hinein: Die App startet auf der Startseite mit allem Öffentlichen. Beim ersten Start kommt nach ein paar Sekunden einmal der Hinweis zum Anmelden, unter „Mehr“ steht „Anmelden oder registrieren“, und nach dem Anmelden geht es zurück, wo du warst (#918).
@@ -16,7 +20,6 @@
 - Mobile: Jahreszeiten: Silvester mit verschiedenen Kalibern, um Mitternacht steht die Jahreszahl aus Funken am Himmel; Vereinsgeburtstag mit Mütze, Ballons und Zahlkerzen; Adventkalender und Nikolaus gleich unter dem Kranz; der Faschingshut sitzt gerade (#853, #856, #852, #855).
 - Mobile: Seiten, die du von der Startseite, aus einer News oder einer Benachrichtigung öffnest, haben jetzt einen Zurück-Pfeil, und ein Tipp auf den Tab führt wieder zur Übersicht.
 - Mobile: Auf Tablets und aufgeklappten Faltgeräten dreht die App mit, Handys bleiben hochkant. Die App ist kleiner geworden (#917).
-- Mobile: Aus Google Play installiert, kommen Updates nur noch über Google Play – kein eigenes Update-Fenster mehr, auch wenn unser Server einen neuen Build schon kennt (#926).
 
 ## 1.1.0 - 2026-10-03
 
