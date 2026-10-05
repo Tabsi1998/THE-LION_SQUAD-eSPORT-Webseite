@@ -12,6 +12,7 @@ import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
+import { BallotPopup } from "@/components/tls/BallotPopup";
 import { CookieConsentProvider } from "@/components/tls/CookieConsent";
 import { AnalyticsHead } from "@/components/tls/AnalyticsHead";
 import { ConfirmDialogProvider } from "@/components/tls/ConfirmDialog";
@@ -201,6 +202,8 @@ function App() {
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
             <SignalSync />
             <CeremonyHost />
+            {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht als Popup auf jeder Seite, nie im Admin. */}
+            <BallotPopup />
             {/* Jahreszeiten (#634): Deko-Ebenen über der ganzen Website, nie im Admin, nie klickbar. */}
             <SeasonStage />
             <Toaster theme="dark" position="top-right" richColors />

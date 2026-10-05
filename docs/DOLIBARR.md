@@ -244,6 +244,31 @@ schreibt in dieser Ausbaustufe **nichts** nach Dolibarr.
 - **Freigabe zurücknehmen:** alle Haken entfernen und freigeben.
 - In Dolibarr wird dabei nie etwas gelöscht oder geändert.
 
+## Abstimmung live: Popup in Web und App (Vereine ab 1.7.0, #844)
+
+Bei der Generalversammlung macht die Versammlungsleitung alles in Dolibarr. Öffnet sie dort eine
+Abstimmung, bekommen die Mitglieder mit offenem Stimmrecht **sofort ein Popup** – auf der Website auf
+jeder Seite, in der App über jedem Screen – und einmal eine Benachrichtigung (Glocke, Push in der App).
+Antwort wählen, „Stimme abgeben“, fertig; die Stimme geht direkt an Dolibarr.
+
+**Einrichten:** In Dolibarr braucht der API-Benutzer der Website das Recht **„Änderungen abholen
+(Änderungsfeed)“** (Benutzer → Rechte → Vereine). Darüber erfährt die Website binnen Sekunden, dass eine
+Abstimmung aufging: Sie liest den Feed alle fünf Sekunden, solange eine Versammlung läuft (*Sitzung
+beginnen* bis *Sitzung beenden* in Dolibarr), sonst jede Minute. Fehlt das Recht, fragen offene Seiten
+am Versammlungstag selbst alle 15 Sekunden nach – langsamer, aber es geht.
+
+**Im Popup:**
+
+- Frage, Tagesordnungspunkt und je Stimmrecht die Antworten – das eigene und jede Vollmacht.
+- **Offene Abstimmung:** Die Stimme wird mit dem Namen gespeichert; eine Stimme lässt sich nicht ändern.
+- **Geheime Wahl:** Nur der Hinweis „auf Papier im Saal“ – über Website und App wird nicht geheim
+  abgestimmt.
+- **„Später“** macht daraus ein Band am unteren Rand, bis abgestimmt ist oder die Abstimmung schließt.
+- Abstimmen kann nur, wer auf der Anwesenheitsliste steht – am einfachsten über den Einlass mit der
+  Mitgliedskarte. Sonst sagt das Popup, was fehlt.
+- Ist die Abstimmung geschlossen, verschwindet das Popup; das Ergebnis steht unter *Mitgliederbereich →
+  Versammlungen*, sobald die Versammlungsleitung es bestätigt hat.
+
 ## Vereinsdaten und Vorstand aus Dolibarr (Rechtliches II)
 
 Seit Vereinsmodul 0.7.0 liefert Dolibarr den Verein (`/vereine/organization`: Name, ZVR,

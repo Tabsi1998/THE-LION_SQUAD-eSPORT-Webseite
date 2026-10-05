@@ -467,6 +467,18 @@ async def _safe_dolibarr_participations():
         _log_task_failure("dolibarr_participations", exc)
 
 
+async def _safe_dolibarr_ballot_watch():
+    """Abstimmung live (#844): alle fünf Sekunden nachsehen, ob es Zeit ist - während einer Versammlung alle fünf Sekunden
+    in den Feed, sonst jede Minute."""
+    try:
+        from services.dolibarr_ballot_watch import run_due
+        res = await run_due()
+        if res.get("opened") or res.get("error"):
+            logger.info(f"[scheduler] dolibarr_ballot_watch {res}")
+    except Exception as exc:
+        _log_task_failure("dolibarr_ballot_watch", exc)
+
+
 async def _safe_youtube_feed():
     """Neue YouTube-Videos als News (#578) - alle 15 Minuten, ein Replikat; aus = kein Abruf."""
     try:
@@ -799,6 +811,8 @@ def start_scheduler() -> AsyncIOScheduler:
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("discord_embeds_full", _safe_discord_embeds_full, lease_seconds=300.0), IntervalTrigger(minutes=10), id="discord_embeds_full",
                   max_instances=1, coalesce=True)
+    sched.add_job(_single_replica("dolibarr_ballot_watch", _safe_dolibarr_ballot_watch, lease_seconds=60.0), IntervalTrigger(seconds=5),
+                  id="dolibarr_ballot_watch", max_instances=1, coalesce=True)
     sched.add_job(_single_replica("youtube_feed", _safe_youtube_feed, lease_seconds=300.0), IntervalTrigger(minutes=15), id="youtube_feed",
                   max_instances=1, coalesce=True)
     sched.add_job(_single_replica("github_releases", _safe_github_releases, lease_seconds=600.0), IntervalTrigger(minutes=10), id="github_releases",
