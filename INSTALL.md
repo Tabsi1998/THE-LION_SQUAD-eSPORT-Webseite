@@ -71,6 +71,30 @@ For a Docker-based proxy or when all traffic first reaches the frontend containe
 add and then narrow the corresponding Docker network shown by
 `docker network inspect`. Never configure `*`, `0.0.0.0/0`, or `::/0`.
 
+### Proxy on another machine, Cloudflare in front
+
+When Nginx Proxy Manager runs on a different host than the stack (and Cloudflare proxies the
+domain), two settings decide whether the application sees the visitor or only the proxy:
+
+1. Server `.env`: add the address of the proxy host to the trusted sources, then
+   `docker compose up -d backend`:
+
+   ```env
+   TRUSTED_PROXY_CIDRS=127.0.0.1/32,::1/128,172.16.0.0/12,<proxy-host-ip>/32
+   ```
+
+2. Nginx Proxy Manager -> proxy host -> Advanced, only when the Cloudflare record is proxied
+   (orange cloud): `real_ip_header CF-Connecting-IP;` plus one `set_real_ip_from <network>;` line
+   for each Cloudflare network listed at https://www.cloudflare.com/ips/. With a DNS-only record
+   (grey cloud) this block is not needed.
+
+Without them every session carries the proxy address, and every per-address limit (registration,
+password reset, two-factor) is shared by all visitors. The admin shows this under
+System -> Betrieb & Logs -> Checks -> "Besucher-Adresse".
+
+Cloudflare caps a proxied request at 100 MB regardless of the body size configured in the proxy
+manager; larger uploads need the DNS-only upload host described in `OPERATIONS.md`.
+
 ## 5. First admin and login
 
 Prefer `./install.sh`, which creates the first superadmin once and then removes

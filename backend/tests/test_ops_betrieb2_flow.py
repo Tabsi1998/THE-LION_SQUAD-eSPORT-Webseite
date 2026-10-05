@@ -97,10 +97,10 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     run = await ops_checks.run_checks(flow.db)
     assert {check["key"] for check in run["checks"]} == {
         "database", "disk", "uploads", "mail_queue", "change_stream", "image_variants", "error_groups", "scheduler",
-        "twitch_poll", "dolibarr_sync",
+        "twitch_poll", "dolibarr_sync", "client_ip",
     }
     assert run["status"] in {"ok", "warn", "crit"}
-    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 10
+    assert run["counts"]["ok"] + run["counts"]["warn"] + run["counts"]["crit"] == 11
     assert {check["key"]: check for check in run["checks"]}["twitch_poll"]["value"] == "noch kein Lauf"
     by_key = {check["key"]: check for check in run["checks"]}
     assert by_key["database"]["status"] == "ok"
@@ -113,13 +113,13 @@ async def test_checks_run_and_the_club_admin_sees_the_traffic_light(flow):
     overview = await flow.get("/api/admin/ops/checks")
     assert overview.status_code == 200, overview.text
     data = overview.json()
-    assert len(data["latest"]["checks"]) == 10
+    assert len(data["latest"]["checks"]) == 11
     assert data["history"][0]["runs"] == 1
     assert data["interval_minutes"] == 5
 
     again = await flow.post("/api/admin/ops/checks/run")
     assert again.status_code == 200, again.text
-    assert len(again.json()["checks"]) == 10
+    assert len(again.json()["checks"]) == 11
     assert await flow.db.ops_check_runs.count_documents({}) == 2
 
     summary = await flow.get("/api/admin/ops/summary")
@@ -228,3 +228,24 @@ async def test_alerts_use_only_the_ops_channel_never_the_community_channel(flow,
     test_message = await flow.post("/api/settings/discord/test?target=ops")
     assert test_message.status_code == 200 and test_message.json()["ok"] is True
     assert posted[-1]["channel_id"] == "100000000000000004"
+
+
+@pytest.mark.asyncio
+async def test_the_client_address_check_reads_the_sessions_of_the_last_day(flow):
+    """#941: tragen alle Sitzungen die Adresse des Proxys, steht die Prüfung auf Gelb und nennt den Klickweg."""
+    from datetime import timedelta
+
+    from models import now_utc
+
+    quiet = await ops_checks.check_client_ip(flow.db)
+    assert quiet["status"] == "ok" and quiet["value"] == "keine Sitzung in 24 h"
+    for number in range(6):
+        await flow.db.auth_sessions.insert_one({"id": f"s{number}", "family_id": f"f{number}", "ip": "192.168.2.100", "last_active": now_utc()})
+    await flow.db.auth_sessions.insert_one({"id": "alt", "family_id": "alt", "ip": "88.117.10.20", "last_active": now_utc() - timedelta(days=3)})
+    proxied = await ops_checks.check_client_ip(flow.db)
+    assert proxied["status"] == "warn" and proxied["value"] == "6 Sitzungen in 24 h von 1 Adressen"
+    assert "TRUSTED_PROXY_CIDRS" in proxied["detail"] and "docs/BETRIEB.md" in proxied["detail"]
+    for number in range(6):
+        await flow.db.auth_sessions.update_one({"id": f"s{number}"}, {"$set": {"ip": f"88.117.10.{number + 1}"}})
+    real = await ops_checks.check_client_ip(flow.db)
+    assert real["status"] == "ok" and real["value"] == "6 Sitzungen in 24 h von 6 Adressen"

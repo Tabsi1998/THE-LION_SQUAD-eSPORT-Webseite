@@ -1,6 +1,12 @@
 """MongoDB database connection + index setup."""
+import logging
 import os
+from typing import Any
+
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import OperationFailure
+
+logger = logging.getLogger(__name__)
 
 _client = None
 _db = None
@@ -345,6 +351,83 @@ async def init_indexes():
     await db.season_raffles.create_index("source_key", unique=True)
     await db.season_raffle_entries.create_index([("raffle_id", 1), ("user_id", 1)], unique=True)
     await db.season_raffle_entries.create_index("user_id")
+    await init_audit_indexes(db)
+
+
+async def unique_index(collection, keys, name: str, **options) -> bool:
+    """Eindeutiger Index, der den Start nicht gefährdet (#930). Liegen in der Sammlung schon Dubletten, scheitert der
+    Aufbau - dann bleibt ein gewöhnlicher Index und eine Warnung im Log, der Server startet trotzdem. Sind die
+    Dubletten bereinigt, greift der eindeutige beim nächsten Start von selbst (der gewöhnliche macht ihm vorher Platz:
+    zwei Indizes auf denselben Feldern lässt MongoDB nicht zu)."""
+    unique, plain = f"{name}_unique", f"{name}_plain"
+    existing = await collection.index_information()
+    if unique in existing:
+        return True
+    if plain in existing:
+        await collection.drop_index(plain)
+    try:
+        await collection.create_index(keys, unique=True, name=unique, **options)
+        return True
+    except OperationFailure as exc:
+        logger.warning("[indexes] %s: Dubletten verhindern den eindeutigen Index %s - gewöhnlicher Index angelegt (%s)",
+                       collection.name, unique, str(exc)[:200])
+        await collection.create_index(keys, name=plain, **options)
+        return False
+
+
+# Vollprüfung Oktober 2026 (#930): diese Sammlungen werden bei fast jeder Anfrage gelesen und hatten keinen Index;
+# „einmal je …“ war bisher nur im Code geprüft, zwei gleichzeitige Anfragen konnten zwei Zeilen anlegen.
+AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
+    ("user_xp", "user_id", "user", {}),
+    ("news_reads", [("user_id", 1), ("news_id", 1)], "user_news", {}),
+    ("discord_memberships", [("user_id", 1), ("guild_id", 1)], "user_guild", {}),
+    ("youtube_videos", [("channel_id", 1), ("video_id", 1)], "channel_video", {}),
+    # Ein fremdes Konto gehört zu höchstens einem Nutzer. Verknüpfungen ohne Kennung der Plattform bleiben außen vor.
+    ("platform_links", [("platform", 1), ("external_id", 1)], "platform_external",
+     {"partialFilterExpression": {"external_id": {"$type": "string"}}}),
+)
+AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
+    ("platform_links", "user_id"),
+    ("moderation_sanctions", [("user_id", 1), ("status", 1)]),  # bei jeder Chat-Nachricht gelesen
+    ("moderation_strikes", "user_id"),
+    ("moderation_strikes", [("source", 1), ("ref_id", 1)]),
+    ("team_members", [("team_id", 1), ("user_id", 1)]),
+    ("team_members", "user_id"),
+    ("membership_applications", [("user_id", 1), ("status", 1)]),
+    ("membership_applications", "status"),
+    ("media_scans", "state"),
+    ("media_scans", "owner_id"),
+    ("billing_cases", [("order_id", 1), ("status", 1)]),
+    ("billing_cases", "status"),
+    ("tournament_awards", [("tournament_id", 1), ("registration_id", 1)]),
+    ("tournament_awards", "registration_id"),
+    ("team_squads", "team_id"),
+    ("chat_attachments", "owner_id"),
+    ("chat_attachments", [("status", 1), ("created_at", 1)]),
+    ("stream_watches", [("user_id", 1), ("day", 1), ("key", 1)]),
+    ("match_commendations", [("match_id", 1), ("from_registration_id", 1)]),
+    ("match_commendations", "to_registration_id"),
+    ("match_commendations", "from_user_id"),
+    ("club_member_profiles", "user_id"),
+    ("club_member_profiles", "dolibarr_member_id"),
+    # Felder, nach denen Startseite und Listen filtern oder sortieren.
+    ("news_posts", [("published", 1), ("published_at", -1)]),
+    ("seasons", "status"),
+    ("tournaments", "start_date"),
+    ("events", "start_date"),
+    ("f1_challenges", "start_date"),
+)
+
+
+async def init_audit_indexes(db) -> dict:
+    """Die Indizes aus der Vollprüfung. Gibt zurück, welche eindeutigen an Dubletten gescheitert sind."""
+    blocked = []
+    for collection, keys, name, options in AUDIT_UNIQUE_INDEXES:
+        if not await unique_index(getattr(db, collection), keys, name, **options):
+            blocked.append(f"{collection}.{name}")
+    for collection, keys in AUDIT_INDEXES:
+        await getattr(db, collection).create_index(keys)
+    return {"unique": len(AUDIT_UNIQUE_INDEXES) - len(blocked), "blocked": blocked, "plain": len(AUDIT_INDEXES)}
 
 
 async def close_client():

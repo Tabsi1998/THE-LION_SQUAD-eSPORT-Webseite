@@ -13,6 +13,7 @@ Schwellen prüfen können, ohne eine Platte vollzuschreiben.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import shutil
@@ -42,6 +43,15 @@ DOLIBARR_STALE_MINUTES = 60.0
 VARIANTS_WARN_MISSING = 50
 VARIANT_SCAN_LIMIT = 5000
 UPLOAD_SCAN_LIMIT = 200_000
+# Besucher-Adresse (#941): unter so vielen Sitzungen am Tag sagt eine gemeinsame Adresse nichts.
+CLIENT_IP_MIN_SESSIONS = 5
+# Die Netze von Cloudflare (cloudflare.com/ips, Stand Oktober 2026) - eine Sitzung von dort ist der Proxy, kein Besucher.
+CLOUDFLARE_NETS = tuple(ipaddress.ip_network(net) for net in (
+    "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18",
+    "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
+    "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+    "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32", "2405:b500::/32", "2405:8100::/32", "2a06:98c0::/29", "2c0f:f248::/32",
+))
 
 
 # ---------------------------------------------------------------- Bewertung
@@ -128,6 +138,27 @@ def rate_error_groups(open_groups: int, new_5xx_last_hour: int) -> str:
     if int(open_groups or 0) > 0:
         return "warn"
     return "ok"
+
+
+def rate_client_ip(sessions: int, addresses: int, proxied: int) -> str:
+    """Gelb, wenn der Server statt der Besucher den Proxy sieht (#941): alle Sitzungen eines Tages von einer einzigen
+    Adresse oder ausschließlich aus privaten Netzen bzw. denen von Cloudflare. Dann gilt jede Bremse je Adresse
+    (Registrierung, Passwort vergessen, Zwei-Faktor) für alle gemeinsam."""
+    sessions = int(sessions or 0)
+    if sessions < CLIENT_IP_MIN_SESSIONS:
+        return "ok"
+    if int(addresses or 0) <= 1 or int(proxied or 0) >= sessions:
+        return "warn"
+    return "ok"
+
+
+def behind_proxy(address: str | None) -> bool:
+    """Eine Adresse, die kein Besucher hat: privat (Proxy im eigenen Netz, Docker) oder aus den Netzen von Cloudflare."""
+    try:
+        ip = ipaddress.ip_address(str(address or "").strip())
+    except ValueError:
+        return False
+    return ip.is_private or ip.is_loopback or any(ip.version == net.version and ip in net for net in CLOUDFLARE_NETS)
 
 
 def result(key: str, label: str, status: str, value: str, detail: str = "") -> dict:
@@ -353,6 +384,25 @@ async def check_scheduler() -> dict:
     return result("scheduler", label, "ok" if running else "crit", f"{jobs} Jobs" if running else "steht", "läuft" if running else "kein Scheduler aktiv")
 
 
+async def check_client_ip(db) -> dict:
+    label = "Besucher-Adresse"
+    try:
+        since = now_utc() - timedelta(hours=24)
+        rows = await db.auth_sessions.find({"last_active": {"$gte": since}}, {"_id": 0, "ip": 1}).to_list(5000)
+    except Exception as exc:  # noqa: BLE001
+        return failed("client_ip", label, exc)
+    addresses = [str(row["ip"]) for row in rows if row.get("ip")]
+    distinct = len(set(addresses))
+    status = rate_client_ip(len(addresses), distinct, sum(1 for address in addresses if behind_proxy(address)))
+    value = f"{len(addresses)} Sitzungen in 24 h von {distinct} Adressen" if addresses else "keine Sitzung in 24 h"
+    if status == "ok":
+        return result("client_ip", label, status, value, "Besucher kommen mit ihrer eigenen Adresse an")
+    return result("client_ip", label, status, value,
+                  "Der Server sieht den Proxy statt der Besucher - jede Bremse je Adresse gilt dann für alle gemeinsam. "
+                  "TRUSTED_PROXY_CIDRS in der Server-.env prüfen, hinter Cloudflare zusätzlich den Proxy (docs/BETRIEB.md, "
+                  "„Besucher-Adresse“). Kein Fehler, wenn an dem Tag wirklich alle im selben Netz waren, etwa am Vereinsabend.")
+
+
 CheckRunner = Callable[[Any], Awaitable[dict]]
 
 
@@ -368,6 +418,7 @@ def default_checks(db) -> list[tuple[str, str, Callable[[], Awaitable[dict]]]]:
         ("scheduler", "Scheduler", check_scheduler),
         ("twitch_poll", "Twitch-Abfrage", lambda: check_twitch_poll(db)),
         ("dolibarr_sync", "Dolibarr-Abgleich", lambda: check_dolibarr_sync(db)),
+        ("client_ip", "Besucher-Adresse", lambda: check_client_ip(db)),
     ]
 
 
