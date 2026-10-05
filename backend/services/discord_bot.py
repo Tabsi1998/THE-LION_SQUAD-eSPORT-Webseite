@@ -738,6 +738,19 @@ class BotRunner:
                 if not role.is_default() and not getattr(role, "managed", False)]
         return {"ok": True, "roles": rows}
 
+    def role_id(self, name: str | None, guild_id: str | None = None) -> str | None:
+        """Die Kennung der Rolle mit diesem Namen auf einem Server (#629, Ping-Rollen) - ohne ``guild_id`` am
+        Hauptserver. Gibt es die Rolle dort nicht oder ist der Bot nicht verbunden, gibt es nichts zu erwähnen."""
+        if not name or self._client is None or not self.connected:
+            return None
+        guild = self._guild(guild_id=guild_id) if guild_id else self._guild()
+        if guild is None:
+            return None
+        for role in guild.roles:
+            if role.name == name and not role.is_default():
+                return str(role.id)
+        return None
+
     def _guild(self, view: dict | None = None, guild_id: str | None = None):
         """Der Hauptserver - oder, mit ``guild_id`` (#628), genau dieser Server (Termine auf Unterservern)."""
         client = self._client

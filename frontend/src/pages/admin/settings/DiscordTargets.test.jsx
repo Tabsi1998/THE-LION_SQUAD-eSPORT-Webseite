@@ -142,5 +142,13 @@ test("Meldungen mit Spielbezug haben eine Regel samt Vorschau, private keine", a
   await user.selectOptions(select, "both_full");
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { routing: { "tournament.live": "both_full" } }));
   expect(toastMock.success).toHaveBeenLastCalledWith("Regel gespeichert.");
+
+  // Spiel-Rolle anpingen (#629): ein Haken je Meldung mit Spielbezug, von Anfang an aus - Privates hat keinen.
+  const ping = screen.getByTestId("discord-ping-tournament.live");
+  expect(ping).not.toBeChecked();
+  expect(screen.queryByTestId("discord-ping-membership.application")).toBeNull();
+  await user.click(ping);
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/discord", { pings: { "tournament.live": true } }));
+  expect(toastMock.success).toHaveBeenLastCalledWith("Die Spiel-Rolle wird angepingt.");
 });
 

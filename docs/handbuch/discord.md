@@ -179,6 +179,15 @@ Erweitert → Entwicklermodus an → Rechtsklick auf den Kanal → „Kanal-ID k
 Wer einen Schalter einschaltet, bekommt **nicht das Archiv** in den Kanal – gemeldet wird nur, was
 ab dann erscheint.
 
+**Spiel-Rolle anpingen** (seit Oktober 2026): Bei Meldungen mit Spielbezug (Turniere, Fast Lap) steht
+unter der Regel ein Haken „Spiel-Rolle anpingen“. Ist er gesetzt, beginnt die Meldung mit der Rolle des
+Spiels, etwa „@CoD-Spieler“ – wer die Rolle trägt, bekommt eine Benachrichtigung. Von Anfang an ist er
+aus. Gepingt wird höchstens eine Rolle je Meldung, immer die des Hauptspiels (ein MW3-Turnier ruft die
+„CoD-Spieler“), nur an der vollen Meldung – der kurze Querverweis am Hauptserver pingt nie – und nie in
+einem privaten Kanal. Gibt es die Rolle auf einem Server nicht, geht die Meldung ohne Ping hinaus.
+Damit Discord wirklich benachrichtigt, muss die Rolle „erwähnbar“ sein (Servereinstellungen → Rollen);
+Rollen, die der Bot anlegt, sind es.
+
 ### 2.6 Prüfen
 
 - **Reiter „Meldungen“ → „Vorschau: so sehen die Meldungen aus“** zeigt jede Meldungsart so, wie sie
