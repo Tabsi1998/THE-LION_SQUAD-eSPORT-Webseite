@@ -37,12 +37,14 @@ class FakeBot:
         self.deleted: set[str] = set()
         self.counter = 0
 
-    async def send_embed(self, channel_id, embed, buttons=None):
+    async def send_embed(self, channel_id, embed, buttons=None, files=None):
+        self.files = getattr(self, 'files', []) + [(channel_id, name, len(data)) for name, data in files or []]
         self.counter += 1
         self.sent.append({"channel_id": channel_id, "embed": embed})
         return {"ok": True, "message_id": f"m{self.counter}", "channel_id": channel_id}
 
-    async def edit_embed(self, channel_id, message_id, embed, buttons=None):
+    async def edit_embed(self, channel_id, message_id, embed, buttons=None, files=None):
+        self.files = getattr(self, 'files', []) + [(channel_id, name, len(data)) for name, data in files or []]
         if message_id in self.deleted:
             return {"ok": False, "reason": "unknown_message"}
         self.edited.append({"channel_id": channel_id, "message_id": message_id, "embed": embed})
@@ -176,3 +178,26 @@ async def test_sweep_full_covers_live_and_ended_and_private_tournaments_stay_out
     await flow.db.tournaments.insert_one({"id": "t3", "slug": "cup3", "title": "Ohne Kanal", "status": "live", "is_public": True, "visibility": "public"})
     missing = await discord_bracket.refresh(flow.db, "t3")
     assert missing["reason"] == "channel_missing" and "Kanal" in missing["error"]
+
+
+@pytest.mark.asyncio
+async def test_the_whole_tree_hangs_on_the_message_as_an_image(flow, bot):
+    """#575: Das Bracket kommt als Bild an die Nachricht (``attachment://bracket.png``); gleicher Baum, kein neues Bild -
+    eine korrigierte frühere Runde bringt eins, auch wenn die Felder (nur die aktuelle Runde) gleich bleiben."""
+    await configure(flow)
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(2, 1))})
+    await flow.db.matches_v2.update_one({"id": "b"}, {"$set": match("b", 1, 2, "r3", "r4", status="completed", score=(0, 2))})
+    t0 = now_utc()
+    posted = await discord_bracket.refresh(flow.db, "t1", now=t0)
+    assert posted["reason"] == "posted" and bot.sent[-1]["embed"]["image"] == {"url": "attachment://bracket.png"}
+    assert len(bot.files) == 1 and bot.files[0][:2] == (EVENTS_CHANNEL, "bracket.png") and bot.files[0][2] > 1000
+    assert (await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=2)))["reason"] == "unchanged" and len(bot.files) == 1
+
+    # Ergebnis in Runde 1 korrigiert: die Felder zeigen schon Runde 2, das Bild aber den ganzen Baum - also neu.
+    await flow.db.matches_v2.update_one({"id": "a"}, {"$set": match("a", 1, 1, "r1", "r2", status="completed", score=(3, 1))})
+    corrected = await discord_bracket.refresh(flow.db, "t1", now=t0 + timedelta(minutes=4))
+    assert corrected["reason"] == "edited" and len(bot.files) == 2
+
+    # Nur Tabellen: kein Bild, die Einbettung bleibt Text.
+    raw, image = await discord_bracket.build_with_image(flow.db, {"id": "leer", "title": "Leer"})
+    assert image is None and "image_signature" not in raw

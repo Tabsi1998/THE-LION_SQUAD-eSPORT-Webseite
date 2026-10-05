@@ -28,11 +28,11 @@ class FakeDiscord:
         self.edited: list[dict] = []
         self.dms: list[dict] = []
 
-    async def send_embed(self, channel_id, embed, buttons=None):
+    async def send_embed(self, channel_id, embed, buttons=None, files=None):
         self.sent.append({"channel_id": channel_id, "embed": embed, "buttons": buttons})
         return {"ok": True, "message_id": f"m{len(self.sent)}", "channel_id": channel_id}
 
-    async def edit_embed(self, channel_id, message_id, embed, buttons=None):
+    async def edit_embed(self, channel_id, message_id, embed, buttons=None, files=None):
         self.edited.append({"channel_id": channel_id, "message_id": message_id, "embed": embed, "buttons": buttons})
         return {"ok": True, "message_id": message_id}
 
