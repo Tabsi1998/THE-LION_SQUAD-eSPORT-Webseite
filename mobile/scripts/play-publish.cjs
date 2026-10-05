@@ -22,7 +22,10 @@ const SCOPE = "https://www.googleapis.com/auth/androidpublisher";
 const DEFAULT_TOKEN_URI = "https://oauth2.googleapis.com/token";
 // Die Play Console nennt den ersten geschlossenen Test „Alpha“ (Track „alpha“); weitere
 // geschlossene Tracks tragen den Namen, den man ihnen dort gibt - der geht als --play=<name>.
-const TRACK_ALIASES = { internal: "internal", intern: "internal", closed: "alpha", geschlossen: "alpha", alpha: "alpha", beta: "beta" };
+// Nur der offene Test (#925, Entscheidung 05.10.): jeder Build geht dorthin, die Produktion gibt der Betreiber frei.
+// Bei Google heißt der offene Test „beta“; interner und geschlossener Test sind abgeschaltet.
+const OPEN_TRACK = "beta";
+const TRACK_ALIASES = { open: OPEN_TRACK, offen: OPEN_TRACK, offener: OPEN_TRACK, "offener-test": OPEN_TRACK, beta: OPEN_TRACK };
 const RELEASE_NOTES_LIMIT = 500;
 
 /** Der JSON-Schlüssel des Dienstkontos; null, wenn die Datei fehlt. Der Inhalt wird nie ausgegeben. */
@@ -99,14 +102,15 @@ function client({ token, packageName, fetch = globalThis.fetch }) {
   };
 }
 
-/** Der Track-Name für die API; Produktion wird abgelehnt. */
+/** Der Track-Name für die API: immer der offene Test; Produktion und alle anderen Tests werden abgelehnt. */
 function resolveTrack(requested) {
-  const key = String(requested || "internal").trim().toLowerCase();
-  if (!key) return "internal";
+  const key = String(requested || "").trim().toLowerCase();
+  if (!key) return OPEN_TRACK;
   if (key === "production" || key === "produktion") {
     throw new Error("Produktion lädt dieses Skript nicht: die Freigabe an alle klickt der Betreiber selbst in der Play Console.");
   }
-  return TRACK_ALIASES[key] || key;
+  if (TRACK_ALIASES[key]) return TRACK_ALIASES[key];
+  throw new Error(`Nur der offene Test („--play“): interner, geschlossener und eigene Test-Tracks sind abgeschaltet (Entscheidung 05.10., #925) – „${requested}“ geht nicht.`);
 }
 
 /** Nur lesen: Edit anlegen, Tracks abfragen, Edit wieder verwerfen. Zeigt, ob das Dienstkonto die App sehen darf. */
@@ -126,7 +130,26 @@ async function checkAccess({ account, packageName, fetch }) {
 function trackNotes(notes) {
   const text = String(notes || "").trim();
   if (!text) return [];
-  return [{ language: "de-DE", text: text.length > RELEASE_NOTES_LIMIT ? `${text.slice(0, RELEASE_NOTES_LIMIT - 1)}…` : text }];
+  return [{ language: "de-DE", text: fitNotes(text, RELEASE_NOTES_LIMIT) }];
+}
+
+/**
+ * Kürzen ohne Wortbruch (#924): ganze Punkte, solange sie passen; der Rest fällt weg. Ist schon der erste Punkt
+ * zu lang, endet er am letzten Satzende - sonst am letzten Wort mit „…“.
+ */
+function fitNotes(text, limit) {
+  if (text.length <= limit) return text;
+  const kept = [];
+  for (const line of text.split("\n")) {
+    if ([...kept, line].join("\n").length > limit) break;
+    kept.push(line);
+  }
+  if (kept.length) return kept.join("\n").trim();
+  const head = text.slice(0, limit);
+  const sentence = head.lastIndexOf(". ");
+  if (sentence >= limit / 2) return head.slice(0, sentence + 1);
+  const space = head.lastIndexOf(" ", limit - 2);
+  return `${head.slice(0, space > 0 ? space : limit - 1).trimEnd()}…`;
 }
 
 /**
@@ -157,6 +180,7 @@ async function publishBundle({ account, packageName, aabPath, mappingPath, versi
 module.exports = {
   API,
   DEFAULT_TOKEN_URI,
+  OPEN_TRACK,
   RELEASE_NOTES_LIMIT,
   SCOPE,
   TRACK_ALIASES,
@@ -165,6 +189,7 @@ module.exports = {
   assertion,
   checkAccess,
   client,
+  fitNotes,
   loadServiceAccount,
   publishBundle,
   resolveTrack,

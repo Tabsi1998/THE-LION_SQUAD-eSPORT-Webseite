@@ -9,7 +9,7 @@ Einfügen. Vorschläge lassen sich hier ändern; die Play Console zeigt nur, was
 | Baustein | Stand |
 | --- | --- |
 | App Bundle (AAB) | `npm run release:local -- --aab` baut es mit dem Upload-Schlüssel (Play App Signing), siehe `mobile/RELEASES.md` |
-| Bundle in den Test-Track laden | `npm run release:local -- --play` (intern) bzw. `--play=closed`, sobald das Dienstkonto eingerichtet ist (#412, Abschnitt in `mobile/RELEASES.md`) |
+| Bundle in den offenen Test laden | `npm run release:local -- --play`, sobald das Dienstkonto eingerichtet ist (#412, Abschnitt in `mobile/RELEASES.md`). Interner und geschlossener Test sind abgeschaltet (#925) |
 | Absturzberichte | Firebase Crashlytics, ohne Nutzerkennung (#219 Teil 2) |
 | Datenschutzerklärung | `https://lionsquad.at/privacy` hat den Abschnitt „LionsAPP“: Push, Absturzberichte, App-Sperre, Konto löschen – er entsteht aus den Einstellungen und braucht keinen Zusatztext |
 | Konto löschen in der App | Profil → „Konto löschen“ (#390); Google verlangt das bei Registrierung in der App |
@@ -125,8 +125,9 @@ erlaubt die Berechtigung dafür nur App-Stores). Die APK am GitHub-Release ist n
 Play – Download im Browser, der Vorstand schickt den Link.
 
 1. PR mit Version, Build-Zähler und Changelog-Abschnitt mergen (siehe `mobile/RELEASES.md`).
-2. `npm run release:local -- --play` (intern) oder `--play=closed`: GitHub-Release, APK an den Vereinsserver, Bundle in den Track. Ohne Dienstkonto: `--aab` und das Bundle aus `mobile/builds/` in der Console hochladen.
-3. Versionshinweise stehen im Track (aus dem Changelog, bis 500 Zeichen); Tester bekommen das Update über den Play Store.
+2. `npm run release:local -- --play`: GitHub-Release, APK an den Vereinsserver, Bundle samt R8-Zuordnung in den **offenen Test**. Ohne Dienstkonto: `--aab`, dann in der Console „Testen und veröffentlichen“ → „Testen“ → „Offener Test“ → „Neuen Release erstellen“, das Bundle aus `mobile/builds/` hochladen und die Zuordnung (`…aab.mapping.txt`) im App-Bundle-Explorer unter „Downloads“ ergänzen. Interner und geschlossener Test fallen weg (Entscheidung 05.10., #925).
+3. Versionshinweise stehen im Track (aus dem Changelog, ganze Punkte bis 500 Zeichen); Tester bekommen das Update über den Play Store. In die Produktion gibt der Betreiber frei, wann er will.
+   Wer die App aus Google Play hat, bekommt Updates nur über Google Play – die App zeigt dann keinen eigenen Hinweis (#926).
 4. Für 1.0.0: Version ohne `-beta`, Produktion in der Console freigeben.
 
 ## Checkliste für den Betreiber

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 - 2026-10-05
+
+- Mobile: Aus Google Play installiert, kommen Updates nur noch über Google Play – kein eigenes Update-Fenster mehr, auch wenn unser Server einen neuen Build schon kennt (#926).
+
 ## 1.2.0 - 2026-10-05
 
 - Mobile: Ohne Konto gleich hinein: Die App startet auf der Startseite mit allem Öffentlichen. Beim ersten Start kommt nach ein paar Sekunden einmal der Hinweis zum Anmelden, unter „Mehr“ steht „Anmelden oder registrieren“, und nach dem Anmelden geht es zurück, wo du warst (#918).

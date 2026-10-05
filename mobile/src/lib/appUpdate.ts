@@ -95,6 +95,17 @@ export function decideUpdate(info: AppVersionInfo | null | undefined, snoozedBui
   return { show: true, mandatory, release };
 }
 
+/**
+ * Ob unser eigener Update-Hinweis erscheint (#926): nie für eine App aus Google Play - dort kommt jedes Update über
+ * Googles eigenen Dialog, sobald Play es anbietet; der Vereinsserver kennt einen neuen Build oft früher als Play.
+ * Solange die Quelle noch nicht feststeht, auch nicht - sonst blitzt der Hinweis bei Play-Installationen kurz auf.
+ * Nur die Server-APK (`sideload`) und Geräte ohne erkennbare Quelle (`unknown`) bekommen ihn.
+ */
+export function showOwnUpdateHint(decision: UpdateDecision, source: InstallSource | null | undefined, whatsNewOpen = false): boolean {
+  if (!decision.show || !decision.release || whatsNewOpen) return false;
+  return source === "sideload" || source === "unknown";
+}
+
 export function releaseTitle(release: AppRelease) {
   return `Build ${release.build} ist da – v${release.version}`;
 }

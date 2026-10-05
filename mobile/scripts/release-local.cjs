@@ -7,8 +7,8 @@
  *   npm run release:local                bauen, prüfen und das Release anlegen
  *   npm run release:local -- --upload-only  die zuletzt gebaute APK nur an den Vereinsserver schicken
  *   npm run release:local -- --aab       zusätzlich das App Bundle (.aab) für die Play Console bauen (#219)
- *   npm run release:local -- --play      … und das Bundle danach in den internen Test der Play Console laden (#412)
- *   npm run release:local -- --play=closed  … in den geschlossenen Test (bei Google „alpha“); jeder Track-Name geht, Produktion nie
+ *   npm run release:local -- --play      … und das Bundle danach in den offenen Test der Play Console laden (#412, #925);
+ *                                        interner und geschlossener Test sind abgeschaltet, Produktion klickt der Betreiber
  *
  * Schlüssel, Passwörter und google-services.json liegen außerhalb des Repos,
  * standardmäßig in %USERPROFILE%\.lionsapp-release (Einrichtung: RELEASES.md).
@@ -35,9 +35,9 @@ const buildsDir = path.join(mobileDir, "builds");
 const isWindows = process.platform === "win32";
 const flags = new Set(process.argv.slice(2));
 const mode = flags.has("--check") ? "check" : flags.has("--dry-run") ? "dry-run" : flags.has("--upload-only") ? "upload-only" : "release";
-// Bundle in den Play-Test-Track (#412): --play (intern) oder --play=closed; Produktion nie.
+// Bundle in den offenen Test (#412, #925): --play; andere Tracks und Produktion lehnt play-publish ab.
 const playFlag = [...flags].find((flag) => flag === "--play" || flag.startsWith("--play="));
-const playTrack = playFlag ? (playFlag.includes("=") ? playFlag.slice("--play=".length) : "internal") : "";
+const playTrack = playFlag ? (playFlag.includes("=") ? playFlag.slice("--play=".length) : "open") : "";
 // Die Play Console nimmt nur App Bundles; die APK bleibt für Sideload und den Vereinsserver (#219).
 const wantBundle = flags.has("--aab") || Boolean(playTrack);
 const releaseDir = process.env.LIONSAPP_RELEASE_DIR || path.join(os.homedir(), ".lionsapp-release");
@@ -542,7 +542,7 @@ async function main() {
   step("APK an den Vereinsserver schicken");
   const uploaded = await uploadToServer({ config, apkPath, apk, version, versionCode, changelog });
   if (playTrack) {
-    step(`App Bundle in den Play-Test-Track „${play.resolveTrack(playTrack)}“ laden`);
+    step(`App Bundle in den offenen Test der Play Console laden (Track „${play.resolveTrack(playTrack)}“)`);
     await publishToPlay({ account: playAccount, aabPath, mappingPath, version, versionCode, changelog });
   }
   return uploaded;

@@ -5,7 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import { AppUpdateBanner } from "../components/AppUpdateBanner";
 import { WhatsNewCard } from "../components/WhatsNewCard";
 import { api } from "../lib/api";
-import { decideUpdate, ownBuild, shouldCheck, SNOOZE_KEY, type AppVersionInfo } from "../lib/appUpdate";
+import { decideUpdate, ownBuild, shouldCheck, showOwnUpdateHint, SNOOZE_KEY, type AppVersionInfo } from "../lib/appUpdate";
 import { detectInstallSource, startPlayUpdate, type PlayUpdateState } from "../lib/installSource";
 import { currentWhatsNew, SEEN_BUILD_KEY, shouldShowWhatsNew } from "../lib/whatsnew";
 import { isGuestUser } from "../live";
@@ -108,7 +108,7 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
   const decision = decideUpdate(info, snoozed);
 
   // Play kennt schon ein Update: Googles Dialog einmal je Sitzung von selbst öffnen - bei Pflicht
-  // „sofort“, sonst im Hintergrund. Der Banner bleibt als zweiter Weg.
+  // „sofort“, sonst im Hintergrund. Eine App aus Google Play bekommt keinen eigenen Hinweis (#926).
   useEffect(() => {
     if (!play || play.source !== "play" || !play.updateAvailable || playDialogShown.current) return;
     playDialogShown.current = true;
@@ -121,11 +121,11 @@ export function AppUpdateProvider({ children }: { children: React.ReactNode }) {
     <AppUpdateContext.Provider value={value}>
       {children}
       <WhatsNewCard entry={entry} visible={whatsNewOpen} onClose={() => setWhatsNewOpen(false)} />
-      {decision.show && decision.release && !whatsNewOpen ? (
+      {/* Eigener Hinweis nur für die Server-APK und Geräte ohne Play (#926) - aus Google Play kommt nur Googles Dialog. */}
+      {decision.release && showOwnUpdateHint(decision, play?.source, whatsNewOpen) ? (
         <AppUpdateBanner
           release={decision.release}
           mandatory={decision.mandatory}
-          onStartPlayUpdate={play?.source === "play" ? (immediate) => startPlayUpdate(immediate && Boolean(play?.immediateAllowed)) : undefined}
           onLater={() => {
             setSnoozed(decision.release?.build ?? null);
             void writeNumber(SNOOZE_KEY, decision.release?.build ?? 0);

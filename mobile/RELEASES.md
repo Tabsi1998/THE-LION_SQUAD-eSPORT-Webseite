@@ -78,7 +78,7 @@ cd mobile
 npm run release:local -- --check     # zeigt, was fehlt
 npm run release:local -- --dry-run   # baut und prüft, veröffentlicht nichts
 npm run release:local                # baut, prüft und legt das Release an
-npm run release:local -- --play      # … und lädt das Bundle in den internen Test der Play Console (#412)
+npm run release:local -- --play      # … und lädt das Bundle in den offenen Test der Play Console (#412, #925)
 ```
 
 Das Skript geht so vor:
@@ -93,11 +93,12 @@ Das Skript geht so vor:
    signiert; Google signiert es beim Ausliefern mit dem App-Signaturschlüssel (Play App Signing) –
    dessen SHA-256 steht deshalb zusätzlich in `assetlinks.json` und beim Passkey-Login (#394).
 7. Mit `--play` lädt es das Bundle nach dem Release über die Google Play Developer API in den
-   **internen Test** der Play Console; `--play=closed` in den geschlossenen Test (bei Google
-   „alpha“), jeder andere Track-Name geht als `--play=<name>`. Produktion nie – die Freigabe an alle
-   klickt der Betreiber. `--play` schließt `--aab` ein. Versionshinweise kommen aus dem
-   Changelog-Abschnitt (bis 500 Zeichen). Scheitert der Upload, bleibt das GitHub-Release gültig;
-   das Skript endet mit Code 1 und nennt das Bundle unter `builds/` zum Hochladen von Hand.
+   **offenen Test** der Play Console (bei Google „beta“) – dazu die R8-Zuordnung als Deobfuskation.
+   Interner und geschlossener Test sind abgeschaltet (Entscheidung 05.10., #925), Produktion
+   sowieso: die Freigabe an alle klickt der Betreiber. `--play` schließt `--aab` ein.
+   Versionshinweise kommen aus dem Changelog-Abschnitt – ganze Punkte bis 500 Zeichen (#924).
+   Scheitert der Upload, bleibt das GitHub-Release gültig; das Skript endet mit Code 1 und nennt das
+   Bundle unter `builds/` zum Hochladen von Hand.
 
 **Hinweise der Play Console beim Hochladen (#393):** „Mit diesem App Bundle ist keine
 Offenlegungsdatei verknüpft“ ist reine Information – die App wird nicht verschleiert
@@ -203,6 +204,7 @@ Neueste oben.
 - `1.0.4`: Build 83, Adventkalender und Adventkranz in der App, Halloween-Fundstücke zählen aus der App, Katze wedelt an der Wurzel (Meilenstein Jahreszeiten II, #641, #637, #678)
 - `1.0.5`: Build 84, Schnee und Wetter in der App, Weihnachten mit Lichterkette und Gruß, Nikolausstiefel mit Sticker (Meilenstein Jahreszeiten II, #642, #771, #736)
 - `1.2.0`: Build 86, ohne Konto gleich hinein und Passkeys ohne eigenen Knopf, Abstimmung live, Ehrungen und Teilnahmen im Profil, Konten und einmalige Freigabe in „Meine Mitgliedschaft“, Feinschliff der Jahreszeiten; Release-Build mit R8 und ohne Hochkant-Sperre im Manifest (Meilensteine App 1.2.0, Vereinsmodul 1.5, #917, #918, #919)
+- `1.2.1`: Build 87, aus Google Play kommen Updates nur noch über Google Play – kein eigenes Update-Fenster (#926); Release-Skript nur noch offener Test (#925), Versionshinweise an Punktgrenzen (#924)
 - `1.1.0`: Build 85, Erfolge in der App (Abzeichen, Zeremonien, Reiter „Erfolge“, Schaukasten), Ostern und Ostereiersuche, Vereinsgeburtstag, Fasching, Discord im Mitgliederbereich, dazu der Inhalt der nie gebauten 1.0.6 (Silvester mit Skia, Winterhimmel, Töne nach Medienlautstärke) (Meilensteine Erfolge II, Jahreszeiten II und III, Discord V und VI, #623, #647)
 - `0.18.0-beta`: Build 78, Sticker und GIFs der Tastatur im Chat, Versammlungen und Abstimmungen, Konten verknüpfen (Meilenstein App 0.9.0-beta, #239)
 - `0.17.0-beta`: Build 77, Updates je nach Herkunft – Play-Installationen bekommen Googles Update-Dialog, Server-APK nur für Sideload (Meilenstein App 1.0.0, #421)
