@@ -8,7 +8,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "buildNumber": "86",
+      "buildNumber": "87",
       "bundleIdentifier": "at.lionsquad.app",
       "associatedDomains": [
         "webcredentials:lionsquad.at"
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "at.lionsquad.app",
-      "versionCode": 86,
+      "versionCode": 87,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

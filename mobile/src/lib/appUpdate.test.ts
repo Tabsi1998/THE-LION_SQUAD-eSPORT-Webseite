@@ -1,4 +1,4 @@
-import { channelLabel, decideUpdate, installPrompt, releaseChannel, releaseTitle, shouldCheck, type AppRelease } from "./appUpdate";
+import { channelLabel, decideUpdate, showOwnUpdateHint, installPrompt, releaseChannel, releaseTitle, shouldCheck, type AppRelease } from "./appUpdate";
 
 // Update aus der App (#250, #593): wann gefragt wird, wann der Banner erscheint, welche
 // Art (Beta oder Release) genannt wird. Den Download gibt es seit der Play-Fassung nicht mehr.
@@ -40,4 +40,19 @@ test("releaseChannel, channelLabel und installPrompt", () => {
   expect(installPrompt("beta", false)).toEqual({ title: "Testversion installieren?", message: expect.stringContaining("kann Fehler enthalten") });
   expect(installPrompt("release", true).message).toContain("Pflicht");
   expect(installPrompt("release", false).title).toBe("Release installieren?");
+});
+
+// Aus Google Play nur über Google Play (#926): der Server kennt neue Builds oft früher als Play.
+test("eigener Update-Hinweis nur für die Server-APK und Geräte ohne Play - nie für eine App aus Google Play", () => {
+  const info = { update_available: true, mandatory: false, current: { build: 87, version: "1.2.0", channel: "release" } } as never;
+  const decision = decideUpdate(info, null);
+  expect(decision.show).toBe(true);
+  expect(showOwnUpdateHint(decision, "play")).toBe(false);
+  expect(showOwnUpdateHint(decideUpdate({ ...(info as object), mandatory: true } as never, null), "play")).toBe(false);
+  expect(showOwnUpdateHint(decision, null)).toBe(false);
+  expect(showOwnUpdateHint(decision, undefined)).toBe(false);
+  expect(showOwnUpdateHint(decision, "sideload")).toBe(true);
+  expect(showOwnUpdateHint(decision, "unknown")).toBe(true);
+  expect(showOwnUpdateHint(decision, "sideload", true)).toBe(false);
+  expect(showOwnUpdateHint(decideUpdate(info, 87), "sideload")).toBe(false);
 });

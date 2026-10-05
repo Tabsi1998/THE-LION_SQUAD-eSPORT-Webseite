@@ -6,7 +6,7 @@ import path from "node:path";
 import test from "node:test";
 import play from "./play-publish.cjs";
 
-// Bundle in den Play-Test-Track (#412): geprüft wird ohne Google - ein nachgestelltes fetch
+// Bundle in den offenen Test (#412, #925): geprüft wird ohne Google - ein nachgestelltes fetch
 // hält jede Anfrage fest. Was hier zählt: ein gültig signiertes JWT, die richtige Reihenfolge
 // (Edit → Bundle → Track → Commit), Build und Versionshinweise im Track, kein Weg nach Produktion,
 // und dass ein gescheiterter Edit verworfen wird.
@@ -77,14 +77,14 @@ test("der Zugangstoken kommt per JWT-Bearer; ohne Token steht Googles Grund in d
 test("Bundle hochladen: Edit, Bundle als Rohdaten, Track mit Build und Hinweisen, Commit - jeweils mit dem Token", async () => {
   const { fetch, calls } = fakeFetch();
   const aabPath = await bundleFile();
-  const result = await play.publishBundle({ account, packageName: PACKAGE, aabPath, versionCode: 78, track: "internal", notes: "- Sticker der Tastatur im Chat\n- GIF bleibt GIF", fetch });
+  const result = await play.publishBundle({ account, packageName: PACKAGE, aabPath, versionCode: 78, notes: "- Sticker der Tastatur im Chat\n- GIF bleibt GIF", fetch });
 
-  assert.deepEqual(result, { editId: "edit-1", track: "internal", versionCode: 78 });
+  assert.deepEqual(result, { editId: "edit-1", track: "beta", versionCode: 78 });
   const routes = calls.slice(1).map((call) => `${call.method} ${call.url.replace(play.UPLOAD_API, "upload:").replace(play.API, "")}`);
   assert.deepEqual(routes, [
     `POST /applications/${PACKAGE}/edits`,
     `POST upload:/applications/${PACKAGE}/edits/edit-1/bundles?uploadType=media`,
-    `PUT /applications/${PACKAGE}/edits/edit-1/tracks/internal`,
+    `PUT /applications/${PACKAGE}/edits/edit-1/tracks/beta`,
     `POST /applications/${PACKAGE}/edits/edit-1:commit`,
   ]);
   for (const call of calls.slice(1)) assert.equal(call.headers.Authorization, "Bearer tok-1");
@@ -95,16 +95,21 @@ test("Bundle hochladen: Edit, Bundle als Rohdaten, Track mit Build und Hinweisen
   assert.equal(upload.body.toString(), "PK\u0003\u0004 nicht wirklich ein Bundle");
 
   assert.deepEqual(JSON.parse(calls[3].body), {
-    track: "internal",
+    track: "beta",
     releases: [{ versionCodes: ["78"], status: "completed", releaseNotes: [{ language: "de-DE", text: "- Sticker der Tastatur im Chat\n- GIF bleibt GIF" }] }],
   });
 });
 
-test("geschlossener Test heißt bei Google „alpha“; Produktion wird abgelehnt, ein eigener Track-Name geht durch", () => {
-  assert.equal(play.resolveTrack(undefined), "internal");
-  assert.equal(play.resolveTrack("closed"), "alpha");
-  assert.equal(play.resolveTrack("Geschlossen"), "alpha");
-  assert.equal(play.resolveTrack("mitglieder-test"), "mitglieder-test");
+// Nur der offene Test (#925): bei Google „beta“; interner, geschlossener und eigene Tracks sind abgeschaltet.
+test("--play heißt offener Test; interner, geschlossener, eigener Track und Produktion werden abgelehnt", () => {
+  assert.equal(play.resolveTrack(undefined), "beta");
+  assert.equal(play.resolveTrack(""), "beta");
+  assert.equal(play.resolveTrack("open"), "beta");
+  assert.equal(play.resolveTrack("Offen"), "beta");
+  assert.equal(play.resolveTrack("beta"), "beta");
+  for (const track of ["internal", "intern", "closed", "Geschlossen", "alpha", "mitglieder-test"]) {
+    assert.throws(() => play.resolveTrack(track), /Nur der offene Test/);
+  }
   assert.throws(() => play.resolveTrack("production"), /Produktion/);
   assert.throws(() => play.resolveTrack("Produktion"), /Produktion/);
 });
@@ -112,7 +117,7 @@ test("geschlossener Test heißt bei Google „alpha“; Produktion wird abgelehn
 test("trägt das Bundle einen anderen Build, wird der Edit verworfen und nichts bestätigt", async () => {
   const { fetch, calls } = fakeFetch({ [`POST /applications/${PACKAGE}/edits/edit-1/bundles`]: reply(200, { versionCode: 77 }) });
   const aabPath = await bundleFile();
-  await assert.rejects(play.publishBundle({ account, packageName: PACKAGE, aabPath, versionCode: 78, track: "internal", fetch }), /Build 77, erwartet war 78/);
+  await assert.rejects(play.publishBundle({ account, packageName: PACKAGE, aabPath, versionCode: 78, fetch }), /Build 77, erwartet war 78/);
   const routes = calls.map((call) => `${call.method} ${call.url.replace(play.API, "")}`);
   assert.equal(routes.includes(`DELETE /applications/${PACKAGE}/edits/edit-1`), true);
   assert.equal(routes.some((route) => route.endsWith(":commit")), false);
@@ -134,12 +139,21 @@ test("die Prüfung liest nur: Tracks abfragen und den Edit wieder verwerfen", as
   ]);
 });
 
-test("Versionshinweise: leer bleibt leer, zu lang wird auf 500 Zeichen gekürzt", () => {
+test("Versionshinweise: leer bleibt leer, zu lang wird an Punktgrenzen gekürzt - nie mitten im Wort (#924)", () => {
   assert.deepEqual(play.trackNotes(""), []);
   assert.deepEqual(play.trackNotes("- Neu"), [{ language: "de-DE", text: "- Neu" }]);
-  const long = play.trackNotes("x".repeat(600));
-  assert.equal(long[0].text.length, play.RELEASE_NOTES_LIMIT);
-  assert.equal(long[0].text.endsWith("…"), true);
+  const items = Array.from({ length: 8 }, (_, index) => `- Punkt ${index + 1}: ${"Wort ".repeat(18).trim()}.`);
+  const fitted = play.trackNotes(items.join("\n"))[0].text;
+  assert.ok(fitted.length <= play.RELEASE_NOTES_LIMIT);
+  assert.deepEqual(fitted.split("\n"), items.slice(0, fitted.split("\n").length), "nur ganze Punkte");
+  assert.equal(fitted.endsWith("."), true);
+  // Ein einzelner überlanger Punkt endet am Satzende, ohne Satzende am Wort.
+  const sentences = `- ${"Das ist ein Satz mit Inhalt. ".repeat(30).trim()}`;
+  assert.equal(play.fitNotes(sentences, 500).endsWith("Inhalt."), true);
+  assert.ok(play.fitNotes(sentences, 500).length <= 500);
+  const words = play.fitNotes(`- ${"Wort ".repeat(200)}`, 500);
+  assert.equal(words.endsWith("Wort…"), true);
+  assert.ok(words.length <= 500);
 });
 
 test("Dienstkonto-Datei: fehlt → null, ohne Schlüssel → klare Meldung, sonst E-Mail, Schlüssel und Token-Adresse", async () => {
@@ -164,14 +178,14 @@ test("mit R8-Zuordnung (#917): nach dem Bundle geht mapping.txt als Deobfuskatio
   const aabPath = await bundleFile();
   const mappingPath = `${aabPath}.mapping.txt`;
   await writeFile(mappingPath, "at.lionsquad.app.MainActivity -> a.b:\n");
-  await play.publishBundle({ account, packageName: PACKAGE, aabPath, mappingPath, versionCode: 78, track: "internal", fetch });
+  await play.publishBundle({ account, packageName: PACKAGE, aabPath, mappingPath, versionCode: 78, fetch });
 
   const routes = calls.slice(1).map((call) => `${call.method} ${call.url.replace(play.UPLOAD_API, "upload:").replace(play.API, "")}`);
   assert.deepEqual(routes, [
     `POST /applications/${PACKAGE}/edits`,
     `POST upload:/applications/${PACKAGE}/edits/edit-1/bundles?uploadType=media`,
     `POST upload:/applications/${PACKAGE}/edits/edit-1/apks/78/deobfuscationFiles/proguard?uploadType=media`,
-    `PUT /applications/${PACKAGE}/edits/edit-1/tracks/internal`,
+    `PUT /applications/${PACKAGE}/edits/edit-1/tracks/beta`,
     `POST /applications/${PACKAGE}/edits/edit-1:commit`,
   ]);
   assert.equal(calls[3].headers["Content-Type"], "application/octet-stream");
