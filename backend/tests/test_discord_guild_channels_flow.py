@@ -156,7 +156,10 @@ async def test_channel_list_per_server_and_preview_per_server(flow, posted, monk
 def test_every_send_to_caller_names_its_server_or_means_the_main_server():
     """Jeder Aufrufer von send_to ist hier gezählt - ein neuer muss sagen, welchen Server er meint (#625)."""
     expected = {
-        "discord_service.py": 3,          # send_event reicht guild_id durch; send_discord und send_ops_discord meinen den Hauptserver
+        # send_event: ausdrücklicher Server oder Thread; nach der Regel (#627) Spielserver oder Hauptserver, Querverweis,
+        # voll am Hauptserver; send_discord und send_ops_discord meinen den Hauptserver.
+        "discord_service.py": 6,
+        "services/discord_threads.py": 1,  # Querverweis im Turnier-Thread am Hauptserver (#627)
         "routes/settings_routes.py": 2,   # erneut senden (guild_id aus dem Log), Test je Ziel (Hauptserver)
         "services/discord_guilds.py": 1,  # Test am Hauptserver (Unterserver gehen direkt in den Systemkanal)
         "services/discord_samples.py": 1, # Vorschau-Test in den Testkanal des Hauptservers

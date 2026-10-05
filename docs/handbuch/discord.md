@@ -362,7 +362,7 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
 
 | | Hauptserver | Unterserver |
 | --- | --- | --- |
-| Meldungen (News, Events, Turniere …) | ja | **heute noch nicht** – siehe 5.4 |
+| Meldungen (News, Events, Turniere …) | ja | **mit Spielbezug** – je Meldung einstellbar, siehe 5.4 |
 | Private Kanäle (Mitglieder, Vorstand, Betrieb, Test) | ja | gibt es dort nie |
 | Einbettungen und Discord-Termine | ja | nein |
 | Rollen Mitglied/Vorstand/Turnierleitung | ja | nein |
@@ -378,8 +378,8 @@ Ein Bot kann auf beliebig vielen Servern sein – **ein zweiter Bot ist nie nöt
    - Haken **„an“** setzen. Erst dann erscheint er irgendwo.
    - **Einladungslink:** „Erzeugen“ lässt den Bot einen unbegrenzt gültigen Link anlegen; ein
      eigener Link geht auch.
-   - **Kanäle auf diesem Server:** Community, News, Events und Turniere – für die Meldungen, sobald
-     es sie gibt (5.4).
+   - **Kanäle auf diesem Server:** Community, News, Events und Turniere – für die Meldungen mit
+     Spielbezug (5.4).
    - **Notiz** – wofür der Server ist.
 3. **„Prüfen“:** Bot da? Welche Rechte fehlen – in Worten mit Klickweg.
 4. **„Test“:** schreibt in den Systemkanal des Servers – öffentlich, darum mit Rückfrage.
@@ -402,12 +402,31 @@ sichtbar und bekommt nichts mehr.
   eigenen Spielen passen.
 - Ausgeschaltete Server erscheinen nirgends.
 
-### 5.4 Meldungen auf Unterservern – noch nicht
+### 5.4 Meldungen auf Unterservern
 
-Heute gehen **alle** automatischen Meldungen an den **Hauptserver**. Dass ein Turnier in
-Rocket League seine Meldungen auf dem Rocket-League-Server bekommt (mit Verweis am Hauptserver,
-je Ereignisart einstellbar), ist der nächste Schritt: **Issue #627 „Versand je Spiel“**. Bis dahin
-könnt ihr die Kanäle der Unterserver schon wählen – sie werden dann sofort genutzt.
+Eine Meldung mit **Spielbezug** – ein Turnier, sein Live-Stream, eine Fast-Lap-Challenge, ein Event
+oder eine News mit Spiel – kann auf den Server des Spiels gehen. Welcher das ist, steht beim Spiel
+(5.2). Was genau passiert, stellt ihr **je Meldung** ein: **Reiter „Meldungen“ → „Was gemeldet
+wird“**, unter dem Schalter steht die Regel.
+
+| Regel | Spielserver | Hauptserver |
+| --- | --- | --- |
+| **Spielserver + Querverweis** (Vorgabe mit Spielbezug) | die volle Meldung | ein kurzer Querverweis: Titel, ein Satz, Knöpfe „Zum Server …“ und „Beitreten“ |
+| Spielserver und Hauptserver | voll | voll |
+| nur Spielserver | voll | nichts |
+| nur Hauptserver (Vorgabe ohne Spielbezug) | nichts | voll |
+
+- Unter jeder Auswahl steht, wohin es geht, z. B. „geht an: CoD-Server (Events und Turniere),
+  Hauptserver (Querverweis)“.
+- Der **Querverweis** enthält nie den vollen Inhalt. Der Knopf zur Nachricht öffnet nur, wer auf
+  beiden Servern ist; darum steht immer auch „Beitreten“ dabei.
+- Hat das Spiel keinen eigenen Server, ist der Server aus, verlassen oder hat er keinen Kanal für
+  die Meldung, geht sie **voll an den Hauptserver**. Scheitert der Versand am Spielserver, ebenso –
+  statt eines Verweises ins Leere.
+- **Private Meldungen** (Mitglieder, Vorstand, Betrieb, Test) gehen immer nur an den Hauptserver;
+  dafür gibt es keine Auswahl.
+- Im **Versandprotokoll** (Admin → Betrieb & Logs → Ereignisse) steht je Discord-Meldung der Server,
+  ab zwei Servern mit Filter.
 
 ---
 
@@ -431,7 +450,7 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 | Befehle erscheinen nicht | nur am Hauptserver; Einladung ohne `applications.commands` | Bot mit dem Link aus dem Reiter „Server“ neu einladen |
 | Direktnachrichten kommen nicht an | Datenschutz-Einstellung der Person | Discord → Einstellungen → Datenschutz → „Direktnachrichten von Servermitgliedern erlauben“ |
 | Auf der Website keine Discord-Zahl | Server-Widget aus, oder niemand online | Servereinstellungen → Widget → aktivieren; „Jetzt prüfen“ |
-| Unterserver bekommt keine Meldungen | heute so vorgesehen | 5.4 |
+| Unterserver bekommt keine Meldungen | Regel „nur Hauptserver“, Spiel ohne eigenen Server, Server aus oder ohne Kanal | Regel unter „Was gemeldet wird“, Spiel → „Discord-Server“, Kanäle im Reiter „Server“ (5.4) |
 | „Einladung erstellen“ scheitert | Recht „Einladung erstellen“ fehlt | Recht geben oder Link von Hand eintragen |
 
 ---

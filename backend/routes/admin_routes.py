@@ -362,6 +362,25 @@ HREFS = {
 SEVERITY_FILTERS = {"problem": {"error", "warn"}, "error": {"error"}, "warn": {"warn"}, "info": {"info"}, "success": {"success"}}
 
 
+async def _discord_guild_names(db) -> dict[str, str]:
+    """Servernamen für das Versand-Log (#627); der Hauptserver heißt so, auch wenn er umbenannt wurde."""
+    names = {}
+    async for row in db.discord_guilds.find({}, {"_id": 0, "guild_id": 1, "name": 1, "role": 1}):
+        names[str(row["guild_id"])] = f"{row.get('name') or row['guild_id']}{' (Hauptserver)' if row.get('role') == 'main' else ''}"
+    return names
+
+
+def _discord_log_line(row: dict, names: dict[str, str]) -> str:
+    """„Discord · Rocket League · Querverweis“ - der Server je Meldung (#627)."""
+    parts = ["discord"]
+    guild_id = str(row.get("guild_id") or "")
+    if guild_id:
+        parts.append(names.get(guild_id) or f"Server {guild_id}")
+    if row.get("crossref"):
+        parts.append("Querverweis")
+    return " · ".join(parts)
+
+
 def _since_iso_hours(hours: int) -> str:
     from datetime import timedelta
     return (now_utc() - timedelta(hours=int(hours))).isoformat() if hours else ""
@@ -403,14 +422,19 @@ async def _log_sources(db, safe_limit: int, *, since_iso: str = "") -> list[dict
     ]
 
     email_rows = await db.email_logs.find(since("created_at"), {"_id": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
+    guild_names = await _discord_guild_names(db) if any(row.get("channel") == "discord" for row in email_rows) else {}
     email_items = []
     for row in email_rows:
         status = row.get("status") or ""
         severity = "success" if status == "sent" else "error" if status == "failed" else "warn" if status == "skipped" else "info"
-        email_items.append(_log_item("email", "E-Mail-Versand", HREFS["email"], row, severity=severity, status=status,
-                                     title=row.get("template_key") or row.get("event_key") or row.get("subject") or "Versand",
-                                     subtitle=" · ".join(filter(None, [row.get("channel") or "email", row.get("to")])),
-                                     detail=row.get("error") or row.get("message_id") or "", time_keys=("created_at",)))
+        discord = row.get("channel") == "discord"
+        subtitle = _discord_log_line(row, guild_names) if discord else " · ".join(filter(None, [row.get("channel") or "email", row.get("to")]))
+        item = _log_item("email", "E-Mail-Versand", HREFS["email"], row, severity=severity, status=status,
+                         title=row.get("template_key") or row.get("event_key") or row.get("subject") or "Versand",
+                         subtitle=subtitle, detail=row.get("error") or row.get("message_id") or "", time_keys=("created_at",))
+        if discord:
+            item["guild_id"] = str(row.get("guild_id") or "")
+        email_items.append(item)
 
     queue_rows = await db.mail_jobs.find(since("created_at"), {"_id": 0, "html": 0}).sort("created_at", -1).limit(safe_limit).to_list(safe_limit)
     queue_items = []
@@ -511,9 +535,11 @@ async def admin_logs_overview(limit: int = Query(default=80, ge=1, le=200), me: 
 
 @router.get("/ops/events")
 async def ops_events(source: str = "all", severity: str = "all", hours: int = Query(default=168, ge=0, le=24 * 366), q: str = "",
-                     limit: int = Query(default=200, ge=1, le=500), format: str = "json", me: dict = Depends(require_area("system"))):
+                     limit: int = Query(default=200, ge=1, le=500), format: str = "json", guild: str = "",
+                     me: dict = Depends(require_area("system"))):
     """Ereignisse aller Quellen in einer Liste (#517 Teil 2): Filter nach Quelle, Schwere, Zeitraum und Text;
-    `format=csv` liefert dieselbe Auswahl als Datei. Zustand und Zähler je Quelle kommen mit."""
+    `format=csv` liefert dieselbe Auswahl als Datei. Zustand und Zähler je Quelle kommen mit. ``guild`` (#627):
+    nur Discord-Meldungen dieses Servers."""
     db = get_db()
     since_iso = _since_iso_hours(hours)
     sources = await _log_sources(db, _safe_log_limit(min(limit, 200)), since_iso=since_iso)
@@ -528,6 +554,8 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
             if severities and item.get("severity") not in severities:
                 continue
             if needle and needle not in " ".join(str(item.get(key) or "") for key in ("source_label", "title", "subtitle", "detail", "status")).lower():
+                continue
+            if guild and item.get("guild_id") != guild:
                 continue
             items.append(item)
     items.sort(key=lambda item: item.get("time") or "", reverse=True)
@@ -551,7 +579,9 @@ async def ops_events(source: str = "all", severity: str = "all", hours: int = Qu
             "problem_count": sum(source["problem_count"] for source in sources),
             "latest_at": max((source["latest_at"] for source in sources), default=""),
         },
-        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": q, "limit": limit},
+        "filters": {"source": sorted(wanted) or ["all"], "severity": severity, "hours": hours, "q": q, "limit": limit, "guild": guild},
+        # Server für den Filter (#627) - erst ab zwei Servern sinnvoll.
+        "guilds": [{"guild_id": guild_id, "name": name} for guild_id, name in sorted((await _discord_guild_names(db)).items(), key=lambda pair: pair[1].lower())],
     }
 
 

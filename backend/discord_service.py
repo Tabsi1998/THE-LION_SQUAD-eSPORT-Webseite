@@ -36,21 +36,22 @@ TARGET_LABELS = {
 # einschaltet; was es vor #300 schon gab, bleibt an. Turnier-Meldungen sind an - seit #572 stehen
 # sie im Thread des Turniers, der Kanal bleibt ruhig. Erfolge gehen seit #566 in keinen Kanal
 # mehr - die Person selbst bekommt die Gratulation (#568).
+# ``game``: die Meldung kann einen Spielbezug haben - dann gilt die Routing-Regel (#627, services/discord_routing.py).
 EVENTS = {
-    "news.published": {"target": "news", "label": "News veröffentlicht", "default": False},
-    "event.announced": {"target": "events", "label": "Event angekündigt", "default": False},
+    "news.published": {"target": "news", "label": "News veröffentlicht", "default": False, "game": True},
+    "event.announced": {"target": "events", "label": "Event angekündigt", "default": False, "game": True},
     # Nur für Mitglieder (#605): in den Mitgliederkanal; Internes an den Vorstand - ohne Text, nur Titel, Zeit, Ort.
     "news.members": {"target": "members", "label": "News für Mitglieder", "default": False},
     "event.members": {"target": "members", "label": "Event für Mitglieder", "default": False},
     "news.internal": {"target": "board", "label": "News intern (Vorstand)", "default": False},
     "event.internal": {"target": "board", "label": "Event intern (Vorstand)", "default": False},
-    "tournament.registration_open": {"target": "events", "label": "Turnier: Anmeldung offen", "default": True},
-    "tournament.check_in": {"target": "events", "label": "Turnier: Check-in offen", "default": True},
-    "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True},
-    "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True},
-    "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True},
-    "tournament.stream_live": {"target": "events", "label": "Turnier: Teilnehmer streamt", "default": True},
-    "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True},
+    "tournament.registration_open": {"target": "events", "label": "Turnier: Anmeldung offen", "default": True, "game": True},
+    "tournament.check_in": {"target": "events", "label": "Turnier: Check-in offen", "default": True, "game": True},
+    "tournament.live": {"target": "events", "label": "Turnier: jetzt live", "default": True, "game": True},
+    "tournament.completed": {"target": "events", "label": "Turnier: beendet", "default": True, "game": True},
+    "tournament.results_published": {"target": "events", "label": "Turnier: Ergebnisse veröffentlicht", "default": True, "game": True},
+    "tournament.stream_live": {"target": "events", "label": "Turnier: Teilnehmer streamt", "default": True, "game": True},
+    "f1.new_leader": {"target": "events", "label": "Fast Lap: neue Bestzeit", "default": True, "game": True},
     "membership.application": {"target": "board", "label": "Neuer Mitgliedsantrag", "default": False},
     "contact.request": {"target": "board", "label": "Neue Kontaktanfrage", "default": False},
     # Vereinsgeburtstag (#644): einmal im Jahr ab 10:00 am Gründungstag - öffentlich, ohne Personenbezug.
@@ -198,6 +199,8 @@ async def _get_discord_config() -> dict:
         "bot": bot_settings(s),
         "channels": {target: str(stored.get(target) or "").strip() for target in TARGETS},
         "events": {key: (s.get("events") or {}).get(event_field(key)) for key in EVENTS},
+        # Routing-Regel je Ereignis (#627); leer heißt Vorgabe.
+        "routing": {key: (s.get("routing") or {}).get(event_field(key)) for key in EVENTS},
     }
 
 
@@ -315,11 +318,12 @@ async def _send_embed(channel_id: str, *, title: str, description: str, color: i
 async def send_to(target: str, title: str, description: str = "", *, color: int = 0x29B6E8, url: str = None,
                   fields: list = None, image_url: str = None, event_key: str = "custom",
                   footer: str | None = None, test: bool = False, thread_id: str | None = None,
-                  buttons: list | None = None, guild_id: str | None = None) -> dict:
+                  buttons: list | None = None, guild_id: str | None = None, crossref_of: str | None = None) -> dict:
     """An ein Ziel senden. Öffentliche Ziele fallen auf Community zurück, private nie; ohne Bot gar nichts.
     ``thread_id`` (#572): in diesen Thread im Kanal des Ziels statt in den Kanal selbst.
     ``guild_id`` (#625): an diesen Server - ohne ist der Hauptserver gemeint. Ein Unterserver muss eingeschaltet sein
-    und kennt nur öffentliche Ziele; nie fällt etwas auf einen anderen Server zurück."""
+    und kennt nur öffentliche Ziele; nie fällt etwas auf einen anderen Server zurück.
+    ``crossref_of`` (#627): ein Querverweis am Hauptserver auf die Meldung dieses Spielservers - steht so im Log."""
     cfg = await _get_discord_config()
     guild = None
     if guild_id:
@@ -328,6 +332,14 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
     log = _new_log(event_key, title, resolved["target"], test=test)
     if guild_id:
         log["guild_id"] = str(guild_id)
+    else:
+        # Jede Meldung trägt ihren Server (#627) - ohne Angabe der Hauptserver, sobald es das Verzeichnis gibt.
+        main = await get_db().discord_guilds.find_one({"role": "main"}, {"_id": 0, "guild_id": 1})
+        if main:
+            log["guild_id"] = str(main["guild_id"])
+    if crossref_of:
+        log["crossref"] = True
+        log["crossref_guild_id"] = str(crossref_of)
     if resolved["fallback"]:
         log["wanted_target"] = target
     log["payload"] = _payload(title, description, color, url, fields, image_url, buttons)
@@ -356,16 +368,39 @@ async def send_to(target: str, title: str, description: str = "", *, color: int 
 
 async def send_event(event_key: str, title: str, description: str = "", *, item: dict | None = None,
                      color: int = 0x29B6E8, url: str = None, fields: list = None, image_url: str = None,
-                     thread_id: str | None = None, buttons: list | None = None, guild_id: str | None = None) -> dict:
-    """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle."""
+                     thread_id: str | None = None, buttons: list | None = None, guild_id: str | None = None,
+                     route: bool = True) -> dict:
+    """Ein benanntes Ereignis melden: Schalter, Ziel und die Grenze „privat nie öffentlich“ an einer Stelle.
+    Mit Spielbezug entscheidet die Routing-Regel (#627), welcher Server die Meldung voll bekommt und ob am
+    Hauptserver ein Querverweis steht. Ein ausdrücklicher Server, ein Thread oder ``route=False`` heißt: genau dorthin."""
     spec = EVENTS.get(event_key) or {"target": "community"}
     if not allowed_in_target(item, spec["target"]):
         return {"ok": False, "reason": "private_visibility"}
     cfg = await _get_discord_config()
     if not event_enabled(cfg, event_key):
         return {"ok": False, "reason": "event_disabled"}
-    return await send_to(spec["target"], title, description, color=color, url=url, fields=fields,
-                         image_url=image_url, event_key=event_key, thread_id=thread_id, buttons=buttons, guild_id=guild_id)
+    full = {"color": color, "url": url, "fields": fields, "image_url": image_url, "event_key": event_key, "buttons": buttons}
+    if guild_id or thread_id or not route:
+        return await send_to(spec["target"], title, description, thread_id=thread_id, guild_id=guild_id, **full)
+    from services import discord_routing
+
+    plan = await discord_routing.plan(get_db(), cfg, event_key, item, spec["target"])
+    game_guild = (plan["game"] or {}).get("guild_id")
+    sent = await send_to(spec["target"], title, description, guild_id=game_guild, **full)
+    if not game_guild:
+        return sent
+    main_kind = plan["main"]
+    if main_kind == "crossref" and not sent.get("ok") and sent.get("reason") in discord_routing.FALLBACK_REASONS:
+        main_kind = "full"  # der Spielserver nimmt nichts an: voll an den Hauptserver statt eines Verweises ins Leere
+    main = None
+    if main_kind == "crossref":
+        ref = discord_routing.crossref_message(title, url=url, server=plan["game"], game_name=plan["game_name"], sent=sent, color=color)
+        main = await send_to(spec["target"], ref["title"], ref["description"], color=color, url=url, event_key=event_key,
+                             footer=ref["footer"], buttons=ref["buttons"], crossref_of=game_guild)
+    elif main_kind == "full":
+        main = await send_to(spec["target"], title, description, **full)
+    primary = sent if sent.get("ok") or not (main and main_kind == "full" and main.get("ok")) else main
+    return {**primary, "routing": plan["rule"], "game_guild_id": game_guild, "main": main}
 
 
 async def send_discord(title: str, description: str = "", *,
@@ -402,12 +437,14 @@ async def target_status(db=None) -> dict:
     db = db if db is not None else get_db()
     cfg = await _get_discord_config()
     names = {str(row.get("id")): row.get("name") for row in ((await read_state(db)).get("channels") or []) if row.get("id")}
+    main_id = str(((await db.discord_guilds.find_one({"role": "main"}, {"_id": 0, "guild_id": 1})) or {}).get("guild_id") or "") or None
     status = {}
     for target in TARGETS:
         resolved = resolve_target(cfg, target)
         own = not resolved["fallback"] and bool(resolved["channel_id"])
         last = await db.email_logs.find_one(
-            {"channel": "discord", "target": target, "status": {"$in": ["sent", "failed"]}},
+            # Nur der Hauptserver (#627): Versand an Spielserver steht dort am Server-Eintrag.
+            {"channel": "discord", "target": target, "status": {"$in": ["sent", "failed"]}, "guild_id": {"$in": [None, main_id]}},
             {"_id": 0, "status": 1, "reason": 1, "error": 1, "event_key": 1, "created_at": 1, "channel_id": 1},
             # Gleicher Zeitpunkt (Versand und gleich danach der Thread, #572): der später gespeicherte gilt.
             sort=[("created_at", -1), ("_id", -1)],

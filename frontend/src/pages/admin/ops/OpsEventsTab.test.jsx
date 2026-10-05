@@ -49,3 +49,18 @@ test("die Quelle aus der Adresse gilt beim Laden (Umleitung der alten Audit-Seit
   render(<MemoryRouter initialEntries={["/admin/ops?tab=events&source=email"]}><OpsEventsTab /></MemoryRouter>);
   await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/ops/events", { params: expect.objectContaining({ source: "email" }) }));
 });
+
+// Versand-Routing (#627): ab zwei Discord-Servern lässt sich das Protokoll nach Server filtern, sonst gibt es den Filter nicht.
+test("Discord-Meldungen nach Server filtern, erst ab zwei Servern", async () => {
+  const user = userEvent.setup();
+  const { unmount } = render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalled());
+  expect(screen.queryByTestId("ops-events-guild")).toBeNull();
+  unmount();
+
+  apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, guilds: [{ guild_id: "111", name: "LION (Hauptserver)" }, { guild_id: "222", name: "CoD-Server" }] } });
+  render(<MemoryRouter initialEntries={["/admin/ops?tab=events"]}><OpsEventsTab /></MemoryRouter>);
+  await user.selectOptions(await screen.findByTestId("ops-events-guild"), "222");
+  await waitFor(() => expect(apiMock.get).toHaveBeenLastCalledWith("/admin/ops/events", { params: expect.objectContaining({ guild: "222" }) }));
+});
+
