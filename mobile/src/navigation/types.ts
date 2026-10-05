@@ -1,6 +1,9 @@
 import type { NavigatorScreenParams } from "@react-navigation/native";
 
-export type AuthStackParamList = {
+// Gast zuerst (#918): Die App startet ohne Konto. Anmelden und Registrieren liegen im Stapel über den Tabs - erreichbar aus
+// „Mehr“, dem Hinweis beim ersten Start und überall, wo man ein Konto braucht; danach geht es zurück, woher man kam.
+export type RootStackParamList = {
+  Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Login: undefined;
   Register: undefined;
 };

@@ -7,6 +7,8 @@ export function FormInput({ label, ...props }: TextInputProps & { label: string 
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        // Der Bildschirmleser nennt das Feld beim Namen (und Tests finden es so).
+        accessibilityLabel={label}
         {...props}
         placeholderTextColor={colors.muted}
         style={[styles.input, props.style]}

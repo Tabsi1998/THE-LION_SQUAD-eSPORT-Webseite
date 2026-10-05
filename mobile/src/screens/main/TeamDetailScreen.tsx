@@ -11,6 +11,8 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatStatus } from "../../lib/format";
+import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import type { Team, TeamSquad, User } from "../../types";
@@ -284,7 +286,15 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             {canManage ? <Pill label="Verwaltung aktiv" tone="success" /> : isMember ? <Pill label="Mitglied" /> : null}
           </View>
           <View style={styles.actionGrid}>
-            <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
+            {/* Gast zuerst (#918): Chat und Beitritt brauchen ein Konto - statt eines Fehlers gleich der Weg dorthin. */}
+            {isGuestUser(user) ? (
+              <>
+                <Muted>Team-Chat und Beitritt gibt es mit einem Konto.</Muted>
+                <Button label="Anmelden oder registrieren" onPress={() => openSignIn()} testID="team-sign-in" />
+              </>
+            ) : (
+              <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
+            )}
             {team.discord_link ? <Button label="Discord öffnen" variant="secondary" onPress={() => Linking.openURL(normalizeLink(team.discord_link)).catch(() => setError("Discord-Link konnte nicht geöffnet werden."))} /> : null}
             {canManage ? <Button label={editOpen ? "Bearbeitung schließen" : "Team bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} /> : null}
             {isMember && !isLeader ? <Button label="Team verlassen" variant="danger" disabled={busy} onPress={leave} /> : null}
@@ -312,7 +322,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {!isMember && user ? (
+        {!isMember && user && !isGuestUser(user) ? (
           <Card style={styles.card}>
             <Heading>Team beitreten</Heading>
             <Muted>Wenn du einen Join-Code vom Team erhalten hast, kannst du hier direkt beitreten.</Muted>

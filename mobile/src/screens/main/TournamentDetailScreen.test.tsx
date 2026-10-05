@@ -14,7 +14,10 @@ jest.mock("../../lib/api", () => ({
 // Ein festes Objekt: der Screen lädt neu, wenn sich `user` ändert - ein neues Objekt je Render wäre eine Endlosschleife.
 const mockAuth = { user: { id: "u-1", username: "paula" } };
 jest.mock("../../auth/AuthContext", () => ({ useAuth: () => mockAuth }));
-jest.mock("../../live", () => ({ isGuestUser: () => false }));
+const mockGuest = { value: false };
+jest.mock("../../live", () => ({ isGuestUser: () => mockGuest.value }));
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("../../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 jest.mock("../../seasons/anchors", () => ({ useSeasonOverlay: () => null, SeasonAnchor: ({ children }: { children?: React.ReactNode }) => children ?? null }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
@@ -40,6 +43,20 @@ function answer(tournament: Record<string, unknown>) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGuest.value = false;
+});
+
+// Gast zuerst (#918): statt „bitte einloggen“ gleich der Weg zum Konto - danach geht es zurück zu diesem Turnier.
+test("als Gast: „Anmelden oder registrieren“ statt der Anmeldung, kein Turnier-Chat", async () => {
+  mockGuest.value = true;
+  answer({ ...TOURNAMENT, event_gate: null, show_chat: true });
+  await render(<TournamentDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("tournament-sign-in")).toBeTruthy());
+  expect(screen.getByText("Teilnehmen kannst du mit einem Konto.")).toBeTruthy();
+  expect(screen.queryByText("Zum Turnier anmelden")).toBeNull();
+  expect(screen.queryByText("Turnier-Chat öffnen")).toBeNull();
+  await fireEvent.press(screen.getByTestId("tournament-sign-in"));
+  expect(mockOpenSignIn).toHaveBeenCalledTimes(1);
 });
 
 test("ohne Event-Anmeldung: der Hinweis und „Zuerst beim Event anmelden“ führen zum Event", async () => {

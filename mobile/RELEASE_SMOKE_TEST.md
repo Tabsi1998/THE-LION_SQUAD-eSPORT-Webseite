@@ -31,8 +31,16 @@ LionsAPP-BETA-v2.0.0-build55-<commit>.apk
 
 - APK auf echtem Android-Gerät installieren.
 - App startet ohne Crash.
-- Login mit Testkonto funktioniert.
-- Gastmodus funktioniert, falls kein Login genutzt wird.
+- Erster Start ohne Konto (#918): die App öffnet gleich die Startseite, kein Anmeldebildschirm. Nach
+  etwa 12 Sekunden kommt einmal „Schön, dass du da bist!“ – „Später“ schließt ihn, nach einem
+  Neustart kommt er nicht wieder.
+- Als Gast: „Mehr“ zeigt oben „Anmelden oder registrieren“ und keinen Block „Konto“; der Tab „Profil“
+  zeigt „Anmelden“ und „Konto erstellen“; ein Turnier zeigt „Anmelden oder registrieren“.
+- Login mit Testkonto über „Mehr“ funktioniert und führt zurück, woher man kam (etwa zum Turnier).
+- Passkey (#919): nach der Passwort-Anmeldung einmal „Nächstes Mal nur mit Fingerabdruck?“ –
+  „Passkey anlegen“ fragt nur den Fingerabdruck. Abmelden, „Anmelden“ öffnen: das Gerät bietet den
+  Passkey von selbst an. Unter Profil → Einstellungen → Passkeys steht er und lässt sich mit dem
+  Passwort entfernen.
 - Keine unerwartete Play-Protect- oder Debug-Signatur-Warnung außer normale Sideload-Hinweise.
 
 ## Pflicht-Screens

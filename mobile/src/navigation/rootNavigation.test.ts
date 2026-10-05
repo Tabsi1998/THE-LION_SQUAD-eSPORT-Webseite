@@ -1,4 +1,4 @@
-import { navigateToUrl, targetFromUrl } from "./rootNavigation";
+import { navigateToUrl, openSignIn, signInOpen, targetFromUrl } from "./rootNavigation";
 
 // Wohin eine Benachrichtigung führt. Seit #301 kommt „Erfolg freigeschaltet“ sofort – der Tipp
 // darauf soll bei den Erfolgen landen (#218).
@@ -11,6 +11,18 @@ jest.mock("@react-navigation/native", () => ({
 beforeEach(() => {
   mockRef.ready = false;
   mockRef.navigate.mockClear();
+});
+
+// Gast zuerst (#918): Anmelden und Registrieren von überall - vor dem Start der Navigation passiert nichts.
+test("openSignIn öffnet Anmelden oder Registrieren, sobald die Navigation steht", () => {
+  expect(openSignIn()).toBe(false);
+  expect(mockRef.navigate).not.toHaveBeenCalled();
+  mockRef.ready = true;
+  expect(openSignIn()).toBe(true);
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Login");
+  expect(openSignIn("Register")).toBe(true);
+  expect(mockRef.navigate).toHaveBeenLastCalledWith("Register");
+  expect(signInOpen()).toBe(false);
 });
 
 test("der Link einer Erfolgs-Benachrichtigung öffnet den Reiter Erfolge", () => {

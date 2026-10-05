@@ -954,9 +954,20 @@ async def mobile_login(body: UserLogin, request: Request):
     if _requires_admin_mfa(user):
         return await _create_mfa_login_challenge(db, user, request, "mobile")
     access, refresh = await _issue_mobile_session(db, user, request)
-    user = _public_user(user)
-    await _attach_membership(user)
-    return {"user": user, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+    public = _public_user(user)
+    await _attach_membership(public)
+    return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer",
+            "passkey_ticket": await _passkey_enroll_ticket(db, user["id"])}
+
+
+async def _passkey_enroll_ticket(db, user_id: str) -> str | None:
+    """Gerade mit Passwort angemeldet (#919): die App darf ohne neue Passworteingabe einen Passkey anlegen."""
+    from routes.passkey_routes import issue_enroll_ticket
+
+    try:
+        return await issue_enroll_ticket(db, user_id)
+    except Exception:  # noqa: BLE001 - ohne Ticket fragt die App beim Anlegen nach dem Passwort
+        return None
 
 
 @router.post("/mobile/refresh")
@@ -1212,7 +1223,8 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
         access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)
         public = _public_user(user)
         await _attach_membership(public)
-        return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}
+        return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer",
+                "passkey_ticket": await _passkey_enroll_ticket(db, user["id"])}
     await _issue_session(db, response, user, request, mfa_verified=True, remember=challenge.get("remember") is not False)
     public = _public_user(user)
     await _attach_membership(public)

@@ -1,5 +1,4 @@
-import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { BrandLogo } from "../../components/BrandLogo";
 import { Button } from "../../components/Button";
@@ -9,14 +8,18 @@ import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
-import { passkeyError, passkeysSupported } from "../../lib/passkeys";
-import type { AuthStackParamList } from "../../navigation/types";
+import { passkeyError, passkeysSupported, silentPasskeyMiss } from "../../lib/passkeys";
 import { colors } from "../../theme";
 
-type Props = NativeStackScreenProps<AuthStackParamList, "Login">;
+// Anmelden (#918, #919): die Seite erreicht man aus dem Mehr-Menü oder dem Hinweis beim ersten Start - die App selbst
+// läuft ohne Konto. Einen Passkey bietet die Seite beim Öffnen selbst an (Fingerabdruck oder Gesicht); gibt es keinen
+// oder bricht man ab, bleibt still das Formular. Nach der Anmeldung geht es zurück, woher man kam.
+
+type LoginNavigation = { navigate: (screen: "Register") => void; goBack?: () => void; canGoBack?: () => boolean };
+type Props = { navigation: LoginNavigation };
 
 export function LoginScreen({ navigation }: Props) {
-  const { login, loginWithPasskey, completeMfa, continueAsGuest, rememberSession } = useAuth();
+  const { login, loginWithPasskey, completeMfa, rememberSession } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(rememberSession);
@@ -24,6 +27,13 @@ export function LoginScreen({ navigation }: Props) {
   const [mfaTicket, setMfaTicket] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Erst nach einem Abbruch (oder Fehler) gibt es den kleinen Link - ohne Passkey auf dem Gerät gar nichts.
+  const [passkeyLink, setPasskeyLink] = useState(false);
+  const asked = useRef(false);
+
+  function done() {
+    if (navigation.canGoBack?.()) navigation.goBack?.();
+  }
 
   async function submit() {
     setSubmitting(true);
@@ -31,9 +41,11 @@ export function LoginScreen({ navigation }: Props) {
     try {
       if (mfaTicket) {
         await completeMfa(mfaTicket, mfaCode.trim(), remember);
+        done();
       } else {
         const result = await login(email.trim(), password, remember);
         if (result.mfaRequired && result.ticket) setMfaTicket(result.ticket);
+        else done();
       }
     } catch (err) {
       setError(errorMessage(err, "Login fehlgeschlagen."));
@@ -42,38 +54,35 @@ export function LoginScreen({ navigation }: Props) {
     }
   }
 
-  // Passkey (#217 Stufe 2): derselbe Passkey wie auf der Website - Fingerabdruck oder Gesicht statt Passwort.
-  async function passkeyLogin() {
+  async function passkeyLogin(silent: boolean) {
     setSubmitting(true);
-    setError("");
+    if (!silent) setError("");
     try {
       await loginWithPasskey(remember);
+      done();
     } catch (err) {
-      setError(passkeyError(err));
+      const miss = silentPasskeyMiss(err);
+      if (!silent) setError(passkeyError(err));
+      setPasskeyLink(miss !== "none" || !silent);
     } finally {
       setSubmitting(false);
     }
   }
 
-  async function liveMode() {
-    setSubmitting(true);
-    setError("");
-    try {
-      await continueAsGuest();
-    } catch (err) {
-      setError(errorMessage(err, "Live-Modus konnte nicht gestartet werden."));
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  // Passkey (#919): einmal beim Öffnen das Gerät fragen - Android zeigt vorhandene Passkeys für lionsquad.at an.
+  useEffect(() => {
+    if (asked.current || !passkeysSupported()) return;
+    asked.current = true;
+    passkeyLogin(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Screen>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.wrap}>
         <View style={styles.brand}>
           <BrandLogo style={styles.wordmark} />
-          <Muted>Native App</Muted>
-          <Body>Einloggen und Turniere, Teams, Matches und Profil direkt am Handy nutzen.</Body>
+          <Body>Mit Konto meldest du dich zu Turnieren und Events an, chattest mit deinem Team und sammelst Erfolge.</Body>
         </View>
         <Card style={styles.card}>
           {mfaTicket ? (
@@ -119,16 +128,11 @@ export function LoginScreen({ navigation }: Props) {
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button label={submitting ? "Anmelden ..." : mfaTicket ? "MFA bestätigen" : "Anmelden"} onPress={submit} disabled={submitting} />
-          {!mfaTicket && passkeysSupported() ? (
-            <Button label="Mit Passkey anmelden" variant="secondary" onPress={passkeyLogin} disabled={submitting} />
+          {!mfaTicket && passkeyLink && passkeysSupported() ? (
+            <Pressable onPress={() => passkeyLogin(false)} disabled={submitting} style={styles.linkWrap} testID="login-passkey-link">
+              <Text style={styles.link}>Mit Passkey anmelden</Text>
+            </Pressable>
           ) : null}
-          <Button
-            label="Live-Daten ansehen"
-            variant="secondary"
-            onPress={liveMode}
-            disabled={submitting}
-          />
-          <Muted>Der Live-Modus nutzt echte öffentliche Daten von lionsquad.at. Nach dem Deployment funktioniert der Login direkt mit deinem Webseiten-Account.</Muted>
           <Pressable onPress={() => navigation.navigate("Register")} style={styles.linkWrap}>
             <Text style={styles.link}>Noch keinen Account? Registrieren</Text>
           </Pressable>

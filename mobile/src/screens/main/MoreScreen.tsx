@@ -12,6 +12,7 @@ import { useBranding } from "../../branding/BrandingProvider";
 import { API_BASE_URL } from "../../config";
 import { api } from "../../lib/api";
 import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 import { useAppUpdate } from "../../update/AppUpdateProvider";
@@ -194,9 +195,25 @@ export function MoreScreen({ navigation }: Props) {
               <Ionicons name="open-outline" color={colors.muted} size={16} />
             </Pressable>
           )
-        ) : null}
+        ) : (
+          // Gast zuerst (#918): wo sonst der Mitgliederbereich steht, geht es ohne Konto zum Anmelden und Registrieren.
+          <Pressable
+            onPress={() => openSignIn()}
+            accessibilityRole="button"
+            testID="more-sign-in"
+            style={({ pressed }) => [styles.signInCard, pressed && styles.pressed]}
+          >
+            <View style={styles.signInIcon}><Ionicons name="log-in-outline" color={colors.cyan} size={22} /></View>
+            <View style={styles.memberText}>
+              <Body style={styles.memberTitle}>Anmelden oder registrieren</Body>
+              <Muted>Turniere, Events, Team-Chat und Erfolge mit deinem Konto</Muted>
+            </View>
+            <Ionicons name="chevron-forward" color={colors.cyan} size={16} />
+          </Pressable>
+        )}
 
-        {[{ title: "Konto", entries: kontoEntries(Boolean(user && !isGuestUser(user) && user.is_club_member)) }, ...moreGroups(advent)].map((group) => {
+        {/* „Konto“ nur mit Konto (#918): Nachrichten, Benachrichtigungen und Rechnungen gibt es für Gäste nicht. */}
+        {[...(user && !isGuestUser(user) ? [{ title: "Konto", entries: kontoEntries(Boolean(user.is_club_member)) }] : []), ...moreGroups(advent)].map((group) => {
           return (
             <View key={group.title} style={styles.group}>
               <Heading>{group.title}</Heading>
@@ -304,6 +321,24 @@ const styles = StyleSheet.create({
   memberIcon: {
     alignItems: "center",
     backgroundColor: "rgba(255, 215, 0, 0.14)",
+    borderRadius: 8,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  signInCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(41, 182, 232, 0.07)",
+    borderColor: "rgba(41, 182, 232, 0.45)",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  signInIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(41, 182, 232, 0.14)",
     borderRadius: 8,
     height: 40,
     justifyContent: "center",

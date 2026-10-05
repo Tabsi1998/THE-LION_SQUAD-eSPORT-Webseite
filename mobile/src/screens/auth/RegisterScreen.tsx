@@ -8,11 +8,11 @@ import { Screen } from "../../components/Screen";
 import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
-import type { AuthStackParamList } from "../../navigation/types";
+import type { RootStackParamList } from "../../navigation/types";
 import { colors, radius } from "../../theme";
 import { API_BASE_URL } from "../../config";
 
-type Props = NativeStackScreenProps<AuthStackParamList, "Register">;
+type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 
 export function RegisterScreen({ navigation }: Props) {
   const { register } = useAuth();
@@ -73,8 +73,9 @@ export function RegisterScreen({ navigation }: Props) {
               onPress={submit}
               disabled={submitting || !acceptPrivacy || !acceptTerms}
             />
-            <Pressable onPress={() => navigation.goBack()} style={styles.linkWrap}>
-              <Text style={styles.link}>Zurück zum Login</Text>
+            {/* Aus „Anmelden“ geht es dorthin zurück; aus dem Hinweis beim ersten Start (#918) ersetzt Anmelden diese Seite. */}
+            <Pressable onPress={() => navigation.popTo("Login")} style={styles.linkWrap} testID="register-login">
+              <Text style={styles.link}>Schon ein Konto? Anmelden</Text>
             </Pressable>
           </Card>
         </ScrollView>

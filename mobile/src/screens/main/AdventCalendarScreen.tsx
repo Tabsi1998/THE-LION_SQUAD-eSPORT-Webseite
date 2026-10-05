@@ -10,11 +10,11 @@ import { DOORS, doorVariant, opensLabel, viennaParts, type Calendar, type Door }
 import { openDoorLink } from "../../advent/links";
 import { sceneSvg } from "../../advent/scene";
 import { useAdventCalendar } from "../../advent/useAdventCalendar";
-import { useAuth } from "../../auth/AuthContext";
 import { useReduceMotion } from "../../components/FadeIn";
 import { Screen } from "../../components/Screen";
 import { announceAchievementUnlocked } from "../../lib/achievements";
 import { errorMessage } from "../../lib/api";
+import { openSignIn } from "../../navigation/rootNavigation";
 import type { MoreStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
 
@@ -71,7 +71,6 @@ function Closed({ calendar }: { calendar: Calendar }) {
 }
 
 export function AdventCalendarScreen(_props: Props) {
-  const { logout } = useAuth();
   const still = useReduceMotion();
   const [busyDay, setBusyDay] = useState<number | null>(null);
   const [sheetDay, setSheetDay] = useState<number | null>(null);
@@ -177,7 +176,7 @@ export function AdventCalendarScreen(_props: Props) {
             {!signedIn && !complete ? (
               <View style={styles.guest} testID="advent-guest">
                 <Text style={styles.guestText}>Du schaust als Gast. Gesammelt wird mit Konto – dann zählt jedes Türchen für den Erfolg „Alle Türchen“.</Text>
-                <Pressable accessibilityRole="button" onPress={() => { void logout(); }} hitSlop={8} style={({ pressed }) => [styles.guestLink, pressed && styles.pressed]} testID="advent-login">
+                <Pressable accessibilityRole="button" onPress={() => { openSignIn(); }} hitSlop={8} style={({ pressed }) => [styles.guestLink, pressed && styles.pressed]} testID="advent-login">
                   <Ionicons name="log-in-outline" size={15} color={GOLD} />
                   <Text style={styles.guestLinkText}>Anmelden</Text>
                 </Pressable>
@@ -209,7 +208,7 @@ export function AdventCalendarScreen(_props: Props) {
           </>
         ) : null}
       </ScrollView>
-      <DoorSheet door={shown} signedIn={signedIn} onClose={onClose} onAnswer={answer} onRaffle={raffle} onLink={onLink} onLogin={() => { void logout(); }} />
+      <DoorSheet door={shown} signedIn={signedIn} onClose={onClose} onAnswer={answer} onRaffle={raffle} onLink={onLink} onLogin={() => { openSignIn(); }} />
     </Screen>
   );
 }

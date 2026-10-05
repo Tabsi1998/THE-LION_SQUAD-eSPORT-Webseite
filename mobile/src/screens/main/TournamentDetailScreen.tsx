@@ -16,6 +16,7 @@ import { formatDate, formatDateTime, formatStatus, formatTournamentFormat } from
 import { getRegistrationState } from "../../lib/registration";
 import { basisLabel, formatCents, ownPriceLine, quoteTotal, startFeeSummary } from "../../lib/startFee";
 import { isGuestUser } from "../../live";
+import { openSignIn } from "../../navigation/rootNavigation";
 import { useLiveRefresh } from "../../realtime/LiveChangesProvider";
 import type { TournamentStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -309,7 +310,11 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                   </View>
                 ) : null}
                 {guest ? (
-                  <Muted>Zum Anmelden bitte mit deinem Account einloggen.</Muted>
+                  // Gast zuerst (#918): der Weg zum Konto gleich hier - nach der Anmeldung geht es zurück zu diesem Turnier.
+                  <>
+                    <Muted>Teilnehmen kannst du mit einem Konto.</Muted>
+                    <Button label="Anmelden oder registrieren" variant="secondary" onPress={() => openSignIn()} testID="tournament-sign-in" />
+                  </>
                 ) : registered ? (
                   <>
                     <Muted style={styles.success}>Du bist angemeldet: {formatStatus(ownRegistration?.status)}</Muted>
@@ -353,7 +358,8 @@ export function TournamentDetailScreen({ navigation, route }: Props) {
                 location: tournament.event?.location || null, detail: [tournament.game?.display_name || tournament.game?.name, formatTournamentFormat(tournament.format)].filter(Boolean).join(" · ") || null,
                 url: tournament.slug ? `https://lionsquad.at/tournaments/${tournament.slug}` : null,
               } : null} />
-              {tournament.show_chat ? (
+              {/* Den Turnier-Chat gibt es mit Konto (#918) - Gäste finden „Anmelden oder registrieren“ oben bei der Teilnahme. */}
+              {tournament.show_chat && !guest ? (
                 <Button
                   label="Turnier-Chat öffnen"
                   onPress={() => navigation.navigate("TournamentChat", { id: tournament.id, title: `${tournament.title} Chat` })}

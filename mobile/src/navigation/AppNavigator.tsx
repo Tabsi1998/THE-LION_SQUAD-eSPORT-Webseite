@@ -3,13 +3,15 @@ import { NavigationContainer, DefaultTheme } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { UnderHeaderContext } from "../components/Screen";
 import { BootScreen } from "../screens/BootScreen";
 import { LockScreen } from "../screens/LockScreen";
 import { AchievementCatchUpOverlay } from "../components/AchievementCatchUpOverlay";
 import { BallotPopupOverlay } from "../components/BallotPopupOverlay";
+import { PasskeyInvite } from "../components/PasskeyInvite";
+import { markSignInNudgeSeen, SignInNudge } from "../components/SignInNudge";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { RegisterScreen } from "../screens/auth/RegisterScreen";
 import { ConsentScreen } from "../screens/auth/ConsentScreen";
@@ -56,14 +58,14 @@ import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
 import type {
-  AuthStackParamList,
   MainTabParamList,
   MoreStackParamList,
+  RootStackParamList,
   TeamStackParamList,
   TournamentStackParamList,
 } from "./types";
 
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 const TournamentStack = createNativeStackNavigator<TournamentStackParamList>();
 const TeamStack = createNativeStackNavigator<TeamStackParamList>();
@@ -85,6 +87,10 @@ export function AppNavigator() {
   const { user, loading } = useAuth();
   const { locked } = useAppLock();
   const signedIn = Boolean(user && !isGuestUser(user));
+  // Wer angemeldet war, kennt den Weg: der Hinweis für Gäste (#918) kommt dann auch nach dem Abmelden nicht mehr.
+  useEffect(() => {
+    if (signedIn) void markSignInNudgeSeen();
+  }, [signedIn]);
 
   if (loading) return <BootScreen />;
   // App-Sperre (#217): erst Fingerabdruck, dann Chats und Profil. Gäste haben nichts zu schützen.
@@ -92,34 +98,40 @@ export function AppNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>
-      {signedIn && user?.consent_required ? <ConsentScreen /> : user ? (
-        <View style={styles.mainWithBanner}>
-          {/* Laufbanner (#245): über allen Tabs, dieselben Banner wie die Website mit Kanal „app“. */}
-          <SiteBannerTicker />
-          <View style={styles.mainWithBanner}><MainTabs /></View>
-          {/* Jahreszeiten (#636): Deko-Ebenen über den Tabs, nie klickbar. */}
-          <SeasonStage />
-        </View>
-      ) : <AuthScreens />}
+      {signedIn && user?.consent_required ? <ConsentScreen /> : <RootScreens />}
       {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}
       {/* Abstimmung live (#844): offene Abstimmung mit eigenem Stimmrecht über jedem Screen. */}
       {signedIn && !user?.consent_required ? <BallotPopupOverlay /> : null}
+      {/* Passkey (#919): direkt nach einer Anmeldung mit Passwort einmal die Einladung zum Fingerabdruck. */}
+      {signedIn && !user?.consent_required ? <PasskeyInvite /> : null}
+      {/* Gast zuerst (#918): beim ersten Start nach ein paar Sekunden einmal „Konto erstellen oder anmelden“. */}
+      {!signedIn ? <SignInNudge /> : null}
     </NavigationContainer>
   );
 }
 
-function AuthScreens() {
+// Gast zuerst (#918): Die App startet ohne Konto. Anmelden und Registrieren liegen über den Tabs - nach der Anmeldung geht
+// es zurück, woher man kam (Turnier, Adventkalender, „Mehr“ ...).
+function RootScreens() {
   return (
-    <AuthStack.Navigator
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: "#101113" },
-      }}
-    >
-      <AuthStack.Screen name="Login" component={LoginScreen} />
-      <AuthStack.Screen name="Register" component={RegisterScreen} />
-    </AuthStack.Navigator>
+    <RootStack.Navigator screenOptions={stackOptions} screenLayout={stackScreenLayout}>
+      <RootStack.Screen name="Main" component={MainScreen} options={{ headerShown: false }} />
+      <RootStack.Screen name="Login" component={LoginScreen} options={{ title: "Anmelden" }} />
+      <RootStack.Screen name="Register" component={RegisterScreen} options={{ title: "Registrieren" }} />
+    </RootStack.Navigator>
+  );
+}
+
+function MainScreen() {
+  return (
+    <View style={styles.mainWithBanner}>
+      {/* Laufbanner (#245): über allen Tabs, dieselben Banner wie die Website mit Kanal „app“. */}
+      <SiteBannerTicker />
+      <View style={styles.mainWithBanner}><MainTabs /></View>
+      {/* Jahreszeiten (#636): Deko-Ebenen über den Tabs, nie klickbar. */}
+      <SeasonStage />
+    </View>
   );
 }
 
