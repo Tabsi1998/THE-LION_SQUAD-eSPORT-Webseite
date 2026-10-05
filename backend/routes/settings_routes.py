@@ -2,8 +2,8 @@
 
 import logging
 import os
-from fastapi import Query, APIRouter, HTTPException, Depends, Response
-from pydantic import BaseModel, EmailStr
+from fastapi import Query, APIRouter, HTTPException, Depends, Request, Response
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, List, Literal, Dict
 from datetime import datetime, timezone
 import httpx
@@ -12,6 +12,7 @@ from database import get_db
 from auth import require_admin, require_club_admin, require_super, get_optional_user, require_area
 from services.public_site_settings import PUBLIC_LEGAL_SOURCE_FIELDS, build_public_legal_settings
 from services.auth_settings import is_google_client_id, load_auth_settings
+from services.rate_limit import enforce_rate_limit
 from services.secret_store import decrypt_secret, encrypt_secret, secret_is_configured
 from models import now_utc, new_id
 from email_service import send_template
@@ -290,7 +291,7 @@ class SiteBannerPatch(BaseModel):
 
 
 class SiteBannerStatBody(BaseModel):
-    banner_id: str
+    banner_id: str = Field(min_length=1, max_length=160)
 
 
 async def _newsletter_source(kind: str, source_id: str) -> dict:
@@ -1026,28 +1027,41 @@ async def delete_site_banner(banner_id: str, me: dict = Depends(require_area("co
     return {"ok": True}
 
 
-@settings_router.post("/site-banners/impression")
-async def track_site_banner_impression(body: SiteBannerStatBody):
+# Zähler der Banner (#931): beide Wege gehen ohne Anmeldung, deshalb je Adresse gebremst - und gezählt wird nur ein
+# Banner, den es gibt. Die Website meldet jeden Banner einmal je Besuch; im Vereins-WLAN teilen sich viele eine Adresse,
+# darum liegt die Grenze der Einblendungen höher als die der Klicks.
+BANNER_IMPRESSION_LIMIT = 60  # je Adresse und Minute
+BANNER_CLICK_LIMIT = 30
+
+
+async def _known_banner(db, banner_id: str) -> bool:
+    if await db.site_banners.find_one({"id": banner_id}, {"_id": 0, "id": 1}):
+        return True
+    return banner_id.startswith("auto-") and any(doc.get("id") == banner_id for doc in await _auto_site_banners(db))
+
+
+async def _count_banner(request: Request, banner_id: str, counter: str, stamp: str, limit: int) -> dict:
+    await enforce_rate_limit(request, f"site-banner:{counter}", limit=limit, window_seconds=60)
     db = get_db()
-    now = now_utc().isoformat()
-    await db.site_banner_stats.update_one(
-        {"id": body.banner_id},
-        {"$inc": {"impressions": 1}, "$set": {"last_impression_at": now}, "$setOnInsert": {"id": body.banner_id}},
-        upsert=True,
-    )
+    # Eine unbekannte Kennung bekommt dieselbe Antwort, legt aber keine Zeile an: sonst ließe sich die Sammlung mit
+    # erfundenen Kennungen füllen. Ein gerade gelöschter Banner in einem offenen Browser ist so auch kein Fehler.
+    if await _known_banner(db, banner_id):
+        await db.site_banner_stats.update_one(
+            {"id": banner_id},
+            {"$inc": {counter: 1}, "$set": {stamp: now_utc().isoformat()}, "$setOnInsert": {"id": banner_id}},
+            upsert=True,
+        )
     return {"ok": True}
+
+
+@settings_router.post("/site-banners/impression")
+async def track_site_banner_impression(body: SiteBannerStatBody, request: Request):
+    return await _count_banner(request, body.banner_id, "impressions", "last_impression_at", BANNER_IMPRESSION_LIMIT)
 
 
 @settings_router.post("/site-banners/click")
-async def track_site_banner_click(body: SiteBannerStatBody):
-    db = get_db()
-    now = now_utc().isoformat()
-    await db.site_banner_stats.update_one(
-        {"id": body.banner_id},
-        {"$inc": {"clicks": 1}, "$set": {"last_click_at": now}, "$setOnInsert": {"id": body.banner_id}},
-        upsert=True,
-    )
-    return {"ok": True}
+async def track_site_banner_click(body: SiteBannerStatBody, request: Request):
+    return await _count_banner(request, body.banner_id, "clicks", "last_click_at", BANNER_CLICK_LIMIT)
 
 
 @settings_router.get("/email")

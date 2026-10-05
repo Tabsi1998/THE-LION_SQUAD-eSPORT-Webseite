@@ -19,6 +19,9 @@ import logging
 import re
 import xml.etree.ElementTree as ET
 
+from defusedxml import ElementTree as SafeET
+from defusedxml.common import DefusedXmlException
+
 import httpx
 
 from models import new_id, now_utc
@@ -113,10 +116,13 @@ async def resolve_channel_id(client: httpx.AsyncClient, url: str) -> str:
 
 def parse_feed(text: str) -> list[dict]:
     """Die Einträge des Atom-Feeds - älteste zuerst, damit neue Videos in der richtigen Reihenfolge News werden."""
+    # Fremdes XML (#931): defusedxml lehnt Entitäten und externe Verweise ab, bevor sie aufgelöst werden.
     try:
-        root = ET.fromstring(text)
+        root = SafeET.fromstring(text)
     except ET.ParseError as exc:
         raise YoutubeError("feed_failed", f"Der Feed ist kein gültiges XML ({exc}).") from exc
+    except DefusedXmlException as exc:
+        raise YoutubeError("feed_failed", "Der Feed enthält XML-Bestandteile, die nicht erlaubt sind (Entitäten oder externe Verweise).") from exc
     entries = []
     for entry in root.findall("atom:entry", NS):
         video_id = (entry.findtext("yt:videoId", default="", namespaces=NS) or "").strip()
