@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Depends
 
 from database import get_db
 from auth import require_super, get_current_user
+from services import account_erasure
 from services.competition_privacy import registration_match_snapshot
 from models import now_utc, new_id
 
@@ -24,7 +25,7 @@ async def _user_data_export(db, user_id: str) -> dict:
 
     registrations = await rows(db.tournament_registrations, {"user_id": user_id})
     return {
-        "format_version": 2,
+        "format_version": 3,
         "exported_at": now_utc().isoformat(),
         "user": user,
         "consent_records": await rows(db.consent_records, {"user_id": user_id}),
@@ -66,6 +67,18 @@ async def _user_data_export(db, user_id: str) -> dict:
         "mobile_devices": await rows(db.mobile_push_tokens, {"user_id": user_id}),
         "mobile_client_logs": await rows(db.mobile_client_logs, {"user_id": user_id}),
         "audit_trail": await rows(db.audit_logs, {"$or": [{"actor_id": user_id}, {"target_id": user_id}]}),
+        # Seit Fassung 3 (#928): was bisher weder in der Auskunft stand noch beim Löschen aufgeräumt wurde.
+        "xp": await db.user_xp.find_one({"user_id": user_id}, {"_id": 0}),
+        "xp_events": await rows(db.xp_events, {"user_id": user_id}),
+        "directory_profiles": await rows(db.club_member_profiles, {"user_id": user_id}),
+        "membership_applications": await rows(db.membership_applications, {"user_id": user_id}),
+        "membership_invitations": await rows(db.membership_invitations, {"user_id": user_id}),
+        "board_positions": await rows(db.board_positions, {"$or": [{"user_id": user_id}, {"deputy_user_id": user_id}]}),
+        "tournament_staff": await rows(db.tournament_staff_assignments, {"user_id": user_id}),
+        "moderation_items": await rows(db.moderation_items, {"user_id": user_id}),
+        "discord_activity": await rows(db.discord_activity, {"user_id": user_id}),
+        "discord_memberships": await rows(db.discord_memberships, {"user_id": user_id}),
+        "uploads": await rows(db.media_uploads, {"owner_id": user_id}),
     }
 
 
@@ -127,6 +140,8 @@ async def _anonymize_user_data(db, user_id: str, actor_id: str, action: str) -> 
     # Abrechnung (#322): Belege bleiben in Dolibarr; der Auftrag hier behält Betrag und Nummer, verliert Name und E-Mail.
     from services.billing_orders import anonymize_user as anonymize_billing
     await anonymize_billing(db, user_id)
+    # Alles außerhalb des Kontos (#928): Verzeichnis, Anträge, Anmeldungen, XP, Zugänge und die eigenen Bilder.
+    await account_erasure.erase_related(db, user, now)
     await db.audit_logs.insert_one({
         "id": new_id(), "action": action, "actor_id": actor_id, "target_id": user_id,
         "data": {"personal_data_removed": True}, "created_at": now,

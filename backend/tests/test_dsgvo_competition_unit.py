@@ -67,6 +67,10 @@ class FakeDb:
             "mobile_client_logs", "audit_logs", "platform_links", "user_signals", "news_reads", "stream_watches",
             "user_achievement_stats", "match_commendations", "advent_openings", "season_raffle_entries",
             "easter_finds", "easter_progress",
+            # Auskunft Fassung 3 (#928)
+            "user_xp", "xp_events", "club_member_profiles", "membership_applications", "membership_invitations",
+            "board_positions", "tournament_staff_assignments", "moderation_items", "discord_activity",
+            "discord_memberships", "media_uploads",
         ):
             setattr(self, name, FakeCollection())
 
