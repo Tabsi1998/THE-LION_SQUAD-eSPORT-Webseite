@@ -63,7 +63,7 @@ class FakeDb:
         for name in (
             "consent_records", "memberships", "user_socials", "event_registrations", "team_members",
             "team_invites", "user_achievements", "season_points", "prize_pickups", "notifications",
-            "direct_messages", "friendships", "user_blocks", "user_reports", "mobile_push_tokens",
+            "direct_messages", "friendships", "user_blocks", "user_reports", "mobile_push_tokens", "discord_guild_active",
             "mobile_client_logs", "audit_logs", "platform_links", "user_signals", "news_reads", "stream_watches",
             "user_achievement_stats", "match_commendations", "advent_openings", "season_raffle_entries",
             "easter_finds", "easter_progress",

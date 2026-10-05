@@ -385,6 +385,10 @@ AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     # Ein fremdes Konto gehört zu höchstens einem Nutzer. Verknüpfungen ohne Kennung der Plattform bleiben außen vor.
     ("platform_links", [("platform", 1), ("external_id", 1)], "platform_external",
      {"partialFilterExpression": {"external_id": {"$type": "string"}}}),
+    # Discord (#631): je Person und Tag bzw. je Server und Tag genau eine Zeile - der Bot zählt bei jeder Nachricht hoch.
+    ("discord_activity", [("user_id", 1), ("day", 1)], "user_day", {}),
+    ("discord_guild_stats", [("guild_id", 1), ("day", 1)], "guild_day", {}),
+    ("discord_guild_active", [("guild_id", 1), ("day", 1), ("user_id", 1)], "guild_day_user", {}),
 )
 AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("platform_links", "user_id"),
@@ -416,6 +420,9 @@ AUDIT_INDEXES: tuple[tuple[str, Any], ...] = (
     ("tournaments", "start_date"),
     ("events", "start_date"),
     ("f1_challenges", "start_date"),
+    # Statistik je Server (#631): Auskunft und Löschen je Konto, Aufräumen und Fenster je Tag.
+    ("discord_guild_active", "user_id"),
+    ("discord_guild_active", "day"),
 )
 
 

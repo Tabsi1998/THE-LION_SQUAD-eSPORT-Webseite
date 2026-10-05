@@ -277,6 +277,26 @@ Der Reiter „Server“ zeigt umgekehrt je Server die **Spiele auf diesem Server
 
 Versand je Spiel (#627), Brackets, Rollen und Befehle je Server folgen in den weiteren Teilen.
 
+### Weitergabe und Statistik (#631)
+
+- **Ankündigungen folgen:** kein Kopieren durch den Bot. Der Sammelkanal liegt am Hauptserver
+  (`settings.discord.forward.channel_id`); je eingeschaltetem Unterserver folgt der Bot dem gewählten
+  Ankündigungskanal (`TextChannel.follow`, braucht im Sammelkanal „Webhooks verwalten“). Der Stand kommt von
+  Discord – den Folge-Webhooks im Sammelkanal –, also gilt auch von Hand Eingerichtetes. Fehlt Recht oder
+  Ankündigungskanal, nennt die Übersicht den Klickweg. Die Kanalliste trägt dafür `news` und `can_webhooks`.
+- **Mitteilung verteilen:** `/verteilen` (Bereiche Turnierleitung, Vereinsverwaltung, System – über das
+  verknüpfte Konto) und das Formular im Reiter „Weitergabe“. Erst `plan` (Vorschau, je Server der Kanal des
+  Ziels), dann `send`: je Server ein `send_to` mit Fußzeile „verteilt von … vom …“, Ereignis
+  `staff.distribute`, im Versand-Log mit Server; das Verteilen selbst als Adminaktion `discord.distribute`
+  (wer, wohin, wie viele – nicht der Text). Nur öffentliche Ziele, keine Erwähnungen.
+- **Statistik je Server:** `discord_guild_stats` (Server, Tag, Nachrichten, Beitritte, Austritte – nur Zahlen)
+  und `discord_guild_active` (Server, Tag, verknüpftes Konto – 35 Tage, in Auskunft und Löschung). Gezählt
+  wird in `handle_message`, wenn „Nachrichten zählen“ an ist; die Erfolge bleiben **ein** Zähler je Person
+  über alle Server (`users.discord_messages_count`).
+- Code: `services/discord_follow.py`, `services/discord_distribute.py`, `services/discord_stats.py`,
+  Routen `GET/PUT /api/settings/discord/forward`, `POST …/forward/{server}`, `GET/POST …/distribute`,
+  `GET …/stats`; Web `DiscordForwardPanel.jsx`, `DiscordStatsPanel.jsx`.
+
 ## Gestaltung und Stream-Meldungen (#866)
 
 **Gestaltung** (Verbindungen → Discord → Reiter „Gestaltung“): Jede Meldungsart ist eine Vorlage im Discord-Format –
@@ -337,7 +357,8 @@ braucht, steht unter Admin → Verbindungen → Discord → „Discord-Bot“. E
   und Betriebsalarme in die gewählten Kanäle – Abschnitt oben. Ist er aus, gibt es keine Meldungen.
 - **Zählen:** Jede Nachricht eines verknüpften Mitglieds zählt eins hoch (für die Erfolge
   „Discord-Aktiv“). Gezählt wird die Zahl, nie der Inhalt – der Bot hat kein Recht, Nachrichten
-  zu lesen. Nicht verknüpfte Konten und andere Bots zählen nicht.
+  zu lesen. Nicht verknüpfte Konten zählen für die Erfolge nicht; in die Statistik je Server (#631) gehen ihre
+  Nachrichten nur als Tageszahl ein. Andere Bots zählen nie.
 - **Rollen:** Aktives Mitglied ↔ Rolle „Mitglied“, Vorstand ↔ „Vorstand“, Turnierleitung ↔
   „Turnierleitung“. Der Abgleich läuft alle zehn Minuten und auf Knopfdruck („Rollen jetzt
   abgleichen“). Der Bot fasst **nur diese drei Rollen und die Spiel-Rollen** an – andere Rollen

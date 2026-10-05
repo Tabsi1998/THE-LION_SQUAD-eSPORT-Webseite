@@ -262,6 +262,12 @@ def resolve_target(cfg: dict, target: str, guild: dict | None = None) -> dict:
     return {"target": "community", "channel_id": channels.get("community") or "", "fallback": target != "community"}
 
 
+async def target_channel(target: str, guild: dict | None = None) -> dict:
+    """Wohin ein Ziel auf diesem Server heute ginge (#631): Kanal, tatsächliches Ziel, Rückfall - für die Vorschau beim
+    Verteilen. Ohne ``guild`` der Hauptserver."""
+    return resolve_target(await _get_discord_config(), target, guild)
+
+
 async def build_embed(title: str, description: str = "", *, color: int = 0x29B6E8, url: str | None = None,
                       fields: list | None = None, image_url: str | None = None, footer: str | None = None) -> dict:
     """Das Embed, wie Discord es bekommt - auch die Vorschau im Admin baut es hiermit (#303, #583)."""

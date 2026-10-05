@@ -7,10 +7,12 @@ import { useAuth } from "@/context/AuthContext";
 import { DiscordBotPanel } from "./DiscordBotPanel";
 import { DiscordDesignPanel } from "./DiscordDesignPanel";
 import { DiscordEmbedsPanel } from "./DiscordEmbedsPanel";
+import { DiscordForwardPanel } from "./DiscordForwardPanel";
 import { DiscordGuildsPanel } from "./DiscordGuildsPanel";
 import { DiscordScheduledPanel } from "./DiscordScheduledPanel";
 import { DiscordStreamsPanel } from "./DiscordStreamsPanel";
 import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
+import { DiscordStatsPanel } from "./DiscordStatsPanel";
 import { DiscordTargets } from "./DiscordTargets";
 import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
 
@@ -18,6 +20,7 @@ import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
 // Seit #566 gibt es keine Webhook-Adressen mehr - der Bot schickt alles; ist er aus, wird nichts
 // gesendet. Alles steht auf der Discord-Seite unter Verbindungen (24.09.: „muss das doppelt sein?“).
 // Seit Discord VI (#624) in Reitern: die Seite war eine lange Kette von Kästen, und je Server kommt noch mehr dazu.
+// Mit #631: „Weitergabe“ (Ankündigungen folgen, Mitteilung verteilen) und „Statistik“ (Zahlen je Server).
 
 export const DISCORD_TABS = [
   { key: "messages", label: "Meldungen" },
@@ -26,6 +29,8 @@ export const DISCORD_TABS = [
   { key: "welcome", label: "Willkommen" },
   { key: "bot", label: "Bot & Aktivität" },
   { key: "servers", label: "Server" },
+  { key: "forward", label: "Weitergabe" },
+  { key: "stats", label: "Statistik" },
 ];
 
 const EMPTY_DISCORD = { enabled: true, configured: false, last_status: "", last_error: "", last_event_key: "", last_checked_at: "" };
@@ -161,6 +166,8 @@ export function DiscordSettings({ initialTab = "messages" }) {
       {tab === "design" && <DiscordDesignPanel />}
       {tab === "welcome" && <DiscordWelcomePanel />}
       {tab === "servers" && <DiscordGuildsPanel />}
+      {tab === "forward" && <DiscordForwardPanel />}
+      {tab === "stats" && <DiscordStatsPanel />}
       {tab === "bot" && <>
       <DiscordBotPanel canSystem={user?.role === "superadmin"} />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4">

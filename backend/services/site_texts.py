@@ -286,10 +286,12 @@ def privacy_page(legal: dict, facts: dict) -> dict:
                   "unseres Discord-Servers (Discord Inc., USA; EU-Standardvertragsklauseln). Dabei gehen nur die auf der Website ohnehin "
                   "öffentlichen Angaben mit: Anzeigenamen, Teamnamen, Ergebnisse, Bilder der Beiträge. Interne Vereinsinhalte werden nur in "
                   "interne Kanäle gepostet.", "privacy-discord-channels") if discord.get("channels") else None,
-                p("Auf unserem Discord-Server läuft der Vereins-Bot. Er zählt für Mitglieder, die ihr Discord-Konto im Profil verknüpft haben, "
-                  "die **Anzahl** ihrer Nachrichten (nie den Inhalt – der Bot hat kein Recht, Nachrichten zu lesen), gleicht die Rollen "
-                  "„Mitglied“, „Vorstand“ und „Turnierleitung“ mit dem Vereinsstand ab und beantwortet Befehle wie „nächstes Event“. Nicht "
-                  "verknüpfte Konten werden ignoriert. Grundlage ist unser berechtigtes Interesse an einer gepflegten Community (Art. 6 Abs. 1 "
+                p("Auf unseren Discord-Servern läuft der Vereins-Bot. Er zählt für Mitglieder, die ihr Discord-Konto im Profil verknüpft haben, "
+                  "die **Anzahl** ihrer Nachrichten (nie den Inhalt – der Bot hat kein Recht, Nachrichten zu lesen) und merkt sich für eine "
+                  "Statistik je Server 35 Tage lang, an welchen Tagen sie auf welchem Server geschrieben haben. Er gleicht die Rollen "
+                  "„Mitglied“, „Vorstand“ und „Turnierleitung“ mit dem Vereinsstand ab und beantwortet Befehle wie „nächstes Event“. Von nicht "
+                  "verknüpften Konten wird nichts gespeichert; ihre Nachrichten sowie Beitritte und Austritte zählen nur in einer Tageszahl "
+                  "je Server mit. Grundlage ist unser berechtigtes Interesse an einer gepflegten Community (Art. 6 Abs. 1 "
                   "lit. f DSGVO); die Verknüpfung lässt sich jederzeit im Profil trennen.", "privacy-discord-bot") if discord.get("bot") else None),
         _platform_section(f),
         _google_data_section(f, club_name),

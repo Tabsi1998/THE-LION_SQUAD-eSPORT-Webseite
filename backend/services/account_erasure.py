@@ -27,7 +27,7 @@ DELETED_TEXT = "[Nachricht gelöscht]"
 
 # Zeilen, die nur mit Konto einen Zweck haben: Verhalten, Zustände und Zugänge.
 PURGED = (
-    "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_memberships",
+    "user_xp", "xp_events", "membership_invitations", "member_card_tokens", "discord_activity", "discord_guild_active", "discord_memberships",
     "achievement_eval_queue", "live_streams", "twitch_stream_sessions", "tournament_staff_assignments",
 )
 # Ein Antrag in diesen Zuständen läuft noch - ohne Konto ist er zurückgezogen (der Abgleich mit der

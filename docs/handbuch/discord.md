@@ -225,6 +225,10 @@ Zweck“ zeigt je Kanal, was der Bot dort darf.
 Für Befehle braucht der Bot beim Einladen zusätzlich den Bereich **`applications.commands`** – der
 Einladungslink aus dem Reiter „Server“ enthält ihn.
 
+**Ein elftes Recht, nur in einem Kanal:** „Webhooks verwalten“ im **Sammelkanal** am Hauptserver, wenn
+der Bot das Folgen von Ankündigungskanälen selbst einrichten und den Stand anzeigen soll (siehe 5.5).
+Kanal bearbeiten → Berechtigungen → Rolle des Bots. Ohne dieses Recht geht das Folgen von Hand genauso.
+
 ---
 
 ## 4. Die Funktionen einzeln
@@ -358,6 +362,7 @@ Bots. **Jede Antwort sieht nur, wer fragt.**
 | `/verknuepfen` | der Weg zum Verknüpfen | alle |
 | `/meine-erfolge` | eigene Erfolge | verknüpfte Konten |
 | `/mitglied` | eigener Stand im Verein (Art, seit wann – nie Beitrag oder Zahlungsdaten) | verknüpfte Konten |
+| `/verteilen` | eine Mitteilung an mehrere Server schicken – mit Vorschau vor dem Senden (siehe 5.5) | Turnierleitung und Vorstand |
 | `/status` | Stand des Bots | Vorstand |
 
 **Auf einem Spielserver** zeigen `/turniere`, `/naechstes-event` und `/bracket` nur die Spiele dieses
@@ -379,7 +384,8 @@ Servers (wie im Reiter „Server“ unter „Spiele auf diesem Server“):
 **Reiter „Bot & Aktivität“ → „Nachrichten zählen“.** Jede Nachricht eines verknüpften Kontos zählt
 eins hoch – auf allen Servern, auf denen der Bot ist. Gezählt wird die **Zahl**, nie der Inhalt.
 Die Zähler stehen darunter und lassen sich je Person korrigieren. Sie zählen für die Erfolge
-„Discord-Aktiv“.
+„Discord-Aktiv“ – **ein Zähler je Person**, egal auf welchem Server sie schreibt. Derselbe Schalter
+speist die Statistik je Server (siehe 5.6).
 
 ### 4.9 Persönliche Benachrichtigungen per Direktnachricht
 
@@ -512,6 +518,49 @@ wird“**, unter dem Schalter steht die Regel.
 - Im **Versandprotokoll** (Admin → Betrieb & Logs → Ereignisse) steht je Discord-Meldung der Server,
   ab zwei Servern mit Filter.
 
+### 5.5 Infos zwischen den Servern weitergeben
+
+**Reiter „Weitergabe“.** Der Bot kopiert keine Nachrichten von Server zu Server. Es gibt zwei Wege,
+beide bewusst:
+
+**a) Ankündigungen folgen** – was auf einem Unterserver im Ankündigungskanal veröffentlicht wird,
+erscheint von selbst in einem Sammelkanal am Hauptserver, mit Herkunft. Das ist Discords eigenes
+„Folgen“; niemand liest oder kopiert mit.
+
+1. Am Hauptserver einen Kanal anlegen, etwa `#aus-den-servern`.
+2. Im Reiter „Weitergabe“ oben diesen Kanal als **Sammelkanal** wählen.
+3. Dem Bot in diesem Kanal „Webhooks verwalten“ geben (Kanal bearbeiten → Berechtigungen → Rolle des Bots).
+4. Je Unterserver den Ankündigungskanal wählen und **„Einrichten“** klicken.
+5. Fertig, sobald dort „eingerichtet“ steht.
+
+Steht bei einem Server „kein Ankündigungskanal“: Auf dem Unterserver die Community-Funktion einschalten
+(Servereinstellungen → „Community aktivieren“) und den Kanal umstellen (Kanal bearbeiten → Übersicht →
+„Ankündigungskanal“). Ohne Bot-Recht geht es auch von Hand: im Ankündigungskanal oben „Folgen“ klicken
+und den Sammelkanal wählen – das erkennt die Seite ebenfalls als eingerichtet.
+
+**b) Mitteilung verteilen** – ein Text an mehrere Server auf einmal, je Server in den Kanal des gewählten
+Ziels (Community, News oder Events und Turniere).
+
+- **Im Discord:** `/verteilen text: … ziel: … server: … titel: …`. Nur Turnierleitung und Vorstand mit
+  verknüpftem Konto. Erst kommt eine Vorschau, die nur du siehst – mit der Liste, wohin es geht.
+  „Senden“ schickt ab, „Abbrechen“ nicht.
+- **Im Admin:** derselbe Reiter, Kasten „Mitteilung verteilen“ – Text, Ziel, Server anhaken,
+  „Vorschau“, dann „An … Server senden“.
+
+Unter jeder verteilten Mitteilung steht, wer sie verteilt hat und von wo. Erwähnt wird niemand.
+Hat ein Server für das Ziel keinen Kanal, geht es dort in Community; hat er gar keinen Kanal, kommt
+dort nichts an – das steht schon in der Vorschau. Jede Sendung steht im Versandprotokoll.
+
+### 5.6 Statistik je Server
+
+**Reiter „Statistik“.** Je Server: Nachrichten und aktive Konten über 7 und 30 Tage, Beitritte und
+Austritte, dazu der Verlauf der letzten 30 Tage als Balken. Darunter die Summe über alle Server.
+
+- Es sind **nur Zahlen**. Der Bot liest keine Inhalte und merkt sich bei Gästen nichts.
+- „Aktive Konten“ sind Mitglieder, die ihr Discord mit der Website verknüpft haben. Wer wann aktiv war,
+  wird nach 35 Tagen gelöscht und steht in „Meine Daten“.
+- Nachrichten zählen nur, wenn „Nachrichten zählen“ an ist (Reiter „Bot & Aktivität“).
+
 ---
 
 ## 6. Wenn etwas nicht klappt
@@ -550,6 +599,8 @@ Fehlgeschlagene lassen sich dort erneut senden – immer an dasselbe Ziel.
 - **Bot aus = keine Meldung.** Es gibt keinen Umweg über andere Wege.
 - **Nie @everyone oder @here.** Erwähnt wird höchstens die eine Rolle, die ihr bei den Stream-Meldungen wählt.
 - **Der Bot liest keine Nachrichten.** Er zählt nur, dass jemand geschrieben hat.
+- **Der Bot kopiert nichts von Server zu Server.** Weitergegeben wird nur, was Discord selbst spiegelt
+  (Folgen) oder was jemand bewusst verteilt.
 - **Keine Namen aus dem Widget:** Die Website verwirft sie beim Abruf; gezeigt werden nur Zahlen.
 - **In Direktnachrichten keine Texte anderer Personen**, keine Moderation, keine Zahlungsdaten.
 - Auch in den privaten Vorstandskanal gehen keine Namen, Adressen oder Nachrichtentexte von
