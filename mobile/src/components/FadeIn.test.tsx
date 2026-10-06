@@ -7,8 +7,8 @@ import { FadeIn, staggerDelay } from "./FadeIn";
 
 test("Listen bauen sich nur in den ersten Zeilen nacheinander auf", () => {
   expect(staggerDelay(0)).toBe(0);
-  expect(staggerDelay(3)).toBe(120);
-  expect(staggerDelay(40)).toBe(240);
+  expect(staggerDelay(3)).toBe(210);
+  expect(staggerDelay(40)).toBe(560);
   expect(staggerDelay(-2)).toBe(0);
 });
 

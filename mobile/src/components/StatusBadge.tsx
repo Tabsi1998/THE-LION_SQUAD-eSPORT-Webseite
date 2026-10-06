@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import { useReduceMotion } from "./FadeIn";
 import { formatStatus } from "../lib/format";
 import { colors } from "../theme";
 import { Muted } from "./Text";
@@ -39,8 +40,34 @@ export function StatusBadge({
   const tone = toneForStatus(`${text} ${status || ""} ${phaseState(phase)}`);
   return (
     <View style={[styles.badge, toneStyles[tone].badge, style]}>
-      {phaseState(phase) === "live" ? <View style={[styles.dot, { backgroundColor: toneStyles[tone].text.color }]} /> : null}
+      {phaseState(phase) === "live" ? <LiveDot color={toneStyles[tone].text.color} /> : null}
       <Muted style={[styles.text, toneStyles[tone].text]}>{text}</Muted>
+    </View>
+  );
+}
+
+// LIVE (#1085): wie im Web steht der Chip ruhig, nur der Punkt pulsiert mit einem Ring, der leise ausläuft.
+function LiveDot({ color }: { color: string }) {
+  const reduce = useReduceMotion();
+  const ring = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (reduce) {
+      ring.setValue(0);
+      return undefined;
+    }
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(ring, { toValue: 1, duration: 1700, useNativeDriver: true }),
+      Animated.timing(ring, { toValue: 0, duration: 700, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [reduce, ring]);
+  const scale = ring.interpolate({ inputRange: [0, 1], outputRange: [1, 2.8] });
+  const opacity = ring.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.7, 0, 0] });
+  return (
+    <View style={styles.dotWrap} testID="status-live-dot">
+      {reduce ? null : <Animated.View style={[styles.dot, styles.ring, { backgroundColor: color, opacity, transform: [{ scale }] }]} />}
+      <View style={[styles.dot, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -141,6 +168,15 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  dotWrap: {
+    width: 7,
+    height: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ring: {
+    position: "absolute",
   },
   dot: {
     borderRadius: 3,

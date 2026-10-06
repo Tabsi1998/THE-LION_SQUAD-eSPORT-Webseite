@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, type StyleProp, type ViewStyle } from "react-native";
+import { AccessibilityInfo, Animated, type StyleProp, type ViewStyle } from "react-native";
+import { MOTION, motionEasing, staggerMs } from "../lib/motion";
 
 // Sanfte Übergänge (#218): Inhalt blendet kurz ein, statt zu springen. Keine Dauer-Animation,
 // und wer am Handy „Bewegung reduzieren“ / „Animationen entfernen“ eingestellt hat, bekommt
@@ -21,13 +22,12 @@ export function useReduceMotion(): boolean {
   return reduce;
 }
 
-export const FADE_MS = 220;
-const STEP_MS = 40;
-const MAX_STEPS = 6;
+// Dauer und Versatz aus den Bewegungs-Regeln (#1085): wie im Web (240 ms, 70 ms je Stelle, höchstens acht Stufen).
+export const FADE_MS = MOTION.mid;
 
 /** Versatz für Listen: die ersten Zeilen bauen sich leicht nacheinander auf, danach nicht mehr. */
 export function staggerDelay(index: number): number {
-  return Math.min(Math.max(0, index), MAX_STEPS) * STEP_MS;
+  return staggerMs(index);
 }
 
 export function FadeIn({ children, delay = 0, trigger, style }: {
@@ -46,7 +46,7 @@ export function FadeIn({ children, delay = 0, trigger, style }: {
       return undefined;
     }
     value.setValue(0);
-    const animation = Animated.timing(value, { toValue: 1, duration: FADE_MS, delay, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    const animation = Animated.timing(value, { toValue: 1, duration: FADE_MS, delay, easing: motionEasing, useNativeDriver: true });
     animation.start();
     return () => animation.stop();
   }, [delay, reduce, trigger, value]);
