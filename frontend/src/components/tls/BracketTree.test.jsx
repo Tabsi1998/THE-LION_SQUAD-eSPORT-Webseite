@@ -75,6 +75,19 @@ describe("BracketTree", () => {
     expect(screen.getByTestId("bracket-match-v2-m2")).toHaveTextContent("Station A");
   });
 
+  it("Sieger-Schimmer nur, wenn das Ergebnis gerade eintrifft - und nur über die Siegerzeile (#1076)", () => {
+    const { unmount } = render(<BracketTree data={knockout()} />);
+    expect(screen.getByTestId("bracket-match-v2-m1").querySelector("[data-sweep]")).toBeNull();
+    unmount();
+    render(<BracketTree data={knockout()} changedMatchIds={new Set(["m1", "m2"])} />);
+    const swept = screen.getByTestId("bracket-match-v2-m1").querySelectorAll("[data-sweep='1']");
+    expect(swept).toHaveLength(1);
+    expect(swept[0]).toHaveTextContent("Koblauchgeist");
+    expect(swept[0]).toHaveClass("tls-winner-sweep");
+    // Eine geänderte Partie ohne Ergebnis hat keine Siegerzeile.
+    expect(screen.getByTestId("bracket-match-v2-m2").querySelector("[data-sweep]")).toBeNull();
+  });
+
   it("am Handy Runde für Runde mit „Runde x von y“", async () => {
     render(<BracketTree data={knockout()} layout="steps" />);
     expect(screen.getByTestId("bracket-step-label")).toHaveTextContent("Runde 1 von 2");

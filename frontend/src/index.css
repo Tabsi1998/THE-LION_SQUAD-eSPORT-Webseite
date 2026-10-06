@@ -2266,3 +2266,159 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
     opacity: 0.4;
   }
 }
+
+/* Turniere (#1076) ------------------------------------------------------------------------------------------- */
+
+/* LIVE: der Chip steht ruhig, nur der Punkt pulsiert - mit einem Ring, der leise ausläuft. */
+.tls-live-dot {
+  position: relative;
+  flex: none;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 9999px;
+  background: currentColor;
+}
+.tls-live-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  animation: tls-live-ping 2.4s ease-out infinite;
+}
+@keyframes tls-live-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  70%, 100% { transform: scale(2.8); opacity: 0; }
+}
+
+/* Laufender Rahmen: nur an der Karte, die gerade live ist. Ein Lichtpunkt wandert in vier Sekunden um den Rand. */
+@property --tls-live-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.tls-live-frame { position: relative; }
+.tls-live-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  padding: 1.5px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--tls-live-angle), transparent 0 68%, var(--tls-live) 84%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: tls-live-frame 4s linear infinite;
+}
+@keyframes tls-live-frame {
+  to { --tls-live-angle: 360deg; }
+}
+
+/* Match-Karten in Bracket und Spielplan: beim Drüberfahren läuft oben eine Lichtkante ein. */
+.tls-bracket-node::before,
+.tls-match-edge::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 1;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--tls-cyan), transparent);
+  opacity: 0;
+  transform: translateX(calc(-100% * var(--tls-motion-on)));
+  transition: transform var(--tls-motion-slow) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-bracket-node:focus-visible::before,
+.tls-match-edge:focus-within::before {
+  opacity: 1;
+  transform: none;
+}
+@media (hover: hover) {
+  .tls-bracket-node:hover::before,
+  .tls-match-edge:hover::before {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Bracket: die Verbindungslinien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde. */
+.tls-bracket-line--draw {
+  stroke-dasharray: 1;
+  animation: tls-bracket-draw var(--tls-motion-slow) var(--tls-ease) backwards;
+  animation-delay: calc(var(--tls-i, 0) * 140ms * var(--tls-motion-on));
+}
+@keyframes tls-bracket-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Sieger: trifft ein Ergebnis ein, läuft einmal ein goldener Schimmer über die Zeile. Kein Konfetti. */
+.tls-winner-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.tls-winner-sweep::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 215, 0, 0.3) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: tls-winner-sweep 1.1s var(--tls-ease) 1 forwards;
+}
+@keyframes tls-winner-sweep {
+  to { transform: translateX(120%); }
+}
+
+/* Fast Lap (#1077) ------------------------------------------------------------------------------------------- */
+
+/* Beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */
+.tls-lap-row {
+  background-image: linear-gradient(90deg, transparent, rgba(41, 182, 232, 0.16), transparent);
+  background-repeat: no-repeat;
+  background-size: 60% 100%;
+  background-position: -150% 0;
+  transition: background-position var(--tls-motion-slow) var(--tls-ease);
+}
+@media (hover: hover) {
+  .tls-lap-row:hover {
+    background-position: calc(-150% + 400% * var(--tls-motion-on)) 0;
+  }
+}
+/* Platz 1 bis 3 tragen einen Strich in der Farbe ihrer Platzziffer; beim ersten Auftritt wächst er von unten. */
+.tls-lap-row--p1 > td:first-child,
+.tls-lap-row--p2 > td:first-child,
+.tls-lap-row--p3 > td:first-child {
+  position: relative;
+}
+.tls-lap-row--p1 > td:first-child::before,
+.tls-lap-row--p2 > td:first-child::before,
+.tls-lap-row--p3 > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: 50% 100%;
+}
+.tls-lap-board[data-intro="1"] .tls-lap-row > td:first-child::before {
+  animation: tls-lap-bar var(--tls-motion-slow) var(--tls-ease) backwards;
+  animation-delay: calc(var(--tls-motion-mid) * 2);
+}
+@keyframes tls-lap-bar {
+  from { transform: scaleY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-live-dot::after { animation: none; opacity: 0; }
+  .tls-live-frame::before { animation: none; background: var(--tls-live); opacity: 0.55; }
+  .tls-winner-sweep::after { animation: none; opacity: 0; }
+  .tls-bracket-line--draw { animation: none; }
+  .tls-lap-board[data-intro="1"] .tls-lap-row > td:first-child::before { animation: none; }
+}

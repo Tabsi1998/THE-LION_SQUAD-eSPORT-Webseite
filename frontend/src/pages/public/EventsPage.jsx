@@ -126,7 +126,8 @@ function EventCard({ e, meta }) {
       to={`/events/${e.slug}`}
       data-testid={`event-card-${e.slug}`}
       data-season-perch="card"
-      className="tls-card tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col"
+      data-live={e.public_phase?.state === "live" ? "1" : undefined}
+      className={`tls-card tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">

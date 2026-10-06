@@ -143,6 +143,44 @@ test("Turnierbaum 1440px: Kürzel, zweizeilige Köpfe, Spiel um Platz 3, Weg ein
   await expect(page.getByTestId("bracket-match-v2-wb")).not.toHaveAttribute("data-path", /.+/);
 });
 
+// Oberfläche (#1076): die Linien zeichnen sich beim Laden einmal, Runde für Runde; über einer Partie läuft beim
+// Drüberfahren eine Lichtkante ein; in der Liste trägt nur die Karte des laufenden Turniers den laufenden Rahmen.
+test("Turnierbaum: Linien zeichnen sich einmal, Lichtkante im Hover; nur die Live-Karte trägt den Rahmen", async ({ page, isMobile }) => {
+  test.skip(Boolean(isMobile), "Hover gibt es nur mit Maus");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockServer(page);
+  await page.goto("/tournaments/gamers-heaven/bracket");
+  await acceptCookies(page);
+  await expect(page.getByTestId("bracket-match-v2-wa")).toBeVisible();
+  const lines = page.getByTestId("bracket-connectors").locator("path");
+  await expect.poll(() => lines.count()).toBeGreaterThan(0);
+  const first = lines.first();
+  await expect(first).toHaveAttribute("pathLength", "1");
+  await expect(first).toHaveClass(/tls-bracket-line--draw/);
+  expect(await first.evaluate((node) => getComputedStyle(node).animationName)).toBe("tls-bracket-draw");
+  // Jede Linie kennt ihre Runde (--tls-i); spätere Runden warten mit dem Zeichnen auf die früheren. Dieser Baum hat
+  // eine Verbindungsrunde, also stehen alle auf 0.
+  await expect(first).toHaveAttribute("style", /--tls-i: ?0/);
+  const delays = await lines.evaluateAll((nodes) => nodes.map((node) => parseFloat(getComputedStyle(node).animationDelay)));
+  expect(delays.every((delay) => delay >= 0)).toBe(true);
+  const match = page.getByTestId("bracket-match-v2-wa");
+  expect(await match.evaluate((node) => getComputedStyle(node, "::before").opacity)).toBe("0");
+  await match.hover();
+  await expect.poll(() => match.evaluate((node) => getComputedStyle(node, "::before").opacity)).toBe("1");
+  await shot(page, "turnierbaum-licht-1440");
+
+  // Liste: die Karte des laufenden Turniers trägt den Rahmen, die anderen nicht.
+  const live = { ...LIST[0], id: "t4", slug: "live-cup", title: "Live-Cup", status: "live", public_phase: { state: "live", label: "Läuft" } };
+  await page.route("**/api/tournaments?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify([live, ...LIST]) }));
+  await page.goto("/tournaments");
+  await acceptCookies(page);
+  await expect(page.getByTestId("tournament-card-live-cup")).toHaveClass(/tls-live-frame/);
+  await expect(page.getByTestId("tournament-card-herbst-cup")).not.toHaveClass(/tls-live-frame/);
+  expect(await page.getByTestId("tournament-card-live-cup").evaluate((node) => getComputedStyle(node, "::before").animationName)).toBe("tls-live-frame");
+  expect(await page.getByTestId("tournament-card-live-cup").locator(".tls-live-dot").count()).toBe(1);
+  await shot(page, "turnierliste-live-rahmen-1440");
+});
+
 test("Turnierbaum nach dem Ende: „nicht gespielt“ statt „Geplant“, nichts atmet; 390px ohne Überlaufen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockServer(page, { status: "archived" });
