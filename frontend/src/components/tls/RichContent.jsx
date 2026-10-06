@@ -3,6 +3,7 @@ import { Calendar, Flag, Trophy } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { renderMarkdownLite } from "@/lib/markdownLite";
+import { viennaDate } from "@/lib/vienna";
 
 const EMBED_RE = /\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]/gi;
 const EMBED_PARSE_RE = /^\[\[\s*(event|events|turnier|turniere|tournament|tournaments|fastlap|fast-lap|f1)\s*:\s*([^\]\s]+)\s*\]\]$/i;
@@ -75,7 +76,7 @@ function EmbedCard({ embed }) {
         <div className="mt-1 font-heading font-black uppercase text-lg leading-tight group-hover:text-[#29B6E8] transition">{meta.title}</div>
         <div className="mt-2 flex flex-wrap gap-2 items-center">
           {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} />}
-          {item.start_date && <span className="text-xs text-white/50">{new Date(item.start_date).toLocaleDateString("de-DE")}</span>}
+          {item.start_date && <span className="text-xs text-white/50">{viennaDate(item.start_date)}</span>}
           {item.location && <span className="text-xs text-white/50">{item.location}</span>}
         </div>
         {(item.description) && <p className="mt-2 text-sm text-white/60 line-clamp-2">{item.description}</p>}

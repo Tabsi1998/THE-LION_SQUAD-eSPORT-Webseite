@@ -4,6 +4,7 @@ import { CheckCircle2, Crown, ExternalLink, Link2, RefreshCw, Send, Server, XCir
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 // Server-Verzeichnis (#624, Discord VI): ein Bot, mehrere Server. Der Hauptserver bekommt alle Meldungen wie bisher;
 // weitere Server (etwa je Spiel) erscheinen, sobald der Bot dort ist - ausgeschaltet, bis du sie einschaltest. Je
@@ -77,8 +78,8 @@ function GuildGames({ guild }) {
 }
 
 function when(value) {
-  const date = value ? new Date(value) : null;
-  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString("de-DE") : "";
+  const date = value ? asInstant(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? viennaDateTime(date) : "";
 }
 
 /** Rollen je Server (#629): letzter Abgleich in Worten - Änderungen, was fehlt, was angelegt wurde. */

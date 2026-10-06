@@ -14,10 +14,11 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel } from "@/lib/tournamentLabels";
 import { seoTextPreview } from "@/lib/textPreview";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 function formatDateTime(value) {
   if (!value) return "Termin offen";
-  return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 // Ein Spieltag ist eine Woche. Die Kopfzeile nennt deshalb den Zeitraum, nicht
@@ -25,8 +26,8 @@ function formatDateTime(value) {
 function formatWeekRange(startsAt, endsAt) {
   if (!startsAt || !endsAt) return "";
   const day = { day: "2-digit", month: "2-digit" };
-  const start = new Date(startsAt).toLocaleDateString("de-DE", day);
-  const end = new Date(endsAt).toLocaleDateString("de-DE", { ...day, year: "numeric" });
+  const start = viennaDate(startsAt, day);
+  const end = viennaDate(endsAt, { ...day, year: "numeric" });
   return `${start} – ${end}`;
 }
 

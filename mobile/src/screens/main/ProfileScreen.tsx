@@ -698,7 +698,7 @@ function AccountProfile() {
           <>
             <Card style={styles.card}>
               <Heading>Meine Gewinne</Heading>
-              <Muted>Preise aus Turnieren und Fast-Lap-Challenges, sobald sie fuer dein Konto oder Team hinterlegt sind.</Muted>
+              <Muted>Preise aus Turnieren und Fast-Lap-Challenges, sobald sie für dein Konto oder Team hinterlegt sind.</Muted>
               <View style={styles.statGrid}>
                 <Stat label="Offen" value={String(prizeStats.open.length)} />
                 <Stat label="Bereit" value={String(prizeStats.ready.length)} tone="gold" />
@@ -709,7 +709,7 @@ function AccountProfile() {
               prizes.map((item) => <PrizeCard key={item.id} item={item} onOpen={openPrize} />)
             ) : (
               <Card style={styles.card}>
-                <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis fuer dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" />
+                <EmptyState icon="trophy-outline" title="Noch keine Gewinne" detail="Sobald ein Preis für dich oder dein Team eingetragen wird, erscheint er hier." tone="gold" />
               </Card>
             )}
           </>

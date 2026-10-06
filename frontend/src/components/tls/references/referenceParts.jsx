@@ -3,6 +3,7 @@ import { ArrowRight, ExternalLink, Handshake, Medal, Trophy, User, Users } from 
 import { resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
 import { useCountUp } from "@/hooks/useCountUp";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Bausteine der Referenzen (#409, #859): Medaillen, Platz-Abzeichen, Karte einer Teilnahme, Einträge mit Aufstellung -
 // gemeinsam für die Referenzen-Seite und die Vereinsplatzierungen im Mitgliederprofil, damit beide gleich aussehen.
@@ -17,9 +18,9 @@ export const MEDAL_RANK = { gold: 0, silver: 1, bronze: 2 };
 
 export function formatDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { dateStyle: "medium" });
+  return viennaDate(date, { dateStyle: "medium" });
 }
 
 export function referenceGameName(item) {
@@ -100,7 +101,7 @@ export function medalOf(item) {
 }
 
 export function timeOf(item) {
-  const date = new Date(item.start_date || item.end_date || 0);
+  const date = asInstant(item.start_date || item.end_date || 0);
   return Number.isNaN(date.getTime()) ? 0 : date.getTime();
 }
 

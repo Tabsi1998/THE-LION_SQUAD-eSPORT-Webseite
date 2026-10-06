@@ -1,5 +1,6 @@
 import { Eye, Radio, RefreshCw } from "lucide-react";
 import { BrandField, SystemCard } from "./fields";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Twitch-Reiter der Einstellungen. Seit #310 sagt er, ob die Abfrage wirklich
 // läuft, und je Kanal, ob er auf die Startseite käme - und woran es sonst liegt.
@@ -17,7 +18,7 @@ export function apiCard(status) {
 export function pollCard(status) {
   const poll = status?.poll;
   if (!poll?.last_run_at) return { ok: false, detail: "Noch kein Lauf. Die Abfrage läuft alle 90 Sekunden, sobald Zugangsdaten gespeichert sind." };
-  const when = new Date(poll.last_run_at).toLocaleString("de-DE");
+  const when = viennaDateTime(poll.last_run_at);
   if (poll.ok) return { ok: true, detail: `${when}: ${poll.live || 0} live von ${poll.checked || 0} Kanälen` };
   return { ok: false, detail: when, problem: `${poll.reason_text || poll.reason}${poll.detail ? ` (${poll.detail})` : ""}` };
 }
@@ -83,7 +84,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
           <SystemCard title="Letzte Abfrage" ok={poll.ok} detail={poll.detail} problem={poll.problem} testId="twitch-card-poll" />
           <SystemCard title="Kanäle" ok={(status?.channels_visible || 0) > 0} detail={`${status?.checked_users || 0} Accounts mit Twitch-Feld, ${status?.channels_visible || 0} davon kämen auf die Startseite`} testId="twitch-card-channels" />
           <SystemCard title="Live" ok={(status?.live_count || 0) > 0} detail={`${status?.live_count || 0} Stream(s) aktuell live`} />
-          <SystemCard title="Clips" ok={Boolean(status?.clips?.enabled) && !status?.clips?.error} detail={status?.clips?.error || (status?.clips?.enabled ? `${status?.clips?.count || 0} Clips abgelegt${status?.clips?.fetched_at ? `, zuletzt ${new Date(status.clips.fetched_at).toLocaleString("de-DE")}` : ""}` : "aus – Schalter oben")} problem={status?.clips?.error ? "error" : undefined} testId="twitch-card-clips" />
+          <SystemCard title="Clips" ok={Boolean(status?.clips?.enabled) && !status?.clips?.error} detail={status?.clips?.error || (status?.clips?.enabled ? `${status?.clips?.count || 0} Clips abgelegt${status?.clips?.fetched_at ? `, zuletzt ${viennaDateTime(status.clips.fetched_at)}` : ""}` : "aus – Schalter oben")} problem={status?.clips?.error ? "error" : undefined} testId="twitch-card-clips" />
         </div>
       </div>
       {status?.live_streams?.length > 0 && (

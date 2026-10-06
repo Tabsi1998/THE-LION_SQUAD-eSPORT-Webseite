@@ -7,6 +7,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, sourcesFrom, summaryLines, syncLine, toCsv } from "@/lib/billing";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Finanzübersicht (#322): Rechnungsaufträge nach Status - was fehlt, was wartet, was frei zu
 // geben ist; angelegte Belege mit ihrem Zahlungsstand aus Dolibarr (#321); Prüffälle, die nur die
@@ -279,7 +280,7 @@ export default function AdminFinancePage() {
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
                       {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : row.source?.name || row.source_id}
-                      <div className="text-[11px] text-white/40">{new Date(row.created_at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>
+                      <div className="text-[11px] text-white/40">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
                       {Array.isArray(row.invoice_text) && (
                         <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
                       )}

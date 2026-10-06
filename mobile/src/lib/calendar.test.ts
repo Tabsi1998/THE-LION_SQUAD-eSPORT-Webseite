@@ -17,8 +17,8 @@ test("ein mehrtägiger Termin steht an jedem Tag, offene Enden werden gekappt", 
   const map = itemsByDay([
     { id: "lan", kind: "event", title: "LAN", start: "2026-10-02T18:00:00+02:00", end: "2026-10-04T12:00:00+02:00" },
     { id: "cup", kind: "tournament", title: "Cup", start: "2026-10-03T10:00:00+02:00" },
-    // Mittag statt Mitternacht: der Test läuft in der CI in UTC, und 00:00+02:00 ist dort noch der Vortag.
-    { id: "endlos", kind: "fastlap", title: "Saison", start: "2026-10-01T12:00:00+02:00", end: "2027-06-01T12:00:00+02:00" },
+    // Mitternacht in Wien: in UTC ist das noch der Vortag - der Kalender zählt Wiener Tage.
+    { id: "endlos", kind: "fastlap", title: "Saison", start: "2026-10-01T00:00:00+02:00", end: "2027-06-01T12:00:00+02:00" },
     { id: "kaputt", kind: "event", title: "?", start: "kein Datum" },
   ]);
   expect(map.get("2026-10-02")?.map((item) => item.id)).toEqual(["endlos", "lan"]);
@@ -26,11 +26,24 @@ test("ein mehrtägiger Termin steht an jedem Tag, offene Enden werden gekappt", 
   expect(map.get("2026-10-04")?.map((item) => item.id)).toEqual(["endlos", "lan"]);
   expect(map.get("2026-10-31")?.map((item) => item.id)).toEqual(["endlos"]);
   expect(map.get("2026-11-01")).toBeUndefined();
+  expect(map.get("2026-09-30")).toBeUndefined();
   expect(dayKey(new Date(2026, 0, 5))).toBe("2026-01-05");
 });
 
+test("ein Termin steht am Wiener Tag - auch kurz nach Mitternacht und über den Jahreswechsel", () => {
+  const map = itemsByDay([
+    { id: "nacht", kind: "event", title: "Nachtcup", start: "2026-10-04T00:30:00+02:00" },
+    { id: "silvester", kind: "event", title: "Silvester", start: "2026-12-31T20:00:00+01:00", end: "2027-01-01T02:00:00+01:00" },
+  ]);
+  expect(map.get("2026-10-04")?.map((item) => item.id)).toEqual(["nacht"]);
+  expect(map.get("2026-10-03")).toBeUndefined();
+  expect(map.get("2027-01-01")?.map((item) => item.id)).toEqual(["silvester"]);
+  // Halb eins am Neujahrstag in Wien: der Kalender geht im Jänner auf, auch wenn es in UTC noch Dezember ist.
+  expect(initialMonth([{ id: "neujahr", kind: "event", title: "Neujahr", start: "2026-12-31T23:30:00Z" }], new Date("2026-12-01T12:00:00Z"))).toEqual({ year: 2027, month: 0 });
+});
+
 test("der Kalender öffnet beim nächsten Termin, sonst heute", () => {
-  const now = new Date(2026, 8, 22, 12);
+  const now = new Date("2026-09-22T12:00:00+02:00");
   expect(initialMonth([{ id: "a", kind: "event", title: "A", start: "2026-11-05T18:00:00+01:00" }, { id: "b", kind: "event", title: "B", start: "2026-08-01T18:00:00+02:00" }], now)).toEqual({ year: 2026, month: 10 });
   expect(initialMonth([{ id: "b", kind: "event", title: "B", start: "2026-08-01T18:00:00+02:00" }], now)).toEqual({ year: 2026, month: 8 });
 });

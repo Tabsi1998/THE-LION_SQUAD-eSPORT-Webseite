@@ -21,6 +21,7 @@ import { useChangedKeys, useCountdown } from "@/hooks/useLiveChanges";
 import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liveChanges";
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -418,7 +419,7 @@ function NextUp({ items }) {
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-                {item.start_date && <div className="text-xs text-white/45">{new Date(item.start_date).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>}
+                {item.start_date && <div className="text-xs text-white/45">{viennaDateTime(item.start_date, { dateStyle: "medium", timeStyle: "short" })}</div>}
                 {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
               </div>
             </Link>
@@ -497,7 +498,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
           {news.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
         <h3 className={`mt-2 font-heading font-black uppercase leading-tight break-words line-clamp-3 group-hover:text-[#29B6E8] transition ${featured ? "text-xl md:text-2xl" : ""}`}>{news.title}</h3>
-        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{new Date(news.published_at || news.created_at).toLocaleDateString("de-DE", { dateStyle: "medium" })}</div>}
+        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{viennaDate(news.published_at || news.created_at, { dateStyle: "medium" })}</div>}
         {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>

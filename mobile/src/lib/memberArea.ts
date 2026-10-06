@@ -1,3 +1,4 @@
+import { asInstant, viennaDate } from "./vienna";
 // Mitgliederbereich in der App (#340, #339, #342): dieselbe Auswahl wie im Web
 // (frontend/src/lib/memberArea.js), damit Web und App dasselbe zeigen. Ohne React, damit es
 // sich testen lässt. Was jemand sehen darf, entscheidet der Server – hier wird nur sortiert.
@@ -105,9 +106,9 @@ export const FEE_STATUS_LABELS: Record<string, string> = {
 
 function formatDay(value?: string | null): string {
   if (!value) return "–";
-  const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("de-DE");
+  return viennaDate(date);
 }
 
 export function formatMoney(amount?: number | null, currency = "EUR"): string {

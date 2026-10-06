@@ -12,6 +12,7 @@ import { SkeletonList } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, ArrowRight } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -71,7 +72,7 @@ export default function MyPenaltiesPage() {
 function PenaltyCard({ p }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
-  const date = p.issued_at ? new Date(p.issued_at).toLocaleString("de-DE", {
+  const date = p.issued_at ? viennaDateTime(p.issued_at, {
     dateStyle: "medium", timeStyle: "short",
   }) : "—";
   return (

@@ -1,6 +1,7 @@
 // Medien (#223): Konstanten und reine Helfer, die Seite, Vorschau und Seitenblatt teilen.
 import { API_BASE } from "@/lib/api";
 import { VIDEO_EXTENSIONS } from "@/lib/galleryMedia";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 export const BACKEND = API_BASE;
 
@@ -35,9 +36,9 @@ export const uploadStatusClass = (status) => {
 
 export const fmtDateTime = (value) => {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return date.toLocaleString("de-DE");
+  return viennaDateTime(date);
 };
 
 export const fmtBytes = (n) => {

@@ -1,12 +1,13 @@
+import { asInstant, dayBefore, viennaDate, viennaDateTime, viennaDay, viennaTime } from "./vienna";
 export function displayName(user?: { display_name?: string | null; username?: string } | null) {
   return user?.display_name || user?.username || "Spieler";
 }
 
 export function formatDate(value?: string | null) {
   if (!value) return "Noch offen";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("de-AT", {
+  return viennaDate(date, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -15,9 +16,9 @@ export function formatDate(value?: string | null) {
 
 export function formatDateTime(value?: string | null) {
   if (!value) return "Noch offen";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("de-AT", {
+  return viennaDateTime(date, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -89,13 +90,14 @@ export function placeParts(...values: Array<string | null | undefined>) {
 /** Zeit einer Chat-Nachricht: heute nur die Uhrzeit, gestern "Gestern", sonst Datum und Uhrzeit. */
 export function formatChatTime(value?: string | null, now: Date = new Date()) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  const time = date.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const stamp = date.getTime();
-  if (stamp >= dayStart && stamp < dayStart + DAY_MS) return time;
-  if (stamp >= dayStart - DAY_MS && stamp < dayStart) return `Gestern, ${time}`;
+  const time = viennaTime(date, { hour: "2-digit", minute: "2-digit" });
+  // „Heute“ und „Gestern“ sind Wiener Tage - wie die Uhrzeit daneben.
+  const day = viennaDay(date);
+  const today = viennaDay(now);
+  if (day === today) return time;
+  if (day === dayBefore(today)) return `Gestern, ${time}`;
   return `${formatDate(value)}, ${time}`;
 }
 
@@ -112,8 +114,6 @@ export function continuesMessageGroup(previous: GroupableMessage | null | undefi
   if (Number.isNaN(before) || Number.isNaN(after)) return false;
   return after >= before && after - before <= maxGapMs;
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const STATUS_LABELS: Record<string, string> = {
   accepted: "Angenommen",

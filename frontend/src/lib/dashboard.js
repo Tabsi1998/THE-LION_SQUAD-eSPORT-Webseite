@@ -1,8 +1,10 @@
+import { asInstant, viennaDateTime, viennaDay } from "@/lib/vienna";
 // Was das Dashboard aus den eigenen Terminen macht (#256) - dieselben Regeln
 // wie die App-Startseite (mobile/src/lib/dashboard.ts) und das Backend
 // (_still_relevant in mobile_routes.py): offen ist, was nicht beendet oder
 // abgesagt ist und heute oder später endet; "Heute und Live" ist, was heute
-// stattfindet oder gerade läuft. Reine Logik ohne React.
+// stattfindet oder gerade läuft. "Heute" ist der Wiener Tag - er richtet sich
+// nach dem Verein, nicht nach dem Gerät. Reine Logik ohne React.
 
 const LIVE_PHASES = new Set(["live", "check_in"]);
 const LIVE_STATUSES = new Set(["live", "in_progress", "checkin_open", "check_in", "paused"]);
@@ -10,28 +12,18 @@ const DONE_STATUSES = new Set(["completed", "results_published", "archived", "ca
 
 export const VIENNA = "Europe/Vienna";
 
-function startOfLocalDay(now) {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-}
-
-function isSameLocalDay(value, now) {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
-}
-
 export function isStillRelevant(item, now = new Date()) {
   if (DONE_STATUSES.has(String(item?.status || "").toLowerCase())) return false;
-  const end = Date.parse(item?.endDate || item?.date || "");
-  if (Number.isNaN(end)) return true;
-  return end >= startOfLocalDay(now);
+  const end = viennaDay(item?.endDate || item?.date);
+  if (!end) return true;
+  return end >= viennaDay(now);
 }
 
 export function isLiveOrToday(item, now = new Date()) {
   if (LIVE_PHASES.has(String(item?.phaseState || "").toLowerCase())) return true;
   if (LIVE_STATUSES.has(String(item?.status || "").toLowerCase())) return true;
-  return isSameLocalDay(item?.date, now);
+  const day = viennaDay(item?.date);
+  return Boolean(day) && day === viennaDay(now);
 }
 
 const REGISTRATION_LABELS = {
@@ -102,11 +94,11 @@ export function splitHomeTimeline(items, now = new Date(), { liveLimit = 3, next
 
 export function formatVienna(value, { withTime = true } = {}) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   const options = { weekday: "short", day: "2-digit", month: "2-digit", timeZone: VIENNA };
   if (withTime) Object.assign(options, { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleString("de-AT", options);
+  return viennaDateTime(date, options);
 }
 
 // Eine Zeile zur Jahreswertung: die eigene Platzierung, sonst die Spitze.

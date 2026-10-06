@@ -12,6 +12,7 @@ import { SkeletonTable } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useAuth } from "@/context/AuthContext";
+import { viennaDate } from "@/lib/vienna";
 
 // Der Schaukasten (#619): Erfolg der Woche, Kategorien mit dem Fortschritt der Community, das Laufband der
 // neuesten Freischaltungen, Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum) und der Katalog
@@ -397,7 +398,7 @@ function WeekTile({ week, loading }) {
             <Link to={award.user?.username ? `/u/${award.user.username}` : "#"} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
-              {award.earned_at && <span className="text-white/35 text-xs">{new Date(award.earned_at).toLocaleDateString("de-DE")}</span>}
+              {award.earned_at && <span className="text-white/35 text-xs">{viennaDate(award.earned_at)}</span>}
             </Link>
             {award.award_id && (
               <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color }} data-testid="week-award-card">

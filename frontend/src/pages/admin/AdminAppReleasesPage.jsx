@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
+import { viennaDateTime } from "@/lib/vienna";
 
 // App-Versionen (#250): Der Server hält je Build eine APK für angemeldete
 // Nutzer. Hier liegt die Liste, das aktuelle Release, die Pflicht-Grenze
@@ -13,7 +14,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return new Date(value).toLocaleString("de-DE");
+    return viennaDateTime(value);
   } catch {
     return value;
   }

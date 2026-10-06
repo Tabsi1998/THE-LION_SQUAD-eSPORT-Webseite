@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Send, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 // Der eigene Stand bei der Moderation (#416): laufende Maßnahme (Hinweis, Verwarnung mit
 // Chat-Sperre, Sperre bis zur Entscheidung) mit Grund und Dauer, die Treffer der letzten Monate,
@@ -13,8 +14,8 @@ const ACTION_TONE = { notice: "#FFD700", warning: "#FF9500", suspension: "#FF3B3
 
 export function formatMoment(value) {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  const date = asInstant(value);
+  return Number.isNaN(date.getTime()) ? "" : viennaDateTime(date, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function appealState(appeal) {

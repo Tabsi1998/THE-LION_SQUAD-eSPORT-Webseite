@@ -19,6 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, CircleHelp, Pin, PinOff, Share2 } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
+import { viennaDate } from "@/lib/vienna";
 
 const LEVEL_META = {
   1: { name: "Bronze",   color: "#CD7F32" },
@@ -459,7 +460,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
         {tier.earned ? (
           <div className="text-[10px] uppercase tracking-widest text-white/70">
             +{tier.points} Pkt.
-            {tier.earned_at && <div className="text-white/45">{new Date(tier.earned_at).toLocaleDateString("de-DE")}</div>}
+            {tier.earned_at && <div className="text-white/45">{viennaDate(tier.earned_at)}</div>}
           </div>
         ) : (
           <div className="text-[10px] uppercase tracking-widest text-white/50">+{tier.points}</div>

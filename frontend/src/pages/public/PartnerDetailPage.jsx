@@ -12,6 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { seoTextPreview } from "@/lib/textPreview";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Partnerseite (#469 Teil 1): Kopf mit Logo, Art, „Partner seit“ und Kanal-Symbolen; links der
 // laufende Twitch-Stream (nur wenn live), der Text über den Partner, seine Tools und Projekte
@@ -25,9 +26,9 @@ export function twitchPlayerSrc(channel) {
 
 function formatDate(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 export function channelDetail(channel, twitch, discord) {

@@ -11,6 +11,7 @@ import { openSignIn } from "../../navigation/rootNavigation";
 import { EggArt } from "../../seasons/easter/art";
 import { fetchHuntPage, onHuntProgress, type HuntMe, type HuntPage } from "../../seasons/easterHunt/api";
 import { colors } from "../../theme";
+import { asInstant, viennaDate } from "../../lib/vienna";
 
 // Der Korb der Ostereiersuche (#647, wie /ostern im Web): Zeitraum, der eigene Korb mit den gefundenen Eiern in ihrem
 // echten Muster und leeren Mulden für die fehlenden (ohne etwas zu verraten), Hinweise ab dem zweiten Tag, Preise,
@@ -19,9 +20,9 @@ import { colors } from "../../theme";
 const GOLD = "#e9c46a";
 
 function dayLabel(iso?: string | null): string {
-  const day = new Date(iso || "");
+  const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
-  return day.toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
+  return viennaDate(day, { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
 }
 
 /** „1 Std. 12 Min.“ - die Zeit bis zum vollen Korb (wie im Web). */

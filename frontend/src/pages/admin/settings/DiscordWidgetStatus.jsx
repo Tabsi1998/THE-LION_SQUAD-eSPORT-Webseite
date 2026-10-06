@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
+import { viennaTime } from "@/lib/vienna";
 
 // Discord auf der Website (#581): ob das Server-Widget läuft, das Startseite und Mitgliederbereich mit
 // „online“ und „im Voice“ füttert - und wenn nicht, warum, mit Klickweg. „Jetzt prüfen“ nach dem
@@ -10,7 +11,7 @@ import { api, formatApiError } from "@/lib/api";
 export function widgetText(widget) {
   if (!widget) return "";
   if (widget.available) {
-    const when = widget.fetched_at ? ` · Stand ${new Date(widget.fetched_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}` : "";
+    const when = widget.fetched_at ? ` · Stand ${viennaTime(widget.fetched_at, { hour: "2-digit", minute: "2-digit" })}` : "";
     return `Läuft: ${widget.online || 0} online, ${widget.in_voice || 0} im Voice${when}.`;
   }
   return widget.reason_text || "Noch nicht abgefragt – das passiert jede Minute von selbst.";

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { toast } from "sonner";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Sponsoren und Partner aus Dolibarr (#405): ein Block über der Liste - Schalter, Kategorienamen,
 // Stand und „Jetzt nachlesen“. Derselbe Block auf beiden Seiten, weil es ein Schalter für beide
@@ -57,7 +58,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="dolibarr-source-state">
         {source.fetched_at ? (
-          <span className="text-white/60">Stand {new Date(source.fetched_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
+          <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
         ) : (
           <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
         )}

@@ -85,8 +85,11 @@ test("Markdown wie im Discord: Links mit Text, kursiv, Escapes zeigen das Zeiche
 });
 
 test("die Uhrzeit heißt heute „Heute um …“, sonst steht das Datum da", () => {
-  const now = new Date("2026-10-03T18:00:00");
-  expect(discordTime("2026-10-03T17:15:00", now)).toMatch(/^Heute um 17:15 Uhr$/);
-  expect(discordTime("2026-10-01T17:15:00", now)).toMatch(/^01\.10\.2026 17:15$/);
+  const now = new Date("2026-10-03T18:00:00+02:00");
+  expect(discordTime("2026-10-03T17:15:00+02:00", now)).toMatch(/^Heute um 17:15 Uhr$/);
+  expect(discordTime("2026-10-01T17:15:00+02:00", now)).toMatch(/^01\.10\.2026 17:15$/);
+  // „Heute“ ist der Wiener Tag: zehn nach Mitternacht in Wien ist es in UTC noch der Vortag.
+  expect(discordTime("2026-10-03T00:10:00+02:00", now)).toMatch(/^Heute um 00:10 Uhr$/);
+  expect(discordTime("2026-10-02T23:50:00+02:00", now)).toMatch(/^02\.10\.2026 23:50$/);
   expect(discordTime("kein Datum", now)).toBe("");
 });

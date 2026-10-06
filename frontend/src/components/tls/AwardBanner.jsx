@@ -1,13 +1,14 @@
 import { Link } from "react-router-dom";
 import { Medal, Trophy, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 /** Nur der Tag im Vereins-Kalender – die Uhrzeit des Turnierstarts gehört nicht aufs Banner. */
 export function awardDay(value) {
   if (!value) return "";
-  const date = new Date(value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-AT", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Vienna" });
+  return viennaDate(date, { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Vienna" });
 }
 
 // Auszeichnungen (#230): das Banner entsteht aus den Daten – Platz, Bilanz, Turnier, Spiel, Saison.

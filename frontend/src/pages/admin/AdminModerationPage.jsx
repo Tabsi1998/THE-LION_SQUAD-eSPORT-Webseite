@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { formatMoment } from "@/components/tls/ModerationStandingCard";
 import ImageScanTab from "@/pages/admin/moderation/ImageScanTab";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Moderation (#417): drei Reiter - die Meldungen der Community, die Funde des Wortfilters
 // (zurückgehalten wartet auf eine Entscheidung, markiert steht nur da) und die Wortliste selbst.
@@ -315,7 +316,7 @@ function ReportsTab() {
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{report.category} · {STATUS_LABEL[report.status] || report.status}</div>
                 <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap">{report.details}</div>
-                <div className="mt-2 text-[11px] text-white/35">Meldung {report.id} · Ziel {report.target_user_id}{report.message_id ? ` · Nachricht ${report.message_id}` : ""} · {report.created_at && new Date(report.created_at).toLocaleString("de-DE")}</div>
+                <div className="mt-2 text-[11px] text-white/35">Meldung {report.id} · Ziel {report.target_user_id}{report.message_id ? ` · Nachricht ${report.message_id}` : ""} · {report.created_at && viennaDateTime(report.created_at)}</div>
               </div>
               <select value={report.status} disabled={busy === report.id} onChange={(event) => update(report, event.target.value)} className="h-10 bg-black/40 border border-white/10 px-3 text-sm">
                 {STATUS.map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
@@ -376,7 +377,7 @@ function ItemsTab() {
                 <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
                 <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
                 <div className="mt-2 text-[11px] text-white/35">
-                  {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && new Date(item.created_at).toLocaleString("de-DE")}
+                  {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && viennaDateTime(item.created_at)}
                   {item.note ? ` · Notiz: ${item.note}` : ""}
                 </div>
               </div>

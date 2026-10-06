@@ -11,6 +11,7 @@ import { useSeason } from "@/seasons/SeasonContext";
 import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
+import { viennaDate } from "@/lib/vienna";
 
 // Der Mitgliederbereich (#284): oben die Mitgliedschaft, eine Zeile Verweise,
 // darunter nur Karten mit Inhalt. Vorher standen vier Kacheln und darunter
@@ -235,7 +236,7 @@ export default function MemberAreaPage() {
                 <div className="space-y-3">
                   {internalNews.map((n) => (
                     <Link key={n.id} to={`/news/${n.slug}`} className="block border-l-2 border-[#FFD700]/50 pl-3 hover:border-[#FFD700] transition">
-                      <div className="text-[10px] uppercase tracking-widest text-white/40">{new Date(n.created_at).toLocaleDateString("de-DE")}</div>
+                      <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.created_at)}</div>
                       <div className="font-bold text-white mt-0.5">{n.title}</div>
                     </Link>
                   ))}

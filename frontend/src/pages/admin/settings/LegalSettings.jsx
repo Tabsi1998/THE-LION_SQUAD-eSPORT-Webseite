@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { BrandField, LegalTextArea } from "./fields";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Reiter Rechtliches (#223: aus AdminSettingsPage herausgelöst, Verhalten unverändert): Vereinsdaten
 // für Impressum und Datenschutz, der Stand „Vereinsdaten aus Dolibarr“ (#326; der Schalter liegt seit
@@ -72,7 +73,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
               : !dolibarrPublic.has_data ? <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
               : (
                 <>
-                  <span className="text-white/60">Stand {new Date(dolibarrPublic.fetched_at).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
+                  <span className="text-white/60">Stand {viennaDateTime(dolibarrPublic.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
                   <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-[#FFD700]">kein freigegebener Name – bleibt von Hand</span>}</span>
                   {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-[#FFD700]"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
                   {dolibarrPublic.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}

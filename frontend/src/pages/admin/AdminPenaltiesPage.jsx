@@ -9,6 +9,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, ShieldAlert, RefreshCw } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -97,7 +98,7 @@ export default function AdminPenaltiesPage() {
 function Row({ p }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
-  const date = p.issued_at ? new Date(p.issued_at).toLocaleString("de-DE", {
+  const date = p.issued_at ? viennaDateTime(p.issued_at, {
     dateStyle: "short", timeStyle: "short",
   }) : "—";
   return (

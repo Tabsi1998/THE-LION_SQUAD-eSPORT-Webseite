@@ -11,6 +11,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { toast } from "sonner";
 import { ExternalLink, Medal, Pencil, Plus, Save, Trash2, User, Users } from "lucide-react";
+import { viennaDate } from "@/lib/vienna";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
@@ -177,7 +178,7 @@ function buildReferenceSuggestions(items, helpers) {
 
 function formatDate(value) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("de-DE", { dateStyle: "medium" });
+  return viennaDate(value, { dateStyle: "medium" });
 }
 
 function entryPeople(entry) {

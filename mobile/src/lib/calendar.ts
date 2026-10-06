@@ -1,6 +1,8 @@
 // Kalender (#216): Monatsraster, Termine je Tag und „In meinen Kalender“ - reine Rechnung ohne
-// Netz und ohne native Module, damit sie sich testen lässt. Tage sind lokale Gerätetage; Verein
-// und Mitglieder sind in Wien, die Termine kommen als ISO-Zeit mit Zone.
+// Netz und ohne native Module, damit sie sich testen lässt. Ein Tag ist ein Kalendertag in Wien
+// („JJJJ-MM-TT“) - wie die Uhrzeit daneben; die Termine kommen als ISO-Zeit mit Zone. Das Raster
+// selbst ist reine Kalenderrechnung.
+import { viennaDay } from "./vienna";
 
 export type CalendarKind = "event" | "tournament" | "fastlap";
 
@@ -75,8 +77,8 @@ export function itemsByDay(items: CalendarItem[]): Map<string, CalendarItem[]> {
     const start = parseIso(item.start);
     if (!start) continue;
     const end = parseIso(item.end) || start;
-    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const cursor = parseDay(viennaDay(start));
+    const last = parseDay(viennaDay(end));
     let steps = 0;
     while (cursor.getTime() <= last.getTime() && steps < MAX_SPAN_DAYS) {
       const key = dayKey(cursor);
@@ -97,8 +99,8 @@ export function initialMonth(items: CalendarItem[], now: Date = new Date()): { y
     .map((item) => parseIso(item.start))
     .filter((date): date is Date => Boolean(date) && (date as Date).getTime() >= now.getTime())
     .sort((a, b) => a.getTime() - b.getTime())[0];
-  const anchor = upcoming || now;
-  return { year: anchor.getFullYear(), month: anchor.getMonth() };
+  const [year, month] = viennaDay(upcoming || now).split("-").map(Number);
+  return { year, month: month - 1 };
 }
 
 // ---------------------------------------------------------------- „In meinen Kalender“

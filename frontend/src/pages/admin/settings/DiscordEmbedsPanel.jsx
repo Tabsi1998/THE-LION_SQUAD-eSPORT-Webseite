@@ -3,6 +3,7 @@ import { Pin, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { channelOptionLabel } from "./DiscordTargets";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 // Live-Einbettungen (#569): je Einbettung ein Kanal und ein Schalter; der Bot postet eine Nachricht,
 // pinnt sie und bearbeitet sie danach (höchstens einmal pro Minute, ein Sammler alle zehn Minuten).
@@ -15,8 +16,8 @@ export const SUB_EMBEDS = ["ranking", "events"];
 
 export function whenText(value) {
   if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("de-DE");
+  const date = asInstant(value);
+  return Number.isNaN(date.getTime()) ? String(value) : viennaDateTime(date);
 }
 
 // „zuletzt geprüft“ (#883): ob der Lauf überhaupt noch kommt - sonst stand „Nachricht steht“ tagelang still da.

@@ -1,6 +1,8 @@
+import { asInstant, dayNoon, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
 // Kalender auf der Website (#402): Monatsraster, Termine je Tag und der Abo-Link - dieselbe
 // Rechnung wie in der App (mobile/src/lib/calendar.ts), ohne React, damit sie sich testen lässt.
-// Tage sind lokale Gerätetage; die Termine kommen vom Server als ISO-Zeit mit Zone.
+// Ein Tag ist ein Kalendertag in Wien („JJJJ-MM-TT“) - wie die Uhrzeit daneben; die Termine kommen vom Server
+// als ISO-Zeit mit Zone. Das Raster selbst ist reine Kalenderrechnung.
 
 export const WEEKDAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const MONTHS = ["Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -50,7 +52,7 @@ export function monthMatrix(year, month) {
 
 function parseIso(value) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = asInstant(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -61,8 +63,8 @@ export function itemsByDay(items) {
     const start = parseIso(item.start);
     if (!start) continue;
     const end = parseIso(item.end) || start;
-    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const cursor = parseDay(viennaDay(start));
+    const last = parseDay(viennaDay(end));
     let steps = 0;
     while (cursor.getTime() <= last.getTime() && steps < MAX_SPAN_DAYS) {
       const key = dayKey(cursor);
@@ -83,8 +85,8 @@ export function initialMonth(items, now = new Date()) {
     .map((item) => parseIso(item.start))
     .filter((date) => date && date.getTime() >= now.getTime())
     .sort((a, b) => a.getTime() - b.getTime())[0];
-  const anchor = upcoming || now;
-  return { year: anchor.getFullYear(), month: anchor.getMonth() };
+  const [year, month] = viennaDay(upcoming || now).split("-").map(Number);
+  return { year, month: month - 1 };
 }
 
 /** Was als Nächstes ansteht: läuft noch oder beginnt später - nach Beginn, begrenzt. */
@@ -115,9 +117,9 @@ export function feedUrls(origin, feedPath = "/api/calendar/feed.ics") {
 export function timeLabel(value) {
   const date = parseIso(value);
   if (!date) return "";
-  return date.toLocaleTimeString("de-AT", { hour: "2-digit", minute: "2-digit" });
+  return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
 }
 
 export function dayLabel(key) {
-  return parseDay(key).toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long" });
+  return viennaDate(dayNoon(key), { weekday: "long", day: "numeric", month: "long" });
 }

@@ -15,6 +15,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
+import { viennaDateTime } from "@/lib/vienna";
 
 const scheduleLabels = {
   proposed: "Terminvorschlag offen",
@@ -43,7 +44,7 @@ const scheduleModeLabels = {
 
 function formatDateTime(value) {
   if (!value) return "Noch kein Termin";
-  return new Date(value).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
 }
 
 function stationLabel(match) {

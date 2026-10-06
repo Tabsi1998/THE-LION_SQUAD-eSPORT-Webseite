@@ -1,5 +1,6 @@
 // Einstellungen (#223): Abschnitt „Newsletter“ – nur Darstellung; Zustand und Handler bleiben in AdminSettingsPage.
 import { Send, RefreshCw, Eye } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 export function NewsletterSection({ newsletterSources, newsletter, setNewsletter, newsletterPreview, setNewsletterPreview, loadingNewsletterPreview, sendingNewsletter, loadNewsletterSources, previewNewsletter, sendNewsletter, newsletterOptions, selectedNewsletterSource }) {
   return (
@@ -58,7 +59,7 @@ export function NewsletterSection({ newsletterSources, newsletter, setNewsletter
             </div>
             <div className="border border-white/10 bg-black/20 rounded-sm p-3">
               <div className="uppercase tracking-widest text-white/40 font-bold mb-1">Schon versendet</div>
-              <div className="text-white/80">{selectedNewsletterSource.newsletter_sent_at ? new Date(selectedNewsletterSource.newsletter_sent_at).toLocaleString("de-DE") : "nein"}</div>
+              <div className="text-white/80">{selectedNewsletterSource.newsletter_sent_at ? viennaDateTime(selectedNewsletterSource.newsletter_sent_at) : "nein"}</div>
             </div>
           </div>
         )}
@@ -121,7 +122,7 @@ export function NewsletterSection({ newsletterSources, newsletter, setNewsletter
             </div>
             <div className="border border-white/10 bg-black/20 rounded-sm p-3">
               <div className="uppercase tracking-widest text-white/40 font-bold mb-1">Letzter Versand</div>
-              <div className="text-white/80">{newsletterPreview.already_sent_at || newsletterPreview.sent_at ? new Date(newsletterPreview.already_sent_at || newsletterPreview.sent_at).toLocaleString("de-DE") : "nein"}</div>
+              <div className="text-white/80">{newsletterPreview.already_sent_at || newsletterPreview.sent_at ? viennaDateTime(newsletterPreview.already_sent_at || newsletterPreview.sent_at) : "nein"}</div>
             </div>
           </div>
           {(newsletterPreview.sample || []).length > 0 && (

@@ -1,3 +1,4 @@
+import { asInstant, viennaDate } from "./vienna";
 // Digitale Mitgliedskarte (#346), App-Seite. Der Server gibt Karte und Prüfcode; der Code gilt
 // fünf Minuten, die App holt rechtzeitig vorher einen neuen - ein Foto des Codes ist damit wertlos.
 
@@ -36,6 +37,6 @@ export function cardExpired(card: MemberCard | null, now: number = Date.now()): 
 export function validUntilLine(card: MemberCard): string {
   if (card.status !== "valid") return "";
   if (!card.valid_until) return "Gültig, solange die Mitgliedschaft besteht";
-  const date = new Date(card.valid_until.length === 10 ? `${card.valid_until}T00:00:00` : card.valid_until);
-  return Number.isNaN(date.getTime()) ? `Gültig bis ${card.valid_until}` : `Gültig bis ${date.toLocaleDateString("de-DE")}`;
+  const date = asInstant(card.valid_until);
+  return Number.isNaN(date.getTime()) ? `Gültig bis ${card.valid_until}` : `Gültig bis ${viennaDate(date)}`;
 }

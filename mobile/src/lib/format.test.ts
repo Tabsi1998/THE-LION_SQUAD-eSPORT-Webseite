@@ -83,12 +83,19 @@ describe("Ortsangaben", () => {
 });
 
 describe("Zeit im Chat", () => {
-  const now = new Date(2026, 8, 15, 18, 30); // 15.09.2026, 18:30 Ortszeit
+  const now = new Date("2026-09-15T18:30:00+02:00"); // 15.09.2026, 18:30 in Wien
 
   test("heute nur die Uhrzeit, gestern mit Hinweis, sonst Datum und Uhrzeit", () => {
-    expect(formatChatTime(new Date(2026, 8, 15, 14, 5).toISOString(), now)).toBe("14:05");
-    expect(formatChatTime(new Date(2026, 8, 14, 23, 59).toISOString(), now)).toBe("Gestern, 23:59");
-    expect(formatChatTime(new Date(2026, 4, 20, 9, 0).toISOString(), now)).toBe("20.05.2026, 09:00");
+    expect(formatChatTime("2026-09-15T14:05:00+02:00", now)).toBe("14:05");
+    expect(formatChatTime("2026-09-14T23:59:00+02:00", now)).toBe("Gestern, 23:59");
+    expect(formatChatTime("2026-05-20T09:00:00+02:00", now)).toBe("20.05.2026, 09:00");
+  });
+
+  test("die Tage zählen in Wien: zehn nach Mitternacht ist schon heute", () => {
+    expect(formatChatTime("2026-09-15T00:10:00+02:00", now)).toBe("00:10"); // in UTC noch der 14.
+    expect(formatChatTime("2026-09-14T00:10:00+02:00", now)).toBe("Gestern, 00:10");
+    expect(formatChatTime("2026-09-13T23:50:00+02:00", now)).toBe("13.09.2026, 23:50");
+    expect(formatChatTime("2026-09-16T00:10:00+02:00", now)).toBe("16.09.2026, 00:10");
   });
 
   test("ohne oder mit kaputtem Wert kommt nichts Erfundenes", () => {

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Eine Benachrichtigung (oder ein Bündel) als anklickbare Zeile (#255):
 // Titel, eine Zeile Vorschau, Zeit. Der Klick führt ans Ziel und meldet
@@ -10,7 +11,7 @@ import { isExternalUrl, previewText } from "@/lib/notifications";
 export function notificationDate(value) {
   if (!value) return "";
   try {
-    return new Date(value).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+    return viennaDateTime(value, { dateStyle: "short", timeStyle: "short" });
   } catch {
     return "";
   }

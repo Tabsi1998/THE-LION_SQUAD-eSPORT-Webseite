@@ -3,6 +3,7 @@ import { RefreshCw, Youtube } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
+import { asInstant, viennaDateTime } from "@/lib/vienna";
 
 // YouTube → News (#578): neue Videos des Vereinskanals werden von selbst News der Art „Video“ - als
 // Entwurf oder gleich veröffentlicht, Shorts wahlweise. Hier stehen die Schalter, der Kanal, der letzte
@@ -10,8 +11,8 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 
 export function whenText(value) {
   if (!value) return "noch nie";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString("de-DE");
+  const date = asInstant(value);
+  return Number.isNaN(date.getTime()) ? String(value) : viennaDateTime(date);
 }
 
 export function fetchResultText(result) {

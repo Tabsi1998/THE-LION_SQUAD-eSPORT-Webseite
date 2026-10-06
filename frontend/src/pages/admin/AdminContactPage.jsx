@@ -5,6 +5,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle } from "lucide-react";
+import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
 const STATUS_LABEL = {
   new: { l: "Neu", c: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
@@ -70,7 +71,7 @@ export default function AdminContactPage() {
             </div>
             <h1 className="font-heading text-2xl font-black uppercase mb-3">{active.subject}</h1>
             <div className="text-sm text-white/60 mb-4">
-              <strong>{active.name}</strong> &lt;<a href={`mailto:${active.email}`} className="text-[#29B6E8] hover:underline">{active.email}</a>&gt; · {new Date(active.created_at).toLocaleString("de-DE")}
+              <strong>{active.name}</strong> &lt;<a href={`mailto:${active.email}`} className="text-[#29B6E8] hover:underline">{active.email}</a>&gt; · {viennaDateTime(active.created_at)}
             </div>
             <div className="border-t border-white/10 pt-4">
               <pre className="whitespace-pre-wrap text-sm text-white/85 font-sans leading-relaxed">{active.message}</pre>
@@ -139,7 +140,7 @@ export default function AdminContactPage() {
                 const s = STATUS_LABEL[m.status] || STATUS_LABEL.new;
                 return (
                   <tr key={m.id} onClick={() => setActive(m)} data-testid={`contact-row-${m.id}`} className="cursor-pointer hover:bg-white/5">
-                    <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{new Date(m.created_at).toLocaleDateString("de-DE")}</td>
+                    <td className="px-4 py-3 text-white/50 text-xs whitespace-nowrap">{viennaDate(m.created_at)}</td>
                     <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="text-xs text-white/40">{m.email}</div></td>
                     <td className="px-4 py-3 text-xs text-[#29B6E8]">{TOPIC_LABEL[m.topic] || m.topic}</td>
                     <td className="px-4 py-3"><div className="font-semibold truncate max-w-md">{m.subject}</div></td>

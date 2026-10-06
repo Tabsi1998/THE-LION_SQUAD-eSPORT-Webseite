@@ -3,6 +3,9 @@
 // "Heute und Live" ist nur, was heute stattfindet oder gerade läuft. Vorher
 // zählte jede offene Anmeldung als "live", und Halloween stand im September
 // unter "Heute" - und gleich darunter noch einmal unter "nächste Termine" (#212).
+// "Heute" ist der Wiener Tag - er richtet sich nach dem Verein, nicht nach dem
+// Gerät, wie im Backend und wie die Uhrzeiten daneben.
+import { viennaDay } from "./vienna";
 
 export type HomeItem = {
   id: string;
@@ -21,17 +24,15 @@ export type HomeItem = {
 const LIVE_PHASES = new Set(["live", "check_in"]);
 const LIVE_STATUSES = new Set(["live", "in_progress", "checkin_open", "check_in", "paused"]);
 
-export function isSameLocalDay(value: string | null | undefined, now: Date) {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
+export function isSameViennaDay(value: string | null | undefined, now: Date) {
+  const day = viennaDay(value);
+  return Boolean(day) && day === viennaDay(now);
 }
 
 export function isLiveOrToday(item: HomeItem, now: Date = new Date()) {
   if (LIVE_PHASES.has(String(item.phaseState || "").toLowerCase())) return true;
   if (LIVE_STATUSES.has(String(item.status || "").toLowerCase())) return true;
-  return isSameLocalDay(item.date, now);
+  return isSameViennaDay(item.date, now);
 }
 
 const homeKey = (item: HomeItem) => `${item.kind}-${item.id}`;
@@ -59,15 +60,11 @@ const DONE_STATUSES = new Set(["completed", "results_published", "archived", "ca
 
 export type DatedItem = { status?: string | null; date?: string | null; endDate?: string | null };
 
-function startOfLocalDay(now: Date) {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-}
-
 export function isStillRelevant(item: DatedItem, now: Date = new Date()) {
   if (DONE_STATUSES.has(String(item.status || "").toLowerCase())) return false;
-  const end = Date.parse(item.endDate || item.date || "");
-  if (Number.isNaN(end)) return true;
-  return end >= startOfLocalDay(now);
+  const end = viennaDay(item.endDate || item.date);
+  if (!end) return true;
+  return end >= viennaDay(now);
 }
 
 /** Offenes zuerst; Vergangenes getrennt und neueste zuerst. */

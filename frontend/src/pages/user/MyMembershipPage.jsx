@@ -12,6 +12,7 @@ import { MemberFileAccountsCard } from "@/pages/user/MemberFileAccountsCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, ArrowLeft, History, Wallet, Users, ShieldCheck } from "lucide-react";
+import { viennaDateTime } from "@/lib/vienna";
 
 const STATUS_LABELS = {
   active: "Aktives Mitglied", honorary: "Ehrenmitglied",
@@ -140,7 +141,7 @@ export default function MyMembershipPage() {
                         <span className="text-white/40"> (vorher: {STATUS_LABELS[h.from_status] || h.from_status})</span>
                       )}
                     </div>
-                    <div className="text-xs text-white/40 mt-0.5">{new Date(h.at).toLocaleString("de-DE")}</div>
+                    <div className="text-xs text-white/40 mt-0.5">{viennaDateTime(h.at)}</div>
                     {h.source === "dolibarr" && <div className="text-xs text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
                   </div>
                 </div>

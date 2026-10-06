@@ -6,10 +6,11 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import {
-  KINDS, KIND_COLORS, KIND_LABELS, WEEKDAY_LABELS, dayKey, dayLabel, feedUrls, filterKinds, initialMonth, itemsByDay,
+  KINDS, KIND_COLORS, KIND_LABELS, WEEKDAY_LABELS, dayLabel, feedUrls, filterKinds, initialMonth, itemsByDay,
   monthLabel, monthMatrix, parseDay, shiftMonth, timeLabel, upcomingItems,
 } from "@/lib/calendar";
 import { CalendarDays, ChevronLeft, ChevronRight, Copy, Check, ExternalLink, LogIn } from "lucide-react";
+import { viennaDateTime, viennaDay } from "@/lib/vienna";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
 // Art, ein goldener Rahmen um Tage mit eigener Anmeldung, darunter die Termine des gewählten Tags.
@@ -36,7 +37,7 @@ export default function CalendarPage() {
   const byDay = useMemo(() => itemsByDay(items), [items]);
   const shown = month || initialMonth(items);
   const weeks = useMemo(() => monthMatrix(shown.year, shown.month), [shown.year, shown.month]);
-  const todayKey = dayKey(new Date());
+  const todayKey = viennaDay(new Date());
   const dayItems = selectedDay ? byDay.get(selectedDay) || [] : [];
   const next = useMemo(() => upcomingItems(items), [items]);
   const feed = feedUrls(typeof window !== "undefined" ? window.location.origin : "https://lionsquad.at", payload?.feed_path);
@@ -168,7 +169,7 @@ export default function CalendarPage() {
 
 function ItemRow({ item, withDate = false }) {
   const when = withDate
-    ? new Date(item.start).toLocaleString("de-AT", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    ? viennaDateTime(item.start, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
     : timeLabel(item.start);
   return (
     <Link to={item.path} data-testid={`calendar-item-${item.kind}-${item.id}`} className="flex items-start gap-3 border border-white/5 bg-black/15 hover:border-[#9F7AEA]/50 rounded-sm px-3 py-2 transition min-w-0">

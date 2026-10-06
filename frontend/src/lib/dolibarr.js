@@ -1,3 +1,4 @@
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 // Dolibarr-Anbindung (#295, #297, #316): Texte und kleine Entscheidungen für die
 // Admin-Seite und „Meine Mitgliedschaft“. Die Regeln selbst liegen im Backend.
 
@@ -65,9 +66,9 @@ export const CAPABILITY_LABELS = {
 
 export function formatDate(value) {
   if (!value) return "–";
-  const date = new Date(value.length === 10 ? `${value}T00:00:00` : value);
+  const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  return value.length === 10 ? date.toLocaleDateString("de-DE") : date.toLocaleString("de-DE");
+  return value.length === 10 ? viennaDate(date) : viennaDateTime(date);
 }
 
 export function formatMoney(amount, currency = "EUR") {

@@ -3,6 +3,7 @@ import { Send, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { DiscordMessagePreview } from "@/components/tls/DiscordMessagePreview";
+import { viennaDateTime } from "@/lib/vienna";
 
 // Willkommensnachricht (#574): wer neu auf den Discord-Server kommt, bekommt vom Bot eine Direktnachricht -
 // einmal je Person, mit „Auf der Website anmelden“ und „Konto verknüpfen“. Standard aus, bis der Text geprüft
@@ -14,7 +15,7 @@ export function statsText(stats) {
   if (!stats) return "";
   const parts = [`${stats.sent || 0} gesendet`, `${stats.dm_closed || 0} mit geschlossenen Direktnachrichten`];
   if (stats.error) parts.push(`${stats.error} Fehler`);
-  const last = stats.last_at ? ` · zuletzt ${new Date(stats.last_at).toLocaleString("de-DE")}` : "";
+  const last = stats.last_at ? ` · zuletzt ${viennaDateTime(stats.last_at)}` : "";
   return `${parts.join(" · ")}${last}`;
 }
 

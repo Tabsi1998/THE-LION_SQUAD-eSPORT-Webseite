@@ -8,6 +8,7 @@ import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { EggShape } from "@/seasons/easterHunt/EggShape";
 import { fetchHuntPage, onHuntProgress } from "@/seasons/easterHunt/api";
 import "@/seasons/easterHunt/easter-hunt.css";
+import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
 // Die Seite der Ostereiersuche (#646, Korb #758): der eigene Korb mit den gefundenen Eiern in ihrem echten Muster,
 // leere Plätze für die fehlenden (ohne etwas zu verraten), Hinweise ab dem zweiten Tag, Preise, die Schnellsten
@@ -16,15 +17,15 @@ import "@/seasons/easterHunt/easter-hunt.css";
 const SERIF = { fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' };
 
 function dayLabel(iso) {
-  const day = new Date(iso || "");
+  const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
-  return day.toLocaleDateString("de-AT", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
+  return viennaDate(day, { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
 }
 
 function timeLabel(iso) {
-  const day = new Date(iso || "");
+  const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
-  return day.toLocaleString("de-AT", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Vienna" });
+  return viennaDateTime(day, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Vienna" });
 }
 
 /** „1 Std. 12 Min.“ - die Zeit bis zum vollen Korb, gezählt ab Karfreitag 0 Uhr. */

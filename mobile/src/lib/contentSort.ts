@@ -1,9 +1,11 @@
+import { asInstant, viennaDay } from "./vienna";
+
 const DONE_STATUSES = ["completed", "results_published", "archived", "cancelled", "beendet", "archiv"];
 const ACTIVE_TERMS = ["live", "check", "open", "registration", "anmeldung", "aktiv", "running", "progress"];
 
 function timestamp(value?: string | null) {
   if (!value) return null;
-  const time = new Date(value).getTime();
+  const time = asInstant(value).getTime();
   return Number.isNaN(time) ? null : time;
 }
 
@@ -19,7 +21,8 @@ function sortBucket(date?: string | null, status?: string | null, phase?: string
   if (active && !done) return 0;
   if (time == null) return 4;
   if (!done && time >= Date.now()) return 1;
-  if (!done && new Date(time).toDateString() === new Date().toDateString()) return 0;
+  // Derselbe Wiener Tag - "heute" richtet sich nach dem Verein, nicht nach dem Gerät.
+  if (!done && viennaDay(time) === viennaDay(new Date())) return 0;
   if (done) return 3;
   return 2;
 }

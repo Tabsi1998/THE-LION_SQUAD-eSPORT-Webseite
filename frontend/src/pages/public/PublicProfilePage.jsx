@@ -31,6 +31,7 @@ import {
   Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award,
 } from "lucide-react";
 import { toast } from "sonner";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste, fünf Reiter (Übersicht, Achievements,
@@ -85,11 +86,9 @@ function copyText(value, successMessage = "Kopiert.") {
 function formatPublicDate(value) {
   if (!value) return "";
   const raw = String(value).trim();
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
-    ? new Date(`${raw}T12:00:00`)
-    : new Date(raw);
+  const date = asInstant(raw);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("de-DE", { day: "2-digit", month: "long", year: "numeric" });
+  return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
 }
 
 const ROLE_LABELS = {
@@ -365,7 +364,7 @@ export default function PublicProfilePage() {
   const s = profile.stats || {};
   const level = profile.achievement_level || { level: s.level || 1, progress: 0, points: s.points || 0, next_level_points: 100 };
   const isPrivate = profile.privacy_public_profile === false;
-  const joinedDate = profile.created_at ? new Date(profile.created_at) : null;
+  const joinedDate = profile.created_at ? asInstant(profile.created_at) : null;
   const twitchChannel = normalizeTwitchChannel(profile.twitch_handle);
   const twitchUrl = twitchChannel ? `https://www.twitch.tv/${twitchChannel}` : "";
   const liveStream = twitchChannel
@@ -546,7 +545,7 @@ export default function PublicProfilePage() {
                   </span>
                 )}
                 {profile.country && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{countryName(profile.country)}</span>}
-                {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" })}</span>}
+                {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {viennaDate(joinedDate, { month: "long", year: "numeric" })}</span>}
               </div>
             </div>
             <div className="flex flex-wrap gap-2 md:pb-1 md:justify-end shrink-0" data-testid="profile-actions">
@@ -1065,7 +1064,7 @@ function AboutCard({ profile, joinedDate }) {
     ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
     : (profile.is_club_member ? "Vereinsmitglied" : "");
   const rows = [
-    { label: "Dabei seit", value: joinedDate ? joinedDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
+    { label: "Dabei seit", value: joinedDate ? viennaDate(joinedDate, { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
     { label: "Geburtstag", value: birthday, icon: Cake, tone: "gold" },
     { label: "Ort", value: location, icon: MapPin, tone: "blue" },
     { label: "Mitgliedschaft", value: membership, icon: Crown, tone: "gold" },
@@ -1221,7 +1220,7 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
 }
 
 function TournamentRow({ t, expanded = false }) {
-  const date = t.start_date ? new Date(t.start_date) : null;
+  const date = t.start_date ? asInstant(t.start_date) : null;
   return (
     <Link to={`/tournaments/${t.slug || t.id}`} data-testid={`profile-tournament-${t.slug}`} className="flex items-center justify-between gap-3 px-4 py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition">
       <div className="min-w-0 flex-1">
@@ -1233,7 +1232,7 @@ function TournamentRow({ t, expanded = false }) {
         <div className="mt-1 font-heading text-base font-bold truncate">{t.title}</div>
         <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
           {t.game && <span>{gameLabel(t.game)}</span>}
-          {date && <span>· {date.toLocaleDateString("de-DE")}</span>}
+          {date && <span>· {viennaDate(date)}</span>}
           {expanded && t.final_position && <span>· Endplatz: <span className="text-white">{t.final_position}</span></span>}
         </div>
       </div>

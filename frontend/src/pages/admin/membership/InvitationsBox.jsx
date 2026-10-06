@@ -3,14 +3,15 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { Send, X as XIcon } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
+import { asInstant, viennaDate } from "@/lib/vienna";
 
 // Einladungen zum Mitgliedsantrag (#507): wen der Vorstand eingeladen hat, seit wann, ob der Antrag schon
 // gestellt ist; offene Einladungen lassen sich zurückziehen. Einladen selbst geht bei Alle Benutzer.
 const STATUS_LABEL = { open: "offen", applied: "Antrag gestellt", withdrawn: "zurückgezogen", expired: "abgelaufen" };
 
 function formatDay(value) {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString("de-DE");
+  const date = asInstant(value);
+  return Number.isNaN(date.getTime()) ? "" : viennaDate(date);
 }
 
 export function InvitationsBox() {
