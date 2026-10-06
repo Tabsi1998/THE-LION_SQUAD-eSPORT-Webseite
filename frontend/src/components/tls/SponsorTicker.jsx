@@ -1,10 +1,12 @@
 /**
- * SponsorTicker — seamless logo marquee.
+ * SponsorTicker — das Sponsoren-Laufband (Startseite groß mit Überschrift „Sponsoren“, Footer
+ * kompakt, TV-Seiten mit Zeile). Das Band selbst ist der LogoTicker (#968), den auch die Partner nutzen.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { SmartLogo } from "@/components/tls/SmartLogo";
+import { LogoTicker, marqueeDuration, repeatForLoop } from "@/components/tls/LogoTicker";
 
 const tierBox = {
   main: "h-16 w-64 md:w-80",
@@ -13,6 +15,10 @@ const tierBox = {
   silver: "h-11 w-48 md:w-56",
   bronze: "h-10 w-44 md:w-52",
 };
+
+// Startseite (#968): eine Stufe größer als vorher (etwa +12 %), damit die Sponsoren vor den Partnern stehen.
+const SPOTLIGHT_BOX = "h-[5.5rem] w-[20rem] sm:h-[6.75rem] sm:w-[31.5rem] md:h-[7.75rem] md:w-[38rem]";
+const COMPACT_BOX = "h-9 w-32 sm:w-40 md:h-10 md:w-52";
 
 function sponsorKey(sponsor) {
   const logo = String(sponsor.logo_url || "").trim().toLowerCase();
@@ -36,16 +42,6 @@ function uniqueLogoSponsors(sponsors) {
   });
 }
 
-function repeatForLoop(items, minItems) {
-  if (!items.length) return [];
-  const repeats = Math.max(1, Math.ceil(minItems / items.length));
-  return Array.from({ length: repeats }, () => items).flat();
-}
-
-function marqueeDuration(itemCount, secondsPerItem, minSeconds) {
-  return Math.max(minSeconds, itemCount * secondsPerItem);
-}
-
 export function SponsorTicker({ className = "", compact = false, placement = "home", spotlight = false }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
@@ -64,77 +60,50 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
   // Hauptsponsor mit Banner aus dem Vereinsmodul (#880): auf der Startseite groß über dem Laufband.
   const mainBanner = spotlight ? sponsors.find((s) => s.tier === "main" && s.banner_url) : null;
   if (!logoSponsors.length && !mainBanner) return null;
-  const shouldMarquee = logoSponsors.length >= (compact ? 3 : spotlight ? 2 : 3);
-  const loopItems = shouldMarquee ? repeatForLoop(logoSponsors, compact ? 14 : spotlight ? 8 : 10) : logoSponsors;
-  const speed = compact
-    ? marqueeDuration(loopItems.length, 7, 72)
-    : spotlight
-      ? marqueeDuration(loopItems.length, 8, 64)
-      : marqueeDuration(loopItems.length, 6, 60);
+  const items = logoSponsors.map((s) => ({ key: sponsorKey(s), name: s.name, logo_url: s.logo_url, href: s.link || undefined, tier: s.tier }));
+  const boxClassFor = (item) => (compact ? COMPACT_BOX : spotlight ? SPOTLIGHT_BOX : tierBox[item.tier] || tierBox.bronze);
   const shellClass = compact
     ? "bg-transparent"
     : spotlight
       ? "border-y border-[#29B6E8]/15 bg-black"
       : "border-y border-white/5 bg-[#070707]";
-  const itemClass = compact
-    ? "h-9 w-32 sm:w-40 md:h-10 md:w-52"
-    : spotlight
-      ? "h-20 w-72 sm:h-24 sm:w-[28rem] md:h-28 md:w-[34rem]"
-      : null;
-  const gapClass = compact ? "gap-5 sm:gap-8 md:gap-12" : spotlight ? "gap-14" : "gap-16";
-  const groupPaddingClass = compact ? "pr-5 sm:pr-8 md:pr-12" : spotlight ? "pr-14" : "pr-16";
-  const verticalClass = compact ? "py-2" : spotlight ? "py-6 md:py-7" : "py-5";
-  const renderLogo = (s, i, groupIndex = 0, duplicate = false) => (
-    <a
-      key={`${groupIndex}-${sponsorKey(s)}-${i}`}
-      href={s.link || undefined}
-      target={s.link ? "_blank" : undefined}
-      rel="noreferrer"
-      tabIndex={duplicate ? -1 : undefined}
-      className={`inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${itemClass || tierBox[s.tier] || tierBox.bronze}`}
-      title={s.name}
-    >
-      <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-h-full max-w-full w-auto h-auto" />
-    </a>
-  );
   return (
     <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} data-testid="sponsor-ticker">
-      {!compact && (
-        <div className={`max-w-7xl mx-auto px-4 ${spotlight ? "pt-7 pb-1 text-center" : "pt-4 pb-1 text-right"}`}>
-          <span className={`text-[9px] uppercase tracking-[0.35em] font-bold ${spotlight ? "text-[#29B6E8]/70" : "text-white/35"}`}>
-            {spotlight ? "Hauptsponsor" : "Presented by our Partners"}
-          </span>
+      {!compact && !spotlight && (
+        <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
+          <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>
         </div>
       )}
       {mainBanner ? (
-        <div className="max-w-5xl mx-auto px-4 pt-3 pb-1" data-testid="sponsor-main-banner">
+        <div className="max-w-5xl mx-auto px-4 pt-7 pb-1" data-testid="sponsor-main-banner">
+          <div className="pb-2 text-center">
+            <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-[#29B6E8]/70">Hauptsponsor</span>
+          </div>
           <a href={mainBanner.link || undefined} target={mainBanner.link ? "_blank" : undefined} rel="noreferrer" aria-label={mainBanner.name}
             className="block rounded-sm overflow-hidden border border-[#29B6E8]/20 hover:border-[#29B6E8]/50 transition">
             <img src={resolveMediaUrl(mainBanner.banner_url)} alt={mainBanner.name} loading="lazy" className="block w-full h-auto max-h-60 object-contain bg-[#071114]" />
           </a>
         </div>
       ) : null}
-      <div
-        className="relative max-w-full overflow-hidden group"
-        style={shouldMarquee ? { maskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)" } : undefined}
-      >
-        <div
-          className={`flex items-center ${verticalClass} ${shouldMarquee ? "whitespace-nowrap group-hover:[animation-play-state:paused]" : `justify-center flex-wrap px-4 ${gapClass}`}`}
-          style={shouldMarquee ? { animation: `tls-marquee ${speed}s linear infinite`, width: "max-content" } : undefined}
-        >
-          {shouldMarquee ? (
-            <>
-              <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`}>
-                {loopItems.map((s, i) => renderLogo(s, i, 0))}
-              </div>
-              <div className={`flex shrink-0 items-center ${gapClass} ${groupPaddingClass}`} aria-hidden="true">
-                {loopItems.map((s, i) => renderLogo(s, i, 1, true))}
-              </div>
-            </>
-          ) : loopItems.map((s, i) => renderLogo(s, i))}
+      {spotlight && items.length > 0 && (
+        <div className={`max-w-7xl mx-auto px-4 ${mainBanner ? "pt-5" : "pt-6"} pb-0 text-center`} data-testid="sponsor-ticker-title">
+          <span className="text-[11px] uppercase tracking-[0.35em] font-bold text-[#29B6E8]/80">Sponsoren</span>
         </div>
-      </div>
-      <style>{`@keyframes tls-marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
+      )}
+      {items.length > 0 && (
+        <LogoTicker
+          items={items}
+          boxClassFor={boxClassFor}
+          minForMarquee={compact ? 3 : spotlight ? 2 : 3}
+          minItems={compact ? 14 : spotlight ? 8 : 10}
+          secondsPerItem={compact ? 7 : spotlight ? 8 : 6}
+          minSeconds={compact ? 72 : spotlight ? 64 : 60}
+          gapClass={compact ? "gap-5 sm:gap-8 md:gap-12" : spotlight ? "gap-14" : "gap-16"}
+          groupPaddingClass={compact ? "pr-5 sm:pr-8 md:pr-12" : spotlight ? "pr-14" : "pr-16"}
+          verticalClass={compact ? "py-2" : spotlight ? "py-5 md:py-6" : "py-5"}
+          testId="sponsor-ticker-band"
+        />
+      )}
     </section>
   );
 }

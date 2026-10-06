@@ -2057,3 +2057,18 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 @media (prefers-reduced-motion: reduce) {
   .tls-unlock-ticker__track { animation: none; transform: none; }
 }
+
+/* Logo-Laufband (Sponsoren und Partner, #968): nahtlos, Hover und „Bewegung reduzieren“ halten es an. */
+@keyframes tls-logo-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.tls-logo-ticker__track {
+  width: max-content;
+  animation: tls-logo-marquee var(--tls-logo-ticker-speed, 60s) linear infinite;
+}
+.tls-logo-ticker__track--reverse { animation-direction: reverse; }
+.tls-logo-ticker:hover .tls-logo-ticker__track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .tls-logo-ticker__track { animation-play-state: paused; }
+}

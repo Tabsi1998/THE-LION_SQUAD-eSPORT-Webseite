@@ -20,9 +20,14 @@ test("Spotlight: der Banner des Hauptsponsors steht über dem Laufband, mit Link
   apiMock.get.mockResolvedValue({ data: [GOLD, MAIN] });
   render(<SponsorTicker placement="home" spotlight />);
   const block = await screen.findByTestId("sponsor-main-banner");
+  expect(block).toHaveTextContent("Hauptsponsor");
   expect(block.querySelector("a")).toHaveAttribute("href", "https://alpha.test");
   expect(block.querySelector("img")).toHaveAttribute("src", MAIN.banner_url);
   expect(apiMock.get).toHaveBeenCalledWith("/sponsors?placement=home");
+  // Darunter das Band mit der Überschrift „Sponsoren“ (#968) - beide Logos, nahtlos ab zwei.
+  expect(screen.getByTestId("sponsor-ticker-title")).toHaveTextContent("Sponsoren");
+  expect(screen.getByTestId("sponsor-ticker-band")).toHaveAttribute("data-marquee", "1");
+  expect(screen.getAllByTitle("Beta")[0]).not.toHaveAttribute("href");
 });
 
 test("ohne Hauptsponsor-Banner und im Footer-Laufband kein Banner", async () => {
@@ -36,4 +41,5 @@ test("ohne Hauptsponsor-Banner und im Footer-Laufband kein Banner", async () => 
   render(<SponsorTicker placement="footer" compact />);
   await screen.findByTestId("sponsor-ticker");
   expect(screen.queryByTestId("sponsor-main-banner")).toBeNull();
+  expect(screen.queryByTestId("sponsor-ticker-title")).toBeNull();
 });
