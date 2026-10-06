@@ -96,7 +96,18 @@ def test_channel_rows_carry_what_the_bot_may_do_and_writable_ones_come_first():
             self.create_public_threads, self.send_messages_in_threads = threads, in_threads
 
     row = discord_bot.channel_row(Channel(1, "news", Category("Community"), 2), Permissions(embed=False))
-    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False, "can_thread": True}
+    assert row == {"id": "1", "name": "news", "category": "Community", "position": 2, "can_send": True, "can_embed": False, "can_thread": True,
+                   "news": False, "can_webhooks": False}
+
+    # Weitergabe (#631): ein Kanal vom Typ Ankündigung, und ob der Bot dort Webhooks verwalten darf.
+    class NewsChannel(Channel):
+        def is_news(self):
+            return True
+
+    allowed = Permissions()
+    allowed.manage_webhooks = True
+    news = discord_bot.channel_row(NewsChannel(3, "ankündigungen"), allowed)
+    assert (news["news"], news["can_webhooks"]) == (True, True)
     assert discord_bot.channel_row(Channel(2, "regeln"), Permissions(send=False))["can_send"] is False
     # Turnier-Threads (#572): öffnen und darin schreiben - beides nötig.
     assert discord_bot.channel_row(Channel(3, "turniere"), Permissions(threads=False))["can_thread"] is False

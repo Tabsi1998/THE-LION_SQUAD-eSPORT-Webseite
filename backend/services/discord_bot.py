@@ -279,6 +279,9 @@ def channel_row(channel, permissions) -> dict:
         "can_embed": bool(getattr(permissions, "embed_links", False)),
         # Turnier-Threads (#572): öffnen und darin schreiben - fehlt eins, gehen Turnier-Meldungen einzeln in den Kanal.
         "can_thread": bool(getattr(permissions, "create_public_threads", False) and getattr(permissions, "send_messages_in_threads", False)),
+        # Weitergabe (#631): einem Ankündigungskanal kann man folgen; im Sammelkanal braucht der Bot „Webhooks verwalten“.
+        "news": bool(getattr(channel, "is_news", lambda: False)()),
+        "can_webhooks": bool(getattr(permissions, "manage_webhooks", False)),
     }
 
 
@@ -350,6 +353,68 @@ async def read_state(db) -> dict:
 
 
 # ---------------------------------------------------------------- Laufzeit (discord.py)
+
+async def handle_message(db, view: dict, guild_id: str, author_id: str, author_is_bot: bool) -> str | None:
+    """Eine Nachricht auf einem Server des Bots (#302, #631): zählt für die Statistik dieses Servers und - bei
+    verknüpftem Konto - für die Erfolge der Person. **Ein** Zähler je Person über alle Server. Gibt den Nutzer zurück,
+    dem sie zählt; gelesen wird nie, was in der Nachricht steht."""
+    if not view.get("count_messages") or author_is_bot:
+        return None
+    user_id = counted_user(author_id, author_is_bot, await linked_discord_ids(db))
+    from services import discord_stats
+    try:
+        await discord_stats.note_message(db, guild_id, user_id)
+    except Exception as exc:  # noqa: BLE001 - die Statistik hält das Zählen für die Erfolge nie auf
+        logger.warning("[discord-bot] Statistik: %s", type(exc).__name__)
+    if user_id:
+        await count_message(db, user_id)
+    return user_id
+
+
+async def note_guild_member(db, guild_id: str, joined: bool, is_bot: bool = False) -> None:
+    """Beitritt oder Austritt für die Statistik des Servers (#631): nur die Zahl; Bots zählen nicht, ein Fehler stört nie."""
+    if is_bot:
+        return
+    from services import discord_stats
+    try:
+        await discord_stats.note_member(db, guild_id, joined)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("[discord-bot] Statistik: %s", type(exc).__name__)
+
+
+def confirm_view(on_send, *, timeout: float = 300.0):
+    """„Senden“ und „Abbrechen“ unter der Vorschau von ``/verteilen`` (#631). Die Vorschau sieht nur, wer gefragt hat -
+    also kann auch nur diese Person drücken. Ein zweiter Klick tut nichts; nach fünf Minuten verfällt die Vorschau."""
+    import discord
+
+    class Confirm(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=timeout)
+            self.used = False
+
+        @discord.ui.button(label="Senden", style=discord.ButtonStyle.success)
+        async def send(self, interaction, button):
+            if self.used:
+                await interaction.response.defer()
+                return
+            self.used = True
+            self.stop()
+            await interaction.response.edit_message(content="Wird gesendet …", view=None)
+            try:
+                text = await on_send()
+            except Exception as exc:  # noqa: BLE001 - ein Fehler beim Senden wird ein Satz, kein Schweigen
+                logger.warning("[discord-bot] verteilen: %s", type(exc).__name__)
+                text = "Das Senden hat nicht geklappt – im Versand-Log steht, was ankam."
+            await interaction.edit_original_response(content=text)
+
+        @discord.ui.button(label="Abbrechen", style=discord.ButtonStyle.secondary)
+        async def cancel(self, interaction, button):
+            self.used = True
+            self.stop()
+            await interaction.response.edit_message(content="Nicht gesendet.", embed=None, view=None)
+
+    return Confirm()
+
 
 class BotRunner:
     """Eine Verbindung je Prozess. ``apply_settings`` startet neu, wenn sich etwas geändert hat."""
@@ -475,6 +540,7 @@ class BotRunner:
                 await discord_guilds.note_membership(db, str(member.guild.id), str(member.id), True)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("[discord-bot] Mitgliedschaft: %s", type(exc).__name__)
+            await note_guild_member(db, str(member.guild.id), True, bool(member.bot))
             # Willkommensnachricht (#574): einmal je Person, nur wenn eingeschaltet - ohne Erlaubnis still.
             from services.discord_welcome import greet
             try:
@@ -493,15 +559,14 @@ class BotRunner:
                 await discord_guilds.note_membership(db, str(member.guild.id), str(member.id), False)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("[discord-bot] Mitgliedschaft: %s", type(exc).__name__)
+            await note_guild_member(db, str(member.guild.id), False, bool(member.bot))
 
         @client.event
         async def on_message(message):
-            if not view["count_messages"] or message.guild is None:
+            if message.guild is None:
                 return
-            links = await linked_discord_ids(db)
-            user_id = counted_user(str(message.author.id), bool(message.author.bot), links)
-            if user_id:
-                await count_message(db, user_id)
+            # Auf jedem Server des Bots (#631): je Server eine Tageszahl, je Person ein Zähler über alle Server.
+            if await handle_message(db, view, str(message.guild.id), str(message.author.id), bool(message.author.bot)):
                 runner.last_action = f"Nachricht gezählt ({now_utc().strftime('%H:%M')} UTC)"
 
         base_url = ""
@@ -587,6 +652,42 @@ class BotRunner:
             # Je Server (#630): welcher Server das ist, seine Spiele, Kanäle und die letzte Aktualisierung der Einbettungen.
             lines = await discord_commands.server_status_lines(db, interaction.guild_id)
             await interaction.response.send_message("\n".join([status_text(state), *lines]), ephemeral=True)
+
+        # Mitteilung an mehrere Server (#631): erst die Vorschau nur für die fragende Person, gesendet wird mit dem Knopf.
+        from services import discord_distribute
+
+        async def verteil_server(interaction, current: str):
+            return [app_commands.Choice(name=row["name"], value=row["value"]) for row in await discord_distribute.server_choices(db, current)]
+
+        @tree.command(name="verteilen", description="Eine Mitteilung an die Server des Vereins schicken (nur Turnierleitung und Vorstand)")
+        @app_commands.describe(text="Die Mitteilung", ziel="In welchen Kanal – ohne Angabe Community",
+                               server="Nur dieser Server – ohne Angabe alle eingeschalteten", titel="Überschrift – ohne Angabe „Mitteilung“")
+        @app_commands.choices(ziel=[app_commands.Choice(name=label, value=key) for key, label in discord_distribute.TARGET_CHOICES])
+        @app_commands.autocomplete(server=verteil_server)
+        async def verteilen(interaction, text: str, ziel: str = "community", server: str | None = None, titel: str | None = None):
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            try:
+                draft = await discord_distribute.draft_from_discord(
+                    db, interaction.user.id, text, ziel, server, titel,
+                    author=str(getattr(interaction.user, "display_name", "") or ""), guild_id=interaction.guild_id)
+            except Exception as exc:  # noqa: BLE001 - eine Frage im Discord darf nie im Leeren enden
+                logger.warning("[discord-bot] verteilen: %s", type(exc).__name__)
+                await interaction.followup.send("Das hat gerade nicht geklappt – versuch es gleich noch einmal.", ephemeral=True)
+                return
+            if not draft["ok"]:
+                await interaction.followup.send(draft["text"], ephemeral=True)
+                return
+
+            async def send_now() -> str:
+                plan = draft["plan"]
+                result = await discord_distribute.send(
+                    db, text=plan["text"], target=plan["target"], guild_ids=[row["guild_id"] for row in plan["servers"]], title=plan["title"],
+                    author=draft["author"], origin=draft["origin"], actor_id=draft["user"]["id"], via="discord")
+                runner.last_action = f"Mitteilung verteilt ({now_utc().strftime('%H:%M')} UTC)"
+                return discord_distribute.result_text(result)
+
+            extra = {"view": confirm_view(send_now)} if draft["sendable"] else {}
+            await interaction.followup.send(content=draft["content"], embed=discord.Embed.from_dict(draft["embed"]), ephemeral=True, **extra)
 
         try:
             await client.start(token)
@@ -698,6 +799,57 @@ class BotRunner:
         except discord.HTTPException as exc:
             return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
         return {"ok": True, "url": str(invite.url)}
+
+    async def follow_channel(self, source_channel_id: str, destination_channel_id: str) -> dict:
+        """Einem Ankündigungskanal folgen (#631): Discord spiegelt, was dort veröffentlicht wird, in den Zielkanal - der
+        Bot kopiert nichts. Braucht im Zielkanal „Webhooks verwalten“; die Quelle muss vom Typ „Ankündigung“ sein."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        source, problem = await self._channel(client, source_channel_id)
+        if problem:
+            return problem
+        destination, problem = await self._channel(client, destination_channel_id)
+        if problem:
+            return problem
+        if not getattr(source, "is_news", lambda: False)():
+            return {"ok": False, "reason": "not_news"}
+        try:
+            webhook = await source.follow(destination=destination, reason="Weitergabe an den Hauptserver (über die Website eingerichtet)")
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except discord.HTTPException as exc:
+            return {"ok": False, "reason": "http", "error": f"Discord {exc.status}: {exc.text}"[:200]}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        self.last_action = f"Ankündigungen von #{getattr(source, 'name', source_channel_id)} gefolgt ({now_utc().strftime('%H:%M')} UTC)"
+        return {"ok": True, "webhook_id": str(getattr(webhook, "id", "") or "")}
+
+    async def followed_sources(self, destination_channel_id: str) -> dict:
+        """Welchen Ankündigungskanälen der Zielkanal folgt (#631): Quelle → Webhook. Discord verrät das nur mit
+        „Webhooks verwalten“ im Zielkanal."""
+        client = self._client
+        if client is None or not self.connected:
+            return {"ok": False, "reason": "bot_offline"}
+        import discord
+
+        destination, problem = await self._channel(client, destination_channel_id)
+        if problem:
+            return problem
+        try:
+            hooks = await destination.webhooks()
+        except discord.Forbidden:
+            return {"ok": False, "reason": "forbidden"}
+        except Exception as exc:  # noqa: BLE001
+            return {"ok": False, "reason": "error", "error": f"{type(exc).__name__}: {exc}"[:200]}
+        sources: dict[str, str] = {}
+        for hook in hooks:
+            origin = getattr(hook, "source_channel", None)
+            if getattr(hook, "type", None) == discord.WebhookType.channel_follower and origin is not None:
+                sources[str(origin.id)] = str(hook.id)
+        return {"ok": True, "sources": sources}
 
     async def member_status(self, guild_ids: list[str], discord_user_id: str) -> dict[str, bool | None]:
         """Ist dieses Konto auf diesen Servern (#626)? True/False je Server; None, wenn es niemand weiß (Bot offline,

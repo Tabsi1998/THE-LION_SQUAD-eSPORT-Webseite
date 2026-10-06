@@ -45,6 +45,7 @@ from routes.member_card_routes import router as member_card_router
 from routes.finance_routes import router as finance_router
 from routes.platform_link_routes import router as platform_link_router
 from routes.discord_bot_routes import router as discord_bot_router
+from routes.discord_forward_routes import router as discord_forward_router
 from routes.discord_guild_routes import router as discord_guild_router
 from routes.discord_design_routes import router as discord_design_router
 from routes.upload_routes import router as upload_router
@@ -261,6 +262,7 @@ app.include_router(finance_router)
 app.include_router(platform_link_router)
 app.include_router(discord_bot_router)
 app.include_router(discord_guild_router)
+app.include_router(discord_forward_router)
 app.include_router(discord_design_router)
 app.include_router(settings_router)
 app.include_router(season_router)

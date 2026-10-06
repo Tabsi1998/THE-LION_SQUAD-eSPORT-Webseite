@@ -77,6 +77,8 @@ async def _user_data_export(db, user_id: str) -> dict:
         "tournament_staff": await rows(db.tournament_staff_assignments, {"user_id": user_id}),
         "moderation_items": await rows(db.moderation_items, {"user_id": user_id}),
         "discord_activity": await rows(db.discord_activity, {"user_id": user_id}),
+        # Statistik je Server (#631): an welchen Tagen das Konto auf welchem Server geschrieben hat - höchstens 35 Tage zurück.
+        "discord_activity_servers": await rows(db.discord_guild_active, {"user_id": user_id}),
         "discord_memberships": await rows(db.discord_memberships, {"user_id": user_id}),
         # Seit Fassung 4: der Einlass bei der Generalversammlung (#845) - die eigene Anwesenheit, und wo man als
         # Vorstand selbst eingelassen hat (nur der Vorgang, nie der Name der anderen Person).

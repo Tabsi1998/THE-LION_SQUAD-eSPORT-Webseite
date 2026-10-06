@@ -36,6 +36,9 @@ EXPECTED = {
     "tournaments": {"start_date_1"},
     "events": {"start_date_1"},
     "f1_challenges": {"start_date_1"},
+    "discord_activity": {"user_day_unique"},
+    "discord_guild_stats": {"guild_day_unique"},
+    "discord_guild_active": {"guild_day_user_unique", "user_id_1", "day_1"},
 }
 
 

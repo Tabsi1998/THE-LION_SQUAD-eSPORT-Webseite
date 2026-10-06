@@ -589,6 +589,11 @@ async def _safe_ops_retention():
         removed = await purge_old_logs(get_db())
         if any(removed.values()):
             logger.info(f"[scheduler] ops_retention removed={removed}")
+        # Statistik je Server (#631): wer wann aktiv war, bleibt nur für die 30-Tage-Zahl.
+        from services.discord_stats import purge_old as purge_discord_activity
+        gone = await purge_discord_activity(get_db())
+        if gone:
+            logger.info(f"[scheduler] discord_activity_servers removed={gone}")
     except Exception as exc:
         _log_task_failure("ops_retention", exc)
 

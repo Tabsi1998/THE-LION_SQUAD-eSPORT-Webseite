@@ -17,6 +17,8 @@ vi.mock("./DiscordEmbedsPanel", () => ({ DiscordEmbedsPanel: () => <div data-tes
 vi.mock("./DiscordScheduledPanel", () => ({ DiscordScheduledPanel: () => <div data-testid="discord-scheduled" /> }));
 vi.mock("./DiscordWelcomePanel", () => ({ DiscordWelcomePanel: () => <div data-testid="discord-welcome" /> }));
 vi.mock("./DiscordGuildsPanel", () => ({ DiscordGuildsPanel: () => <div data-testid="discord-guilds" /> }));
+vi.mock("./DiscordForwardPanel", () => ({ DiscordForwardPanel: () => <div data-testid="discord-forward" /> }));
+vi.mock("./DiscordStatsPanel", () => ({ DiscordStatsPanel: () => <div data-testid="discord-stats" /> }));
 vi.mock("./DiscordStreamsPanel", () => ({ DiscordStreamsPanel: ({ onDesign }) => <button type="button" data-testid="discord-streams" onClick={onDesign}>Streams</button> }));
 vi.mock("./DiscordDesignPanel", () => ({ DiscordDesignPanel: () => <div data-testid="discord-design" /> }));
 
@@ -65,6 +67,12 @@ test("lädt Stand und Zähler; der Schalter „Versand aktiv“ speichert sofort
   expect(screen.getByTestId("discord-welcome")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("discord-tab-servers"));
   expect(screen.getByTestId("discord-guilds")).toBeInTheDocument();
+  // Weitergabe und Statistik (#631) haben je ihren Reiter.
+  fireEvent.click(screen.getByTestId("discord-tab-forward"));
+  expect(screen.getByTestId("discord-forward")).toBeInTheDocument();
+  expect(screen.queryByTestId("discord-guilds")).toBeNull();
+  fireEvent.click(screen.getByTestId("discord-tab-stats"));
+  expect(screen.getByTestId("discord-stats")).toBeInTheDocument();
   fireEvent.click(screen.getByTestId("discord-tab-bot"));
   expect(screen.getByTestId("discord-bot-panel")).toHaveTextContent("system");
   expect(await screen.findByTestId("discord-counter-save-u1")).toBeInTheDocument();
