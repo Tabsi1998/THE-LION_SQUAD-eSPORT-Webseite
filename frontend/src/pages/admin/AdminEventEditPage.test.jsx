@@ -24,6 +24,7 @@ vi.mock("@/context/AuthContext", () => ({ useAuth: () => ({ can: () => false }) 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const AdminEventEditPage = (await import("./AdminEventEditPage")).default;
+const { toast } = await import("sonner");
 
 const META = {
   types: [{ k: "general", l: "Allgemein" }, { k: "lan", l: "LAN" }],
@@ -109,4 +110,92 @@ test("Partner II (#469): der Partner-Haken geht als partner_ids mit", async () =
   fireEvent.click(await screen.findByTestId("event-partner-p1"));
   fireEvent.submit(screen.getByTestId("event-form"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/events", expect.objectContaining({ name: "TFT-Abend", partner_ids: ["p1"] })));
+});
+
+// Mehrtägige Events (#884): der Schalter ersetzt Start, Ende und Einlass durch Tage; Fehler kommen als Satz,
+// gespeichert wird die Liste; ein Event mit Tagen zeigt sie; aus geht zurück auf Start und Ende.
+const DAYS = [
+  { date: "2026-10-16", start: "18:00", end: "23:00", door: "17:00", title: "Warm-up", location_key: null, start_at: "2026-10-16T16:00:00+00:00", end_at: "2026-10-16T21:00:00+00:00" },
+  { date: "2026-10-17", start: "10:00", end: "16:00", door: null, title: null, location_key: null, start_at: "2026-10-17T08:00:00+00:00", end_at: "2026-10-17T14:00:00+00:00" },
+];
+
+function serveEventWithDays() {
+  apiMock.get.mockImplementation(async (url) => {
+    if (url === "/events/meta") return { data: META };
+    if (url.startsWith("/events?")) return { data: [{ ...EVENTS[0], days: DAYS }] };
+    return { data: [] };
+  });
+}
+
+test("Mehrtägig (#884): Schalter schlägt zwei Tage vor, prüft sie und schickt die Liste", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "ev-9", slug: "lan" } });
+  renderAt("/admin/events/new");
+  expect(await screen.findByRole("heading", { name: "Neues Event" })).toBeInTheDocument();
+  fireEvent.change(screen.getByTestId("event-name"), { target: { value: "LAN-Wochenende" } });
+  fireEvent.change(screen.getByTestId("event-start"), { target: { value: "2026-10-16T18:00" } });
+  fireEvent.click(screen.getByTestId("event-days-toggle"));
+
+  expect(screen.queryByTestId("event-start")).toBeNull();
+  expect(screen.getByTestId("event-day-date-0")).toHaveValue("2026-10-16");
+  expect(screen.getByTestId("event-day-date-1")).toHaveValue("2026-10-17");
+  expect(screen.getByTestId("event-day-start-1")).toHaveValue("18:00");
+  expect(screen.getByTestId("event-days-error")).toHaveTextContent("Tag 1: Das Ende fehlt.");
+
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Tag 1: Das Ende fehlt."));
+  expect(apiMock.post).not.toHaveBeenCalled();
+
+  fireEvent.change(screen.getByTestId("event-day-end-0"), { target: { value: "23:00" } });
+  fireEvent.change(screen.getByTestId("event-day-end-1"), { target: { value: "02:00" } });
+  fireEvent.change(screen.getByTestId("event-day-title-1"), { target: { value: "Finaltag" } });
+  fireEvent.click(screen.getByTestId("event-days-add"));
+  expect(screen.getByTestId("event-day-date-2")).toHaveValue("2026-10-18");
+  fireEvent.click(screen.getByTestId("event-day-remove-2"));
+  expect(screen.queryByTestId("event-days-error")).toBeNull();
+
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+  const [, payload] = apiMock.post.mock.calls[0];
+  expect(payload.days).toEqual([
+    { date: "2026-10-16", start: "18:00", end: "23:00", door: null, title: null, location_key: null },
+    { date: "2026-10-17", start: "18:00", end: "02:00", door: null, title: "Finaltag", location_key: null },
+  ]);
+});
+
+test("Mehrtägig (#884): ein Event mit Tagen zeigt sie, eine Änderung schickt die ganze Liste", async () => {
+  serveEventWithDays();
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByRole("heading", { name: "Event bearbeiten" })).toBeInTheDocument();
+  expect(screen.getByTestId("event-days-toggle")).toBeChecked();
+  expect(screen.queryByTestId("event-start")).toBeNull();
+  expect(screen.getByTestId("event-day-door-0")).toHaveValue("17:00");
+  expect(screen.getByTestId("event-day-title-0")).toHaveValue("Warm-up");
+  expect(screen.getByTestId("event-day-0")).toHaveTextContent("Tag 1 · Fr 16.10.");
+
+  fireEvent.change(screen.getByTestId("event-day-end-1"), { target: { value: "18:00" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  const [, patch] = apiMock.patch.mock.calls[0];
+  expect(patch.days).toEqual([
+    { date: "2026-10-16", start: "18:00", end: "23:00", door: "17:00", title: "Warm-up", location_key: null },
+    { date: "2026-10-17", start: "10:00", end: "18:00", door: null, title: null, location_key: null },
+  ]);
+  expect(patch).not.toHaveProperty("start_date");
+});
+
+test("Mehrtägig (#884): Schalter aus bringt Start und Ende aus dem ersten und letzten Tag zurück", async () => {
+  serveEventWithDays();
+  apiMock.patch.mockResolvedValue({ data: EVENTS[0] });
+  renderAt("/admin/events/ev-1");
+  expect(await screen.findByTestId("event-days-toggle")).toBeChecked();
+  fireEvent.click(screen.getByTestId("event-days-toggle"));
+  expect(screen.getByTestId("event-start")).toHaveValue("2026-10-16T18:00");
+  expect(screen.getByTestId("event-end")).toHaveValue("2026-10-17T16:00");
+  expect(screen.getByTestId("event-door-time")).toHaveValue("2026-10-16T17:00");
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  const [, patch] = apiMock.patch.mock.calls[0];
+  expect(patch.days).toEqual([]);
+  expect(patch.start_date).toContain("2026-10-16T");
 });

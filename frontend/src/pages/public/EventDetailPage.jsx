@@ -22,7 +22,7 @@ import { formatCents, offerSummary, previewQuote } from "@/lib/pricing";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { MapPin, Calendar, Mail, Image as ImageIcon, Newspaper, Crown, Lock, Users, ExternalLink, Trophy, Flag, UserPlus, CheckCircle, XCircle, Radio, Handshake } from "lucide-react";
+import { Calendar, CheckCircle, Clock, Crown, ExternalLink, Flag, Handshake, Image as ImageIcon, Lock, Mail, MapPin, Newspaper, Radio, Trophy, UserPlus, Users, XCircle } from "lucide-react";
 import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
 
 // Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
@@ -49,6 +49,39 @@ function mapEmbedUrl(e) {
 
 function mapLinkUrl(query) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+// Mehrtägig (#884): je Tag eine Karte - der laufende Tag mit LIVE-Punkt, der nächste markiert, vergangene gedimmt.
+// Die Texte (Wochentag, Zeiten, Einlass) kommen fertig vom Server, damit Website, App und Discord dasselbe sagen.
+function EventDaysBlock({ schedule }) {
+  const days = schedule?.days || [];
+  const columns = days.length <= 2 ? "md:grid-cols-2" : days.length === 4 ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3";
+  return (
+    <div data-testid="event-days">
+      <h2 className="font-heading text-2xl font-black uppercase mb-1">Die Tage</h2>
+      {schedule.now?.text && <p className="text-sm text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
+      <ol className={`grid gap-4 ${columns}`}>
+        {days.map((day) => {
+          const frame = day.state === "running" ? "border-[#FF3B30]/60 bg-[#FF3B30]/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
+          return (
+            <li key={day.index} className={`tls-card border rounded-sm p-5 min-w-0 ${frame} ${day.state === "past" ? "opacity-60" : ""}`} data-testid={`event-day-${day.index}`} data-state={day.state}>
+              <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">
+                <span>Tag {day.index}/{schedule.count}</span>
+                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-[#FF3B30]"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
+                {day.state === "next" && <span className="text-white/60">Als Nächstes</span>}
+                {day.state === "past" && <span className="text-white/40">Vorbei</span>}
+              </div>
+              <div className="mt-1 font-heading text-xl font-black uppercase">{day.label}</div>
+              <div className="text-sm text-white/80 inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#9F7AEA] shrink-0" /> {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</div>
+              {day.door && <div className="text-xs text-white/50">Einlass {day.door}</div>}
+              {day.title && <div className="mt-2 text-sm text-white/90 break-words">{day.title}</div>}
+              {day.location_name && <div className="mt-1 text-xs text-white/55 inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 shrink-0" /> {day.location_name}</div>}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
 }
 
 function placeTimeLine(place) {
@@ -138,7 +171,9 @@ export default function EventDetailPage() {
           <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
           {e.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(e.description) }} />}
           <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/70 min-w-0">
-            {e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{viennaDateTime(e.start_date, { dateStyle: "long", timeStyle: "short" })}</span></span>}
+            {e.schedule?.multi_day
+              ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
+              : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{viennaDateTime(e.start_date, { dateStyle: "long", timeStyle: "short" })}</span></span>}
             {(e.locations?.length || 0) > 1
               ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
               : (e.location || fullAddress(e)) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.location, fullAddress(e)].filter(Boolean).join(", ")}</span></span>}
@@ -153,7 +188,7 @@ export default function EventDetailPage() {
               ) : <span className="inline-flex items-center gap-2">{organizerName}</span>
             )}
           </div>
-          <AddToCalendar className="mt-6" item={{
+          <AddToCalendar className="mt-6" days={e.schedule?.multi_day ? e.schedule.days : null} item={{
             id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
             location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
             detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
@@ -193,6 +228,8 @@ export default function EventDetailPage() {
             )}
           </div>
         )}
+
+        {e.schedule?.multi_day && <EventDaysBlock schedule={e.schedule} />}
 
         {(e.locations?.length || 0) > 1 && (
           <div data-testid="event-locations">
@@ -530,6 +567,7 @@ function EventTournamentEmbed({ tournament, accessToken = "" }) {
         <div className="flex flex-wrap items-center gap-2">
           <Trophy className="w-4 h-4 text-[#FFD700]" />
           <PhaseBadge phase={tournament.public_phase} status={tournament.status} />
+          {tournament.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {tournament.event_day.index}/{tournament.event_day.count}</span>}
           {tournament.start_date && <span className="text-xs text-white/45">{viennaDateTime(tournament.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#FFD700] transition break-words">{tournament.title}</h3>
@@ -588,6 +626,7 @@ function EventFastLapEmbed({ challenge, accessToken = "" }) {
         <div className="flex flex-wrap items-center gap-2">
           <Flag className="w-4 h-4 text-[#29B6E8]" />
           <PhaseBadge phase={challenge.public_phase} status={challenge.status} />
+          {challenge.event_day && <span className="text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">Tag {challenge.event_day.index}/{challenge.event_day.count}</span>}
           {challenge.start_date && <span className="text-xs text-white/45">{viennaDateTime(challenge.start_date, { dateStyle: "medium", timeStyle: "short" })}</span>}
         </div>
         <h3 className="mt-3 font-heading text-xl font-black uppercase leading-tight hover:text-[#29B6E8] transition break-words">{challenge.title}</h3>

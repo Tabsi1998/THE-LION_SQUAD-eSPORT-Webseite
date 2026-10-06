@@ -289,6 +289,14 @@ async def test_multi_day_event_gets_one_scheduled_event_per_day(flow, bot):
     await flow.db.events.insert_one({"id": "e9", "slug": "lan-we", "name": "LAN-Wochenende", "status": "scheduled", "visibility": "public",
                                      "location": "Vereinsheim", "days": days, **event_days.derived_range(days)})
 
+    # Die Vorschau im Formular bekommt die Tage als Wandzeit und rechnet sie wie das Speichern.
+    raw = [{"date": d, "start": "10:00", "end": "22:00"} for d in dates]
+    shown = (await flow.post("/api/settings/discord/preview", json={"kind": "event", "item": {"name": "LAN-Wochenende", "status": "scheduled", "visibility": "public", "days": raw}})).json()
+    when = next(field["value"] for field in shown["embed"]["fields"] if field["name"] == "Wann")
+    assert when.startswith("3 Tage · ") and when.count("\n") == 3 and shown["scheduled_event"]["days"] == 3
+    broken = (await flow.post("/api/settings/discord/preview", json={"kind": "event", "item": {"name": "LAN", "status": "scheduled", "visibility": "public", "days": [raw[0]], "start_date": _at(3)}})).json()
+    assert "\n" not in next(field["value"] for field in broken["embed"]["fields"] if field["name"] == "Wann") and broken["scheduled_event"].get("days") is None
+
     first = await discord_scheduled.sync(flow.db)
     assert first["created"] == 3 and first["cancelled"] == 0 and first["errors"] == 0, first
     assert sorted(e["name"] for e in bot.events.values()) == ["LAN-Wochenende – Tag 1/3", "LAN-Wochenende – Tag 2/3", "LAN-Wochenende – Tag 3/3"]

@@ -128,6 +128,11 @@ async def test_days_reach_calendar_home_app_and_daily_center(flow):
     assert second["title"] == "Herbst-LAN – Tag 2/3" and second["marker"] == "event_day" and second["path"] == f"/events/{event['slug']}"
     assert second["start"] == event["days"][1]["start_at"] and second["end"] == event["days"][1]["end_at"]
 
+    # Die ICS-Datei des Events trägt je Tag einen Eintrag mit Erinnerung.
+    ics = await flow.get(f"/api/calendar/events/{event['slug']}.ics")
+    assert ics.status_code == 200 and ics.text.count("BEGIN:VEVENT") == 3 and ics.text.count("BEGIN:VALARM") == 3
+    assert "Herbst-LAN – Tag 2/3" in ics.text and 'filename="herbst-lan.ics"' in ics.headers["content-disposition"]
+
     # Startseite: in der Pause nicht unter „läuft“, sondern unter „bald“ mit dem nächsten Tag.
     state = (await flow.get("/api/home/state")).json()
     assert event["id"] not in {row["id"] for row in state["live"]["events"]}

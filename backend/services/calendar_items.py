@@ -256,6 +256,15 @@ def ics_single(item: dict, *, origin: str, now: datetime | None = None, alarm_mi
     return _calendar(_vevent(item, origin=origin, now=now, alarm_minutes=alarm_minutes, extra_detail=extra_detail))
 
 
+def ics_bundle(items: list[dict], *, origin: str, now: datetime | None = None, alarm_minutes: int | None = ALARM_MINUTES) -> str:
+    """Mehrere Termine in einer Datei - ein mehrtägiges Event (#884) als ein Eintrag je Tag, jeder mit Erinnerung."""
+    now = now or datetime.now(timezone.utc)
+    lines: list[str] = []
+    for item in items:
+        lines += _vevent(item, origin=origin, now=now, alarm_minutes=alarm_minutes)
+    return _calendar(lines)
+
+
 def ics_filename(item: dict) -> str:
     """Dateiname aus dem Titel - wie „In meinen Kalender“ im Web (ASCII, Bindestriche)."""
     base = str(item.get("title") or "termin")

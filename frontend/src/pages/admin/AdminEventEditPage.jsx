@@ -12,6 +12,7 @@ import { MarkdownEditor } from "@/components/tls/MarkdownEditor";
 import { AccessLinksPanel } from "@/components/tls/AccessLinksPanel";
 import { EventBillingSection } from "@/components/tls/EventBillingSection";
 import { EventLocationsSection, formToLocations, locationsFormError, locationsToForm } from "@/components/tls/EventLocationsSection";
+import { EventDaysSection, daysFormError, daysToForm, formToDays } from "@/components/tls/EventDaysSection";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { billingFormError, formToBilling, positionsToForm } from "@/lib/pricing";
@@ -120,6 +121,10 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
   const [locationsForm, setLocationsForm] = useState(() => locationsToForm(event?.locations));
   const locationsDirty = JSON.stringify(locationsForm) !== JSON.stringify(locationsToForm(event?.locations));
   const usesLocationList = locationsForm.length > 0;
+  // Mehrtägig (#884): die Tage ersetzen Start, Ende und Einlass; die Liste geht nur mit, wenn sie sich geändert hat.
+  const [daysForm, setDaysForm] = useState(() => daysToForm(event?.days));
+  const daysDirty = JSON.stringify(daysForm) !== JSON.stringify(daysToForm(event?.days));
+  const usesDays = daysForm.length > 0;
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -186,6 +191,20 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
   }, [event?.id, tournaments, f1Challenges]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // Zurück auf einen Tag: Start und Ende aus dem ersten und letzten Tag übernehmen, damit nichts leer steht.
+  const changeDays = (next) => {
+    if (!next.length && daysForm.length) {
+      const first = daysForm[0];
+      const last = daysForm[daysForm.length - 1];
+      setForm((f) => ({
+        ...f,
+        start_date: first.date && first.start ? `${first.date}T${first.start}` : f.start_date,
+        end_date: last.date && last.end ? `${last.date}T${last.end}` : f.end_date,
+        door_time: first.date && first.door ? `${first.date}T${first.door}` : "",
+      }));
+    }
+    setDaysForm(next);
+  };
   const eventSponsorOptions = sponsors.filter((s) => s.is_active !== false && s.show_on_events === true);
   const insertProgramEmbed = (kind, item) => {
     setForm((f) => ({ ...f, program: appendEmbedToken(f.program, kind, item) }));
@@ -233,11 +252,17 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
       toast.error(locationsProblem);
       return;
     }
+    const daysProblem = daysDirty ? daysFormError(daysForm) : "";
+    if (daysProblem) {
+      toast.error(daysProblem);
+      return;
+    }
     setSaving(true);
     try {
       const payload = normalizeEventPayload(form);
       if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
       if (locationsDirty) payload.locations = formToLocations(locationsForm);
+      if (daysDirty) payload.days = formToDays(daysForm);
       let savedEvent;
       if (isNew) {
         const { data } = await api.post("/events", payload);
@@ -246,6 +271,7 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
         const patch = buildDirtyPayload(payload, originalEventPayload());
         if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
         if (locationsDirty) patch.locations = formToLocations(locationsForm);
+        if (daysDirty) patch.days = formToDays(daysForm);
         const relatedChanged = tournaments.some((t) => relatedTournamentIds.includes(t.id) !== (t.event_id === event.id))
           || f1Challenges.some((c) => relatedF1Ids.includes(c.id) !== (c.event_id === event.id));
         if (!hasPayloadChanges(patch) && !relatedChanged) {
@@ -287,12 +313,17 @@ function EventForm({ event, meta, sponsors = [], tournaments = [], f1Challenges 
             <SelectField label={isNew ? "Veröffentlichung" : "Status"} value={form.status} onChange={(v) => set("status", v)} options={isNew ? CREATE_STATUS_OPTIONS : (meta.statuses || [])} testId="event-status" />
           </FormSection>
           <FormSection title="Zeiten und Plätze" accent={ACCENT}>
-            <TextField label="Start" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="event-start" />
-            <TextField label="Ende" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="event-end" />
-            <TextField label="Einlass / Türöffnung" type="datetime-local" value={form.door_time} onChange={(v) => set("door_time", v)} testId="event-door-time" />
+            {!usesDays && (
+              <>
+                <TextField label="Start" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="event-start" />
+                <TextField label="Ende" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="event-end" />
+                <TextField label="Einlass / Türöffnung" type="datetime-local" value={form.door_time} onChange={(v) => set("door_time", v)} testId="event-door-time" />
+              </>
+            )}
+            <EventDaysSection value={daysForm} onChange={changeDays} locations={locationsForm} startDate={form.start_date} endDate={form.end_date} accent={ACCENT} />
             <TextField label="Max. Teilnehmer" type="number" value={form.max_participants} onChange={(v) => set("max_participants", v)} testId="event-max-participants" />
           </FormSection>
-          <DiscordPreview kind="event" item={form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
+          <DiscordPreview kind="event" item={usesDays ? { ...form, days: formToDays(daysForm) } : form} skip={form.discord_skip} onSkipChange={(value) => set("discord_skip", value)} />
           <SharePreviewToggle visibility={form.visibility} checked={form.share_preview} onChange={(value) => set("share_preview", value)} />
           {!isNew && (
             <AccessLinksPanel targetType="event" targetId={event.id} allowRegister={form.has_registration} />

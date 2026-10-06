@@ -149,3 +149,24 @@ test("ohne Rechte nur die öffentliche Liste mit Namen - kein Check-in, keine No
   expect(screen.queryByTestId("event-offer")).toBeNull();
   expect(screen.getByText("Zum Event anmelden")).toBeTruthy();
 });
+
+// Mehrtägig (#884): Kopfzeile mit Zeitraum und Jetzt-Satz, Karte „Die Tage“ mit Stand je Tag.
+test("mehrtägig: Zeitraum im Kopf und je Tag ein Eintrag mit Stand", async () => {
+  const schedule = {
+    multi_day: true, count: 3, label: "3 Tage · Fr 16.10. – So 18.10.", range_label: "Fr 16.10. – So 18.10.", next_at: "2026-10-18T08:00:00+00:00",
+    now: { state: "running", day_index: 2, text: "Heute 10:00–22:00" },
+    days: [
+      { index: 1, date: "2026-10-16", label: "Fr 16.10.", time_label: "18:00–23:00", start: "18:00", end: "23:00", door: "17:00", title: "Warm-up", start_at: "2026-10-16T16:00:00+00:00", end_at: "2026-10-16T21:00:00+00:00", state: "past" },
+      { index: 2, date: "2026-10-17", label: "Sa 17.10.", time_label: "10:00–22:00", start: "10:00", end: "22:00", location_name: "Vereinsheim", start_at: "2026-10-17T08:00:00+00:00", end_at: "2026-10-17T20:00:00+00:00", state: "running" },
+      { index: 3, date: "2026-10-18", label: "So 18.10.", time_label: "10:00–16:00", start: "10:00", end: "16:00", title: "Finaltag", start_at: "2026-10-18T08:00:00+00:00", end_at: "2026-10-18T14:00:00+00:00", state: "next" },
+    ],
+  };
+  mockGet.mockResolvedValue({ data: { ...EVENT, visibility: "public", has_registration: false, status: "live", public_phase: { state: "live", label: "Tag 2/3 läuft" }, schedule } });
+  await render(<EventDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("event-days")).toBeTruthy());
+  expect(screen.getByTestId("event-when")).toHaveTextContent("3 Tage · Fr 16.10. – So 18.10. · Heute 10:00–22:00");
+  expect(screen.getByTestId("event-days-now")).toHaveTextContent("Heute 10:00–22:00");
+  expect(screen.getByTestId("event-day-1")).toHaveTextContent(/Tag 1\/3.*Vorbei.*Fr 16\.10\. · 18:00–23:00.*Einlass 17:00.*Warm-up/s);
+  expect(screen.getByTestId("event-day-2")).toHaveTextContent(/Läuft.*Vereinsheim/s);
+  expect(screen.getByTestId("event-day-3")).toHaveTextContent(/Als Nächstes.*Finaltag/s);
+});
