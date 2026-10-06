@@ -78,7 +78,7 @@ export function CrownCelebration() {
           type="button"
           onClick={() => setEvent(null)}
           data-testid="crown-celebration-close"
-          className="mt-8 px-6 py-2.5 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-[#1E95C2]"
+          className="tls-btn tls-btn--primary mt-8 px-6 py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs"
         >
           Weiter dominieren
         </button>

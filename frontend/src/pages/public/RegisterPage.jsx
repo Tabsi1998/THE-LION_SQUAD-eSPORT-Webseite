@@ -141,7 +141,7 @@ export default function RegisterPage() {
           <p className="text-sm text-white/60 mt-3">
             Aktuell sind keine neuen Registrierungen möglich. Schau bald wieder vorbei oder melde dich mit einem bestehenden Account an.
           </p>
-          <Link to="/login" className="inline-block mt-6 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition" data-testid="registration-closed-login">
+          <Link to="/login" className="tls-btn tls-btn--primary inline-block mt-6 px-6 py-3 font-bold uppercase tracking-wider rounded-sm" data-testid="registration-closed-login">
             Zum Login
           </Link>
         </div>
@@ -236,7 +236,7 @@ export default function RegisterPage() {
             data-testid="register-submit"
             disabled={loading}
             type="submit"
-            className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
+            className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"
           >
             {loading ? "Registriere ..." : "Account erstellen"}
           </button>

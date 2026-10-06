@@ -56,7 +56,7 @@ function ErrorCard({ error }) {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs"
+          className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
         >
           <RefreshCw className="w-4 h-4" /> Neu laden
         </button>

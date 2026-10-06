@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, formatApiError } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { MEMBERSHIP_STEPS, StepBar, membershipStep } from "@/components/tls/StepBar";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
@@ -169,6 +170,8 @@ export default function MembershipApplyPage() {
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitgliedschaft</span>
         <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">Mitglied werden</h1>
+        {/* Schritt-Anzeige (#1081): Konto ist da, jetzt der Antrag - danach Prüfung und Mitglied. */}
+        <StepBar steps={MEMBERSHIP_STEPS} current={membershipStep(status, renew)} className="tls-steps--gold mt-5 max-w-xl" testId="apply-steps" />
         <p className="mt-3 text-white/60 max-w-2xl">Werde offiziell Teil von THE LION SQUAD — eSPORTS. Stimmrecht bei Generalversammlungen, Member-Bereiche, Vereinslogo auf deinem Trikot. Ein Antrag pro Konto.</p>
 
         {loading ? (

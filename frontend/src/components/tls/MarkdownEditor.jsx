@@ -553,7 +553,7 @@ export function MarkdownEditor({
             <button type="button" onClick={() => importHtml(true)} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-white/5">
               In Editor einfügen
             </button>
-            <button type="button" onClick={() => importHtml(false)} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs font-black uppercase tracking-wider hover:bg-[#6FD6FF]">
+            <button type="button" onClick={() => importHtml(false)} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs font-black uppercase tracking-wider">
               HTML übernehmen
             </button>
           </div>

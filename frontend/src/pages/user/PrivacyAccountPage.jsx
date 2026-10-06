@@ -80,7 +80,7 @@ export default function PrivacyAccountPage() {
               <div className="flex-1">
                 <h2 className="font-heading text-lg md:text-xl font-bold uppercase">Datenexport</h2>
                 <p className="mt-1 text-sm text-white/60">Lade alle Daten herunter, die wir über dich gespeichert haben — Profil, Turnier-Anmeldungen, F1-Zeiten, Teams und E-Mail-Logs.</p>
-                <button onClick={exportData} disabled={busy} data-testid="dsgvo-export-btn" className="mt-4 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50">
+                <button onClick={exportData} disabled={busy} data-testid="dsgvo-export-btn" className="tls-btn tls-btn--primary mt-4 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
                   {busy ? "Lade…" : "Als JSON herunterladen"}
                 </button>
               </div>

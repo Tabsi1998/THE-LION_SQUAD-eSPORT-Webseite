@@ -64,7 +64,7 @@ function TeamList() {
             <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Join-Code und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
           </div>
           {user ? (
-            <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-[#1E95C2]">
+            <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">
               <Plus className="w-3.5 h-3.5" /> Team erstellen
             </button>
           ) : (
@@ -404,7 +404,7 @@ function TeamDetail({ id }) {
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
               <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value); setActionError(""); }} placeholder="Join-Code" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-              <button disabled={mutating} data-testid="team-join-submit" className="w-full px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
+              <button disabled={mutating} data-testid="team-join-submit" className="tls-btn tls-btn--primary w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
             </form>
           )}
           {user && isMember && team.leader_id !== user.id && (
@@ -523,7 +523,7 @@ function TeamChat({ team, user }) {
             className="flex-1 min-w-0"
             textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
           />
-          <button type="button" onClick={send} disabled={loading || !attachments.canSend(text)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+          <button type="button" onClick={send} disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
             <Send className="w-3.5 h-3.5" /> Senden
           </button>
         </div>
@@ -663,7 +663,7 @@ function TeamModal({ team, onClose, onSaved }) {
         <div className="flex justify-end gap-2 p-5 border-t border-white/10">
           {submitError && <div className="mr-auto"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
-          <button disabled={saving} data-testid="team-save" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
+          <button disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
         </div>
       </form>
     </div>

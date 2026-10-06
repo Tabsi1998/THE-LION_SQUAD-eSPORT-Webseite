@@ -156,7 +156,7 @@ export function TeamsPanel() {
                 <div className="mt-1 font-heading font-black uppercase">{invite.team?.name || "Team"}</div>
                 {invite.team?.tag && <div className="text-xs text-[#29B6E8] font-bold">[{invite.team.tag}]</div>}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => actOnInvite(invite, "accept")} className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold">
+                  <button type="button" onClick={() => actOnInvite(invite, "accept")} className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
                     <Check className="w-3.5 h-3.5" /> Annehmen
                   </button>
                   <button type="button" onClick={() => actOnInvite(invite, "decline")} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
@@ -173,7 +173,7 @@ export function TeamsPanel() {
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
           <Users className="w-10 h-10 mx-auto opacity-40 mb-3" />
           <div className="font-heading font-bold text-lg">Noch kein Team</div>
-          <Link to="/teams" className="mt-4 inline-flex px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs">Team erstellen oder beitreten</Link>
+          <Link to="/teams" className="tls-btn tls-btn--primary mt-4 inline-flex px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Team erstellen oder beitreten</Link>
         </div>
       ) : (
         <div className="grid lg:grid-cols-[300px_1fr] gap-5">
@@ -216,7 +216,7 @@ export function TeamsPanel() {
                   <div className="flex gap-2">
                     <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
                     {activeTeam.can_manage && (
-                      <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
+                      <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
                         <Plus className="w-3.5 h-3.5" /> Squad
                       </button>
                     )}
@@ -296,7 +296,7 @@ export function TeamsPanel() {
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-white/10">
               <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button disabled={saving} className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
+              <button disabled={saving} className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
             </div>
           </form>
         </div>

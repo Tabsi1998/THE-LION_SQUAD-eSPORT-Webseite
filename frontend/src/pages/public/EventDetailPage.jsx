@@ -160,7 +160,7 @@ export default function EventDetailPage() {
           }} />
           {(e.tournaments?.length || e.f1_challenges?.length) && (
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to={liveUrl} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:bg-white transition">
+              <Link to={liveUrl} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <Radio className="w-4 h-4" /> Live verfolgen
               </Link>
               <Link to={`/display/event/${e.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 text-xs uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/45 hover:text-white transition">

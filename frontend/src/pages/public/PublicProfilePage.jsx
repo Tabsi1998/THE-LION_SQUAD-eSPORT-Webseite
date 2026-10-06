@@ -554,7 +554,7 @@ export default function PublicProfilePage() {
                   <button
                     type="button"
                     onClick={openMessage}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#1E95C2]"
+                    className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
                   >
                     <MessageSquare className="w-3.5 h-3.5" /> Nachricht
                   </button>

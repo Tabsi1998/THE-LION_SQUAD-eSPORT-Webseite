@@ -145,7 +145,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
         </div>
 
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={download} disabled={busy} data-testid="highlight-card-download" className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#1E95C2] disabled:opacity-50">
+          <button type="button" onClick={download} disabled={busy} data-testid="highlight-card-download" className="tls-btn tls-btn--primary flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             <Download className="w-3.5 h-3.5" /> PNG speichern
           </button>
           <button type="button" onClick={share} disabled={busy} data-testid="highlight-card-share" className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-white/20 text-white rounded-sm text-xs uppercase tracking-wider font-bold hover:border-[#29B6E8]/60 disabled:opacity-50">

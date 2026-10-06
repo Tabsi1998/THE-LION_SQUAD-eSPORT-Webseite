@@ -203,7 +203,7 @@ export default function AboutPage() {
           <h2 className="font-heading text-3xl md:text-5xl font-black uppercase">{texts.cta_title}</h2>
           <Paragraphs text={texts.cta_text} className="mt-4 text-white/70 max-w-2xl mx-auto" />
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link to="/register" data-testid="about-cta-register" className="px-7 py-3.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
+            <Link to="/register" data-testid="about-cta-register" className="tls-btn tls-btn--primary px-7 py-3.5 font-bold uppercase tracking-wider rounded-sm">
               Account erstellen
             </Link>
             <Link to="/membership/join" data-testid="about-cta-join" className="px-7 py-3.5 border-2 border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700] hover:text-black transition">

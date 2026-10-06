@@ -140,7 +140,7 @@ export default function F1DetailPage() {
             </div>
           )}
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition">
+            <Link to={`/display/f1/${challenge.id}${activeTrack ? `?track=${activeTrack}` : ""}`} target="_blank" data-testid="f1-tv-link" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">
               <Tv className="w-4 h-4" /> TV / Beamer Modus
             </Link>
             {showResultPdf && (
@@ -498,7 +498,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
             <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
             <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} data-testid="fastlap-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </label>
-          <button disabled={saving} data-testid="fastlap-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
+          <button disabled={saving} data-testid="fastlap-submit" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
         </div>
         <div className="mt-2 grid md:grid-cols-2 gap-2">
           <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Proof URL optional" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />

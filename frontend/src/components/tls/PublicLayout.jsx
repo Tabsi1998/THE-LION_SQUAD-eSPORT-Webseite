@@ -129,7 +129,7 @@ export function PublicLayout({ children }) {
                 <Link
                   to="/register"
                   data-testid="nav-register"
-                  className="inline-flex px-4 py-2 text-xs font-bold uppercase tracking-wider bg-[#29B6E8] text-black hover:bg-[#1E95C2] hover:shadow-[0_0_15px_rgba(41,182,232,0.6)] transition-all rounded-sm"
+                  className="tls-btn tls-btn--primary inline-flex px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm"
                 >
                   Mitglied werden
                 </Link>

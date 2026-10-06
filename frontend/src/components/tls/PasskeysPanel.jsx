@@ -56,7 +56,7 @@ export function PasskeysPanel() {
           </label>
           <p className="text-xs text-white/60">Zum Hinzufügen oder Entfernen bestätigst du dein Passwort. Nutzt du bisher nur Google, kannst du über <Link to="/forgot-password" className="text-[#29B6E8] underline">Passwort festlegen</Link> zuerst ein Passwort einrichten.</p>
           <button type="button" disabled={submitting || !password || !name.trim()} onClick={() => perform(() => enrollPasskey(name.trim(), password), "Passkey eingerichtet. Beim nächsten Login kannst du ihn verwenden.")}
-            className="min-h-11 px-4 py-2 bg-[#29B6E8] text-black font-bold rounded-sm disabled:opacity-50">{submitting ? "Bitte warten …" : "Passkey hinzufügen"}</button>
+            className="tls-btn tls-btn--primary min-h-11 px-4 py-2 font-bold rounded-sm disabled:opacity-50">{submitting ? "Bitte warten …" : "Passkey hinzufügen"}</button>
           <ul className="space-y-2">
             {items.map((item) => (
               <li key={item.id} className="border-t border-white/10 pt-3 flex flex-wrap gap-3 items-center justify-between">

@@ -72,7 +72,7 @@ export function ForgotPasswordPage() {
             testId="forgot-email"
           />
           {submitError && <AuthFormAlert id="forgot-submit-error">{submitError}</AuthFormAlert>}
-          <button disabled={loading} data-testid="forgot-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
+          <button disabled={loading} data-testid="forgot-submit" className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
             {loading ? "Sende ..." : "Link senden"}
           </button>
         </form>
@@ -188,7 +188,7 @@ export function ResetPasswordPage() {
             </label>
           </div>}
           {submitError && <AuthFormAlert id="reset-submit-error">{submitError}</AuthFormAlert>}
-          <button disabled={loading} data-testid="reset-submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition">
+          <button disabled={loading} data-testid="reset-submit" className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
             {loading ? "Speichere ..." : "Passwort speichern"}
           </button>
         </form>

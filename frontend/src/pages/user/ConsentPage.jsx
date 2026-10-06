@@ -42,7 +42,7 @@ export default function ConsentPage() {
             <input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} className="mt-1 accent-[#29B6E8]" />
             <span className="text-sm">Ich akzeptiere die veröffentlichten <Link to="/terms" target="_blank" className="text-[#29B6E8] underline">Nutzungsbedingungen</Link>.</span>
           </label>
-          <button disabled={busy || !privacy || !terms} className="w-full py-3 bg-[#29B6E8] text-black font-black uppercase tracking-wider disabled:opacity-40">{busy ? "Speichere …" : "Bestätigen und fortfahren"}</button>
+          <button disabled={busy || !privacy || !terms} className="tls-btn tls-btn--primary w-full py-3 font-black uppercase tracking-wider disabled:opacity-40">{busy ? "Speichere …" : "Bestätigen und fortfahren"}</button>
         </form>
       </div>
     </main>

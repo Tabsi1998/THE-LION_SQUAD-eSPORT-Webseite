@@ -740,7 +740,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                   const ok = await uploadFile(current.file, { rotation: current.rotation, cropMode: current.cropMode, cropX: current.cropX, cropY: current.cropY, zoom: current.zoom });
                   if (ok) closeEditor();
                 }}
-                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50"
+                className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50"
               >
                 <Check className="w-4 h-4" /> Übernehmen
               </button>

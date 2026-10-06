@@ -398,7 +398,7 @@ export default function ProfilePage() {
 
             {FORM_TABS.has(tab) && (
               <div className="sticky bottom-0 z-10 -mx-4 px-4 py-3 sm:-mx-6 sm:px-6 lg:mx-0 lg:px-0 bg-[#050505]/95 backdrop-blur border-t border-white/10 flex flex-wrap items-center gap-3" data-testid="profile-save-bar">
-                <button type="submit" disabled={saving} data-testid="profile-save" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs">
+                <button type="submit" disabled={saving} data-testid="profile-save" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs">
                   <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
                 </button>
                 <Link to="/privacy-account" className="inline-flex items-center gap-2 px-6 py-3 border border-white/15 text-white/70 hover:text-white font-bold uppercase tracking-wider rounded-sm text-xs">
