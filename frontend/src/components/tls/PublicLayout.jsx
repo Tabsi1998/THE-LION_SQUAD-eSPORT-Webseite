@@ -285,7 +285,7 @@ export function PublicLayout({ children }) {
               <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
                 {socialLinks.map((social, index) => (
                   <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} className="tls-social"
-                    style={{ "--tls-social": social.color, "--tls-social-fill": social.fill || social.color, "--tls-social-ink": social.ink }}>
+                    style={{ "--tls-social": social.ink === "#0A0A0A" && social.color === "#FFFFFF" ? "#FFFFFF" : social.color }}>
                     <ChannelIcon kind={social.platform} className="w-[18px] h-[18px]" />
                     <span className="tls-social__name" aria-hidden="true">{social.label}</span>
                   </a>
@@ -462,7 +462,7 @@ function getFooterSocialLinks(branding, twitchUrl) {
       const platform = String(social.platform || "custom").toLowerCase();
       const icon = socialIconFor(platform);
       const merged = { color: icon.color, fill: icon.fill, hoverClass: icon.hoverClass, ...social, platform, label: social.label || platform };
-      // Social-Logos (#1083): Fläche in der Markenfarbe, das Logo darauf hell oder dunkel - je nach Farbe.
+      // Social-Logos (#1083): Logo und Winkel in der Markenfarbe; `ink` bleibt für Flächen in Markenfarbe (Partnerseiten).
       return { ...merged, ink: socialInk(merged.color) };
     });
 }

@@ -128,45 +128,41 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     await expect(main).toHaveAttribute("data-route-fade", /^[ab]$/);
   });
 
-  test("Social-Logos: heben sich, füllen sich in der Markenfarbe, das Schild nennt den Namen", async ({ page }) => {
+  test("Social-Logos (Variante D): Logo in Markenfarbe, die Eckwinkel schließen sich zum Rahmen, das Schild nennt den Namen", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockServer(page);
     await page.goto("/");
     const look = (testId) => page.getByTestId(testId).evaluate((node) => {
       const style = getComputedStyle(node);
       const name = getComputedStyle(node.querySelector(".tls-social__name"));
-      return { background: style.backgroundColor, image: style.backgroundImage, color: style.color, transform: style.transform, name: name.opacity };
+      const logo = getComputedStyle(node.querySelector("svg"));
+      return { color: style.color, size: style.backgroundSize.split(",")[0].trim(), fill: style.backgroundColor, logo: logo.transform, name: name.opacity };
     });
     const discord = page.getByTestId("footer-discord");
     await discord.scrollIntoViewIfNeeded();
     const rest = await look("footer-discord");
-    expect(rest.background).toBe("rgb(13, 13, 14)");
-    expect(rest.transform).toBe("none");
+    expect(rest.color).toBe("rgb(88, 101, 242)");
+    expect(rest.size).toBe("9px 2px");
+    expect(rest.fill).toBe("rgba(0, 0, 0, 0)");
+    expect(rest.logo).toBe("none");
     expect(rest.name).toBe("0");
 
     await discord.hover();
-    await page.waitForTimeout(450);
+    await page.waitForTimeout(500);
     const hovered = await look("footer-discord");
-    expect(hovered.background).toBe("rgb(88, 101, 242)");
-    expect(hovered.color).toBe("rgb(255, 255, 255)");
-    expect(hovered.transform).toBe("matrix(1.06, 0, 0, 1.06, 0, -8)");
+    // Die Winkel sind bis zur Mitte jeder Kante gewachsen - der Rahmen ist geschlossen.
+    expect(hovered.size).toBe("51% 2px");
+    expect(hovered.fill).not.toBe("rgba(0, 0, 0, 0)");
+    expect(hovered.logo).toBe("matrix(1.18, 0, 0, 1.18, 0, 0)");
     expect(hovered.name).toBe("1");
     await expect(discord).toHaveAttribute("aria-label", "Discord");
     await expect(discord).toHaveAttribute("href", "https://discord.test/lions");
-
-    await page.getByTestId("footer-instagram").hover();
-    await page.waitForTimeout(450);
-    expect((await look("footer-instagram")).image).toContain("linear-gradient");
     if (SHOTS) {
-      const box = await page.getByTestId("footer-socials").boundingBox();
-      await page.screenshot({ path: `${SHOTS}/social-logos-1440.png`, clip: { x: box.x - 16, y: box.y - 48, width: box.width + 32, height: box.height + 72 } });
+      const bands = await page.getByTestId("footer-socials").boundingBox();
+      await page.screenshot({ path: `${SHOTS}/social-logos-1440.png`, clip: { x: bands.x - 16, y: bands.y - 48, width: bands.width + 32, height: bands.height + 72 } });
     }
-    // X ist eine helle Marke: die Fläche wird weiß, das Logo dunkel.
-    await page.getByTestId("footer-x").hover();
-    await page.waitForTimeout(450);
-    const x = await look("footer-x");
-    expect(x.background).toBe("rgb(255, 255, 255)");
-    expect(x.color).toBe("rgb(10, 10, 10)");
+    // X ist eine helle Marke: Logo und Winkel in Weiß.
+    expect((await look("footer-x")).color).toBe("rgb(255, 255, 255)");
   });
 
   test("Karten: 5 px anheben mit Rand in der Akzentfarbe; mit Saison-Deko bleibt die Karte stehen", async ({ page }) => {
@@ -264,10 +260,10 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     await discord.scrollIntoViewIfNeeded();
     await discord.hover();
     await page.waitForTimeout(100);
-    const style = await discord.evaluate((node) => ({ transform: getComputedStyle(node).transform, background: getComputedStyle(node).backgroundColor }));
-    // Die Farbe wechselt weiter (das ist keine Bewegung), der Weg nach oben entfällt.
-    expect(style.transform).toBe("matrix(1, 0, 0, 1, 0, 0)");
-    expect(style.background).toBe("rgb(88, 101, 242)");
+    const style = await discord.evaluate((node) => ({ logo: getComputedStyle(node.querySelector("svg")).transform, size: getComputedStyle(node).backgroundSize.split(",")[0].trim() }));
+    // Die Winkel schließen sich weiter (sofort, das ist Farbe), das Logo wächst nicht.
+    expect(style.logo).toBe("matrix(1, 0, 0, 1, 0, 0)");
+    expect(style.size).not.toBe("9px 2px");
     // Auch das Glühen im Hero wandert nicht.
     await page.evaluate(() => window.scrollTo(0, 0));
     expect(await page.getByTestId("home-hero-drift").evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
