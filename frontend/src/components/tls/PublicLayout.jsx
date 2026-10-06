@@ -148,12 +148,14 @@ export function PublicLayout({ children }) {
           </div>
         </div>
         </div>
-        {/* Handy-Menü (#1072): gleitet herein und hinaus; mit „Bewegung reduzieren“ blendet es nur. */}
+        {/* Handy-Menü (#1072): gleitet herein und hinaus; mit „Bewegung reduzieren“ blendet es nur. Es liegt über dem
+            Inhalt (absolut unter der Leiste), statt den Kopf zu vergrößern: so springt die Seite beim Öffnen nicht, und
+            Saison-Deko, die an der Kopfzeile hängt, bleibt an ihrem Platz und verschwindet unter dem Menü. */}
         <MotionConfig reducedMotion="user">
         <AnimatePresence initial={false}>
         {mobileOpen && (
           <motion.div id="mobile-navigation" key="mobile-navigation" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={motionTransition("mid")}
-            className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
+            className="lg:hidden absolute inset-x-0 top-full border-t border-b border-white/10 bg-[#0A0A0A] shadow-2xl shadow-black/60 max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-4 flex flex-col gap-1">
               <SeasonMenuSlot onClose={closeMobile} />
               <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
