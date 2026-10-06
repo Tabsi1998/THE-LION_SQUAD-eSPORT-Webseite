@@ -129,7 +129,7 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
           type="button"
           onClick={scrollToBottom}
           data-testid="conversation-new-messages"
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#29B6E8] text-black text-xs font-bold shadow-lg"
+          className="tls-btn tls-btn--primary absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
         >
           {newCount === 1 ? "1 neue Nachricht" : `${newCount} neue Nachrichten`} <ArrowDown className="w-3.5 h-3.5" />
         </button>

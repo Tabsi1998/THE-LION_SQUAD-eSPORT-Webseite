@@ -141,8 +141,8 @@ test("Anmeldung offen: Anmelden ist die eine Hauptaktion, die anderen Wege sind 
   mockApi({ ...base, ...DATES, format: "double_elimination" });
   renderPage();
   const actions = await screen.findByTestId("tournament-actions");
-  expect(actions.querySelector("button[data-testid='tournament-register-btn']")).toHaveClass("bg-[#29B6E8]");
-  expect(screen.getByTestId("tournament-bracket-link")).not.toHaveClass("bg-[#29B6E8]");
+  expect(actions.querySelector("button[data-testid='tournament-register-btn']")).toHaveClass("tls-btn--primary");
+  expect(screen.getByTestId("tournament-bracket-link")).not.toHaveClass("tls-btn--primary");
   expect(screen.getByTestId("tournament-tabs")).toHaveTextContent("Übersicht");
   expect(screen.getByTestId("tournament-tab-participants")).toHaveTextContent("Teilnehmer (0)");
   expect(screen.getByTestId("tournament-timeline-registration_close")).toHaveTextContent("Anmeldung endet");

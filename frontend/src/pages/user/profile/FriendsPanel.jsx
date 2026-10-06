@@ -203,11 +203,11 @@ export function FriendsPanel({ onChanged }) {
                       ) : relation.kind === "sent" ? (
                         <span className="text-[10px] uppercase tracking-wider font-bold text-white/50">Anfrage gesendet</span>
                       ) : relation.kind === "incoming" ? (
-                        <button type="button" onClick={() => act(relation.row, "accept")} className={`${buttonBase} bg-[#29B6E8] text-black`}><Check className="w-3 h-3" /> Anfrage annehmen</button>
+                        <button type="button" onClick={() => act(relation.row, "accept")} className={`${buttonBase}tls-btn tls-btn--primary`}><Check className="w-3 h-3" /> Anfrage annehmen</button>
                       ) : candidate.blocked_by_me ? (
                         <span className="text-[10px] uppercase tracking-wider font-bold text-white/40">Blockiert</span>
                       ) : (
-                        <button type="button" onClick={() => request(candidate)} disabled={busyId === candidate.id} data-testid={`friends-request-${candidate.id}`} className={`${buttonBase} bg-[#29B6E8] text-black`}>
+                        <button type="button" onClick={() => request(candidate)} disabled={busyId === candidate.id} data-testid={`friends-request-${candidate.id}`} className={`${buttonBase}tls-btn tls-btn--primary`}>
                           <UserPlus className="w-3 h-3" /> Anfrage senden
                         </button>
                       )}
@@ -230,7 +230,7 @@ export function FriendsPanel({ onChanged }) {
             <Section title="Offene Anfragen" count={data.incoming.length} rows={data.incoming} empty="Keine offenen Anfragen." testIdPrefix="friends-incoming">
               {(row) => (
                 <>
-                  <button type="button" onClick={() => act(row, "accept")} className={`${buttonBase} bg-[#29B6E8] text-black`}><Check className="w-3 h-3" /> Annehmen</button>
+                  <button type="button" onClick={() => act(row, "accept")} className={`${buttonBase}tls-btn tls-btn--primary`}><Check className="w-3 h-3" /> Annehmen</button>
                   <button type="button" onClick={() => act(row, "decline")} className={`${buttonBase} border border-white/15 text-white/60`}><X className="w-3 h-3" /> Ablehnen</button>
                 </>
               )}

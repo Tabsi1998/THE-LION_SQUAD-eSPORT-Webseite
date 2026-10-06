@@ -90,7 +90,7 @@ export function PasswordPanel({ googleOnly = false }) {
               onClick={submit}
               disabled={!ready}
               data-testid="profile-password-submit"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition text-xs"
+              className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50 text-xs"
             >
               {busy ? "Ändere…" : "Passwort ändern"}
             </button>

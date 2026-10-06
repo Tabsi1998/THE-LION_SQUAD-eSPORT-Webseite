@@ -75,7 +75,7 @@ export default function MyPrizesPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-12 text-center">
             <Award className="w-12 h-12 text-white/20 mx-auto mb-3" />
             <p className="text-white/60">Noch keine Gewinne oder Urkunden.</p>
-            <Link to="/tournaments" className="inline-block mt-4 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm">Aktuelle Turniere</Link>
+            <Link to="/tournaments" className="tls-btn tls-btn--primary inline-block mt-4 px-5 py-2 font-bold uppercase tracking-wider rounded-sm">Aktuelle Turniere</Link>
           </div>
         )}
 

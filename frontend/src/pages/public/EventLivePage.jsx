@@ -206,7 +206,7 @@ export default function EventLivePage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Link to={eventUrl} className="px-4 py-2 border border-white/10 text-xs uppercase tracking-wider font-bold rounded-sm text-white/70 hover:text-white hover:border-white/30">Eventdetails</Link>
-              <button type="button" onClick={load} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
+              <button type="button" onClick={load} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <RotateCw className="w-3.5 h-3.5" /> Aktualisieren
               </button>
             </div>

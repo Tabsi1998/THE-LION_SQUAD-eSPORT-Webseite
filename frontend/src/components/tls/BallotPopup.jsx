@@ -134,7 +134,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
               </button>
               {!ballot.secret ? (
                 <button type="button" onClick={cast} disabled={busy || !ballot.rights.some((right) => right.can_use && chosen[`${ballot.id}:${right.right_id}`])}
-                  data-testid="ballot-popup-cast" className="px-4 py-2 rounded-sm bg-[#29B6E8] text-black text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+                  data-testid="ballot-popup-cast" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
                   Stimme abgeben
                 </button>
               ) : null}

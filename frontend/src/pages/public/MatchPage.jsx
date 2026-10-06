@@ -383,7 +383,7 @@ export default function MatchPage() {
                 <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
                 <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
               </div>
-              <button disabled={busy} className="mt-4 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-inline-report-btn">{data.can_staff_submit_result ? "Ergebnis speichern" : "Ergebnis melden"}</button>
+              <button disabled={busy} className="tls-btn tls-btn--primary mt-4 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-inline-report-btn">{data.can_staff_submit_result ? "Ergebnis speichern" : "Ergebnis melden"}</button>
             </form>
               )}
 
@@ -416,7 +416,7 @@ export default function MatchPage() {
                     <input type="url" value={proofUrl} onChange={(e) => setProofUrl(e.target.value)} className="input" placeholder="Screenshot-/Beweis-Link optional" />
                     <input value={reportNote} onChange={(e) => setReportNote(e.target.value)} className="input" placeholder="Notiz optional" />
                   </div>
-                  <button disabled={busy} className="px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-v2-submit-btn">Heat-Ergebnis speichern</button>
+                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-v2-submit-btn">Heat-Ergebnis speichern</button>
                 </form>
               )}
 
@@ -488,7 +488,7 @@ export default function MatchPage() {
                   <Field label="Notiz">
                     <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
                   </Field>
-                  <button disabled={busy} className="px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
+                  <button disabled={busy} className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Vorschlagen</button>
                 </form>
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
@@ -561,7 +561,7 @@ export default function MatchPage() {
                     textareaClassName="input w-full min-h-[4.5rem] resize-y"
                     placeholder="Nachricht schreiben, @leitung oder @username markieren"
                   />
-                  <button disabled={busy || !chatAttachments.canSend(message)} aria-label="Senden" className="px-3 py-2 bg-[#29B6E8] text-black rounded-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
+                  <button disabled={busy || !chatAttachments.canSend(message)} aria-label="Senden" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm disabled:opacity-50"><Send className="w-4 h-4" /></button>
                 </div>
               </form>
             ) : (

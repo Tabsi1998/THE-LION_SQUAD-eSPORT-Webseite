@@ -2422,3 +2422,103 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
   .tls-bracket-line--draw { animation: none; }
   .tls-lap-board[data-intro="1"] .tls-lap-row > td:first-child::before { animation: none; }
 }
+
+/* Schritt-Anzeige (#1081): eine schmale Leiste je Schritt; erledigte und der aktuelle sind gefüllt, der Balken füllt
+   sich beim Weitergehen von links. Vorleseprogramme hören „Schritt x von y“ (aria-label am Element). */
+.tls-steps {
+  --tls-steps-accent: var(--tls-cyan);
+  display: grid;
+  grid-template-columns: repeat(var(--tls-steps, 4), minmax(0, 1fr));
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tls-steps--gold { --tls-steps-accent: var(--tls-gold); }
+.tls-steps__item {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-steps__bar {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--tls-steps-accent) 50%, rgba(255, 255, 255, 0.12) 50%) 100% 0 / 200% 100% no-repeat;
+  transition: background-position var(--tls-motion-slow) var(--tls-ease), box-shadow var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-steps__item[data-state="done"],
+.tls-steps__item[data-state="current"] {
+  color: #FFFFFF;
+}
+.tls-steps__item[data-state="done"] .tls-steps__bar,
+.tls-steps__item[data-state="current"] .tls-steps__bar {
+  background-position: 0 0;
+}
+.tls-steps__item[data-state="current"] .tls-steps__bar {
+  box-shadow: 0 0 10px color-mix(in srgb, var(--tls-steps-accent) 60%, transparent);
+}
+.tls-steps__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Knöpfe (#1082): eine Sprache für die ganze Seite. Der wichtige Knopf ist blau mit einem Lichtlauf und einem Pfeil,
+   der 3 px fährt; der zweitrangige ein Rahmen in Blau; der leise für Nebensachen. Größe, Form und Anzeige bleiben an
+   der Stelle (ein `hidden md:inline-flex` bleibt versteckt), nur Farbe, Hover und Übergang kommen von hier. Der
+   Lichtlauf ist ein Hintergrundbild, das über den Knopf wandert - kein Pseudo-Element, keine eigene Lage nötig. */
+.tls-btn {
+  transition: background-color var(--tls-motion-mid) var(--tls-ease), border-color var(--tls-motion-mid) var(--tls-ease),
+    color var(--tls-motion-mid) var(--tls-ease), background-position var(--tls-motion-slow) var(--tls-ease),
+    transform var(--tls-motion-fast) var(--tls-ease);
+}
+.tls-btn:active:not(:disabled) {
+  transform: scale(calc(1 - 0.02 * var(--tls-motion-on)));
+}
+.tls-btn .lucide-arrow-right {
+  transition: transform var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-btn--primary {
+  background-color: var(--tls-cyan);
+  color: #04141B;
+  background-image: linear-gradient(100deg, transparent 35%, rgba(255, 255, 255, 0.55) 50%, transparent 65%);
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 150% 0;
+}
+.tls-btn--primary:focus-visible {
+  outline: 2px solid #FFFFFF;
+  outline-offset: 2px;
+}
+.tls-btn--secondary {
+  background-color: transparent;
+  border: 1px solid rgba(41, 182, 232, 0.55);
+  color: var(--tls-cyan);
+}
+.tls-btn--quiet {
+  background-color: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.72);
+}
+@media (hover: hover) {
+  .tls-btn--primary:hover:not(:disabled) {
+    background-color: var(--tls-cyan-hover);
+    background-position: calc(150% - 200% * var(--tls-motion-on)) 0;
+  }
+  .tls-btn--secondary:hover:not(:disabled) {
+    background-color: rgba(41, 182, 232, 0.12);
+  }
+  .tls-btn--quiet:hover:not(:disabled) {
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+  .tls-btn:hover:not(:disabled) .lucide-arrow-right {
+    transform: translateX(calc(3px * var(--tls-motion-on)));
+  }
+}

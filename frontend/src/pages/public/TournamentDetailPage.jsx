@@ -181,10 +181,10 @@ export default function TournamentDetailPage() {
   const primaryClass = "px-6 py-3 font-bold uppercase tracking-wider rounded-sm transition disabled:opacity-50";
   if (canSelfRegister && !myReg) {
     primaryKey = "register";
-    primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
+    primaryAction = <button data-testid="tournament-register-btn" onClick={handleRegister} disabled={loading} className={`${primaryClass}tls-btn tls-btn--primary`}>{loading ? "Wird gesendet…" : (isTeamTournament ? "Team anmelden" : "Jetzt anmelden")}</button>;
   } else if (eventBlocked && !myReg && (registration.canRegister || hasRegisterAccess)) {
     primaryKey = "event_first";
-    primaryAction = <Link to={eventHref} data-testid="tournament-event-first" className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>Zuerst beim Event anmelden</Link>;
+    primaryAction = <Link to={eventHref} data-testid="tournament-event-first" className={`${primaryClass}tls-btn tls-btn--primary`}>Zuerst beim Event anmelden</Link>;
   } else if (clubMemberBlocked && !myReg) {
     primaryKey = "blocked";
     primaryAction = <button type="button" disabled data-testid="tournament-blocked-btn" className={`${primaryClass} border border-[#FFD700]/30 text-[#FFD700]/70 cursor-not-allowed`}>Externe Anmeldung</button>;
@@ -199,7 +199,7 @@ export default function TournamentDetailPage() {
     primaryAction = <Link to={subPage("standings")} data-testid="tournament-standings-link" className={`${primaryClass} bg-[#FFD700] text-black hover:bg-[#ffe45c]`}>Rangliste</Link>;
   } else if (t.started) {
     primaryKey = "bracket";
-    primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass} bg-[#29B6E8] text-black hover:bg-[#1E95C2]`}>Turnierbaum</Link>;
+    primaryAction = <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className={`${primaryClass}tls-btn tls-btn--primary`}>Turnierbaum</Link>;
   } else if (myReg) {
     primaryKey = "schedule";
     primaryAction = <Link to={subPage("matches")} data-testid="tournament-schedule-link" className={`${primaryClass} border border-[#29B6E8]/50 text-[#29B6E8] hover:bg-[#29B6E8]/10`}>Spielplan</Link>;
@@ -508,7 +508,7 @@ function TournamentChat({ tournament, user }) {
                 className="flex-1 min-w-0"
                 textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
               />
-              <button disabled={loading || !attachments.canSend(text)} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+              <button disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
                 <Send className="w-3.5 h-3.5" /> Senden
               </button>
             </form>
@@ -640,7 +640,7 @@ function RegistrationModal({ tournament, user, myTeams = [], loading, error, onC
         {error && <AuthFormAlert id="tournament-registration-error">{error}</AuthFormAlert>}
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)} data-testid="tournament-register-submit" className="px-5 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)} data-testid="tournament-register-submit" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
             {loading ? "Sendet…" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </div>

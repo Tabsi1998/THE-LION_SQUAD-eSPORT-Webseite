@@ -73,7 +73,7 @@ export default function EsportsOverviewPage() {
               Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort. Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/tournaments" className="inline-flex items-center gap-2 rounded-sm bg-[#29B6E8] px-5 py-3 text-xs font-bold uppercase tracking-wider text-black hover:bg-[#1E95C2]">
+              <Link to="/tournaments" className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
                 Turniere <ArrowRight className="h-4 w-4" />
               </Link>
               <Link to="/fastlap" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white/80 hover:border-[#29B6E8]/55 hover:text-white">

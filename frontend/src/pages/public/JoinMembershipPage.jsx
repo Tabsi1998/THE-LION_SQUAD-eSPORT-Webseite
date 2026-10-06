@@ -1,12 +1,15 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { useAuth } from "@/context/AuthContext";
+import { MEMBERSHIP_STEPS, StepBar } from "@/components/tls/StepBar";
 import { Crown, Users, Heart, Trophy, Gamepad2, Mail } from "lucide-react";
 
 export default function JoinMembershipPage() {
   // Wer aus dem Mitgliederbereich hierher kam, erfährt warum - statt stumm umgeleitet zu werden (#364).
   const [params] = useSearchParams();
   const fromMembers = params.get("from") === "members";
+  const { user } = useAuth();
   useDocumentTitle(
     "Mitglied werden",
     "Mitglied werden bei THE LION SQUAD: eSports Verein, Gaming Community, Mitgliederbereich, Events, Turniere und Vorteile in Tirol."
@@ -22,6 +25,8 @@ export default function JoinMembershipPage() {
               Der Mitgliederbereich ist Vereinsmitgliedern vorbehalten. Sobald deine Mitgliedschaft bestätigt ist, findest du ihn rechts oben im Menü.
             </div>
           )}
+          {/* Schritt-Anzeige (#1081): ohne Konto beginnt der Weg beim Konto, mit Konto beim Antrag. */}
+          <StepBar steps={MEMBERSHIP_STEPS} current={user ? 1 : 0} className="tls-steps--gold mb-8 max-w-xl" testId="join-steps" />
           <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">VEREINSMITGLIEDSCHAFT</span>
           <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-[1.05]">
             Werde Teil <br />des <span className="text-[#FFD700]">Rudels</span>

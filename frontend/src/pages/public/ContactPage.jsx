@@ -158,7 +158,7 @@ export default function ContactPage() {
                 <span>Ich habe die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzhinweise</Link> gelesen und stimme der Speicherung meiner Angaben zur Bearbeitung der Anfrage zu.{fieldErrors.accept_privacy && <span id="contact-privacy-error" role="alert" className="block mt-1 text-xs text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
               </label>
               {submitError && <AuthFormAlert id="contact-submit-error">{submitError}</AuthFormAlert>}
-              <button type="submit" disabled={submitting} data-testid="contact-submit" className="inline-flex items-center gap-2 px-6 py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] transition disabled:opacity-50">
+              <button type="submit" disabled={submitting} data-testid="contact-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-6 py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">
                 <Send className="w-4 h-4" /> {submitting ? "Sende…" : "Nachricht senden"}
               </button>
             </form>

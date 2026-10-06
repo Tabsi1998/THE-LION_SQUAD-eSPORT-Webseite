@@ -198,7 +198,7 @@ export default function LoginPage() {
           </p>
           <div className="mt-8 space-y-3">
             <button type="button" disabled={enrolling} onClick={() => answerOffer("setup")} data-testid="passkey-offer-setup"
-              className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{enrolling ? "Richte ein …" : "Jetzt einrichten"}</button>
+              className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{enrolling ? "Richte ein …" : "Jetzt einrichten"}</button>
             <button type="button" disabled={enrolling} onClick={() => answerOffer("later")} data-testid="passkey-offer-later"
               className="w-full py-3 border border-white/15 text-white/80 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Später</button>
             <button type="button" disabled={enrolling} onClick={() => answerOffer("never")} data-testid="passkey-offer-never"
@@ -229,7 +229,7 @@ export default function LoginPage() {
               testId="login-mfa-code"
             />
             {err && <AuthFormAlert id="login-error">{err}</AuthFormAlert>}
-            <button disabled={loading} type="submit" className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50" data-testid="login-mfa-submit">
+            <button disabled={loading} type="submit" className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50" data-testid="login-mfa-submit">
               {loading ? "Prüfe …" : "Anmeldung bestätigen"}
             </button>
             <button type="button" disabled={loading} onClick={() => { setMfaTicket(""); setMfaCode(""); setErr(null); }} className="w-full text-xs text-white/45 hover:text-white">Zurück zum Login</button>
@@ -273,7 +273,7 @@ export default function LoginPage() {
             data-testid="login-submit"
             disabled={loading}
             type="submit"
-            className="w-full py-3 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2] disabled:opacity-50 transition"
+            className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50"
           >
             {loading ? "Login ..." : "Einloggen"}
           </button>

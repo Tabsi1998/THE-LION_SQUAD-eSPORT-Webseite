@@ -283,7 +283,7 @@ export default function MessagesPage() {
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="font-bold text-sm truncate">{other.display_name || other.username}</div>
-                          {thread.unread_count > 0 ? <span className="shrink-0 min-w-5 h-5 px-1 rounded-sm bg-[#29B6E8] text-black text-[10px] font-black inline-flex items-center justify-center">{thread.unread_count}</span> : null}
+                          {thread.unread_count > 0 ? <span className="tls-btn tls-btn--primary shrink-0 min-w-5 h-5 px-1 rounded-sm text-[10px] font-black inline-flex items-center justify-center">{thread.unread_count}</span> : null}
                         </div>
                         <div className="text-xs text-white/40 truncate">{threadPreview(thread)}</div>
                       </button>
@@ -345,7 +345,7 @@ export default function MessagesPage() {
                     data-testid="direct-chat-input"
                     className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50"
                   />
-                  <button type="button" disabled={!canSend || sending || !dmAttachments.canSend(text)} onClick={send} data-testid="direct-chat-send" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+                  <button type="button" disabled={!canSend || sending || !dmAttachments.canSend(text)} onClick={send} data-testid="direct-chat-send" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
                     <Send className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Senden</span>
                   </button>
                 </div>

@@ -98,7 +98,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
           <div className="bg-white p-3 w-fit"><QRCodeSVG value={setup.provisioning_uri} size={180} level="M" /></div>
           <div><div className="text-xs text-white/45">Manueller Schlüssel</div><code className="text-sm break-all select-all">{setup.secret}</code></div>
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Sechsstelliger Code" inputMode="numeric" autoComplete="one-time-code" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
-          <button type="button" disabled={busy || !code} onClick={enable} className="px-4 py-2 bg-[#29B6E8] text-black text-xs font-bold uppercase disabled:opacity-40">MFA bestätigen</button>
+          <button type="button" disabled={busy || !code} onClick={enable} className="tls-btn tls-btn--primary px-4 py-2 text-xs font-bold uppercase disabled:opacity-40">MFA bestätigen</button>
         </div>
       ) : (
         <div className="space-y-3">
