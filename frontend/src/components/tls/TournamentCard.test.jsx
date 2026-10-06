@@ -36,3 +36,15 @@ test("beendet ohne Format und ohne Spiel-Kürzel: kein Strich-Kästchen, kein lo
   expect(screen.getByTestId("tournament-card-action")).toHaveTextContent("Ergebnisse");
   expect(screen.queryByText("Turnierdetails")).toBeNull();
 });
+
+// Laufender Rahmen (#1076): nur die Karte, die gerade live ist, trägt ihn.
+test("live: die Karte trägt den laufenden Rahmen, sonst nicht", () => {
+  const { unmount } = card({ ...BASE, status: "live", public_phase: { state: "live", label: "Läuft" } });
+  expect(screen.getByTestId("tournament-card-cup")).toHaveClass("tls-card", "tls-live-frame");
+  expect(screen.getByTestId("tournament-card-cup")).toHaveAttribute("data-live", "1");
+  unmount();
+  card({ ...BASE, public_phase: { state: "registration_open", label: "Anmeldung offen" } });
+  expect(screen.getByTestId("tournament-card-cup")).toHaveClass("tls-card");
+  expect(screen.getByTestId("tournament-card-cup")).not.toHaveClass("tls-live-frame");
+  expect(screen.getByTestId("tournament-card-cup")).not.toHaveAttribute("data-live");
+});

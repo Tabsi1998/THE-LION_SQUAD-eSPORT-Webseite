@@ -271,7 +271,7 @@ function MatchCard({ match, resolved, changed = false }) {
       to={`/matches/${match.id}`}
       data-testid={`schedule-match-${match.id}`}
       data-changed={changed ? "true" : undefined}
-      className={`border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition ${changed ? "tls-changed" : ""}`}
+      className={`tls-match-edge relative overflow-hidden border border-white/10 hover:border-[#29B6E8]/50 bg-[#121212] rounded-sm p-4 transition ${changed ? "tls-changed" : ""}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">

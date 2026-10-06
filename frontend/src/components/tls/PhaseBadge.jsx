@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 const PHASE_STYLES = {
-  live: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50 animate-live",
+  // LIVE (#1076): der Chip steht ruhig, nur der Punkt pulsiert leise (index.css, .tls-live-dot).
+  live: "bg-[#FF3B30]/20 text-[#FF3B30] border-[#FF3B30]/50",
   registration_open: "bg-[#00FF88]/15 text-[#00FF88] border-[#00FF88]/50",
   registration_pending: "bg-[#29B6E8]/10 text-[#29B6E8] border-[#29B6E8]/40",
   registration_closed: "bg-white/10 text-white/70 border-white/20",
@@ -86,7 +87,7 @@ export function PhaseBadge({ phase, status, size = "sm", className = "" }) {
 
   return (
     <span className={`inline-flex max-w-full min-w-0 items-center gap-1 font-bold uppercase tracking-wider border rounded-sm tabular-nums whitespace-normal break-words leading-tight ${sz} ${PHASE_STYLES[state] || PHASE_STYLES.announced} ${className}`}>
-      {state === "live" ? <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" /> : null}
+      {state === "live" ? <span className="tls-live-dot" aria-hidden="true" data-testid="phase-live-dot" /> : null}
       {label}
     </span>
   );

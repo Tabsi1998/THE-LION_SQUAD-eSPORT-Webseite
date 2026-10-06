@@ -388,7 +388,7 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
           const x2 = b.left - base.left + container.scrollLeft;
           const y2 = b.top + b.height / 2 - base.top + container.scrollTop;
           const mid = x1 + (x2 - x1) / 2;
-          next.push({ id: `${match.id}-${target.id}`, from: match.id, to: target.id, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
+          next.push({ id: `${match.id}-${target.id}`, from: match.id, to: target.id, round: index, d: `M${x1} ${y1} H${mid} V${y2} H${x2}` });
         });
       }
       setLines(next);
@@ -410,7 +410,8 @@ function KnockoutTree({ roundNums, rounds, regMap, podiumMap, compact, onMatchCl
             ? ((playersByMatch.get(line.from) || []).some((id) => pathIds.has(id) && (playersByMatch.get(line.to) || []).includes(id)) ? "on" : "off")
             : "";
           return (
-            <path key={line.id} d={line.d} fill="none" className="tls-bracket-line" data-path={state || undefined}
+            // Die Linien zeichnen sich beim ersten Erscheinen einmal, Runde für Runde (#1076).
+            <path key={line.id} d={line.d} fill="none" pathLength="1" className="tls-bracket-line tls-bracket-line--draw" style={{ "--tls-i": line.round }} data-path={state || undefined}
               stroke={state === "on" ? "rgba(41,182,232,0.85)" : "rgba(255,255,255,0.22)"} strokeWidth={state === "on" ? 2.5 : 2} />
           );
         })}
@@ -535,6 +536,8 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
             bye={isBye(slot)}
             score={done || result ? (result?.score ?? result?.points ?? 0) : null}
             isWinner={isWinner}
+            // Trifft das Ergebnis gerade ein, läuft einmal ein goldener Schimmer über die Siegerzeile (#1076).
+            sweep={changed && isWinner}
             isLoser={done && reg && !isWinner}
             isMine={Boolean(mine) && slot.registration_id === mine}
             podiumRank={podiumMap?.get(slot.registration_id)}
@@ -613,14 +616,14 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   );
 }
 
-function HeatRow({ registrationId, registration, result, played, qualified, isMine, podiumRank, compact = false }) {
+function HeatRow({ registrationId, registration, result, played, qualified, isMine, podiumRank, compact = false, sweep = false }) {
   const user = registration?.user || {};
   const label = registration ? (registration.display_name || user.display_name || registration.ingame_name || "-") : "";
   const score = result?.score ?? result?.points;
   const podium = podiumMeta(podiumRank);
   const pathHandlers = usePathHover(registrationId);
   return (
-    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")}`}>
+    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} border-b border-white/5 last:border-b-0 ${podium?.row || (qualified ? "bg-[#29B6E8]/10" : "")} ${sweep ? "tls-winner-sweep" : ""}`} data-sweep={sweep ? "1" : undefined}>
       <div className="flex items-center gap-2 min-w-0">
         <SlotAvatar avatar={user.avatar_url} label={label} empty={!registration} />
         <div className="min-w-0">
@@ -662,11 +665,11 @@ function usePathHover(registrationId) {
   };
 }
 
-function Row({ registrationId, label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false }) {
+function Row({ registrationId, label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false, sweep = false }) {
   const podium = podiumMeta(podiumRank);
   const pathHandlers = usePathHover(registrationId);
   return (
-    <div {...pathHandlers} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")}`}>
+    <div {...pathHandlers} data-sweep={sweep ? "1" : undefined} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")} ${sweep ? "tls-winner-sweep" : ""}`}>
       <div className="flex items-center gap-2 min-w-0">
         <SlotAvatar avatar={avatar} label={bye ? "" : label} empty={empty || bye} />
         <span className={`${compact ? "text-sm" : "text-base"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-bold" : isLoser ? "text-white/45" : empty ? "text-white/25" : "text-white/85")}`}>

@@ -6,6 +6,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { LapTime, introOnce } from "@/components/tls/LapTime";
 import { PrizeList } from "@/components/tls/PrizeList";
 import { StreamEmbed } from "@/components/tls/StreamEmbed";
 import { AuthFormAlert } from "@/components/tls/AuthFormFields";
@@ -261,7 +262,9 @@ export default function F1DetailPage() {
                   <h3 className="font-heading text-xl font-bold">{board?.track?.name || "—"}</h3>
                   <span className="text-[11px] uppercase tracking-widest text-white/50 font-display">{board?.entries?.length || 0} Fahrer</span>
                 </div>
-                <table className="w-full text-sm">
+                {/* Timing-Board (#1077): beim ersten Erscheinen zählen die Zeiten einmal hoch, Platz 1 bis 3 tragen einen
+                    Strich in Gold, Silber und Bronze, beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */}
+                <table className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
                   <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
                     <tr>
                       <th className="text-left px-4 py-3 w-12">#</th>
@@ -274,12 +277,12 @@ export default function F1DetailPage() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {board?.entries?.map((e) => (
-                      <tr key={e.user_id} data-testid={`f1-row-${e.rank}`} className={e.rank <= 3 ? "bg-[#29B6E8]/5" : ""}>
+                      <tr key={e.user_id} data-testid={`f1-row-${e.rank}`} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""}`}>
                         <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{e.rank}</td>
                         <td className="px-4 py-3">{e.display_name}</td>
                         <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">
                           <span className="inline-flex items-center gap-1.5">
-                            {e.time_str}
+                            <LapTime value={e.time_str} play={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "")} data-testid={`f1-time-${e.rank}`} />
                             {e.penalty_seconds > 0 && (
                               <span
                                 title={`+${e.penalty_seconds}s Strafzeit · ${e.penalty_note || "ohne Begründung"}`}
