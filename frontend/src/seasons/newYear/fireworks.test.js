@@ -12,7 +12,7 @@ const SIZE = { width: 1440, height: 900 };
 // stehen dort im Test: weicht eine Seite ab, wird die andere rot. Seit #853 mit Kalibern und der Jahreszahl.
 const FIRE_PARITY = 3025438839;
 const CHOREO_PARITY = 1292175831;
-const YEAR_PARITY = 2834516894;
+const YEAR_PARITY = 2940152489;
 const PARITY_LAUNCH = { id: "p", at: 0, type: "peony", x: 0.5, distance: 0.3, colors: ["blue", "gold"], burstY: 0.3, rise: 1.4, drift: 12 };
 
 test("Parität mit der App: dieselbe Feuerwerksrechnung und dieselbe Choreografie", () => {

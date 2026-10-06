@@ -127,16 +127,24 @@ export function glyphCounts(text, total) {
   return lengths.map((length) => Math.max(10, Math.round((total * length) / sum)));
 }
 
+/** Ab dieser Fensterbreite steht die Zahl rechts der Mitte - zwischen dem Text links und dem Löwen rechts. */
+export const WIDE_FROM = 1024;
+export const WIDE_CENTER = 0.57;
+
 /**
- * Wo eine Ziffer steht (px): die Zahl mittig, so hoch wie 17 % des Fensters, höchstens 80 % der Breite, und unter der
- * Gruß-Karte. `slot` ist der Platz in der Zahl, `slots` ihre Länge.
+ * Wo eine Ziffer steht (px), unter der Gruß-Karte. `slot` ist der Platz in der Zahl, `slots` ihre Länge. Abnahme
+ * Silvester (#744): die Zahl darf nicht über dem Text der Startseite stehen - am PC (ab 1024 px) steht sie bei 57 %
+ * der Breite zwischen Text und Löwe, 14 % hoch und höchstens halb so breit wie das Fenster; am Handy unter dem Text
+ * bei 55 % der Höhe, 11,5 % hoch und höchstens 80 % breit.
  */
 export function glyphSpot(slot, slots, size) {
   const n = Math.max(1, Number(slots) || 1);
   const span = GLYPH_WIDTH + (n - 1) * GLYPH_PITCH;
-  const height = Math.max(40, Math.min(size.height * 0.17, (size.width * 0.8) / span));
-  const y = Math.max(size.height * 0.42, YEAR_CLEAR_TOP + height / 2);
-  const x = size.width / 2 + ((Number(slot) || 0) - (n - 1) / 2) * GLYPH_PITCH * height;
+  const wide = size.width >= WIDE_FROM;
+  const height = Math.max(40, Math.min(size.height * (wide ? 0.14 : 0.115), (size.width * (wide ? 0.5 : 0.8)) / span));
+  const y = Math.max(size.height * (wide ? 0.42 : 0.55), YEAR_CLEAR_TOP + height / 2);
+  const center = wide ? size.width * WIDE_CENTER : size.width / 2;
+  const x = center + ((Number(slot) || 0) - (n - 1) / 2) * GLYPH_PITCH * height;
   return { x: round1(x), y: round1(y), height: round1(height) };
 }
 

@@ -47,18 +47,24 @@ test("Jahreszahl: nur Ziffern, höchstens vier; ohne Zahl keine Raketen", () => 
   expect(yearLaunches(null, 0)).toEqual([]);
 });
 
-test("Platz: mittig, unter der Gruß-Karte, nie breiter als 80 % des Fensters - am PC und am Handy", () => {
+test("Platz (#744): am PC rechts der Mitte zwischen Text und Löwe, am Handy unter dem Text - immer unter der Gruß-Karte", () => {
   for (const size of [DESKTOP, PHONE, { width: 360, height: 640 }, { width: 2560, height: 1440 }, { width: 844, height: 390 }]) {
+    const wide = size.width >= 1024;
     const spots = [0, 1, 2, 3].map((slot) => glyphSpot(slot, 4, size));
     const left = spots[0].x - spots[0].height * 0.3;
     const right = spots[3].x + spots[3].height * 0.3;
-    expect((left + right) / 2).toBeCloseTo(size.width / 2, 0);
-    expect(right - left).toBeLessThanOrEqual(size.width * 0.8 + 1);
+    expect((left + right) / 2).toBeCloseTo(wide ? size.width * 0.57 : size.width / 2, 0);
+    expect(right - left).toBeLessThanOrEqual(size.width * (wide ? 0.5 : 0.8) + 1);
     expect(spots[0].y - spots[0].height / 2).toBeGreaterThanOrEqual(YEAR_CLEAR_TOP - 0.1);
+    expect(spots[0].y).toBeGreaterThanOrEqual(size.height * (wide ? 0.42 : 0.55) - 0.1);
     expect(spots[1].x - spots[0].x).toBeCloseTo(GLYPH_PITCH * spots[0].height, 0);
   }
-  expect(glyphSpot(0, 4, DESKTOP).height).toBe(153);
-  expect(glyphSpot(0, 4, PHONE).height).toBeLessThan(110);
+  expect(glyphSpot(0, 4, DESKTOP).height).toBe(126);
+  expect(glyphSpot(0, 4, DESKTOP).x).toBeLessThan(DESKTOP.width * 0.61);
+  expect(glyphSpot(3, 4, DESKTOP).x + 126 * 0.3).toBeLessThan(DESKTOP.width * 0.72);
+  const phone = [0, 1, 2, 3].map((slot) => glyphSpot(slot, 4, PHONE));
+  expect(phone[0].height).toBeLessThan(110);
+  expect(phone[0].y - phone[0].height / 2).toBeGreaterThanOrEqual(PHONE.height * 0.47);
 });
 
 test("Raketen der Zahl: je Ziffer eine, kurz nacheinander, groß und nah; die Salve wartet, bis die Zahl rieselt", () => {

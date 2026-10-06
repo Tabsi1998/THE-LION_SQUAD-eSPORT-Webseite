@@ -137,14 +137,23 @@ export function glyphCounts(text: string, total: number): number[] {
   return lengths.map((length) => Math.max(10, Math.round((total * length) / whole)));
 }
 
-/** Wo eine Ziffer steht (pt) - wie im Web: mittig, 17 % der Höhe, höchstens 80 % der Breite, unter der Gruß-Karte. */
+/** Ab dieser Breite steht die Zahl rechts der Mitte (Tablets quer) - dieselbe Rechnung wie im Web. */
+export const WIDE_FROM = 1024;
+export const WIDE_CENTER = 0.57;
+
+/**
+ * Wo eine Ziffer steht (pt) - wie im Web (#744): schmal unter dem Text bei 55 % der Höhe, 11,5 % hoch, höchstens 80 %
+ * breit; breit (ab 1024) bei 57 % der Breite, 14 % hoch, höchstens halb so breit; immer unter der Gruß-Karte.
+ */
 export function glyphSpot(slot: number, slots: number, size: Size): { x: number; y: number; height: number } {
   "worklet";
   const n = Math.max(1, Number(slots) || 1);
   const span = GLYPH_WIDTH + (n - 1) * GLYPH_PITCH;
-  const height = Math.max(40, Math.min(size.height * 0.17, (size.width * 0.8) / span));
-  const y = Math.max(size.height * 0.42, YEAR_CLEAR_TOP + height / 2);
-  const x = size.width / 2 + ((Number(slot) || 0) - (n - 1) / 2) * GLYPH_PITCH * height;
+  const wide = size.width >= WIDE_FROM;
+  const height = Math.max(40, Math.min(size.height * (wide ? 0.14 : 0.115), (size.width * (wide ? 0.5 : 0.8)) / span));
+  const y = Math.max(size.height * (wide ? 0.42 : 0.55), YEAR_CLEAR_TOP + height / 2);
+  const center = wide ? size.width * WIDE_CENTER : size.width / 2;
+  const x = center + ((Number(slot) || 0) - (n - 1) / 2) * GLYPH_PITCH * height;
   return { x: round1(x), y: round1(y), height: round1(height) };
 }
 
