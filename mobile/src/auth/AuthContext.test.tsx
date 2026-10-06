@@ -25,6 +25,8 @@ jest.mock("../lib/api", () => ({
     delete: (...args: unknown[]) => mockApi.delete(...args),
   },
   configureAuthBridge: jest.fn(),
+  // Der gemeinsame Erneuerungsweg (#942) läuft hier über denselben post-Mock wie früher der direkte Aufruf.
+  refreshSession: (token: string) => mockApi.post("/auth/mobile/refresh", { refresh_token: token }).then((response: { data: unknown }) => response.data),
 }));
 jest.mock("../lib/cache", () => ({ clearAllCache: (...args: unknown[]) => mockClearAllCache(...args) }));
 jest.mock("../notifications/PushService", () => ({
@@ -37,6 +39,20 @@ const REMEMBER_KEY = "tls.mobile.rememberSession";
 
 const USER = { id: "u-1", username: "lionfan", display_name: "Lion Fan" };
 const SESSION = { user: USER, access_token: "access-neu", refresh_token: "refresh-neu" };
+const USER_KEY = "tls.mobile.user";
+
+/** Ein Zugangs-Token mit Ablauf (#942): der Start liest ihn und entscheidet ohne Probeaufruf. */
+function accessToken(expiresInSeconds: number): string {
+  const payload = Buffer.from(JSON.stringify({ sub: "u-1", exp: Math.floor(Date.now() / 1000) + expiresInSeconds })).toString("base64")
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+}
+function networkError() {
+  return Object.assign(new Error("Network Error"), { code: "ERR_NETWORK" });
+}
+function rejected(status: number) {
+  return Object.assign(new Error(`HTTP ${status}`), { response: { status, data: {} } });
+}
 
 function wrapper({ children }: { children: React.ReactNode }) {
   return <AuthProvider>{children}</AuthProvider>;
@@ -112,7 +128,7 @@ describe("Anmelden", () => {
 
 describe("Sitzung beim App-Start", () => {
   test("ein gueltiges Access-Token stellt den Nutzer wieder her", async () => {
-    await SecureStore.setItemAsync(ACCESS_KEY, "access-alt");
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
     await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
     await SecureStore.setItemAsync(REMEMBER_KEY, "true");
     mockApi.get.mockResolvedValue({ data: USER });
@@ -123,32 +139,77 @@ describe("Sitzung beim App-Start", () => {
     expect(mockApi.post).not.toHaveBeenCalled();
   });
 
-  test("ein abgelaufenes Access-Token wird ueber den Refresh-Token ersetzt", async () => {
-    await SecureStore.setItemAsync(ACCESS_KEY, "access-abgelaufen");
+  test("ein abgelaufenes Access-Token wird ueber den Refresh-Token ersetzt - ohne Probeaufruf, genau einmal (#942)", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(-60));
     await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
     await SecureStore.setItemAsync(REMEMBER_KEY, "true");
-    mockApi.get.mockRejectedValue(new Error("401"));
 
     const { result } = await renderAuth();
 
+    expect(mockApi.get).not.toHaveBeenCalled();
+    expect(mockApi.post).toHaveBeenCalledTimes(1);
     expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/refresh", { refresh_token: "refresh-alt" });
     expect(result.current.user).toEqual(USER);
     expect(await SecureStore.getItemAsync(ACCESS_KEY)).toBe("access-neu");
+    expect(JSON.parse((await SecureStore.getItemAsync(USER_KEY)) || "null")).toEqual(USER);
+  });
+
+  test("offline beim Start: die Sitzung bleibt, das gemerkte Konto ist da, nichts wird geloescht (#942)", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(-60));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(USER));
+    mockApi.post.mockRejectedValue(networkError());
+
+    const { result } = await renderAuth();
+
+    expect(result.current.user).toEqual(USER);
+    expect(result.current.refreshToken).toBe("refresh-alt");
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBe("refresh-alt");
+    expect(mockClearAllCache).not.toHaveBeenCalled();
+  });
+
+  test("offline mit gueltigem Access-Token: /auth/me scheitert am Netz, das gemerkte Konto traegt (#942)", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(USER));
+    mockApi.get.mockRejectedValue(networkError());
+
+    const { result } = await renderAuth();
+
+    expect(result.current.user).toEqual(USER);
+    expect(mockApi.post).not.toHaveBeenCalled();
+    expect(await SecureStore.getItemAsync(ACCESS_KEY)).not.toBeNull();
+  });
+
+  test("ein 401 auf /auth/me bei gueltigem Token: einmal erneuern statt sofort abmelden (#942)", async () => {
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
+    await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
+    await SecureStore.setItemAsync(REMEMBER_KEY, "true");
+    mockApi.get.mockRejectedValue(rejected(401));
+
+    const { result } = await renderAuth();
+
+    expect(mockApi.post).toHaveBeenCalledTimes(1);
+    expect(result.current.user).toEqual(USER);
   });
 
   test("ein abgelehnter Refresh meldet sauber ab - als Gast, statt haengen zu bleiben", async () => {
     await SecureStore.setItemAsync(REFRESH_KEY, "refresh-ungueltig");
     await SecureStore.setItemAsync(REMEMBER_KEY, "true");
-    mockApi.post.mockRejectedValue(new Error("401"));
+    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(USER));
+    mockApi.post.mockRejectedValue(rejected(401));
 
     const { result } = await renderAuth();
 
     expect(isGuestUser(result.current.user)).toBe(true);
     expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
+    expect(await SecureStore.getItemAsync(USER_KEY)).toBeNull();
   });
 
   test("wer 'angemeldet bleiben' abgewaehlt hat, wird beim Start nicht wiederhergestellt", async () => {
-    await SecureStore.setItemAsync(ACCESS_KEY, "access-alt");
+    await SecureStore.setItemAsync(ACCESS_KEY, accessToken(3600));
     await SecureStore.setItemAsync(REFRESH_KEY, "refresh-alt");
     await SecureStore.setItemAsync(REMEMBER_KEY, "false");
 
@@ -262,5 +323,23 @@ describe("Kontowechsel", () => {
 
     expect(mockClearAllCache).toHaveBeenCalled();
     expect(result.current.user?.id).toBe("u-2");
+  });
+});
+
+// „Angemeldet bleiben“ (#942) geht an den Server: ohne Haken endet die Sitzung dort nach 24 Stunden.
+describe("Angemeldet bleiben", () => {
+  test("die Anmeldung schickt den Haken mit", async () => {
+    const { result } = await renderAuth();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", false);
+    });
+    expect(mockApi.post).toHaveBeenCalledWith("/auth/mobile/login", { email: "fan@lionsquad.at", password: "geheim", remember: false });
+    expect(await SecureStore.getItemAsync(REFRESH_KEY)).toBeNull();
+    expect(await SecureStore.getItemAsync(USER_KEY)).toBeNull();
+    await act(async () => {
+      await result.current.login("fan@lionsquad.at", "geheim", true);
+    });
+    expect(mockApi.post).toHaveBeenLastCalledWith("/auth/mobile/login", { email: "fan@lionsquad.at", password: "geheim", remember: true });
+    expect(JSON.parse((await SecureStore.getItemAsync(USER_KEY)) || "null")).toEqual(USER);
   });
 });

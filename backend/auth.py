@@ -17,6 +17,8 @@ REFRESH_TOKEN_DAYS = 14
 # ohne Nutzung. Sitzungen von vor #348 tragen kein Kennzeichen und gelten als „bleiben“.
 REMEMBER_DAYS = 90
 SESSION_ONLY_HOURS = 24
+# „Zuletzt aktiv“ (#942) wandert mit jedem normalen Aufruf mit - höchstens einmal je Stunde ein Schreibzugriff.
+LAST_ACTIVE_TOUCH_MINUTES = 60
 CSRF_TOKEN_BYTES = 32
 # Short grace so in-flight actions are not hard-killed mid-request by benign
 # security revocations (password reset / admin action). Theft & logout stay immediate.
@@ -193,6 +195,22 @@ def _extract_token(request: Request) -> str | None:
     return None
 
 
+async def touch_session_activity(db, user_id: str, family_id: str, now: datetime) -> None:
+    """„Zuletzt aktiv“ fortschreiben (#942): ein Schreibzugriff nur, wenn der Stand älter als eine Stunde ist - sonst
+    zeigte die Sitzungsliste bei der App dauerhaft „Angemeldet“, weil nur Anmeldung und Erneuerung schrieben."""
+    try:
+        await db.auth_sessions.update_one(
+            {
+                "family_id": family_id,
+                "user_id": user_id,
+                "$or": [{"last_active": {"$lt": now - timedelta(minutes=LAST_ACTIVE_TOUCH_MINUTES)}}, {"last_active": None}],
+            },
+            {"$set": {"last_active": now}},
+        )
+    except Exception:  # noqa: BLE001 - die Anzeige ist kein Grund, einen Aufruf scheitern zu lassen
+        pass
+
+
 async def get_current_user(request: Request) -> dict:
     token = _extract_token(request)
     if not token:
@@ -242,6 +260,8 @@ async def get_current_user(request: Request) -> dict:
                 session_ok = True
     if not session_ok:
         raise HTTPException(status_code=401, detail="Session expired")
+    if family_id:
+        await touch_session_activity(db, user_id, family_id, now)
     user = await db.users.find_one(
         {"id": user_id},
         {

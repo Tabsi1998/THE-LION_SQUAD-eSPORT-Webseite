@@ -415,7 +415,7 @@ async def mobile_login_verify(body: MobileCredentialResponse, request: Request):
     user = await _verified_login_user(db, body, challenge, config["rp_id"], accepted_mobile_origins(), client="app")
     await _security_audit(db, user["id"], "auth.passkey.login", request)
     # Gerätesperre vorgezeigt (require_user_verification) - wie im Web zählt das als zweiter Faktor (#358).
-    access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)
+    access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True, remember=body.remember)
     public = _public_user(user)
     await _attach_membership(public)
     return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer"}

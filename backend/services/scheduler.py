@@ -594,6 +594,11 @@ async def _safe_ops_retention():
         gone = await purge_discord_activity(get_db())
         if gone:
             logger.info(f"[scheduler] discord_activity_servers removed={gone}")
+        # App-Sitzungen ohne Aktivität seit 30 Tagen (#942) schließen - sie stünden sonst 90 Tage in der Liste.
+        from services.auth_sessions import purge_stale_app_sessions
+        closed = await purge_stale_app_sessions(get_db())
+        if closed:
+            logger.info(f"[scheduler] stale_app_sessions closed={closed}")
     except Exception as exc:
         _log_task_failure("ops_retention", exc)
 

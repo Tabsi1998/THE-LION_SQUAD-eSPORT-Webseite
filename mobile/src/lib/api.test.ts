@@ -9,6 +9,8 @@ const mockGetStaleCache = jest.fn();
 const mockSetCached = jest.fn(async (..._args: unknown[]) => {});
 const mockBuildCacheKey = jest.fn((..._args: unknown[]) => "cache-key");
 
+const mockDeviceHeaders = jest.fn(async () => ({ "X-Device-Id": "geraet-1", "X-Device-Name": "Pixel 9 / Android 16" }));
+jest.mock("./deviceIdentity", () => ({ deviceHeaders: () => mockDeviceHeaders() }));
 jest.mock("./cache", () => ({
   buildCacheKey: (...args: unknown[]) => mockBuildCacheKey(...args),
   getStaleCache: (...args: unknown[]) => mockGetStaleCache(...args),
@@ -18,14 +20,14 @@ jest.mock("./cache", () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { api, configureAuthBridge, responseFromCache } = require("./api");
+const { api, configureAuthBridge, responseFromCache, refreshSession } = require("./api");
 
 type Handler = (config: AxiosRequestConfig) => Promise<unknown> | unknown;
 
 let handler: Handler;
 const persistSession = jest.fn(async () => {});
 const clearSession = jest.fn(async () => {});
-let tokens = { accessToken: "access-alt", refreshToken: "refresh-alt", userId: "u-1" };
+let tokens: { accessToken: string | null; refreshToken: string | null; userId: string | null } = { accessToken: "access-alt", refreshToken: "refresh-alt", userId: "u-1" };
 
 function networkError(config: AxiosRequestConfig) {
   // Axios haengt bei echten Netzfehlern die Config an; ohne sie findet der
@@ -157,4 +159,46 @@ test("erfolgreiche GET-Antworten werden zwischengespeichert", async () => {
   await api.get("/dashboard");
 
   expect(mockSetCached).toHaveBeenCalled();
+});
+
+// Gerät und Erneuerung (#942): jeder Aufruf trägt die Gerätekopfzeilen; App-Start und 401-Nachschlag teilen sich eine
+// laufende Erneuerung, statt denselben Token zweimal zu drehen.
+test("jeder Aufruf traegt Kennung und Name des Geraets", async () => {
+  handler = async (config) => ({ data: {}, status: 200, statusText: "OK", headers: {}, config });
+  const response = await api.get("/news");
+  expect(response.config.headers["X-Device-Id"]).toBe("geraet-1");
+  expect(response.config.headers["X-Device-Name"]).toBe("Pixel 9 / Android 16");
+  expect(response.config.headers.Authorization).toBe("Bearer access-alt");
+});
+
+test("refreshSession: eine laufende Erneuerung wird geteilt - auch mit dem 401-Nachschlag", async () => {
+  // Wie in der App: persistSession legt die neuen Token ab, der wiederholte Aufruf traegt das neue Zugangs-Token.
+  (persistSession as jest.Mock).mockImplementation(async (session: { access_token: string; refresh_token: string }) => {
+    tokens = { ...tokens, accessToken: session.access_token, refreshToken: session.refresh_token };
+  });
+  let refreshCalls = 0;
+  let release: (value: unknown) => void = () => {};
+  const gate = new Promise((resolve) => { release = resolve; });
+  handler = async (config) => {
+    if (config.url === "/auth/mobile/refresh") {
+      refreshCalls += 1;
+      await gate;
+      return { data: { user: { id: "u-1" }, access_token: "access-neu", refresh_token: "refresh-neu" }, status: 200, statusText: "OK", headers: {}, config };
+    }
+    if (config.headers?.Authorization === "Bearer access-neu") return { data: { ok: true }, status: 200, statusText: "OK", headers: {}, config };
+    throw httpError(401, config);
+  };
+  const fromBoot = refreshSession("refresh-alt");
+  const fromCall = api.get("/profile");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  release(undefined);
+  const [session, call] = await Promise.all([fromBoot, fromCall]);
+  expect(refreshCalls).toBe(1);
+  expect(session.access_token).toBe("access-neu");
+  expect(call.data).toEqual({ ok: true });
+  expect(persistSession).toHaveBeenCalledTimes(1);
+  // Ohne Token (abgemeldet) gibt es nichts zu erneuern - abgelehnt, ohne Aufruf.
+  tokens = { ...tokens, refreshToken: null };
+  await expect(refreshSession(null)).rejects.toThrow("Kein Erneuerungs-Token");
+  expect(refreshCalls).toBe(1);
 });
