@@ -385,3 +385,17 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
   statt hinter Inhalt den Kontrast zu nehmen. Auf dem Handy kein Mond.
 - „dezent“ und „Bewegung reduzieren“: derselbe Himmel still, mit halb so vielen Sternen.
 - Paritäts-Seeds: im Web heißt der Ort `route`, in der App `screen` – beide mit demselben Wert füllen.
+
+## 20. Ostereiersuche in der Vorschau (#757, #964)
+
+Die Suche selbst (#646) steht in `docs/HISTORIE.md`, Teil A. Zur Vorschau:
+
+- Zwei Wege zum Token: je Ei in der Verwaltung der Eiersuche („Vorschau“, auch im Entwurf) und „Vorschau 60 Sekunden“
+  unter Jahreszeiten. Ohne eigene Zeit gilt der Karsamstag zu Mittag des nächsten Fensters
+  (`seasons.preview_default_at`, kommt mit #963).
+- `/api/seasonal/easter/eggs?preview=` liefert die Eier der Seite aus dem Jahr der Vorschau; gibt es für das Jahr noch
+  keine, liegen drei **Platzhalter** je Seite (`easter_hunt.placeholder_eggs`, Nummern ab 101, `placeholder: true`,
+  Gesamtzahl 12) - je Jahr und Seite dieselben Verstecke.
+- Im Web sammelt ein Tipp das Ei probehalber ein (`EasterEggs.collectPreview`): Hinweis mit Nummer und Versteck-Text,
+  der Korb zählt mit (`previewFind`, nur im Fenster bis zum Neuladen), bis er voll ist; am Server zählt nichts.
+

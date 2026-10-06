@@ -19,7 +19,7 @@ vi.mock("../SeasonContext", () => ({ useSeason: () => seasonState }));
 const motion = { reduced: true };
 vi.mock("@/hooks/useLiveChanges", () => ({ useReducedMotion: () => motion.reduced }));
 
-const { EasterEggs, eggsNear, fitNote, personality } = await import("./EasterEggs");
+const { EasterEggs, eggsNear, fitNote, personality, previewFind, resetPreviewBasket } = await import("./EasterEggs");
 
 function box(element, rect) {
   element.getBoundingClientRect = () => ({ ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top });
@@ -170,17 +170,26 @@ test("zu schnell: freundlicher Hinweis; abgelaufener Schlüssel: neu holen und e
   await waitFor(() => expect(apiMock.findEgg).toHaveBeenLastCalledWith("1.1000.cccccccccccccccccccccccccccccccc"));
 });
 
-test("Vorschau aus dem Admin: mit dem Token geladen, antippen zeigt Nummer und Hinweis - gezählt wird nichts", async () => {
+test("Vorschau (#757, #964): mit dem Token geladen; antippen sammelt probehalber ein - Nummer, Hinweis und Zähler, am Server nichts", async () => {
+  resetPreviewBasket();
   seasonState.preview = true;
   sessionStorage.setItem("tls-season-preview", JSON.stringify({ token: "easter_hunt.9999999999..sig", expires: Date.now() + 60000 }));
   authState.user = { id: "u1" };
-  apiMock.fetchEggs.mockResolvedValue({ active: true, preview: true, total: 3, eggs: [{ ...EGGS.eggs[0], token: "", hint: "Schau bei den News." }] });
+  const third = { egg_no: 3, token: "", spot: { kind: "footer", index: 0, place: "top-left" }, pattern: "stars", found: false, hint: "Platzhalter – unter Verwaltung → Ostereiersuche das Jahr anlegen" };
+  apiMock.fetchEggs.mockResolvedValue({ active: true, preview: true, placeholder: false, year: 2027, total: 2, eggs: [{ ...EGGS.eggs[0], token: "", hint: "Schau bei den News." }, third] });
   renderEggs();
   await settle();
   expect(apiMock.fetchEggs).toHaveBeenCalledWith("/news", "easter_hunt.9999999999..sig");
   fireEvent.click(await screen.findByTestId("easter-egg-1"));
-  expect(await screen.findByTestId("easter-egg-note")).toHaveTextContent("Vorschau: Ei 1 – Schau bei den News.");
+  expect(await screen.findByTestId("easter-egg-note")).toHaveTextContent("Vorschau: 1 von 2 · Ei 1: Schau bei den News.");
+  expect(apiMock.emitHuntProgress).toHaveBeenLastCalledWith({ found: 1, total: 2, completed_at: null, rank: null, active: true, preview: true });
+  await waitFor(() => expect(screen.queryByTestId("easter-egg-1")).toBeNull(), "das Ei ist eingesammelt");
+  fireEvent.click(await screen.findByTestId("easter-egg-3"));
+  expect(await screen.findByTestId("easter-egg-note")).toHaveTextContent("Korb voll (Vorschau) – gezählt wird nichts · Ei 3: Platzhalter");
+  expect(apiMock.emitHuntProgress.mock.calls.at(-1)[0]).toMatchObject({ found: 2, total: 2, active: true, preview: true });
+  expect(apiMock.emitHuntProgress.mock.calls.at(-1)[0].completed_at).toBeTruthy();
   expect(apiMock.findEgg).not.toHaveBeenCalled();
+  expect(previewFind(2027, 2, "/news:1").found).toBe(2);
 });
 
 test("läuft die Suche nicht, liegt nichts", async () => {

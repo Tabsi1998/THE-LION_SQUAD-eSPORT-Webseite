@@ -189,13 +189,14 @@ export default function AdminEasterHuntPage() {
     setDraft(base.map((row, i) => (i === index ? egg : row)));
   };
   const setPrize = (kind, patch) => setPrizes((current) => ({ ...current, [kind]: { ...(current[kind] || { kind }), ...patch } }));
-  // Vorschau (#757): die Eier dieses Jahres auf der echten Seite ansehen - auch im Entwurf, gezählt wird nichts.
+  // Vorschau (#757, #964): die Eier dieses Jahres auf der echten Seite ansehen - auch im Entwurf, gezählt wird nichts;
+  // antippen sammelt sie probehalber ein.
   const navigate = useNavigate();
   const previewEgg = async (egg) => {
     try {
       const { data } = await api.post(`/seasonal/easter/admin/${year}/preview`);
       rememberPreview(data.token, data.seconds || 60);
-      toast.success(`Vorschau ${data.seconds || 60} Sekunden – die Eier liegen auf den Seiten, antippen zeigt Nummer und Hinweis.`);
+      toast.success(`Vorschau ${data.seconds || 60} Sekunden – die Eier liegen auf den Seiten; antippen sammelt sie probehalber ein und zeigt Nummer und Hinweis.`);
       navigate(egg.route);
     } catch (err) {
       toast.error(errorText(err, "Die Vorschau hat nicht geklappt."));
@@ -258,7 +259,7 @@ export default function AdminEasterHuntPage() {
               {draft && <p className="mb-3 text-xs text-white/55">Noch nicht gespeichert.</p>}
               {rows.length ? (
                 <ul className="grid gap-3 lg:grid-cols-2">
-                  {rows.map((egg, index) => <EggCard key={`${egg.egg_no ?? "n"}-${index}`} egg={egg} index={index} view={view} locked={locked} onChange={changeRow} onPreview={draft ? null : previewEgg} />)}
+                  {rows.map((egg, index) => <EggCard key={`${egg.egg_no ?? "n"}-${index}`} egg={egg} index={index} view={view} locked={locked} onChange={changeRow} onPreview={previewEgg} />)}
                 </ul>
               ) : (
                 <p className="text-sm text-white/55">Noch keine Verstecke – „Vorschlag“ verteilt die Eier für {year}.</p>
