@@ -234,7 +234,7 @@ export default function AdminAdventPage() {
               )}
               {data.running && (
                 <Link to="/advent" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wider text-white/80 transition hover:border-white/30" data-testid="advent-admin-open">
-                  <ExternalLink className="h-3.5 w-3.5" /> Zur Seite
+                  <ExternalLink className="h-3.5 w-3.5" /> Kalender öffnen
                 </Link>
               )}
               {!data.filled && <span className="text-xs text-white/45">Die Vorschau gibt es ab dem ersten Türchen.</span>}

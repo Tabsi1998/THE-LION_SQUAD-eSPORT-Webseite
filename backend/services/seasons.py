@@ -528,6 +528,23 @@ def _secret() -> bytes:
     return os.environ.get("JWT_SECRET", "tls-local-development-secret-store").encode("utf-8")
 
 
+def preview_default_at(key: str, now: datetime | None = None) -> datetime | None:
+    """Die Zeit, die „Vorschau 60 Sekunden“ ohne eigene Angabe simuliert (#963, #964). Saisons mit Mitmach-Teil
+    zeigen außerhalb ihres Fensters sonst nichts Brauchbares: der Kalender ohne offenes Türchen, die Eiersuche ohne
+    Eier. Darum ein Tag mitten im nächsten Fenster - der 12. Dezember zu Mittag (zwölf Türchen offen, zwölf zu) und
+    der Karsamstag zu Mittag (wie die Vorschau der Verwaltung). Innerhalb des Fensters und für alle anderen Saisons:
+    nichts, also die echte Zeit."""
+    now = to_vienna(now)
+    if key not in ("advent_calendar", "easter_hunt") or current_window(key, now):
+        return None
+    window = next_window(key, now)
+    if not window:
+        return None
+    if key == "advent_calendar":
+        return at(date(window["year"], 12, 12), 12)
+    return at(good_friday(window["year"]) + timedelta(days=1), 12)
+
+
 def preview_token(key: str, now: datetime | None = None, at_time: datetime | None = None) -> str:
     """Signiertes Kurzzeit-Token für „Vorschau 60 Sekunden“ - wirkt nur bei dem, der es mitschickt."""
     now = to_vienna(now)

@@ -132,6 +132,9 @@ test.describe("Adventkalender", () => {
     await expect(page.getByTestId("advent-guest")).toBeVisible();
     await expect(page.getByTestId("advent-door-12")).toHaveAttribute("data-today", "1");
     await testInfo.attach(`adventkalender-${isMobile ? "handy" : "pc"}`, { body: await page.getByTestId("advent-frame").screenshot(), contentType: "image/png" });
+    // Das ganze Fenster über der Seite (#963) - für die Abnahme mit SHOT_DIR auch als Datei.
+    await testInfo.attach(`adventkalender-fenster-${isMobile ? "handy" : "pc"}`, { body: await page.screenshot(), contentType: "image/png" });
+    if (process.env.SHOT_DIR) await page.screenshot({ path: `${process.env.SHOT_DIR}/adventkalender-fenster-${isMobile ? "handy" : "pc"}.png` });
 
     // Verschlossen: es rüttelt, die Seite sagt, wann es so weit ist - gefragt wird der Server nicht.
     await page.getByTestId("advent-door-button-20").click();
@@ -151,14 +154,16 @@ test.describe("Adventkalender", () => {
     expect(dialog.x + dialog.width, "das Fenster passt in die Breite").toBeLessThanOrEqual(viewport.width + 1);
     expect(dialog.height, "das Fenster passt in die Höhe").toBeLessThanOrEqual(viewport.height);
     await page.getByTestId("advent-dialog-close").click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByTestId("advent-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("advent-window")).toBeVisible();
     await expect(page.getByTestId("advent-progress")).toContainText("1 von 24");
     expect(state.opens).toEqual([12]);
     expect(await page.evaluate((key) => JSON.parse(window.localStorage.getItem(key)), STORAGE)).toEqual({ year: 2026, days: [12] });
     expect(await outside(page, "[data-state='opened'] .tls-adv__leaf"), "kein offener Flügel ragt über den Rahmen").toEqual([]);
 
-    // Nach dem Neuladen nennt der Browser dem Server, was er geöffnet hat - und bekommt den Inhalt wieder.
-    await page.reload();
+    // Nach dem Neuladen nennt der Browser dem Server, was er geöffnet hat - und bekommt den Inhalt wieder
+    // (das Fenster geht über die Adresse /advent wieder auf, #963).
+    await page.goto("/advent");
     await expect(page.getByTestId("advent-door-12")).toHaveAttribute("data-state", "opened", { timeout: 20000 });
     expect(state.asked[state.asked.length - 1]).toBe("12");
     await expect(page.getByTestId("advent-door-12")).toContainText("Heute gibt es etwas zu gewinnen");
@@ -246,8 +251,12 @@ test.describe("Adventkalender", () => {
     const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
     expect(overflow, "die Kopfzeile bleibt in der Breite").toBeLessThanOrEqual(2);
     await widget.click();
-    await expect(page).toHaveURL(/\/advent$/);
+    // Seit #963 ein Fenster über der Startseite - die Adresse bleibt.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId("advent-window")).toBeVisible();
     await expect(page.getByTestId("advent-board")).toBeVisible({ timeout: 20000 });
+    await page.getByTestId("advent-window-close").click();
+    await expect(page.getByTestId("advent-window")).toHaveCount(0);
   });
 
   test("vor dem Advent ist der Kalender zu", async ({ page }, testInfo) => {

@@ -16,9 +16,12 @@ import "./nikolaus.css";
 // sagt die Karte, dass Angemeldete einen Sticker finden. Weil kaum jemand bis zum Footer scrollt, kommt einmal am Tag
 // ein Hinweis mit „Zum Stiefel“, und seit #852 steht ein kleiner Stiefel im Kopf gleich neben Kranz und Kalender (am
 // Handy ganz oben im Menü): ein Klick führt hinunter und öffnet ihn. „dezent“ und „Bewegung reduzieren“: kein Wackeln,
-// die Karte steht gleich da.
+// die Karte steht gleich da. Seit #963 öffnet sich der Stiefel im Kopf an Ort und Stelle (Wackeln, Gutschein, Karte
+// darunter) - oben und unten teilen denselben Stand: wer oben öffnet, findet unten den benutzten Stiefel.
 
 export const HINT_DELAY_MS = 1800;
+/** Ereignis im Fenster: der Stiefel wurde irgendwo auf der Seite geöffnet - die andere Stelle zieht nach. */
+export const OPENED_EVENT = "tls:nikolaus-opened";
 export const HINT_MS = 12000;
 export const BOOT_ID = "tls-nikolaus-boot";
 /** Was über der Linie Platz wegnimmt: Schrift, Bilder, Bedienung im Footer. */
@@ -145,15 +148,14 @@ function BootCard({ card, onClose }) {
 }
 
 /**
- * Der Stiefel auf der Linie über dem Impressum. Angemeldet fragt er den Server, ob er heuer schon geöffnet wurde (dann
- * steht er benutzt da); ein Klick öffnet ihn. Wackeln und Steigen dauern OPEN_MS - die Antwort des Servers läuft
- * parallel, die Karte kommt, wenn beides fertig ist.
+ * Zustand und Öffnen des Stiefels - für den Stiefel unten (Footer) und den im Kopf (Widget). Angemeldet fragt er den
+ * Server, ob er heuer schon geöffnet wurde (dann steht er benutzt da); ein Klick öffnet ihn. Wackeln und Steigen dauern
+ * OPEN_MS - die Antwort des Servers läuft parallel, die Karte kommt, wenn beides fertig ist. Öffnet die Person den
+ * Stiefel an der anderen Stelle, zieht diese hier über OPENED_EVENT nach (#963).
  */
-export function Footer({ season }) {
+export function useBoot(season) {
   const { user } = useAuth();
   const userId = user?.id || null;
-  const lineTop = useFooterLineTop([]);
-  const fit = useBootFit(lineTop);
   const still = season.effective === "subtle";
   const greeting = season.texts?.greeting || "";
   const [opened, setOpened] = useState(false);
@@ -168,8 +170,11 @@ export function Footer({ season }) {
     loadBootState(userId).then((state) => {
       if (!cancelled && state?.active) setOpened(Boolean(state.opened));
     });
+    const onOpened = () => setOpened(true);
+    window.addEventListener(OPENED_EVENT, onOpened);
     return () => {
       cancelled = true;
+      window.removeEventListener(OPENED_EVENT, onOpened);
     };
   }, [userId]);
   useEffect(() => () => timers.current.forEach((handle) => window.clearTimeout(handle)), []);
@@ -196,7 +201,10 @@ export function Footer({ season }) {
         const { data } = await api.post("/seasonal/nikolaus/open", null, preview ? { params: { preview } } : undefined);
         next = cardFor({ result: data, greeting });
         // Die Vorschau verschenkt nichts - der Stiefel bleibt zu und lässt sich wieder öffnen.
-        if (!data?.preview) setOpened(true);
+        if (!data?.preview) {
+          setOpened(true);
+          window.dispatchEvent(new CustomEvent(OPENED_EVENT));
+        }
       } catch (error) {
         next = cardFor({ reason: error?.response?.status === 409 ? "closed" : "error", greeting });
       }
@@ -210,7 +218,14 @@ export function Footer({ season }) {
     timers.current.push(window.setTimeout(close, wait + CARD_MS));
   };
 
-  const used = opened && phase !== "opening";
+  return { opened, phase, card, open, close, still, used: opened && phase !== "opening" };
+}
+
+/** Der Stiefel auf der Linie über dem Impressum. */
+export function Footer({ season }) {
+  const lineTop = useFooterLineTop([]);
+  const fit = useBootFit(lineTop);
+  const { phase, card, open, close, still, used } = useBoot(season);
   return (
     <div className="tls-nikolaus-scene" style={{ right: `${fit.right}px`, ...(lineTop === null ? {} : { top: `${lineTop}px` }) }} data-testid="nikolaus-scene" data-line={lineTop === null ? undefined : "1"} data-height={fit.height}>
       {card && <BootCard card={card} onClose={close} />}
@@ -298,12 +313,27 @@ export function goToBoot(effective, doc = typeof document === "undefined" ? null
   return true;
 }
 
-/** Der kleine Stiefel im Kopf neben Kranz und Kalender (#852) - am Handy steht er stattdessen oben im Menü. */
+/**
+ * Der kleine Stiefel im Kopf neben Kranz und Kalender (#852) - am Handy steht er stattdessen oben im Menü. Seit #963
+ * öffnet er sich an Ort und Stelle: Wackeln, der Gutschein steigt, die Karte hängt unter ihm. Derselbe Stand wie unten.
+ */
 export function Widget({ season }) {
+  const { phase, card, open, close, still, used } = useBoot(season);
   return (
-    <button type="button" className="tls-nikolaus-widget" onClick={() => goToBoot(season.effective)} aria-label="Nikolaus – zum Stiefel" title="Der Nikolaus war da – zum Stiefel" data-testid="nikolaus-widget">
-      <BootArt height={30} />
-    </button>
+    <span className="tls-nikolaus-widget-wrap" data-testid="nikolaus-widget-wrap">
+      <button
+        type="button"
+        className={`tls-nikolaus-widget${phase === "opening" ? " tls-nikolaus-widget--opening" : ""}${still ? " tls-nikolaus-widget--still" : ""}`}
+        onClick={open}
+        aria-label={used ? "Nikolausstiefel – schon geöffnet, noch einmal ansehen" : "Nikolausstiefel öffnen"}
+        title="Der Nikolaus war da – Stiefel öffnen"
+        data-testid="nikolaus-widget"
+        data-used={used ? "1" : undefined}
+      >
+        <BootArt used={used} height={30} />
+      </button>
+      {card && <div className="tls-nikolaus-widget-card" data-testid="nikolaus-widget-card"><BootCard card={card} onClose={close} /></div>}
+    </span>
   );
 }
 

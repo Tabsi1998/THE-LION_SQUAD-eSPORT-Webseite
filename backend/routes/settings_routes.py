@@ -1867,6 +1867,9 @@ async def preview_season(key: str, body: SeasonPreviewPayload, me: dict = Depend
     at_time = seasons._parse_until(body.at) if body.at else None
     if body.at and at_time is None:
         raise HTTPException(400, "Die Zeit für die Vorschau braucht ein Datum mit Uhrzeit, etwa 2026-12-31T23:59.")
+    if at_time is None:
+        # Adventkalender und Eiersuche (#963, #964): ohne Angabe ein Tag mitten in der Saison, sonst gäbe es nichts zu sehen.
+        at_time = seasons.preview_default_at(key)
     token = seasons.preview_token(key, at_time=at_time)
     return {"token": token, "seconds": seasons.PREVIEW_SECONDS, "key": key, "at": at_time.isoformat() if at_time else None}
 

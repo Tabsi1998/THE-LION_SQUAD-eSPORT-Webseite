@@ -1,11 +1,13 @@
 import { useId } from "react";
-import { Link } from "react-router-dom";
+import { AdventCalendarDialog } from "@/advent/AdventCalendarDialog";
+import { openAdventCalendar } from "@/advent/calendarDialog";
 import "./advent-calendar-widget.css";
 
-// Adventkalender (#641): der Einstieg neben dem Logo - ein kleines Türchen mit der Zahl des neuesten Tages, das zur
-// Seite /advent führt. Es erscheint nur, wenn für das Jahr Türchen angelegt sind (`data.ready` vom Server). Durch
-// den Spalt fällt Licht; „dezent“ und „Bewegung reduzieren“ lassen es ruhig stehen. Am Handy steht er zusätzlich
-// ganz oben im Menü (#852) - dort ist er mit einem Tipp erreichbar, auch wenn der Kopf eng wird.
+// Adventkalender (#641): der Einstieg neben dem Logo - ein kleines Türchen mit der Zahl des neuesten Tages. Seit #963
+// öffnet es den Kalender als Fenster über der Seite (AdventCalendarDialog, an der Bühne dieser Saison) statt eine
+// eigene Seite. Es erscheint nur, wenn für das Jahr Türchen angelegt sind (`data.ready` vom Server; in der Vorschau
+// immer). Durch den Spalt fällt Licht; „dezent“ und „Bewegung reduzieren“ lassen es ruhig stehen. Am Handy steht er
+// zusätzlich ganz oben im Menü (#852) - dort ist er mit einem Tipp erreichbar, auch wenn der Kopf eng wird.
 
 export const ACCENT = "rgba(233, 196, 106, 0.26)";
 
@@ -54,8 +56,9 @@ export function Widget({ season }) {
   if (!entry) return null;
   const subtle = season?.effective === "subtle";
   return (
-    <Link
-      to="/advent"
+    <button
+      type="button"
+      onClick={openAdventCalendar}
       className={`tls-advcal${subtle ? " tls-advcal--subtle" : ""}${entry.waiting ? " tls-advcal--waiting" : ""}`}
       aria-label={entry.label}
       title={entry.label}
@@ -63,21 +66,30 @@ export function Widget({ season }) {
       data-door={entry.door}
     >
       <DoorGlyph door={entry.door} />
-    </Link>
+    </button>
   );
 }
 
-/** Der Eintrag ganz oben im Handy-Menü (#852): Türchen und Satz, ein Tipp führt zum Kalender. */
+/** Der Eintrag ganz oben im Handy-Menü (#852): Türchen und Satz, ein Tipp schließt das Menü und öffnet den Kalender. */
 export function MenuEntry({ season, onClose }) {
   const entry = calendarEntry(season);
   if (!entry) return null;
+  const go = () => {
+    onClose?.();
+    openAdventCalendar();
+  };
   return (
-    <Link to="/advent" onClick={onClose} className="tls-advcal-menu" data-testid="season-menu-advent-calendar">
+    <button type="button" onClick={go} className="tls-advcal-menu" data-testid="season-menu-advent-calendar">
       <span className="tls-advcal-menu__door" aria-hidden="true"><DoorGlyph door={entry.door} /></span>
       <span className="tls-advcal-menu__text">{entry.label.replace("Adventkalender – ", "")}</span>
       <span className="tls-advcal-menu__title">Adventkalender</span>
-    </Link>
+    </button>
   );
 }
 
-export const season = { key: "advent_calendar", accent: ACCENT, Widget, MenuEntry };
+/** Das Fenster des Kalenders - die Bühne zeigt es, solange die Saison läuft (auch in der Vorschau). */
+export function Overlay() {
+  return <AdventCalendarDialog />;
+}
+
+export const season = { key: "advent_calendar", accent: ACCENT, Widget, MenuEntry, Overlay };
