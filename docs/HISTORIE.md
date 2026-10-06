@@ -3535,6 +3535,48 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   `/partners/{slug}`, rückwärts, ohne Logos kein Band). Keyframes, Hover-Pause und
   `prefers-reduced-motion` in `index.css` (`tls-logo-ticker__track`). Browser-Test
   `e2e/home-tickers.spec.js` bei 390/768/1440/2560 px. `SponsorGrid` (TV) unverändert.
+- source-map-js im Web (Dependabot; PR #974; nur `frontend/yarn.lock`): 1.2.1 → 1.2.2 (GHSA-68fv-2mgg-jv7q);
+  dieselbe Meldung im App-Lockfile kam mit #971.
+- App 1.3.0 Teil 1, Links und Passkey (#921, #949; PR #975; App, Server, Web; Build 1.3.0): `lib/siteUrls.ts`
+  (`isOwnUrl`, `ownPath` – Server-Adresse, `lionsquad.at`, `www.`), `lib/openLink.ts` (ein Weg für alle Links:
+  Screen, sonst Browser; `RichText`, Laufbanner, Dashboard, Info-Center, Mehr, Mitgliederbereich, Sponsoren
+  der Eventseite; `advent/links.ts` verweist nur noch darauf), `lib/appLinks.ts` (`handleIncomingUrl`,
+  `flushPendingLink`, `listenForAppLinks` – Android App Links beim Start und im Lauf, gemerkt bis die
+  Navigation steht; eine eigene Adresse ohne Screen geht nie an den Browser zurück). `rootNavigation.parsePath`
+  und `contentLinks.toPath` prüfen die Domain (start.gg/tournaments/… ist kein Turnier). `app.json`
+  `android.intentFilters` mit `autoVerify` für `lionsquad.at` und `www.` (Listen als `path`, Einträge als
+  `pathPrefix` mit Schrägstrich; Test gegen `targetFromUrl`), `assetlinks.json` zusätzlich
+  `delegate_permission/common.handle_all_urls`. Passkey ohne Gegenstück am Server: `passkey_routes.
+  unknown_passkey_text` + Kopfzeile `X-Passkey-Error: unknown-credential`, `GET /api/auth/passkeys/signal`
+  (`rp_id`, `user_handle`, `credential_ids`); Web `lib/passkeys.js` (`unknownPasskey`, `signalUnknownPasskey`,
+  `reconcilePasskeys`, `verifyLogin` auch im Autofill-Weg, `PasskeysPanel` gleicht nach dem Laden ab); App
+  `lib/passkeys.ts` (gleiche Namen, `PasskeyMiss` mit „unknown“), `LoginScreen` ruhiger Hinweis
+  `login-passkey-unknown`, nach der Passwort-Anmeldung kommt die Einladung zum neuen Passkey;
+  `react-native-passkey` 3.6.2 bringt beide Signal-Aufrufe schon mit.
+- App 1.3.0 Teil 2, Schneehaube und Neigungssensor (#729, #667; PR #976; App; Build 1.3.0): `seasons/snow/caps.ts`
+  (Port von `frontend/src/seasons/snow/caps.js` ohne Spuren), `SnowCap.tsx` als `Edge` der Saison `snow`
+  (Hero-Karte im Dashboard, Entscheidung A vom 3.10.; `snowKeys.caps`, stille Screens keine, „dezent“ dünn).
+  `seasons/tilt.ts`: `tiltSource` (expo-sensors DeviceMotion, 15 je Sekunde, `FULL_AT` ≈ 25°, Glättung 0,22,
+  Ruhelage wandert langsam mit, Pause im Hintergrund, aus ohne Zuhörer), `useTilt` (Animated). Halloween: Netz
+  pendelt um seine Ecke (höchstens 4°), `DropSpider` um den Aufhängepunkt (14°); Schnee: `flakes.windAt(…, lean)`
+  + `TILT_WIND`, `SnowField lean` (SharedValue), `SnowSky` hört nur bei laufendem Schnee zu; `WinterSky`: Sterne
+  in eigener Animated-Ebene (`STAR_PARALLAX`). `app.json` Plugin `expo-sensors` (iOS-Text), Nachbildung in
+  `jest.setup.js`.
+- App 1.3.0 Teil 3, Einlass per Mitgliedskarte (#845, Entscheidung B; PR #977; App; Build 1.3.0):
+  `lib/admission.ts` (`canAdmit` über `User.areas` „club“, `quorumText`, `resultFromScan`/`resultFromError`,
+  `rememberAdmission`, `rowText`, `ScanGate` – 2,5 s Ruhe, 6 s je Code), `screens/main/AdmissionScreen.tsx`
+  (`expo-camera` nur QR, Pause-Knopf, aus im Hintergrund, Mitgliedsnummer von Hand, Rücknahme nur mit Grund,
+  Kamerarecht mit Weg in die Einstellungen), „Mehr“ Eintrag `more-admission`, `MoreStackParamList.Admission`.
+  Dieselben Server-Wege wie im Web (`/api/admin/admission/*`). `app.json` Plugin `expo-camera` (ohne Mikrofon).
+- Silvester-Abnahme (#744; PR #978; Web und App): die Jahreszahl aus Funken stand über dem Text der Startseite –
+  `glyphSpot` (`yearDigits.js/.ts`, Paritätstest `YEAR_PARITY` 2940152489): ab 1024 px bei 57 % der Breite
+  zwischen Text und Löwe, 14 % hoch, höchstens halb so breit; darunter bei 55 % der Höhe unter dem Text,
+  11,5 % hoch. Abnahme-Runde 6.10. zu #733, #738, #744, #748, #752, #759 als Kommentar in den Issues
+  (106 Browser-Regressionen, App-Abnahme-Tests, Bilder angesehen); Jahreszeiten II und III geschlossen.
+- App 1.3.0, Build 89 (PR #979; `mobile/app.json`, `package.json`, `package-lock.json`, `CHANGELOG.md`,
+  `RELEASES.md`, `src/whatsnew.json`): Version 1.3.0 / `versionCode` 89; gebaut lokal mit
+  `npm run release:local -- --aab` (erster Build nach Lockfile-Änderung), Tag `mobile-v1.3.0-build89`,
+  APK am Vereinsserver, AAB für den offenen Test bei Google Play (Versionshinweis im PR #979).
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)

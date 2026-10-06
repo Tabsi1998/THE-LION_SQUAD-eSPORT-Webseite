@@ -164,6 +164,13 @@ was hilft.
 - **Meilenstein mit Datum:** `due_on` auf 12:00 UTC setzen, sonst zeigt GitHub den Vortag.
 - **`jq` gibt es in dieser Git Bash nicht:** `gh … --json … --jq '…'` nehmen, keine `| jq`-Pipe.
 
+- **Harter Absturz des PCs hinterlässt Null-Dateien (6.10.2026):** was in der letzten Minute vor dem Absturz geschrieben wurde,
+  bestand danach nur aus Nullbytes – `.git/HEAD`, ein frischer Branch-Ref samt Reflog, ein geholter Remote-Ref und
+  `mobile/src/whatsnew.json`; Git meldete „not a git repository“. Reparatur: `.git` (ohne `objects`) und frisch
+  geschriebene Dateien auf reine Nullen prüfen, `.git/HEAD` als `ref: refs/heads/main` neu schreiben, genullte Refs und
+  Logs löschen, `git fetch`, `git checkout -- <Datei>`, `git fsck`. Alles vor dem Absturz Gepushte war unversehrt – vor
+  langen Builds oder Checks immer pushen.
+
 ## 3. Web
 
 - **Vitest:** bei mehreren Treffern `getAllByText` statt `getByText`.
