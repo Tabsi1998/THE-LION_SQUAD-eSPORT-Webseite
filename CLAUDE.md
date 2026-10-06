@@ -371,53 +371,47 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (5. Oktober 2026, spät abends)
+## 9. Letzter Stand (6. Oktober 2026, Vormittag)
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #950 (`47b3e1b9`): die kurze `CLAUDE.md`. Vollcheck `--all` auf dem Stand davor
-  (nach #948): alle CI-Gruppen grün, Ratschen neu aufgenommen.
-- **Offene PRs** (unabhängig voneinander, alle auf `main`): #951 (Banner-Zähler gebremst, YouTube-Feed
-  mit defusedxml, #931), #952 (Konto löschen räumt Verzeichnis, Anträge, Anmeldungen, XP und Bilder auf,
-  mit Nachzug für früher gelöschte Konten, #928) und der Doku-PR mit diesem Stand. Nach dem Merge brauchen
-  beide Code-PRs je einen Eintrag in `docs/HISTORIE.md` Teil A.
-- **Server:** eingespielt bis #940. #946 (Passkey in der Fassung aus Google Play), #948 (Startseite) und
-  die beiden offenen PRs brauchen `update.sh`; mit #951 baut das Backend-Image einmal neu
-  (`defusedxml`), mit #952 läuft beim Start einmal Migration 4.
-- **App:** 1.2.2 / Build 88 (`mobile-v1.2.2-build88`, Commit `d6e50e5`) am GitHub-Release und am
-  Vereinsserver. Google Play: der Betreiber lädt die Bundles aus `mobile/builds/` von Hand in den offenen
-  Test – Build 86 ist hochgeladen, 88 steht an (87 kann ausfallen).
-- **GitHub aufgeräumt (5.10.):** zehn fertige Meilensteine geschlossen – zuletzt „App 1.0.0“ mit #219 (die App ist
-  bei Google Play, das passt dem Betreiber so). Jedes offene Issue hat einen Meilenstein. Neu: „App 1.3.0“
-  (#921, #949) und „Klammern: Messlatten und Daueraufgaben“ (#658, #677, #772). Der Online-Spiegel des
-  Umbauplans ist gelöscht.
-- **Reihenfolge laut Betreiber (5.10.): erst alles Offene fertig machen, dann Neues – und nur, was Sinn macht.**
-  1. Meilenstein „Prüfung Oktober 2026“ (Rest): #930, #932–#937, #941, #943, #944, #775; kleine Issues
-     gebündelt in einem PR je Bereich. #942 (App meldet sich täglich ab) wartet auf die Abfrage vom Server.
-  2. Offene Meilensteine schließen: Vereinsmodul 1.5 (#845 – wartet auf A oder B), Discord VI (#629 Teil 2
-     mit #576, #631, danach #606), Erfolge II (#615 – die Gruppen, die auf Daten aus der Mitgliederverwaltung
-     warteten), Jahreszeiten II (#667 und #729 mit dem nächsten App-Build; Abnahmen #733, #738, #744),
-     Jahreszeiten III (Abnahmen #748, #752, #759), Dolibarr III (#329 Mandat, #330 Durchläufe).
-  3. App 1.3.0 als ein Build: #921 (Links öffnen den passenden Bildschirm), #949 (Passkey, den der Server
-     nicht kennt), dazu #667 und #729.
-  4. Erst danach Neues: Events II (#884, #885). „Später“ bleibt geparkt (#323, #577, #779).
-- **Parallel arbeiten:** der Betreiber fragte am 5.10. nach zwei oder drei Workern. Einschätzung: lohnt nur bei
-  großen, voneinander unabhängigen Brocken (kostet etwa doppelt so viele Tokens und braucht einen eigenen
-  Arbeitsordner je Worker); sonst die Wartezeit der Prüfläufe nutzen und kleine Issues bündeln.
+- **`main`** steht nach #972 (`80dec0c5`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
+  #956, #957, #959, #965, #966, #969, #970, #971, #972 – alle mit Eintrag in `docs/HISTORIE.md` Teil A.
+  Meilensteine „Discord VI“ (38), „Erfolge II“ (39) und „Wünsche Oktober 2026“ (51) sind erledigt.
+- **Offene PRs** (unabhängig voneinander, alle auf `main`): #975 (App 1.3.0 Teil 1: Links öffnen den
+  passenden Screen, Passkey ohne Gegenstück am Server – #921, #949), #976 (App 1.3.0 Teil 2: Schneehaube im
+  Dashboard-Kopf, Neigungssensor – #729, #667; `expo-sensors`), #974 (Dependabot, `source-map-js` im Web) und
+  der Doku-PR mit diesem Stand. Beide App-PRs brauchen den Build 1.3.0 und je einen Eintrag in
+  `docs/HISTORIE.md` Teil A nach dem Merge.
+- **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh`; dabei baut das
+  Backend-Image einmal neu (`defusedxml` aus #951) und beim Start läuft einmal Migration 4 (#952). Danach
+  unter System → Betrieb & Logs → Checks: „Besucher-Adresse“ (#956) soll grün sein; eine Logzeile
+  `[indexes] … Dubletten` bitte schicken.
+- **App:** 1.2.2 / Build 88 (`mobile-v1.2.2-build88`) am GitHub-Release und am Vereinsserver; in Google Play
+  lädt der Betreiber die Bundles von Hand in den offenen Test (86 ist oben, 88 steht an). Kein offener PR
+  braucht einen Build; der nächste Build ist „App 1.3.0“.
+- **Meilenstein „Wünsche Oktober 2026“ (51):** #967 (#971) und #968 (#972) gemergt. Website bei Partnern war
+  schon optional (Nachfrage des Betreibers, 6.10. – falscher Alarm).
+- **Reihenfolge laut Betreiber: erst alles Offene fertig machen, dann Neues – und nur, was Sinn macht.**
+  1. App 1.3.0 als ein Build: #921 und #949 (PR #975), #729 und #667 (PR #976), dann #845 (Einlass per
+     Karte, Entscheidung B mit Kamera, `expo-camera`) als Teil 3, danach der Release-PR (Build 89).
+  2. Abnahmen Jahreszeiten II (#733, #738, #744) und III (#748, #752, #759): QA-Runden mit den
+     `frontend/e2e/*-regression.spec.js` und Bildern, dann schließen.
+  3. Dolibarr III: #330 – Vorschlag (Runbook plus kurze Live-Checkliste statt Docker-Labor) wartet auf das
+     Ja des Betreibers; #329 Mandat.
+  4. Meilenstein „Prüfung Oktober 2026“ (Rest): #932–#937, #775; #942 wartet auf die Abfrage vom Server.
+  5. Erst danach Neues: Events II (#884, #885). „Später“ bleibt geparkt (#323, #576, #577, #779, #960, #962).
 - **Offen beim Betreiber** (ausführlich in `UMBAUPLAN.md`, „Was von dir kommen muss“): die PRs mergen,
-  `update.sh`; danach am Handy die alten Passkeys für lionsquad.at im Passwortmanager löschen und in der
-  App neu anlegen; Play Console → App-Integrität → App-Signatur: die SHA-256-Fingerabdrücke nennen (klärt,
-  was der eingetragene `1D:10…` ist); Build 88 in den offenen Test und den Text unter „App-Zugriff“
-  ersetzen (`docs/PLAY_STORE.md`); die Abfrage aus #942; #845: Einlass in der App A (ohne Kamera,
-  empfohlen) oder B; die Rechte in Dolibarr und Discord vom 5.10.
-- **Vorschlag, noch nicht entschieden:** CodeQL wieder automatisch laufen lassen – `codeql.yml` nennt als
-  Bedingung selbst „sobald das Repo öffentlich ist“; dabei die Kommentare in `codeql.yml` und
-  `app_releases.py` berichtigen, die noch „privat“ sagen.
-- **Fristen:** am **2.11.2026** laufen die beiden Ausnahmen im Sicherheitscheck der App ab (`node-forge`,
-  `braces`) – dann neu prüfen, sonst wird `npm run audit:ci` rot. Termine der Meilensteine stehen auf
-  GitHub.
+  `update.sh`; Sammelkanal für „Ankündigungen folgen“ am Hauptserver anlegen und dem Bot dort „Webhooks
+  verwalten“ geben (#966); am Handy die alten Passkeys für lionsquad.at im Passwortmanager löschen und in
+  der App neu anlegen; Play Console → App-Integrität → App-Signatur: die SHA-256-Fingerabdrücke nennen;
+  Build 88 in den offenen Test und den Text unter „App-Zugriff“ ersetzen (`docs/PLAY_STORE.md`); die Rechte
+  in Dolibarr und Discord vom 5.10.; die Abfrage aus #942; das Ja zu #330.
+- **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`,
+  `braces`, `sprintf-js`) – dann neu prüfen, sonst wird `npm run audit:ci` rot. Termine der Meilensteine
+  stehen auf GitHub.
 - **GitHub:** `main` hat keinen Branch-Schutz („nie direkt auf `main`“ ist Vereinbarung); gemergte Zweige
-  werden nicht von selbst gelöscht (rund 400 liegen noch dort).
+  werden nicht von selbst gelöscht. CodeQL läuft seit #955 wieder automatisch.
 
 ---
 
