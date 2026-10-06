@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -63,13 +64,13 @@ export default function PartnersPage() {
             <div className="text-sm mt-2">Du willst mit uns zusammenarbeiten? Schreib uns direkt über die Kontaktseite.</div>
           </div>
         ) : (
-          <div className="mt-12 space-y-8">
+          <Reveal className="tls-reveal-grid mt-12 space-y-8">
             {partners.map((p, idx) => {
               const target = `/partners/${encodeURIComponent(p.slug || p.id)}`;
               const channels = Array.isArray(p.channels) ? p.channels : [];
               const since = p.since || (p.since_year ? String(p.since_year) : "");
               return (
-                <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition">
+                <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="tls-reveal-item grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition">
                   <Link to={target} className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
                     {p.logo_url ? (
                       <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
@@ -106,7 +107,7 @@ export default function PartnersPage() {
                 </article>
               );
             })}
-          </div>
+          </Reveal>
         )}
       </section>
     </PublicLayout>

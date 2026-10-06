@@ -194,6 +194,45 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     expect(await look()).toEqual({ transform: "none", border: "rgba(41, 182, 232, 0.55)" });
   });
 
+  test("Einblenden auf Listen (#1074): das Raster blendet seine Karten nacheinander ein", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page);
+    const list = ["herbst-cup", "winter-cup", "sommer-cup"].map((slug, index) => ({
+      id: `t${index}`, slug, title: slug.replace("-", " "), status: "registration_open", registration_enabled: true, format: "single_elim",
+      start_date: "2026-11-14T10:00:00+01:00", max_participants: 16, participant_count: 4 + index, banner_url: "/api/static/uploads/public/cup.svg",
+    }));
+    await page.route("**/api/tournaments?**", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(list) }));
+    await page.route("**/api/static/uploads/public/cup.svg", (route) => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#29B6E8"/></svg>' }));
+    await page.goto("/tournaments");
+    const grid = page.locator(".tls-reveal-grid").first();
+    await expect(grid).toHaveAttribute("data-reveal", /hidden|shown/);
+    const cards = grid.locator("> a");
+    await expect(cards).toHaveCount(3);
+    await expect(cards.first()).toHaveClass(/tls-reveal-item/);
+    // Jede Karte kennt ihre Stelle im Raster - daraus wird der Versatz beim Einblenden.
+    expect(await cards.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).getPropertyValue("--tls-i").trim()))).toEqual(["0", "1", "2"]);
+    await expect(grid).toHaveAttribute("data-reveal", "shown");
+    await expect.poll(() => cards.last().locator("> *").first().evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
+  });
+
+  test("Hero (#1075): Körnung über dem Grund, das Glühen wandert und steht außerhalb des Bildes still", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page, { news: NEWS });
+    await page.goto("/");
+    const grain = page.getByTestId("home-hero-grain");
+    await expect(grain).toBeAttached();
+    expect(Number(await grain.evaluate((node) => getComputedStyle(node).opacity))).toBeGreaterThan(0.05);
+    const drift = page.getByTestId("home-hero-drift");
+    const look = () => drift.evaluate((node) => ({ name: getComputedStyle(node).animationName, state: getComputedStyle(node).animationPlayState }));
+    expect(await look()).toEqual({ name: "tls-glow-drift", state: "running" });
+    // Das Glühen selbst folgt weiter dem Zeiger (Hülle und Glühen sind getrennt).
+    await expect(page.getByTestId("home-hero-glow")).toBeAttached();
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect.poll(async () => (await look()).state).toBe("paused");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(async () => (await look()).state).toBe("running");
+  });
+
   test("die Suche dunkelt die ganze Seite ab, nicht nur die Kopfleiste", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await mockServer(page);
@@ -229,5 +268,8 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     // Die Farbe wechselt weiter (das ist keine Bewegung), der Weg nach oben entfällt.
     expect(style.transform).toBe("matrix(1, 0, 0, 1, 0, 0)");
     expect(style.background).toBe("rgb(88, 101, 242)");
+    // Auch das Glühen im Hero wandert nicht.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expect(await page.getByTestId("home-hero-drift").evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
   });
 });

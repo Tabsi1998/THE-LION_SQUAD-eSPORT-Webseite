@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { eventTypeLabel } from "@/lib/eventTypes";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -108,9 +109,9 @@ export default function EventsPage() {
             className="mt-10"
           />
         ) : (
-          <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 min-w-0">
+          <Reveal className="tls-reveal-grid mt-10 grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 min-w-0">
             {filtered.map((e) => <EventCard key={e.id} e={e} meta={meta} />)}
-          </div>
+          </Reveal>
         )}
       </section>
     </PublicLayout>
@@ -127,7 +128,7 @@ function EventCard({ e, meta }) {
       data-testid={`event-card-${e.slug}`}
       data-season-perch="card"
       data-live={e.public_phase?.state === "live" ? "1" : undefined}
-      className={`tls-card tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
+      className={`tls-card tls-reveal-item tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${e.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
