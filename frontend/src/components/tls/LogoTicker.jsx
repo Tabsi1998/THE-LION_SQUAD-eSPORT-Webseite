@@ -19,6 +19,9 @@ export function marqueeDuration(itemCount, secondsPerItem, minSeconds) {
 
 const MASK = "linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent)";
 
+// Kleine Überschrift über einem Band im Footer - dieselbe Schrift wie die Spaltenköpfe dort (Verein, eSports …).
+export const BAND_HEADING_CLASS = "pb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]";
+
 export function LogoTicker({
   items,
   boxClassFor,

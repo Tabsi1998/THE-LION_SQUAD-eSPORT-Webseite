@@ -2,8 +2,8 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Partner-Laufband im Footer unter den Sponsoren (#968): nur Partner mit Logo, jedes Logo führt auf die
-// Partnerseite, ohne Partner-Logos kein Band (keine leere Zeile). Keine sichtbare Überschrift - das Band
-// heißt für Vorleseprogramme Partner und steht ohne eigene Fläche auf dem Grund des Footers.
+// Partnerseite, ohne Partner-Logos kein Band (keine leere Zeile). Eine kleine Überschrift „Partner“ trennt es
+// von den Sponsoren darüber; das Band steht ohne eigene Fläche auf dem Grund des Footers.
 
 const apiMock = { get: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, resolveMediaUrl: (value) => value || "" }));
@@ -21,12 +21,12 @@ const PARTNERS = [
 
 beforeEach(() => apiMock.get.mockReset());
 
-test("ein Band namens Partner ohne sichtbare Überschrift, Logos mit Link auf die Partnerseite; ohne Logo nicht dabei", async () => {
+test("ein Band mit der kleinen Überschrift Partner, Logos mit Link auf die Partnerseite; ohne Logo nicht dabei", async () => {
   apiMock.get.mockResolvedValue({ data: PARTNERS });
   render(<MemoryRouter><PartnerTicker /></MemoryRouter>);
   const band = await screen.findByTestId("partner-ticker");
   expect(band).toHaveAttribute("aria-label", "Partner");
-  expect(band.textContent).toBe("");
+  expect(screen.getByTestId("partner-ticker-heading")).toHaveTextContent("Partner");
   expect(band).toHaveClass("bg-transparent");
   expect(apiMock.get).toHaveBeenCalledWith("/partners");
   expect(screen.getByTestId("partner-ticker-band")).toHaveAttribute("data-marquee", "1");

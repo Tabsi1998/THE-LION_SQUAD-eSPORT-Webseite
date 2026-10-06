@@ -3,7 +3,9 @@ const { test, expect } = require("@playwright/test");
 // Logo-Bänder (#968, Nachzug vom 06.10.2026): auf der Startseite bleibt das große Sponsoren-Band mit Überschrift.
 // Im Footer jeder Seite stehen die Sponsoren kompakt und direkt darunter, eine Stufe kleiner, die Partner (nur
 // Partner mit Logo, das Logo führt auf die Partnerseite). Beide Footer-Bänder liegen auf demselben Grund, keines
-// bringt eine eigene Fläche mit. Jedes Logo füllt die Höhe seines Kastens - auch eine winzige Vorlage wächst mit.
+// bringt eine eigene Fläche mit. Über jedem Band steht eine kleine Überschrift; über den Sponsoren ist so viel Luft
+// wie unter den Partnern, dazwischen klarer Abstand, und die Partner stehen dichter als die Sponsoren.
+// Jedes Logo füllt die Höhe seines Kastens - auch eine winzige Vorlage wächst mit.
 // Ohne Partner-Logos kein zweites Band, ohne Sponsoren und Partner kein Block. Bei 390, 768, 1440 und 2560 px
 // läuft nichts seitlich über; mit „Bewegung reduzieren“ stehen alle Bänder still. Bilder in SHOT_DIR.
 
@@ -88,6 +90,22 @@ test.describe("Logo-Bänder: Sponsoren groß auf der Startseite, Sponsoren und P
       const partnerLogo = await partners.getByTitle("Gamers Heaven").first().boundingBox();
       expect(partnerLogo.height).toBeLessThan(sponsorLogo.height);
 
+      // Kleine Überschriften trennen die Bänder. Über den Sponsoren ist so viel Luft wie unter den Partnern, zwischen
+      // den Reihen liegt deutlich mehr als ein Zeilenabstand, und die kleineren Partner-Logos stehen dichter.
+      const sponsorHeading = sponsors.getByTestId("sponsor-ticker-heading");
+      const partnerHeading = partners.getByTestId("partner-ticker-heading");
+      await expect(sponsorHeading).toHaveText("Sponsoren");
+      await expect(partnerHeading).toHaveText("Partner");
+      const bandsBox = await bands.boundingBox();
+      const ctaBox = await page.getByTestId("footer-cta").boundingBox();
+      const above = (await sponsorHeading.boundingBox()).y - (ctaBox.y + ctaBox.height);
+      const below = bandsBox.y + bandsBox.height - (partnerLogo.y + partnerLogo.height);
+      expect(Math.abs(above - below)).toBeLessThanOrEqual(6);
+      expect((await partnerHeading.boundingBox()).y - (sponsorLogo.y + sponsorLogo.height)).toBeGreaterThanOrEqual(32);
+      const sponsorPitch = (await sponsors.getByTitle("Energie Tirol").first().boundingBox()).x - sponsorLogo.x;
+      const partnerPitch = Math.abs((await partners.getByTitle("eSport Verein B").first().boundingBox()).x - partnerLogo.x);
+      expect(partnerPitch).toBeLessThan(Math.abs(sponsorPitch) * 0.75);
+
       // Gleicher Grund: keines der beiden Bänder bringt eine eigene Fläche oder Linie mit.
       const looks = await page.evaluate(() => ["sponsor-ticker", "partner-ticker"].map((id) => {
         const node = document.querySelector(`footer [data-testid="footer-logo-bands"] [data-testid="${id}"]`);
@@ -114,6 +132,25 @@ test.describe("Logo-Bänder: Sponsoren groß auf der Startseite, Sponsoren und P
       }
     });
   }
+
+  test("fährt die Maus über ein Logo, treten die anderen im selben Band zurück", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page);
+    await page.goto("/");
+    const partners = page.locator("footer").getByTestId("partner-ticker");
+    await partners.scrollIntoViewIfNeeded();
+    // Das Band steht für die Messung still: ein laufendes Logo lässt sich nicht sicher treffen.
+    await page.addStyleTag({ content: ".tls-logo-ticker__track { animation: none !important; }" });
+    const heaven = partners.getByTitle("Gamers Heaven").first();
+    const other = partners.getByTitle("eSport Verein B").first();
+    await heaven.hover();
+    await page.waitForTimeout(400);
+    expect(Number(await heaven.evaluate((node) => getComputedStyle(node).opacity))).toBe(1);
+    expect(Number(await other.evaluate((node) => getComputedStyle(node).opacity))).toBeCloseTo(0.4, 1);
+    // Das Sponsoren-Band darüber bleibt, wie es ist.
+    const sponsor = page.locator("footer").getByTestId("sponsor-ticker").getByTitle("Raika").first();
+    expect(Number(await sponsor.evaluate((node) => getComputedStyle(node).opacity))).toBeCloseTo(0.8, 1);
+  });
 
   test("ohne Partner mit Logo gibt es kein zweites Band", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });

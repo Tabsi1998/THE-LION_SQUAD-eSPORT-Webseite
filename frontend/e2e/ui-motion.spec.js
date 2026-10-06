@@ -3,11 +3,16 @@ const { test, expect } = require("@playwright/test");
 // Oberfläche, Welle 1 (#1070, #1072, #1073, #1083): Die Kopfleiste wird beim Scrollen flacher, ohne dass der Inhalt
 // springt; der aktive Menüpunkt trägt eine Linie; das Handy-Menü gleitet; beim Seitenwechsel blendet der neue Inhalt
 // ein; die Social-Logos im Footer heben sich und füllen sich in der Markenfarbe; die Suche dunkelt die ganze Seite ab.
+// Karten heben sich überall gleich um 5 px (#1071) - außer sie tragen gerade Saison-Deko.
 // Mit „Bewegung reduzieren“ bleibt alles an seinem Platz. Bilder in SHOT_DIR.
 
 const SHOTS = process.env.SHOT_DIR || "";
 const EMPTY = { events: [], tournaments: [], challenges: [] };
 const HOME = { has_live: false, live: EMPTY, today: EMPTY, soon: EMPTY, upcoming: EMPTY, news: [], featured_news: [], stats: {}, club_numbers: {} };
+const NEWS = [
+  { id: "n1", slug: "erste", title: "Rückblick aufs LAN-Wochenende", excerpt: "Drei Tage, zwei Turniere.", published_at: "2026-10-01T10:00:00+00:00", visibility: "public" },
+  { id: "n2", slug: "zweite", title: "Winter Cup: Anmeldung offen", excerpt: "Jetzt Team melden.", published_at: "2026-09-28T10:00:00+00:00", visibility: "public" },
+];
 const SOCIALS = [
   { platform: "discord", label: "Discord", url: "https://discord.test/lions" },
   { platform: "instagram", label: "Instagram", url: "https://instagram.test/lions" },
@@ -15,14 +20,14 @@ const SOCIALS = [
   { platform: "youtube", label: "YouTube", url: "https://youtube.test/lions" },
 ];
 
-async function mockServer(page) {
+async function mockServer(page, { news = [] } = {}) {
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
   await page.route("**/api/**", (route) => route.fulfill({ contentType: "application/json", body: "[]" }));
   await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, body: "{}" }));
   await page.route("**/api/settings/public", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ club_name: "THE LION SQUAD", tagline: "eSports", domain: "lionsquad.at", social_links: SOCIALS }) }));
-  await page.route("**/api/home/state", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify(HOME) }));
+  await page.route("**/api/home/state", (route) => route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...HOME, news, featured_news: news.slice(0, 1) }) }));
 }
 
 function headerState(page) {
@@ -162,6 +167,31 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     const x = await look("footer-x");
     expect(x.background).toBe("rgb(255, 255, 255)");
     expect(x.color).toBe("rgb(10, 10, 10)");
+  });
+
+  test("Karten: 5 px anheben mit Rand in der Akzentfarbe; mit Saison-Deko bleibt die Karte stehen", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockServer(page, { news: NEWS });
+    await page.goto("/");
+    const card = page.getByTestId("home-featured-news-erste");
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toHaveClass(/(^| )tls-card( |$)/);
+    const look = () => card.evaluate((node) => ({ transform: getComputedStyle(node).transform, border: getComputedStyle(node).borderTopColor }));
+    expect((await look()).transform).toBe("none");
+    await card.hover();
+    await page.waitForTimeout(450);
+    expect(await look()).toEqual({ transform: "matrix(1, 0, 0, 1, 0, -5)", border: "rgba(41, 182, 232, 0.55)" });
+    if (SHOTS) {
+      const box = await card.boundingBox();
+      await page.screenshot({ path: `${SHOTS}/karte-hover-1440.png`, clip: { x: Math.max(0, box.x - 24), y: Math.max(0, box.y - 24), width: Math.min(1440, box.width + 48), height: box.height + 60 } });
+    }
+    // Trägt die Karte Saison-Deko (die Saison-Bühne meldet das am Wurzelelement), bleibt sie stehen - der Rand reagiert.
+    await page.mouse.move(2, 2);
+    await page.waitForTimeout(450);
+    await page.evaluate(() => { document.documentElement.dataset.seasonIntensity = "normal"; });
+    await card.hover();
+    await page.waitForTimeout(450);
+    expect(await look()).toEqual({ transform: "none", border: "rgba(41, 182, 232, 0.55)" });
   });
 
   test("die Suche dunkelt die ganze Seite ab, nicht nur die Kopfleiste", async ({ page }) => {

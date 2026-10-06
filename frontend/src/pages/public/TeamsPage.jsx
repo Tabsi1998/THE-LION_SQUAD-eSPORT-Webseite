@@ -72,7 +72,7 @@ function TeamList() {
           )}
         </div>
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+        <div className="tls-dim-siblings mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
           {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
           {list.length === 0 && <div className="col-span-full text-center py-20 text-white/40 font-display tracking-widest">KEINE TEAMS</div>}
         </div>
@@ -84,7 +84,7 @@ function TeamList() {
 
 function TeamCard({ team: t, levelInfo, crown = null }) {
   return (
-    <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm bg-[#121212] overflow-hidden transition">
+    <Link to={`/teams/${t.id}`} data-testid={`team-card-${t.tag}`} className="tls-card group block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
       <div className="relative h-28 bg-[#0A0A0A] border-b border-white/10 overflow-hidden">
         {t.banner_url ? (
           <img src={resolveMediaUrl(t.banner_url)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-75 group-hover:opacity-95 group-hover:scale-[1.02] transition duration-500" />

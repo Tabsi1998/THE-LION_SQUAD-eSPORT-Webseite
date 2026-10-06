@@ -234,7 +234,7 @@ export default function PartnerDetailPage() {
 // Gemeinsames Event oder Turnier (#469 Teil 2): Karte mit Art, Titel und Datum, führt zur Seite.
 function SharedCard({ to, testId, kicker, title, date }) {
   return (
-    <Link to={to} data-testid={testId} className="border border-white/10 rounded-sm bg-[#121212] p-3 hover:border-[#29B6E8]/60 transition min-w-0">
+    <Link to={to} data-testid={testId} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-3 min-w-0">
       <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{kicker}</div>
       <div className="mt-1 font-heading font-bold leading-tight break-words">{title}</div>
       {formatDate(date) && <div className="mt-1 text-[11px] text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(date)}</div>}

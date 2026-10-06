@@ -126,7 +126,7 @@ function EventCard({ e, meta }) {
       to={`/events/${e.slug}`}
       data-testid={`event-card-${e.slug}`}
       data-season-perch="card"
-      className="group min-w-0 border border-white/10 hover:border-[#9F7AEA]/50 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition"
+      className="tls-card tls-card--purple group min-w-0 border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col"
     >
       {e.banner_url ? (
         <div className="aspect-video bg-[#0A0A0A] overflow-hidden">

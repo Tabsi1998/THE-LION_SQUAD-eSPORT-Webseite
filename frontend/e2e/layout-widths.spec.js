@@ -40,7 +40,7 @@ test.describe("PC-Layout: Container nutzt die Breite", () => {
       for (const path of PAGES) {
         await page.goto(path);
         await expect(page.locator("header")).toBeVisible();
-        const box = await page.locator("header > div").first().boundingBox();
+        const box = await page.getByTestId("site-header-row").boundingBox();
         expect(box, `Kopfzeile auf ${path}`).not.toBeNull();
         expect(box.width, `Kopfzeile auf ${path} bei ${viewport.width}px`).toBeGreaterThanOrEqual(expected - 2);
         expect(box.width).toBeLessThanOrEqual(CONTAINER_MAX + 2);

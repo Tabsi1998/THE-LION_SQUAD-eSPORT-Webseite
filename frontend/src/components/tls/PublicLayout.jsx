@@ -246,11 +246,12 @@ export function PublicLayout({ children }) {
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          {/* Sponsoren, direkt darunter eine Stufe kleiner die Partner: gleicher Grund, eine Linie darunter.
+          {/* Sponsoren, darunter eine Stufe kleiner die Partner - jedes Band mit kleiner Überschrift wie die Spalten
+              darunter, dazwischen klarer Abstand. Über den Sponsoren ist so viel Luft wie unter den Partnern (48 px).
               Ohne Sponsoren und ohne Partner fällt der Block samt Linie weg. */}
-          <div className="pb-8 border-b border-white/5 empty:hidden" data-testid="footer-logo-bands">
-            <SponsorTicker compact placement="footer" />
-            <PartnerTicker className="mt-2" />
+          <div className="pb-11 border-b border-white/5 empty:hidden" data-testid="footer-logo-bands">
+            <SponsorTicker compact placement="footer" heading="Sponsoren" />
+            <PartnerTicker className="[&:not(:first-child)]:mt-10" />
           </div>
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
             {footerColumns(branding, { isClubMember }).map((column) => (

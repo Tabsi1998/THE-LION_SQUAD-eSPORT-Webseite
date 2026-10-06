@@ -42,4 +42,13 @@ test("ohne Hauptsponsor-Banner und im Footer-Laufband kein Banner", async () => 
   await screen.findByTestId("sponsor-ticker");
   expect(screen.queryByTestId("sponsor-main-banner")).toBeNull();
   expect(screen.queryByTestId("sponsor-ticker-title")).toBeNull();
+  // Ohne `heading` (Handy-Menü) bleibt das kompakte Band ohne Überschrift.
+  expect(screen.queryByTestId("sponsor-ticker-heading")).toBeNull();
+});
+
+test("im Footer trägt das kompakte Band die kleine Überschrift", async () => {
+  apiMock.get.mockResolvedValue({ data: [MAIN, GOLD] });
+  render(<SponsorTicker placement="footer" compact heading="Sponsoren" />);
+  expect(await screen.findByTestId("sponsor-ticker-heading")).toHaveTextContent("Sponsoren");
+  expect(screen.getByTestId("sponsor-ticker")).toHaveAttribute("aria-label", "Sponsoren");
 });

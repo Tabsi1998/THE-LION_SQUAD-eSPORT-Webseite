@@ -33,7 +33,7 @@ export function TournamentCard({ tournament, index = 0 }) {
     <Link
       to={`/tournaments/${t.slug || t.id}`}
       data-testid={`tournament-card-${t.slug}`}
-      className="group relative block overflow-hidden rounded-sm border border-white/10 hover:border-[#29B6E8]/60 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_24px_rgba(41,182,232,0.25)] bg-[#18181B]"
+      className="tls-card group relative block overflow-hidden rounded-sm border border-white/10 bg-[#18181B]"
     >
       <div className="aspect-[16/9] relative overflow-hidden">
         <LazyImg
@@ -41,7 +41,7 @@ export function TournamentCard({ tournament, index = 0 }) {
           priority={index < 2}
           sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"
           alt={t.title}
-          className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-500"
+          className="absolute inset-0 w-full h-full object-cover opacity-90 group-hover:opacity-100 tls-card__media"
         />
         {/* Die Grafik bleibt sichtbar (#833): oben ein Schleier für die Plaketten, unten der Übergang in die Karte. */}
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />

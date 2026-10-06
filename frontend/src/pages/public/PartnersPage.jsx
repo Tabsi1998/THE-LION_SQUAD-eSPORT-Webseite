@@ -36,7 +36,7 @@ export default function PartnersPage() {
         </p>
 
         <div className="mt-8 grid md:grid-cols-2 gap-3">
-          <Link to="/sponsors" className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#FFD700]/35 hover:bg-white/[0.03]">
+          <Link to="/sponsors" className="tls-card tls-card--gold group rounded-sm border border-white/10 bg-[#101010] p-4">
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
               <Star className="h-3.5 w-3.5" /> Sponsoren
             </div>
@@ -45,7 +45,7 @@ export default function PartnersPage() {
               Sponsoren ansehen <ArrowRight className="h-3 w-3" />
             </span>
           </Link>
-          <Link to="/contact" className="group rounded-sm border border-white/10 bg-[#101010] p-4 transition hover:border-[#29B6E8]/35 hover:bg-white/[0.03]">
+          <Link to="/contact" className="tls-card group rounded-sm border border-white/10 bg-[#101010] p-4">
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">
               <Handshake className="h-3.5 w-3.5" /> Kooperation
             </div>

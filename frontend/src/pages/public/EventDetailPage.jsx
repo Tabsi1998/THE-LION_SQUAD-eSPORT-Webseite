@@ -253,7 +253,7 @@ export default function EventDetailPage() {
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               {e.albums.map((a) => (
-                <Link key={a.id} to={`/galerie/${a.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden">
+                <Link key={a.id} to={`/galerie/${a.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
@@ -269,7 +269,7 @@ export default function EventDetailPage() {
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><Newspaper className="w-5 h-5 text-[#29B6E8]" /> Verknüpfte News</h2>
             <div className="grid sm:grid-cols-2 gap-4">
               {e.news.map((n) => (
-                <Link key={n.id} to={`/news/${n.slug}`} className="border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] p-4 transition">
+                <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
                   <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
                   <div className="font-heading font-bold mt-1">{n.title}</div>
                   {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
