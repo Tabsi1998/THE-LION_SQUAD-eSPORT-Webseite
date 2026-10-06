@@ -33,6 +33,308 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.POST_NOTIFICATIONS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/tournaments"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/tournaments/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/events"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/events/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/matches/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/fastlap"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/fastlap/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/fastlaps"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/fastlaps/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/f1/challenges/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/teams"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/teams/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/news"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/news/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/u/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/users/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/user/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/players/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/player/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/profiles/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/profile"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "pathPrefix": "/profile/"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/gallery"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/galerie"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/achievements"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/advent"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/ostern"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/me/prizes"
+            },
+            {
+              "scheme": "https",
+              "host": "lionsquad.at",
+              "path": "/account/invoices"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/tournaments"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/tournaments/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/events"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/events/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/matches/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/fastlap"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/fastlap/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/fastlaps"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/fastlaps/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/f1/challenges/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/teams"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/teams/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/news"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/news/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/u/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/users/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/user/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/players/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/player/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/profiles/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/profile"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "pathPrefix": "/profile/"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/gallery"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/galerie"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/achievements"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/advent"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/ostern"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/me/prizes"
+            },
+            {
+              "scheme": "https",
+              "host": "www.lionsquad.at",
+              "path": "/account/invoices"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
       ]
     },
     "web": {

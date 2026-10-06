@@ -42,11 +42,56 @@ export function passkeyError(error) {
   return error?.response?.data?.detail ? formatApiError(error.response.data.detail) : "Passkey-Vorgang fehlgeschlagen. Bitte erneut versuchen.";
 }
 
+/** Der Server kennt den vorgezeigten Passkey nicht (mehr) - er sagt das in einer Kopfzeile (#949). */
+export function unknownPasskey(error) {
+  return String(error?.response?.headers?.["x-passkey-error"] || "") === "unknown-credential";
+}
+
+/**
+ * Signal API (#949): dem Passwortmanager sagen, dass ein Passkey hier nichts mehr gilt - nach einer Anmeldung
+ * mit einem Passkey, den der Server nicht kennt. Der Browser versteckt ihn dann; wo es die Schnittstelle nicht
+ * gibt, passiert nichts. Immer nur ein Versuch, nie ein Fehler nach außen.
+ */
+export async function signalUnknownPasskey(rpId, credentialId) {
+  try {
+    if (rpId && credentialId && typeof window.PublicKeyCredential?.signalUnknownCredential === "function") {
+      await window.PublicKeyCredential.signalUnknownCredential({ rpId, credentialId });
+    }
+  } catch {
+    // nur ein Hinweis an den Passwortmanager
+  }
+}
+
+/**
+ * Signal API, zweiter Teil (#949): nach dem Laden der Liste im Profil und nach jedem Entfernen die vollständige
+ * Menge melden - alles, was am Gerät für dieses Konto darüber hinaus liegt, verschwindet dort.
+ */
+export async function reconcilePasskeys() {
+  try {
+    if (typeof window.PublicKeyCredential?.signalAllAcceptedCredentials !== "function") return false;
+    const { data } = await api.get("/auth/passkeys/signal", { skipInvalidation: true });
+    if (!data?.rp_id || !data.user_handle || !Array.isArray(data.credential_ids)) return false;
+    await window.PublicKeyCredential.signalAllAcceptedCredentials({ rpId: data.rp_id, userId: data.user_handle, allAcceptedCredentialIds: data.credential_ids });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function verifyLogin(options, credential, remember) {
+  try {
+    const { data } = await api.post("/auth/passkeys/login/verify", { credential: serializeCredential(credential), remember }, { skipInvalidation: true });
+    return data;
+  } catch (error) {
+    if (unknownPasskey(error)) await signalUnknownPasskey(options?.rpId, credential?.id);
+    throw error;
+  }
+}
+
 export async function signInWithPasskey({ remember = true } = {}) {
   const { data: options } = await api.post("/auth/passkeys/login/options", {}, { skipInvalidation: true });
   const credential = await navigator.credentials.get({ publicKey: credentialOptions(options) });
-  const { data } = await api.post("/auth/passkeys/login/verify", { credential: serializeCredential(credential), remember }, { skipInvalidation: true });
-  return data;
+  return verifyLogin(options, credential, remember);
 }
 
 export async function passkeyAutofillAvailable() {
@@ -80,7 +125,7 @@ export function startPasskeyAutofill({ remember = () => true, onSignedIn, onErro
       const credential = await navigator.credentials.get({ publicKey: credentialOptions(options), mediation: "conditional", signal: controller.signal });
       clearTimeout(timer);
       if (stopped) return;
-      const { data } = await api.post("/auth/passkeys/login/verify", { credential: serializeCredential(credential), remember: remember() }, { skipInvalidation: true });
+      const data = await verifyLogin(options, credential, remember());
       onSignedIn(data);
     } catch (error) {
       clearTimeout(timer);

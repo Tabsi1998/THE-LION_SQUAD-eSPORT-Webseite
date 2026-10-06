@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Linking, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Body } from "./Text";
 import { api } from "../lib/api";
 import { dismissKey, loadDismissed, rememberDismissed, tickerDurationMs, toneColor, visibleBanners, type SiteBanner } from "../lib/banners";
-import { navigateToNotification, targetFromUrl } from "../navigation/rootNavigation";
+import { openLink } from "../lib/openLink";
 import { useLiveRefresh } from "../realtime/LiveChangesProvider";
 import { colors } from "../theme";
 
@@ -54,14 +54,9 @@ export function SiteBannerTicker() {
   const color = toneColor(banner.tone);
   const text = banner.link_label ? `${banner.text} – ${banner.link_label}` : banner.text;
 
+  // Ein Ziel in der App (Event, Turnier, Profil …) öffnet sich in der App, alles andere im Browser (#921).
   const open = () => {
-    if (!banner.link_url) return;
-    // Ein Ziel in der App (Event, Turnier, Profil …) öffnet sich in der App, alles andere im Browser.
-    if (targetFromUrl(banner.link_url)) {
-      navigateToNotification({ id: `banner-${banner.id}`, kind: "site_banner", title: banner.text, url: banner.link_url } as never);
-    } else {
-      Linking.openURL(banner.link_url).catch(() => undefined);
-    }
+    if (banner.link_url) openLink(banner.link_url);
   };
   const dismiss = async () => {
     setDismissed(await rememberDismissed(dismissed, dismissKey(banner)));

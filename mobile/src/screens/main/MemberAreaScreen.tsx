@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openLink } from "../../lib/openLink";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { EmptyState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
@@ -106,7 +107,7 @@ export function MemberAreaScreen({ navigation }: Props) {
   const openEvent = (event: ClubEvent) => navigation.getParent()?.navigate("Tournaments", { screen: "EventDetail", params: { id: event.slug || event.id }, initial: false });
   const nothingYet = !loading && !events.length && !docs.length && !benefits.length && !news.length;
   const serverList = (discordServers?.servers || []).filter((server) => server.available);
-  const openInvite = (url?: string | null) => { if (url) Linking.openURL(url).catch(() => {}); };
+  const openInvite = (url?: string | null) => { if (url) openLink(url); };
 
   return (
     <Screen padded={false}>
@@ -178,7 +179,7 @@ export function MemberAreaScreen({ navigation }: Props) {
             ))}
             {!(discordVoice.voice || []).length ? <Muted>Gerade ist niemand in einem Sprachkanal.</Muted> : null}
             {discordVoice.invite || discordUrl ? (
-              <Pressable onPress={() => Linking.openURL(String(discordVoice.invite || discordUrl))} accessibilityRole="link" testID="member-area-discord-open">
+              <Pressable onPress={() => openLink(String(discordVoice.invite || discordUrl))} accessibilityRole="link" testID="member-area-discord-open">
                 <Body style={styles.discordLink}>Discord öffnen →</Body>
               </Pressable>
             ) : null}
@@ -269,7 +270,7 @@ export function MemberAreaScreen({ navigation }: Props) {
         ) : null}
 
         {discordUrl && !serverList.length ? (
-          <Pressable onPress={() => { Linking.openURL(discordUrl).catch(() => {}); }} accessibilityRole="link" testID="member-area-discord" style={({ pressed }) => [styles.discord, pressed && styles.pressed]}>
+          <Pressable onPress={() => { openLink(discordUrl); }} accessibilityRole="link" testID="member-area-discord" style={({ pressed }) => [styles.discord, pressed && styles.pressed]}>
             <Ionicons name="logo-discord" color="#5865F2" size={22} />
             <Body style={styles.discordText}>Zum Vereins-Discord</Body>
             <Ionicons name="open-outline" color={colors.muted} size={16} />

@@ -15,7 +15,8 @@ jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: mockUser })
 const mockGuest = { value: false };
 jest.mock("../../live", () => ({ isGuestUser: () => mockGuest.value }));
 const mockOpenSignIn = jest.fn();
-jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
+// Die Beitrittsseite hat keinen Screen (#921): `openLink` fragt die Navigation und öffnet dann den Browser.
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args), navigateToUrl: () => false }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 const mockOpenWhatsNew = jest.fn();
 jest.mock("../../update/AppUpdateProvider", () => ({ useAppUpdate: () => ({ openWhatsNew: mockOpenWhatsNew, info: null, check: jest.fn() }) }));

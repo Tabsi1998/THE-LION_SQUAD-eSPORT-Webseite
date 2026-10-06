@@ -57,6 +57,7 @@ import { SeasonStage, useSeasonTabIcon } from "../seasons/SeasonStage";
 import { useNotifications } from "../notifications/NotificationContext";
 import { colors } from "../theme";
 import { flushPendingNotification, navigationRef } from "./rootNavigation";
+import { flushPendingLink, listenForAppLinks } from "../lib/appLinks";
 import type {
   MainTabParamList,
   MoreStackParamList,
@@ -91,13 +92,15 @@ export function AppNavigator() {
   useEffect(() => {
     if (signedIn) void markSignInNudgeSeen();
   }, [signedIn]);
+  // Links von außen (#921): Discord, WhatsApp, Browser - Android reicht Adressen von lionsquad.at an die App.
+  useEffect(() => listenForAppLinks(), []);
 
   if (loading) return <BootScreen />;
   // App-Sperre (#217): erst Fingerabdruck, dann Chats und Profil. Gäste haben nichts zu schützen.
   if (signedIn && locked) return <LockScreen />;
 
   return (
-    <NavigationContainer ref={navigationRef} theme={theme} onReady={flushPendingNotification}>
+    <NavigationContainer ref={navigationRef} theme={theme} onReady={() => { flushPendingNotification(); flushPendingLink(); }}>
       {signedIn && user?.consent_required ? <ConsentScreen /> : <RootScreens />}
       {signedIn && !user?.consent_required ? <NotificationBellOverlay /> : null}
       {signedIn && !user?.consent_required ? <AchievementCatchUpOverlay /> : null}

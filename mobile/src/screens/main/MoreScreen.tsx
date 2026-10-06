@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openLink } from "../../lib/openLink";
 import Constants from "expo-constants";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
@@ -182,7 +183,7 @@ export function MoreScreen({ navigation }: Props) {
             </Pressable>
           ) : (
             <Pressable
-              onPress={() => { Linking.openURL(JOIN_URL).catch(() => {}); }}
+              onPress={() => { openLink(JOIN_URL); }}
               accessibilityRole="link"
               testID="more-join"
               style={({ pressed }) => [styles.joinCard, pressed && styles.pressed]}
@@ -247,7 +248,7 @@ export function MoreScreen({ navigation }: Props) {
                   key={`${link.platform}-${link.url}`}
                   accessibilityRole="link"
                   accessibilityLabel={link.label || link.platform || "Link"}
-                  onPress={() => { Linking.openURL(String(link.url)).catch(() => {}); }}
+                  onPress={() => { openLink(String(link.url)); }}
                   style={({ pressed }) => [styles.social, pressed && styles.pressed]}
                   testID={`social-${String(link.platform || "link").toLowerCase()}`}
                 >

@@ -12,10 +12,7 @@ jest.mock("../lib/api", () => ({ api: { get: (...args: unknown[]) => mockGet(...
 jest.mock("../realtime/LiveChangesProvider", () => ({ useLiveRefresh: () => {} }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
-jest.mock("../navigation/rootNavigation", () => ({
-  navigateToNotification: (...args: unknown[]) => mockNavigate(...args),
-  targetFromUrl: (url?: string | null) => (url && url.startsWith("/events/") ? { area: "tournaments", screen: "EventDetail", params: { id: "lan" } } : null),
-}));
+jest.mock("../lib/openLink", () => ({ openLink: (url?: string | null) => mockNavigate(url) }));
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -39,7 +36,7 @@ test("lädt nur App-Banner, zeigt den wichtigsten, Wegwischen zeigt den nächste
   expect(SecureStore.setItemAsync).toHaveBeenCalled();
 
   await fireEvent.press(screen.getByTestId("site-banner-text"));
-  expect(mockNavigate).toHaveBeenCalledWith(expect.objectContaining({ url: "/events/lan" }));
+  expect(mockNavigate).toHaveBeenCalledWith("/events/lan");
 });
 
 test("ohne Banner bleibt die Leiste weg", async () => {

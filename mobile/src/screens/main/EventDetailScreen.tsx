@@ -17,6 +17,7 @@ import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import type { ContentTarget } from "../../lib/contentLinks";
+import { openLink } from "../../lib/openLink";
 import { companionChangeHint, eventBasisLabel, eventOfferSummary, formatCents, ownEventPriceLine, quoteTotal } from "../../lib/eventPrice";
 import { formatDateTime, formatStatus, placeParts } from "../../lib/format";
 import { internalLabel } from "../../lib/memberArea";
@@ -568,7 +569,7 @@ function openSponsor(sponsor: { url?: string | null; link?: string | null }) {
   const raw = String(sponsor.url || sponsor.link || "").trim();
   if (!raw) return;
   const url = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  Linking.openURL(url).catch(() => {});
+  openLink(url);
 }
 
 const styles = StyleSheet.create({

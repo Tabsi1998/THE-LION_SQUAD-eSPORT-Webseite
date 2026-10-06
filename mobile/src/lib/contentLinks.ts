@@ -1,3 +1,5 @@
+import { ownPath } from "./siteUrls";
+
 export type ContentTarget = {
   id: string;
   label?: string;
@@ -77,11 +79,9 @@ export function isImageUrl(value?: string | null) {
 
 function toPath(value: string) {
   if (value.startsWith("/")) return value;
-  try {
-    return new URL(value).pathname;
-  } catch {
-    return null;
-  }
+  // Nur die eigene Website (#921): start.gg/tournaments/… ist kein eigenes Turnier.
+  const own = ownPath(value);
+  return own === null ? null : own.split("?")[0];
 }
 
 function cleanId(value?: string | null) {
