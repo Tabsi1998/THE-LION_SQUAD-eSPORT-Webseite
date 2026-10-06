@@ -197,7 +197,7 @@ function LinkedAccountCard({ account }) {
       <div className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Plattformkonto</div>
       <Link
         to={account.profile_url}
-        className={`mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3 hover:border-[#29B6E8] hover:bg-[#0B1D24] transition`}
+        className={`tls-card mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3`}
       >
         <div className="flex items-center gap-3">
           <LevelAvatarFrame level={level} compact className="w-14 h-14 shrink-0">

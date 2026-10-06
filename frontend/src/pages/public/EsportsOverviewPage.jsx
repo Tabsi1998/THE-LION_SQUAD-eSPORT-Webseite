@@ -148,7 +148,7 @@ function StatCard({ icon: Icon, label, value }) {
 
 function HubLink({ to, icon: Icon, title, text }) {
   return (
-    <Link to={to} className="group rounded-sm border border-white/10 bg-[#121212] p-5 transition hover:border-[#29B6E8]/55 hover:bg-[#151515]">
+    <Link to={to} className="tls-card group rounded-sm border border-white/10 bg-[#121212] p-5">
       <div className="flex items-start justify-between gap-4">
         <Icon className="h-6 w-6 text-[#29B6E8]" />
         <ArrowRight className="h-4 w-4 text-white/25 transition group-hover:text-[#29B6E8]" />
@@ -174,9 +174,9 @@ function SectionHeader({ eyebrow, title, action }) {
 function ActivityCard({ item, index = 0 }) {
   const image = item.banner_url || item.game?.cover_url || (item.kind === "fastlap" ? "https://images.unsplash.com/photo-1771440571270-e27b63085a48?w=1200" : "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200");
   return (
-    <Link to={item.href} className="group overflow-hidden rounded-sm border border-white/10 bg-[#121212] transition hover:-translate-y-1 hover:border-[#29B6E8]/60 hover:shadow-[0_0_24px_rgba(41,182,232,0.22)]">
+    <Link to={item.href} className="tls-card group overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
       <div className="relative aspect-video overflow-hidden">
-        <LazyImg src={image} priority={index < 2} alt={item.title} sizes="(min-width: 1024px) 33vw, 100vw" className="absolute inset-0 h-full w-full object-cover opacity-45 transition duration-500 group-hover:scale-105 group-hover:opacity-65" />
+        <LazyImg src={image} priority={index < 2} alt={item.title} sizes="(min-width: 1024px) 33vw, 100vw" className="absolute inset-0 h-full w-full object-cover opacity-45 tls-card__media group-hover:opacity-65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/45 to-transparent" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
           <span className="rounded-sm border border-white/15 bg-black/45 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75">{item.label}</span>

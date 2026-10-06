@@ -1,17 +1,18 @@
 /**
  * PartnerTicker - das kleinere Laufband mit den Partnern, im Footer direkt unter den Sponsoren.
  * Sponsoren geben dem Verein etwas und bekommen eine Gegenleistung, Partner sind kostenlose
- * Partnerschaften auf Gegenseitigkeit - deshalb zwei Bänder: gleicher Grund, gleiche Machart, die Partner
- * eine Stufe kleiner und in Gegenrichtung. Nur Partner mit Logo, jedes Logo führt auf die Partnerseite;
- * ohne Partner-Logos fällt das Band weg.
+ * Partnerschaften auf Gegenseitigkeit - deshalb zwei Bänder, jedes mit kleiner Überschrift: gleicher Grund,
+ * gleiche Machart, die Partner eine Stufe kleiner, dichter gesetzt und in Gegenrichtung. Nur Partner mit Logo,
+ * jedes Logo führt auf die Partnerseite; ohne Partner-Logos fällt das Band weg.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { LogoTicker } from "@/components/tls/LogoTicker";
+import { BAND_HEADING_CLASS, LogoTicker } from "@/components/tls/LogoTicker";
 
-// Etwa drei Viertel der Sponsoren-Kästen im Footer (SponsorTicker, COMPACT_BOX).
-const BOX = "h-8 w-28 sm:w-32 md:h-9 md:w-44";
+// Etwa drei Viertel so hoch wie die Sponsoren-Kästen im Footer (SponsorTicker, COMPACT_BOX) und schmaler:
+// kleinere Logos brauchen weniger Abstand, sonst wirkt die Reihe löchrig.
+const BOX = "h-8 w-24 sm:w-28 md:h-9 md:w-32";
 
 export function partnerTickerItems(partners) {
   return (Array.isArray(partners) ? partners : [])
@@ -25,7 +26,7 @@ export function partnerTickerItems(partners) {
     }));
 }
 
-export function PartnerTicker({ className = "" }) {
+export function PartnerTicker({ className = "", heading = "Partner" }) {
   const [partners, setPartners] = useState([]);
   const load = useCallback(async () => {
     try {
@@ -41,16 +42,17 @@ export function PartnerTicker({ className = "" }) {
   if (!items.length) return null;
   return (
     <section className={`relative max-w-full overflow-hidden bg-transparent ${className}`} aria-label="Partner" data-testid="partner-ticker">
+      {heading ? <div className={BAND_HEADING_CLASS} data-testid="partner-ticker-heading">{heading}</div> : null}
       <LogoTicker
         items={items}
         boxClassFor={() => BOX}
         minForMarquee={3}
-        minItems={14}
-        secondsPerItem={7}
+        minItems={16}
+        secondsPerItem={6}
         minSeconds={72}
-        gapClass="gap-5 sm:gap-8 md:gap-12"
-        groupPaddingClass="pr-5 sm:pr-8 md:pr-12"
-        verticalClass="py-2"
+        gapClass="gap-4 sm:gap-6 md:gap-8"
+        groupPaddingClass="pr-4 sm:pr-6 md:pr-8"
+        verticalClass="py-1"
         reverse
         testId="partner-ticker-band"
       />

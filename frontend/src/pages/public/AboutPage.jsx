@@ -142,7 +142,7 @@ export default function AboutPage() {
           </div>
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {board.map((contact) => (
-              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="group flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 rounded-sm bg-[#111] p-4 transition min-w-0">
+              <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`about-board-${contact.id}`} data-season-anchor="card" className="tls-card tls-card--gold group flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
                 {contact.avatar ? (
                   <LazyImg src={contact.avatar} alt="" className="w-16 h-16 rounded-sm object-cover shrink-0" />
                 ) : (
@@ -184,7 +184,7 @@ export default function AboutPage() {
             </div>
             <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-3">
               {offlineEvents.map((event) => (
-                <Link key={event.id} to={`/events/${event.slug || event.id}`} data-testid={`about-offline-event-${event.id}`} className="group relative overflow-hidden rounded-sm border border-white/10 hover:border-[#29B6E8]/50 bg-[#111] aspect-[16/10] transition">
+                <Link key={event.id} to={`/events/${event.slug || event.id}`} data-testid={`about-offline-event-${event.id}`} className="tls-card group relative overflow-hidden rounded-sm border border-white/10 bg-[#111] aspect-[16/10]">
                   <LazyImg src={event.banner_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-[1.02] transition duration-500" />
                   <span className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/90 to-transparent">
                     <span className="block text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{formatDate(event.start_date)}</span>

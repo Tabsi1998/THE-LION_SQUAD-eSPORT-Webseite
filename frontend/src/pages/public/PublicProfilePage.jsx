@@ -870,7 +870,7 @@ export default function PublicProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {teams.length ? (
               teams.map((tm) => (
-                <Link key={tm.id} to={`/teams/${tm.id}`} className="border border-white/10 rounded-sm p-4 bg-[#121212] hover:border-[#29B6E8]/60 transition">
+                <Link key={tm.id} to={`/teams/${tm.id}`} className="tls-card border border-white/10 rounded-sm p-4 bg-[#121212]">
                   <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{tm.tag}]</div>
                   <div className="font-heading text-xl font-bold">{tm.name}</div>
                   {tm.description && <p className="mt-2 text-sm text-white/60 line-clamp-2">{tm.description}</p>}

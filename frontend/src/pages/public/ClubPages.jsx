@@ -255,7 +255,7 @@ function BoardDeputyCard({ position }) {
     );
   }
   return (
-    <Link to={d.profile_url || `/u/${d.username}`} className="group border border-white/10 rounded-sm bg-[#0A0A0A] p-6 flex items-center gap-5 min-h-[11.5rem] hover:border-[#FFD700]/40 hover:bg-[#121212] transition">
+    <Link to={d.profile_url || `/u/${d.username}`} className="tls-card tls-card--gold group border border-white/10 rounded-sm bg-[#0A0A0A] p-6 flex items-center gap-5 min-h-[11.5rem]">
       {d.avatar_url ? (
         <img src={resolveMediaUrl(d.avatar_url)} alt="" className="w-28 h-32 rounded-sm object-contain object-bottom bg-black border border-white/10" />
       ) : (

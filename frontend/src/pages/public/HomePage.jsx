@@ -322,10 +322,10 @@ function BoardTeaser({ contacts }) {
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {contacts.map((contact, index) => (
           <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} data-season-anchor="card" style={{ "--tls-i": index + 1 }}
-            className="group tls-reveal-item flex items-center gap-4 border border-white/10 hover:border-[#FFD700]/50 focus-visible:border-[#FFD700]/50 hover:shadow-[0_18px_40px_-26px_rgba(255,215,0,0.55)] rounded-sm bg-[#111] p-4 transition duration-300 min-w-0">
+            className="tls-card tls-card--gold group tls-reveal-item flex items-center gap-4 border border-white/10 rounded-sm bg-[#111] p-4 min-w-0">
             {contact.avatar ? (
               <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm overflow-hidden shrink-0">
-                <LazyImg src={contact.avatar} alt="" className="w-full h-full object-cover transition duration-500 group-hover:scale-105" />
+                <LazyImg src={contact.avatar} alt="" className="w-full h-full object-cover tls-card__media" />
               </span>
             ) : (
               <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
@@ -344,10 +344,10 @@ function BoardTeaser({ contacts }) {
 function FeaturedNews({ news }) {
   return (
     <Link to={`/news/${news.slug}`} data-testid={`home-featured-news-${news.slug}`} data-season-anchor="card"
-      className="group tls-reveal-item border border-white/10 hover:border-[#29B6E8]/50 focus-visible:border-[#29B6E8]/50 hover:shadow-[0_22px_48px_-28px_rgba(41,182,232,0.6)] rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] transition duration-300 min-w-0">
+      className="tls-card group tls-reveal-item border border-white/10 rounded-sm bg-[#111] overflow-hidden grid lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)] min-w-0">
       <div className="aspect-[16/9] lg:aspect-auto bg-[#070707] overflow-hidden">
         {news.banner_url ? (
-          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 group-hover:scale-105 transition duration-500" />
+          <LazyImg src={news.banner_url} alt="" sizes="(min-width: 1024px) 45vw, 100vw" className="w-full h-full object-cover object-center opacity-90 tls-card__media" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 via-[#101010] to-black" />
         )}
@@ -478,7 +478,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
       data-testid={`home-news-${news.slug}`}
       data-season-anchor="card"
       style={{ "--tls-i": index + 1 }}
-      className={`group tls-reveal-item border border-white/10 hover:border-[#29B6E8]/50 focus-visible:border-[#29B6E8]/50 hover:shadow-[0_18px_40px_-24px_rgba(41,182,232,0.55)] rounded-sm bg-[#121212] overflow-hidden transition duration-300 flex flex-col ${newsCardSpan(featured, count)}`}
+      className={`tls-card group tls-reveal-item border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${newsCardSpan(featured, count)}`}
     >
       {news.banner_url ? (
         <div className={`${media} relative bg-[#0A0A0A] overflow-hidden`} data-testid={tall ? "home-news-tall-media" : undefined}>
@@ -488,7 +488,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
               className="hidden lg:block absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-40" />
           )}
           <LazyImg src={news.banner_url} alt="" sizes={featured ? "(min-width: 1024px) 66vw, 100vw" : "(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw"}
-            className={`relative w-full h-full ${tall ? "object-cover lg:object-contain" : "object-cover"} group-hover:scale-105 transition duration-500`} />
+            className={`relative w-full h-full ${tall ? "object-cover lg:object-contain" : "object-cover"} tls-card__media`} />
         </div>
       ) : (
         <div className={`${media} bg-gradient-to-br from-[#29B6E8]/20 via-[#0A0A0A] to-[#0A0A0A]`} />

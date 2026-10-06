@@ -134,7 +134,8 @@ function NavDropdown({ item, isClubMember }) {
           to={item.to}
           data-testid={`nav-${item.label.toLowerCase()}`}
           aria-expanded={open}
-          className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
+          data-active={isActive ? "1" : "0"}
+          className={`tls-nav-link px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
             isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
           }`}
         >
@@ -146,7 +147,8 @@ function NavDropdown({ item, isClubMember }) {
           type="button"
           data-testid={`nav-${item.label.toLowerCase()}`}
           aria-expanded={open}
-          className={`px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
+          data-active={isActive ? "1" : "0"}
+          className={`tls-nav-link px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm inline-flex items-center gap-1.5 ${
             isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
           }`}
         >
@@ -277,7 +279,7 @@ export function MainNav({ isClubMember = false }) {
             end={item.end}
             data-testid={`nav-${item.label.toLowerCase()}`}
             className={({ isActive }) =>
-              `px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm ${
+              `tls-nav-link px-4 py-2 text-sm font-semibold uppercase tracking-wider transition rounded-sm ${
                 isActive ? "text-[#29B6E8]" : "text-white/70 hover:text-white"
               }`
             }

@@ -291,8 +291,8 @@ function TrophyCard({ item }) {
   const people = entriesOf(item).flatMap((entry) => entry.lineup_members || []);
   const bestEntry = entriesOf(item).find((entry) => Number(entry.placement) === bestPlacement(item)) || entriesOf(item)[0];
   return (
-    <Link to={`/references/${item.id}`} data-testid={`reference-trophy-${item.id}`} className={`group relative shrink-0 w-[85vw] max-w-sm lg:w-auto lg:max-w-none snap-start overflow-hidden rounded-sm border ${tone.soft} bg-[#0F0F0F] min-h-[18rem] flex flex-col transition hover:-translate-y-1 ${tone.glow}`}>
-      {cover && <img src={resolveMediaUrl(cover)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 group-hover:scale-105 transition duration-700" />}
+    <Link to={`/references/${item.id}`} data-testid={`reference-trophy-${item.id}`} className={`tls-card tls-card--own group relative shrink-0 w-[85vw] max-w-sm lg:w-auto lg:max-w-none snap-start overflow-hidden rounded-sm border ${tone.soft} bg-[#0F0F0F] min-h-[18rem] flex flex-col ${tone.glow}`}>
+      {cover && <img src={resolveMediaUrl(cover)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 group-hover:opacity-40 tls-card__media" />}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent" />
       <div className={`absolute top-0 inset-x-0 h-1 bg-gradient-to-r ${tone.ring}`} />
       <div className="relative p-5 flex flex-col h-full">

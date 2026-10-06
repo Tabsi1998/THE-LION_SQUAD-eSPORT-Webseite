@@ -171,11 +171,11 @@ function NewsCard({ n, featured = false }) {
       to={`/news/${n.slug}`}
       data-testid={`news-card-${n.slug}`}
       data-season-anchor="card"
-      className={`group border border-white/10 hover:border-white/30 rounded-sm bg-[#121212] overflow-hidden flex flex-col transition ${featured ? "lg:col-span-1" : ""}`}
+      className={`tls-card group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${featured ? "lg:col-span-1" : ""}`}
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
         {n.banner_url ? (
-          <LazyImg src={n.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={n.banner_url} alt="" sizes="(min-width: 1024px) 33vw, (min-width: 768px) 50vw, 100vw" className="w-full h-full object-cover tls-card__media" />
         ) : (
           <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c}33, #0A0A0A 48%, #121212)` }}>
             <Newspaper className="w-10 h-10 text-white/20" />

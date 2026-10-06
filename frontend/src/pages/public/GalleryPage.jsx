@@ -66,11 +66,11 @@ function AlbumCard({ a }) {
     <Link
       to={`/galerie/${a.slug}`}
       data-testid={`album-card-${a.slug}`}
-      className="group border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#121212] overflow-hidden block transition"
+      className="tls-card group border border-white/10 rounded-sm bg-[#121212] overflow-hidden block"
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (
-          <LazyImg src={a.cover_url} alt={a.title} sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          <LazyImg src={a.cover_url} alt={a.title} sizes="(min-width: 1024px) 25vw, (min-width: 768px) 33vw, (min-width: 640px) 50vw, 100vw" className="w-full h-full object-cover tls-card__media" />
         ) : (
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}

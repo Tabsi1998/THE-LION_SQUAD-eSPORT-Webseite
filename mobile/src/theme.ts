@@ -19,3 +19,11 @@ export const radius = {
   lg: 8,
 };
 
+// Bewegungs-Regeln (#1070) - dieselben Werte wie im Web (frontend/src/lib/motion.js und index.css): drei Dauern in
+// Millisekunden und eine Kurve. Ein Test im Web (lib/motion.test.js) hält beide Seiten zusammen.
+export const motion = {
+  fast: 150,
+  mid: 240,
+  slow: 420,
+  ease: [0.2, 0.7, 0.2, 1] as const,
+};

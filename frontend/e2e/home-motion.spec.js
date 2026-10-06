@@ -119,12 +119,29 @@ test("1440: Raster ohne Lücke, Plakette einzeilig, Einblenden beim Scrollen ohn
   await expect.poll(() => card.locator("> *").first().evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
   expect(await card.evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
 
-  // Tiefe beim Darüberfahren - über Schatten, die Karte bleibt, wo sie ist (Saison-Deko hängt an ihr).
-  const before = await card.boundingBox();
+  // Tiefe beim Darüberfahren (#1071): die Karte hebt sich um 5 px und bekommt einen Schatten. Trägt sie gerade
+  // Saison-Deko, bleibt sie, wo sie ist - die Deko hängt an ihrer gemessenen Kante. Ohne Maus (Touch) gibt es keinen
+  // Hover, der hängen bleiben könnte.
+  // Gemessen in Seitenkoordinaten, damit ein Scrollen beim Hover die Zahl nicht verfälscht.
+  const pageY = async () => (await card.boundingBox()).y + (await page.evaluate(() => window.scrollY));
+  const before = await pageY();
+  const canHover = await page.evaluate(() => window.matchMedia("(hover: hover)").matches);
   await card.hover();
-  await expect.poll(() => card.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
-  const after = await card.boundingBox();
-  expect(Math.abs(after.y - before.y)).toBeLessThan(0.5);
+  if (canHover) {
+    await expect.poll(() => card.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+    await expect.poll(async () => Math.round(before - (await pageY()))).toBe(5);
+    await page.mouse.move(2, 2);
+    await expect.poll(async () => Math.round(before - (await pageY()))).toBe(0);
+    await page.evaluate(() => { document.documentElement.dataset.seasonIntensity = "normal"; });
+    await card.hover();
+    await expect.poll(() => card.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+    await page.waitForTimeout(350);
+    expect(Math.abs((await pageY()) - before)).toBeLessThan(0.5);
+    await page.evaluate(() => { delete document.documentElement.dataset.seasonIntensity; });
+  } else {
+    await page.waitForTimeout(350);
+    expect(Math.abs((await pageY()) - before)).toBeLessThan(0.5);
+  }
 
   // Das Licht hinter dem Löwen folgt dem Mauszeiger - mit Touch bleibt es still (dort gibt es keinen Zeiger).
   await page.evaluate(() => window.scrollTo(0, 0));

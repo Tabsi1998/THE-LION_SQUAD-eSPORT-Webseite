@@ -86,7 +86,7 @@ export default function PlayersPage() {
           ) : filtered.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Keine Spieler gefunden.</div>
           ) : (
-            <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+            <div className="tls-dim-siblings grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filtered.map((p) => {
                 const isMember = memberUsernames.has(p.username);
                 const accountLevel = p.achievement_level?.level || 1;
@@ -95,7 +95,7 @@ export default function PlayersPage() {
                     key={p.username}
                     to={`/u/${p.username}`}
                     data-testid={`player-card-${p.username}`}
-                    className={`border ${accountLevelFrameClass(accountLevel)} hover:border-[#29B6E8]/70 rounded-sm bg-[#121212] p-4 transition group`}
+                    className={`tls-card border ${accountLevelFrameClass(accountLevel)} rounded-sm bg-[#121212] p-4 group`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">

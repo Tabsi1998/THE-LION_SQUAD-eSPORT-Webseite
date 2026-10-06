@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { SmartLogo } from "@/components/tls/SmartLogo";
-import { LogoTicker, marqueeDuration, repeatForLoop } from "@/components/tls/LogoTicker";
+import { BAND_HEADING_CLASS, LogoTicker, marqueeDuration, repeatForLoop } from "@/components/tls/LogoTicker";
 
 const tierBox = {
   main: "h-16 w-64 md:w-80",
@@ -43,7 +43,8 @@ function uniqueLogoSponsors(sponsors) {
   });
 }
 
-export function SponsorTicker({ className = "", compact = false, placement = "home", spotlight = false }) {
+// `heading`: kleine Überschrift über dem kompakten Band (Footer) - im Handy-Menü bleibt es ohne.
+export function SponsorTicker({ className = "", compact = false, placement = "home", spotlight = false, heading = "" }) {
   const [sponsors, setSponsors] = useState([]);
   const load = useCallback(async () => {
     try {
@@ -91,6 +92,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
           <span className="text-[11px] uppercase tracking-[0.35em] font-bold text-[#29B6E8]/80">Sponsoren</span>
         </div>
       )}
+      {compact && heading && items.length > 0 ? <div className={BAND_HEADING_CLASS} data-testid="sponsor-ticker-heading">{heading}</div> : null}
       {items.length > 0 && (
         <LogoTicker
           items={items}
@@ -101,7 +103,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
           minSeconds={compact ? 72 : spotlight ? 64 : 60}
           gapClass={compact ? "gap-5 sm:gap-8 md:gap-12" : spotlight ? "gap-14" : "gap-16"}
           groupPaddingClass={compact ? "pr-5 sm:pr-8 md:pr-12" : spotlight ? "pr-14" : "pr-16"}
-          verticalClass={compact ? "py-2" : spotlight ? "py-5 md:py-6" : "py-5"}
+          verticalClass={compact ? (heading ? "py-1" : "py-2") : spotlight ? "py-5 md:py-6" : "py-5"}
           testId="sponsor-ticker-band"
         />
       )}

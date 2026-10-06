@@ -72,6 +72,15 @@ module.exports = {
   				'5': 'hsl(var(--chart-5))'
   			}
   		},
+  		// Bewegungs-Regeln (#1070): duration-fast/-mid/-slow und ease-tls lesen die Werte aus index.css.
+  		transitionDuration: {
+  			fast: 'var(--tls-motion-fast)',
+  			mid: 'var(--tls-motion-mid)',
+  			slow: 'var(--tls-motion-slow)'
+  		},
+  		transitionTimingFunction: {
+  			tls: 'var(--tls-ease)'
+  		},
   		keyframes: {
   			'accordion-down': {
   				from: {

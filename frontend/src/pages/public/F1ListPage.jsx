@@ -74,12 +74,12 @@ function FastLapCard({ challenge: c }) {
     <Link
       to={`/fastlap/${c.slug || c.id}`}
       data-testid={`f1-list-${c.slug}`}
-      className="group block border border-white/10 hover:border-[#29B6E8]/60 rounded-sm p-5 sm:p-6 bg-[#121212] transition-all"
+      className="tls-card group block border border-white/10 rounded-sm p-5 sm:p-6 bg-[#121212]"
     >
       <div className="flex items-start gap-4 sm:gap-5 min-w-0">
         <div className="hidden sm:flex w-32 h-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#0A0A0A] border border-white/10">
           {c.banner_url ? (
-            <LazyImg src={c.banner_url} alt="" sizes="8rem" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+            <LazyImg src={c.banner_url} alt="" sizes="8rem" className="w-full h-full object-cover tls-card__media" />
           ) : (
             <Flag className="w-8 h-8 text-[#29B6E8]/35" />
           )}
