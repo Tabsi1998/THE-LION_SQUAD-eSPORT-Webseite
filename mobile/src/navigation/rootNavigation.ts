@@ -1,6 +1,7 @@
 import { createNavigationContainerRef, type NavigationContainerRefWithCurrent } from "@react-navigation/native";
 import type { MainTabParamList, RootStackParamList } from "./types";
 import type { UserNotification } from "../types";
+import { ownPath } from "../lib/siteUrls";
 
 export const navigationRef = createNavigationContainerRef<MainTabParamList>();
 let pendingNotification: UserNotification | null = null;
@@ -182,10 +183,11 @@ export function targetFromUrl(url?: string | null): NotificationTarget | null {
 }
 
 function parsePath(value?: string | null) {
-  const raw = String(value || "").trim();
+  // Eine fremde Adresse (#921) bekommt nie einen Screen - auch nicht mit zufällig gleichem Pfad.
+  const raw = /^https?:\/\//i.test(String(value || "").trim()) ? ownPath(value) || "" : String(value || "").trim();
   if (!raw) return { path: "", query: "" };
   try {
-    const url = raw.startsWith("http") ? new URL(raw) : new URL(raw, "https://lionsquad.local");
+    const url = new URL(raw, "https://lionsquad.local");
     return { path: url.pathname.replace(/^\/+|\/+$/g, ""), query: url.search.replace(/^\?/, "") };
   } catch {
     const [path, query = ""] = raw.split("?");

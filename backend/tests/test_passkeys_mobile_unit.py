@@ -10,7 +10,7 @@ from fastapi import HTTPException, Response
 from webauthn.helpers import bytes_to_base64url
 
 from routes import passkey_routes as routes
-from test_passkeys_unit import authentication_credential, enroll, make_setup, registration_credential
+from test_passkeys_unit import authentication_credential, bind_cookie, enroll, make_setup, registration_credential
 
 UPLOAD_HASH, PLAY_HASH, PLAY_SIGNING_HASH = routes.DEFAULT_APK_KEY_HASHES.split(",")
 # Die APK vom Vereinsserver (Upload-Schlüssel), der am 23.09. eingetragene Play-Schlüssel (#394) und der Schlüssel,
@@ -273,3 +273,62 @@ def test_assetlinks_names_every_app_key():
     links = json.loads((pathlib.Path(__file__).resolve().parents[2] / "frontend" / "public" / ".well-known" / "assetlinks.json").read_text(encoding="utf-8"))
     fingerprints = {item for entry in links for item in entry["target"]["sha256_cert_fingerprints"]}
     assert set(routes.DEFAULT_APK_KEY_HASHES.split(",")) <= fingerprints
+
+
+def test_a_passkey_the_server_does_not_know_gets_its_own_reason_in_app_and_web(setup, monkeypatch):
+    """#949: Das Handy bietet einen Passkey an, den der Server nie gespeichert hat (Anlegen scheiterte erst am Server)
+    oder nicht mehr kennt (im Profil entfernt). Statt „fehlgeschlagen“ kommt der Grund mit dem Weg (Passwortmanager
+    aufräumen, mit Passwort anmelden) und eine Kopfzeile, mit der Website und App den Passwortmanager bitten, den
+    Eintrag zu vergessen - und das, ohne dass eine Unterschrift geprüft wird."""
+    async def scenario():
+        db, _user, request, issue = setup
+        monkeypatch.setattr(routes, "_issue_mobile_session", AsyncMock(return_value=("zugang", "erneuerung")))
+        private_key = ec.generate_private_key(ec.SECP256R1())
+        await enroll(setup, private_key)
+        db.passkeys.rows.clear()   # im Profil entfernt - am Handy liegt er noch
+
+        start = await routes.mobile_login_options(request)
+        credential = authentication_credential(start["options"], private_key, origin=APP_ORIGIN)
+        with pytest.raises(HTTPException) as app_error:
+            await routes.mobile_login_verify(routes.MobileCredentialResponse(credential=credential, ticket=start["ticket"], remember=False), request)
+        assert app_error.value.status_code == 401
+        assert app_error.value.detail.startswith("Diesen Passkey kennt club.example nicht (mehr).")
+        assert "bietet dir die App einen neuen an" in app_error.value.detail
+        assert app_error.value.headers == {"X-Passkey-Error": "unknown-credential"}
+
+        response = Response()
+        options = await routes.login_options(request, response)
+        bind_cookie(request, response, "login")
+        with pytest.raises(HTTPException) as web_error:
+            await routes.login_verify(routes.CredentialResponse(credential=authentication_credential(options, private_key)), request, Response())
+        assert web_error.value.status_code == 401
+        assert "im Profil kannst du dann einen neuen anlegen" in web_error.value.detail
+        assert web_error.value.headers == {"X-Passkey-Error": "unknown-credential"}
+        issue.assert_not_awaited()
+
+        # Eine falsche Unterschrift bei bekanntem Passkey bleibt „fehlgeschlagen“ - ohne Kopfzeile.
+        await enroll(setup, private_key)
+        start = await routes.mobile_login_options(request)
+        forged = authentication_credential(start["options"], ec.generate_private_key(ec.SECP256R1()), origin=APP_ORIGIN)
+        with pytest.raises(HTTPException) as forged_error:
+            await routes.mobile_login_verify(routes.MobileCredentialResponse(credential=forged, ticket=start["ticket"], remember=False), request)
+        assert forged_error.value.detail == "Passkey-Anmeldung fehlgeschlagen." and not forged_error.value.headers
+    asyncio.run(scenario())
+
+
+def test_signal_state_names_what_the_password_manager_may_keep(setup, monkeypatch):
+    """#949: `GET /api/auth/passkeys/signal` liefert Relying Party, Kennung des Kontos (wie bei der Registrierung:
+    die Konto-ID als Bytes) und alle Passkeys des Kontos - Website und App melden das dem Passwortmanager, der
+    verwaiste Einträge dann versteckt. Ohne Passkeys ist die Liste leer (dann verschwinden alle)."""
+    async def scenario():
+        db, user, _request, _issue = setup
+        assert await routes.signal_state(user) == {"rp_id": "club.example", "user_handle": bytes_to_base64url(b"user-1"), "credential_ids": []}
+        await enroll(setup, ec.generate_private_key(ec.SECP256R1()))
+        db.passkeys.rows.append({"_id": "fremd", "user_id": "user-2", "rp_id": "club.example", "public_key": "", "sign_count": 0})
+        state = await routes.signal_state(user)
+        assert state["credential_ids"] == [bytes_to_base64url(b"test-passkey-credential")], "nur die eigenen"
+        monkeypatch.setenv("FRONTEND_URL", "")
+        with pytest.raises(HTTPException) as off:
+            await routes.signal_state(user)
+        assert off.value.status_code == 503
+    asyncio.run(scenario())

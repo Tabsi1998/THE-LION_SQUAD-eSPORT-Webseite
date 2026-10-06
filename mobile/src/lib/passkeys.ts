@@ -20,6 +20,8 @@ export function passkeysSupported(): boolean {
 /** Das Gerät meldet Fehler als Kennwort; hier werden sie zu einem Satz. */
 export function passkeyError(error: unknown, fallback = "Passkey-Anmeldung fehlgeschlagen. Bitte erneut versuchen."): string {
   const raised = error as { error?: string; message?: string; response?: { data?: { detail?: unknown } } } | null;
+  // Unbekannter Passkey (#949): der Server nennt den Weg selbst - der Satz kommt wörtlich.
+  if (unknownPasskey(error) && typeof raised?.response?.data?.detail === "string") return raised.response.data.detail;
   const code = String(raised?.error || raised?.message || "");
   if (/UserCancelled|cancel/i.test(code)) return "Passkey-Vorgang abgebrochen.";
   if (/NoCredentials|no credential/i.test(code)) {
@@ -43,17 +45,56 @@ export function credentialPayload(result: PasskeyGetResult) {
   };
 }
 
+/** Der Server kennt den vorgezeigten Passkey nicht (mehr) - er sagt das in einer Kopfzeile (#949). */
+export function unknownPasskey(error: unknown): boolean {
+  const raised = error as { response?: { headers?: Record<string, unknown> } } | null;
+  return String(raised?.response?.headers?.["x-passkey-error"] || "") === "unknown-credential";
+}
+
+/**
+ * Signal API (#949): dem Passwortmanager sagen, dass dieser Passkey hier nichts mehr gilt - nach einem Anlegen, das
+ * erst am Server scheiterte, oder nach dem Entfernen im Profil liegt er sonst am Handy und wird bei jedem Öffnen der
+ * Anmeldung angeboten. Nur ein Hinweis: Fehler bleiben leise, ältere Android-Fassungen tun nichts.
+ */
+export async function signalUnknownPasskey(rpId: string | undefined, credentialId: string | undefined): Promise<boolean> {
+  if (!rpId || !credentialId || typeof Passkey.signalUnknownCredential !== "function") return false;
+  try {
+    await Passkey.signalUnknownCredential({ rpId, credentialId });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Zweiter Teil der Signal API (#949): die vollständige Liste des Kontos melden - nach dem Laden und nach dem Entfernen. */
+export async function reconcilePasskeys(): Promise<boolean> {
+  if (typeof Passkey.signalAllAcceptedCredentials !== "function") return false;
+  try {
+    const { data } = await api.get<{ rp_id?: string; user_handle?: string; credential_ids?: string[] }>("/auth/passkeys/signal");
+    if (!data?.rp_id || !data.user_handle || !Array.isArray(data.credential_ids)) return false;
+    await Passkey.signalAllAcceptedCredentials({ rpId: data.rp_id, userId: data.user_handle, allAcceptedCredentialIds: data.credential_ids });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function signInWithPasskey(remember: boolean, silent = false): Promise<AuthResponse> {
   const { data: start } = await api.post<PasskeyStart>("/auth/passkeys/mobile/login/options", {});
   // Still beim Öffnen der Anmeldung (#919): nur ein Passkey, der sofort da ist. Ohne ihn zeigt Android sonst eine eigene
   // Leiste („Sign in another way“) und hält die Anfrage offen; so kommt gleich „NoCredentials“ und das Formular bleibt.
   const result = silent ? await Passkey.getImmediate(start.options) : await Passkey.get(start.options);
-  const { data } = await api.post<AuthResponse>("/auth/passkeys/mobile/login/verify", {
-    ticket: start.ticket,
-    credential: credentialPayload(result),
-    remember,
-  });
-  return data;
+  try {
+    const { data } = await api.post<AuthResponse>("/auth/passkeys/mobile/login/verify", {
+      ticket: start.ticket,
+      credential: credentialPayload(result),
+      remember,
+    });
+    return data;
+  } catch (error) {
+    if (unknownPasskey(error)) await signalUnknownPasskey(start.options?.rpId, result?.id);
+    throw error;
+  }
 }
 
 // Passkeys in der App anlegen und verwalten (#919) - dieselben Passkeys wie auf der Website. Nachweis ist das Ticket
@@ -120,10 +161,14 @@ export function passkeyCreateError(error: unknown): string {
 }
 
 /** Ob die Anmeldung still bleiben soll: kein Passkey auf dem Gerät oder abgebrochen - dann einfach das Formular. */
-export function silentPasskeyMiss(error: unknown): "none" | "cancelled" | "failed" {
+export type PasskeyMiss = "none" | "cancelled" | "failed" | "unknown";
+
+export function silentPasskeyMiss(error: unknown): PasskeyMiss {
   const raised = error as { error?: string; message?: string; response?: { status?: number } } | null;
   // Der Server bietet (noch) keine Passkeys für die App an: dann gibt es auch nichts anzubieten.
   if (raised?.response?.status === 503) return "none";
+  // Am Handy liegt ein Passkey, den der Server nicht (mehr) kennt (#949) - die Anmeldung sagt es ruhig.
+  if (unknownPasskey(error)) return "unknown";
   const code = String(raised?.error || raised?.message || "");
   if (/NoCredentials|no credential/i.test(code)) return "none";
   if (/UserCancelled|cancel/i.test(code)) return "cancelled";

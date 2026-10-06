@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { errorMessage } from "../lib/api";
 import { formatDate } from "../lib/format";
-import { createPasskey, listPasskeys, passkeyCreateError, passkeysAvailable, passkeysSupported, removePasskey, silentPasskeyMiss, type PasskeyRow } from "../lib/passkeys";
+import { createPasskey, listPasskeys, passkeyCreateError, passkeysAvailable, passkeysSupported, reconcilePasskeys, removePasskey, silentPasskeyMiss, type PasskeyRow } from "../lib/passkeys";
 import { colors } from "../theme";
 import { Button } from "./Button";
 import { Card } from "./Card";
@@ -28,6 +28,8 @@ export function PasskeysCard({ style }: { style?: object }) {
   const load = useCallback(async () => {
     try {
       setRows(await listPasskeys());
+      // Signal API (#949): was am Handy für dieses Konto liegt, aber hier fehlt, versteckt der Passwortmanager.
+      await reconcilePasskeys();
     } catch (error) {
       setFailed(true);
       setMessage(errorMessage(error, "Passkeys konnten nicht geladen werden."));

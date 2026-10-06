@@ -8,7 +8,7 @@ import { Screen } from "../../components/Screen";
 import { Body, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { errorMessage } from "../../lib/api";
-import { passkeyError, passkeysSupported, silentPasskeyMiss } from "../../lib/passkeys";
+import { passkeyError, passkeysSupported, silentPasskeyMiss, type PasskeyMiss } from "../../lib/passkeys";
 import { colors } from "../../theme";
 
 // Anmelden (#918, #919): die Seite erreicht man aus dem Mehr-Menü oder dem Hinweis beim ersten Start - die App selbst
@@ -31,7 +31,9 @@ export function LoginScreen({ navigation }: Props) {
   const [passkeyLink, setPasskeyLink] = useState(false);
   // Was die stille Abfrage auf diesem Gerät fand (#939): „none“ = kein Passkey hier - dann lädt die App nach der
   // Passwort-Anmeldung ein, auch wenn das Konto anderswo (etwa am PC) schon einen hat.
-  const [deviceMiss, setDeviceMiss] = useState<"none" | "cancelled" | "failed" | null>(null);
+  const [deviceMiss, setDeviceMiss] = useState<PasskeyMiss | null>(null);
+  // Ein Passkey am Handy, den der Server nicht (mehr) kennt (#949): ruhiger Hinweis statt rotem Fehler.
+  const [unknownHint, setUnknownHint] = useState("");
   const asked = useRef(false);
 
   function done() {
@@ -43,10 +45,10 @@ export function LoginScreen({ navigation }: Props) {
     setError("");
     try {
       if (mfaTicket) {
-        await completeMfa(mfaTicket, mfaCode.trim(), remember, deviceMiss === "none");
+        await completeMfa(mfaTicket, mfaCode.trim(), remember, noDevicePasskey);
         done();
       } else {
-        const result = await login(email.trim(), password, remember, deviceMiss === "none");
+        const result = await login(email.trim(), password, remember, noDevicePasskey);
         if (result.mfaRequired && result.ticket) setMfaTicket(result.ticket);
         else done();
       }
@@ -56,6 +58,10 @@ export function LoginScreen({ navigation }: Props) {
       setSubmitting(false);
     }
   }
+
+  // Kein brauchbarer Passkey auf diesem Gerät: dann lädt die App nach der Passwort-Anmeldung zu einem neuen ein -
+  // auch, wenn hier nur ein Passkey liegt, den der Server nicht mehr kennt (#949).
+  const noDevicePasskey = deviceMiss === "none" || deviceMiss === "unknown";
 
   async function passkeyLogin(silent: boolean) {
     // Die stille Abfrage beim Öffnen sperrt das Formular nicht - man kann gleich tippen.
@@ -69,7 +75,12 @@ export function LoginScreen({ navigation }: Props) {
     } catch (err) {
       const miss = silentPasskeyMiss(err);
       if (silent) setDeviceMiss(miss);
-      if (!silent) setError(passkeyError(err));
+      if (miss === "unknown") {
+        setUnknownHint(passkeyError(err));
+        setError("");
+      } else if (!silent) {
+        setError(passkeyError(err));
+      }
       setPasskeyLink(miss !== "none" || !silent);
     } finally {
       if (!silent) setSubmitting(false);
@@ -133,6 +144,7 @@ export function LoginScreen({ navigation }: Props) {
               <Muted>Die App meldet dich beim nächsten Öffnen automatisch wieder an.</Muted>
             </Pressable>
           </View>
+          {unknownHint ? <Muted testID="login-passkey-unknown" style={styles.hint}>{unknownHint}</Muted> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Button label={submitting ? "Anmelden ..." : mfaTicket ? "MFA bestätigen" : "Anmelden"} onPress={submit} disabled={submitting} />
           {!mfaTicket && passkeyLink && passkeysSupported() ? (
@@ -166,6 +178,10 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 14,
+  },
+  hint: {
+    marginBottom: 12,
+    lineHeight: 18,
   },
   error: {
     color: colors.live,

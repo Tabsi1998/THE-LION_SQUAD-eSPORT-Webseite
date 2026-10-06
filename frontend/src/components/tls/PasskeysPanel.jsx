@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { enrollPasskey, passkeyError, passkeysSupported } from "@/lib/passkeys";
+import { enrollPasskey, passkeyError, passkeysSupported, reconcilePasskeys } from "@/lib/passkeys";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { viennaDate } from "@/lib/vienna";
@@ -19,6 +19,8 @@ export function PasskeysPanel() {
   async function load() {
     const { data } = await api.get("/auth/passkeys");
     setItems(Array.isArray(data) ? data : []);
+    // Signal API (#949): was am Gerät für dieses Konto liegt, aber hier fehlt, versteckt der Passwortmanager.
+    await reconcilePasskeys();
   }
   useEffect(() => {
     if (!passkeysSupported()) return;

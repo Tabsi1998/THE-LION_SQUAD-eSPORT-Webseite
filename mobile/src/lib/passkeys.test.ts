@@ -8,8 +8,10 @@ import {
   passkeyName,
   passkeysAvailable,
   passkeysSupported,
+  reconcilePasskeys,
   removePasskey,
   signInWithPasskey,
+  signalUnknownPasskey,
   silentPasskeyMiss,
 } from "./passkeys";
 
@@ -113,4 +115,40 @@ test("der Name des Passkeys nennt das Gerät; ohne Gerätenamen „Android“", 
   expect(passkeyName("  Pixel   9 ")).toBe("LionsAPP · Pixel 9");
   expect(passkeyName(null)).toBe("LionsAPP · Android");
   expect(passkeyName("x".repeat(100)).length).toBeLessThanOrEqual(80);
+});
+
+// Unbekannter Passkey (#949): der Server sagt es in einer Kopfzeile, die App meldet ihn dem Passwortmanager (Signal API)
+// und zeigt den Satz des Servers; die Liste im Profil wird mit der vollständigen Menge abgeglichen.
+function unknownError() {
+  return { response: { status: 401, headers: { "x-passkey-error": "unknown-credential" }, data: { detail: "Diesen Passkey kennt lionsquad.at nicht (mehr). Lösche ihn im Passwortmanager deines Handys und melde dich mit Passwort an – danach bietet dir die App einen neuen an." } } };
+}
+
+test("unbekannter Passkey: Signal an den Passwortmanager, Grund „unknown“, Satz vom Server", async () => {
+  (Passkey as unknown as { signalUnknownCredential: jest.Mock }).signalUnknownCredential = jest.fn(async () => undefined);
+  mockPost.mockResolvedValueOnce({ data: { ticket: "t-3", options: OPTIONS } }).mockRejectedValueOnce(unknownError());
+  (Passkey.getImmediate as jest.Mock).mockResolvedValueOnce(RESULT);
+  await expect(signInWithPasskey(true, true)).rejects.toMatchObject({ response: { status: 401 } });
+  expect(Passkey.signalUnknownCredential).toHaveBeenCalledWith({ rpId: "lionsquad.at", credentialId: "cred-1" });
+  expect(silentPasskeyMiss(unknownError())).toBe("unknown");
+  expect(passkeyError(unknownError())).toContain("kennt lionsquad.at nicht (mehr)");
+  expect(await signalUnknownPasskey(undefined, "cred-1")).toBe(false);
+
+  // Eine falsche Unterschrift ohne Kopfzeile bleibt „failed“ - kein Signal.
+  (Passkey.signalUnknownCredential as jest.Mock).mockClear();
+  mockPost.mockResolvedValueOnce({ data: { ticket: "t-4", options: OPTIONS } }).mockRejectedValueOnce({ response: { status: 401, headers: {}, data: { detail: "Passkey-Anmeldung fehlgeschlagen." } } });
+  await expect(signInWithPasskey(true, false)).rejects.toMatchObject({ response: { status: 401 } });
+  expect(Passkey.signalUnknownCredential).not.toHaveBeenCalled();
+  expect(silentPasskeyMiss({ response: { status: 401, headers: {} } })).toBe("failed");
+});
+
+test("Abgleich im Profil: die vollständige Liste vom Server geht an den Passwortmanager", async () => {
+  const signalAll = jest.fn(async () => undefined);
+  (Passkey as unknown as { signalAllAcceptedCredentials: jest.Mock }).signalAllAcceptedCredentials = signalAll;
+  mockGet.mockResolvedValueOnce({ data: { rp_id: "lionsquad.at", user_handle: "dXNlci0x", credential_ids: ["cred-1"] } });
+  expect(await reconcilePasskeys()).toBe(true);
+  expect(signalAll).toHaveBeenCalledWith({ rpId: "lionsquad.at", userId: "dXNlci0x", allAcceptedCredentialIds: ["cred-1"] });
+  mockGet.mockRejectedValueOnce(new Error("offline"));
+  expect(await reconcilePasskeys()).toBe(false);
+  delete (Passkey as unknown as { signalAllAcceptedCredentials?: jest.Mock }).signalAllAcceptedCredentials;
+  expect(await reconcilePasskeys()).toBe(false);
 });

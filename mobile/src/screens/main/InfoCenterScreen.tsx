@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openLink } from "../../lib/openLink";
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { platformColor, platformIcon } from "../../components/LinkedAccounts";
@@ -163,7 +164,7 @@ function Sponsors({ items }: { items: any[] }) {
               return (
                 <Pressable
                   key={sponsor.id}
-                  onPress={href ? () => Linking.openURL(href) : undefined}
+                  onPress={href ? () => openLink(href) : undefined}
                   style={({ pressed }) => [styles.sponsorTile, { flexBasis: `${Math.floor(100 / tier.perRow) - 3}%` }, pressed && styles.pressed]}
                   accessibilityLabel={href ? `${sponsor.name} – Website öffnen` : sponsor.name}
                   accessibilityRole={href ? "link" : "image"}
@@ -220,7 +221,7 @@ function Partners({ items }: { items: any[] }) {
                         key={channel.key}
                         accessibilityRole="link"
                         accessibilityLabel={`${channel.label} von ${partner.name}`}
-                        onPress={() => Linking.openURL(channel.url).catch(() => {})}
+                        onPress={() => openLink(channel.url)}
                         testID={`partner-channel-${partner.id}-${channel.key}`}
                         style={({ pressed }) => [styles.channelChip, { borderColor: platformColor(channel.key) }, pressed && styles.pressed]}
                       >
@@ -231,7 +232,7 @@ function Partners({ items }: { items: any[] }) {
                   </View>
                 ) : null}
                 {partner.slug || partner.id ? (
-                  <Pressable accessibilityRole="link" onPress={() => Linking.openURL(`${WEB_BASE_URL}/partners/${partner.slug || partner.id}`).catch(() => {})} testID={`partner-page-${partner.id}`}>
+                  <Pressable accessibilityRole="link" onPress={() => openLink(`${WEB_BASE_URL}/partners/${partner.slug || partner.id}`)} testID={`partner-page-${partner.id}`}>
                     <Muted style={styles.link}>Partnerseite öffnen</Muted>
                   </Pressable>
                 ) : partner.url || partner.link ? <Muted style={styles.link}>Website öffnen</Muted> : null}
@@ -409,7 +410,7 @@ function LinkedCard({ url, children }: { url?: string | null; children: React.Re
   const href = normalizeLink(url);
   if (!href) return <>{children}</>;
   return (
-    <Pressable onPress={() => Linking.openURL(href)} style={({ pressed }) => [pressed && styles.pressed]}>
+    <Pressable onPress={() => openLink(href)} style={({ pressed }) => [pressed && styles.pressed]}>
       {children}
     </Pressable>
   );

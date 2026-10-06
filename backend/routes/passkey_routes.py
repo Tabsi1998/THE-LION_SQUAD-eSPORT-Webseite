@@ -229,6 +229,19 @@ async def status():
     return {"enabled": enabled, "app": enabled and bool(mobile_origins())}
 
 
+@router.get("/signal")
+async def signal_state(user: dict = Depends(get_current_user)):
+    """Signal API (#949): was der Passwortmanager für dieses Konto behalten darf. Website und App gleichen damit nach
+    dem Laden der Liste und nach dem Entfernen ab - ein Passkey, der am Gerät liegt, aber hier fehlt, verschwindet
+    dort. Die Kennung ist die aus der Registrierung (`user_id` als Bytes, base64url)."""
+    config = passkey_configuration()
+    if not config:
+        raise HTTPException(503, "Passkeys sind für diese Website derzeit nicht verfügbar.")
+    rows = await get_db().passkeys.find({"user_id": user["id"], "rp_id": config["rp_id"]}, {"_id": 1}).to_list(50)
+    return {"rp_id": config["rp_id"], "user_handle": bytes_to_base64url(user["id"].encode()),
+            "credential_ids": [row["_id"] for row in rows]}
+
+
 @router.get("")
 async def list_passkeys(user: dict = Depends(get_current_user)):
     rows = await get_db().passkeys.find({"user_id": user["id"]}, {
@@ -302,12 +315,26 @@ async def login_options(request: Request, response: Response):
     return json.loads(options_to_json(options))
 
 
-async def _verified_login_user(db, body: CredentialResponse, challenge: dict, rp_id: str, expected_origin) -> dict:
+# Ein Passkey, den der Server nicht (mehr) kennt (#949): am Gerät liegt er noch - nach einem Anlegen, das erst am
+# Server scheiterte, oder nach dem Entfernen im Profil. Der Grund sagt nur das und verrät nichts über Konten; die
+# Kopfzeile lässt Website und App den Passwortmanager bitten, den Eintrag zu vergessen (WebAuthn Signal API).
+UNKNOWN_PASSKEY_HEADERS = {"X-Passkey-Error": "unknown-credential"}
+
+
+def unknown_passkey_text(rp_id: str, client: str = "web") -> str:
+    if client == "app":
+        return (f"Diesen Passkey kennt {rp_id} nicht (mehr). Lösche ihn im Passwortmanager deines Handys und melde dich "
+                "mit Passwort an – danach bietet dir die App einen neuen an.")
+    return (f"Diesen Passkey kennt {rp_id} nicht (mehr). Entferne ihn im Passwortmanager deines Browsers oder Handys und "
+            "melde dich mit Passwort an – im Profil kannst du dann einen neuen anlegen.")
+
+
+async def _verified_login_user(db, body: CredentialResponse, challenge: dict, rp_id: str, expected_origin, client: str = "web") -> dict:
     """Die Unterschrift prüfen - Website (eine Herkunft) und App (Signaturschlüssel) gleich."""
     identifier = _credential_id(body)
     key = await db.passkeys.find_one({"_id": identifier, "rp_id": rp_id})
     if not key:
-        raise HTTPException(401, "Passkey-Anmeldung fehlgeschlagen.")
+        raise HTTPException(401, unknown_passkey_text(rp_id, client), headers=UNKNOWN_PASSKEY_HEADERS)
     try:
         verified = await run_in_threadpool(verify_authentication_response, credential=body.credential,
             expected_challenge=base64url_to_bytes(challenge["challenge"]), expected_rp_id=rp_id,
@@ -385,7 +412,7 @@ async def mobile_login_verify(body: MobileCredentialResponse, request: Request):
     if not challenge:
         raise HTTPException(401, "Passkey-Anfrage abgelaufen oder bereits verwendet. Bitte erneut starten.")
     body.credential = _normalized_credential(body.credential)
-    user = await _verified_login_user(db, body, challenge, config["rp_id"], accepted_mobile_origins())
+    user = await _verified_login_user(db, body, challenge, config["rp_id"], accepted_mobile_origins(), client="app")
     await _security_audit(db, user["id"], "auth.passkey.login", request)
     # Gerätesperre vorgezeigt (require_user_verification) - wie im Web zählt das als zweiter Faktor (#358).
     access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)

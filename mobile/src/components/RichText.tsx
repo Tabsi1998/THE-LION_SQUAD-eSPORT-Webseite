@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openLink } from "../lib/openLink";
 import React from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { isImageUrl, parseContentTarget, type ContentTarget } from "../lib/contentLinks";
 import { colors } from "../theme";
 import type { ContentEmbed } from "../types";
@@ -187,7 +188,7 @@ function renderInline(value: string, blockIndex: number, onOpenContent?: (target
               return;
             }
             const url = /^https?:\/\//i.test(token.url) ? token.url : `https://${token.url}`;
-            Linking.openURL(url).catch(() => {});
+            openLink(url);
           }}
         >
           {token.label}

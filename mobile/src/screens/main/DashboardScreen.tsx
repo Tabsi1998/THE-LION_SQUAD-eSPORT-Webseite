@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openLink } from "../../lib/openLink";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import React, { useCallback, useMemo, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { Card } from "../../components/Card";
 import { ContentCard } from "../../components/ContentCard";
 import { EmptyState, OfflineNotice, SkeletonList } from "../../components/ListState";
@@ -189,7 +190,7 @@ export function DashboardScreen({ navigation }: Props) {
           <Card style={styles.inviteCard} testID="dashboard-invitation">
             <Heading>Einladung zum Verein</Heading>
             <Body>Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.{invitation.note ? ` „${invitation.note}“` : ""}</Body>
-            <Pressable accessibilityRole="button" onPress={() => Linking.openURL(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply">
+            <Pressable accessibilityRole="button" onPress={() => openLink(`${WEB_BASE_URL}/membership/apply`)} style={styles.inviteButton} testID="dashboard-invitation-apply">
               <Body style={styles.inviteButtonText}>Antrag ausfüllen</Body>
             </Pressable>
           </Card>
@@ -356,7 +357,7 @@ function StreamCard({ stream }: { stream: LiveStream }) {
   const name = stream.member_profile?.gamertag || stream.member_profile?.display_name || stream.display_name || stream.username || stream.twitch_login || "Stream";
   const url = stream.stream_url || (stream.twitch_login ? `https://www.twitch.tv/${stream.twitch_login}` : "");
   return (
-    <Pressable onPress={() => url ? Linking.openURL(url).catch(() => {}) : undefined} style={({ pressed }) => [pressed && styles.pressed]}>
+    <Pressable onPress={() => url ? openLink(url) : undefined} style={({ pressed }) => [pressed && styles.pressed]}>
       <Card style={styles.streamCard} perch="dashboard-stream" perchKind="banner">
         <View style={styles.streamIcon}>
           <Ionicons name="radio-outline" color={colors.live} size={20} />

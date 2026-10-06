@@ -75,3 +75,20 @@ test("kein Passkey auf diesem Gerät: die Passwort-Anmeldung meldet es für die 
   await fireEvent.press(screen.getByText("Anmelden"));
   await waitFor(() => expect(mockLogin).toHaveBeenCalledWith("paula@club-mail.at", "geheim", true, true));
 });
+
+// Passkey am Handy, den der Server nicht kennt (#949): ruhiger Hinweis mit dem Satz des Servers, kein rotes Feld, das
+// Formular bleibt bedienbar, der kleine Link bleibt - und die Passwort-Anmeldung lädt danach zu einem neuen Passkey ein.
+test("unbekannter Passkey: ruhiger Hinweis, Formular frei, Einladung zum neuen Passkey nach der Passwort-Anmeldung", async () => {
+  const unknown = { response: { status: 401, headers: { "x-passkey-error": "unknown-credential" }, data: { detail: "Diesen Passkey kennt lionsquad.at nicht (mehr). Lösche ihn im Passwortmanager deines Handys und melde dich mit Passwort an – danach bietet dir die App einen neuen an." } } };
+  mockLoginWithPasskey.mockRejectedValueOnce(unknown);
+  mockLogin.mockResolvedValueOnce({ mfaRequired: false });
+  await render(<LoginScreen navigation={navigation} />);
+  await waitFor(() => expect(screen.getByTestId("login-passkey-unknown")).toBeTruthy());
+  expect(screen.getByTestId("login-passkey-unknown")).toHaveTextContent(/kennt lionsquad\.at nicht \(mehr\)/);
+  expect(screen.getByTestId("login-passkey-link")).toBeTruthy();
+  await fireEvent.changeText(screen.getByLabelText("E-Mail"), "paula@club-mail.at");
+  await fireEvent.changeText(screen.getByLabelText("Passwort"), "geheim");
+  await fireEvent.press(screen.getByText("Anmelden"));
+  await waitFor(() => expect(mockLogin).toHaveBeenCalledWith("paula@club-mail.at", "geheim", true, true));
+  expect(navigation.goBack).toHaveBeenCalled();
+});
