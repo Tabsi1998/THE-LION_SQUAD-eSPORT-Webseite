@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { SOCIAL_ICONS, socialIconFor } from "@/lib/socialIcons";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { SOCIAL_ICONS, socialIconFor, socialInk } from "@/lib/socialIcons";
+import { motionTransition } from "@/lib/motion";
 import { ChannelIcon } from "@/components/tls/ChannelIcon";
 import { useAuth } from "@/context/AuthContext";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
@@ -23,15 +25,17 @@ import { PLAY_BADGE_SRC, contactLines, footerButtons, footerColumns } from "@/li
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Menu, X, LogOut, Shield, Crown, Megaphone, ArrowUp, MessageSquare, Smartphone } from "lucide-react";
 import { UserMenu } from "@/components/tls/UserMenu";
-import { useCallback, useMemo, useState, useEffect } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 
 export function PublicLayout({ children }) {
   const { user, logout, isAdmin, isClubMember } = useAuth();
   const location = useLocation();
+  const routeFade = useRouteFade(location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [branding, setBranding] = useState(getCachedBranding());
   const [siteBanners, setSiteBanners] = useState([]);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [headerCompact, setHeaderCompact] = useState(false);
   const loadBranding = useCallback(async () => {
     try {
       const { data } = await api.get("/settings/public");
@@ -57,7 +61,11 @@ export function PublicLayout({ children }) {
   useEffect(() => { loadSiteBanner(); }, [loadSiteBanner, user?.id, isClubMember, isAdmin]);
   useApiInvalidation(loadSiteBanner, ["settings", "branding"]);
   useEffect(() => {
-    const updateScrollTopVisibility = () => setShowScrollTop(window.scrollY > 520);
+    const updateScrollTopVisibility = () => {
+      setShowScrollTop(window.scrollY > 520);
+      // Kopfleiste (#1072): ab 24 px Scrollweg flacher, am Seitenanfang wieder in voller Höhe.
+      setHeaderCompact(window.scrollY > 24);
+    };
     updateScrollTopVisibility();
     window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateScrollTopVisibility);
@@ -81,9 +89,14 @@ export function PublicLayout({ children }) {
     // Ohne eigenen Hintergrund: das Schwarz kommt von <html> (index.css), damit der Winterhimmel hinter dem Inhalt liegt.
     <div className="min-h-screen max-w-full overflow-x-clip text-white flex flex-col">
       <a href="#main-content" className="tls-skip-link">Zum Inhalt springen</a>
-      <header className="sticky top-0 z-50 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4">
-          <div className="flex items-center min-w-0"><Logo size="lg" /><SeasonWidgetSlot /></div>
+      {/* Kopfleiste (#1072): beim Scrollen flacher - Fläche und Zeile rücken zusammen, der Kopf behält im Seitenfluss
+          seine Höhe (index.css, .tls-header). Mit offenem Handy-Menü bleibt sie in voller Höhe. Die Unschärfe liegt
+          auf der Fläche und nicht mehr am Kopf selbst: so öffnet die Suche ihr Fenster über die ganze Seite. */}
+      <header className="tls-header sticky top-0 z-50" data-compact={headerCompact && !mobileOpen ? "1" : "0"} data-testid="site-header">
+        <div className="relative">
+        <div aria-hidden="true" className="tls-header__bg absolute inset-0 backdrop-blur-xl bg-[#0A0A0A]/80 border-b border-white/10" data-testid="site-header-bg" />
+        <div className="tls-header__row relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 md:h-20 flex items-center justify-between gap-4" data-testid="site-header-row">
+          <div className="flex items-center min-w-0"><span className="tls-header__logo"><Logo size="lg" /></span><SeasonWidgetSlot /></div>
           <MainNav isClubMember={isClubMember} />
           <div className="flex items-center gap-2">
             <GlobalSearch />
@@ -134,8 +147,13 @@ export function PublicLayout({ children }) {
             </button>
           </div>
         </div>
+        </div>
+        {/* Handy-Menü (#1072): gleitet herein und hinaus; mit „Bewegung reduzieren“ blendet es nur. */}
+        <MotionConfig reducedMotion="user">
+        <AnimatePresence initial={false}>
         {mobileOpen && (
-          <div id="mobile-navigation" className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
+          <motion.div id="mobile-navigation" key="mobile-navigation" initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={motionTransition("mid")}
+            className="lg:hidden border-t border-white/10 bg-[#0A0A0A] max-h-[calc(100vh-4rem)] overflow-y-auto">
             <div className="px-4 py-4 flex flex-col gap-1">
               <SeasonMenuSlot onClose={closeMobile} />
               <MobileNav isClubMember={isClubMember} onClose={closeMobile} />
@@ -182,13 +200,16 @@ export function PublicLayout({ children }) {
                 <SponsorTicker compact placement="footer" />
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
+        </AnimatePresence>
+        </MotionConfig>
       </header>
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="below_nav" />
       {/* Einladung zum Verein (#507): nur für angemeldete Konten, die noch nicht Mitglied sind. */}
       {user && !isClubMember ? <InvitationBanner pathname={location.pathname} /> : null}
-      <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
+      {/* Seitenwechsel (#1073): der neue Inhalt blendet ein (index.css, .tls-route); der erste Aufbau bleibt ohne. */}
+      <main id="main-content" tabIndex={-1} data-route-fade={routeFade || undefined} className="tls-route flex-1 min-w-0 max-w-full overflow-x-clip">{children}</main>
       <CrownCelebration />
       <LevelUpCelebration />
       <SiteBannerSlot banners={siteBanners} pathname={location.pathname} slot="above_footer" />
@@ -260,8 +281,10 @@ export function PublicLayout({ children }) {
               )}
               <div className="mt-4 flex flex-wrap gap-2" data-testid="footer-socials">
                 {socialLinks.map((social, index) => (
-                  <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} title={social.label} className={`w-9 h-9 inline-flex items-center justify-center border border-white/10 rounded-sm text-white/70 transition ${social.hoverClass}`}>
-                    <ChannelIcon kind={social.platform} className="w-4 h-4" />
+                  <a key={`${social.platform}-${index}`} href={social.url} target="_blank" rel="noreferrer" data-testid={`footer-${social.platform}`} aria-label={social.label} className="tls-social"
+                    style={{ "--tls-social": social.color, "--tls-social-fill": social.fill || social.color, "--tls-social-ink": social.ink }}>
+                    <ChannelIcon kind={social.platform} className="w-[18px] h-[18px]" />
+                    <span className="tls-social__name" aria-hidden="true">{social.label}</span>
                   </a>
                 ))}
               </div>
@@ -385,6 +408,26 @@ function bannerTickerDuration(text, configuredSpeed) {
   return Math.max(8, Math.min(180, Math.max(saved, automatic)));
 }
 
+// Seitenwechsel (#1073): der neue Inhalt blendet ein, der erste Aufbau nach dem Laden nicht. Jede Seite baut ihren
+// Rahmen selbst auf - deshalb merkt sich das Modul, ob in diesem Seitenaufruf schon eine Seite gezeigt wurde, und
+// die nächste startet mit der Animation. Wechselt nur der Pfad derselben Seite, wechselt der Name zwischen zwei
+// gleichen Animationen, damit sie neu startet.
+let pageShown = false;
+
+function useRouteFade(pathname) {
+  const [name, setName] = useState(() => (pageShown ? "a" : ""));
+  const previous = useRef(pathname);
+  useEffect(() => {
+    pageShown = true;
+  }, []);
+  useEffect(() => {
+    if (previous.current === pathname) return;
+    previous.current = pathname;
+    setName((value) => (value === "a" ? "b" : "a"));
+  }, [pathname]);
+  return name;
+}
+
 const DEFAULT_SOCIAL_LINKS = [
   { platform: "discord", label: "Discord", url: "https://discord.com/invite/thelionsquadesports" },
   { platform: "whatsapp", label: "WhatsApp Kanal", url: "https://whatsapp.com/channel/0029VaaWufTGU3BNG6VOxo1I" },
@@ -415,7 +458,9 @@ function getFooterSocialLinks(branding, twitchUrl) {
     .map((social) => {
       const platform = String(social.platform || "custom").toLowerCase();
       const icon = socialIconFor(platform);
-      return { color: icon.color, hoverClass: icon.hoverClass, ...social, platform, label: social.label || platform };
+      const merged = { color: icon.color, fill: icon.fill, hoverClass: icon.hoverClass, ...social, platform, label: social.label || platform };
+      // Social-Logos (#1083): Fläche in der Markenfarbe, das Logo darauf hell oder dunkel - je nach Farbe.
+      return { ...merged, ink: socialInk(merged.color) };
     });
 }
 
