@@ -3528,6 +3528,13 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   Website/Discord/Twitch, Beschriftung nur bei „Eigener Link“); `formFromPartner` holt die alten Felder in
   die Liste, `partnerPayload` leert sie. Nebenbei Audit-Gate der App: `source-map-js` 1.2.2 im Lockfile,
   `sprintf-js` bis 2.11.2026 angenommen (`mobile/scripts/security-audit-allowlist.json`).
+- Zwei Laufbänder auf der Startseite (#968; PR #972; Web; `update.sh`): `components/tls/LogoTicker.jsx`
+  ist das Band (nahtlos, zwei Gruppen, Tempo aus der Anzahl, `reverse`, Router-Link für interne Ziele);
+  `SponsorTicker` nutzt es (Startseite „Sponsoren“, Kästen etwa +12 %, „Hauptsponsor“ nur beim Banner),
+  `PartnerTicker.jsx` läuft darunter („Partner“, `/api/partners` nur mit Logo, Link auf
+  `/partners/{slug}`, rückwärts, ohne Logos kein Band). Keyframes, Hover-Pause und
+  `prefers-reduced-motion` in `index.css` (`tls-logo-ticker__track`). Browser-Test
+  `e2e/home-tickers.spec.js` bei 390/768/1440/2560 px. `SponsorGrid` (TV) unverändert.
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)

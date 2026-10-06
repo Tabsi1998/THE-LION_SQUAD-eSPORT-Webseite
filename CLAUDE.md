@@ -375,13 +375,14 @@ den ausgelieferten Skripten suchen.
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #971 (`8ed47fe8`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
-  #956, #957, #959, #965, #966, #969, #970, #971 – alle mit Eintrag in `docs/HISTORIE.md` Teil A.
-  Meilensteine „Discord VI“ (38) und „Erfolge II“ (39) sind geschlossen.
-- **Offene PRs** (unabhängig voneinander, alle auf `main`): #972 (zwei Laufbänder auf der Startseite, #968),
-  #975 (App 1.3.0 Teil 1: Links öffnen den passenden Screen, Passkey ohne Gegenstück am Server – #921, #949;
-  braucht den Build 1.3.0), #974 (Dependabot, `source-map-js` im Web) und der Doku-PR mit diesem Stand. Nach
-  dem Merge brauchen #972 und #975 je einen Eintrag in `docs/HISTORIE.md` Teil A (Text liegt bereit).
+- **`main`** steht nach #972 (`80dec0c5`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
+  #956, #957, #959, #965, #966, #969, #970, #971, #972 – alle mit Eintrag in `docs/HISTORIE.md` Teil A.
+  Meilensteine „Discord VI“ (38), „Erfolge II“ (39) und „Wünsche Oktober 2026“ (51) sind erledigt.
+- **Offene PRs** (unabhängig voneinander, alle auf `main`): #975 (App 1.3.0 Teil 1: Links öffnen den
+  passenden Screen, Passkey ohne Gegenstück am Server – #921, #949), #976 (App 1.3.0 Teil 2: Schneehaube im
+  Dashboard-Kopf, Neigungssensor – #729, #667; `expo-sensors`), #974 (Dependabot, `source-map-js` im Web) und
+  der Doku-PR mit diesem Stand. Beide App-PRs brauchen den Build 1.3.0 und je einen Eintrag in
+  `docs/HISTORIE.md` Teil A nach dem Merge.
 - **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh`; dabei baut das
   Backend-Image einmal neu (`defusedxml` aus #951) und beim Start läuft einmal Migration 4 (#952). Danach
   unter System → Betrieb & Logs → Checks: „Besucher-Adresse“ (#956) soll grün sein; eine Logzeile
@@ -389,12 +390,11 @@ den ausgelieferten Skripten suchen.
 - **App:** 1.2.2 / Build 88 (`mobile-v1.2.2-build88`) am GitHub-Release und am Vereinsserver; in Google Play
   lädt der Betreiber die Bundles von Hand in den offenen Test (86 ist oben, 88 steht an). Kein offener PR
   braucht einen Build; der nächste Build ist „App 1.3.0“.
-- **Neuer Meilenstein „Wünsche Oktober 2026“ (51):** #967 (gemergt, #971) und #968 (PR #972). Website bei
-  Partnern war schon optional (Nachfrage des Betreibers, 6.10. – falscher Alarm).
+- **Meilenstein „Wünsche Oktober 2026“ (51):** #967 (#971) und #968 (#972) gemergt. Website bei Partnern war
+  schon optional (Nachfrage des Betreibers, 6.10. – falscher Alarm).
 - **Reihenfolge laut Betreiber: erst alles Offene fertig machen, dann Neues – und nur, was Sinn macht.**
-  1. App 1.3.0 als ein Build: #921 und #949 (PR #975), dann #729 (Schneehauben im Kopf des Dashboards) und
-     #667 (Neigungssensor, `expo-sensors`) als Teil 2, #845 (Einlass per Karte, Entscheidung B mit Kamera,
-     `expo-camera`) als Teil 3, danach der Release-PR (Build 89).
+  1. App 1.3.0 als ein Build: #921 und #949 (PR #975), #729 und #667 (PR #976), dann #845 (Einlass per
+     Karte, Entscheidung B mit Kamera, `expo-camera`) als Teil 3, danach der Release-PR (Build 89).
   2. Abnahmen Jahreszeiten II (#733, #738, #744) und III (#748, #752, #759): QA-Runden mit den
      `frontend/e2e/*-regression.spec.js` und Bildern, dann schließen.
   3. Dolibarr III: #330 – Vorschlag (Runbook plus kurze Live-Checkliste statt Docker-Labor) wartet auf das
