@@ -16,7 +16,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_locations, pricing
+from services import billing_orders, event_days, event_locations, pricing
 from services.permissions import areas_for, user_has_area
 from models import EventCreate, EventUpdate, EventRegistrationCreate, EventRegistrationUpdate, now_utc, new_id
 
@@ -113,6 +113,7 @@ def _compact_event(event: dict) -> dict:
         "registration_summary": event.get("registration_summary"),
         "public_phase": event.get("public_phase"),
         "event_phase": event.get("event_phase"),
+        "schedule": event.get("schedule"),
     }
 
 
@@ -486,6 +487,8 @@ async def _attach_event_sponsors(event: dict) -> None:
 async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
     event["public_phase"] = _event_phase(event)
     event["event_phase"] = event["public_phase"]
+    # Mehrere Tage (#884): Überschrift, Tage mit Zeiten und der Satz zum Jetzt - für jede Liste und die Detailseite.
+    event["schedule"] = event_days.schedule_view(event)
     if event.get("has_registration"):
         event["registration_summary"] = await _event_registration_summary(event)
     else:
@@ -542,7 +545,7 @@ async def list_events(
             "_id": 0, "id": 1, "name": 1, "slug": 1, "description": 1,
             "banner_url": 1, "event_type": 1, "status": 1, "visibility": 1,
             "start_date": 1, "end_date": 1, "location": 1, "has_registration": 1,
-            "max_participants": 1,
+            "max_participants": 1, "days": 1,
         }
     fetch_limit = max(200, min(max(int(limit or 48), 1) + max(int(offset or 0), 0) + 80, 500))
     events = await db.events.find(q, projection).sort("start_date", 1 if upcoming else -1).to_list(fetch_limit)
@@ -642,6 +645,9 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
         "fastlap",
         access,
     )
+    # Mehrere Tage (#884): jedes Turnier und jede Challenge nennt den Tag, an dem sie laufen.
+    for related in (*event["tournaments"], *event["f1_challenges"]):
+        related["event_day"] = event_days.day_of(event, related.get("start_date"))
     # Albums linked to this event
     albums = await db.gallery_albums.find(
         {"event_id": event["id"], "published": True}, {"_id": 0},
@@ -945,6 +951,31 @@ def _apply_locations(target: dict, raw: dict) -> None:
     event_locations.mirror_primary(places, target)
 
 
+def _apply_days(target: dict, raw: dict, existing: dict | None = None) -> None:
+    """Mehrere Tage (#884): prüfen, ordnen und Beginn, Ende und Einlass des Events daraus ableiten.
+
+    Ohne ``days`` in der Anfrage bleibt alles, wie es ist - hat das Event Tage, bestimmen weiter sie den Zeitraum
+    (ein Formular, das die Tage nicht kennt, kann ihn nicht verschieben). Eine leere Liste macht das Event wieder
+    eintägig; dann gelten Beginn und Ende aus der Anfrage."""
+    if "days" not in raw:
+        target.pop("days", None)
+        if event_days.is_multi_day(existing):
+            for field in ("start_date", "end_date", "door_time"):
+                target.pop(field, None)
+        return
+    if not raw.get("days"):
+        target["days"] = []
+        return
+    places = target.get("locations") if "locations" in target else event_locations.event_locations(existing or {})
+    keys = {str(place.get("key")) for place in places or [] if place.get("key")}
+    try:
+        days = event_days.normalize_days(raw.get("days"), location_keys=keys)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    target["days"] = days
+    target.update(event_days.derived_range(days))
+
+
 async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict | None:
     """Kosten pflegt nur, wer den Bereich Finanzen hat (#322). Ohne Angabe bleibt alles wie es ist."""
     if "billing" not in raw:
@@ -966,12 +997,13 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
     _apply_locations(doc, body.model_dump(exclude_unset=True))
+    _apply_days(doc, body.model_dump(exclude_unset=True))
     doc["slug"] = await unique_slug(db.events, doc.get("slug") or doc.get("name"), fallback="event")
     doc["id"] = new_id()
     if not doc.get("status"):
         doc["status"] = "draft"
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
-        if doc.get(k):
+        if doc.get(k) and hasattr(doc[k], "isoformat"):
             doc[k] = doc[k].isoformat()
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
@@ -990,6 +1022,8 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
                 }},
             )
     doc.pop("_id", None)
+    # Mehrere Tage (#884): das Formular liest den Plan direkt aus der Antwort.
+    doc["schedule"] = event_days.schedule_view(doc)
     return doc
 
 
@@ -1017,12 +1051,13 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     else:
         updates.pop("billing", None)
     _apply_locations(updates, raw)
+    _apply_days(updates, raw, existing)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
     if slug_source is not None:
         updates["slug"] = await unique_slug(db.events, slug_source, current_id=event_id, fallback="event")
         apply_slug_history(existing, updates)
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
-        if updates.get(k):
+        if updates.get(k) and hasattr(updates[k], "isoformat"):
             updates[k] = updates[k].isoformat()
     updates["updated_at"] = now_utc().isoformat()
     await db.events.update_one({"id": event_id}, {"$set": updates})
@@ -1038,6 +1073,8 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
                 }},
             )
             event = await db.events.find_one({"id": event_id}, {"_id": 0})
+    if event:
+        event["schedule"] = event_days.schedule_view(event)
     return event
 
 

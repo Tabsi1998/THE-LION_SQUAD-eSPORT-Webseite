@@ -19,6 +19,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from models import now_utc
+from services import event_days
 
 logger = logging.getLogger("tls.discord.scheduled")
 
@@ -26,6 +27,10 @@ SETTINGS_KEY = "scheduled_events"
 FIELD = "discord_scheduled_event"
 # Termine auf Unterservern (#628): je Server-ID derselbe Stand wie am Hauptserver.
 SUB_FIELD = "discord_scheduled_guilds"
+# Mehrtägige Events (#884): je Tag ein Termin - Hauptserver je Tag unter DAYS_FIELD.<datum>, Unterserver unter
+# DAY_GUILDS_FIELD.<datum>.<server>. Der eine Termin für das ganze Event wird dann abgesagt.
+DAYS_FIELD = "discord_scheduled_days"
+DAY_GUILDS_FIELD = "discord_scheduled_day_guilds"
 DEFAULT_HOURS = {"event": 2, "tournament": 4}
 MAX_OPS_PER_RUN = 20
 ACTIVE_STATUSES = {"scheduled", "registration_open", "registration_closed", "checkin_open", "check_in", "live", "paused"}
@@ -37,6 +42,8 @@ REASON_TEXTS = {
     "status": "In diesem Stand (Entwurf, abgesagt, vorbei) gibt es keinen Termin.",
     "no_date": "Ohne Beginn kein Termin.",
     "past": "Der Beginn liegt in der Vergangenheit – Discord nimmt keine vergangenen Termine.",
+    "per_day": "Das Event hat mehrere Tage – je Tag ein Termin statt eines für alles.",
+    "day_removed": "Diesen Tag gibt es nicht mehr.",
 }
 
 
@@ -57,6 +64,18 @@ def _settings_view(discord_settings: dict | None) -> dict:
     stored = (discord_settings or {}).get(SETTINGS_KEY) if isinstance((discord_settings or {}).get(SETTINGS_KEY), dict) else {}
     return {"enabled": bool(stored.get("enabled")), "internal": bool(stored.get("internal")),
             "last_run_at": stored.get("last_run_at"), "last_result": stored.get("last_result")}
+
+
+def day_docs(doc: dict) -> list[tuple[str, dict]]:
+    """Ein mehrtägiges Event (#884) als Einzeltermine: (Tagesschlüssel, Dokument mit Beginn, Ende und Namenszusatz)."""
+    days = event_days.stored_days(doc)
+    if not days:
+        return []
+    out = []
+    for index, day in enumerate(days, start=1):
+        name = f"{doc.get('name') or 'Event'} – Tag {index}/{len(days)}" + (f" · {day['title']}" if day.get("title") else "")
+        out.append((day["date"], {**doc, "name": name, "start_date": day["start_at"], "end_date": day["end_at"]}))
+    return out
 
 
 def scheduled_payload(kind: str, doc: dict, origin: str, now: datetime | None = None) -> dict | None:
@@ -121,8 +140,21 @@ async def _origin() -> str:
 async def preview_for(db, kind: str, doc: dict, now: datetime | None = None) -> dict:
     """Für das Formular: so erscheint der Termin - oder warum nicht."""
     cfg = _settings_view(await db.settings.find_one({"id": "discord"}, {"_id": 0, SETTINGS_KEY: 1}))
+    origin = await _origin()
+    per_day = day_docs(doc) if kind == "event" else []
+    if per_day:
+        # Vorschau für mehrtägige Events: der nächste Tag als Beispiel, dazu alle Tage.
+        upcoming = [(key, day_doc) for key, day_doc in per_day if wants_event(kind, day_doc, cfg, now)[0]]
+        key, sample = upcoming[0] if upcoming else per_day[0]
+        wanted, reason = wants_event(kind, sample, cfg, now)
+        payload = scheduled_payload(kind, sample, origin, now) if wanted else None
+        stored = (doc.get(DAYS_FIELD) or {}).get(key) or {}
+        return {"would_create": bool(wanted and payload), "reason": reason if not wanted else None,
+                "reason_text": REASON_TEXTS.get(reason) if reason else None, "payload": payload, "days": len(per_day),
+                "payloads": [scheduled_payload(kind, day_doc, origin, now) for _, day_doc in per_day],
+                "existing_id": stored.get("id") if not stored.get("cancelled_at") else None}
     wanted, reason = wants_event(kind, doc, cfg, now)
-    payload = scheduled_payload(kind, doc, await _origin(), now) if wanted else None
+    payload = scheduled_payload(kind, doc, origin, now) if wanted else None
     stored = doc.get(FIELD) or {}
     return {"would_create": bool(wanted and payload), "reason": reason if not wanted else None,
             "reason_text": REASON_TEXTS.get(reason) if reason else None, "payload": payload,
@@ -131,9 +163,11 @@ async def preview_for(db, kind: str, doc: dict, now: datetime | None = None) -> 
 
 async def _candidates(db) -> list[tuple[str, object, dict]]:
     rows: list[tuple[str, object, dict]] = []
-    query = {"$or": [{"status": {"$in": list(ACTIVE_STATUSES)}}, {f"{FIELD}.id": {"$exists": True}}, {SUB_FIELD: {"$exists": True}}]}
+    query = {"$or": [{"status": {"$in": list(ACTIVE_STATUSES)}}, {f"{FIELD}.id": {"$exists": True}}, {SUB_FIELD: {"$exists": True}},
+                     {DAYS_FIELD: {"$exists": True}}, {DAY_GUILDS_FIELD: {"$exists": True}}]}
     fields = {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, "status": 1, "visibility": 1, "is_public": 1, "discord_skip": 1, "game_id": 1,
-              "start_date": 1, "end_date": 1, "location": 1, "city": 1, "short_description": 1, "description": 1, FIELD: 1, SUB_FIELD: 1}
+              "start_date": 1, "end_date": 1, "location": 1, "city": 1, "short_description": 1, "description": 1, FIELD: 1, SUB_FIELD: 1,
+              "days": 1, DAYS_FIELD: 1, DAY_GUILDS_FIELD: 1}
     for doc in await db.events.find(query, fields).sort("start_date", 1).to_list(500):
         rows.append(("event", db.events, doc))
     for doc in await db.tournaments.find(query, fields).sort("start_date", 1).to_list(500):
@@ -154,6 +188,55 @@ async def targets(db, doc: dict) -> tuple[bool, dict | None]:
     if not row or row.get("role") == "main":
         return True, None
     return row.get("mirror_events") is not False, row
+
+
+async def _plan_for(db, kind: str, doc: dict, cfg: dict, origin: str, now: datetime, field: str, sub_field: str,
+                    not_wanted_reason: str | None = None) -> list[tuple]:
+    """Der Plan für ein Dokument (oder einen Tag): (Server oder None, Feld, gespeicherter Stand, soll stehen, Grund, Payload)."""
+    wanted, reason = wants_event(kind, doc, cfg, now)
+    if not_wanted_reason:
+        wanted, reason = False, not_wanted_reason
+    payload = scheduled_payload(kind, doc, origin, now) if wanted else None
+    main_wanted, sub = await targets(db, doc) if payload else (False, None)
+    subs = dict(doc.get(sub_field) or {}) if "." not in sub_field else dict(_nested(doc, sub_field) or {})
+    stored_main = doc.get(field) if "." not in field else _nested(doc, field)
+    plan = [(None, field, stored_main or {}, bool(payload) and main_wanted, reason or "mirror_off", payload)]
+    if sub:
+        plan.append((sub["guild_id"], f"{sub_field}.{sub['guild_id']}", subs.get(sub["guild_id"]) or {}, True, None, payload))
+    for guild_id, stored in subs.items():
+        if not sub or guild_id != sub["guild_id"]:
+            plan.append((guild_id, f"{sub_field}.{guild_id}", stored or {}, False, reason or "moved", payload))
+    return plan
+
+
+def _nested(doc: dict, dotted: str):
+    value = doc
+    for part in dotted.split("."):
+        if not isinstance(value, dict):
+            return None
+        value = value.get(part)
+    return value
+
+
+async def _plan(db, kind: str, doc: dict, cfg: dict, origin: str, now: datetime) -> list[tuple]:
+    """Eintägig wie bisher; mehrtägig (#884) je Tag ein Termin, der eine Termin für das ganze Event wird abgesagt,
+    verschwundene Tage ebenso."""
+    per_day = day_docs(doc) if kind == "event" else []
+    if not per_day:
+        plan = await _plan_for(db, kind, doc, cfg, origin, now, FIELD, SUB_FIELD)
+        # Ein Event, das wieder eintägig wurde: alte Tagestermine absagen.
+        for key in (doc.get(DAYS_FIELD) or {}):
+            plan += await _plan_for(db, kind, doc, cfg, origin, now, f"{DAYS_FIELD}.{key}", f"{DAY_GUILDS_FIELD}.{key}", "day_removed")
+        return plan
+    plan = await _plan_for(db, kind, doc, cfg, origin, now, FIELD, SUB_FIELD, "per_day")
+    keys = set()
+    for key, day_doc in per_day:
+        keys.add(key)
+        plan += await _plan_for(db, kind, {**doc, **day_doc}, cfg, origin, now, f"{DAYS_FIELD}.{key}", f"{DAY_GUILDS_FIELD}.{key}")
+    for key in (doc.get(DAYS_FIELD) or {}):
+        if key not in keys:
+            plan += await _plan_for(db, kind, doc, cfg, origin, now, f"{DAYS_FIELD}.{key}", f"{DAY_GUILDS_FIELD}.{key}", "day_removed")
+    return plan
 
 
 async def sync(db, *, now: datetime | None = None, limit: int = MAX_OPS_PER_RUN) -> dict:
@@ -178,19 +261,8 @@ async def sync(db, *, now: datetime | None = None, limit: int = MAX_OPS_PER_RUN)
     blocked: set = set()
     for kind, collection, doc in await _candidates(db):
         outcome["checked"] += 1
-        wanted, reason = wants_event(kind, doc, cfg, current)
-        payload = scheduled_payload(kind, doc, origin, current) if wanted else None
-        main_wanted, sub = await targets(db, doc) if payload else (False, None)
-        subs = dict(doc.get(SUB_FIELD) or {})
-        # (Server oder None = Hauptserver, Feld, gespeicherter Stand, soll stehen, Grund fürs Absagen)
-        plan = [(None, FIELD, doc.get(FIELD) or {}, bool(payload) and main_wanted, reason or "mirror_off")]
-        if sub:
-            plan.append((sub["guild_id"], f"{SUB_FIELD}.{sub['guild_id']}", subs.get(sub["guild_id"]) or {}, True, None))
-        for guild_id, stored in subs.items():
-            if not sub or guild_id != sub["guild_id"]:
-                plan.append((guild_id, f"{SUB_FIELD}.{guild_id}", stored or {}, False, reason or "moved"))
         stop = False
-        for guild_id, field, stored, want, why in plan:
+        for guild_id, field, stored, want, why, payload in await _plan(db, kind, doc, cfg, origin, current):
             if guild_id in blocked:
                 continue
             try:
@@ -249,6 +321,9 @@ async def scheduled_status(db) -> dict:
     cfg = _settings_view(await db.settings.find_one({"id": "discord"}, {"_id": 0, SETTINGS_KEY: 1}))
     query = {f"{FIELD}.id": {"$exists": True}, f"{FIELD}.cancelled_at": None}
     cfg["active"] = await db.events.count_documents(query) + await db.tournaments.count_documents(query)
+    # Tagestermine mehrtägiger Events (#884) zählen mit.
+    for doc in await db.events.find({DAYS_FIELD: {"$exists": True}}, {"_id": 0, DAYS_FIELD: 1}).to_list(500):
+        cfg["active"] += sum(1 for entry in (doc.get(DAYS_FIELD) or {}).values() if (entry or {}).get("id") and not entry.get("cancelled_at"))
     by_guild: dict[str, int] = {}
     for collection in (db.events, db.tournaments):
         for doc in await collection.find({SUB_FIELD: {"$exists": True}}, {"_id": 0, SUB_FIELD: 1}).to_list(2000):

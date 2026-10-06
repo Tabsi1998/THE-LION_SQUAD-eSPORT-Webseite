@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from services import event_days
+
 
 TERMINAL_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 MANUAL_STATUSES = {"draft", "paused", *TERMINAL_STATUSES}
@@ -15,6 +17,7 @@ STATUS_LABELS = {
     "registration_closed": "Anmeldung geschlossen",
     "check_in": "Check-in offen",
     "live": "Läuft",
+    "day_break": "Pause bis zum nächsten Tag",
     "paused": "Pausiert",
     "completed": "Beendet",
     "results_published": "Ergebnisse veröffentlicht",
@@ -98,6 +101,25 @@ def derive_public_phase(doc: dict, kind: str = "content", now: datetime | None =
             "next_transition_at": None,
             "countdown_kind": None,
             "now": now.isoformat(),
+        }
+
+    # Mehrtägige Events (#884): „läuft“ gilt nur innerhalb der Tageszeiten. Zwischen zwei Tagen steht der nächste
+    # Tag mit seinem Beginn da - ein Wochenende gilt nachts nicht als laufend.
+    where = event_days.position(doc, now) if kind == "event" else None
+    if where and where["state"] in ("running", "break"):
+        day = where["day"]
+        running = where["state"] == "running"
+        target = day["end_at"] if running else (day.get("door_at") or day["start_at"])
+        return {
+            "state": "live" if running else "day_break",
+            "label": event_days.phase_label(where),
+            "raw_status": raw_status,
+            "target_at": target,
+            "next_transition_at": target,
+            "countdown_kind": "ends" if running else "starts",
+            "now": now.isoformat(),
+            "day_index": where["index"] + 1,
+            "day_count": where["count"],
         }
 
     if start and now >= start:

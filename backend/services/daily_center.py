@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from services import event_days
 from services.dolibarr_policy import CLUB_TZ
 
 SOON_HOURS = 24
@@ -85,7 +86,15 @@ async def today_items(db, now: datetime | None = None, limit: int = 30) -> list[
 
     event_query = {"status": {"$nin": ["draft", "archived", "cancelled"]}, "start_date": {"$lt": end.isoformat()},
                    "$or": [{"end_date": {"$gte": start.isoformat()}}, {"end_date": None}, {"end_date": {"$exists": False}}]}
-    async for event in db.events.find(event_query, {"_id": 0, "id": 1, "name": 1, "slug": 1, "start_date": 1, "end_date": 1, "status": 1, "location": 1}).sort("start_date", 1).limit(limit):
+    async for event in db.events.find(event_query, {"_id": 0, "id": 1, "name": 1, "slug": 1, "start_date": 1, "end_date": 1, "status": 1, "location": 1, "days": 1}).sort("start_date", 1).limit(limit):
+        by_day = event_days.overlaps(event, start, end)
+        if by_day is False:
+            continue   # mehrtägig (#884), aber heute kein Tag
+        if by_day:
+            at = next((day["start_at"] for day in event_days.stored_days(event) if _parse(day["start_at"]) < end and _parse(day["end_at"]) >= start), event.get("start_date"))
+            items.append({"kind": "event", "at": at, "title": f"{event.get('name') or 'Event'} · {event_days.now_text(event, now)}", "status": event.get("status"),
+                          "url": f"/events/{event.get('slug') or event['id']}", "detail": event.get("location") or ""})
+            continue
         starts = _parse(event.get("start_date"))
         if starts and starts >= end:
             continue

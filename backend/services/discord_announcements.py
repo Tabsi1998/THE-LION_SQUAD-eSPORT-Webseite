@@ -27,6 +27,8 @@ from zoneinfo import ZoneInfo
 from database import get_db
 from models import now_utc
 
+from services import event_days
+
 logger = logging.getLogger("tls.discord.announce")
 
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -93,7 +95,12 @@ def news_message(post: dict) -> dict:
 
 def event_message(event: dict) -> dict:
     fields = []
-    if event.get("start_date"):
+    day_lines = event_days.lines(event)
+    if day_lines:
+        # Mehrtägig (#884): der Zeitraum und je Tag eine Zeile.
+        fields.append({"name": "Wann", "value": event_days.summary_text(event), "inline": True})
+        fields.append({"name": "Tage", "value": "\n".join(day_lines)[:1024], "inline": False})
+    elif event.get("start_date"):
         when = vienna(event["start_date"])
         end = _parse(event.get("end_date"))
         start = _parse(event.get("start_date"))
@@ -150,6 +157,9 @@ async def event_values(event: dict) -> dict:
     start, end = _parse(event.get("start_date")), _parse(event.get("end_date"))
     if when and start and end and end.astimezone(VIENNA).date() != start.astimezone(VIENNA).date():
         when = f"{when} – {vienna(end, with_time=False)}"
+    day_lines = event_days.lines(event)
+    if day_lines:
+        when = event_days.summary_text(event) + "\n" + "\n".join(day_lines)
     registration = bool(event.get("has_registration"))
     return {"name": str(event.get("name") or event.get("title") or "Event"),
             "text": plain_text(event.get("short_description") or event.get("description"), 400), "when": when,

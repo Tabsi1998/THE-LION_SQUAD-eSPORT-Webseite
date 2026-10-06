@@ -372,6 +372,16 @@ class EventLocation(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 
 
+class EventDay(BaseModel):
+    """Ein Tag eines mehrtägigen Events (#884): Datum und Uhrzeiten in Wiener Zeit; geprüft in services/event_days."""
+    date: str = Field(max_length=10)
+    start: str = Field(max_length=5)
+    end: str = Field(max_length=5)
+    door: Optional[str] = Field(default=None, max_length=5)
+    title: Optional[str] = Field(default=None, max_length=60)
+    location_key: Optional[str] = Field(default=None, max_length=40)
+
+
 class EventCreate(BaseModel):
     name: str
     slug: Optional[str] = None
@@ -417,6 +427,8 @@ class EventCreate(BaseModel):
     billing: Optional[BillingConfig] = None
     # Mehrere Standorte (#203); leer = ein Standort aus den Feldern oben.
     locations: Optional[List[EventLocation]] = None
+    # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
+    days: Optional[List[EventDay]] = None
 
 
 class EventUpdate(BaseModel):
@@ -461,6 +473,8 @@ class EventUpdate(BaseModel):
     status: Optional[EventStatus] = None
     billing: Optional[BillingConfig] = None
     locations: Optional[List[EventLocation]] = None
+    # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
+    days: Optional[List[EventDay]] = None
 
 
 EventRegistrationStatus = Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]

@@ -19,6 +19,7 @@ from auth import get_optional_user, require_area
 from models import now_utc
 from services import founding
 from services.visibility import user_can_see
+from services import event_days
 from services.public_phase import derive_public_phase
 
 router = APIRouter(prefix="/api/home", tags=["home"])
@@ -60,11 +61,15 @@ def _normalize_status(row: dict, kind: str | None = None) -> dict:
         row["status"] = "check_in"
     phase_kind = "f1" if kind == "fastlap" else (kind or "content")
     row["public_phase"] = derive_public_phase(row, phase_kind)
+    if kind == "event":
+        # Mehrtägig (#884): die Karte zeigt „3 Tage · Fr – So“ und den nächsten Tag.
+        row["schedule"] = event_days.schedule_view(row)
     return row
 
 
 def _event_date(row: dict):
-    return _parse_dt(row.get("start_date")) or datetime.max.replace(tzinfo=timezone.utc)
+    # Mehrtägig (#884): sortiert nach dem laufenden bzw. nächsten Tag.
+    return event_days.next_start(row) or _parse_dt(row.get("start_date")) or datetime.max.replace(tzinfo=timezone.utc)
 
 
 def _row_not_finished(row: dict, now: datetime) -> bool:
@@ -75,6 +80,9 @@ def _row_not_finished(row: dict, now: datetime) -> bool:
 
 
 def _overlaps_window(row: dict, start: datetime, end: datetime) -> bool:
+    by_day = event_days.overlaps(row, start, end)
+    if by_day is not None:
+        return by_day
     row_start = _parse_dt(row.get("start_date"))
     if not row_start:
         return False
@@ -188,10 +196,12 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         {"status": {"$in": list(LIVE_STATUSES)}}, {"_id": 0},
     ).sort("updated_at", -1).to_list(20)
 
+    # Mehrtägige Events (#884) sind zwischen zwei Tagen nicht „live“, auch wenn ihr Stand so heißt.
+    live_event_rows = [row for row in await _filter_rows(live_events, user, "event") if (row.get("public_phase") or {}).get("state") == "live"]
     live = {
         "tournaments": await _filter_rows(live_tournaments, user, "tournament"),
         "challenges": await _attach_events_to_challenges(await _filter_rows(live_challenges, user, "fastlap")),
-        "events": await _filter_rows(live_events, user, "event"),
+        "events": live_event_rows,
     }
 
     # ---------- TODAY ----------
@@ -220,15 +230,17 @@ async def home_state(user: dict | None = Depends(get_optional_user)):
         {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(SOON_STATUSES)}}, {"_id": 0},
     ).sort("start_date", 1).to_list(50)
     soon_e = await db.events.find(
-        {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(EVENT_SOON_STATUSES)}}, {"_id": 0},
+        {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(EVENT_SOON_STATUSES | {"live"})}}, {"_id": 0},
     ).sort("start_date", 1).to_list(50)
+    # Laufende mehrtägige Events zwischen zwei Tagen (#884): der nächste Tag steht unter „bald“.
+    soon_e = [row for row in soon_e if row.get("status") != "live" or (event_days.position(row, now) or {}).get("state") == "break"]
     soon_c = await db.f1_challenges.find(
         {"start_date": {"$exists": True, "$ne": None}, "status": {"$in": list(SOON_STATUSES)}}, {"_id": 0},
     ).sort("start_date", 1).to_list(50)
 
     def _within_horizon(rows):
         return sorted(
-            [r for r in rows if _starts_between(r, now, horizon) and _row_not_finished(r, now)],
+            [r for r in rows if _starts_between({**r, "start_date": _event_date(r).isoformat()}, now, horizon) and _row_not_finished(r, now)],
             key=_event_date,
         )
 

@@ -16,6 +16,7 @@ from database import get_db
 from models import new_id, now_utc
 from services.match_overview import operational_match_overviews, own_match_overviews
 from services.profile_references import personal_profile_references
+from services import event_days
 from services.public_phase import derive_public_phase
 from services.visibility import user_can_see
 from services.app_releases import current_release, next_check_after, public_release, release_file, update_decision, updater_settings
@@ -252,11 +253,12 @@ async def _event_summary(event_id: str | None, user: dict | None) -> dict | None
     db = get_db()
     event = await db.events.find_one(
         {"id": event_id},
-        {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, "location": 1, "start_date": 1, "status": 1, "visibility": 1},
+        {"_id": 0, "id": 1, "slug": 1, "name": 1, "title": 1, "location": 1, "start_date": 1, "status": 1, "visibility": 1, "days": 1},
     )
     if not event or not await _visible_event(event, user):
         return None
     event["public_phase"] = derive_public_phase(event, "event")
+    event["schedule"] = event_days.schedule_view(event)
     return event
 
 
@@ -316,6 +318,8 @@ async def _compact_event(event: dict, registration: dict | None = None) -> dict:
         "banner_url": event.get("banner_url"),
         "has_registration": event.get("has_registration"),
         "own_registration": _public_event_registration(registration),
+        # Mehrtägig (#884): „3 Tage · Fr – So“, die Tage und der Satz zum Jetzt.
+        "schedule": event_days.schedule_view(event),
     }
 
 
