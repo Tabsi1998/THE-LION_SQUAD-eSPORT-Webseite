@@ -64,4 +64,6 @@ export type MoreStackParamList = {
   // Helferdienste (#331): Schichten aus der Vereinsakte.
   MemberHelperShifts: undefined;
   MemberCard: undefined;
+  // Einlass bei der Generalversammlung (#845): nur für den Vorstand (Bereich „Verein“).
+  Admission: undefined;
 };

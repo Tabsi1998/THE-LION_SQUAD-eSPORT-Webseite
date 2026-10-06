@@ -357,6 +357,14 @@
       "@react-native-firebase/crashlytics",
       "expo-secure-store",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Die LionsAPP liest am Eingang der Generalversammlung den QR-Code der Mitgliedskarte.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "Die LionsAPP entsperrt sich mit Face ID, wenn du die App-Sperre einschaltest."

@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { seasonScrollProps } from "../../seasons/sky/scroll";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
+import { canAdmit } from "../../lib/admission";
 import { useBranding } from "../../branding/BrandingProvider";
 import { API_BASE_URL } from "../../config";
 import { api } from "../../lib/api";
@@ -196,7 +197,26 @@ export function MoreScreen({ navigation }: Props) {
               <Ionicons name="open-outline" color={colors.muted} size={16} />
             </Pressable>
           )
-        ) : (
+        ) : null}
+
+        {/* Einlass (#845, Entscheidung B): der Vorstand scannt am Eingang - nur mit dem Bereich „Verein“. */}
+        {user && canAdmit(user) ? (
+          <Pressable
+            onPress={() => navigation.navigate("Admission")}
+            accessibilityRole="button"
+            testID="more-admission"
+            style={({ pressed }) => [styles.memberCard, styles.admissionCard, pressed && styles.pressed]}
+          >
+            <View style={styles.memberIcon}><Ionicons name="qr-code-outline" color={colors.cyan} size={22} /></View>
+            <View style={styles.memberText}>
+              <Body style={styles.memberTitle}>Einlass</Body>
+              <Muted>Mitgliedskarte scannen – Anwesenheit bei der Generalversammlung</Muted>
+            </View>
+            <Ionicons name="chevron-forward" color={colors.cyan} size={16} />
+          </Pressable>
+        ) : null}
+
+        {user && !isGuestUser(user) ? null : (
           // Gast zuerst (#918): wo sonst der Mitgliederbereich steht, geht es ohne Konto zum Anmelden und Registrieren.
           <Pressable
             onPress={() => openSignIn()}
@@ -318,6 +338,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     padding: 14,
+  },
+  admissionCard: {
+    borderColor: "rgba(41, 182, 232, 0.35)",
   },
   memberIcon: {
     alignItems: "center",

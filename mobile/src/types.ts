@@ -10,6 +10,8 @@ export type User = {
   user_type?: string;
   is_club_member?: boolean;
   is_tournament_staff?: boolean;
+  /** Bereiche der Verwaltung (#287) - „club“ zeigt den Einlass (#845). Der Server prüft jede Antwort selbst. */
+  areas?: string[];
   membership?: Record<string, unknown> | null;
   newsletter_consent?: boolean;
   notification_preferences?: Record<string, boolean>;

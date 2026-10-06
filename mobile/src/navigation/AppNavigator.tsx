@@ -29,6 +29,7 @@ import { GalleryScreen } from "../screens/main/GalleryScreen";
 import { GalleryAlbumScreen } from "../screens/main/GalleryAlbumScreen";
 import { GalleryViewerScreen } from "../screens/main/GalleryViewerScreen";
 import { MemberAreaScreen } from "../screens/main/MemberAreaScreen";
+import { AdmissionScreen } from "../screens/main/AdmissionScreen";
 import { MemberCardScreen } from "../screens/main/MemberCardScreen";
 import { MemberDocumentsScreen } from "../screens/main/MemberDocumentsScreen";
 import { MemberMeetingsScreen } from "../screens/main/MemberMeetingsScreen";
@@ -267,6 +268,7 @@ function MoreStackScreen() {
       <MoreStack.Screen name="EasterHunt" component={EasterHuntScreen} options={{ title: "Ostereiersuche", headerTintColor: "#e9c46a" }} />
       <MoreStack.Screen name="MyInvoices" component={MyInvoicesScreen} options={{ title: "Meine Rechnungen", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberArea" component={MemberAreaScreen} options={{ title: "Mitgliederbereich", headerTintColor: colors.gold }} />
+      <MoreStack.Screen name="Admission" component={AdmissionScreen} options={{ title: "Einlass" }} />
       <MoreStack.Screen name="MyMembership" component={MyMembershipScreen} options={{ title: "Meine Mitgliedschaft", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberDocuments" component={MemberDocumentsScreen} options={{ title: "Dokumente", headerTintColor: colors.gold }} />
       <MoreStack.Screen name="MemberMeetings" component={MemberMeetingsScreen} options={{ title: "Versammlungen", headerTintColor: colors.gold }} />
