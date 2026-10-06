@@ -9,7 +9,14 @@
 .tls-nikolaus-widget { display: inline-flex; align-items: flex-end; justify-content: center; width: 2.1rem; height: 2.75rem; margin-left: 0.15rem; padding: 0; border: 0; background: none; cursor: pointer; flex: none; transition: transform 0.18s ease-out; }
 .tls-nikolaus-widget:hover { transform: translateY(-1px) rotate(-4deg); }
 .tls-nikolaus-widget:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; border-radius: 0.35rem; }
-@media (max-width: 640px) { .tls-nikolaus-widget { display: none; } }
+@media (max-width: 640px) { .tls-nikolaus-widget, .tls-nikolaus-widget-wrap { display: none; } }
+/* Der Stiefel im Kopf öffnet sich an Ort und Stelle (#963): Wackeln und Gutschein wie unten, die Karte hängt darunter. */
+.tls-nikolaus-widget-wrap { position: relative; display: inline-flex; align-items: flex-end; }
+.tls-nikolaus-widget--opening { transform: none; }
+.tls-nikolaus-widget--opening .tls-nikolaus-art { animation: tls-nikolaus-wobble 0.6s ease-in-out both; transform-origin: 50% 92%; }
+.tls-nikolaus-widget--opening .tls-nikolaus-voucher { animation: tls-nikolaus-rise 0.9s ease-in 0.15s both; }
+.tls-nikolaus-widget-card { position: absolute; top: calc(100% + 10px); left: -0.6rem; z-index: 60; }
+.tls-nikolaus-widget-card .tls-nikolaus-card::after { top: -7px; bottom: auto; left: 1.4rem; right: auto; transform: rotate(-135deg); }
 .tls-nikolaus-menu { display: grid; grid-template-columns: 2.4rem 1fr; grid-template-rows: auto auto; column-gap: 0.75rem; align-items: center; width: 100%; padding: 0.45rem 0.75rem; border-radius: 0.4rem; background: rgba(214, 69, 65, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); color: #fbe9d0; text-align: left; cursor: pointer; }
 .tls-nikolaus-menu__boot { grid-row: 1 / span 2; display: flex; justify-content: center; }
 .tls-nikolaus-menu__title { grid-column: 2; grid-row: 1; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #ffc857; }

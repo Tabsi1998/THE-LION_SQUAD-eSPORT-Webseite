@@ -25,7 +25,7 @@ async function headerFits(page) {
   });
 }
 
-test("PC: Kranz, Türchen und Stiefel nebeneinander - der Stiefel führt hinunter und öffnet sich", async ({ page, isMobile }, testInfo) => {
+test("PC: Kranz, Türchen und Stiefel nebeneinander - der Stiefel öffnet sich oben an Ort und Stelle (#963)", async ({ page, isMobile }, testInfo) => {
   test.skip(Boolean(isMobile), "PC");
   await open(page, 1440);
   const slot = page.getByTestId("season-widget-slot");
@@ -40,8 +40,15 @@ test("PC: Kranz, Türchen und Stiefel nebeneinander - der Stiefel führt hinunte
   await testInfo.attach("advent-kopf-1440.png", { body: await page.screenshot({ clip: { x: 0, y: 0, width: 1440, height: 90 } }), contentType: "image/png" });
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/advent-kopf-1440.png`, clip: { x: 0, y: 0, width: 1440, height: 90 } });
   await boot.click();
-  await expect(page.getByTestId("nikolaus-card")).toBeVisible({ timeout: 6000 });
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  const card = page.getByTestId("nikolaus-widget-card").getByTestId("nikolaus-card");
+  await expect(card).toBeVisible({ timeout: 6000 });
+  // Kein Hinunterscrollen mehr: die Karte hängt unter dem Stiefel im Kopf und bleibt im Bild.
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const cardBox = await card.boundingBox();
+  expect(cardBox.x).toBeGreaterThanOrEqual(0);
+  expect(cardBox.y).toBeGreaterThan(bootBox.y + bootBox.height);
+  await testInfo.attach("nikolaus-kopf-karte-1440.png", { body: await page.screenshot({ clip: { x: 0, y: 0, width: 720, height: 240 } }), contentType: "image/png" });
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/nikolaus-kopf-karte-1440.png`, clip: { x: 0, y: 0, width: 720, height: 240 } });
 });
 
 for (const width of [390, 768]) {
@@ -63,7 +70,9 @@ for (const width of [390, 768]) {
     await testInfo.attach(`advent-menue-${width}.png`, { body: await page.screenshot({ clip: { x: 0, y: 0, width, height: 360 } }), contentType: "image/png" });
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/advent-menue-${width}.png`, clip: { x: 0, y: 0, width, height: 360 } });
     await entries.getByTestId("season-menu-advent-calendar").click();
-    await expect(page).toHaveURL(/\/advent$/);
+    // Seit #963 geht der Kalender als Fenster über der Seite auf - kein Seitenwechsel.
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId("advent-window")).toBeVisible();
   });
 }
 

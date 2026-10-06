@@ -25,11 +25,13 @@ async def load_context(db) -> tuple[dict, str | None]:
 
 async def with_calendar(db, payload: dict) -> dict:
     """Adventkalender (#641): ``ready`` sagt, ob für dieses Jahr Türchen angelegt sind - ohne sie zeigen Web und
-    App keinen Einstieg in einen Kalender, den es nicht gibt."""
+    App keinen Einstieg in einen Kalender, den es nicht gibt. In der Vorschau (#963) steht der Einstieg immer da:
+    der Kalender zeigt dann Platzhalter, bis Türchen angelegt sind."""
     for season in payload.get("seasons") or []:
         if season.get("key") == "advent_calendar":
             year = int(str(season.get("starts_at") or "0000")[:4] or 0)
-            season["data"] = {**(season.get("data") or {}), "ready": bool(await db.advent_doors.find_one({"year": year}, {"_id": 0, "id": 1}))}
+            ready = bool(payload.get("preview")) or bool(await db.advent_doors.find_one({"year": year}, {"_id": 0, "id": 1}))
+            season["data"] = {**(season.get("data") or {}), "ready": ready}
     return payload
 
 

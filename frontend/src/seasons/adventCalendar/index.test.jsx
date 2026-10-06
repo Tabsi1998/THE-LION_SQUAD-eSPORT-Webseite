@@ -1,7 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { MenuEntry, Widget, calendarEntry, season } from "./index.jsx";
+import { MenuEntry, Overlay, Widget, calendarEntry, season } from "./index.jsx";
 import { SEASON_MODULES, hasModule } from "../registry";
+import { closeAdventCalendar, isAdventCalendarOpen } from "@/advent/calendarDialog";
+
+afterEach(() => closeAdventCalendar());
 
 // Adventkalender (#641): das kleine Türchen neben dem Logo - nur wenn für das Jahr Türchen angelegt sind.
 
@@ -25,10 +28,13 @@ test("ohne angelegte Türchen kein Einstieg", () => {
   expect(container).toBeEmptyDOMElement();
 });
 
-test("der Einstieg führt zum Kalender und nennt das Türchen", () => {
+test("der Einstieg öffnet das Fenster des Kalenders und nennt das Türchen", () => {
   render(<MemoryRouter><Widget season={calendar()} /></MemoryRouter>);
   const link = screen.getByTestId("advent-calendar-widget");
-  expect(link).toHaveAttribute("href", "/advent");
+  expect(link.tagName).toBe("BUTTON");
+  expect(isAdventCalendarOpen()).toBe(false);
+  link.click();
+  expect(isAdventCalendarOpen()).toBe(true);
   expect(link).toHaveAccessibleName("Adventkalender – Türchen 12 ist offen");
   expect(link).toHaveAttribute("title", "Adventkalender – Türchen 12 ist offen");
   expect(link).toHaveAttribute("data-door", "12");
@@ -58,11 +64,14 @@ test("#852: oben im Handy-Menü - Türchen, Name und Stand; ein Tipp führt zum 
   const onClose = vi.fn();
   const { rerender } = render(<MemoryRouter><MenuEntry season={calendar()} onClose={onClose} /></MemoryRouter>);
   const entry = screen.getByTestId("season-menu-advent-calendar");
-  expect(entry).toHaveAttribute("href", "/advent");
+  expect(entry.tagName).toBe("BUTTON");
   expect(entry).toHaveTextContent("Adventkalender");
   expect(entry).toHaveTextContent("Türchen 12 ist offen");
   entry.click();
   expect(onClose).toHaveBeenCalled();
+  expect(isAdventCalendarOpen()).toBe(true);
+  // Das Fenster hängt an der Bühne dieser Saison (#963).
+  expect(season.Overlay).toBe(Overlay);
   rerender(<MemoryRouter><MenuEntry season={calendar({ ready: false })} onClose={onClose} /></MemoryRouter>);
   expect(screen.queryByTestId("season-menu-advent-calendar")).toBeNull();
 });

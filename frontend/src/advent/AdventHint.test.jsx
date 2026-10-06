@@ -7,6 +7,9 @@ const context = { byKey: {} };
 vi.mock("@/seasons/SeasonContext", () => ({ useSeason: () => context }));
 
 const { AdventHint, hintText } = await import("./AdventHint");
+const { isAdventCalendarOpen, closeAdventCalendar } = await import("./calendarDialog");
+
+afterEach(() => closeAdventCalendar());
 
 function calendar(data = {}, effective = "normal") {
   return { key: "advent_calendar", effective, data: { today_door: 12, catch_up: false, door_hour: 6, ready: true, ...data } };
@@ -21,10 +24,13 @@ test("läuft der Kalender, steht der Weg dorthin da", () => {
   show();
   const hint = screen.getByTestId("advent-hint");
   expect(hint).toHaveTextContent("AdventkalenderTürchen 12 ist offen – schau hinein.");
-  expect(screen.getByTestId("advent-hint-link")).toHaveAttribute("href", "/advent");
   expect(screen.getByTestId("advent-hint-link")).toHaveTextContent("Zum Kalender");
-  // Die Zeichnung ist Schmuck: kein zweiter Link, nichts zum Vorlesen.
-  expect(hint.querySelectorAll("a")).toHaveLength(1);
+  // Seit #963 öffnet „Zum Kalender“ das Fenster über der Seite - kein Seitenwechsel.
+  expect(isAdventCalendarOpen()).toBe(false);
+  screen.getByTestId("advent-hint-link").click();
+  expect(isAdventCalendarOpen()).toBe(true);
+  // Die Zeichnung ist Schmuck: kein Link, nichts zum Vorlesen.
+  expect(hint.querySelectorAll("a")).toHaveLength(0);
   expect(hint.querySelector(".tls-advcal")).toHaveAttribute("aria-hidden", "true");
 });
 

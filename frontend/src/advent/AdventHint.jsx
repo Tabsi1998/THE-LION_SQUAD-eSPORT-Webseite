@@ -1,10 +1,11 @@
-import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { useSeason } from "@/seasons/SeasonContext";
 import { DoorGlyph, calendarEntry } from "@/seasons/adventCalendar";
+import { openAdventCalendar } from "./calendarDialog";
 
 // Hinweis auf den Adventkalender (#641) im Dashboard: nur solange der Kalender läuft und Türchen angelegt sind.
-// Was die Person schon geöffnet hat, steht auf der Seite selbst - hier geht es nur um den Weg dorthin.
+// Was die Person schon geöffnet hat, steht im Kalender selbst - hier geht es nur um den Weg dorthin: seit #963 ein
+// Klick, der das Fenster öffnet.
 
 export function hintText(entry) {
   if (!entry) return "";
@@ -25,9 +26,9 @@ export function AdventHint() {
         <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#e9c46a]">Adventkalender</div>
         <div className="mt-0.5 text-sm text-white/80">{hintText(entry)}</div>
       </div>
-      <Link to="/advent" className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-[#e9c46a] transition hover:bg-[#e9c46a]/10" data-testid="advent-hint-link">
+      <button type="button" onClick={openAdventCalendar} className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-[#e9c46a] transition hover:bg-[#e9c46a]/10" data-testid="advent-hint-link">
         Zum Kalender <ArrowRight className="h-3.5 w-3.5" />
-      </Link>
+      </button>
     </div>
   );
 }

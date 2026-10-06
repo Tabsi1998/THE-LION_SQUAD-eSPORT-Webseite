@@ -356,6 +356,36 @@
 }
 
 /* ---------- Der Inhalt im Fenster ---------- */
+/* Das Fenster des Kalenders (#963): über der Seite; am Handy bildschirmfüllend, sonst ein Rahmen mit Rand. Das Fenster
+   eines Türchens (.tls-adv-dialog, z-60) liegt darüber; der Kopf der Seite hat z-50. */
+.tls-adv-window {
+  --adv-gold: #e9c46a;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  color: #f4ecdc;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(233, 196, 106, 0.14), rgba(0, 0, 0, 0) 60%),
+    linear-gradient(180deg, #0c0a12, #06080f);
+  outline: none;
+}
+.tls-adv-window__scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 3.25rem 1rem 2rem; }
+@media (min-width: 640px) {
+  .tls-adv-window {
+    inset: 12px;
+    margin: auto;
+    width: min(calc(100vw - 24px), 1180px);
+    max-height: calc(100dvh - 24px);
+    border: 1px solid rgba(233, 196, 106, 0.35);
+    border-radius: 14px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(255, 241, 184, 0.05);
+  }
+  .tls-adv-window__scroll { padding: 3rem 1.5rem 2rem; }
+}
+@media (min-width: 1024px) { .tls-adv-window__scroll { padding: 3rem 2rem 2.5rem; } }
+
 .tls-adv-dialog {
   --adv-gold: #e9c46a;
   width: min(calc(100vw - 24px), 640px);

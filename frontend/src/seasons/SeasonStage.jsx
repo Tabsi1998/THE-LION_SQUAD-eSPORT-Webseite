@@ -211,6 +211,11 @@ export function SeasonStage() {
         const Toast = modules[season.key].Toast;
         return Toast ? <Toast key={`${season.key}-toast`} season={season} /> : null;
       })}
+      {mounted.map((season) => {
+        // Fenster, die eine Saison selbst aufmacht (#963): der Adventkalender über der Seite.
+        const Overlay = modules[season.key].Overlay;
+        return Overlay ? <Overlay key={`${season.key}-overlay`} season={season} /> : null;
+      })}
     </>,
     document.body,
   );

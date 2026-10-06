@@ -79,41 +79,64 @@ class CopyPayload(BaseModel):
 
 # ------------------------------------------------------------------ Für alle
 
+# Vorschau (#963): mit dem Token der „Vorschau 60 Sekunden“ sieht die Person den Kalender zur simulierten Zeit - wie ein
+# Gast, ohne dass ein Türchen, ein Quiz oder eine Teilnahme gezählt wird. Ein ungültiges oder fremdes Token zählt nicht.
+PreviewToken = Query(None, max_length=200)
+
+
 @router.get("")
-async def calendar(response: Response, opened: str | None = Query(None, max_length=120), user: dict | None = Depends(get_optional_user)):
+async def calendar(response: Response, opened: str | None = Query(None, max_length=120), preview: str | None = PreviewToken,
+                   user: dict | None = Depends(get_optional_user)):
     """Der Kalender: 24 Türchen mit Zustand. Inhalt tragen nur die geöffneten - angemeldet die eigenen, für Gäste
     die, die ihr Browser als geöffnet nennt (und die schon offen sein dürfen)."""
     _private(response)
+    demo = advent.preview_context(preview)
+    if demo:
+        return await advent.preview_calendar(get_db(), demo[0], demo[1], guest_opened=advent.parse_days(opened))
     return await advent.calendar_view(get_db(), user if user and user.get("id") else None, guest_opened=advent.parse_days(opened))
 
 
 @router.post("/{day}/open")
-async def open_door(day: int, request: Request, response: Response, user: dict | None = Depends(get_optional_user)):
+async def open_door(day: int, request: Request, response: Response, preview: str | None = PreviewToken, user: dict | None = Depends(get_optional_user)):
     _private(response)
     viewer = user if user and user.get("id") else None
     await enforce_rate_limit(request, "advent_open", 60, 60, subject=(viewer or {}).get("id"))
+    demo = advent.preview_context(preview)
+    if demo:
+        return await advent.preview_open(get_db(), demo[0], day, demo[1])
     return await advent.open_door(get_db(), viewer, day)
 
 
 @router.post("/{day}/quiz")
-async def answer_quiz(day: int, body: QuizAnswer, request: Request, response: Response, user: dict | None = Depends(get_optional_user)):
+async def answer_quiz(day: int, body: QuizAnswer, request: Request, response: Response, preview: str | None = PreviewToken,
+                      user: dict | None = Depends(get_optional_user)):
     _private(response)
     viewer = user if user and user.get("id") else None
     await enforce_rate_limit(request, "advent_quiz", 30, 60, subject=(viewer or {}).get("id"))
+    demo = advent.preview_context(preview)
+    if demo:
+        return await advent.preview_quiz(get_db(), demo[0], day, body.answer, demo[1])
     return await advent.answer_quiz(get_db(), viewer, day, body.answer)
 
 
+def _no_raffle_in_preview(preview: str | None) -> None:
+    if advent.preview_context(preview):
+        raise HTTPException(status_code=409, detail="In der Vorschau wird bei keiner Verlosung mitgemacht.")
+
+
 @router.post("/{day}/enter")
-async def enter_raffle(day: int, request: Request, response: Response, me: dict = Depends(get_current_user)):
+async def enter_raffle(day: int, request: Request, response: Response, preview: str | None = PreviewToken, me: dict = Depends(get_current_user)):
     """Bei der Verlosung im Türchen mitmachen - ein eigener Klick, nie automatisch."""
     _private(response)
+    _no_raffle_in_preview(preview)
     await enforce_rate_limit(request, "advent_enter", 20, 60, subject=me["id"])
     return await advent.enter_raffle(get_db(), me, day)
 
 
 @router.delete("/{day}/enter")
-async def withdraw_raffle(day: int, request: Request, response: Response, me: dict = Depends(get_current_user)):
+async def withdraw_raffle(day: int, request: Request, response: Response, preview: str | None = PreviewToken, me: dict = Depends(get_current_user)):
     _private(response)
+    _no_raffle_in_preview(preview)
     await enforce_rate_limit(request, "advent_enter", 20, 60, subject=me["id"])
     return await advent.withdraw_raffle(get_db(), me, day)
 

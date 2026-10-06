@@ -324,9 +324,10 @@ def parse_days(value: str | None) -> set[int]:
 
 
 async def calendar_view(db, viewer: dict | None, now: datetime | None = None, guest_opened: set[int] | None = None,
-                        year: int | None = None, record: bool = True) -> dict:
+                        year: int | None = None, record: bool = True, placeholder: bool = False) -> dict:
     """Der Kalender, wie ihn die Person jetzt sieht. ``year`` und ``record=False`` sind die Vorschau der Verwaltung:
-    ein bestimmtes Jahr zu einer gewählten Zeit, ohne dass etwas gezählt wird."""
+    ein bestimmtes Jahr zu einer gewählten Zeit, ohne dass etwas gezählt wird. ``placeholder`` (#963): ein Jahr ohne
+    Türchen zeigt in der Vorschau trotzdem alle 24 - mit dem Inhalt, den ein leeres Türchen hätte."""
     now = seasons.to_vienna(now)
     if year is None:
         state = await running(db, now)
@@ -336,7 +337,7 @@ async def calendar_view(db, viewer: dict | None, now: datetime | None = None, gu
     else:
         ends_at = seasons.windows_for(SEASON, year)[0]["end"]
     doors = await _doors(db, year)
-    if not doors:
+    if not doors and not placeholder:
         # Ein Jahr, für das noch nichts angelegt ist, zeigt keinen leeren Kalender.
         return {"active": False, "next_start": await next_start(now), "reason": "empty"}
     user_id = (viewer or {}).get("id") if record else None
@@ -360,7 +361,59 @@ async def calendar_view(db, viewer: dict | None, now: datetime | None = None, gu
         "catch_up": now.date() > date(year, 12, DOORS), "newest_door": open_now or None,
         "door_hour": seasons.ADVENT_DOOR_HOUR, "order": door_order(year), "doors": items,
         "signed_in": bool(user_id), "opened": len(opened) if user_id else len([d for d in shown if is_open(year, d, now)]), "total": DOORS,
+        "placeholder": not doors,
     }
+
+
+# ------------------------------------------------------------------ Vorschau auf der Website (#963)
+
+def preview_context(token: str | None) -> tuple[int, datetime] | None:
+    """(Jahr, simulierte Zeit) aus einem gültigen Vorschau-Token für den Kalender - sonst None. Außerhalb des Fensters
+    gilt das nächste Jahr; die Zeit kommt aus dem Token (Vorgabe: 12. Dezember zu Mittag, siehe seasons.preview_default_at)."""
+    parsed = seasons.read_preview_token(token)
+    if not parsed or parsed[0] != SEASON:
+        return None
+    now = seasons.to_vienna(parsed[1])
+    window = seasons.current_window(SEASON, now) or seasons.next_window(SEASON, now)
+    return (int(window["year"]), now) if window else None
+
+
+async def preview_calendar(db, year: int, now: datetime, guest_opened: set[int] | None = None) -> dict:
+    """Der Kalender in der Vorschau: wie ein Gast zur simulierten Zeit - geöffnet ist, was die Seite als offen nennt;
+    gezählt wird nichts, und ohne Türchen stehen Platzhalter da."""
+    view = await calendar_view(db, None, now=now, guest_opened=guest_opened, year=year, record=False, placeholder=True)
+    return {**view, "preview": True}
+
+
+def _preview_door(year: int, day: int, now: datetime) -> None:
+    if day not in DOOR_DAYS:
+        raise HTTPException(status_code=404, detail="Dieses Türchen gibt es nicht.")
+    if not is_open(year, day, now):
+        raise HTTPException(status_code=409, detail=locked_message(year, day))
+
+
+async def preview_open(db, year: int, day: int, now: datetime) -> dict:
+    """Ein Türchen in der Vorschau öffnen: der Inhalt kommt, nichts wird gespeichert oder gezählt."""
+    _preview_door(year, day, now)
+    doors = await _doors(db, year)
+    content = await content_for(db, doors.get(day), day, None, now)
+    if content.get("quiz") is not None:
+        content["quiz"]["done"] = False
+    return {"day": day, "year": year, "state": "opened", "seed": door_seed(year, day), "content": content, "counted": False, "first": False,
+            "opened": None, "total": DOORS, "newly_awarded": 0, "opened_at": None, "preview": True}
+
+
+async def preview_quiz(db, year: int, day: int, answer: int, now: datetime) -> dict:
+    """Die Auflösung in der Vorschau - ohne dass irgendwo „mitgemacht“ steht."""
+    _preview_door(year, day, now)
+    door = (await _doors(db, year)).get(day) or {}
+    quiz = door.get("quiz") if door.get("kind") == "quiz" else None
+    if not quiz:
+        raise HTTPException(status_code=404, detail="In diesem Türchen steckt kein Quiz.")
+    if answer not in range(QUIZ_ANSWERS):
+        raise HTTPException(status_code=400, detail="Diese Antwort gibt es nicht.")
+    return {"day": day, "correct": answer == quiz["correct"], "correct_index": quiz["correct"], "correct_answer": quiz["answers"][quiz["correct"]],
+            "explanation": quiz.get("explanation") or "", "done": True, "preview": True}
 
 
 def locked_message(year: int, day: int) -> str:

@@ -5,10 +5,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 
 const apiMock = { get: vi.fn(), post: vi.fn(), delete: vi.fn() };
 const auth = { user: null };
+const seasonState = { preview: false };
+const previewToken = { value: null };
 vi.mock("@/lib/api", () => ({ api: apiMock }));
 vi.mock("@/context/AuthContext", () => ({ useOptionalAuth: () => auth }));
+vi.mock("@/seasons/SeasonContext", () => ({ useSeason: () => seasonState }));
+vi.mock("@/seasons/preview", () => ({ previewTokenFor: () => previewToken.value }));
 
-const { AWARDED_EVENT, errorText, useAdventCalendar } = await import("./useAdventCalendar");
+const { AWARDED_EVENT, PREVIEW_RAFFLE_TEXT, errorText, useAdventCalendar } = await import("./useAdventCalendar");
 const { STORAGE_KEY, readOpened, rememberOpened } = await import("./storage");
 
 function calendar(opened = [], today = 12, year = 2026) {
@@ -31,6 +35,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
   auth.user = null;
+  seasonState.preview = false;
+  previewToken.value = null;
   awarded = [];
   window.addEventListener(AWARDED_EVENT, onAwarded);
   apiMock.get.mockResolvedValue({ data: calendar() });
@@ -173,4 +179,26 @@ test("Quiz und Verlosung ändern nur ihr Türchen", async () => {
   expect(apiMock.delete).toHaveBeenCalledWith("/seasonal/advent/12/enter", { skipInvalidation: true });
   expect(result.current.calendar.doors[11].content.prize.entered).toBe(false);
   expect(result.current.calendar.doors[0].content).toBeUndefined();
+});
+
+test("Vorschau (#963): das Token geht mit, geöffnet wird nur auf dieser Seite, nichts wird gefeiert, keine Verlosung", async () => {
+  seasonState.preview = true;
+  previewToken.value = "advent_calendar.9999999999..abc";
+  auth.user = { id: "u1" };
+  apiMock.get.mockResolvedValue({ data: { ...calendar(), preview: true, signed_in: false } });
+  apiMock.post.mockResolvedValueOnce({ data: { ...opened(12).data, counted: false, newly_awarded: 0, preview: true } });
+  const { result } = renderHook(() => useAdventCalendar());
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(apiMock.get).toHaveBeenCalledWith("/seasonal/advent", { params: { preview: previewToken.value }, skipInvalidation: true });
+  expect(result.current.previewing).toBe(true);
+  expect(result.current.signedIn).toBe(false);
+  await act(async () => { await result.current.open(12); });
+  expect(apiMock.post).toHaveBeenCalledWith("/seasonal/advent/12/open", null, { skipInvalidation: true, params: { preview: previewToken.value } });
+  expect(readOpened(2026)).toEqual([]);
+  expect(awarded).toEqual([]);
+  // Beim Nachladen nennt die Seite, was sie in der Vorschau geöffnet hat - der Server merkt sich nichts.
+  await act(async () => { await result.current.reload(); });
+  expect(apiMock.get).toHaveBeenLastCalledWith("/seasonal/advent", { params: { opened: "12", preview: previewToken.value }, skipInvalidation: true });
+  await expect(result.current.raffle(12, true)).rejects.toMatchObject({ response: { status: 409, data: { detail: PREVIEW_RAFFLE_TEXT } } });
+  expect(apiMock.delete).not.toHaveBeenCalled();
 });

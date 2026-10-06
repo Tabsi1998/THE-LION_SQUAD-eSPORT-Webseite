@@ -246,9 +246,11 @@ Was man auf der Seite oder in der App findet, zählt als **Signal** am Server (`
 
 ## 11. Adventkalender (#641, #732, #785)
 
-Der Adventkalender ist eine Saison mit **eigener Seite** statt Deko: Web `/advent`, App-Screen unter Mehr → Verein
-(`SCREEN_SEASONS` in `SeasonStage.tsx`). Die Deko rundherum hält sich zurück (Seitenklasse `calm` im Web, `CALM` in
-der App).
+Der Adventkalender ist eine Saison mit **eigenem Fenster** statt Deko: im Web ein Dialog über der Seite, den das
+Türchen neben dem Logo öffnet (`advent/AdventCalendarDialog.jsx`, an der Bühne der Saison als `Overlay`; der
+Speicher „offen/zu“ liegt in `advent/calendarDialog.js`; die alte Adresse `/advent` leitet auf die Startseite um und
+öffnet das Fenster, #963), App-Screen unter Mehr → Verein (`SCREEN_SEASONS` in `SeasonStage.tsx`). Die Deko rundherum
+hält sich zurück (Seitenklasse `calm` im Web, `CALM` in der App).
 
 - Einstieg nur, wenn für das Jahr Türchen angelegt sind (`data.ready` aus `/api/seasonal/active`): ein kleines
   Türchen neben dem Logo, ein Hinweis im Dashboard, der Adventkranz nennt das offene Türchen.
@@ -257,6 +259,11 @@ der App).
   `scene.ts` und `doors.ts`) – ein Paritätstest auf festen Werten hält Web und App zusammen.
 - „Bewegung reduzieren“: nichts schwingt, der Inhalt erscheint sofort.
 - Gewinne laufen über `services/season_raffles.py`; dieselbe Verlosung nutzt später die Eiersuche (#646).
+- Vorschau (#963): „Vorschau 60 Sekunden“ simuliert außerhalb des Advents den 12. Dezember zu Mittag
+  (`seasons.preview_default_at`), der Einstieg steht auch ohne angelegte Türchen da. `/api/seasonal/advent` und das
+  Öffnen nehmen das Token (`preview=`) und zeigen den Kalender wie einem Gast zur simulierten Zeit: ohne Türchen
+  Platzhalter, Öffnen und Quiz zählen nicht, Verlosungen sind zu. Im Web merkt sich nur die Seite, was in der
+  Vorschau offen ist (`useAdventCalendar`, `previewing`).
 
 ## 12. Bewegung in der App: Drehpunkt in der Mitte (#788, #789)
 
@@ -320,7 +327,7 @@ Die App zeichnet Schnee, Regen und Wetterleuchten ohne Zeichenfläche (Skia ist 
 
 | Teil | Web | App |
 |---|---|---|
-| Stiefel | `Footer` auf der Linie über dem Impressum (`footerLine.js`), Größe nach freiem Platz (`bootFit`) | `Shelf` im Kopf von „Mehr“, auf der Kante der ersten Karte, links neben der Glocke |
+| Stiefel | `Footer` auf der Linie über dem Impressum (`footerLine.js`), Größe nach freiem Platz (`bootFit`); der kleine Stiefel im Kopf (`Widget`) öffnet sich seit #963 an Ort und Stelle, die Karte hängt darunter – `useBoot` teilt den Stand beider Stellen (`OPENED_EVENT`) | `Shelf` im Kopf von „Mehr“, auf der Kante der ersten Karte, links neben der Glocke |
 | Öffnen | wackeln, der Gutschein steigt, Karte mit dem Sticker; danach gekippt und leer | gleich, dazu leichtes Tippen beim Öffnen und ein Erfolgs-Tippen beim neuen Sticker |
 | Hinweis | `Toast` einmal am Tag mit „Zum Stiefel“ (scrollt hin) | `Greeting` einmal am Tag mit „Zum Stiefel“ (führt in „Mehr“), Tab-Symbol Stiefel |
 
