@@ -363,3 +363,27 @@ was hilft.
 - **Server hinter zwei Proxys** (Nginx Proxy Manager und Cloudflare): ohne `TRUSTED_PROXY_CIDRS` und
   `real_ip_header CF-Connecting-IP` tragen alle Sitzungen dieselbe Adresse, und jede Bremse je Adresse gilt
   für alle gemeinsam (#941).
+
+## 6./7. Oktober 2026 – Oberflächen-Pakete
+
+- **Unschärfe am Kopf sperrt feste Fenster ein.** `backdrop-filter` (wie `transform`) macht ein Element zum
+  Bezugsrahmen für `position: fixed`-Nachfahren. Die Suche im Kopf öffnete ihr Vollbild-Fenster, das aber nur die
+  80 px der Kopfleiste abdeckte. Seit #1086 liegt die Unschärfe auf einer eigenen Fläche im Kopf; die Zeile rückt beim
+  Kompaktwerden über `top`, nicht über `transform`.
+- **Handy-Menü als Block im Fluss.** Es vergrößerte den Kopf um die Menühöhe; Saison-Deko, die an der Kopfzeile hängt,
+  wanderte mit und lag neben dem Menü frei (Oster-Test). Jetzt eine `absolute`-Auflage unter der Leiste.
+- **Playwright-Projekt „mobile“ hat `hover: none`.** Hover-Regeln in `@media (hover: hover)` gelten dort nicht;
+  Browser-Tests, die Hover prüfen, verzweigen über `matchMedia("(hover: hover)")`.
+- **Windows-Checkout ist CRLF.** Ein Test, der `index.css` liest und `"}\n}"` sucht, fiel nach dem Checkout von `main`
+  um – Dateien in Tests mit `.replace(/\r\n/g, "\n")` normalisieren.
+- **Gestapelte PRs nach Squash-Merge.** `git rebase` des nächsten Zweigs auf `origin/main` kollidiert mit dem Squash
+  (dieselben Änderungen, andere Commits). Stattdessen den Baum des Zweigs auf `main` setzen:
+  `git commit-tree <zweig>^{tree} -p origin/main -F msg.txt`, dann `git branch -f <zweig> <neu>`, Force-Push mit
+  `--force-with-lease`, `gh pr edit --base main`. Vorher prüfen: `origin/main^{tree}` muss gleich dem Baum des alten
+  Basis-Commits sein. Mit Prozess-Substitution (`-F <(…)`) scheitert Git Bash – Nachricht in eine Datei schreiben.
+- **Heredocs im Bash-Werkzeug.** Mehrzeilige Dateien mit Backticks und Anführungszeichen (JS-Templates) brachen
+  beim Schreiben per Heredoc ab („unexpected EOF“). Dateien mit dem Write-Werkzeug anlegen und per `cp`/Python
+  einspielen.
+- **Zwei lokale Checks gleichzeitig.** Ein versehentlich zweites `local_check.py` (gestartet, während das erste lief)
+  teilt sich Port 3105 und die Logs – nur über die Prozess-ID beenden (`Stop-Process -Id`), nie über den Namen.
+

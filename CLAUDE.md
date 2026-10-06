@@ -371,45 +371,41 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (6. Oktober 2026, Abend)
+## 9. Letzter Stand (7. Oktober 2026, nachts)
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #979 (`5f765ea9`). Gemergt am 6.10. nach dem Doku-Stand #973: #974 (Dependabot), #975,
-  #976, #977 (App 1.3.0 Teil 1–3), #978 (Silvester-Jahreszahl, Abnahme #744), #979 (Release-PR 1.3.0) – alle
-  mit Eintrag in `docs/HISTORIE.md` Teil A. Keine offenen Code-PRs.
-- **App 1.3.0 / Build 89** (`mobile-v1.3.0-build89`): lokal gebaut am 6.10. abends, APK am GitHub-Release und am
-  Vereinsserver; das AAB ``LionsAPP-v1.3.0-build89-5f765ea.aab`` lädt der Betreiber von Hand in den **offenen Test** (Versionshinweis in
-  PR #979). Neue Berechtigung Kamera (nur Einlass-Scanner); `expo-sensors` ohne Abfrage auf Android. Nach dem
-  Lockfile-Wechsel (expo-sensors, expo-camera) war es ein voller nativer Build.
+- **`main`** steht nach #1099 (`4826ea49`). Gemergt am 6./7.10.: #1066 (Doku), #1067 (Restore-Schreiberstopp, #1008),
+  #1068 (App-Sitzungen, #942), #1069 (Footer-Bänder), #1086, #1095, #1096, #1097, #1099 (Oberfläche Paket 1–5),
+  #1098 (Social-Logos Variante D). Offen: **#1100** (App-Bewegung, #1085) – fertig geprüft, wartet auf den Merge.
+- **Meilenstein 56 „Oberfläche: Bewegung und Feinschliff“** (aus der UI-Auswahl des Betreibers vom 6.10., Vorschau
+  als privater Artefakt-Link beim Betreiber): 14 von 16 Tickets zu. Offen: **#1084** Download-Knopf für die
+  LionsAPP (Variante A/B/C aus der Vorschau, Abschnitt 10, fehlt noch) und #1085 (mit #1100). Das offizielle
+  Google-Play-Badge darf nicht umgefärbt oder animiert werden – der Knopf wird ein eigener mit neutralem Symbol.
+- **Meilenstein 57 „Jahreszeiten IV: Deko reagiert auf Karten“** (#1087 Signal, #1088–#1094 je Deko): Idee des
+  Betreibers vom 6.10. spät. Grundregeln stehen in jedem Ticket (nur die Deko der gehobenen Karte, Auslöser nach
+  einer Viertelsekunde, einmal je Anheben mit Ruhezeit, nichts ohne Maus oder mit „Bewegung reduzieren“). Bis dahin
+  heben sich Karten mit Saison-Deko nicht (`html[data-season-intensity]` in `index.css`).
+- **Dolibarr III** (21) und **Klammern** (50) sind geschlossen; #772 (Jahreszeiten-Geräteabnahme) liegt in 55.
+- **Events II** (46): #884 (mehrtägige Events) ist auf dem lokalen Zweig `feat/884-mehrtaegige-events` begonnen
+  (`backend/services/event_days.py`, reine Rechnung, noch nirgends eingebunden; Patch-Skript im Scratchpad der
+  Sitzung) – wird nach dem Oberflächen-Meilenstein fortgesetzt, danach #885 (Anmeldung im Discord; braucht einen
+  gemeinsamen Anmelde-Dienst, heute liegt die Logik in `event_routes.register_for_event`).
+- **Stabilisierung 48:** alle 18 offenen Tickets verweisen auf `C:\GIT\lion-audit-2026-10-06\prepared-issue-drafts.json`
+  – der Ordner liegt noch nicht auf diesem Rechner; der Betreiber bringt ihn nach. Nichts erfinden.
 - **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh` (Backend-Image baut einmal neu,
-  Migration 4 läuft einmal); danach System → Betrieb & Logs → Checks („Besucher-Adresse“ grün?) und die Zeilen in
-  `UMBAUPLAN.md` „Nach dem Update vom 6.10.“.
-- **Meilensteine:** geschlossen heute 38, 39, 41 (Jahreszeiten II), 42 (Jahreszeiten III), 51 (Wünsche Oktober).
-  „App 1.3.0“ (49) schließt mit der Übergabe des Bundles. **Dolibarr III** (21) hat nur noch #330 – mein Vorschlag
-  (Runbook plus kurze Live-Checkliste statt Docker-Labor) wartet auf das Ja des Betreibers.
-- **Projektprüfung 6.10. (zweite Sitzung des Betreibers, Übersicht #1065):** fünf neue Meilensteine mit rund 90
-  Issues (#980–#1064), Prioritäten P1–P3 je Issue, parallel bearbeitbar: 48 „Stabilisierung: Konten, Rechte und
-  Datenschutz“ (ersetzt „Prüfung Oktober“; #942 und die P1 #1027 #1028 #1039 #1047 #1052 #1053), 52 „Daten,
-  Buchungen und Turnierabläufe“, 53 „Darstellung und Bedienung“ (dort auch #937), 54 „Qualität: Performance, Tests
-  und CI“ (dort #932–#936, #775), 55 „Betrieb: Wiederherstellung und Release-Abnahme“ (u. a. #1016 Build 89,
-  #1018 App Links, #1019 Passkeys, #1020 Einlass – Geräteabnahmen). Die Arbeitsunterlagen (`prepared-issue-drafts.json`,
-  `bericht.md`) liegen laut #1065 unter `C:\GIT\lion-audit-2026-10-06\` – auf diesem Rechner nicht vorhanden; bei
-  Sicherheits-Tickets zuerst das JSON lesen, nichts erfinden.
-- **Reihenfolge laut Betreiber (6.10. abends):** erst die fast fertigen Meilensteine zu Ende (erledigt bis auf #330
-  und die Bundle-Übergabe), dann **warten auf seine Merges und sein OK**, dann die Stabilisierung – zuerst P1,
-  dann P2, dann P3; Geräte-/Integrationsabnahmen (55) getrennt von Code-Fixes behandeln.
-- **Offen beim Betreiber** (ausführlich in `UMBAUPLAN.md`, „Was von dir kommen muss“): `update.sh`; Build 89 in den
-  offenen Test; Sammelkanal + „Webhooks verwalten“ für den Bot (#966); alte Passkeys am Handy löschen; Play Console
-  → App-Signatur: SHA-256-Fingerabdrücke; die Rechte in Dolibarr und Discord vom 5.10.; die Abfrage aus #942; das
-  Ja zu #330; das OK für den Start der Stabilisierung.
+  Migration 4 läuft einmal). Zeilen in `UMBAUPLAN.md` „Nach dem Update vom 6.10.“ und „Nach dem Update vom 7.10.“.
+- **App 1.3.0 / Build 89** (`mobile-v1.3.0-build89`): AAB lädt der Betreiber in den offenen Test (Text in PR #979).
+  Nächster Build trägt #942 (Sitzungen), #1085 (Bewegung) und die vier Expo-Patches aus #1068.
+- **Offen beim Betreiber:** `update.sh`; Build 89 in den offenen Test; Merge #1100; Variante für #1084; die
+  Audit-Unterlagen; Sammelkanal + „Webhooks verwalten“ (#966); alte Passkeys am Handy; SHA-256-Fingerabdrücke.
 - **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
-  `sprintf-js`) – dann neu prüfen, sonst wird `npm run audit:ci` rot.
-- **Stolperstein 6.10.:** der PC ging um ~09:47 hart aus; `.git/HEAD`, frische Refs und `mobile/src/whatsnew.json`
-  waren danach mit Nullen gefüllt („not a git repository“). Repariert (HEAD neu, Refs gelöscht, `fetch`,
-  `checkout`); alles war gepusht. Rezept in `docs/STOLPERSTEINE.md`.
-- **GitHub:** `main` hat keinen Branch-Schutz („nie direkt auf `main`“ ist Vereinbarung); gemergte Zweige werden
-  nicht von selbst gelöscht. CodeQL läuft seit #955 automatisch.
+  `sprintf-js`). Dependabot meldet zusätzlich `postcss-selector-parser` (frontend, mittel) – `yarn audit:high` ist
+  grün, bei Gelegenheit heben.
+- **Arbeitsweise bei gestapelten PRs seit dem 6.10.:** nach einem Squash-Merge der Basis den nächsten Zweig nicht
+  rebasen (kollidiert mit dem Squash), sondern `git commit-tree <zweig>^{tree} -p origin/main -F msg` und den Zweig
+  darauf setzen (Rezept in `docs/STOLPERSTEINE.md`). Windows-Checkout ist CRLF: Tests, die Dateien lesen,
+  normalisieren Zeilenenden.
 
 ---
 
