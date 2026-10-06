@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 // nur Deko), darunter stehen die Logos; interne Ziele sind Router-Links, externe öffnen neu.
 
 vi.mock("@/lib/api", () => ({ resolveMediaUrl: (value) => value || "" }));
-vi.mock("@/components/tls/SmartLogo", () => ({ SmartLogo: ({ alt }) => <img alt={alt} /> }));
+vi.mock("@/components/tls/SmartLogo", () => ({ SmartLogo: ({ alt, className }) => <img alt={alt} className={className} /> }));
 
 const { LogoTicker, repeatForLoop, marqueeDuration } = await import("./LogoTicker");
 
@@ -26,6 +26,8 @@ test("läuft ab drei Logos: zwei Gruppen, die zweite ohne Tab-Stopp, Tempo aus d
   const [first, , , hidden] = screen.getAllByTitle("Alpha");
   expect(first).toHaveAttribute("href", "https://alpha.test");
   expect(first).toHaveAttribute("target", "_blank");
+  // Das Logo füllt den Kasten - auch eine kleine Vorlage wächst mit.
+  expect(first.querySelector("img")).toHaveClass("w-full", "h-full", "object-contain");
   expect(hidden).toHaveAttribute("tabindex", "-1");
   expect(screen.getAllByTitle("Beta")[0]).toHaveAttribute("href", "/partners/beta");
   expect(screen.getAllByTitle("Beta")[0]).not.toHaveAttribute("target");

@@ -1,15 +1,17 @@
 /**
- * PartnerTicker — das kleinere Laufband mit den Partnern unter den Sponsoren (#968).
+ * PartnerTicker - das kleinere Laufband mit den Partnern, im Footer direkt unter den Sponsoren.
  * Sponsoren geben dem Verein etwas und bekommen eine Gegenleistung, Partner sind kostenlose
- * Partnerschaften auf Gegenseitigkeit – deshalb zwei Bänder mit Überschrift. Nur Partner mit Logo,
- * jedes Logo führt auf die Partnerseite; ohne Partner-Logos fällt das Band weg.
+ * Partnerschaften auf Gegenseitigkeit - deshalb zwei Bänder: gleicher Grund, gleiche Machart, die Partner
+ * eine Stufe kleiner und in Gegenrichtung. Nur Partner mit Logo, jedes Logo führt auf die Partnerseite;
+ * ohne Partner-Logos fällt das Band weg.
  */
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { LogoTicker } from "@/components/tls/LogoTicker";
 
-const BOX = "h-12 w-44 sm:h-14 sm:w-56 md:h-16 md:w-64";
+// Etwa drei Viertel der Sponsoren-Kästen im Footer (SponsorTicker, COMPACT_BOX).
+const BOX = "h-8 w-28 sm:w-32 md:h-9 md:w-44";
 
 export function partnerTickerItems(partners) {
   return (Array.isArray(partners) ? partners : [])
@@ -38,20 +40,17 @@ export function PartnerTicker({ className = "" }) {
   const items = partnerTickerItems(partners);
   if (!items.length) return null;
   return (
-    <section className={`relative max-w-full overflow-hidden bg-black border-b border-[#29B6E8]/10 ${className}`} data-testid="partner-ticker">
-      <div className="max-w-7xl mx-auto px-4 pt-5 pb-0 text-center">
-        <span className="text-[10px] uppercase tracking-[0.35em] font-bold text-white/40">Partner</span>
-      </div>
+    <section className={`relative max-w-full overflow-hidden bg-transparent ${className}`} aria-label="Partner" data-testid="partner-ticker">
       <LogoTicker
         items={items}
         boxClassFor={() => BOX}
         minForMarquee={3}
-        minItems={10}
+        minItems={14}
         secondsPerItem={7}
-        minSeconds={70}
-        gapClass="gap-10 md:gap-14"
-        groupPaddingClass="pr-10 md:pr-14"
-        verticalClass="py-4 md:py-5"
+        minSeconds={72}
+        gapClass="gap-5 sm:gap-8 md:gap-12"
+        groupPaddingClass="pr-5 sm:pr-8 md:pr-12"
+        verticalClass="py-2"
         reverse
         testId="partner-ticker-band"
       />

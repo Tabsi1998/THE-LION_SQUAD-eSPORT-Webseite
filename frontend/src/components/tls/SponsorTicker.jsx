@@ -18,7 +18,8 @@ const tierBox = {
 
 // Startseite (#968): eine Stufe größer als vorher (etwa +12 %), damit die Sponsoren vor den Partnern stehen.
 const SPOTLIGHT_BOX = "h-[5.5rem] w-[20rem] sm:h-[6.75rem] sm:w-[31.5rem] md:h-[7.75rem] md:w-[38rem]";
-const COMPACT_BOX = "h-9 w-32 sm:w-40 md:h-10 md:w-52";
+// Footer: eine Stufe größer als zuvor (etwa +20 %); die Partner direkt darunter bleiben kleiner (PartnerTicker).
+const COMPACT_BOX = "h-10 w-36 sm:h-11 sm:w-44 md:h-12 md:w-60";
 
 function sponsorKey(sponsor) {
   const logo = String(sponsor.logo_url || "").trim().toLowerCase();
@@ -68,7 +69,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
       ? "border-y border-[#29B6E8]/15 bg-black"
       : "border-y border-white/5 bg-[#070707]";
   return (
-    <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} data-testid="sponsor-ticker">
+    <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} aria-label={compact ? "Sponsoren" : undefined} data-testid="sponsor-ticker">
       {!compact && !spotlight && (
         <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
           <span className="text-[9px] uppercase tracking-[0.35em] font-bold text-white/35">Presented by our Partners</span>

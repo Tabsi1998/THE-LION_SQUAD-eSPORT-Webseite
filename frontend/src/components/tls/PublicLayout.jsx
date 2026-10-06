@@ -11,6 +11,7 @@ import { InvitationBanner } from "@/components/tls/InvitationBanner";
 import { CrownCelebration } from "@/components/tls/CrownCelebration";
 import { LevelUpCelebration } from "@/components/tls/LevelUpCelebration";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
+import { PartnerTicker } from "@/components/tls/PartnerTicker";
 import { GlobalSearch } from "@/components/tls/GlobalSearch";
 import { openCookieSettings } from "@/components/tls/CookieConsent";
 import { SeasonFooterSlot, SeasonMenuSlot, SeasonWidgetSlot } from "@/seasons/SeasonSlots";
@@ -224,7 +225,12 @@ export function PublicLayout({ children }) {
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <SponsorTicker compact placement="footer" className="pb-8 border-b border-white/5" />
+          {/* Sponsoren, direkt darunter eine Stufe kleiner die Partner: gleicher Grund, eine Linie darunter.
+              Ohne Sponsoren und ohne Partner fällt der Block samt Linie weg. */}
+          <div className="pb-8 border-b border-white/5 empty:hidden" data-testid="footer-logo-bands">
+            <SponsorTicker compact placement="footer" />
+            <PartnerTicker className="mt-2" />
+          </div>
           <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-8 min-w-0" data-testid="footer-columns">
             {footerColumns(branding, { isClubMember }).map((column) => (
               <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className="min-w-0">

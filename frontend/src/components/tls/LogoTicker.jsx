@@ -39,7 +39,9 @@ export function LogoTicker({
   const renderLogo = (item, i, groupIndex = 0, duplicate = false) => {
     const key = `${groupIndex}-${item.key}-${i}`;
     const linkClass = `inline-flex items-center justify-center shrink-0 opacity-80 hover:opacity-100 transition ${boxClassFor(item)}`;
-    const logo = <SmartLogo src={resolveMediaUrl(item.logo_url)} alt={item.name} className="max-h-full max-w-full w-auto h-auto" />;
+    // Jedes Logo füllt seinen Kasten (object-contain): eine kleine Vorlage wächst mit, eine große schrumpft. So stehen
+    // alle Logos eines Bandes gleich hoch, egal wie groß die Datei ist, und folgen jeder Kastengröße.
+    const logo = <SmartLogo src={resolveMediaUrl(item.logo_url)} alt={item.name} className="w-full h-full object-contain" />;
     if (item.to) {
       return <Link key={key} to={item.to} tabIndex={duplicate ? -1 : undefined} className={linkClass} title={item.name}>{logo}</Link>;
     }
