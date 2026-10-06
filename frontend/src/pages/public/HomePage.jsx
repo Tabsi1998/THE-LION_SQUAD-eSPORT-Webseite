@@ -13,7 +13,6 @@ import { MascotBadge } from "@/components/tls/Logo";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { SeasonPassWidget } from "@/components/tls/SeasonPassWidget";
 import { SponsorTicker } from "@/components/tls/SponsorTicker";
-import { PartnerTicker } from "@/components/tls/PartnerTicker";
 import { LiveStreamSlider } from "@/components/tls/LiveStreamSlider";
 import { TwitchClips } from "@/components/tls/TwitchClips";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
@@ -102,9 +101,8 @@ export default function HomePage() {
       {/* Discord (#581): online und im Voice - nur Zahlen, nur bei eingeschaltetem Server-Widget. */}
       <LiveStreamSlider />
       <TwitchClips />
-      {/* Sponsoren groß, darunter die Partner kleiner (#968): Sponsoren geben dem Verein etwas, Partner sind Partnerschaften auf Gegenseitigkeit. */}
+      {/* Sponsoren groß (#968). Die Partner stehen als kleineres Band im Footer direkt unter den Sponsoren. */}
       <SponsorTicker placement="home" spotlight />
-      <PartnerTicker />
 
       {!state && (
         <section className="border-b border-white/10 bg-[#080808]/35">
