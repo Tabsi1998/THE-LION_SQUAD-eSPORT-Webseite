@@ -205,16 +205,44 @@ def preview_for(year: int) -> dict:
     return {"token": seasons.preview_token(SEASON, at_time=at), "seconds": seasons.PREVIEW_SECONDS, "at": at.isoformat()}
 
 
+PLACEHOLDER_EGGS = 3
+PLACEHOLDER_TOTAL = 12
+
+
+def placeholder_eggs(year: int, route: str, channel: str = "web", count: int = PLACEHOLDER_EGGS) -> list[dict]:
+    """Eier für die Vorschau einer Seite, für die (noch) keine angelegt sind (#964): drei Verstecke an echten Kanten
+    dieser Seite, je Jahr und Seite dieselben - so zeigt die Vorschau überall, wie die Suche aussieht, auch bevor die
+    Verwaltung ein Jahr angelegt hat. Sie bekommen hohe Nummern, damit sie nie mit echten Eiern verwechselt werden."""
+    channel = channel if channel in CHANNELS else "web"
+    route = normalize_route(route)
+    rng = random.Random(f"easter-hunt-placeholder:{int(year)}:{channel}:{route}")
+    kinds = [kind for kind in SPOT_KINDS[channel] for _ in range(SPOT_WEIGHTS.get(kind, 1))]
+    patterns = list(PATTERNS)
+    rng.shuffle(patterns)
+    out = []
+    for offset in range(count):
+        kind = rng.choice(kinds)
+        out.append({"egg_no": 100 + offset + 1, "year": int(year), "channel": channel, "route": route, "pattern": patterns[offset % len(patterns)],
+                    "spot": {"kind": kind, "index": rng.randrange(0, 4) if kind in ("card", "image") else 0, "place": rng.choice(PLACES)},
+                    "hint": "Platzhalter – unter Verwaltung → Ostereiersuche das Jahr anlegen", "placeholder": True})
+    return out
+
+
 async def preview_eggs(db, route: str, channel: str, at: datetime | None = None) -> dict:
-    """Vorschau für die Verwaltung (#757, Token „Vorschau 60 Sekunden“): die Eier dieser Seite aus dem Jahr der
-    Vorschau - auch im Entwurf und vor Karfreitag, mit Hinweis, damit sich Versteck und Hinweis prüfen lassen. Ohne
-    Schlüssel: gefunden wird in der Vorschau nichts."""
+    """Vorschau (Token „Vorschau 60 Sekunden“, #757, #964): die Eier dieser Seite aus dem Jahr der Vorschau - auch im
+    Entwurf und vor Karfreitag, mit Hinweis, damit sich Versteck und Hinweis prüfen lassen. Gibt es für das Jahr noch
+    keine Eier, liegen Platzhalter da (``placeholder``), damit sich die Suche trotzdem ausprobieren lässt. Ohne
+    Schlüssel: gefunden wird am Server nichts - was in der Vorschau gefunden wird, zählt nur die Seite."""
     channel = channel if channel in CHANNELS else "web"
     year = preview_year(at)
     rows = await db[EGGS].find({"year": year, "route": normalize_route(route), "channel": channel}, {"_id": 0}).sort("egg_no", 1).to_list(MAX_EGGS)
     total = await db[EGGS].count_documents({"year": year})
+    placeholder = total == 0
+    if placeholder:
+        rows = placeholder_eggs(year, route, channel)
+        total = PLACEHOLDER_TOTAL
     return {
-        "active": bool(rows), "preview": True, "year": year, "total": total, "guest": False,
+        "active": True, "preview": True, "placeholder": placeholder, "year": year, "total": total, "guest": False,
         "eggs": [{**egg_view(egg), "token": "", "found": False, "hint": egg.get("hint") or default_hint(egg)} for egg in rows],
     }
 

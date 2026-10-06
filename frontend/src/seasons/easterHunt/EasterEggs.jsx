@@ -15,8 +15,10 @@ import "./easter-hunt.css";
 // Person); placement.js legt sie in Ecken echter Kanten. Jedes Ei ist ein Knopf („Osterei einsammeln“) - mit Maus,
 // Finger und Tastatur erreichbar. Manche liegen ruhig, manche wackeln, wenn die Maus näher kommt, manche wippen ab
 // und zu von selbst; ein Fund hebt das Ei kurz an und sagt, wie viele es jetzt sind. Gäste sehen die Eier und werden
-// zum Anmelden eingeladen - gezählt wird nichts. In der Vorschau aus dem Admin (#757) liegen die Eier des Jahres auch
-// im Entwurf; antippen zeigt Nummer und Hinweis.
+// zum Anmelden eingeladen - gezählt wird nichts. In der Vorschau (#757, #964) liegen die Eier des Jahres auch im
+// Entwurf - ohne angelegtes Jahr Platzhalter -, und die Suche lässt sich ausprobieren: antippen sammelt das Ei
+// probehalber ein (Nummer und Hinweis stehen dabei), der Korb zählt mit, bis er voll ist. Das merkt sich nur diese
+// Seite bis zum Neuladen; am Server zählt nichts.
 // Die Eier liegen in Seitenkoordinaten unter der Kopfzeile, ihren Menüs und der Leiste unten: wer scrollt, sieht
 // sie darunter verschwinden.
 
@@ -31,6 +33,24 @@ const NEAR_PX = 90;
 const NEAR_MS = 900;
 const NEAR_EVERY_MS = 120;
 const NEAR_REST_MS = 5000;
+/** Der Korb der Vorschau (#964): je Jahr, nur in diesem Fenster, bis zum Neuladen. */
+const previewBasket = { year: null, found: new Set() };
+
+export function previewFind(year, total, key) {
+  if (previewBasket.year !== year) {
+    previewBasket.year = year;
+    previewBasket.found = new Set();
+  }
+  previewBasket.found.add(key);
+  const found = Math.min(previewBasket.found.size, total);
+  return { found, total, full: total > 0 && found >= total };
+}
+
+/** Nur für Tests: den Korb der Vorschau leeren. */
+export function resetPreviewBasket() {
+  previewBasket.year = null;
+  previewBasket.found = new Set();
+}
 
 /**
  * Je Ei fest: leichte Neigung und Gemüt - ruhig, neugierig (wackelt kurz, wenn die Maus näher kommt) oder lebhaft
@@ -100,6 +120,7 @@ export function EasterEggs({ season }) {
   const eggsRef = useRef([]);
   const placedRef = useRef({});
   const noteTimer = useRef(null);
+  const huntRef = useRef({ year: null, total: 0 });
   const route = location.pathname;
   const { preview: previewOn } = useSeason();
   const previewToken = previewOn ? previewTokenFor("easter_hunt") : null;
@@ -109,6 +130,7 @@ export function EasterEggs({ season }) {
     try {
       const data = await fetchEggs(route, previewToken);
       setPreviewing(Boolean(data?.preview));
+      huntRef.current = { year: data?.year ?? null, total: Number(data?.total) || 0 };
       reportHuntActive(data?.active);
       const fresh = data?.active ? (data.eggs || []).filter((egg) => !egg.found) : [];
       eggsRef.current = fresh;
@@ -224,9 +246,25 @@ export function EasterEggs({ season }) {
     if (kind === "found" || kind === "error") noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
   };
 
+  // Vorschau (#964): das Ei wird probehalber eingesammelt - Nummer und Hinweis stehen dabei, der Korb zählt mit.
+  const collectPreview = (egg) => {
+    const { year, total } = huntRef.current;
+    const { found, full } = previewFind(year, total, `${route}:${egg.egg_no}`);
+    emitHuntProgress({ found, total, completed_at: full ? new Date().toISOString() : null, rank: null, active: true, preview: true });
+    setLive(full ? `Osterei gefunden – der Korb der Vorschau ist voll.` : `Osterei gefunden (Vorschau): ${found} von ${total}.`);
+    setPopping(egg.egg_no);
+    const hint = egg.hint ? ` · Ei ${egg.egg_no}: ${egg.hint}` : ` · Ei ${egg.egg_no}`;
+    showNote(egg, full ? "done" : "preview", full ? `Korb voll (Vorschau) – gezählt wird nichts${hint}` : `Vorschau: ${found} von ${total}${hint}`);
+    setTimeout(() => {
+      eggsRef.current = eggsRef.current.filter((item) => item.egg_no !== egg.egg_no);
+      setEggs(eggsRef.current);
+      setPopping(null);
+    }, reduced ? 0 : POP_MS);
+  };
+
   const collect = async (egg, retried = false) => {
     if (previewing) {
-      showNote(egg, "preview", `Vorschau: Ei ${egg.egg_no}${egg.hint ? ` – ${egg.hint}` : ""}`);
+      collectPreview(egg);
       return;
     }
     if (!user) {

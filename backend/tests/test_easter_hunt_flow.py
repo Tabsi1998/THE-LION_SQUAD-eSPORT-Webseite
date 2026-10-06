@@ -369,3 +369,36 @@ async def test_seite_ohne_suche_nennt_den_naechsten_start(flow, monkeypatch):
     flow.act_as(None)
     page = (await flow.get("/api/seasonal/easter/page")).json()
     assert page == {"phase": "none", "next_start": "2027-03-26T00:00:00+01:00"}
+
+
+@pytest.mark.asyncio
+async def test_vorschau_ohne_angelegtes_jahr_legt_platzhalter_auf_jede_seite(flow, monkeypatch):
+    """#964: Die Vorschau zeigt die Suche auch, bevor die Verwaltung ein Jahr angelegt hat - drei Platzhalter je Seite,
+    mit hohen Nummern und dem Hinweis, wo das Jahr angelegt wird. Sobald es Eier gibt, liegen nur noch die echten da."""
+    Clock(monkeypatch, vienna(2026, 10, 6, 9))
+    flow.act_as(None)
+    saturday = vienna(2027, 3, 27, 12)
+    token = seasons.preview_token(easter.SEASON, at_time=saturday)
+    home = (await flow.get("/api/seasonal/easter/eggs", params={"route": "/", "channel": "web", "preview": token})).json()
+    assert home["active"] is True and home["preview"] is True and home["placeholder"] is True and home["year"] == 2027
+    assert [egg["egg_no"] for egg in home["eggs"]] == [101, 102, 103] and home["total"] == easter.PLACEHOLDER_TOTAL
+    assert all(egg["token"] == "" and "Platzhalter" in egg["hint"] and egg["spot"]["kind"] in easter.SPOT_KINDS["web"] for egg in home["eggs"])
+    # Dieselbe Seite, dieselben Verstecke - eine andere Seite eigene.
+    again = (await flow.get("/api/seasonal/easter/eggs", params={"route": "/", "channel": "web", "preview": token})).json()
+    assert again["eggs"] == home["eggs"]
+    news = (await flow.get("/api/seasonal/easter/eggs", params={"route": "/news", "channel": "web", "preview": token})).json()
+    assert news["placeholder"] is True and [egg["spot"] for egg in news["eggs"]] != [egg["spot"] for egg in home["eggs"]]
+    # Ohne Token bleibt es dabei: im Oktober keine Eier.
+    assert (await flow.get("/api/seasonal/easter/eggs", params={"route": "/", "channel": "web"})).json()["active"] is False
+
+    # Mit angelegtem Jahr (auch im Entwurf): nur die echten Eier; eine Seite ohne Ei bleibt in der Vorschau leer.
+    staff = await flow.add_staff("Redaktion")
+    eggs = await setup_hunt(flow, staff, status="draft")
+    flow.act_as(None)
+    web_egg = next(egg for egg in eggs if egg["channel"] == "web")
+    real = (await flow.get("/api/seasonal/easter/eggs", params={"route": web_egg["route"], "channel": "web", "preview": token})).json()
+    assert real["placeholder"] is False and all(egg["egg_no"] < 100 for egg in real["eggs"]) and real["total"] == len(eggs)
+    unused = next(route for route in easter.WEB_ROUTES if route not in {egg["route"] for egg in eggs})
+    empty = (await flow.get("/api/seasonal/easter/eggs", params={"route": unused, "channel": "web", "preview": token})).json()
+    assert empty["active"] is True and empty["placeholder"] is False and empty["eggs"] == []
+
