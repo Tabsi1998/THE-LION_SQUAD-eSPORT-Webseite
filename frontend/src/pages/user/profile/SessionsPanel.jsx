@@ -5,8 +5,10 @@ import { toast } from "sonner";
 import { Laptop, LogOut, ShieldCheck, Smartphone } from "lucide-react";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 
-function parseSessionDevice(userAgent = "", client = "web") {
-  if (client === "mobile") return { browser: "Lion Squad App", os: "Mobile", mobile: true };
+// Gerät der App (#942): der Server kennt seit Build 89 Modell und System („Pixel 9 / Android 16“) - ältere App-Sitzungen
+// stehen weiter als „Mobile“.
+export function parseSessionDevice(userAgent = "", client = "web", device = "") {
+  if (client === "mobile") return { browser: "Lion Squad App", os: device || "Mobile", mobile: true };
   const ua = userAgent || "";
   const browser = /edg\//i.test(ua) ? "Edge"
     : /opr\/|opera/i.test(ua) ? "Opera"
@@ -119,7 +121,7 @@ export function SessionsPanel() {
         </div>
       )}
       {(sessions || []).map((session) => {
-        const device = parseSessionDevice(session.user_agent, session.client);
+        const device = parseSessionDevice(session.user_agent, session.client, session.device);
         const DeviceIcon = device.mobile ? Smartphone : Laptop;
         return (
           <div

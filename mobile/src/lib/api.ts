@@ -2,6 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL, API_URL } from "../config";
 import type { AuthResponse } from "../types";
 import { buildCacheKey, getStaleCache, setCached } from "./cache";
+import { deviceHeaders } from "./deviceIdentity";
 
 type TokenSnapshot = {
   accessToken: string | null;
@@ -19,6 +20,25 @@ let readTokens: () => TokenSnapshot = () => ({ accessToken: null, refreshToken: 
 let persistSession: (session: AuthResponse) => Promise<void> = async () => {};
 let clearSession: () => Promise<void> = async () => {};
 let refreshPromise: Promise<AuthResponse> | null = null;
+
+/**
+ * Die Sitzung erneuern (#942) - ein Weg für alle: der 401-Nachschlag und der App-Start teilen sich eine laufende
+ * Erneuerung, statt denselben Token zweimal zu drehen (der zweite Versuch fiel sonst außerhalb des Gnadenfensters
+ * und der Server warf die ganze Sitzung weg). Ohne Token wird abgelehnt wie vom Server.
+ */
+export function refreshSession(token?: string | null): Promise<AuthResponse> {
+  const refreshToken = token || readTokens().refreshToken;
+  if (!refreshToken) return Promise.reject(new Error("Kein Erneuerungs-Token"));
+  refreshPromise =
+    refreshPromise ||
+    api
+      .post<AuthResponse>("/auth/mobile/refresh", { refresh_token: refreshToken })
+      .then(({ data }) => data)
+      .finally(() => {
+        refreshPromise = null;
+      });
+  return refreshPromise;
+}
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -45,6 +65,11 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const { accessToken, userId } = readTokens();
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
+  }
+  // Gerät je Installation (#942): Kennung und Name als Kopfzeilen - der Server zeigt das Gerät in der Sitzungsliste
+  // und schließt beim Neu-Login die alte Sitzung desselben Geräts.
+  for (const [name, value] of Object.entries(await deviceHeaders())) {
+    config.headers.set(name, value);
   }
 
   // Bind every cached response to the account and exact query parameters.
@@ -74,16 +99,8 @@ api.interceptors.response.use(
     // ── 401: Token-Refresh ──────────────────────────────────────────────────
     if (error.response?.status === 401 && original && !original._retry && refreshToken && !isAuthCall) {
       original._retry = true;
-      refreshPromise =
-        refreshPromise ||
-        api
-          .post<AuthResponse>("/auth/mobile/refresh", { refresh_token: refreshToken })
-          .then(({ data }) => data)
-          .finally(() => {
-            refreshPromise = null;
-          });
       try {
-        const session = await refreshPromise;
+        const session = await refreshSession(refreshToken);
         await persistSession(session);
         original.headers.Authorization = `Bearer ${session.access_token}`;
         return api(original);

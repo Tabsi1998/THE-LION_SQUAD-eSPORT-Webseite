@@ -1,8 +1,9 @@
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { api, configureAuthBridge } from "../lib/api";
+import { api, configureAuthBridge, refreshSession } from "../lib/api";
 import { clearAllCache } from "../lib/cache";
 import { signInWithPasskey } from "../lib/passkeys";
+import { accessTokenExpired, isNetworkError, isSessionRejected } from "../lib/session";
 import { isGuestUser, liveGuestUser } from "../live";
 import { unregisterPushToken } from "../notifications/PushService";
 import type { AuthResponse, User } from "../types";
@@ -10,6 +11,8 @@ import type { AuthResponse, User } from "../types";
 const ACCESS_KEY = "tls.mobile.accessToken";
 const REFRESH_KEY = "tls.mobile.refreshToken";
 const REMEMBER_KEY = "tls.mobile.rememberSession";
+// Das Konto der Sitzung (#942): damit die App offline mit der gemerkten Sitzung startet statt sich abzumelden.
+const USER_KEY = "tls.mobile.user";
 
 type RegisterPayload = {
   username: string;
@@ -86,11 +89,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         SecureStore.setItemAsync(ACCESS_KEY, session.access_token),
         SecureStore.setItemAsync(REFRESH_KEY, session.refresh_token),
         SecureStore.setItemAsync(REMEMBER_KEY, "true"),
+        SecureStore.setItemAsync(USER_KEY, JSON.stringify(session.user)),
       ]);
     } else {
       await Promise.all([
         SecureStore.deleteItemAsync(ACCESS_KEY),
         SecureStore.deleteItemAsync(REFRESH_KEY),
+        SecureStore.deleteItemAsync(USER_KEY),
         SecureStore.setItemAsync(REMEMBER_KEY, "false"),
       ]);
     }
@@ -105,6 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await Promise.all([
       SecureStore.deleteItemAsync(ACCESS_KEY),
       SecureStore.deleteItemAsync(REFRESH_KEY),
+      SecureStore.deleteItemAsync(USER_KEY),
       clearAllCache(),
     ]);
   }, [enterGuest]);
@@ -124,14 +130,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    // Sitzung beim Start (#942): ein Weg. Gilt das Zugangs-Token noch, reicht /auth/me; sonst genau eine Erneuerung
+    // über den gemeinsamen Weg (den auch der 401-Nachschlag nutzt). Ein Netzfehler meldet nicht ab: die Sitzung und
+    // das gemerkte Konto bleiben, bis der Server antwortet. Nur eine abgelehnte Erneuerung (401/403) beendet sie.
     async function boot() {
+      let storedAccess: string | null = null;
+      let storedRefresh: string | null = null;
+      let storedUser: User | null = null;
       try {
-        const [storedAccess, storedRefresh, storedRemember] = await Promise.all([
+        const [access, refresh, storedRemember, userJson] = await Promise.all([
           SecureStore.getItemAsync(ACCESS_KEY),
           SecureStore.getItemAsync(REFRESH_KEY),
           SecureStore.getItemAsync(REMEMBER_KEY),
+          SecureStore.getItemAsync(USER_KEY),
         ]);
         if (!mounted) return;
+        storedAccess = access;
+        storedRefresh = refresh;
+        try {
+          storedUser = userJson ? (JSON.parse(userJson) as User) : null;
+        } catch {
+          storedUser = null;
+        }
 
         const shouldRestore = storedRemember !== "false";
         setRememberSession(shouldRestore);
@@ -140,33 +160,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await clearSession();
           return;
         }
-
-        if (storedAccess) {
-          try {
-            setAccessToken(storedAccess);
-            setRefreshToken(storedRefresh);
-            const { data } = await api.get<User>("/auth/me", {
-              headers: { Authorization: `Bearer ${storedAccess}` },
-            });
-            if (mounted) setUser(data);
-            return;
-          } catch {
-            // Fall through to refresh-token restore if the access token expired.
-          }
-        }
-
-        if (storedRefresh) {
-          setRefreshToken(storedRefresh);
-          const { data } = await api.post<AuthResponse>("/auth/mobile/refresh", {
-            refresh_token: storedRefresh,
-          });
-          if (mounted) await persistSession(data, true);
+        if (!storedAccess && !storedRefresh) {
+          // Nichts gespeichert (erster Start oder abgemeldet): Gastmodus (#918).
+          enterGuest();
           return;
         }
-        // Nichts gespeichert (erster Start oder abgemeldet): Gastmodus (#918).
-        if (mounted) enterGuest();
-      } catch {
-        if (mounted) await clearSession();
+
+        setAccessToken(storedAccess);
+        setRefreshToken(storedRefresh);
+        if (storedAccess && !accessTokenExpired(storedAccess)) {
+          try {
+            const { data } = await api.get<User>("/auth/me", { headers: { Authorization: `Bearer ${storedAccess}` } });
+            if (mounted) {
+              setUser(data);
+              activeUserIdRef.current = data.id;
+              await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
+            }
+            return;
+          } catch (error) {
+            if (isNetworkError(error)) throw error;
+            // Vom Server abgelehnt oder gestört: einmal erneuern, das entscheidet.
+          }
+        }
+        if (!storedRefresh) throw Object.assign(new Error("Kein Erneuerungs-Token"), { response: { status: 401 } });
+        const session = await refreshSession(storedRefresh);
+        if (mounted) await persistSession(session, true);
+      } catch (error) {
+        if (!mounted) return;
+        if (isSessionRejected(error) || (!isNetworkError(error) && !storedUser)) {
+          await clearSession();
+          return;
+        }
+        // Offline oder Server gestört: angemeldet bleiben, mit dem gemerkten Konto - der nächste Aufruf erneuert.
+        if (storedUser) {
+          setUser(storedUser);
+          activeUserIdRef.current = storedUser.id;
+        } else {
+          enterGuest();
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -183,7 +214,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string, remember = true, noDevicePasskey = false) => {
-      const { data } = await api.post<AuthResponse>("/auth/mobile/login", { email, password });
+      // „Angemeldet bleiben“ (#942) geht mit: ohne Haken endet die Sitzung am Server nach 24 Stunden statt 90 Tagen.
+      const { data } = await api.post<AuthResponse>("/auth/mobile/login", { email, password, remember });
       const challenge = data as AuthResponse & { mfa_required?: boolean; mfa_ticket?: string };
       if (challenge.mfa_required) return { mfaRequired: true, ticket: challenge.mfa_ticket };
       await persistSession(data, remember);

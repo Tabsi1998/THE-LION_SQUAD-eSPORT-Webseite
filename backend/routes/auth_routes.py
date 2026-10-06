@@ -29,6 +29,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 BRUTE_FORCE_MAX = 7
 BRUTE_FORCE_WINDOW_MIN = 15
 REFRESH_REPLAY_GRACE_SECONDS = 10
+# Dasselbe Gerät der App (Kennung in `X-Device-Id`, #942) darf eine gerade gedrehte Erneuerung länger wiederholen:
+# beim App-Start können Wiederherstellung und ein 401-Nachschlag denselben Token erneuern, auch bei langsamem Netz.
+DEVICE_REPLAY_GRACE_SECONDS = 60
+DEVICE_HEADER_MAX = 120
 ADMIN_ROLES = {"tournament_admin", "club_admin", "superadmin"}
 
 
@@ -164,6 +168,14 @@ def _request_identity(request: Request) -> tuple[str, str]:
     return (str(request.headers.get("user-agent") or "")[:512], get_client_ip(request))
 
 
+def _device_identity(request: Request) -> dict:
+    """Das Gerät der App (#942): Kennung je Installation und ein Name wie „Pixel 9 · Android 16“ aus den Kopfzeilen
+    `X-Device-Id` und `X-Device-Name` - die Website schickt nichts, dann bleibt beides leer."""
+    device_id = str(request.headers.get("x-device-id") or "").strip()[:80]
+    device_name = " ".join(str(request.headers.get("x-device-name") or "").split())[:DEVICE_HEADER_MAX]
+    return {"device_id": device_id or None, "device_name": device_name or None}
+
+
 def _eligible_session_user(user: dict | None) -> dict:
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
@@ -281,6 +293,7 @@ async def _store_session(
         user_agent=user_agent,
         ip=ip,
         client=client,
+        device=_device_identity(request),
     )
     return access, refresh
 
@@ -362,8 +375,19 @@ async def _attach_membership(user: dict) -> dict:
     return user
 
 
-async def _issue_mobile_session(db, user: dict, request: Request, *, mfa_verified: bool = False) -> tuple[str, str]:
-    return await _issue_tokens(db, user, request, client="mobile", mfa_verified=mfa_verified)
+async def _issue_mobile_session(db, user: dict, request: Request, *, mfa_verified: bool = False, remember: bool = True) -> tuple[str, str]:
+    """Eine App-Sitzung (#942): „Angemeldet bleiben“ zählt auch in der App (sonst 24 h statt 90 Tage), und meldet sich
+    dasselbe Gerät neu an, schließt das die alte Sitzung dieses Geräts - die Liste zeigt dann nicht mehr je Tag eine neue."""
+    device_id = _device_identity(request).get("device_id")
+    if device_id:
+        stale = await db.auth_sessions.find(
+            {"user_id": user["id"], "client": "mobile", "device_id": device_id, "revoked": {"$ne": True}},
+            {"_id": 0, "family_id": 1},
+        ).to_list(50)
+        for row in stale:
+            if row.get("family_id"):
+                await _revoke_refresh_family(db, user["id"], row["family_id"], "device_relogin")
+    return await _issue_tokens(db, user, request, client="mobile", mfa_verified=mfa_verified, remember=remember)
 
 
 def _ua_fingerprint(user_agent: str) -> tuple[str, str]:
@@ -378,7 +402,7 @@ def _ua_fingerprint(user_agent: str) -> tuple[str, str]:
     return (browser or "", os_name or "")
 
 
-def _within_rotation_grace(stored: dict, now: datetime, user_agent: str) -> bool:
+def _within_rotation_grace(stored: dict, now: datetime, user_agent: str, device_id: str | None = None) -> bool:
     """Benign concurrent-refresh detection.
 
     A refresh token that was JUST rotated (within the grace window) by the SAME
@@ -395,7 +419,10 @@ def _within_rotation_grace(stored: dict, now: datetime, user_agent: str) -> bool
     if stored.get("revocation_reason") not in (None, "rotated"):
         return False
     rotated_at = as_utc_datetime(stored.get("rotated_at"))
-    if not rotated_at or now - rotated_at > timedelta(seconds=REFRESH_REPLAY_GRACE_SECONDS):
+    # Dasselbe Gerät der App (#942) bekommt das längere Fenster - eine fremde Wiederholung hat die Kennung nicht.
+    same_device = bool(device_id) and stored.get("rotation_device_id") == device_id
+    grace = DEVICE_REPLAY_GRACE_SECONDS if same_device else REFRESH_REPLAY_GRACE_SECONDS
+    if not rotated_at or now - rotated_at > timedelta(seconds=grace):
         return False
     if _ua_fingerprint(stored.get("rotation_user_agent")) != _ua_fingerprint(user_agent):
         return False
@@ -416,6 +443,7 @@ async def _touch_auth_session(
     user_agent: str,
     ip: str,
     client: str | None = None,
+    device: dict | None = None,
 ) -> None:
     """Keep one device/session document per refresh-token family."""
     update = {
@@ -428,6 +456,9 @@ async def _touch_auth_session(
     }
     if client:
         update["client"] = client
+    for key in ("device_id", "device_name"):
+        if device and device.get(key):
+            update[key] = device[key]
     try:
         await db.auth_sessions.update_one(
             {"family_id": family_id},
@@ -497,6 +528,7 @@ async def _rotate_session(
     remember = token_remembers(payload)
     replacement_expires_at = refresh_expires_at(remember)
     user_agent, ip = _request_identity(request)
+    device_id = _device_identity(request).get("device_id")
     stored = await db.refresh_tokens.find_one_and_update(
         {
             "jti": token_id,
@@ -513,6 +545,7 @@ async def _rotate_session(
             "replacement_expires_at": replacement_expires_at,
             "rotation_user_agent": user_agent,
             "rotation_ip": ip,
+            "rotation_device_id": device_id,
         }},
         return_document=ReturnDocument.BEFORE,
     )
@@ -522,7 +555,7 @@ async def _rotate_session(
             "jti": token_id,
             "token_hash": hash_token(token),
         })
-        if not stored or not _within_rotation_grace(stored, now, user_agent):
+        if not stored or not _within_rotation_grace(stored, now, user_agent, device_id):
             await _revoke_refresh_family(db, user_id, family_id, "refresh_reuse")
             raise HTTPException(status_code=401, detail="Invalid refresh token")
         replacement_jti = stored.get("replacement_jti")
@@ -952,8 +985,8 @@ async def mobile_login(body: UserLogin, request: Request):
 
     await _clear_failed(db, identifier)
     if _requires_admin_mfa(user):
-        return await _create_mfa_login_challenge(db, user, request, "mobile")
-    access, refresh = await _issue_mobile_session(db, user, request)
+        return await _create_mfa_login_challenge(db, user, request, "mobile", remember=body.remember)
+    access, refresh = await _issue_mobile_session(db, user, request, remember=body.remember)
     public = _public_user(user)
     await _attach_membership(public)
     return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer",
@@ -1074,6 +1107,8 @@ async def list_sessions(request: Request, user: dict = Depends(get_current_user)
             "user_agent": row.get("user_agent") or "",
             "ip": row.get("ip") or "",
             "client": row.get("client") or "web",
+            # Gerät der App (#942): „Pixel 9 · Android 16“ statt nur „Mobile“; die Website hat keins.
+            "device": row.get("device_name") or "",
             "current": bool(current_family and row.get("family_id") == current_family),
             # „Bleibt angemeldet bis …“ (#348); verlängert sich mit jeder Nutzung.
             "expires_at": expires_at.isoformat() if expires_at else None,
@@ -1220,7 +1255,7 @@ async def complete_mfa_login(body: MfaLoginBody, request: Request, response: Res
     client = "mobile" if challenge.get("client") == "mobile" or body.client == "mobile" else "web"
     await _security_audit(db, user["id"], "auth.mfa.login", request)
     if client == "mobile":
-        access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True)
+        access, refresh = await _issue_mobile_session(db, user, request, mfa_verified=True, remember=challenge.get("remember") is not False)
         public = _public_user(user)
         await _attach_membership(public)
         return {"user": public, "access_token": access, "refresh_token": refresh, "token_type": "bearer",
