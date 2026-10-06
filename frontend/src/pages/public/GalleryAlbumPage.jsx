@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motionAllowed } from "@/lib/motion";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -78,6 +79,8 @@ export default function GalleryAlbumPage() {
   const [a, setA] = useState(null);
   const [error, setError] = useState(null);
   const [active, setActive] = useState(null);
+  // Galerie (#1079): die Kacheln merken sich ihr Element, damit das große Bild aus seiner Kachel wachsen kann.
+  const tileRefs = useRef(new Map());
   const [dimensions, setDimensions] = useState({});
   const items = a?.photos || [];
   const sectionGroups = buildSectionGroups(items, a?.sections || []);
@@ -190,11 +193,13 @@ export default function GalleryAlbumPage() {
                       key={item.id}
                       onClick={() => setActive(index)}
                       data-testid={`gallery-photo-${index}`}
-                      className="mb-3 block w-full break-inside-avoid overflow-hidden bg-[#0A0A0A] border border-white/5 hover:border-[#29B6E8]/45 transition group relative rounded-sm shadow-sm shadow-black/30 hover:-translate-y-0.5"
+                      ref={(node) => { if (node) tileRefs.current.set(index, node); else tileRefs.current.delete(index); }}
+                      className="tls-gallery-tile mb-3 block w-full break-inside-avoid overflow-hidden bg-[#0A0A0A] border border-white/5 group relative rounded-sm shadow-sm shadow-black/30"
                       style={{ aspectRatio: tileAspect(item, dimensions) }}
                       aria-label={isVideoLike(item) ? "Video öffnen" : "Bild öffnen"}
                     >
                       <GalleryTile item={item} onDimensions={rememberDimensions} />
+                      {item.caption ? <span className="tls-gallery-tile__caption" aria-hidden="true">{item.caption}</span> : null}
                     </button>
                   ))}
                 </div>
@@ -205,7 +210,7 @@ export default function GalleryAlbumPage() {
       </section>
 
       {active !== null && items[active] && (
-        <Lightbox item={items[active]} onClose={() => setActive(null)}
+        <Lightbox item={items[active]} onClose={() => setActive(null)} origin={tileRefs.current.get(active) || null}
           onPrev={() => setActive((i) => (i - 1 + items.length) % items.length)}
           onNext={() => setActive((i) => (i + 1) % items.length)}
         />
@@ -228,7 +233,7 @@ function GalleryTile({ item, onDimensions }) {
       <LazyImg
         src={poster || url}
         alt={item.caption || ""}
-        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+        className="tls-gallery-tile__media w-full h-full object-cover"
         sizes={GRID_SIZES}
         onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
       />
@@ -240,7 +245,7 @@ function GalleryTile({ item, onDimensions }) {
         <LazyImg
           src={poster}
           alt={item.caption || ""}
-          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+          className="tls-gallery-tile__media w-full h-full object-cover"
           sizes={GRID_SIZES}
           onLoad={(event) => onDimensions?.(item, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
         />
@@ -258,13 +263,43 @@ function GalleryTile({ item, onDimensions }) {
   );
 }
 
-function Lightbox({ item, onClose, onPrev, onNext }) {
+// Galerie (#1079): das große Bild wächst aus seiner Kachel. Beim ersten Bild wird die Bühne an die Stelle und Größe
+// der Kachel gesetzt und gleitet dann an ihren Platz; weiterblättern wechselt nur den Inhalt. Mit „Bewegung
+// reduzieren“ oder ohne Kachel (Tastatur, Link) erscheint das Bild sofort.
+function useGrowFrom(origin) {
+  const stage = useRef(null);
+  useEffect(() => {
+    const node = stage.current;
+    if (!node || !origin || typeof origin.getBoundingClientRect !== "function" || !motionAllowed()) return undefined;
+    const from = origin.getBoundingClientRect();
+    const to = node.getBoundingClientRect();
+    if (!to.width || !to.height) return undefined;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+    const scale = Math.max(0.05, Math.min(from.width / to.width, from.height / to.height));
+    node.style.transition = "none";
+    node.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+    node.style.opacity = "0.6";
+    const frame = window.requestAnimationFrame(() => {
+      node.style.transition = "";
+      node.style.transform = "none";
+      node.style.opacity = "1";
+    });
+    return () => window.cancelAnimationFrame(frame);
+    // Nur beim Öffnen - beim Weiterblättern bleibt die Bühne, wo sie ist.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return stage;
+}
+
+function Lightbox({ item, onClose, onPrev, onNext, origin = null }) {
   const type = mediaTypeFromItem(item);
+  const stage = useGrowFrom(origin);
   return (
-    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={onClose}>
+    <div className="tls-lightbox fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={onClose} data-testid="gallery-lightbox">
       <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white z-10" aria-label="Schließen"><X className="w-6 h-6" /></button>
       <button onClick={(e) => { e.stopPropagation(); onPrev(); }} className="absolute left-4 p-3 text-white/70 hover:text-white z-10" aria-label="Vorheriges"><ChevronLeft className="w-6 h-6" /></button>
-      <div className="max-w-[92vw] max-h-[86vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+      <div ref={stage} className="tls-lightbox__stage max-w-[92vw] max-h-[86vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()} data-testid="gallery-lightbox-stage">
         {type === "image" ? <LightboxImage item={item} /> : <LightboxVideo item={item} />}
       </div>
       <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white z-10" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
