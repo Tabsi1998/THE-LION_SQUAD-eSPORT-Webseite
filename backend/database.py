@@ -379,6 +379,10 @@ async def unique_index(collection, keys, name: str, **options) -> bool:
 # „einmal je …“ war bisher nur im Code geprüft, zwei gleichzeitige Anfragen konnten zwei Zeilen anlegen.
 AUDIT_UNIQUE_INDEXES: tuple[tuple[str, Any, str, dict], ...] = (
     ("user_xp", "user_id", "user", {}),
+    # Stand der Zähler und Signale der Erfolge: je Konto eine Zeile bzw. eine je Signal - bei jeder Auswertung und
+    # seit #615 bei jedem Abruf der Abstimmungen gelesen.
+    ("user_achievement_stats", "user_id", "user", {}),
+    ("user_signals", [("user_id", 1), ("name", 1)], "user_name", {}),
     ("news_reads", [("user_id", 1), ("news_id", 1)], "user_news", {}),
     ("discord_memberships", [("user_id", 1), ("guild_id", 1)], "user_guild", {}),
     ("youtube_videos", [("channel_id", 1), ("video_id", 1)], "channel_video", {}),

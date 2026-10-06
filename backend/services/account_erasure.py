@@ -9,7 +9,9 @@ Je Sammlung eine Entscheidung - sie steht für Betroffene in der Datenschutzerkl
 - **Überschrieben**, weil die Zeile als Zählung oder Nachweis bleibt: Anmeldungen zu Events und Turnieren,
   Mitgliedsanträge, Rundenzeiten, Gewinne, die Textauszüge der Moderation, Zugangslinks.
 - **Gelöst**, nicht gelöscht: Vorstandsposten sowie redaktionelle und aus der Mitgliederverwaltung stammende
-  Einträge im Verzeichnis verlieren nur die Verknüpfung zum Konto - sie gehören dem Verein.
+  Einträge im Verzeichnis verlieren nur die Verknüpfung zum Konto - sie gehören dem Verein. Ebenso der Einlass bei
+  einer Generalversammlung (``meeting_admissions``, #845): die Anwesenheit ist Sache des Vereins; wer als Vorstand
+  selbst eingelassen hat, steht dort danach ohne Namen.
 """
 from __future__ import annotations
 
@@ -77,6 +79,10 @@ async def _records(db, user: dict, now: str) -> None:
     await db.moderation_items.update_many({"user_id": user_id}, {"$set": {"excerpt": DELETED_TEXT}})
     await db.board_positions.update_many({"user_id": user_id}, {"$set": {"user_id": None}})
     await db.board_positions.update_many({"deputy_user_id": user_id}, {"$set": {"deputy_user_id": None}})
+    # Einlass bei der Generalversammlung (#845): die Anwesenheit gehört dem Verein und bleibt - ohne Verknüpfung zum
+    # Konto. Wer selbst eingelassen hat, bleibt als Vorgang stehen, aber ohne Namen.
+    await db.meeting_admissions.update_many({"user_id": user_id}, {"$set": {"user_id": None}})
+    await db.meeting_admissions.update_many({"by": user_id}, {"$set": {"by": None, "by_name": GONE}})
     email = str(user.get("email") or "").strip().lower()
     bound = [{"user_id": user_id}] + ([{"email": email}] if email else [])
     await db.access_links.update_many({"$or": bound}, {"$set": {"is_active": False, "email": None, "note": None, "updated_at": now}})

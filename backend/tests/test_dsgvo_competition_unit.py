@@ -71,6 +71,8 @@ class FakeDb:
             "user_xp", "xp_events", "club_member_profiles", "membership_applications", "membership_invitations",
             "board_positions", "tournament_staff_assignments", "moderation_items", "discord_activity",
             "discord_memberships", "media_uploads",
+            # Auskunft Fassung 4: Einlass bei der Generalversammlung
+            "meeting_admissions",
         ):
             setattr(self, name, FakeCollection())
 

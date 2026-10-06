@@ -349,4 +349,15 @@ export const PEOPLE = {
       <path d="M35 31 L37 28 L39 31 L41 28 L43 31" strokeWidth="2.5" />
     </>
   ),
+  // „Überall dabei“ (#615): die Discord-Server des Vereins, verbunden.
+  "server-ring": (
+    <>
+      <path d="M32 16 L15 46 H49 Z" opacity="0.5" />
+      <rect x="21" y="6" width="22" height="17" rx="4" fill="currentColor" stroke="none" />
+      <rect x="4" y="40" width="22" height="17" rx="4" fill="currentColor" stroke="none" />
+      <rect x="38" y="40" width="22" height="17" rx="4" fill="currentColor" stroke="none" />
+      <path d="M26 14 H28 M33 14 H38 M9 48 H11 M16 48 H21 M43 48 H45 M50 48 H55" stroke="#000" strokeOpacity="0.55" strokeWidth="3" />
+      <circle cx="32" cy="36" r="4" fill="currentColor" stroke="none" />
+    </>
+  ),
 };

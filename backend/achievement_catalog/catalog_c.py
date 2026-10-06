@@ -1,9 +1,10 @@
-"""Erfolge II, Katalog C (#614): Community, Streaming & Creator, Profil & Konto - 42 Gruppen als Daten der Stufenleiter v2.
+"""Erfolge II, Katalog C (#614): Community, Streaming & Creator, Profil & Konto - 43 Gruppen als Daten der Stufenleiter v2.
 
-Gleiches Muster wie Katalog A und B. Vier Gruppen aus #614 fehlen hier bewusst, weil es ihre Daten noch nicht gibt:
-„Überall dabei“ (Discord-Server, braucht Discord VI), „Mitbestimmer“ (Abstimmungen liegen in Dolibarr), „Mitgestalter“
-(Referenzen und Alben legt heute nur die Verwaltung an) und „Botschafter“ (Einladungslinks gibt es noch nicht) - sie
-kommen, sobald die Quelle da ist. Drei Gruppen werden weiter von Hand vergeben (Helfende Hand, Mentor, Kreativgeist).
+Gleiches Muster wie Katalog A und B. „Überall dabei“ kam nach, seit es mit Discord VI mehrere Server gibt (#615).
+„Mitbestimmer“ steht als „Mitgliederstimme“ beim Verein (Katalog D): abgestimmt wird in der Generalversammlung, und
+dieselbe Zahl zweimal zu belohnen wäre doppelt. Zwei Gruppen aus #614 fehlen weiter, weil es ihre Daten nicht gibt:
+„Mitgestalter“ (Referenzen und Alben legt nur die Verwaltung an) und „Botschafter“ (Einladungslinks gibt es nicht).
+Drei Gruppen werden weiter von Hand vergeben (Helfende Hand, Mentor, Kreativgeist).
 """
 from __future__ import annotations
 
@@ -68,6 +69,11 @@ COMMUNITY = [
        "hand-helping", "helping-hand", None, [1, 3, 7, 15, 30], "{n}-mal geholfen.", sort_order=625, manual=True),
     _c("mentor", "Mentor", "community", "Begleite Neue beim Einstieg.", "Wird von der Vereinsleitung vergeben, wenn du Neue einarbeitest oder coachst.",
        "graduation-cap", "mentor", None, [1, 3, 7, 15, 30], "{n} Menschen begleitet.", sort_order=626, manual=True),
+    # „Überall dabei“ (#614, nachgezogen mit #615): eine Stufe je Schritt wie beim App-Nutzer, weil „alle Server“ kein
+    # festes Ziel ist. Das Motiv: drei verbundene Server (motifs/people.jsx).
+    _c("discord_servers", "Überall dabei", "community", "Sei auf den Discord-Servern des Vereins dabei.", "Mit verknüpftem Discord-Konto den Servern des Vereins beitreten - die Einladungen stehen unter „Über uns“ bei den Spielen und im Mitgliederbereich.",
+       "server", "server-ring", "discord_servers_stage", [1, 2, 3], "", sort_order=627,
+       steps=["Auf einem Discord-Server des Vereins dabei.", "Auf drei Discord-Servern des Vereins dabei.", "Auf allen Discord-Servern des Vereins dabei."]),
 ]
 
 CREATOR = [

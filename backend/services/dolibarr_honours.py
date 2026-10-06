@@ -14,7 +14,7 @@ werden“ angehakt, und das Mitglied hat „Ehrungen auf meinem Profil zeigen“
 from __future__ import annotations
 
 from models import now_utc
-from services import dolibarr_identity
+from services import dolibarr_identity, member_activity
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
 
 COLLECTION = "dolibarr_honours"
@@ -99,7 +99,10 @@ async def overview(db, user: dict) -> dict:
     honours = [honour_view(row) for row in rows]
     # Teilnahmen (#906): scheitert nur dieser Teil, bleiben die Ehrungen stehen - ein Satz sagt, warum die Liste fehlt.
     try:
-        base["participations"] = [participation_view(row) for row in await client.my_participations(access["params"])]
+        taken = await client.my_participations(access["params"])
+        base["participations"] = [participation_view(row) for row in taken]
+        # Helferdienste und Stunden für die Erfolge (#615): nur die Zahlen, aus dem, was hier ohnehin gelesen wird.
+        await member_activity.note_participations(db, user["id"], taken)
     except DolibarrError as exc:
         base["participations_text"] = f"Deine Teilnahmen sind gerade nicht lesbar ({exc.text})."
     if base["public"]:

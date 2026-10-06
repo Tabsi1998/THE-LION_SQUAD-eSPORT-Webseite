@@ -158,7 +158,7 @@ def test_katalog_d_form():
     club = [g for g in catalog.GROUPS_D if g["category"] == "club"]
     special = [g for g in catalog.GROUPS_D if g["category"] == "special"]
     hidden = [g for g in catalog.GROUPS_D if g["category"] == "hidden"]
-    assert (len(club), len(special), len(hidden)) == (8, 16, 14)
+    assert (len(club), len(special), len(hidden)) == (12, 16, 14)
     assert all(g["member_only"] for g in club)
     club_tiers = [t for t in catalog.TIERS_D if t["group_code"] in {g["code"] for g in club}]
     assert all(t["member_only"] for t in club_tiers)

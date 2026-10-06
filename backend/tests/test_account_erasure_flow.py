@@ -71,6 +71,11 @@ async def fill(flow, user: dict, public: pathlib.Path, quarantine: pathlib.Path)
     await db.access_links.insert_one({"id": "link-konto", "user_id": uid, "email": None, "note": "für Paula", "is_active": True})
     await db.access_links.insert_one({"id": "link-mail", "user_id": None, "email": user["email"], "note": None, "is_active": True})
     await db.access_links.insert_one({"id": "link-fremd", "user_id": "anderer", "email": "gast@example.test", "is_active": True})
+    # Einlass bei der Generalversammlung (#845): Paula wurde eingelassen - und hat als Vorstand selbst jemanden eingelassen.
+    await db.meeting_admissions.insert_one({"meeting_id": 7, "member_id": 11, "round": 0, "name": "Paula P.", "user_id": uid, "state": "present", "voting": True,
+                                            "reason": "own", "arrived": "18:55", "by": "vorstand", "by_name": "Vera V.", "updated_at": "2026-03-14T17:55:00+00:00"})
+    await db.meeting_admissions.insert_one({"meeting_id": 7, "member_id": 12, "round": 0, "name": "Otto O.", "user_id": "anderer", "state": "present", "voting": True,
+                                            "reason": "own", "arrived": "18:57", "by": uid, "by_name": "paula", "updated_at": "2026-03-14T17:57:00+00:00"})
     await db.user_xp.insert_one({"user_id": uid, "total": 120, "level": 3, "prestige": 0})
     await db.user_xp.insert_one({"user_id": "anderer", "total": 40, "level": 1, "prestige": 0})
     for name in account_erasure.PURGED:
@@ -87,7 +92,12 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     flow.act_as(paula)
 
     export = (await flow.get("/api/dsgvo/export-my-data")).json()
-    assert export["format_version"] == 3
+    assert export["format_version"] == 4
+    # Einlass: die eigene Anwesenheit ohne den Namen der einlassenden Person; der selbst getätigte Einlass ohne den der anderen.
+    assert export["meeting_admissions"] == [{"meeting_id": 7, "name": "Paula P.", "state": "present", "voting": True, "reason": "own", "arrived": "18:55",
+                                             "updated_at": "2026-03-14T17:55:00+00:00"}]
+    assert export["meeting_admissions_recorded"] == [{"meeting_id": 7, "state": "present", "updated_at": "2026-03-14T17:57:00+00:00"}]
+    assert "Otto" not in str(export) and "Vera" not in str(export)
     assert export["xp"]["total"] == 120 and len(export["xp_events"]) == 1
     assert {row["id"] for row in export["directory_profiles"]} == {"selbst", "akte"}
     assert {row["id"] for row in export["membership_applications"]} == {"antrag-alt", "antrag-neu"}
@@ -109,6 +119,11 @@ async def test_the_export_names_everything_and_deleting_leaves_no_personal_copy(
     assert (await db.board_positions.find_one({"id": "kassier"}))["user_id"] is None
     obmann = await db.board_positions.find_one({"id": "obmann"})
     assert obmann["user_id"] == "anderer" and obmann["deputy_user_id"] is None
+
+    # Einlass: die Anwesenheit bleibt beim Verein, ohne Konto; der selbst getätigte Einlass bleibt als Vorgang ohne Namen.
+    own, recorded = await db.meeting_admissions.find_one({"member_id": 11}), await db.meeting_admissions.find_one({"member_id": 12})
+    assert own["user_id"] is None and own["state"] == "present" and own["by"] == "vorstand"
+    assert (recorded["by"], recorded["by_name"], recorded["user_id"], recorded["name"]) == (None, "Gelöschter User", "anderer", "Otto O.")
 
     # Anträge: ohne Text und Person; der laufende gilt als zurückgezogen, der entschiedene behält seinen Stand.
     old, new = await db.membership_applications.find_one({"id": "antrag-alt"}), await db.membership_applications.find_one({"id": "antrag-neu"})

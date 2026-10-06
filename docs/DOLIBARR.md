@@ -435,6 +435,30 @@ ausgeschaltet ist), steht sie mit Grund in der Liste und wird nach sechs Stunden
 erneut versucht. Ist das Modul älter als 1.8.0, steht „braucht Vereine 1.8.0“ da, und es geht nichts
 hinaus.
 
+## Erfolge aus der Vereinsakte (#615)
+
+Vier Erfolge der Kategorie „Verein“ zählen, was die Mitgliederverwaltung je Mitglied führt:
+
+| Erfolg | Was zählt | Woher |
+| --- | --- | --- |
+| Versammlungsbesucher | Generalversammlungen, bei denen das Mitglied da war | Einlass am Eingang (Karte gescannt oder Nummer eingetippt) oder eine dort abgegebene Stimme |
+| Mitgliederstimme | Abstimmungen, bei denen eine Stimme abgegeben wurde – **dass**, nie wie | Abstimmungen des Mitglieds (`me/ballots`) |
+| Helfer | bestätigte Helferdienste, deren Tag vorbei ist | Teilnahmen der Art „Helferdienst“ (`me/participations`) |
+| Helferstunden | die Stunden dieser Dienste | dieselben Zeilen |
+
+Die Website fragt dafür nicht eigens nach, sondern zählt mit, wo sie die Daten der Person ohnehin liest: auf der Seite
+„Versammlungen“, im Abstimmungs-Popup und im Reiter „Ehrungen & Teilnahmen“. Weil diesen Reiter nicht jeder öffnet,
+liest der stündliche Lauf die Teilnahmen nach – je aktivem Mitglied höchstens einmal am Tag, höchstens 25 Abrufe je
+Lauf. Behalten werden nur Zahlen und Zeitpunkte im Stand der Zähler des Kontos. Antwortet Dolibarr nicht, bleibt der
+letzte Stand; ist das Modul älter als 1.8.0, ruht der Nachlauf.
+
+Zwei Schutzregeln: Ein Einlass zählt erst fünf Minuten nach dem Scan (bis dahin lässt sich ein Versehen zurücknehmen),
+und eine bestätigte Schicht zählt erst am Tag danach.
+
+**Nicht messbar** (es fehlen die Daten): LAN-Crew – ein Helferdienst trägt keine Art der Veranstaltung; Pünktlicher
+Beitrag – Rechnungen nennen Status und Fälligkeit, aber kein Zahldatum; Förderer – Spenden kommen über die
+Schnittstelle nicht; Mitglieder werben – Einladungslinks gibt es nicht.
+
 ## Vereinsakte ohne Einladungscode (Vereine ab 1.4.0, #531)
 
 Seit Vereinsmodul **1.4.0** braucht ein Mitglied keinen Einladungscode mehr: Ist sein Website-Konto

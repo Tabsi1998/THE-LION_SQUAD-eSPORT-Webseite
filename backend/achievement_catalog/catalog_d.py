@@ -1,12 +1,14 @@
-"""Erfolge II, Katalog D (#615): Verein, Besonders, Geheim - 36 Gruppen als Daten der Stufenleiter v2.
+"""Erfolge II, Katalog D (#615): Verein, Besonders, Geheim - 42 Gruppen als Daten der Stufenleiter v2.
 
 Verein (nur Mitglieder, mit dem XP-Bonus aus E7), Besonders (Legendär, je eine Stufe), Geheim (versteckt bis zur
 Freischaltung, 40 Punkte). Die sieben Negativ-Gruppen bleiben unverändert im alten Block. Papierkram (Öffnen-Spur in
 ``document_opens``), Vorstandsarbeit (Datum je Funktion aus Dolibarr bzw. je Zuweisung von Hand) und Sprinter
-(``profile_completed_at``) sind seit dem Nachtrag messbar. Acht Gruppen aus #615 fehlen hier weiter, weil es ihre
-Daten (noch) nicht gibt: Versammlungen, Helferdienste, Helferstunden, LAN-Crew, Mitgliederstimme und Förderer liegen
-nur live in Dolibarr; Pünktlicher Beitrag braucht das Zahldatum (der Rechnungs-Zwischenspeicher kennt nur Status und
-Fälligkeit); Mitglieder werben braucht Einladungslinks. Eierkönig kam mit der Ostereiersuche (#646) dazu.
+(``profile_completed_at``) sind seit dem Nachtrag messbar; Eierkönig kam mit der Ostereiersuche (#646) dazu.
+Versammlungsbesucher, Mitgliederstimme, Helfer und Helferstunden zählen, seit die Website mitschreibt, was sie aus der
+Vereinsakte ohnehin liest (``services/member_activity.py``: Einlass, Abstimmungen, Teilnahmen - nur Zahlen, nie eine
+Antwort). Vier Gruppen aus #615 fehlen weiter, weil es ihre Daten nicht gibt: LAN-Crew (ein Helferdienst trägt keine
+Art, nur den Namen der Veranstaltung), Pünktlicher Beitrag (Rechnungen nennen Status und Fälligkeit, kein Zahldatum),
+Förderer (Spenden kommen über die Schnittstelle nicht) und Mitglieder werben (Einladungslinks gibt es nicht).
 """
 from __future__ import annotations
 
@@ -49,6 +51,16 @@ CLUB = [
     # Jubiläen (#848): runde Jahre ab dem Mitgliedsbeginn aus der Mitgliederverwaltung - mit eigenem Abzeichen.
     _d("membership_jubilee", "Vereinsjubiläum", "club", "Feiere runde Jahre im Verein.", "Volle Jahre seit deinem Mitgliedsbeginn - 5, 10 und 25 Jahre sind ein Jubiläum.",
        "award", "jubilee", "membership_years", [5, 10, 25], "{n} im Verein.", sort_order=917, unit=" Jahre"),
+    # Rest aus #615: was die Mitgliederverwaltung je Mitglied führt - jede Gruppe mit eigenem Motiv
+    # (frontend/src/components/achievements/motifs/club.jsx).
+    _d("meetings", "Versammlungsbesucher", "club", "Komm zur Generalversammlung.", "Bei der Generalversammlung am Eingang die Mitgliedskarte scannen lassen oder dort abstimmen - jede Versammlung zählt einmal.",
+       "users-round", "assembly", "meetings_attended", [1, 3, 5, 10, 20], "{n}-mal bei der Generalversammlung dabei.", sort_order=918),
+    _d("member_votes", "Mitgliederstimme", "club", "Bestimm mit, wohin der Verein geht.", "Bei den Abstimmungen der Generalversammlung deine Stimme abgeben - jede Abstimmung zählt einmal. Gezählt wird nur, dass du abgestimmt hast, nie wie.",
+       "check-check", "ballot-box", "member_votes_cast", [1, 5, 15, 40, 100], "{n}-mal abgestimmt.", sort_order=919),
+    _d("helper_shifts", "Helfer", "club", "Pack bei Veranstaltungen des Vereins mit an.", "Im Mitgliederbereich unter „Helfen“ einen Dienst anfragen - er zählt, sobald der Vorstand ihn bestätigt hat und der Tag vorbei ist.",
+       "hand-helping", "helper-vest", "helper_shifts_completed", [1, 3, 7, 15, 30, 60, 100], "{n}-mal Helferdienst geleistet.", sort_order=920),
+    _d("helper_hours", "Helferstunden", "club", "Sammle Stunden im Einsatz für den Verein.", "Die Stunden deiner bestätigten Helferdienste zählen zusammen - vom Vorstand notiert oder die Länge der Schicht.",
+       "timer", "helper-hours", "helper_hours", [5, 20, 50, 100, 250], "{n} Helferstunden geleistet.", sort_order=921),
 ]
 
 SPECIAL = [
