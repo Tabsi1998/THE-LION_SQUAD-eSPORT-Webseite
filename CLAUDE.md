@@ -375,13 +375,13 @@ den ausgelieferten Skripten suchen.
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #969 (`3abb6fb3`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
-  #956, #957, #959, #965, #966, #969 – alle mit Eintrag in `docs/HISTORIE.md` Teil A. Meilensteine
+- **`main`** steht nach #970 (`9df222ca`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
+  #956, #957, #959, #965, #966, #969, #970 – alle mit Eintrag in `docs/HISTORIE.md` Teil A. Meilensteine
   „Discord VI“ (38) und „Erfolge II“ (39) sind geschlossen.
-- **Offene PRs** (unabhängig voneinander, alle auf `main`): #970 (Ostereiersuche in der Vorschau, #964),
-  #971 (Partner-Socials als Liste, #967; nebenbei das Audit-Gate der App), #972 (zwei Laufbänder auf der
-  Startseite, #968) und der Doku-PR mit diesem Stand. Nach dem Merge brauchen die drei Code-PRs je einen
-  Eintrag in `docs/HISTORIE.md` Teil A (Text liegt bereit).
+- **Offene PRs** (unabhängig voneinander, alle auf `main`): #971 (Partner-Socials als Liste, #967; nebenbei
+  das Audit-Gate der App), #972 (zwei Laufbänder auf der Startseite, #968) und der Doku-PR mit diesem
+  Stand. Nach dem Merge brauchen die zwei Code-PRs je einen Eintrag in `docs/HISTORIE.md` Teil A (Text
+  liegt bereit).
 - **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh`; dabei baut das
   Backend-Image einmal neu (`defusedxml` aus #951) und beim Start läuft einmal Migration 4 (#952). Danach
   unter System → Betrieb & Logs → Checks: „Besucher-Adresse“ (#956) soll grün sein; eine Logzeile

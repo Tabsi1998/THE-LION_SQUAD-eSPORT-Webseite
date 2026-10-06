@@ -3514,6 +3514,11 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   409; `/api/seasonal/advent`, `…/open`, `…/quiz` nehmen `preview=`. Nikolaus: `useBoot` für Kopf und
   Footer, `OPENED_EVENT`, der Stiefel im Kopf öffnet an Ort und Stelle. Z-Reihenfolge: Kalenderfenster
   z-50 über dem klebenden Kopf, Türchen-Dialog z-60. App unverändert (#772).
+- Ostereiersuche in der Vorschau (#964; PR #970; Backend, Web, Doku; `update.sh`): ohne angelegtes Jahr
+  liegen drei Platzhalter-Eier je Seite (`easter_hunt.placeholder_eggs`, Nummern ab 101, Saat aus Jahr
+  und Seite); `preview_eggs` liefert `placeholder` und immer `active`. Web sammelt probehalber im Fenster
+  (`EasterEggs.collectPreview`, `previewFind`, Fortschritt mit `preview: true`), der Server zählt nichts;
+  Vorschau-Knopf je Ei auch im Entwurf. `docs/SEASONS.md` §20.
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)
