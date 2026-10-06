@@ -1,5 +1,6 @@
 import { countryName } from "@/lib/countries";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useTilt } from "@/hooks/useTilt";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -325,6 +326,9 @@ export default function PublicProfilePage() {
   const [liveStreams, setLiveStreams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("overview");
+  // Leichtes 3D im Profilkopf (#1078): der Rahmen für Bild und Name neigt sich mit der Maus.
+  const tiltRef = useRef(null);
+  useTilt(tiltRef);
   const [referenceFilter, setReferenceFilter] = useState("all");
   const seoDescription = seoTextPreview(profile?.bio, "Community-Profil bei THE LION SQUAD eSports.");
   useDocumentTitle(profile?.display_name || profile?.username || "Community-Profil", seoDescription, {
@@ -511,8 +515,9 @@ export default function PublicProfilePage() {
           )}
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:items-end gap-4 md:gap-6">
-            <div className="shrink-0">
+          {/* Leichtes 3D (#1078): Bild und Name neigen sich mit der Maus um höchstens 3 Grad - nur hier, nur am PC. */}
+          <div ref={tiltRef} className="tls-tilt relative -mt-14 sm:-mt-16 lg:-mt-20 flex flex-col md:flex-row md:items-end gap-4 md:gap-6" data-testid="profile-tilt">
+            <div className="tls-tilt__deep shrink-0">
               <LevelAvatarFrame level={level.level} crown={crown} className="w-28 h-28 sm:w-32 sm:h-32 lg:w-40 lg:h-40" testId="profile-avatar-frame">
                 {profile.avatar_url ? (
                   <img src={resolveMediaUrl(profile.avatar_url)} alt={displayName} className="w-full h-full object-cover" />
@@ -523,7 +528,7 @@ export default function PublicProfilePage() {
                 )}
               </LevelAvatarFrame>
             </div>
-            <div className="flex-1 min-w-0 md:pb-1">
+            <div className="tls-tilt__mid flex-1 min-w-0 md:pb-1">
               <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
                 <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}

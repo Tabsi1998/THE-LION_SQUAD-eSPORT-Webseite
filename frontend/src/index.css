@@ -2574,3 +2574,72 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
 @media (prefers-reduced-motion: reduce) {
   .tls-hero-drift { animation: none; }
 }
+
+/* Spielerkarte (#1078): leichtes 3D im Profilkopf. Die Neigung kommt aus useTilt als Variablen; Bild (tief) und
+   Name (mittel) liegen auf eigenen Ebenen und bewegen sich minimal verschieden. Nur mit Maus, höchstens 3 Grad. */
+.tls-tilt {
+  transform-style: preserve-3d;
+  perspective: 1100px;
+}
+.tls-tilt__deep,
+.tls-tilt__mid {
+  transition: transform var(--tls-motion-mid) var(--tls-ease);
+  transform-style: preserve-3d;
+}
+.tls-tilt__deep {
+  transform: perspective(1100px) rotateX(calc(var(--tls-tilt-x, 0deg) * var(--tls-motion-on))) rotateY(calc(var(--tls-tilt-y, 0deg) * var(--tls-motion-on))) translateZ(calc(14px * var(--tls-tilt-on, 0) * var(--tls-motion-on)));
+}
+.tls-tilt__mid {
+  transform: perspective(1100px) rotateX(calc(var(--tls-tilt-x, 0deg) * 0.6 * var(--tls-motion-on))) rotateY(calc(var(--tls-tilt-y, 0deg) * 0.6 * var(--tls-motion-on))) translateZ(calc(6px * var(--tls-tilt-on, 0) * var(--tls-motion-on)));
+}
+
+/* Galerie (#1079): das Bild zoomt beim Drüberfahren leicht, die Beschriftung kommt aus einer Maske von unten; das
+   große Bild wächst aus seiner Kachel (useGrowFrom setzt den Start, die Bühne gleitet an ihren Platz). */
+.tls-gallery-tile {
+  transition: border-color var(--tls-motion-mid) var(--tls-ease), box-shadow var(--tls-motion-mid) var(--tls-ease);
+}
+.tls-gallery-tile__media {
+  transition: transform var(--tls-motion-slow) var(--tls-ease);
+}
+.tls-gallery-tile__caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 1.6rem 0.75rem 0.6rem;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #FFFFFF;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.82));
+  transform: translateY(calc(100% * var(--tls-motion-on)));
+  opacity: calc(1 - var(--tls-motion-on));
+  transition: transform var(--tls-motion-slow) var(--tls-ease), opacity var(--tls-motion-mid) var(--tls-ease);
+  pointer-events: none;
+}
+.tls-gallery-tile:focus-visible {
+  border-color: rgba(41, 182, 232, 0.5);
+}
+.tls-gallery-tile:focus-visible .tls-gallery-tile__caption {
+  transform: none;
+  opacity: 1;
+}
+@media (hover: hover) {
+  .tls-gallery-tile:hover {
+    border-color: rgba(41, 182, 232, 0.5);
+    box-shadow: 0 18px 36px -24px rgba(41, 182, 232, 0.6);
+  }
+  .tls-gallery-tile:hover .tls-gallery-tile__media {
+    transform: scale(calc(1 + 0.06 * var(--tls-motion-on)));
+  }
+  .tls-gallery-tile:hover .tls-gallery-tile__caption {
+    transform: none;
+    opacity: 1;
+  }
+}
+.tls-lightbox {
+  animation: tls-route-in-a var(--tls-motion-mid) var(--tls-ease) backwards;
+}
+.tls-lightbox__stage {
+  transition: transform var(--tls-motion-slow) var(--tls-ease), opacity var(--tls-motion-slow) var(--tls-ease);
+  transform-origin: 50% 50%;
+}

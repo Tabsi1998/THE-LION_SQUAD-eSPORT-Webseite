@@ -108,6 +108,30 @@ test.describe("Galerie-Album", () => {
     expect(srcsets.some((value) => value.includes("w=400 400w"))).toBe(true);
   });
 
+  // Galerie (#1079): beim Drüberfahren zoomt das Bild und die Beschriftung kommt von unten; beim Öffnen wächst das
+  // große Bild aus seiner Kachel und steht danach ohne Verschiebung da.
+  test("Hover zeigt die Beschriftung, das große Bild wächst aus seiner Kachel", async ({ page, isMobile }) => {
+    test.skip(Boolean(isMobile), "Hover gibt es nur mit Maus");
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/galerie/gamers-heaven-2026");
+    const tile = page.getByTestId("gallery-photo-0");
+    await expect(tile).toHaveClass(/tls-gallery-tile/);
+    const caption = tile.locator(".tls-gallery-tile__caption");
+    await expect(caption).toHaveText("Siegerehrung");
+    expect(await caption.evaluate((node) => getComputedStyle(node).opacity)).toBe("0");
+    await tile.hover();
+    await expect.poll(() => caption.evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
+    await expect.poll(() => tile.locator(".tls-gallery-tile__media").evaluate((node) => getComputedStyle(node).transform)).toBe("matrix(1.06, 0, 0, 1.06, 0, 0)");
+    await tile.click();
+    const stage = page.getByTestId("gallery-lightbox-stage");
+    await expect(stage).toBeVisible();
+    // Direkt nach dem Öffnen liegt die Bühne noch verkleinert auf der Kachel, dann gleitet sie an ihren Platz.
+    await expect.poll(() => stage.evaluate((node) => getComputedStyle(node).transform), { timeout: 3000 }).toBe("none");
+    expect(await stage.evaluate((node) => getComputedStyle(node).opacity)).toBe("1");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("gallery-lightbox")).toHaveCount(0);
+  });
+
   test("das Album läuft am Telefon nicht quer", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/galerie/gamers-heaven-2026");
