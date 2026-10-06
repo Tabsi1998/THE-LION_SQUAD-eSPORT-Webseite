@@ -3458,6 +3458,62 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   Daueraufgaben“ (#658, #677, #772); #729, #733, #738, #744 in „Jahreszeiten II“, #748, #752, #759 in
   „Jahreszeiten III“, #775 in „Prüfung Oktober 2026“; die sieben Abnahme-Issues tragen jetzt Labels.
 
+- Banner-Zähler und YouTube-Feed (#931; PR #951; Backend; `update.sh`, Backend-Image baut neu):
+  `POST /api/settings/site-banners/impression` und `/click` bremsen je Adresse (60 Einblendungen, 30 Klicks
+  je Minute, darüber 429) und zählen nur Banner, die es gibt (von Hand oder automatisch); unbekannte
+  Kennungen legen nichts mehr an, Kennung höchstens 160 Zeichen. `services/youtube_feed.py` liest den
+  Feed mit `defusedxml` (Entitäten und externe Verweise abgelehnt). Tests `test_site_banner_stats_flow.py`,
+  `test_youtube_feed_xml_unit.py`.
+- Konto löschen vollständig (#928; PR #952; Backend, Datenschutztext; `update.sh`, beim Start Migration 4):
+  `services/account_erasure.py` entscheidet je Datenart (XP, Einladungen, Kartentokens, Discord-Zustände
+  gelöscht; eigener Verzeichniseintrag gelöscht; Avatar/Banner/Uploads samt kleineren Fassungen und
+  Quarantäne-Kopie gelöscht, außer noch verwendet; Anträge ohne Person, laufende gelten als zurückgezogen;
+  Anmeldungen bleiben als Zählung ohne Name/E-Mail/Notiz; Rundenzeiten ohne Nachweis-Link; gehaltene
+  Texte als „gelöscht“; Zugangslinks abgeschaltet; Vorstandsposten und Verzeichniseinträge der
+  Mitgliederverwaltung bleiben ohne Kontoverknüpfung). Auskunft `export-my-data` Fassung 3. Migration 4
+  räumt früher gelöschte Konten nach. Datenschutzerklärung „Konto löschen“, Tabelle in `DATA_PROTECTION.md`.
+- CodeQL automatisch (#954; PR #955; nur `.github/workflows/codeql.yml`, `README.md`, Kommentar in
+  `app_releases.py`): läuft bei Pull Requests (kein Entwurf) und Merges nach `main`, die `backend/`,
+  `frontend/` oder `mobile/` berühren, montags früh und von Hand; Doku-PRs starten nichts. Funde unter
+  Security → Code scanning; die alten Stil-Hinweise dort baut #934 ab.
+- Backend-Paket Indizes und Besucher-Adresse (#930, #941; PR #956; Backend, `INSTALL.md`, `docs/BETRIEB.md`;
+  `update.sh`): `database.py` legt 5 eindeutige und 28 gewöhnliche Indizes auf 18 Sammlungen an
+  (`AUDIT_UNIQUE_INDEXES`, `AUDIT_INDEXES`); bei alten Dubletten bleibt statt des eindeutigen ein
+  gewöhnlicher Index und eine Warnung `[indexes] … Dubletten` im Log – der Start scheitert nie daran.
+  Betriebsprüfung „Besucher-Adresse“ in `ops_checks.py`: Gelb, wenn alle Sitzungen der letzten 24 Stunden
+  von einer Adresse oder nur aus privaten/Cloudflare-Netzen kommen (ab fünf Sitzungen). Doku: Proxy auf
+  anderem Rechner und Cloudflare davor (zwei Schritte, 100-MB-Grenze).
+- Discord D6 Teil 2, Spiel-Rolle anpingen (#629; PR #959; Backend, Bot, Web, Handbuch): je Meldung mit
+  Spielbezug ein Haken „Spiel-Rolle anpingen“ (von Anfang an aus; Feld `pings`, nur Ereignisse mit
+  Spielbezug, sonst 400). `discord_service.game_ping/with_ping`: höchstens eine Rolle je Meldung, die des
+  Hauptspiels auf dem Zielserver, nie am Querverweis, nie in private Ziele (`send_to` nimmt sie heraus);
+  `discord_roles.ping_role_name`, `bot.role_id`. #576 (Team-Rollen) bleibt „Später“ (Grenze 250 Rollen).
+- Wiener Zeit überall (#943, #944; PR #957; Web; `update.sh`): jede Anzeige läuft über `lib/vienna`
+  (`viennaDate/Time/DateTime`, `viennaDay`, `dayNoon`, `dayBefore`); `asInstant` liest zonenlose Texte
+  (`2026-12-24` oder `…T18:00`) als Wiener Wanduhr, damit ein Datum in Tokio nicht zum Vortag wird.
+  Prüf-Tests verbieten direktes `toLocale*`, `vienna…(new Date(` und `Intl.DateTimeFormat(` ohne
+  `timeZone`. Eingabefelder (`datetime-local`) bleiben Gerätezeit → #960 („Später“). Zonen wirklich
+  prüfen geht nur über PowerShell (`$env:TZ`) – Git Bash wirft `TZ=Asia/Tokyo` still weg
+  (`docs/STOLPERSTEINE.md`).
+- Erfolge II, Katalog D Rest (#615, #961; PR #965; Backend, Web, Doku; `update.sh`): die letzten fünf
+  Gruppen aus der Vereinsakte mit eigenen Motiven (Versammlungsbesucher, Mitgliederstimme, Helfer,
+  Helferstunden, „Überall dabei“); `meeting_admissions` in Export und Löschung; zwei Indizes
+  (`database.AUDIT_UNIQUE_INDEXES`). Nicht baubare Gruppen → #962 („Später“).
+- Discord VI, Weitergabe und Statistik (#631, schließt Klammer #606; PR #966; Backend, Bot, Web, Doku):
+  Ankündigungskanäle anderer Server in einen Sammelkanal folgen (`services/discord_follow.py`,
+  Bot `follow_channel/followed_sources`), `/verteilen` plus Formular in der Verwaltung
+  (`discord_distribute.py`, `routes/discord_forward_routes.py`, `DiscordForwardPanel.jsx`), Zahlen je
+  Server (`discord_stats.py`, `DiscordStatsPanel.jsx`). Datenschutztext: Absatz „Discord“ geändert.
+  Der Betreiber legt den Sammelkanal am Hauptserver an und gibt dem Bot dort „Webhooks verwalten“.
+- Adventkalender als Fenster, Vorschau, Stiefel oben (#963; PR #969; Backend, Web, Doku; `update.sh`): der
+  Kalender ist ein Radix-Dialog über der Seite (`advent/AdventCalendarDialog.jsx`, Inneres
+  `AdventCalendarPanel.jsx`, offen/zu für alle Einstiege in `advent/calendarDialog.js`); `/advent` leitet
+  auf die Startseite und öffnet ihn. Vorschau: `seasons.preview_default_at` (Adventkalender 12. Dezember
+  12:00, Ostereiersuche Karsamstag 12:00), `advent_calendar.preview_context/preview_calendar/
+  preview_open/preview_quiz`, Platzhalter ohne angelegte Türchen, Öffnen und Quiz ohne Spur, Verlosung
+  409; `/api/seasonal/advent`, `…/open`, `…/quiz` nehmen `preview=`. Nikolaus: `useBoot` für Kopf und
+  Footer, `OPENED_EVENT`, der Stiefel im Kopf öffnet an Ort und Stelle. Z-Reihenfolge: Kalenderfenster
+  z-50 über dem klebenden Kopf, Türchen-Dialog z-60. App unverändert (#772).
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)
