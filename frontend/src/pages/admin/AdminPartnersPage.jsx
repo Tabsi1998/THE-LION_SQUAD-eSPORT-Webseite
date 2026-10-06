@@ -3,7 +3,7 @@ import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
-import { CheckField, TextAreaField, TextField } from "@/components/tls/FormFields";
+import { CheckField, SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { DolibarrSourceBlock, dolibarrLocked, useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { imageSourceText, shownLogo } from "@/lib/sponsorImages";
 import { ImageUpload } from "@/components/tls/ImageUpload";
@@ -11,18 +11,25 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
+import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
 
 // Partner: Liste und Seitenblatt (#435). Seit der Partnerseite (#469) hat jeder Partner eine eigene
-// Adresse (/partners/<slug>), Kanäle (Discord, Twitch, YouTube, X, Instagram, TikTok), einen Text
-// „Über den Partner“ und Tools/Projekte; aus Dolibarr (#405) kommen Name und Art, der Rest bleibt hier.
+// Adresse (/partners/<slug>), Kanäle (Discord, Twitch und seit #967 eine Liste Socials: „+“, Plattform aus dem
+// Dropdown, Adresse - statt fester Felder), einen Text „Über den Partner“ und Tools/Projekte; aus Dolibarr (#405)
+// kommen Name und Art, der Rest bleibt hier.
 
 export const emptyPartner = {
   name: "", slug: "", logo_url: "", link: "", description: "", kind: "verein", is_active: true, order_index: 0,
   about: "", since: "", discord_invite: "", discord_guild_id: "", twitch_channel: "",
-  youtube_url: "", x_url: "", instagram_url: "", tiktok_url: "", tools: [],
+  youtube_url: "", x_url: "", instagram_url: "", tiktok_url: "", social_links: [], tools: [],
 };
 
 const emptyTool = () => ({ id: "", title: "", url: "", description: "", image_url: "", embed: false });
+const emptySocial = () => ({ platform: "facebook", url: "", label: "" });
+// Die vier festen Felder von früher wandern beim Laden in die Liste - gespeichert wird nur noch die Liste.
+const LEGACY_SOCIALS = [["youtube", "youtube_url"], ["x", "x_url"], ["instagram", "instagram_url"], ["tiktok", "tiktok_url"]];
+/** Die Auswahl im Dropdown: alles aus lib/socialIcons außer dem, was eigene Felder hat (Website, Discord, Twitch). */
+export const PARTNER_SOCIAL_OPTIONS = SOCIAL_PLATFORMS.filter(([key]) => !["website", "discord", "twitch"].includes(key));
 
 // Null aus der Datenbank wird zum leeren Feld; Tools bekommen alle Felder.
 export function formFromPartner(partner) {
@@ -34,13 +41,50 @@ export function formFromPartner(partner) {
   form.tools = (Array.isArray(partner?.tools) ? partner.tools : []).map((tool) => ({
     ...emptyTool(), ...tool, description: tool.description || "", image_url: tool.image_url || "", embed: Boolean(tool.embed),
   }));
+  const socials = (Array.isArray(partner?.social_links) ? partner.social_links : []).map((link) => ({ ...emptySocial(), ...link, label: link.label || "" }));
+  const known = new Set(socials.map((link) => String(link.url || "").toLowerCase()));
+  for (const [platform, field] of LEGACY_SOCIALS) {
+    const url = String(partner?.[field] || "").trim();
+    if (url && !known.has(url.toLowerCase())) socials.push({ platform, url, label: "" });
+    form[field] = "";
+  }
+  form.social_links = socials;
   return form;
 }
 
-// Leere Tool-Zeilen (weder Titel noch Adresse) gehen nicht mit; alles andere prüft der Server.
+// Leere Tool- und Social-Zeilen gehen nicht mit; alles andere prüft der Server. Die vier festen Felder von früher gehen
+// leer mit, weil ihre Adressen jetzt in der Liste stehen.
 export function partnerPayload(form) {
   const tools = (form.tools || []).filter((tool) => String(tool.title || "").trim() || String(tool.url || "").trim());
-  return { ...form, tools };
+  const social_links = (form.social_links || []).filter((link) => String(link.url || "").trim());
+  return { ...form, tools, social_links, youtube_url: "", x_url: "", instagram_url: "", tiktok_url: "" };
+}
+
+/** Socials eines Partners (#967): „+ Social“ holt eine Zeile, die Plattform kommt aus dem Dropdown - keine leeren Felder. */
+export function SocialsEditor({ socials, onChange }) {
+  const update = (index, patch) => onChange(socials.map((link, at) => (at === index ? { ...link, ...patch } : link)));
+  const remove = (index) => onChange(socials.filter((_, at) => at !== index));
+  const options = PARTNER_SOCIAL_OPTIONS.map(([key, label]) => [key, label]);
+  return (
+    <div className="space-y-2" data-testid="partner-socials">
+      {socials.map((link, index) => (
+        <div key={index} className="grid grid-cols-1 md:grid-cols-[9.5rem_minmax(0,1fr)_auto] gap-2 items-end border border-white/10 bg-black/20 rounded-sm p-3" data-testid={`partner-social-${index}`}>
+          <SelectField label="Plattform" value={link.platform} onChange={(v) => update(index, { platform: v })} options={options} testId={`partner-social-platform-${index}`} />
+          <TextField label="Adresse" value={link.url} onChange={(v) => update(index, { url: v })} placeholder={link.platform === "email" ? "name@verein.at" : "https://…"} testId={`partner-social-url-${index}`} />
+          <button type="button" onClick={() => remove(index)} aria-label="Social entfernen" className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center" data-testid={`partner-social-remove-${index}`}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+          {(link.platform === "custom" || link.label) && (
+            <TextField label="Beschriftung" value={link.label} onChange={(v) => update(index, { label: v })} placeholder="So steht der Link auf der Partnerseite" testId={`partner-social-label-${index}`} className="md:col-span-2" />
+          )}
+        </div>
+      ))}
+      {!socials.length && <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Socials – mit „Social“ kommt die erste Zeile.</div>}
+      <button type="button" onClick={() => onChange([...socials, emptySocial()])} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="partner-social-add">
+        <Plus className="w-3.5 h-3.5" /> Social
+      </button>
+    </div>
+  );
 }
 
 export default function AdminPartnersPage() {
@@ -178,11 +222,11 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
           <TextField label="Discord-Einladung" value={form.discord_invite} onChange={(v) => set("discord_invite", v)} placeholder="discord.gg/…" testId="partner-discord-invite" />
           <TextField label="Discord-Server-ID" value={form.discord_guild_id} onChange={(v) => set("discord_guild_id", v)} placeholder="123456789012345678" testId="partner-discord-guild" />
           <TextField label="Twitch-Kanal" value={form.twitch_channel} onChange={(v) => set("twitch_channel", v)} placeholder="pineapps" testId="partner-twitch-channel" />
-          <TextField label="YouTube" value={form.youtube_url} onChange={(v) => set("youtube_url", v)} placeholder="https://youtube.com/@…" testId="partner-youtube" />
-          <TextField label="X (Twitter)" value={form.x_url} onChange={(v) => set("x_url", v)} placeholder="https://x.com/…" testId="partner-x" />
-          <TextField label="Instagram" value={form.instagram_url} onChange={(v) => set("instagram_url", v)} placeholder="https://instagram.com/…" testId="partner-instagram" />
-          <TextField label="TikTok" value={form.tiktok_url} onChange={(v) => set("tiktok_url", v)} placeholder="https://tiktok.com/@…" testId="partner-tiktok" />
         </FormGrid>
+      </FormSection>
+
+      <FormSection title="Socials" hint="Facebook, Instagram, YouTube, X, TikTok, LinkedIn und alle anderen: je Zeile eine Plattform und die Adresse, auf der Partnerseite in dieser Reihenfolge. Bei „Eigener Link“ kommt eine Beschriftung dazu." plain>
+        <SocialsEditor socials={form.social_links} onChange={(socials) => set("social_links", socials)} />
       </FormSection>
 
       <FormSection title="Tools & Projekte" hint="Seiten des Partners, zum Beispiel ein TFT-Dashboard. „Einbetten“ zeigt die Seite direkt auf der Partnerseite – nur, wenn die Seite des Partners das zulässt." plain testId="partner-tools-section">

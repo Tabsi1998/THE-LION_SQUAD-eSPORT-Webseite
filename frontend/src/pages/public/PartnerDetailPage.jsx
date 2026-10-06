@@ -284,12 +284,12 @@ function ChannelsCard({ channels, twitch, discord }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="partner-channels">
       <h2 className="font-heading text-lg font-bold uppercase flex items-center gap-2"><Radio className="w-4 h-4 text-[#29B6E8]" /> Kanäle</h2>
       <div className="mt-3 grid gap-2">
-        {channels.map((channel) => {
+        {channels.map((channel, index) => {
           const detail = channelDetail(channel, twitch, discord);
           const color = channelColor(channel.key);
           return (
             <a
-              key={channel.key}
+              key={`${channel.key}-${index}`}
               href={channel.url}
               target="_blank"
               rel="noopener noreferrer"

@@ -215,9 +215,9 @@ function Partners({ items }: { items: any[] }) {
                 <Muted>{partner.description || `${partner.country || "Community"} · ${(partner.favorite_games || []).join(", ") || "THE LION SQUAD"}`}</Muted>
                 {Array.isArray(partner.channels) && partner.channels.length ? (
                   <View style={styles.channelRow}>
-                    {(partner.channels as PartnerChannel[]).map((channel) => (
+                    {(partner.channels as PartnerChannel[]).map((channel, index) => (
                       <Pressable
-                        key={channel.key}
+                        key={`${channel.key}-${index}`}
                         accessibilityRole="link"
                         accessibilityLabel={`${channel.label} von ${partner.name}`}
                         onPress={() => Linking.openURL(channel.url).catch(() => {})}

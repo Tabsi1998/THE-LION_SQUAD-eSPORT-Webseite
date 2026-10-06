@@ -1067,6 +1067,13 @@ class PartnerTool(BaseModel):
     embed: bool = False
 
 
+class PartnerSocialLink(BaseModel):
+    """Ein Social eines Partners (#967): Plattform aus der Liste, Adresse, auf Wunsch eine eigene Beschriftung."""
+    platform: str = "custom"
+    url: str = ""
+    label: Optional[str] = None
+
+
 class PartnerCreate(BaseModel):
     name: str
     slug: Optional[str] = None
@@ -1086,6 +1093,7 @@ class PartnerCreate(BaseModel):
     x_url: Optional[str] = None
     instagram_url: Optional[str] = None
     tiktok_url: Optional[str] = None
+    social_links: Optional[list[PartnerSocialLink]] = None
     tools: list[PartnerTool] = []
 
 
@@ -1107,6 +1115,7 @@ class PartnerUpdate(BaseModel):
     x_url: Optional[str] = None
     instagram_url: Optional[str] = None
     tiktok_url: Optional[str] = None
+    social_links: Optional[list[PartnerSocialLink]] = None
     tools: Optional[list[PartnerTool]] = None
 
 
