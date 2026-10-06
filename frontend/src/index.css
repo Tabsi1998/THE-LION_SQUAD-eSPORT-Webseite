@@ -2522,3 +2522,42 @@ html[data-season-intensity]:not([data-season-intensity=""]) .tls-card[data-seaso
     transform: translateX(calc(3px * var(--tls-motion-on)));
   }
 }
+
+/* Einblenden (#1074): in einem Raster blenden die Karten nacheinander ein - der Versatz folgt der Stelle im Raster,
+   ohne dass jede Seite einen Zähler mitgeben muss. Der Rahmen bleibt stehen, nur der Inhalt blendet (Reveal.jsx). */
+.tls-reveal-grid > :nth-child(1) { --tls-i: 0; }
+.tls-reveal-grid > :nth-child(2) { --tls-i: 1; }
+.tls-reveal-grid > :nth-child(3) { --tls-i: 2; }
+.tls-reveal-grid > :nth-child(4) { --tls-i: 3; }
+.tls-reveal-grid > :nth-child(5) { --tls-i: 4; }
+.tls-reveal-grid > :nth-child(6) { --tls-i: 5; }
+.tls-reveal-grid > :nth-child(7) { --tls-i: 6; }
+.tls-reveal-grid > :nth-child(8) { --tls-i: 7; }
+.tls-reveal-grid > :nth-child(9) { --tls-i: 8; }
+.tls-reveal-grid > :nth-child(10) { --tls-i: 9; }
+.tls-reveal-grid > :nth-child(11) { --tls-i: 10; }
+.tls-reveal-grid > :nth-child(12) { --tls-i: 11; }
+.tls-reveal-grid > :nth-child(n + 13) { --tls-i: 12; }
+
+/* Hero (#1075): das Glühen wandert von selbst sehr langsam, eine feine Körnung liegt über dem Grund. Die Drift liegt
+   auf einer Hülle, damit der Zeiger das Glühen weiter lenken kann; außerhalb des Bildes steht sie (--tls-hero-play). */
+@keyframes tls-glow-drift {
+  from { transform: translate3d(-2.5%, -2%, 0) scale(1); }
+  to { transform: translate3d(3%, 2.5%, 0) scale(1.06); }
+}
+.tls-hero-drift {
+  animation: tls-glow-drift 22s ease-in-out infinite alternate;
+  animation-play-state: var(--tls-hero-play, running);
+}
+.tls-hero-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.13;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media (prefers-reduced-motion: reduce) {
+  .tls-hero-drift { animation: none; }
+}

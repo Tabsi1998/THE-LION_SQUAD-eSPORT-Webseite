@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Search, Crown } from "lucide-react";
@@ -86,7 +87,7 @@ export default function PlayersPage() {
           ) : filtered.length === 0 ? (
             <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Keine Spieler gefunden.</div>
           ) : (
-            <div className="tls-dim-siblings grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
+            <Reveal className="tls-reveal-grid tls-dim-siblings grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-4">
               {filtered.map((p) => {
                 const isMember = memberUsernames.has(p.username);
                 const accountLevel = p.achievement_level?.level || 1;
@@ -95,7 +96,7 @@ export default function PlayersPage() {
                     key={p.username}
                     to={`/u/${p.username}`}
                     data-testid={`player-card-${p.username}`}
-                    className={`tls-card border ${accountLevelFrameClass(accountLevel)} rounded-sm bg-[#121212] p-4 group`}
+                    className={`tls-card tls-reveal-item border ${accountLevelFrameClass(accountLevel)} rounded-sm bg-[#121212] p-4 group`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="relative">
@@ -137,7 +138,7 @@ export default function PlayersPage() {
                   </Link>
                 );
               })}
-            </div>
+            </Reveal>
           )}
         </div>
         {tab === "all" && !loading && totalPages > 1 && (

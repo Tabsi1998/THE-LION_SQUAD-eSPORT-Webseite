@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -48,7 +49,7 @@ export default function F1ListPage() {
           <p className="mt-4 text-white/70 max-w-2xl">Time-Trial Events mit Live-Leaderboards, mehreren Strecken und Championship-Wertung.</p>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
+      <Reveal className="tls-reveal-grid max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-5">
         {loading ? (
           <PublicLoadingState cards={3} />
         ) : list.length ? (
@@ -63,7 +64,7 @@ export default function F1ListPage() {
             secondaryAction={{ to: "/news", label: "News lesen" }}
           />
         )}
-      </div>
+      </Reveal>
     </PublicLayout>
   );
 }
@@ -74,7 +75,7 @@ function FastLapCard({ challenge: c }) {
     <Link
       to={`/fastlap/${c.slug || c.id}`}
       data-testid={`f1-list-${c.slug}`}
-      className="tls-card group block border border-white/10 rounded-sm p-5 sm:p-6 bg-[#121212]"
+      className="tls-card tls-reveal-item group block border border-white/10 rounded-sm p-5 sm:p-6 bg-[#121212]"
     >
       <div className="flex items-start gap-4 sm:gap-5 min-w-0">
         <div className="hidden sm:flex w-32 h-20 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-[#0A0A0A] border border-white/10">

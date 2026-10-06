@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { TournamentCard } from "@/components/tls/TournamentCard";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
@@ -101,7 +102,7 @@ export default function TournamentsPage() {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
+          <Reveal className="tls-reveal-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
             {list.map((t, i) => <TournamentCard key={t.id} tournament={t} index={i} />)}
             {list.length === 0 && (
               <PublicEmptyState
@@ -114,7 +115,7 @@ export default function TournamentsPage() {
                 className="col-span-full"
               />
             )}
-          </div>
+          </Reveal>
         )}
       </div>
     </PublicLayout>

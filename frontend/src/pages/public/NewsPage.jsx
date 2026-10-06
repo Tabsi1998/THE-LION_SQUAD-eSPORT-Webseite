@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -145,16 +146,16 @@ export default function NewsPage() {
                 <div className="text-[11px] uppercase tracking-widest text-[#FFD700]/80 font-bold mb-3 flex items-center gap-2">
                   <Pin className="w-3.5 h-3.5" /> Angepinnt
                 </div>
-                <div className="grid md:grid-cols-2 gap-5">
+                <Reveal className="tls-reveal-grid grid md:grid-cols-2 gap-5">
                   {pinned.map((n) => <NewsCard key={n.id} n={n} featured />)}
-                </div>
+                </Reveal>
               </div>
             )}
             <div>
               {pinned.length > 0 && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">Aktuell</div>}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
+              <Reveal className="tls-reveal-grid grid md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                 {rest.map((n) => <NewsCard key={n.id} n={n} />)}
-              </div>
+              </Reveal>
             </div>
           </div>
         )}
@@ -171,7 +172,7 @@ function NewsCard({ n, featured = false }) {
       to={`/news/${n.slug}`}
       data-testid={`news-card-${n.slug}`}
       data-season-anchor="card"
-      className={`tls-card group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${featured ? "lg:col-span-1" : ""}`}
+      className={`tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col ${featured ? "lg:col-span-1" : ""}`}
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
         {n.banner_url ? (

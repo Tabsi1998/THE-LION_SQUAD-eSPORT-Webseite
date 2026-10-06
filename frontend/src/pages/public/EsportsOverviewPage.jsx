@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -103,9 +104,9 @@ export default function EsportsOverviewPage() {
           ) : error ? (
             <PublicEmptyState icon={Radio} eyebrow="eSports" title="Aktivitäten konnten nicht geladen werden" description="Bitte lade die Seite neu oder prüfe später noch einmal." primaryAction={{ label: "Erneut laden", onClick: load }} />
           ) : spotlight.length ? (
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <Reveal className="tls-reveal-grid grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {spotlight.map((item, index) => <ActivityCard key={`${item.kind}-${item.id}`} item={item} index={index} />)}
-            </div>
+            </Reveal>
           ) : (
             <PublicEmptyState icon={Trophy} eyebrow="eSports" title="Noch keine Aktivitäten sichtbar" description="Sobald Turniere oder Fast-Lap-Challenges öffentlich sind, erscheint hier automatisch die Übersicht." primaryAction={{ to: "/events", label: "Events ansehen" }} />
           )}
@@ -174,7 +175,7 @@ function SectionHeader({ eyebrow, title, action }) {
 function ActivityCard({ item, index = 0 }) {
   const image = item.banner_url || item.game?.cover_url || (item.kind === "fastlap" ? "https://images.unsplash.com/photo-1771440571270-e27b63085a48?w=1200" : "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=1200");
   return (
-    <Link to={item.href} className="tls-card group overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
+    <Link to={item.href} className="tls-card tls-reveal-item group overflow-hidden rounded-sm border border-white/10 bg-[#121212]">
       <div className="relative aspect-video overflow-hidden">
         <LazyImg src={image} priority={index < 2} alt={item.title} sizes="(min-width: 1024px) 33vw, 100vw" className="absolute inset-0 h-full w-full object-cover opacity-45 tls-card__media group-hover:opacity-65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/45 to-transparent" />

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -52,9 +53,9 @@ export default function GalleryPage() {
             className="mt-10"
           />
         ) : (
-          <div className="mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-5">
+          <Reveal className="tls-reveal-grid mt-10 grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-5">
             {albums.map((a) => <AlbumCard key={a.id} a={a} />)}
-          </div>
+          </Reveal>
         )}
       </section>
     </PublicLayout>
@@ -66,7 +67,7 @@ function AlbumCard({ a }) {
     <Link
       to={`/galerie/${a.slug}`}
       data-testid={`album-card-${a.slug}`}
-      className="tls-card group border border-white/10 rounded-sm bg-[#121212] overflow-hidden block"
+      className="tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden block"
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden relative">
         {a.cover_url ? (

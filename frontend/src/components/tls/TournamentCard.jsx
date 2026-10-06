@@ -34,7 +34,7 @@ export function TournamentCard({ tournament, index = 0 }) {
       to={`/tournaments/${t.slug || t.id}`}
       data-testid={`tournament-card-${t.slug}`}
       data-live={t.public_phase?.state === "live" ? "1" : undefined}
-      className={`tls-card group relative block overflow-hidden rounded-sm border border-white/10 bg-[#18181B] ${t.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
+      className={`tls-card tls-reveal-item group relative block overflow-hidden rounded-sm border border-white/10 bg-[#18181B] ${t.public_phase?.state === "live" ? "tls-live-frame" : ""}`}
     >
       <div className="aspect-[16/9] relative overflow-hidden">
         <LazyImg
