@@ -38,9 +38,9 @@ export function initialFlakes(slots: Slot[], counts: FieldCounts, size: Size, se
  * Ein Schritt für alle Flocken - die Rechnung des Frame-Callbacks, ohne Reanimated testbar. `active` sagt je Platz, ob
  * er gerade schneien soll; ein wieder gebrauchter Platz fällt oben neu herein, ein nicht mehr gebrauchter fällt zu Ende.
  */
-export function stepFlakes(list: Flake[], slots: Slot[], counts: FieldCounts, dt: number, t: number, base: WindBase, gust: Gust | null, size: Size, scrolled = 0, random: () => number = Math.random): Flake[] {
+export function stepFlakes(list: Flake[], slots: Slot[], counts: FieldCounts, dt: number, t: number, base: WindBase, gust: Gust | null, size: Size, scrolled = 0, random: () => number = Math.random, lean = 0): Flake[] {
   "worklet";
-  const wind = windAt(t, base, gust);
+  const wind = windAt(t, base, gust, lean);
   for (let i = 0; i < list.length; i += 1) {
     const flake = list[i];
     const slot = slots[i];
@@ -73,7 +73,7 @@ function FlakeSprite({ index, flakes, flake }: { index: number; flakes: SharedVa
   );
 }
 
-export function SnowField({ capacity, counts, wind, size, seed, running, scroll, testID = "snow-field" }: { capacity: FieldCounts; counts: FieldCounts; wind: WindBase; size: Size; seed: string; running: boolean; scroll?: SharedValue<ScrollState> | null; testID?: string }) {
+export function SnowField({ capacity, counts, wind, size, seed, running, scroll, lean, testID = "snow-field" }: { capacity: FieldCounts; counts: FieldCounts; wind: WindBase; size: Size; seed: string; running: boolean; scroll?: SharedValue<ScrollState> | null; lean?: SharedValue<number> | null; testID?: string }) {
   const slots = useMemo(() => poolLayout(capacity), [capacity.back, capacity.mid, capacity.front]);
   // Neu gewürfelt wird nur mit neuen Plätzen, einem neuen Seed oder einer neuen Größe - nicht, wenn sich die Zahl ändert.
   const initial = useMemo(() => initialFlakes(slots, counts, size, seed), [slots, seed, size.width, size.height]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -105,11 +105,13 @@ export function SnowField({ capacity, counts, wind, size, seed, running, scroll,
     clock.value = { t, gust, screen: now ? now.screen : "", y: now ? now.y : 0 };
     const counts = want.value;
     const windBase = base.value;
+    // Neigung des Handys (#667): die Flocken driften zur tieferen Seite.
+    const tilt = lean ? lean.value : 0;
     flakes.modify((list) => {
       "worklet";
-      return stepFlakes(list, slots, counts, dt, t, windBase, gust, area, scrolled);
+      return stepFlakes(list, slots, counts, dt, t, windBase, gust, area, scrolled, Math.random, tilt);
     });
-  }, [slots, width, height, scroll, clock, want, base, flakes]);
+  }, [slots, width, height, scroll, clock, want, base, flakes, lean]);
   const frame = useFrameCallback(step, running);
   useEffect(() => {
     frame.setActive(running);

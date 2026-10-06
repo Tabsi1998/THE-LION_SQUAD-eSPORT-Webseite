@@ -16,6 +16,7 @@ import { advanceRappel, createRappel, rappelView, type RappelSpec, type RappelSt
 import { between, pick, screenRng, seasonRng, seasonYear } from "./rng";
 import type { ActiveSeason } from "./SeasonProvider";
 import { useSeason } from "./SeasonProvider";
+import { useTilt } from "./tilt";
 import { recordSignal } from "./signals";
 import { EXTENT, buildPlan, planLines, stepDurationMs, toPixels, webRadius, type WebPlan } from "./webPlan";
 
@@ -282,11 +283,17 @@ function OrbWebInner({ web, width, reduced, plan }: { web: WebSpec; width: numbe
   }, [done, step, plan]);
   const boxWidth = EXTENT.x * radius;
   const boxHeight = EXTENT.y * radius;
-  const rotate = sway.interpolate({ inputRange: [0, 1], outputRange: ["-0.8deg", "0.8deg"] });
+  // Neigen des Handys (#667): das Netz pendelt um seine Ecke - weich, höchstens vier Grad, nie bei „Bewegung reduzieren“.
+  const tilt = useTilt(!reduced);
+  const angle = Animated.add(sway.interpolate({ inputRange: [0, 1], outputRange: [-0.8, 0.8] }), Animated.multiply(tilt.x, mirror ? -4 : 4));
+  const rotate = angle.interpolate({ inputRange: [-30, 30], outputRange: ["-30deg", "30deg"] });
+  const pivot = mirror
+    ? [{ translateX: boxWidth / 2 }, { translateY: -boxHeight / 2 }, { rotate }, { translateX: -boxWidth / 2 }, { translateY: boxHeight / 2 }]
+    : [{ translateX: -boxWidth / 2 }, { translateY: -boxHeight / 2 }, { rotate }, { translateX: boxWidth / 2 }, { translateY: boxHeight / 2 }];
   const hub = toPixels(plan.nodes[0], radius, mirror);
   const spiderSize = Math.max(14, Math.round(radius * 0.22));
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.web, web.corner === "tl" ? { left: 0 } : { right: 0 }, { width: boxWidth, height: boxHeight, transform: [{ rotate }] }]} testID={done ? "halloween-web-built" : "halloween-web-building"}>
+    <Animated.View pointerEvents="box-none" style={[styles.web, web.corner === "tl" ? { left: 0 } : { right: 0 }, { width: boxWidth, height: boxHeight, transform: pivot }]} testID={done ? "halloween-web-built" : "halloween-web-building"}>
       <Svg width={boxWidth} height={boxHeight}>
         {lines.map((line, index) => (builtThreads.has(index) ? (
           <Line key={index} x1={line.x1} y1={line.y1} x2={line.x2} y2={line.y2} stroke={line.kind === "spiral" ? THREAD_SOFT : THREAD} strokeWidth={line.kind === "spiral" ? 0.65 : 0.9} strokeLinecap="round" />
@@ -393,12 +400,16 @@ function DropSpider({ spec, width, reduced }: { spec: NonNullable<ScreenLayout["
       if (token) releaseMotion(token);
     };
   }, [drop, sway, spec, reduced]);
+  // Neigen (#667): die Spinne pendelt am Faden zur tieferen Seite - der Faden hängt oben, dort liegt der Drehpunkt.
+  const tilt = useTilt(!reduced);
   if (reduced) return null;
   const translateY = drop.interpolate({ inputRange: [0, 1], outputRange: [-spec.drop - spec.size * 4, 0] });
-  const rotate = sway.interpolate({ inputRange: [-1, 1], outputRange: ["-6deg", "6deg"] });
+  const angle = Animated.add(sway.interpolate({ inputRange: [-1, 1], outputRange: [-6, 6] }), Animated.multiply(tilt.x, -14));
+  const rotate = angle.interpolate({ inputRange: [-30, 30], outputRange: ["-30deg", "30deg"] });
+  const half = spec.size * 2;
   const offset = Math.round(width * spec.offset);
   return (
-    <Animated.View pointerEvents="none" style={[styles.spider, spec.side === "left" ? { left: offset } : { right: offset }, { transform: [{ translateY }, { rotate }] }]} testID={`halloween-spider-${spec.side}`}>
+    <Animated.View pointerEvents="none" style={[styles.spider, spec.side === "left" ? { left: offset } : { right: offset }, { transform: [{ translateY }, { translateY: -half }, { rotate }, { translateY: half }] }]} testID={`halloween-spider-${spec.side}`}>
       <SpiderShape size={spec.size} />
     </Animated.View>
   );

@@ -2,6 +2,7 @@ import * as Haptics from "expo-haptics";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, useWindowDimensions } from "react-native";
+import { useSharedValue } from "react-native-reanimated";
 import Svg, { Circle, G, Line } from "react-native-svg";
 import { useAppActive } from "../halloween";
 import { seasonCapabilities } from "../intensity";
@@ -10,6 +11,7 @@ import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { recordSignal } from "../signals";
 import { SnowField } from "../sky/SnowField";
 import { seasonScroll } from "../sky/scroll";
+import { tiltSource } from "../tilt";
 import { MELT, breakShards, catchStyle, type CatchStyle } from "./catch";
 import { fadeAt, flakeCounts, snowfallFactor, windFrom } from "./flakes";
 
@@ -43,11 +45,23 @@ export function SnowSky({ season, screen, reducedMotion }: { season: ActiveSeaso
   const active = useAppActive();
   const budget = reducedMotion ? 0 : skyBudget(season.effective);
   const share = snowShare(screen, season.effective);
+  // Neigung (#667): nur solange es schneit und die App vorne ist - der Sensor läuft nicht umsonst.
+  const lean = useSharedValue(0);
+  const wantsTilt = budget > 0 && share > 0 && active;
+  useEffect(() => {
+    if (!wantsTilt) {
+      lean.value = 0;
+      return undefined;
+    }
+    return tiltSource.subscribe((tilt) => {
+      lean.value = tilt.x;
+    });
+  }, [wantsTilt, lean]);
   if (!budget || share <= 0 || !width || !height) return null;
   const counts = flakeCounts(budget, { share, factor: snowfallFactor(weather, 0.55), fade: fadeAt(season.ends_at) });
   const capacity = flakeCounts(budget, { factor: 1.25 });
   const seed = seasonSeed({ season: "snow", year: seasonYear(season), screen: "sky" });
-  return <SnowField capacity={capacity} counts={counts} wind={windFrom(weather)} size={{ width, height }} seed={seed} running={active} scroll={seasonScroll()} testID="snow-sky" />;
+  return <SnowField capacity={capacity} counts={counts} wind={windFrom(weather)} size={{ width, height }} seed={seed} running={active} scroll={seasonScroll()} lean={lean} testID="snow-sky" />;
 }
 
 async function readClicks(): Promise<number> {

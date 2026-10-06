@@ -395,7 +395,13 @@
           "enableBackgroundRecording": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Die LionsAPP lässt Deko der Jahreszeiten beim Neigen des Handys mitschwingen."
+        }
+      ]
     ],
     "updates": {
       "enabled": false

@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { StyleSheet, View, useWindowDimensions } from "react-native";
+import { Animated, StyleSheet, View, useWindowDimensions } from "react-native";
 import Svg, { Circle, Defs, LinearGradient, RadialGradient, Rect, Stop } from "react-native-svg";
 import { colors } from "../../theme";
 import { seasonCapabilities } from "../intensity";
 import { seasonYear } from "../rng";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { skyLight, winterStars } from "../sky/light";
+import { useTilt } from "../tilt";
+
+/** So viele px wandern die Sterne bei voller Neigung (#667) - Parallaxe, kein Wackeln. */
+export const STAR_PARALLAX = 9;
 
 // Der Winterhimmel in der App (W4 #730, #772): hinter dem Inhalt jedes Screens (Slot Backdrop in `Screen`) - nachts
 // ein leiser Blauschein, um Auf- und Untergang ein warmes Glühen auf der Seite der Sonne, dazu wenige stille Sterne
@@ -35,7 +39,10 @@ export function WinterSkyBackdrop({ season, screen }: { season: ActiveSeason; sc
   const count = Math.round(most * light.stars * (season.effective === "subtle" ? 0.5 : 1));
   const year = String(seasonYear({ key: "snow", starts_at: season.starts_at || "" }));
   const stars = useMemo(() => winterStars(year, most).slice(0, count), [year, most, count]);
+  const { reducedMotion } = useSeason();
+  const tilt = useTilt(!reducedMotion && count > 0 && season.effective !== "subtle");
   if (!caps.sky || (light.night <= 0.01 && light.warmth <= 0.01)) return null;
+  const drift = { transform: [{ translateX: Animated.multiply(tilt.x, STAR_PARALLAX) }, { translateY: Animated.multiply(tilt.y, STAR_PARALLAX * 0.5) }] };
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill} testID="winter-sky">
       <Svg width="100%" height="100%">
@@ -58,10 +65,16 @@ export function WinterSkyBackdrop({ season, screen }: { season: ActiveSeason; sc
         {light.night > 0.01 ? <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterNight)" testID="winter-tint" /> : null}
         {light.warmth > 0.01 ? <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterGlow)" testID="winter-glow" /> : null}
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#winterFadeIn)" />
-        {stars.map((star) => (
-          <Circle key={star.index} cx={star.x * width} cy={star.y * height} r={star.r} fill="#eef4ff" fillOpacity={star.bright * 0.8} testID="winter-star" />
-        ))}
       </Svg>
+      {stars.length ? (
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, drift]} testID="winter-stars">
+          <Svg width="100%" height="100%">
+            {stars.map((star) => (
+              <Circle key={star.index} cx={star.x * width} cy={star.y * height} r={star.r} fill="#eef4ff" fillOpacity={star.bright * 0.8} testID="winter-star" />
+            ))}
+          </Svg>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

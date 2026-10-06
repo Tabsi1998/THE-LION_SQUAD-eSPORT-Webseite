@@ -73,12 +73,18 @@ export function gustAt(gust: Gust | null, t: number): number {
   return 1;
 }
 
-/** Der Wind zum Zeitpunkt t (Sekunden): Grundwind mit langsamem Auf und Ab mal Böe; x in px/s (Vorzeichen = Richtung), y drückt etwas nach unten. */
-export function windAt(t: number, base: WindBase = { factor: 0.6, sign: 1 }, gust: Gust | null = null): Wind {
+/** So viel px/s schiebt die volle Neigung des Handys (#667) die Flocken zur Seite - dazu zum Wind. */
+export const TILT_WIND = 46;
+
+/**
+ * Der Wind zum Zeitpunkt t (Sekunden): Grundwind mit langsamem Auf und Ab mal Böe; x in px/s (Vorzeichen = Richtung),
+ * y drückt etwas nach unten. `lean` (-1…1) ist die seitliche Neigung des Handys (#667).
+ */
+export function windAt(t: number, base: WindBase = { factor: 0.6, sign: 1 }, gust: Gust | null = null, lean = 0): Wind {
   "worklet";
   const breath = 1 + 0.25 * Math.sin(t / 5.3) + 0.12 * Math.sin(t / 1.9 + 1);
   const strength = base.factor * breath * gustAt(gust, t);
-  return { x: base.sign * (8 + 38 * strength), y: 6 * strength, strength };
+  return { x: base.sign * (8 + 38 * strength) + lean * TILT_WIND, y: 6 * strength, strength };
 }
 
 function between(rng: () => number, [min, max]: [number, number]): number {
