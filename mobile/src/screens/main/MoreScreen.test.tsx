@@ -79,6 +79,23 @@ test("Zeilen statt Karten: jedes Ziel einmal; Mitglieder sehen die goldene Karte
   expect(navigate).toHaveBeenCalledWith("InfoCenter", { section: "sponsors" });
 });
 
+test("Einlass (#845): nur mit dem Bereich „Verein“ - der Eintrag führt zum Scanner", async () => {
+  const board = mockUser as { areas?: string[] };
+  board.areas = ["club"];
+  try {
+    const asBoard = await render(<MoreScreen navigation={navigation} route={route} />);
+    await waitFor(() => expect(mockGet).toHaveBeenCalled());
+    await fireEvent.press(screen.getByTestId("more-admission"));
+    expect(navigate).toHaveBeenCalledWith("Admission");
+    await asBoard.unmount();
+  } finally {
+    delete board.areas;
+  }
+  await render(<MoreScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(mockGet).toHaveBeenCalled());
+  expect(screen.queryByTestId("more-admission")).toBeNull();
+});
+
 test("wer kein Mitglied ist, sieht „Mitglied werden“ mit Link zur Beitrittsseite", async () => {
   mockUser.is_club_member = false;
   const openUrl = jest.spyOn(Linking, "openURL").mockResolvedValue(true);
