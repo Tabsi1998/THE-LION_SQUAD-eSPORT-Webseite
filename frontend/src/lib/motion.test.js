@@ -6,8 +6,9 @@ import { MOTION, motionAllowed, motionSeconds, motionTransition } from "./motion
 // sie zusammen: wer eine Zahl ändert, muss alle drei ändern.
 
 const root = process.cwd();
-const css = readFileSync(path.join(root, "src/index.css"), "utf8");
-const app = readFileSync(path.join(root, "../mobile/src/theme.ts"), "utf8");
+// Zeilenenden egal: ein Windows-Checkout liefert CRLF, der Test vergleicht Inhalte.
+const css = readFileSync(path.join(root, "src/index.css"), "utf8").replace(/\r\n/g, "\n");
+const app = readFileSync(path.join(root, "../mobile/src/theme.ts"), "utf8").replace(/\r\n/g, "\n");
 
 test("JS, CSS und App nennen dieselben Dauern und dieselbe Kurve", () => {
   expect(MOTION).toEqual({ fast: 150, mid: 240, slow: 420, ease: [0.2, 0.7, 0.2, 1] });
