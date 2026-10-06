@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 - 2026-10-06
+
+- Mobile: Links öffnen die App: Turniere, Events, Matches, Fast Laps, Teams, News, Profile, Galerie, Erfolge, Jahreswertung und Rechnungen gehen aus News, Chat, Laufbanner, Dashboard, Info-Center und von außen (Discord, WhatsApp, Browser) gleich im passenden Bildschirm auf – alles andere wie bisher im Browser (#921).
+- Mobile: Passkey, den der Server nicht kennt: Liegt am Handy ein alter Passkey, sagt die Anmeldung das ruhig und bittet den Passwortmanager, ihn zu vergessen; nach der Anmeldung mit Passwort bietet die App einen neuen an (#949).
+- Mobile: Schneehaube: In der Schnee-Saison liegt auf der Begrüßungskarte im Dashboard eine Haube wie auf der Website – sie wächst mit der Stufe und taut bei Plusgraden (#729).
+- Mobile: Neigen des Handys: Das Halloween-Netz und die Spinne pendeln beim Neigen, Schneeflocken driften zur Seite, Sterne wandern leicht mit – nur mit eingeschalteter Deko, nie bei „Bewegung reduzieren“ (#667).
+- Mobile: Einlass bei der Generalversammlung: Der Vorstand scannt die Mitgliedskarte mit der App; groß steht, ob die Person anwesend und stimmberechtigt ist, dazu die Zahlen zur Beschlussfähigkeit, Mitgliedsnummer von Hand und Rücknahme mit Grund (#845).
+
 ## 1.2.2 - 2026-10-05
 
 - Mobile: Mehrere Passkeys: Hast du schon einen auf einem anderen Gerät (etwa am PC mit Windows Hello), lädt die App nach der Anmeldung mit Passwort ein, auch für dieses Handy einen anzulegen. Neue Passkeys tragen den Namen deines Handys, damit du sie in der Liste auseinanderhältst (#939).
