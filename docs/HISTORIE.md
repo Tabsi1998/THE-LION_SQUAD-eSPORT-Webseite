@@ -3519,6 +3519,15 @@ Die alte Fassung im Ganzen zeigt `git show 279c53c3:CLAUDE.md`.
   und Seite); `preview_eggs` liefert `placeholder` und immer `active`. Web sammelt probehalber im Fenster
   (`EasterEggs.collectPreview`, `previewFind`, Fortschritt mit `preview: true`), der Server zählt nichts;
   Vorschau-Knopf je Ei auch im Entwurf. `docs/SEASONS.md` §20.
+- Partner-Socials als Liste (#967; PR #971; Backend, Web, App-Anzeige; `update.sh`): `social_links`
+  (`PartnerSocialLink`: Plattform, Adresse, Beschriftung) statt vier fester Felder;
+  `partner_pages.SOCIAL_PLATFORMS` (Name + erlaubte Hosts), `clean_social_links` (Host-Prüfung, mailto,
+  doppelt/leer weg, höchstens 20), `channels_for` hängt die Liste hinter Website/Discord/Twitch und
+  danach die alten Felder (`LEGACY_SOCIAL_FIELDS`) an – Partnerseite und App zeigen neue Plattformen
+  ohne Umbau. Verwaltung: `SocialsEditor` („+ Social“, Dropdown aus `lib/socialIcons` ohne
+  Website/Discord/Twitch, Beschriftung nur bei „Eigener Link“); `formFromPartner` holt die alten Felder in
+  die Liste, `partnerPayload` leert sie. Nebenbei Audit-Gate der App: `source-map-js` 1.2.2 im Lockfile,
+  `sprintf-js` bis 2.11.2026 angenommen (`mobile/scripts/security-audit-allowlist.json`).
 ---
 
 ## Teil B – Stand-Verlauf (eingefroren am 5. Oktober 2026)
