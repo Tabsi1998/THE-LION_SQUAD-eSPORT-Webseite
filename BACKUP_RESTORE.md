@@ -134,9 +134,33 @@ bash scripts/restore.sh \
 unset RESTORE_CONFIRM
 ```
 
-Das Skript validiert beide Archive, erstellt standardmäßig ein zusätzliches Sicherheitsbackup,
-restauriert MongoDB mit `--drop`, ersetzt das Upload-Volume und startet Web/API neu. Danach
-Readiness, Adminlogin, Uploads, ein historisches Turnier, Mailqueue und Auditlog prüfen.
+Das Skript arbeitet in dieser Reihenfolge (#1008):
+
+1. **Archive prüfen** (`restore-check.sh`) – noch ohne Änderung.
+2. **Schreiber anhalten:** `docker compose stop backend` (API samt Scheduler, alle Container des
+   Dienstes) und den Stopp mit `docker inspect` prüfen. Läuft noch etwas oder ist der Zustand unklar,
+   bricht das Skript ab, bevor es etwas ändert. Weitere Schreiber – etwa ein zweiter Stack auf
+   derselben Datenbank – kennt es nicht; die hält man vorher selbst an (`RESTORE_WRITER_SERVICES`
+   nennt die Dienste, Standard `backend`).
+3. **Sicherheitsbackup** des aktuellen Stands – jetzt stimmen Datenbank und Uploads zusammen, weil
+   niemand mehr schreibt.
+4. **MongoDB mit `--drop`** restaurieren, dann das **Upload-Volume** ersetzen.
+5. **Prüfen, bevor jemand schreibt:** Sammlungen und Konten in der Datenbank, Dateien im Upload-Volume.
+   Ein leeres Volume gilt nur mit `RESTORE_ALLOW_EMPTY_UPLOADS=true` als richtig.
+6. **Freigabe:** Backend und Web starten und bis zu `RESTORE_READY_TIMEOUT_SECONDS` (Standard 180)
+   warten, bis das Backend wieder „healthy“ meldet.
+
+Scheitert ein Schritt nach dem Stopp, **bleibt das System gesperrt** (Backend aus) und das Skript
+nennt den Weg: Ursache beheben und erneut starten – oder zurück zum Stand davor mit dem
+Sicherheitsbackup aus Schritt 3 (`scripts/restore.sh <Sicherheits-Archiv> <Sicherheits-Uploads>`).
+Erst wenn Datenbank und Uploads nachweislich stimmen: `docker compose start backend frontend`.
+
+Danach Readiness, Adminlogin, Uploads, ein historisches Turnier, Mailqueue und Auditlog prüfen.
+
+**Abnahme auf einem Testsystem** (nie produktiv): während des Restores einen Schreibversuch gegen die
+API schicken (muss scheitern, Backend steht), einen zweiten Backend-Container im Projekt starten
+(der Stopp trifft alle), und je einen Abbruch nach Schritt 4 und vor dem Upload-Teil erzwingen – das
+System muss gesperrt bleiben und den Rückweg ausgeben.
 
 `SKIP_PRE_RESTORE_BACKUP=true` nur verwenden, wenn der aktuelle Zustand nachweislich unbrauchbar
 ist und nicht mehr forensisch gesichert werden soll.
