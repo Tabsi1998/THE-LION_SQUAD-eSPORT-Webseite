@@ -371,47 +371,45 @@ den ausgelieferten Skripten suchen.
 
 ---
 
-## 9. Letzter Stand (6. Oktober 2026, Vormittag)
+## 9. Letzter Stand (6. Oktober 2026, Abend)
 
 **Ersetzen, nicht anhängen** – höchstens eine Seite. Was davor war: `docs/HISTORIE.md` Teil B.
 
-- **`main`** steht nach #972 (`80dec0c5`). Gemergt seit dem letzten Doku-Stand (#953): #951, #952, #955,
-  #956, #957, #959, #965, #966, #969, #970, #971, #972 – alle mit Eintrag in `docs/HISTORIE.md` Teil A.
-  Meilensteine „Discord VI“ (38), „Erfolge II“ (39) und „Wünsche Oktober 2026“ (51) sind erledigt.
-- **Offene PRs** (unabhängig voneinander, alle auf `main`): #975 (App 1.3.0 Teil 1: Links öffnen den
-  passenden Screen, Passkey ohne Gegenstück am Server – #921, #949), #976 (App 1.3.0 Teil 2: Schneehaube im
-  Dashboard-Kopf, Neigungssensor – #729, #667; `expo-sensors`), #974 (Dependabot, `source-map-js` im Web) und
-  der Doku-PR mit diesem Stand. Beide App-PRs brauchen den Build 1.3.0 und je einen Eintrag in
-  `docs/HISTORIE.md` Teil A nach dem Merge.
-- **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh`; dabei baut das
-  Backend-Image einmal neu (`defusedxml` aus #951) und beim Start läuft einmal Migration 4 (#952). Danach
-  unter System → Betrieb & Logs → Checks: „Besucher-Adresse“ (#956) soll grün sein; eine Logzeile
-  `[indexes] … Dubletten` bitte schicken.
-- **App:** 1.2.2 / Build 88 (`mobile-v1.2.2-build88`) am GitHub-Release und am Vereinsserver; in Google Play
-  lädt der Betreiber die Bundles von Hand in den offenen Test (86 ist oben, 88 steht an). Kein offener PR
-  braucht einen Build; der nächste Build ist „App 1.3.0“.
-- **Meilenstein „Wünsche Oktober 2026“ (51):** #967 (#971) und #968 (#972) gemergt. Website bei Partnern war
-  schon optional (Nachfrage des Betreibers, 6.10. – falscher Alarm).
-- **Reihenfolge laut Betreiber: erst alles Offene fertig machen, dann Neues – und nur, was Sinn macht.**
-  1. App 1.3.0 als ein Build: #921 und #949 (PR #975), #729 und #667 (PR #976), dann #845 (Einlass per
-     Karte, Entscheidung B mit Kamera, `expo-camera`) als Teil 3, danach der Release-PR (Build 89).
-  2. Abnahmen Jahreszeiten II (#733, #738, #744) und III (#748, #752, #759): QA-Runden mit den
-     `frontend/e2e/*-regression.spec.js` und Bildern, dann schließen.
-  3. Dolibarr III: #330 – Vorschlag (Runbook plus kurze Live-Checkliste statt Docker-Labor) wartet auf das
-     Ja des Betreibers; #329 Mandat.
-  4. Meilenstein „Prüfung Oktober 2026“ (Rest): #932–#937, #775; #942 wartet auf die Abfrage vom Server.
-  5. Erst danach Neues: Events II (#884, #885). „Später“ bleibt geparkt (#323, #576, #577, #779, #960, #962).
-- **Offen beim Betreiber** (ausführlich in `UMBAUPLAN.md`, „Was von dir kommen muss“): die PRs mergen,
-  `update.sh`; Sammelkanal für „Ankündigungen folgen“ am Hauptserver anlegen und dem Bot dort „Webhooks
-  verwalten“ geben (#966); am Handy die alten Passkeys für lionsquad.at im Passwortmanager löschen und in
-  der App neu anlegen; Play Console → App-Integrität → App-Signatur: die SHA-256-Fingerabdrücke nennen;
-  Build 88 in den offenen Test und den Text unter „App-Zugriff“ ersetzen (`docs/PLAY_STORE.md`); die Rechte
-  in Dolibarr und Discord vom 5.10.; die Abfrage aus #942; das Ja zu #330.
-- **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`,
-  `braces`, `sprintf-js`) – dann neu prüfen, sonst wird `npm run audit:ci` rot. Termine der Meilensteine
-  stehen auf GitHub.
-- **GitHub:** `main` hat keinen Branch-Schutz („nie direkt auf `main`“ ist Vereinbarung); gemergte Zweige
-  werden nicht von selbst gelöscht. CodeQL läuft seit #955 wieder automatisch.
+- **`main`** steht nach #979 (`5f765ea9`). Gemergt am 6.10. nach dem Doku-Stand #973: #974 (Dependabot), #975,
+  #976, #977 (App 1.3.0 Teil 1–3), #978 (Silvester-Jahreszahl, Abnahme #744), #979 (Release-PR 1.3.0) – alle
+  mit Eintrag in `docs/HISTORIE.md` Teil A. Keine offenen Code-PRs.
+- **App 1.3.0 / Build 89** (`mobile-v1.3.0-build89`): lokal gebaut am 6.10. abends, APK am GitHub-Release und am
+  Vereinsserver; das AAB ``LionsAPP-v1.3.0-build89-5f765ea.aab`` lädt der Betreiber von Hand in den **offenen Test** (Versionshinweis in
+  PR #979). Neue Berechtigung Kamera (nur Einlass-Scanner); `expo-sensors` ohne Abfrage auf Android. Nach dem
+  Lockfile-Wechsel (expo-sensors, expo-camera) war es ein voller nativer Build.
+- **Server:** eingespielt bis #940 (Stand 5.10.). Alles seit #946 braucht `update.sh` (Backend-Image baut einmal neu,
+  Migration 4 läuft einmal); danach System → Betrieb & Logs → Checks („Besucher-Adresse“ grün?) und die Zeilen in
+  `UMBAUPLAN.md` „Nach dem Update vom 6.10.“.
+- **Meilensteine:** geschlossen heute 38, 39, 41 (Jahreszeiten II), 42 (Jahreszeiten III), 51 (Wünsche Oktober).
+  „App 1.3.0“ (49) schließt mit der Übergabe des Bundles. **Dolibarr III** (21) hat nur noch #330 – mein Vorschlag
+  (Runbook plus kurze Live-Checkliste statt Docker-Labor) wartet auf das Ja des Betreibers.
+- **Projektprüfung 6.10. (zweite Sitzung des Betreibers, Übersicht #1065):** fünf neue Meilensteine mit rund 90
+  Issues (#980–#1064), Prioritäten P1–P3 je Issue, parallel bearbeitbar: 48 „Stabilisierung: Konten, Rechte und
+  Datenschutz“ (ersetzt „Prüfung Oktober“; #942 und die P1 #1027 #1028 #1039 #1047 #1052 #1053), 52 „Daten,
+  Buchungen und Turnierabläufe“, 53 „Darstellung und Bedienung“ (dort auch #937), 54 „Qualität: Performance, Tests
+  und CI“ (dort #932–#936, #775), 55 „Betrieb: Wiederherstellung und Release-Abnahme“ (u. a. #1016 Build 89,
+  #1018 App Links, #1019 Passkeys, #1020 Einlass – Geräteabnahmen). Die Arbeitsunterlagen (`prepared-issue-drafts.json`,
+  `bericht.md`) liegen laut #1065 unter `C:\GIT\lion-audit-2026-10-06\` – auf diesem Rechner nicht vorhanden; bei
+  Sicherheits-Tickets zuerst das JSON lesen, nichts erfinden.
+- **Reihenfolge laut Betreiber (6.10. abends):** erst die fast fertigen Meilensteine zu Ende (erledigt bis auf #330
+  und die Bundle-Übergabe), dann **warten auf seine Merges und sein OK**, dann die Stabilisierung – zuerst P1,
+  dann P2, dann P3; Geräte-/Integrationsabnahmen (55) getrennt von Code-Fixes behandeln.
+- **Offen beim Betreiber** (ausführlich in `UMBAUPLAN.md`, „Was von dir kommen muss“): `update.sh`; Build 89 in den
+  offenen Test; Sammelkanal + „Webhooks verwalten“ für den Bot (#966); alte Passkeys am Handy löschen; Play Console
+  → App-Signatur: SHA-256-Fingerabdrücke; die Rechte in Dolibarr und Discord vom 5.10.; die Abfrage aus #942; das
+  Ja zu #330; das OK für den Start der Stabilisierung.
+- **Fristen:** am **2.11.2026** laufen die drei Ausnahmen im Sicherheitscheck der App ab (`node-forge`, `braces`,
+  `sprintf-js`) – dann neu prüfen, sonst wird `npm run audit:ci` rot.
+- **Stolperstein 6.10.:** der PC ging um ~09:47 hart aus; `.git/HEAD`, frische Refs und `mobile/src/whatsnew.json`
+  waren danach mit Nullen gefüllt („not a git repository“). Repariert (HEAD neu, Refs gelöscht, `fetch`,
+  `checkout`); alles war gepusht. Rezept in `docs/STOLPERSTEINE.md`.
+- **GitHub:** `main` hat keinen Branch-Schutz („nie direkt auf `main`“ ist Vereinbarung); gemergte Zweige werden
+  nicht von selbst gelöscht. CodeQL läuft seit #955 automatisch.
 
 ---
 
