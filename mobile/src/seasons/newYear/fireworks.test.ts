@@ -9,7 +9,7 @@ import { DIGIT_STROKES, YEAR_SALVO_DELAY_MS, calmYearDots, glyphCounts, glyphPoi
 
 export const FIRE_PARITY = 3025438839;
 export const CHOREO_PARITY = 1292175831;
-export const YEAR_PARITY = 2834516894;
+export const YEAR_PARITY = 2940152489;
 
 const LAUNCH: Launch = { id: "p", at: 0, type: "peony", x: 0.5, distance: 0.3, colors: ["blue", "gold"], burstY: 0.3, rise: 1.4, drift: 12 };
 

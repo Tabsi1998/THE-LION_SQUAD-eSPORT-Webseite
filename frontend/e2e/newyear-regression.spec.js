@@ -60,12 +60,13 @@ test.describe("Silvester: Countdown und Gruß", () => {
   });
 });
 
-/** Wo die Ziffern stehen (CSS-Pixel) - dieselbe Rechnung wie `glyphSpot` in yearDigits.js. */
+/** Wo die Ziffern stehen (CSS-Pixel) - dieselbe Rechnung wie `glyphSpot` in yearDigits.js (#744: PC rechts der Mitte, Handy unter dem Text). */
 function digitBoxes(width, height, slots = 4) {
-  const glyph = Math.max(40, Math.min(height * 0.17, (width * 0.8) / (0.6 + (slots - 1) * 0.82)));
-  const y = Math.max(height * 0.42, 240 + glyph / 2);
+  const wide = width >= 1024;
+  const glyph = Math.max(40, Math.min(height * (wide ? 0.14 : 0.115), (width * (wide ? 0.5 : 0.8)) / (0.6 + (slots - 1) * 0.82)));
+  const y = Math.max(height * (wide ? 0.42 : 0.55), 240 + glyph / 2);
   return Array.from({ length: slots }, (_, slot) => {
-    const x = width / 2 + (slot - (slots - 1) / 2) * 0.82 * glyph;
+    const x = (wide ? width * 0.57 : width / 2) + (slot - (slots - 1) / 2) * 0.82 * glyph;
     return { left: x - glyph * 0.3, right: x + glyph * 0.3, top: y - glyph / 2, bottom: y + glyph / 2 + 8 };
   });
 }
