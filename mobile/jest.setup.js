@@ -85,6 +85,13 @@ jest.mock("react-native-passkey", () => ({
   },
 }));
 
+jest.mock("expo-sensors", () => ({
+  DeviceMotion: {
+    isAvailableAsync: jest.fn(async () => false),
+    setUpdateInterval: jest.fn(),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+  },
+}));
 jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),
