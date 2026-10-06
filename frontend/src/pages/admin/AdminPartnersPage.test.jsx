@@ -75,6 +75,45 @@ test("Partnerseite (#469): Kanäle und ein Tool gehen mit, eine leere Tool-Zeile
   })));
 });
 
+test("Socials (#967): „+ Social“ holt eine Zeile mit Plattform und Adresse, Entfernen nimmt sie weg; gespeichert wird die Liste, die alten Felder leer", async () => {
+  render(<MemoryRouter><AdminPartnersPage /></MemoryRouter>);
+  await screen.findByText("Gamers Heaven");
+  fireEvent.click(screen.getByTestId("partner-new"));
+  fireEvent.change(screen.getByTestId("partner-name"), { target: { value: "Gamers Heaven" } });
+  expect(screen.queryByTestId("partner-youtube")).toBeNull();
+  expect(screen.getByTestId("partner-socials")).toHaveTextContent("Noch keine Socials");
+  fireEvent.click(screen.getByTestId("partner-social-add"));
+  expect(screen.getByTestId("partner-social-platform-0")).toHaveValue("facebook");
+  fireEvent.change(screen.getByTestId("partner-social-url-0"), { target: { value: "https://facebook.com/gamersheaven" } });
+  fireEvent.click(screen.getByTestId("partner-social-add"));
+  fireEvent.change(screen.getByTestId("partner-social-platform-1"), { target: { value: "linkedin" } });
+  fireEvent.change(screen.getByTestId("partner-social-url-1"), { target: { value: "https://linkedin.com/company/gh" } });
+  fireEvent.click(screen.getByTestId("partner-social-add"));
+  expect(screen.queryByTestId("partner-social-label-2")).toBeNull();
+  fireEvent.change(screen.getByTestId("partner-social-platform-2"), { target: { value: "custom" } });
+  expect(screen.getByTestId("partner-social-label-2")).toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("partner-social-remove-2"));
+  expect(screen.queryByTestId("partner-social-2")).toBeNull();
+  const options = [...screen.getByTestId("partner-social-platform-0").querySelectorAll("option")].map((option) => option.value);
+  expect(options).toEqual(expect.arrayContaining(["facebook", "instagram", "tiktok", "youtube", "x", "linkedin", "threads", "bluesky", "email", "custom"]));
+  expect(options).not.toContain("website");
+  fireEvent.submit(screen.getByTestId("partner-sheet"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/partners", expect.objectContaining({
+    name: "Gamers Heaven",
+    social_links: [{ platform: "facebook", url: "https://facebook.com/gamersheaven", label: "" }, { platform: "linkedin", url: "https://linkedin.com/company/gh", label: "" }],
+    youtube_url: "", x_url: "", instagram_url: "", tiktok_url: "",
+  })));
+});
+
+test("formFromPartner holt die vier alten Felder in die Liste; partnerPayload lässt leere Zeilen weg", () => {
+  const form = formFromPartner({ id: "p", name: "X", youtube_url: "https://youtube.com/@x", instagram_url: null, social_links: [{ platform: "facebook", url: "https://facebook.com/x", label: null }] });
+  expect(form.social_links).toEqual([{ platform: "facebook", url: "https://facebook.com/x", label: "" }, { platform: "youtube", url: "https://youtube.com/@x", label: "" }]);
+  expect(form.youtube_url).toBe("");
+  const payload = partnerPayload({ ...form, social_links: [...form.social_links, { platform: "tiktok", url: "  ", label: "" }] });
+  expect(payload.social_links).toHaveLength(2);
+  expect(payload.youtube_url).toBe("");
+});
+
 test("formFromPartner macht aus null leere Felder; partnerPayload lässt leere Tool-Zeilen weg", () => {
   const form = formFromPartner({ id: "p", name: "X", about: null, twitch_channel: null, tools: [{ id: "t", title: "A", url: "https://a.test", description: null }] });
   expect(form.about).toBe("");

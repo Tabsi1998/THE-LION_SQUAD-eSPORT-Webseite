@@ -29,19 +29,46 @@ DISCORD_TTL = 300
 MAX_TOOLS = 20
 DISCORD_WIDGET_URL = "https://discord.com/api/guilds/{guild_id}/widget.json"
 
-# key, Anzeigename, Feld am Partner
+# key, Anzeigename, Feld am Partner - die Kanäle mit eigener Funktion (Seite, Discord-Widget, Twitch-Live).
 CHANNELS = (
     ("website", "Website", "link"),
     ("discord", "Discord", "discord_invite"),
     ("twitch", "Twitch", "twitch_channel"),
-    ("youtube", "YouTube", "youtube_url"),
-    ("x", "X", "x_url"),
-    ("instagram", "Instagram", "instagram_url"),
-    ("tiktok", "TikTok", "tiktok_url"),
 )
 URL_FIELDS = {
     "link": "Website", "youtube_url": "YouTube", "x_url": "X", "instagram_url": "Instagram", "tiktok_url": "TikTok",
 }
+# Die vier festen Social-Felder von früher (#469): bleiben lesbar, die Verwaltung schreibt seit #967 in ``social_links``.
+LEGACY_SOCIAL_FIELDS = (("youtube", "youtube_url"), ("x", "x_url"), ("instagram", "instagram_url"), ("tiktok", "tiktok_url"))
+# Socials eines Partners (#967): dieselbe Liste wie unter Einstellungen → Socials (frontend/src/lib/socialIcons.js).
+# Je Plattform die Hosts, zu denen eine Adresse gehören muss - sonst steht bei „Facebook“ ein Link irgendwohin.
+SOCIAL_PLATFORMS: dict[str, tuple[str, tuple[str, ...] | None]] = {
+    "discord": ("Discord", ("discord.gg", "discord.com")),
+    "whatsapp": ("WhatsApp", ("whatsapp.com", "wa.me")),
+    "telegram": ("Telegram", ("t.me", "telegram.me", "telegram.org")),
+    "facebook": ("Facebook", ("facebook.com", "fb.com", "fb.me")),
+    "instagram": ("Instagram", ("instagram.com",)),
+    "threads": ("Threads", ("threads.net", "threads.com")),
+    "x": ("X", ("x.com", "twitter.com")),
+    "bluesky": ("Bluesky", ("bsky.app",)),
+    "mastodon": ("Mastodon", None),
+    "tiktok": ("TikTok", ("tiktok.com",)),
+    "youtube": ("YouTube", ("youtube.com", "youtu.be")),
+    "twitch": ("Twitch", ("twitch.tv",)),
+    "kick": ("Kick", ("kick.com",)),
+    "linkedin": ("LinkedIn", ("linkedin.com",)),
+    "reddit": ("Reddit", ("reddit.com",)),
+    "steam": ("Steam", ("steamcommunity.com", "steampowered.com")),
+    "github": ("GitHub", ("github.com",)),
+    "snapchat": ("Snapchat", ("snapchat.com",)),
+    "pinterest": ("Pinterest", ("pinterest.com", "pinterest.at", "pinterest.de", "pin.it")),
+    "vimeo": ("Vimeo", ("vimeo.com",)),
+    "spotify": ("Spotify", ("spotify.com",)),
+    "email": ("E-Mail", None),
+    "website": ("Website", None),
+    "custom": ("Eigener Link", None),
+}
+MAX_SOCIAL_LINKS = 20
 TEXT_FIELDS = ("about", "since")
 
 _cache: dict[tuple[str, str], tuple[float, dict]] = {}
@@ -109,6 +136,51 @@ def clean_twitch_channel(value) -> str | None:
     return login
 
 
+def _host_of(url: str) -> str:
+    from urllib.parse import urlparse
+
+    return str(urlparse(url).hostname or "").lower()
+
+
+def clean_social_links(value) -> list[dict]:
+    """Die Socials eines Partners (#967): Plattform aus der Liste, Adresse vollständig und zur Plattform passend,
+    jede Adresse einmal, höchstens MAX_SOCIAL_LINKS. Leere Zeilen fallen still weg."""
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise HTTPException(400, "Socials: eine Liste aus Plattform und Adresse.")
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise HTTPException(400, "Socials: eine Liste aus Plattform und Adresse.")
+        platform = str(entry.get("platform") or "custom").strip().lower()
+        if platform not in SOCIAL_PLATFORMS:
+            raise HTTPException(400, f"Socials: die Plattform „{platform}“ kennt die Website nicht.")
+        name, hosts = SOCIAL_PLATFORMS[platform]
+        raw = str(entry.get("url") or "").strip()
+        if not raw:
+            continue
+        if platform == "email":
+            address = raw[7:] if raw.lower().startswith("mailto:") else raw
+            if not re.match(r"^[^\s@]+@[^\s@]+\.[^\s@]+$", address):
+                raise HTTPException(400, "E-Mail: bitte eine Adresse wie name@verein.at eintragen.")
+            url = f"mailto:{address}"
+        else:
+            url = clean_url(raw, label=name)
+            if hosts and not any(_host_of(url) == host or _host_of(url).endswith(f".{host}") for host in hosts):
+                raise HTTPException(400, f"{name}: diese Adresse gehört nicht zu {name} (erwartet {' oder '.join(hosts[:2])}).")
+        key = (platform, url.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        label = str(entry.get("label") or "").strip()[:60]
+        out.append({"platform": platform, "url": url, "label": label or None})
+        if len(out) > MAX_SOCIAL_LINKS:
+            raise HTTPException(400, f"Socials: höchstens {MAX_SOCIAL_LINKS} je Partner.")
+    return out
+
+
 def clean_tools(value) -> list[dict]:
     if value is None:
         return []
@@ -150,6 +222,8 @@ def normalize_partner_fields(raw: dict) -> dict:
         cleaned["twitch_channel"] = clean_twitch_channel(raw.get("twitch_channel"))
     if "tools" in raw:
         cleaned["tools"] = clean_tools(raw.get("tools"))
+    if "social_links" in raw:
+        cleaned["social_links"] = clean_social_links(raw.get("social_links"))
     for field in TEXT_FIELDS:
         if field in raw:
             cleaned[field] = str(raw.get(field) or "").strip() or None
@@ -159,7 +233,11 @@ def normalize_partner_fields(raw: dict) -> dict:
 # ---------- Ausgabe ----------
 
 def channels_for(partner: dict) -> list[dict]:
+    """Die Kanäle eines Partners für Website und App: erst die mit Funktion (Website, Discord, Twitch), dann die
+    Socials in der gepflegten Reihenfolge (#967), dann die vier festen Felder von früher, soweit noch gefüllt - jede
+    Adresse einmal."""
     channels: list[dict] = []
+    seen: set[str] = set()
     for key, label, field in CHANNELS:
         value = str(partner.get(field) or "").strip()
         if not value:
@@ -168,6 +246,19 @@ def channels_for(partner: dict) -> list[dict]:
             channels.append({"key": key, "label": label, "url": f"https://www.twitch.tv/{value}", "handle": value})
         else:
             channels.append({"key": key, "label": label, "url": value, "handle": None})
+            seen.add(value.lower())
+    for link in partner.get("social_links") or []:
+        platform = str((link or {}).get("platform") or "custom")
+        url = str((link or {}).get("url") or "").strip()
+        if not url or url.lower() in seen or platform not in SOCIAL_PLATFORMS:
+            continue
+        seen.add(url.lower())
+        channels.append({"key": platform, "label": (link or {}).get("label") or SOCIAL_PLATFORMS[platform][0], "url": url, "handle": None})
+    for key, field in LEGACY_SOCIAL_FIELDS:
+        value = str(partner.get(field) or "").strip()
+        if value and value.lower() not in seen:
+            seen.add(value.lower())
+            channels.append({"key": key, "label": SOCIAL_PLATFORMS[key][0], "url": value, "handle": None})
     return channels
 
 

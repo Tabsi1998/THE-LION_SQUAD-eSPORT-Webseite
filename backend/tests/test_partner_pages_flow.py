@@ -261,3 +261,57 @@ async def test_sitemap_lists_only_active_partner_pages(flow, fake):
     xml = (await flow.get("/api/sitemap.xml")).text
     assert f"/partners/{created['slug']}</loc>" in xml
     assert "/partners/alter-partner" not in xml
+
+
+@pytest.mark.asyncio
+async def test_socials_als_liste_mit_plattform_und_geprueften_adressen(flow, fake):
+    """#967: Socials kommen als Liste (Plattform aus dem Dropdown, Adresse); eine Adresse muss zur Plattform passen; die
+    Partnerseite zeigt sie in der gepflegten Reihenfolge hinter Website, Discord und Twitch; die vier festen Felder von
+    früher bleiben lesbar und verschwinden, sobald die Verwaltung die Liste speichert."""
+    staff = await flow.add_staff("Redaktion")
+    flow.act_as(staff)
+    wrong = await flow.post("/api/partners", json={"name": "Falsch", "social_links": [{"platform": "facebook", "url": "https://instagram.com/lion"}]})
+    assert wrong.status_code == 400 and "gehört nicht zu Facebook" in wrong.json()["detail"]
+    unknown = await flow.post("/api/partners", json={"name": "Falsch", "social_links": [{"platform": "myspace", "url": "https://myspace.com/lion"}]})
+    assert unknown.status_code == 400 and "myspace" in unknown.json()["detail"]
+    bad_mail = await flow.post("/api/partners", json={"name": "Falsch", "social_links": [{"platform": "email", "url": "kein-mail"}]})
+    assert bad_mail.status_code == 400 and "E-Mail" in bad_mail.json()["detail"]
+
+    created = await flow.post("/api/partners", json={
+        "name": "Gamers Heaven", "link": "https://gamersheaven.at", "twitch_channel": "gamersheaven", "youtube_url": "https://youtube.com/@gh",
+        "social_links": [
+            {"platform": "facebook", "url": "facebook.com/gamersheaven", "label": "Facebook-Seite"},
+            {"platform": "instagram", "url": "https://www.instagram.com/gamersheaven/"},
+            {"platform": "instagram", "url": "https://www.instagram.com/gamersheaven/"},   # doppelt: fällt weg
+            {"platform": "email", "url": "team@gamersheaven.at"},
+            {"platform": "custom", "url": "   "},                                            # leer: fällt weg
+            {"platform": "linkedin", "url": "https://at.linkedin.com/company/gamers-heaven"},
+        ],
+    })
+    assert created.status_code == 200, created.text
+    partner = created.json()
+    assert partner["social_links"] == [
+        {"platform": "facebook", "url": "https://facebook.com/gamersheaven", "label": "Facebook-Seite"},
+        {"platform": "instagram", "url": "https://www.instagram.com/gamersheaven/", "label": None},
+        {"platform": "email", "url": "mailto:team@gamersheaven.at", "label": None},
+        {"platform": "linkedin", "url": "https://at.linkedin.com/company/gamers-heaven", "label": None},
+    ]
+
+    flow.act_as(None)
+    page = (await flow.get(f"/api/partners/{partner['slug']}")).json()
+    keys = [channel["key"] for channel in page["partner"]["channels"]] if "partner" in page else [channel["key"] for channel in page["channels"]]
+    assert keys == ["website", "twitch", "facebook", "instagram", "email", "linkedin", "youtube"], "erst die mit Funktion, dann die Liste, dann die alten Felder"
+    channels = page["partner"]["channels"] if "partner" in page else page["channels"]
+    assert channels[2] == {"key": "facebook", "label": "Facebook-Seite", "url": "https://facebook.com/gamersheaven", "handle": None}
+    assert channels[4]["url"] == "mailto:team@gamersheaven.at"
+
+    # Die Verwaltung speichert die Liste und leert die alten Felder - das YouTube-Feld von früher steht jetzt in der Liste.
+    flow.act_as(staff)
+    moved = await flow.patch(f"/api/partners/{partner['id']}", json={"youtube_url": "", "social_links": [*partner["social_links"], {"platform": "youtube", "url": "https://youtube.com/@gh"}]})
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["youtube_url"] is None and len(moved.json()["social_links"]) == 5
+    flow.act_as(None)
+    page = (await flow.get(f"/api/partners/{partner['slug']}")).json()
+    channels = page["partner"]["channels"] if "partner" in page else page["channels"]
+    assert [channel["key"] for channel in channels] == ["website", "twitch", "facebook", "instagram", "email", "linkedin", "youtube"]
+    assert sum(1 for channel in channels if channel["key"] == "youtube") == 1, "jede Adresse einmal"
