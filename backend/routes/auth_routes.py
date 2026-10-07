@@ -1,6 +1,7 @@
 """Authentication routes."""
 import os
 import secrets
+from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Response, Request, HTTPException, Depends
 from pydantic import BaseModel
@@ -23,6 +24,7 @@ from services.auth_settings import load_auth_settings
 from services.google_identity import GoogleIdentityError, verify_google_credential
 from services.secret_store import decrypt_secret, encrypt_secret
 from services.totp import generate_recovery_codes, generate_totp_secret, provisioning_uri, verify_totp
+from services.return_path import safe_next_path
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -155,6 +157,10 @@ async def _send_email_verification(db, user: dict) -> None:
     })
     frontend = await _site_base_url()
     verification_url = f"{frontend}/verify-email?token={token}"
+    # Wohin es nach der Bestätigung geht (#1225): das beim Registrieren geprüfte Ziel, als Pfad dieser Website.
+    next_path = safe_next_path(user.get("signup_next"))
+    if next_path:
+        verification_url += f"&next={quote(next_path, safe='')}"
     await send_template(
         "email_verification",
         user["email"],
@@ -662,6 +668,10 @@ async def register(body: UserRegister, request: Request, response: Response):
         "created_at": now_utc().isoformat(),
         "updated_at": now_utc().isoformat(),
     }
+    # Ziel nach der Mail-Bestätigung (#1225): nur ein Pfad auf dieser Website; ein fremdes Ziel wird verworfen.
+    signup_next = safe_next_path(body.next)
+    if signup_next:
+        user_doc["signup_next"] = signup_next
     await db.users.insert_one(user_doc)
     await _record_registration_consents(
         db, user_id, privacy=body.accept_privacy, terms=body.accept_terms,
@@ -1213,10 +1223,11 @@ async def verify_email(body: EmailVerificationBody, request: Request):
     )
     await db.users.update_one(
         {"id": user["id"]},
-        {"$set": {"email_verified": True, "email_verified_at": now, "updated_at": now.isoformat()}},
+        {"$set": {"email_verified": True, "email_verified_at": now, "updated_at": now.isoformat()}, "$unset": {"signup_next": ""}},
     )
     await send_template("registration", user["email"], display_name=user.get("display_name") or user.get("username"))
-    return {"ok": True}
+    # Das Ziel vom Registrieren (#1225) - die Seite schickt nach dem Einloggen dorthin.
+    return {"ok": True, "next": safe_next_path(user.get("signup_next"))}
 
 
 @router.post("/mfa/complete")

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -15,6 +15,8 @@ import { GoogleAuthButton } from "@/components/tls/GoogleAuthButton";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
+import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
+import { useReturnPurpose } from "@/hooks/useReturnPurpose";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -42,6 +44,10 @@ export default function RegisterPage() {
   const { register } = useAuth();
   const settings = usePublicSiteSettings();
   const nav = useNavigate();
+  // Ziel (#1225): kommt man vom Turnier oder vom Mitgliedsantrag, geht es nach Registrieren und Mail-Bestätigung dorthin.
+  const [params] = useSearchParams();
+  const next = safeNextPath(params.get("next"));
+  const purpose = useReturnPurpose(next, "register");
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -108,6 +114,7 @@ export default function RegisterPage() {
       accept_privacy: true,
       accept_terms: true,
       newsletter_consent: newsletter,
+      ...(next !== DEFAULT_RETURN_PATH ? { next } : {}),
     };
     const attempt = await submitOnce(() => register(payload));
     if (!attempt.started) return;
@@ -120,10 +127,10 @@ export default function RegisterPage() {
     if (res.ok) {
       if (res.data?.verification_required) {
         toast.success("Bestätigungslink wurde gesendet.");
-        nav(`/verify-email?sent=1&email=${encodeURIComponent(res.data.email || form.email.trim())}`);
+        nav(`/verify-email?sent=1&email=${encodeURIComponent(res.data.email || form.email.trim())}${nextQuery(next).replace("?", "&")}`);
       } else {
         toast.success("Willkommen in der TLS Community!");
-        nav("/dashboard");
+        nav(next);
       }
     } else {
       setErr(res.error);
@@ -155,6 +162,7 @@ export default function RegisterPage() {
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Account erstellen</h1>
         <p className="text-sm text-white/60 text-center mt-1">Werde Teil der THE LION SQUAD Community.</p>
+        {purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/85 text-center" data-testid="register-purpose">{purpose}</p>}
         <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "register-error" : undefined}>
           <AuthTextField
             id="register-username"
@@ -243,14 +251,14 @@ export default function RegisterPage() {
         </form>
         <GoogleAuthButton
           label="Mit Google registrieren"
-          returnPath="/dashboard"
+          returnPath={next}
           intent="register"
           acceptPrivacy={accept}
           acceptTerms={acceptTerms}
           newsletterConsent={newsletter}
         />
         <div className="mt-6 text-sm text-white/60 text-center">
-          Bereits registriert? <Link to="/login" className="text-[#29B6E8] hover:text-white font-bold">Login</Link>
+          Bereits registriert? <Link to={`/login${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="register-login-link">Login</Link>
         </div>
         <div className="mt-3 text-[11px] text-white/45 text-center">
           Du wirst <strong className="text-white/65">Community-Spieler</strong>. Eine offizielle Vereinsmitgliedschaft kann nur durch den Vorstand freigeschaltet werden.

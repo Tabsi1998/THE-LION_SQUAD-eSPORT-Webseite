@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 import { toast } from "sonner";
+import { safeNextPath } from "@/lib/returnPath";
 
 const GOOGLE_SCRIPT_ID = "google-identity-services";
 
@@ -26,9 +27,6 @@ function loadGoogleIdentityServices() {
   });
 }
 
-function safeReturnPath(value) {
-  return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : "/dashboard";
-}
 
 export function GoogleAuthButton({
   label = "Mit Google fortfahren",
@@ -86,7 +84,8 @@ export function GoogleAuthButton({
               toast.success(`Google verknüpft${result.data?.google_email ? `: ${result.data.google_email}` : ""}.`);
             } else {
               toast.success(result.data?._created ? "Willkommen im Rudel! Account erstellt." : "Erfolgreich angemeldet.");
-              navigate(safeReturnPath(returnPath));
+              // Dieselbe Prüfregel wie Login, Registrieren und Mail-Link (#1225).
+              navigate(safeNextPath(returnPath));
             }
             onSuccess?.(result.data);
           },

@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { enrollPasskey, passkeyAutofillAvailable, passkeyError, passkeysSupported, signInWithPasskey, startPasskeyAutofill } from "@/lib/passkeys";
 import { deviceLabel, dismissPasskeyOffer, readRemember, shouldOfferPasskey, writeRemember } from "@/lib/loginComfort";
+import { nextQuery, safeNextPath } from "@/lib/returnPath";
+import { useReturnPurpose } from "@/hooks/useReturnPurpose";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,7 +22,9 @@ export default function LoginPage() {
   const { login, completeMfa, setUser, mfaTicket, setMfaTicket } = useAuth();
   const settings = usePublicSiteSettings();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/dashboard";
+  // Ziel nach dem Anmelden (#1225): nur ein Pfad auf dieser Website, sonst das Dashboard.
+  const next = safeNextPath(params.get("next"));
+  const purpose = useReturnPurpose(next, "login");
   const nav = useNavigate();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
@@ -215,6 +219,7 @@ export default function LoginPage() {
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
         <h1 className="font-heading text-2xl font-black uppercase text-center">Login</h1>
         <p className="text-sm text-white/60 text-center mt-1">{mfaTicket ? "Gib den Code aus deiner Authenticator-App ein." : "Willkommen bei THE LION SQUAD."}</p>
+        {!mfaTicket && purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/85 text-center" data-testid="login-purpose">{purpose}</p>}
 
         {mfaTicket ? (
           <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
@@ -293,7 +298,7 @@ export default function LoginPage() {
         )}
         <div className="mt-6 text-sm text-white/60 text-center space-y-2">
           {settings.registration_enabled !== false && (
-            <div>Kein Account? <Link to="/register" className="text-[#29B6E8] hover:text-white font-bold">Registrieren</Link></div>
+            <div>Kein Account? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
           )}
           <div><Link to="/forgot-password" className="text-white/45 hover:text-[#29B6E8]">Passwort vergessen?</Link></div>
           <div><Link to="/verify-email" state={{ email: email.trim() }} className="text-white/60 hover:text-[#29B6E8]">Keine Bestätigungs-E-Mail erhalten?</Link></div>
