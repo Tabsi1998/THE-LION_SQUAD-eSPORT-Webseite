@@ -65,6 +65,16 @@ test("angemeldet: alle Gruppen in der festen Reihenfolge - wie im Web", async ()
   expect(screen.getByTestId("season-deco-setting")).toBeTruthy();
 });
 
+// Geräteprobe vor 1.4.0: die Überschriften stehen über den Karten - der oberste Schalter einer Karte bekam trotzdem
+// seine Trennlinie und stand unter einem leeren Strich. Zwischen zwei Schaltern bleibt die Linie.
+test("der oberste Schalter einer Karte hat keine Trennlinie über sich, die folgenden schon", async () => {
+  await renderSettings();
+  for (const id of ["settings-toggle-newsletter", "settings-toggle-app-lock", "settings-toggle-public-profile"]) {
+    expect(screen.getByTestId(id)).toHaveStyle({ borderTopWidth: 0, paddingTop: 0 });
+  }
+  expect(screen.getByTestId("settings-toggle-achievements-public")).toHaveStyle({ borderTopWidth: 1 });
+});
+
 test("Gast: nur Darstellung und Über die App", async () => {
   mockUser.value = null;
   await renderSettings();
