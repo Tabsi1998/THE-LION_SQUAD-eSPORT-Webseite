@@ -4,6 +4,7 @@ import { effectClasses, pageClass } from "../intensity";
 import { hashString } from "../rng";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { FlowerArt } from "./art";
+import { CardEggs } from "./CardEggs";
 import { EggRow } from "./EggRow";
 import { Meadow } from "./Meadow";
 import { Butterflies, HarePeek } from "./Moments";
@@ -12,7 +13,8 @@ import { greetingDay, isQuiet, yearOf } from "./plan";
 import "./easter.css";
 
 // Ostern (Jahreszeiten III S14 #645, E1 #753, E4 #756): von Palmsonntag bis Ostermontag. Hasenohren trägt der Löwe
-// nicht mehr (Wunsch des Betreibers, #857). Unter der Kopfzeile eine Reihe
+// nicht mehr (Wunsch des Betreibers, #857). Auf einigen Karten liegt ein Ei, das wackelt und ein Stück rollt, wenn sich
+// die Karte hebt (Jahreszeiten IV, #1092). Unter der Kopfzeile eine Reihe
 // bemalter Eier im Gras (während der Eiersuche Blumen), über der Fußzeile eine kleine Wiese, hinter dem Inhalt ein
 // helles Frühlingslicht, das langsam wandert. Selten sinkt ein Blütenblatt, bei „voll“ flattert ab und zu ein
 // Zitronenfalter vorbei, und alle paar Minuten streckt ein Feldhase die Ohren hinter einer Karte hervor. Ostersonntag
@@ -30,6 +32,7 @@ export function Corners({ season }) {
   return (
     <>
       {fx.corner > 0 ? <EggRow moving={moving} /> : null}
+      <CardEggs season={season} quiet={quiet} />
       {fx.scene !== "none" ? <Meadow year={yearOf(season)} small={fx.scene === "small"} moving={moving} /> : null}
       {moving && fx.motion && season.effective === "full" ? <Butterflies /> : null}
       {moving && fx.rare ? <HarePeek /> : null}

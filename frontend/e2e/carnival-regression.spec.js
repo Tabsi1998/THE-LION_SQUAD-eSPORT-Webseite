@@ -17,7 +17,8 @@ defineSeasonQa({
   seasonKey: "carnival",
   now: NOW,
   season: carnival(),
-  pieces: "[data-testid='carnival-streamer'], [data-testid='carnival-hat'], [data-testid='carnival-hero-hat']",
+  // Seit #1093 auch Luftschlangen auf Karten: Schlaufen und Ende einzeln (der Kasten der ganzen Luftschlange reicht in die Karte).
+  pieces: "[data-testid='carnival-streamer'], [data-testid='carnival-hat'], [data-testid='carnival-hero-hat'], [data-testid='carnival-card-streamer'] .tls-cstreamer__loop, [data-testid='carnival-card-streamer'] .tls-cstreamer__hang",
   layers: ".tls-streamers, .tls-mascot-hat-page, [data-testid='carnival-toast']",
   exempt: "[data-testid='tls-logo-link'], [data-testid='tls-logo'], [data-season-anchor='lion']",
   offPieces: "[data-testid^='carnival-']",

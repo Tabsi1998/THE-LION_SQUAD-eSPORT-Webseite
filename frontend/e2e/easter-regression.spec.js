@@ -10,7 +10,8 @@ function easter(overrides = {}, data = {}) {
 }
 
 const NOW = "2027-03-24T11:00:00+01:00";
-const PIECES = "[data-testid='easter-row'], [data-testid='easter-meadow'] .tls-meadow__item";
+// Seit #1092 liegen Eier auch auf Karten - geprüft wird das Ei selbst (der Halter ist ein Punkt auf der Kante).
+const PIECES = "[data-testid='easter-row'], [data-testid='easter-meadow'] .tls-meadow__item, [data-testid='easter-card-egg'] .tls-card-egg__body, [data-testid='easter-card-egg'] .tls-card-egg__tuft";
 
 defineSeasonQa({
   title: "Ostern: Abnahme auf Hauptseiten und Breakpoints",

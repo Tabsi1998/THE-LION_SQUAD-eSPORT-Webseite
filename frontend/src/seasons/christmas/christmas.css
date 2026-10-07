@@ -1,5 +1,5 @@
-/* Weihnachten (S8, #639; X1/X2/X4): Lichterkette an Kopf- und Fußzeile, warme Lichtinseln hinter dem Inhalt, der
-   Gruß als Karte des Vereins. Wind (--season-wind) lässt die Kette minimal schwingen; jedes Lämpchen glimmt in seinem
+/* Weihnachten (S8, #639; X1/X2/X4): Lichterkette an Kopf- und Fußzeile (seit #1091 auch an Karten), warme Lichtinseln
+   hinter dem Inhalt, der Gruß als Karte des Vereins. Wind (--season-wind) lässt die Kette minimal schwingen; jedes Lämpchen glimmt in seinem
    eigenen Takt, ein paar flackern selten. „dezent“: Kette ohne Glimmen. „Bewegung reduzieren“: alles still. */
 .tls-lights { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; }
 .tls-lights__chain { display: block; max-width: none; z-index: 52; pointer-events: none; overflow: visible; transform-origin: top center; animation: tls-lights-sway 7s ease-in-out infinite; }
@@ -19,13 +19,66 @@
   50% { opacity: 1; }
 }
 /* Seltenes Flackern: ein kurzer Aussetzer alle paar Sekunden, je Lämpchen zu einer anderen Zeit. */
-.tls-lights__bulb--flicker .tls-lights__bulbBody, .tls-lights__bulb--flicker .tls-lights__glow { animation-name: tls-lights-flicker; animation-duration: 11s; animation-delay: var(--flicker-delay, 5s); }
+.tls-lights__bulb--flicker .tls-lights__bulbBody, .tls-lights__glow--flicker { animation-name: tls-lights-flicker; animation-duration: 11s; animation-delay: var(--flicker-delay, 5s); }
 @keyframes tls-lights-flicker {
   0%, 88%, 100% { opacity: var(--brightness, 0.9); }
   90% { opacity: 0.25; }
   92% { opacity: var(--brightness, 0.9); }
   94% { opacity: 0.4; }
   96% { opacity: var(--brightness, 0.9); }
+}
+
+/* Ketten an Karten (Jahreszeiten IV, #1091): im unteren Innenabstand einer Karte, die sich hebt - sie fahren mit hoch
+   (seasons.css, data-season-lifted) und liegen unter Kopfzeile, Menüs und der Leiste unten (z 39). */
+.tls-lights__chain--card { z-index: 39; transition: translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease), opacity 0.2s ease-out; }
+.tls-lights__chain--yield { opacity: 0; }
+/* Nachschwingen (#1091): der Draht hängt tiefer durch und federt zweimal nach (um die Nagellinie, y = 1), die Lämpchen
+   ziehen mit und pendeln um ihre Fassung; ein Licht flackert einmal. Die Stützstellen sind SWING.keys aus swing.js
+   (0,16 · 0,34 | 0,38 · −0,2 | 0,6 · 0,12 | 0,8 · −0,05) - die App rechnet mit denselben. `--amp`: 1 beim Anheben,
+   0,45 beim Loslassen. */
+.tls-lights__rig, .tls-lights__wire, .tls-lights__hang { transform-box: view-box; }
+.tls-lights__wire { transform-origin: 0 1px; }
+.tls-lights--swing-lift .tls-lights__wire { animation: tls-chain-sag var(--swing-ms, 1100ms) ease-in-out both; }
+.tls-lights--swing-lift .tls-lights__hang { animation: tls-chain-bob var(--swing-ms, 1100ms) ease-in-out both; }
+/* Beim Loslassen dieselben Keyframes unter eigenem Namen - so beginnt das zweite Schwingen von vorn. */
+.tls-lights--swing-leave .tls-lights__wire { animation: tls-chain-sag-leave var(--swing-ms, 1100ms) ease-in-out both; }
+.tls-lights--swing-leave .tls-lights__hang { animation: tls-chain-bob-leave var(--swing-ms, 1100ms) ease-in-out both; }
+@keyframes tls-chain-sag {
+  0%, 100% { transform: scaleY(1); }
+  16% { transform: scaleY(calc(1 + 0.34 * var(--amp, 1))); }
+  38% { transform: scaleY(calc(1 - 0.2 * var(--amp, 1))); }
+  60% { transform: scaleY(calc(1 + 0.12 * var(--amp, 1))); }
+  80% { transform: scaleY(calc(1 - 0.05 * var(--amp, 1))); }
+}
+@keyframes tls-chain-sag-leave {
+  0%, 100% { transform: scaleY(1); }
+  16% { transform: scaleY(calc(1 + 0.34 * var(--amp, 1))); }
+  38% { transform: scaleY(calc(1 - 0.2 * var(--amp, 1))); }
+  60% { transform: scaleY(calc(1 + 0.12 * var(--amp, 1))); }
+  80% { transform: scaleY(calc(1 - 0.05 * var(--amp, 1))); }
+}
+@keyframes tls-chain-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  16% { transform: translateY(calc(var(--h, 0px) * 0.34 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * var(--amp, 1))); }
+  38% { transform: translateY(calc(var(--h, 0px) * -0.2 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * -0.5882 * var(--amp, 1))); }
+  60% { transform: translateY(calc(var(--h, 0px) * 0.12 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * 0.3529 * var(--amp, 1))); }
+  80% { transform: translateY(calc(var(--h, 0px) * -0.05 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * -0.1471 * var(--amp, 1))); }
+}
+@keyframes tls-chain-bob-leave {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  16% { transform: translateY(calc(var(--h, 0px) * 0.34 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * var(--amp, 1))); }
+  38% { transform: translateY(calc(var(--h, 0px) * -0.2 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * -0.5882 * var(--amp, 1))); }
+  60% { transform: translateY(calc(var(--h, 0px) * 0.12 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * 0.3529 * var(--amp, 1))); }
+  80% { transform: translateY(calc(var(--h, 0px) * -0.05 * var(--amp, 1))) rotate(calc(var(--tilt, 0deg) * -0.1471 * var(--amp, 1))); }
+}
+/* Das eine Licht flackert einmal beim Anheben (SWING.blinkMs, SWING.blinkAt). */
+.tls-lights--swing-lift .tls-lights__bulb--blink .tls-lights__bulbBody, .tls-lights--swing-lift .tls-lights__glow--blink { animation: tls-lights-blink 600ms ease-in-out 140ms both; }
+@keyframes tls-lights-blink {
+  0%, 100% { opacity: var(--brightness, 0.9); }
+  20% { opacity: 0.2; }
+  40% { opacity: 1; }
+  60% { opacity: 0.35; }
+  80% { opacity: var(--brightness, 0.9); }
 }
 
 /* Warme Lichtinseln (X2): hinter dem Inhalt, lokal statt Vollfläche - Schrift bleibt, wie sie ist. */
@@ -73,7 +126,7 @@ html[data-season~="christmas"] .tls-snowcap { filter: drop-shadow(0 1px 1px rgba
 html[data-season-intensity~="subtle"] .tls-lights__glow, html[data-season-intensity~="subtle"] .tls-lights__bulbBody, html[data-season-intensity~="subtle"] .tls-lights__chain, .tls-xmas-toast--subtle .tls-xmas-toast__light, .tls-xmas-toast--subtle .tls-xmas-toast__star { animation: none; opacity: 0.9; }
 /* „Bewegung reduzieren“: alles still, die Lämpchen leuchten ruhig, die Karte steht. */
 @media (prefers-reduced-motion: reduce) {
-  .tls-lights__chain, .tls-lights__glow, .tls-lights__bulbBody, .tls-xmas-toast, .tls-xmas-toast__star, .tls-xmas-toast__light { animation: none !important; }
+  .tls-lights__chain, .tls-lights__glow, .tls-lights__bulbBody, .tls-lights__wire, .tls-lights__hang, .tls-xmas-toast, .tls-xmas-toast__star, .tls-xmas-toast__light { animation: none !important; }
   .tls-lights__chain { transform: none; }
   .tls-xmas-toast__light { opacity: 1; }
   .tls-xmas-toast__star { opacity: 0.6; }

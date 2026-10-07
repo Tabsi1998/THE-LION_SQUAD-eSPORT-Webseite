@@ -8,6 +8,7 @@ import Svg, { Circle, ClipPath, Defs, G, Path } from "react-native-svg";
 import { Body } from "../../components/Text";
 import { greetingShownToday, localDay, markGreetingShown } from "../christmas/greeting";
 import { TAB_BAR, useAppActive } from "../halloween";
+import { useCardDecoAssignments } from "../cardDeco";
 import { effectClasses, screenClass } from "../intensity";
 import { anyOverlayOpen, subscribeQuiet } from "../quiet";
 import { hashString, mulberry32, seasonRng, seasonYear } from "../rng";
@@ -339,10 +340,14 @@ function Streamer({ streamer, unfold, moving }: { streamer: AppStreamer; unfold:
   );
 }
 
-/** Oben in den Rändern: Luftschlangen, beim ersten Mal am Tag entfalten sie sich, danach schwingen sie leise. */
+/**
+ * Oben in den Rändern: Luftschlangen, beim ersten Mal am Tag entfalten sie sich, danach schwingen sie leise. Dazu liegt
+ * auf einigen Karten eine Luftschlange (Jahreszeiten IV, #1093 - cardDeco.tsx wählt sie aus), die beim Antippen flattert.
+ */
 export function CarnivalCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
   const { reducedMotion } = useSeason();
   const still = reducedMotion || season.effective === "subtle";
+  useCardDecoAssignments(season, screen, "streamer", screenClass(screen) !== "quiet");
   const [mode, setMode] = useState<"wait" | "unfold" | "hang">(() => (still || once.unfoldChecked ? "hang" : "wait"));
   // Entfaltet wird einmal - danach hängen sie auf jedem weiteren Screen gleich da.
   useEffect(() => {

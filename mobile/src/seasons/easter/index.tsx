@@ -13,7 +13,10 @@ import { hashString, mulberry32 } from "../rng";
 import { seasonScroll, type ScrollState } from "../sky/scroll";
 import { useSeason, type ActiveSeason } from "../SeasonProvider";
 import { onHuntActive } from "../easterHunt/api";
+import { useCardDecoAssignments } from "../cardDeco";
+import { useCardKey } from "../useCardLift";
 import { ButterflyWing, EggArt, FlowerArt, GrassStrip, HareEarsArt } from "./art";
+import { rollTilt, rollWay, useEggRoll, type EggRoll } from "./cardEgg";
 import {
   BUTTERFLY_EVERY, BUTTERFLY_FIRST, PEEK_BOX, PEEK_EVERY, PEEK_FIRST, PETAL_COLORS, butterflyFlight, createPetal, edgeCount, greetingDay, isQuiet, nextDelay, peekSpot, petalCount, petalPose,
   rowPatterns, stepPetal, type EggPattern, type Flight, type Petal,
@@ -25,6 +28,8 @@ import {
 // zum Screen und ziehen beim Scrollen mit), bei „voll“ flattert ab und zu ein Zitronenfalter vorbei, und alle paar
 // Minuten streckt ein Feldhase die Ohren hinter einer Karte hervor. Ostersonntag und -montag kommt der Gruß.
 // Karfreitag ist still: alles da, nichts bewegt sich, kein Gruß. „dezent“ und „Bewegung reduzieren“: alles steht.
+// Jahreszeiten IV (#1092): wird die Begrüßungskarte angetippt, wackeln ihre Eier zweimal und das äußerste rollt ein Stück
+// zur Ecke; auf einigen weiteren Karten liegt ein Ei, das dasselbe tut (cardEgg.tsx).
 
 export const GREETING_KEY = "easter-greeting";
 export const TOAST_DELAY_MS = 1500;
@@ -83,8 +88,17 @@ export function EasterBackdrop({ season, screen }: { season: ActiveSeason; scree
 
 const EDGE_FLOWERS = ["daisy", "tulip", "primrose", "daisy", "tulip"];
 
-/** Ein Ei der Reihe (oder eine Blume, solange die Suche läuft): wiegt sich langsam, je Stück versetzt; still ohne Bewegung. */
-function EdgeEgg({ pattern, index, moving, flower = null }: { pattern: EggPattern; index: number; moving: boolean; flower?: string | null }) {
+/** So weit darf das äußerste Ei der Reihe zur Ecke der Begrüßungskarte rollen (Mitte bis 14 Punkte vor den Rand). */
+export const EDGE_ROLL_ROOM = 18;
+/** Das äußerste Ei rollt nach rechts zur Ecke der Begrüßungskarte. */
+const EDGE_ROLL_PLAN = { dir: 1 as const, room: EDGE_ROLL_ROOM };
+
+/**
+ * Ein Ei der Reihe (oder eine Blume, solange die Suche läuft): wiegt sich langsam, je Stück versetzt; still ohne
+ * Bewegung. `roll` (#1092): die Karte wurde angetippt - es wackelt zweimal; `rolls`: es ist das äußerste und rollt
+ * dabei zur Ecke, `offset` ist, wo es danach liegt.
+ */
+function EdgeEgg({ pattern, index, moving, flower = null, roll = null, rolls = false, offset = 0 }: { pattern: EggPattern; index: number; moving: boolean; flower?: string | null; roll?: EggRoll | null; rolls?: boolean; offset?: number }) {
   const sway = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!moving) return undefined;
@@ -103,9 +117,14 @@ function EdgeEgg({ pattern, index, moving, flower = null }: { pattern: EggPatter
   const rotate = sway.interpolate({ inputRange: [-1, 1], outputRange: ["-4deg", "4deg"] });
   const height = EDGE_EGG * (38 / 30);
   // Gedreht wird um den Fuß des Eis: die Ebene ist doppelt so hoch, ihre Mitte liegt auf dem Fuß (1 px über dem Boden).
+  const shift = rolls ? (roll ? rollWay(roll) : offset) : 0;
+  // Das Wackeln dreht eine zweite Ebene mit derselben Mitte (dem Fuß des Eis).
+  const wobble = roll ? rollTilt(roll, rolls ? 1 : 0) : "0deg";
   return (
-    <Animated.View style={[styles.edgeEggPivot, { left: 6 + index * EDGE_STEP, height: height * 2, bottom: -height + 1, transform: [{ rotate }] }]} testID={flower ? "easter-edge-flower" : "easter-edge-egg"}>
-      {flower ? <FlowerArt kind={flower} height={height} /> : <EggArt pattern={pattern} size={EDGE_EGG} />}
+    <Animated.View style={[styles.edgeEggPivot, { left: 6 + index * EDGE_STEP, height: height * 2, bottom: -height + 1, transform: [{ translateX: shift }, { rotate }] }]} testID={flower ? "easter-edge-flower" : "easter-edge-egg"} data-roll={roll ? "1" : undefined} data-offset={rolls ? String(offset) : undefined}>
+      <Animated.View style={{ width: EDGE_EGG, height: height * 2, transform: [{ rotate: wobble }] }}>
+        {flower ? <FlowerArt kind={flower} height={height} /> : <EggArt pattern={pattern} size={EDGE_EGG} />}
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -127,16 +146,34 @@ export function EasterEdge({ season, screen }: { season: ActiveSeason; screen: s
   const flowers = huntWindow && huntActive !== false;
   const count = edgeCount(width);
   const patterns = useMemo(() => rowPatterns(hashString(`easter-edge:${localDay()}`), count), [count]);
-  if (screenClass(screen) === "quiet") return null;
+  // Antippen der Begrüßungskarte (#1092): alle Eier wackeln, das äußerste rollt zur Ecke - nicht die Blumen, nicht am Karfreitag.
+  const cardKey = useCardKey();
+  const shown = screenClass(screen) !== "quiet";
+  const { offset, roll } = useEggRoll(shown && !flowers ? cardKey : null, "edge-row", EDGE_ROLL_PLAN, !isQuiet(season));
+  if (!shown) return null;
   const rowWidth = count * EDGE_STEP + 12;
   return (
     <View pointerEvents="none" style={[styles.edge, { width: rowWidth }]} testID="easter-edge">
-      {patterns.map((pattern, index) => <EdgeEgg key={pattern} pattern={pattern} index={index} moving={!still} flower={flowers ? EDGE_FLOWERS[index % EDGE_FLOWERS.length] : null} />)}
+      {patterns.map((pattern, index) => <EdgeEgg key={pattern} pattern={pattern} index={index} moving={!still} flower={flowers ? EDGE_FLOWERS[index % EDGE_FLOWERS.length] : null} roll={flowers ? null : roll} rolls={index === patterns.length - 1} offset={offset} />)}
       <View style={styles.edgeGrass}>
         <GrassStrip width={rowWidth} height={7} />
       </View>
     </View>
   );
+}
+
+/**
+ * Eier an Karten (Jahreszeiten IV, Variante B, #1092): auf einigen Karten des Screens liegt ein Ei auf der Oberkante
+ * (cardDeco.tsx wählt sie aus) - nicht auf stillen Screens und nicht, solange die Eiersuche läuft (deren Eier liegen
+ * dann an den Karten und sähen genauso aus).
+ */
+export function EasterCorners({ season, screen }: { season: ActiveSeason; screen: string }) {
+  const { byKey } = useSeason();
+  const huntWindow = Boolean(byKey?.easter_hunt && byKey.easter_hunt.effective !== "off");
+  const [huntActive, setHuntActive] = useState<boolean | null>(null);
+  useEffect(() => (huntWindow ? onHuntActive(setHuntActive) : undefined), [huntWindow]);
+  useCardDecoAssignments(season, screen, "egg", screenClass(screen) !== "quiet" && (!huntWindow || huntActive === false));
+  return null;
 }
 
 /** Ein Blütenblatt: Lage aus dem gemeinsamen Zustand, Form ein Oval mit Spitze (gedreht, taumelnd). */

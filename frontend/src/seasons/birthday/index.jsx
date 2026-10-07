@@ -11,6 +11,7 @@ import { hashString, seasonYear } from "../rng";
 import { useSeason } from "../SeasonContext";
 import { markToastShown, toastShownToday } from "../SeasonStage";
 import { createBalloonLayer, nextCelebration, requestBalloons } from "./balloons";
+import { CardGarlands } from "./CardGarlands";
 import { BOTTOM, CAKE_VIEW, CLUB, PLATE, TOP, cakePlan, ignitionOrder } from "./cake";
 import { GARLAND_PAD, SAGS, garlandPlan, garlandSpan, pennants, probePoints, stringPath } from "./garland";
 import { BirthdayHats } from "./hat";
@@ -316,7 +317,10 @@ function Garland({ chain, span, top, sag, unfold, moving }) {
   );
 }
 
-/** Was am Geburtstag auf jeder Seite ist: die Mütze auf dem Löwen, der Feier-Takt und die Wimpelketten. */
+/**
+ * Was am Geburtstag auf jeder Seite ist: die Mütze auf dem Löwen, der Feier-Takt, die Wimpelketten unter der Kopfzeile
+ * und - seit Jahreszeiten IV (#1094) - an einigen Karten, die beim Anheben einmal durchflattern.
+ */
 export function Corners({ season }) {
   const { reducedMotion } = useSeason();
   const moving = season.effective !== "subtle" && !reducedMotion;
@@ -325,6 +329,7 @@ export function Corners({ season }) {
       <BirthdayHats moving={moving} years={yearsOf(season)} />
       <Celebration moving={moving} />
       <Garlands season={season} />
+      <CardGarlands season={season} year={yearOf(season)} />
     </>
   );
 }

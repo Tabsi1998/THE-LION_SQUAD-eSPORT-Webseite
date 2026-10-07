@@ -46,8 +46,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("im Register: Kante, Gruß, Himmel, Tab-Symbol - keine Hasenohren mehr (#857) - und die App nennt Ostern als laufend", () => {
-  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Backdrop", "Edge", "Greeting", "Sky", "TabIcon"]);
+test("im Register: Kante, Eier an Karten, Gruß, Himmel, Tab-Symbol - keine Hasenohren mehr (#857) - und die App nennt Ostern als laufend", () => {
+  expect(Object.keys(SEASON_MODULES.easter).sort()).toEqual(["Backdrop", "Corners", "Edge", "Greeting", "Sky", "TabIcon"]);
   expect(appNamesSeason({ key: "easter" })).toBe(true);
 });
 

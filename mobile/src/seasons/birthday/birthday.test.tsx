@@ -62,8 +62,8 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-test("die Bühne kennt den Vereinsgeburtstag: Konfetti, Karte, Wimpel, Mütze im Kopf und am Tab „Mehr“", () => {
-  expect(Object.keys(SEASON_MODULES.club_birthday).sort()).toEqual(["Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
+test("die Bühne kennt den Vereinsgeburtstag: Konfetti, Karte, Wimpel (auch an Karten), Mütze im Kopf und am Tab „Mehr“", () => {
+  expect(Object.keys(SEASON_MODULES.club_birthday).sort()).toEqual(["Corners", "Edge", "Greeting", "Sky", "TabIcon", "Widget"]);
   expect(appNamesSeason({ key: "club_birthday" })).toBe(true);
   expect(yearsOf(birthday())).toBe(8);
   expect(yearsOf(birthday({ data: {} }))).toBeNull();

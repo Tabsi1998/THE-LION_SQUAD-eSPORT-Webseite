@@ -1,4 +1,4 @@
-/* Ostern (S14 #645, E1 #753, E4 #756): Eier-Reihe unter der Kopfzeile, Wiese über der Fußzeile, Frühlingslicht
+/* Ostern (S14 #645, E1 #753, E4 #756): Eier-Reihe unter der Kopfzeile (seit #1092 auch Eier an Karten), Wiese über der Fußzeile, Frühlingslicht
    hinter dem Inhalt, selten ein Zitronenfalter und ein Feldhase - Hasenohren trägt der Löwe nicht mehr (#857). Alle
    Ebenen gehören zur Seite und liegen unter Kopfzeile, Menüs und Leiste unten (z 39); nichts davon ist klickbar. */
 .tls-easter-layer { position: absolute; z-index: 39; pointer-events: none; }
@@ -9,6 +9,38 @@
 .tls-easter-row--sway .tls-easter-row__item { animation: tls-row-sway 5.5s ease-in-out infinite alternate; }
 .tls-easter-row__grass { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; align-items: flex-end; line-height: 0; }
 @keyframes tls-row-sway { from { transform: rotate(-4deg); } to { transform: rotate(4deg); } }
+
+/* Eier an Karten (Jahreszeiten IV, #1092): ein Ei liegt auf der Oberkante einer Karte, daneben Gras; es fährt mit der
+   Karte hoch (seasons.css). Hebt sich die Karte, wackelt es zweimal und rollt ein Stück zur Ecke - die Stützstellen
+   sind ROLL aus roll.js (Wackeln 0,12 · −1 | 0,24 · 0,89 | 0,36 · −0,56 | 0,48 · 0; Rollen 0,7 · 1 · 0,62 | 0,86 · −0,21 ·
+   1 | 0,94 · 0,07 · 1), die App rechnet mit denselben. Unter Kopfzeile, Menüs und Leiste unten (z 39). */
+.tls-card-eggs { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 39; pointer-events: none; }
+.tls-card-egg { position: absolute; width: 0; height: 0; transition: translate var(--tls-motion-mid, 240ms) var(--tls-ease, ease), opacity 0.2s ease-out; }
+.tls-card-egg svg { max-width: none; }
+.tls-card-egg--yield { opacity: 0; }
+.tls-card-egg__roll, .tls-card-egg__tilt { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.tls-card-egg__body { position: absolute; line-height: 0; }
+.tls-card-egg__body .tls-egg__svg { display: block; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45)); }
+.tls-card-egg__shadow { position: absolute; top: -1.5px; height: 3px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0) 70%); }
+.tls-card-egg__tuft { position: absolute; line-height: 0; }
+.tls-card-egg__roll--go { animation: tls-card-egg-roll 1080ms ease-in-out both; }
+.tls-card-egg__tilt--go { animation: tls-card-egg-tilt 1080ms ease-in-out both; }
+@keyframes tls-card-egg-roll {
+  0%, 48% { transform: translateX(var(--from, 0px)); }
+  70% { transform: translateX(calc(var(--from, 0px) + (var(--to, 0px) - var(--from, 0px)) * 0.62)); }
+  86%, 100% { transform: translateX(var(--to, 0px)); }
+}
+@keyframes tls-card-egg-tilt {
+  0% { transform: rotate(0deg); }
+  12% { transform: rotate(calc(var(--wobble, 9deg) * -1)); }
+  24% { transform: rotate(calc(var(--wobble, 9deg) * 0.89)); }
+  36% { transform: rotate(calc(var(--wobble, 9deg) * -0.56)); }
+  48% { transform: rotate(0deg); }
+  70% { transform: rotate(var(--turn, 0deg)); }
+  86% { transform: rotate(calc(var(--turn, 0deg) * -0.21)); }
+  94% { transform: rotate(calc(var(--turn, 0deg) * 0.07)); }
+  100% { transform: rotate(0deg); }
+}
 
 /* Die Wiese über der Fußzeile. */
 .tls-meadow__item { position: absolute; bottom: 0; line-height: 0; transform-origin: 50% 100%; }
@@ -55,6 +87,7 @@
 .tls-easter-toast__close { margin-left: 0.4rem; border: 0; background: transparent; color: rgba(255, 255, 255, 0.6); font-size: 1.1rem; cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
+  .tls-card-egg__roll--go, .tls-card-egg__tilt--go,
   .tls-easter-row--sway .tls-easter-row__item, .tls-meadow--sway .tls-meadow__item--flower, .tls-easter-light,
   .tls-butterfly-flight, .tls-butterfly-bob, .tls-butterfly__wing, .tls-hare-peek__ears, .tls-hare__right { animation: none; }
 }

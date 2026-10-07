@@ -69,8 +69,8 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test("Weihnachten ist ein Modul der App mit Kette, Gruß und Lichtinseln und steht unter „Gerade läuft“", () => {
-  expect(Object.keys(SEASON_MODULES.christmas).sort()).toEqual(["Backdrop", "Edge", "Greeting"]);
+test("Weihnachten ist ein Modul der App mit Kette (auch an Karten), Gruß und Lichtinseln und steht unter „Gerade läuft“", () => {
+  expect(Object.keys(SEASON_MODULES.christmas).sort()).toEqual(["Backdrop", "Corners", "Edge", "Greeting"]);
   expect(appNamesSeason({ key: "christmas" })).toBe(true);
 });
 

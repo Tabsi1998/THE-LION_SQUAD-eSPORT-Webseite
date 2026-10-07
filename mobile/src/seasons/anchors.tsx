@@ -1,14 +1,15 @@
 import * as Haptics from "expo-haptics";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View, useWindowDimensions } from "react-native";
-import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
+import { NavigationRouteContext } from "@react-navigation/native";
 import { FlyingBatShape, HangingBatShape, SHAPE_HEIGHT, SittingBatShape } from "./batArt";
 import { ALERT_MS, TAKEOFF_MS, alertEveryMs, restMs, wantsToRoam, type Temperament } from "./batLife";
 import { REST_MS, claimCardTouch, createRest } from "./cardLift";
 import { activeFlights, fleePath, requestHop, startFlight } from "./flights";
 import { getMotionScheduler, requestMotion } from "./motion";
 import { hashString, mulberry32 } from "./rng";
-import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type PerchAssignment, type PerchKind, type PerchRect, type WebAssignment } from "./perches";
+import { clearAssignment, perchPoint, perchSnapshot, registerPerch, subscribePerches, unregisterPerch, type CardDecoAssignment, type PerchAssignment, type PerchKind, type PerchRect, type WebAssignment } from "./perches";
+import { CardDeco } from "./cardDeco";
 import { CornerWeb } from "./cornerWeb";
 import { HuntEggView, useEggTumbles } from "./easterHunt/HuntEgg";
 import { useHuntSpots } from "./easterHunt/store";
@@ -22,7 +23,9 @@ import { useCardLift } from "./useCardLift";
 // Karte in Fensterkoordinaten, den Flug zeichnet die Bühne. Dazu zwei Haken für Ruhezonen: `useSeasonOverlay`
 // (Dialoge und Sheets) und `useSeasonQuietZone` (Formulare, Tabellen).
 // Jahreszeiten IV (#1087-#1092): wird die Karte angetippt (Karten-Signal, cardLift.ts), reißt ihr Netz, ihre Fledermaus
-// flattert kurz auf und landet wieder, ein Ei der Suche purzelt hervor - nur an genau dieser Karte.
+// flattert kurz auf und landet wieder, ein Ei der Suche purzelt hervor - nur an genau dieser Karte. Variante B
+// (#1091-#1094): an einigen Karten hängt dazu Deko der laufenden Saison (cardDeco.tsx) - Lichterkette, Osterei,
+// Luftschlange, Wimpelkette - und reagiert genauso nur hier.
 
 /** Der Name des Screens, auf dem die Komponente liegt - ohne Navigation „Dashboard“. */
 export function useRouteNameSafe(): string {
@@ -30,25 +33,8 @@ export function useRouteNameSafe(): string {
   return (route && route.name) || "Dashboard";
 }
 
-/**
- * Ist der Screen, auf dem die Komponente liegt, gerade im Blick? Tabs bleiben geladen, wenn man woanders hinwechselt -
- * eine Dauer-Bewegung (Flammen, Wiegen) ruht dann, statt unsichtbar Akku zu kosten. Ohne Navigation (Tests): ja.
- */
-export function useScreenFocused(): boolean {
-  const navigation = useContext(NavigationContext);
-  const [focused, setFocused] = useState(() => (navigation ? navigation.isFocused() : true));
-  useEffect(() => {
-    if (!navigation) return undefined;
-    setFocused(navigation.isFocused());
-    const offFocus = navigation.addListener("focus", () => setFocused(true));
-    const offBlur = navigation.addListener("blur", () => setFocused(false));
-    return () => {
-      offFocus();
-      offBlur();
-    };
-  }, [navigation]);
-  return focused;
-}
+/** Ist der Screen gerade im Blick? (screenFocus.ts - hier weiter erreichbar für die Saisons, die es von hier holen.) */
+export { useScreenFocused } from "./screenFocus";
 
 /** Ein Dialog oder Sheet meldet sich: solange es offen ist, ruhen große Bewegungen und Plätze darunter. */
 export function useSeasonOverlay(id: string, open: boolean) {
@@ -114,6 +100,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
   const ref = useRef<View>(null);
   const [assignment, setAssignment] = useState<PerchAssignment | null>(() => perchSnapshot().assignments[id] || null);
   const [web, setWeb] = useState<WebAssignment | null>(() => perchSnapshot().webs[id] || null);
+  const [deco, setDeco] = useState<CardDecoAssignment | null>(() => perchSnapshot().deco[id] || null);
   const [covered, setCovered] = useState(anyOverlayOpen());
   const eggs = useHuntSpots(id);
   const tumbles = useEggTumbles(id, eggs, clip);
@@ -122,11 +109,13 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
     const stop = subscribePerches((state) => {
       setAssignment(state.assignments[id] || null);
       setWeb(state.webs[id] || null);
+      setDeco(state.deco[id] || null);
     });
     const stopQuiet = subscribeQuiet((state) => setCovered(state.overlays.length > 0));
     registerPerch({ id, screen, kind, clip, measure: () => measureNode(ref.current) });
     setAssignment(perchSnapshot().assignments[id] || null);
     setWeb(perchSnapshot().webs[id] || null);
+    setDeco(perchSnapshot().deco[id] || null);
     return () => {
       stop();
       stopQuiet();
@@ -135,6 +124,7 @@ export function SeasonPerch({ id, kind = "card", timeScale = 1, clip = false }: 
   }, [id, screen, kind, clip]);
   return (
     <View ref={ref} collapsable={false} pointerEvents="box-none" style={StyleSheet.absoluteFill} testID={`season-perch-${id}`}>
+      {deco && !covered ? <CardDeco perchId={id} deco={deco} /> : null}
       {web && !covered ? <CornerWeb perchId={id} side={web.side} seed={web.seed} radius={web.radius} /> : null}
       {assignment && !covered ? <PerchBat perchId={id} screen={screen} assignment={assignment} landed={Boolean(assignment.landed)} timeScale={timeScale} measure={() => measurePerch(id, () => measureNode(ref.current))} /> : null}
       {eggs.map((spot) => <HuntEggView key={spot.egg.egg_no} spot={spot} clip={clip} tumble={tumbles[spot.egg.egg_no]} />)}

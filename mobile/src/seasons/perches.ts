@@ -19,13 +19,19 @@ export type Perch = {
 export type PerchAssignment = { perchId: string; corner: PerchCorner; pose: PerchPose; size: number; temperament: string; /** nach einem Flug gelandet (Einfedern mit Haptik) */ landed?: boolean };
 /** Ein kleines Netz in einer oberen Innenecke einer Karte (A4): Seite und Seed je Karte. */
 export type WebAssignment = { perchId: string; side: "tl" | "tr"; seed: number; radius: number };
-export type PerchState = { perches: Perch[]; assignments: Record<string, PerchAssignment>; webs: Record<string, WebAssignment> };
+/**
+ * Deko einer Saison an einer Karte (Jahreszeiten IV, Variante B, #1091-#1094): Lichterkette, Osterei, Luftschlange oder
+ * Wimpelkette - je Karte höchstens eine, `seed` macht sie je Karte und Jahr anders.
+ */
+export type CardDecoKind = "chain" | "egg" | "streamer" | "garland";
+export type CardDecoAssignment = { perchId: string; season: string; kind: CardDecoKind; seed: string; year: number };
+export type PerchState = { perches: Perch[]; assignments: Record<string, PerchAssignment>; webs: Record<string, WebAssignment>; deco: Record<string, CardDecoAssignment> };
 type Listener = (state: PerchState) => void;
 
 /** Wie oft welche Art drankommt. Der Held (Dashboard-Kopf) etwas seltener, damit er nicht immer besetzt ist. */
 export const KIND_WEIGHTS: Record<PerchKind, number> = { card: 0.4, tile: 0.3, banner: 0.2, hero: 0.1 };
 
-const state: PerchState = { perches: [], assignments: {}, webs: {} };
+const state: PerchState = { perches: [], assignments: {}, webs: {}, deco: {} };
 const listeners = new Set<Listener>();
 
 function emit() {
@@ -35,7 +41,7 @@ function emit() {
 }
 
 export function perchSnapshot(): PerchState {
-  return { perches: [...state.perches], assignments: { ...state.assignments }, webs: { ...state.webs } };
+  return { perches: [...state.perches], assignments: { ...state.assignments }, webs: { ...state.webs }, deco: { ...state.deco } };
 }
 
 export function registerPerch(perch: Perch) {
@@ -48,6 +54,7 @@ export function unregisterPerch(id: string) {
   state.perches = state.perches.filter((entry) => entry.id !== id);
   if (state.assignments[id]) delete state.assignments[id];
   if (state.webs[id]) delete state.webs[id];
+  if (state.deco[id]) delete state.deco[id];
   if (state.perches.length !== before) emit();
 }
 
@@ -79,6 +86,29 @@ export function chooseWebPerches(candidates: Perch[], count: number, rng: () => 
     out.push({ perchId: pick.id, side: rng() < 0.5 ? "tl" : "tr", seed: rng(), radius: Math.round(22 + rng() * 8) });
   }
   return out;
+}
+
+/**
+ * Deko an Karten einer Saison: ersetzt alle Einträge dieser Saison (Karten anderer Screens verlieren ihre), lässt die
+ * der anderen Saisons stehen.
+ */
+export function assignCardDeco(season: string, list: CardDecoAssignment[]) {
+  const next: Record<string, CardDecoAssignment> = {};
+  Object.values(state.deco).forEach((entry) => {
+    if (entry.season !== season) next[entry.perchId] = entry;
+  });
+  list.forEach((entry) => {
+    if (!next[entry.perchId]) next[entry.perchId] = entry;
+  });
+  const keys = Object.keys(next);
+  const same = keys.length === Object.keys(state.deco).length && keys.every((key) => state.deco[key] && state.deco[key].season === next[key].season && state.deco[key].seed === next[key].seed && state.deco[key].kind === next[key].kind);
+  if (same) return;
+  state.deco = next;
+  emit();
+}
+
+export function cardDecoFor(season: string): CardDecoAssignment[] {
+  return Object.values(state.deco).filter((entry) => entry.season === season);
 }
 
 export function perchesFor(screen: string): Perch[] {
@@ -116,6 +146,7 @@ export function resetPerches() {
   state.perches = [];
   state.assignments = {};
   state.webs = {};
+  state.deco = {};
   emit();
 }
 
