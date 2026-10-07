@@ -212,8 +212,16 @@ async def dashboard(me: dict = Depends(require_any_admin())):
         "daily_tasks": daily_tasks,
         "finance_attention": finance_attention,
         "today": today,
-        "recent_audit_logs": await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(20),
+        "recent_audit_logs": await _recent_audit_logs(db, me),
     }
+
+
+async def _recent_audit_logs(db, me: dict) -> list[dict]:
+    """Die letzten Adminaktionen auf der Startseite. Vollständige Einträge (mit Gerät und Adresse) liest nur, wer auch das
+    Protokoll unter „Betrieb & Logs“ öffnen darf - alle anderen sehen, was wann geschah."""
+    from services.permissions import areas_for
+    projection = {"_id": 0} if "system" in await areas_for(me) else {"_id": 0, "action": 1, "created_at": 1}
+    return await db.audit_logs.find({}, projection).sort("created_at", -1).to_list(20)
 
 
 @router.get("/audit-logs")
@@ -744,6 +752,26 @@ def _upload_status() -> dict:
     return {"ok": all(c["ok"] for c in checks), "checks": checks}
 
 
+def _system_status_summary(payload: dict) -> dict:
+    """Für Admin-Bereiche ohne „System“: ob etwas läuft - ohne Server-Namen, Absender, Pfade und Fehlertexte."""
+    smtp = payload.get("smtp") or {}
+    discord = payload.get("discord") or {}
+    scheduler = payload.get("scheduler") or {}
+    push = payload.get("mobile_push") or {}
+    queue = payload.get("mail_queue") or {}
+    return {
+        "database": {"ok": bool((payload.get("database") or {}).get("ok"))},
+        "smtp": {"ok": bool(smtp.get("ok")), "provider": smtp.get("provider") or "", "host": "", "sender_email": "",
+                 "latest_problem": None},
+        "discord": {key: bool(discord.get(key)) for key in ("ok", "configured", "bot_enabled", "enabled")} | {"latest": None},
+        "uploads": {"ok": bool((payload.get("uploads") or {}).get("ok"))},
+        "scheduler": {"running": bool(scheduler.get("running")),
+                      "jobs": [{"id": job.get("id")} for job in scheduler.get("jobs") or [] if isinstance(job, dict)]},
+        "mobile_push": {key: push.get(key, 0) for key in ("active_tokens", "users_with_tokens", "ticket_errors", "receipt_errors")},
+        "mail_queue": {key: queue.get(key, 0) for key in ("pending", "sending", "sent", "failed", "skipped")},
+    }
+
+
 @router.get("/system-status")
 async def system_status(me: dict = Depends(require_any_admin())):
     db = get_db()
@@ -799,7 +827,7 @@ async def system_status(me: dict = Depends(require_any_admin())):
     discord_channels = discord.get("channels") if isinstance(discord.get("channels"), dict) else {}
     discord_configured = any(str(value or "").strip() for value in discord_channels.values())
     discord_ready = bool(discord.get("enabled", True)) and bool(discord.get("bot_enabled")) and discord_configured
-    return {
+    payload = {
         "database": database,
         "smtp": {
             "ok": smtp_ready,
@@ -820,6 +848,11 @@ async def system_status(me: dict = Depends(require_any_admin())):
         "mobile_push": mobile_push,
         "mail_queue": {**queue_counts, **{k: v for k, v in queue_stats.items() if k != "counts"}},
     }
+    from services.permissions import areas_for
+    if "system" in await areas_for(me):
+        return payload
+    # Turnierleitung, Inhalte und Verein sehen auf der Startseite, ob alles läuft - die Einzelheiten gehören zum Bereich System.
+    return _system_status_summary(payload)
 
 
 @router.get("/notifications")
