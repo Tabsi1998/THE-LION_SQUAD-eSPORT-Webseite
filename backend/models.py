@@ -265,6 +265,16 @@ class TeamUpdate(BaseModel):
     banner_url: Optional[str] = None
     discord_link: Optional[str] = None
     social_links: Optional[dict] = None
+    # Team-Farbe (#1347): eine von acht ruhigen Farben oder „auto“ (Farbe des Spiels) - Unbekanntes wird abgelehnt.
+    color: Optional[str] = None
+
+    @field_validator("color", mode="before")
+    @classmethod
+    def _team_color(cls, value):
+        if value is None:
+            return None
+        from services.team_colors import clean_color
+        return clean_color(value)
 
 
 # ---------- Games ----------

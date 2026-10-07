@@ -38,3 +38,34 @@ export function inviteTokenFrom(search) {
     return "";
   }
 }
+
+// Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern.
+export const ROLE_LABELS = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+
+/** Die Rolle eines Mitglieds: Kapitän (Leitung), Co-Kapitän oder Spieler. */
+export function memberRole(team, member) {
+  if (!team || !member) return "player";
+  if (team.leader_id === member.id) return "captain";
+  if ((team.co_leader_ids || []).includes(member.id)) return "co_captain";
+  return "player";
+}
+
+/** Die Gesichter-Reihe: Kapitän zuerst, dann die Co-Kapitäne, dann alle anderen in ihrer Reihenfolge. */
+export function orderedFaces(team) {
+  const order = { captain: 0, co_captain: 1, player: 2 };
+  return (team?.members || [])
+    .map((member, index) => ({ member, index, role: memberRole(team, member) }))
+    .sort((a, b) => order[a.role] - order[b.role] || a.index - b.index)
+    .map(({ member, role }) => ({ ...member, role, roleLabel: ROLE_LABELS[role] }));
+}
+
+/** Zwei Buchstaben für ein Gesicht ohne Bild: „NeonFalke“ → „NF“, „luna byte“ → „LB“. */
+export function initials(name) {
+  const text = String(name || "").trim();
+  if (!text) return "?";
+  const words = text.split(/[\s_.-]+/).filter(Boolean);
+  if (words.length > 1) return (words[0][0] + words[1][0]).toUpperCase();
+  const capitals = text.match(/[A-ZÄÖÜ]/g) || [];
+  if (capitals.length >= 2) return (capitals[0] + capitals[1]).toUpperCase();
+  return text.slice(0, 2).toUpperCase();
+}

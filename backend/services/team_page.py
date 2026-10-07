@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from models import new_id, now_utc
 from services.competition_read import load_competition_read_model, load_registration_matches
 from services.round_labels import round_label, rounds_by_section, stage_kind
+from services.team_colors import effective_color
 from services.visibility import user_can_see
 
 INVITE_PARAM = "einladung"
@@ -148,10 +149,34 @@ def _match_line(match: dict, own_ids: set[str], names: dict[str, str]) -> dict |
     }
 
 
+async def main_game(db, team: dict, registrations: list[dict], tournaments: dict[str, dict]) -> dict | None:
+    """Das Spiel, das das Team am meisten spielt (#1347): aus Turnier-Anmeldungen und Squads, bei Gleichstand das
+    zuletzt gespielte. Für die Spiel-Plakette im Kopf und die Farbe, wenn das Team keine eigene gewählt hat."""
+    counts: dict[str, int] = {}
+    latest: dict[str, str] = {}
+    for reg in registrations:
+        tournament = tournaments.get(reg.get("tournament_id")) or {}
+        game_id = tournament.get("game_id")
+        if not game_id or tournament.get("status") == "draft":
+            continue
+        counts[game_id] = counts.get(game_id, 0) + 1
+        latest[game_id] = max(latest.get(game_id, ""), str(tournament.get("start_date") or ""))
+    for squad in await db.team_squads.find({"team_id": team["id"], "status": {"$ne": "archived"}}, {"_id": 0, "game_id": 1}).to_list(50):
+        if squad.get("game_id"):
+            counts[squad["game_id"]] = counts.get(squad["game_id"], 0) + 1
+    if not counts:
+        return None
+    best = max(counts, key=lambda gid: (counts[gid], latest.get(gid, ""), gid))
+    game = await db.games.find_one({"id": best}, {"_id": 0, "id": 1, "name": 1, "short_name": 1})
+    return game or None
+
+
 async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, recent_limit: int = 5) -> dict:
-    """„Angemeldet für“ und „Letzte Spiele“ der Team-Seite."""
+    """Der Kopf (Farbe, Spiel), „Angemeldet für“ und „Letzte Spiele“ der Team-Seite."""
     registrations = await _team_registrations(db, team["id"])
     tournaments = await _tournaments(db, (reg.get("tournament_id") for reg in registrations))
+    game = await main_game(db, team, registrations, tournaments)
+    header = {**effective_color(team, (game or {}).get("id")), "game": game}
     visible = {tid: row for tid, row in tournaments.items() if await tournament_visible(viewer, row, insider=insider)}
     games = await _game_names(db, (row.get("game_id") for row in visible.values()))
     events = await _event_names(db, (row.get("event_id") for row in visible.values()))
@@ -205,7 +230,7 @@ async def team_overview(db, team: dict, viewer: dict | None, *, insider: bool, r
             "tournament": {"id": tournament.get("id"), "slug": tournament.get("slug"), "title": tournament.get("title") or "Turnier"},
             **line,
         })
-    return {"upcoming": upcoming, "recent": recent}
+    return {"header": header, "upcoming": upcoming, "recent": recent}
 
 
 # ------------------------------------------------------------------ Einladungs-Link

@@ -105,3 +105,54 @@ test("Einladungs-Link: oben „Beitreten“, ein Tipp und man ist drin", async (
   await waitFor(() => expect(mockPost).toHaveBeenCalledWith("/teams/t1/join-link", { token: "AbC123" }));
   expect(setParams).toHaveBeenCalledWith({ invite: undefined });
 });
+
+// Wappen-Kopf (#1347): Band in der Team-Farbe, Logo-Platzhalter mit Kürzel, eine Zeile mit Spiel und Level,
+// Gesichter mit Rolle - du mit Ecken-Klammern; die Farbe wählt der Kapitän beim Bearbeiten.
+const CREW = {
+  ...TEAM,
+  tag: "LRK",
+  leader_id: "u-cap",
+  co_leader_ids: ["u-co"],
+  member_ids: ["u-1", "u-co", "u-cap"],
+  members: [
+    { id: "u-1", username: "paula", display_name: "Paula" },
+    { id: "u-co", username: "pixelpanther", display_name: "PixelPanther" },
+    { id: "u-cap", username: "neonfalke", display_name: "NeonFalke" },
+  ],
+  is_member: true,
+};
+
+test("Kopf: Name, Kürzel, Spiel und Level; Gesichter Kapitän zuerst, du mit Ecken-Klammern", async () => {
+  mockAuth.user = MEMBER;
+  serve(CREW, {
+    "/teams/t1/overview": { ...OVERVIEW, header: { color: "violet", color_hex: "#6A47B8", color_source: "team", game: { id: "g", name: "Rocket League" } } },
+    "/teams/t1/level": { level: 9, crown: "gold" },
+  });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-header")).toBeTruthy());
+  expect(screen.getByTestId("team-name")).toHaveTextContent("Lions");
+  expect(screen.getByTestId("team-header-line")).toHaveTextContent("LRK·Rocket League·Level 9");
+  const faces = screen.getAllByTestId(/^team-face-u-/).map((node) => node.props.testID);
+  expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-1"]);
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("KAPITÄN");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("CO-KAPITÄN");
+  expect(screen.getByTestId("team-face-role-u-1")).toHaveTextContent("SPIELER");
+  expect(screen.getAllByTestId("team-face-you")).toHaveLength(1);
+  await fireEvent.press(screen.getByTestId("team-face-u-co"));
+  expect(navigate).toHaveBeenCalledWith("PublicProfile", { username: "pixelpanther" });
+  expect(screen.queryByTestId("team-manage-members")).toBeNull();
+});
+
+test("Kapitän wählt die Team-Farbe beim Bearbeiten", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockPatch = jest.fn().mockResolvedValue({ data: {} });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.patch = mockPatch;
+  serve({ ...CREW, can_manage: true, color: "auto" }, { "/teams/t1/invite-link": { url: "https://lionsquad.at/teams/t1?einladung=x1", token: "x1" } });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-manage-members")).toBeTruthy());
+  await fireEvent.press(screen.getByText("Team bearbeiten"));
+  await fireEvent.press(screen.getByTestId("team-color-green"));
+  await fireEvent.press(screen.getByText("Team speichern"));
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ color: "green" })));
+});

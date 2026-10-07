@@ -137,6 +137,8 @@ export type Team = {
   member_ids?: string[];
   can_manage?: boolean;
   my_role?: string;
+  // Team-Farbe (#1347): einer der acht Schlüssel aus lib/teamColors oder „auto“ (Farbe des Spiels).
+  color?: string | null;
   members?: Array<{ id: string; name?: string; username?: string; display_name?: string; role?: string; avatar_url?: string | null; achievements?: string[] }>;
   squads?: TeamSquad[];
   chat_preview?: Array<{ author: string; message: string; time: string }>;

@@ -177,3 +177,39 @@ async def test_private_team_shows_itself_only_with_a_valid_link(flow):
     assert valid["valid"] is True and valid["team"]["is_public"] is False
     flow.act_as(None)
     assert (await flow.post(f"/api/teams/{team['id']}/join-link", json={"token": token})).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_team_color_only_allowed_values_only_captains_and_game_fallback(flow):
+    """Team-Farbe (#1347): nur die acht erlaubten Werte, nur Kapitän und Co-Kapitän; ohne Wahl die Farbe des Spiels."""
+    from services.team_colors import TEAM_COLORS, game_color
+
+    captain = await flow.add_user(role="player", name="neonfalke")
+    co = await flow.add_user(role="player", name="pixelpanther")
+    mate = await flow.add_user(role="player", name="lunabyte")
+    team = await make_team(flow, captain, co, mate, co=(co,))
+
+    flow.act_as(captain)
+    header = (await flow.get(f"/api/teams/{team['id']}/overview")).json()["header"]
+    assert header == {"color": "cyan", "color_hex": TEAM_COLORS["cyan"], "color_source": "default", "game": None}
+
+    await flow.db.games.insert_one({"id": "game-rl", "name": "Rocket League", "short_name": "RL"})
+    cup = await flow.create_tournament(title="RL Cup", status="results_published", team_mode="team", game_id="game-rl")
+    await team_registration(flow, cup, team)
+    header = (await flow.get(f"/api/teams/{team['id']}/overview")).json()["header"]
+    assert header["color_source"] == "game" and header["color"] == game_color("game-rl")
+    assert header["game"] == {"id": "game-rl", "name": "Rocket League", "short_name": "RL"}
+
+    flow.act_as(co)
+    assert (await flow.patch(f"/api/teams/{team['id']}", json={"color": "violet"})).status_code == 200
+    header = (await flow.get(f"/api/teams/{team['id']}/overview")).json()["header"]
+    assert header["color"] == "violet" and header["color_source"] == "team" and header["color_hex"] == TEAM_COLORS["violet"]
+    assert (await flow.patch(f"/api/teams/{team['id']}", json={"color": "neonpink"})).status_code == 422
+    assert (await flow.db.teams.find_one({"id": team["id"]}))["color"] == "violet"
+
+    flow.act_as(mate)
+    assert (await flow.patch(f"/api/teams/{team['id']}", json={"color": "green"})).status_code == 403
+
+    flow.act_as(captain)
+    assert (await flow.patch(f"/api/teams/{team['id']}", json={"color": "auto"})).status_code == 200
+    assert (await flow.get(f"/api/teams/{team['id']}/overview")).json()["header"]["color_source"] == "game"

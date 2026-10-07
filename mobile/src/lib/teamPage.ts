@@ -48,3 +48,34 @@ export function upcomingLine(row?: TeamUpcoming | null): string {
   const when = t.start_date ? viennaDateTime(t.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
   return [t.event_name, when ? when.replace(", ", " · ") : "", !t.event_name ? t.game_name : ""].filter(Boolean).join(" · ");
 }
+
+// Wappen-Kopf (#1347): Rollen in Alltagsworten unter den Gesichtern - wie im Web.
+export type TeamRole = "captain" | "co_captain" | "player";
+export const ROLE_LABELS: Record<TeamRole, string> = { captain: "Kapitän", co_captain: "Co-Kapitän", player: "Spieler" };
+
+type FaceTeam = { leader_id?: string | null; co_leader_ids?: string[] | null; members?: Array<{ id: string; username?: string | null; display_name?: string | null; avatar_url?: string | null }> | null };
+
+export function memberRole(team: FaceTeam | null | undefined, member: { id: string } | null | undefined): TeamRole {
+  if (!team || !member) return "player";
+  if (team.leader_id === member.id) return "captain";
+  if ((team.co_leader_ids || []).includes(member.id)) return "co_captain";
+  return "player";
+}
+
+export function orderedFaces(team: FaceTeam | null | undefined) {
+  const order: Record<TeamRole, number> = { captain: 0, co_captain: 1, player: 2 };
+  return (team?.members || [])
+    .map((member, index) => ({ member, index, role: memberRole(team, member) }))
+    .sort((a, b) => order[a.role] - order[b.role] || a.index - b.index)
+    .map(({ member, role }) => ({ ...member, role, roleLabel: ROLE_LABELS[role] }));
+}
+
+export function initials(name?: string | null): string {
+  const text = String(name || "").trim();
+  if (!text) return "?";
+  const words = text.split(/[\s_.-]+/).filter(Boolean);
+  if (words.length > 1) return (words[0][0] + words[1][0]).toUpperCase();
+  const capitals = text.match(/[A-ZÄÖÜ]/g) || [];
+  if (capitals.length >= 2) return (capitals[0] + capitals[1]).toUpperCase();
+  return text.slice(0, 2).toUpperCase();
+}

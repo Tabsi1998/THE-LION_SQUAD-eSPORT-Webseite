@@ -95,3 +95,47 @@ test("Einladen: QR-Code mit dem Link, neu erzeugen erst nach Rückfrage", async 
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/invite-link"));
   await waitFor(() => expect(screen.getByTestId("team-invite-url")).toHaveValue("https://lionsquad.at/teams/t-1?einladung=Neu222"));
 });
+
+// Wappen-Kopf (#1347): Band in der Team-Farbe, Logo oder Platzhalter mit Kürzel, eine Zeile mit Spiel und Level,
+// Gesichter mit Rolle - du mit Ecken-Klammern. Keine Krone über dem Logo, nur das kleine goldene Zeichen am Level.
+vi.mock("@/components/tls/Logo", () => ({ MascotBadge: ({ className }) => <img alt="" data-testid="team-lion" className={className} /> }));
+const { TeamHeader } = await import("./TeamHeader");
+
+const HEAD_TEAM = {
+  id: "t-1", name: "Lions Rocket", tag: "LRK", description: "Rocket League seit 2024.", leader_id: "u-cap", co_leader_ids: ["u-co"],
+  members: [
+    { id: "u-3", username: "lunabyte", display_name: "LunaByte" },
+    { id: "u-co", username: "pixelpanther", display_name: "PixelPanther", avatar_url: "/api/uploads/pp.png" },
+    { id: "u-cap", username: "neonfalke", display_name: "NeonFalke" },
+  ],
+};
+
+test("Kopf ohne Logo: Platzhalter mit Kürzel, Farbe aus dem Server, Zeile mit Spiel und Level, Krone nur klein am Level", () => {
+  render(<MemoryRouter><TeamHeader team={HEAD_TEAM} header={{ color: "violet", color_hex: "#6A47B8", game: { name: "Rocket League" } }} levelInfo={{ level: 9, crown: "gold" }} userId="u-3" /></MemoryRouter>);
+  expect(screen.getByTestId("team-header")).toHaveAttribute("data-color", "violet");
+  expect(screen.getByTestId("team-band").style.background).toContain("linear-gradient");
+  expect(screen.getByTestId("team-crest-placeholder")).toHaveTextContent("LRK");
+  expect(screen.getByTestId("team-name")).toHaveTextContent("Lions Rocket");
+  expect(screen.getByTestId("team-header-line")).toHaveTextContent("LRK·Rocket League·Level 9");
+  expect(screen.getByTestId("team-header-crown")).toBeInTheDocument();
+  expect(screen.getByTestId("team-lion")).toBeInTheDocument();
+  const faces = within(screen.getByTestId("team-faces")).getAllByRole("listitem").map((item) => item.getAttribute("data-testid"));
+  expect(faces).toEqual(["team-face-u-cap", "team-face-u-co", "team-face-u-3"]);
+  expect(screen.getByTestId("team-face-role-u-cap")).toHaveTextContent("Kapitän");
+  expect(screen.getByTestId("team-face-role-u-co")).toHaveTextContent("Co-Kapitän");
+  expect(screen.getByTestId("team-face-role-u-3")).toHaveTextContent("Spieler");
+  // Du: Ecken-Klammern nur an deinem Gesicht.
+  expect(within(screen.getByTestId("team-face-u-3")).getByTestId("team-face-you")).toBeInTheDocument();
+  expect(within(screen.getByTestId("team-face-u-cap")).queryByTestId("team-face-you")).toBeNull();
+  expect(within(screen.getByTestId("team-face-u-co")).getByRole("link")).toHaveAttribute("href", "/u/pixelpanther");
+});
+
+test("Kopf mit Logo und ohne Server-Antwort: Bild statt Platzhalter, Farbe des Teams, ohne Level keine Krone", () => {
+  render(<MemoryRouter><TeamHeader team={{ ...HEAD_TEAM, logo_url: "/api/uploads/logo.png", color: "green" }} header={null} levelInfo={null} userId={null} /></MemoryRouter>);
+  expect(screen.getByTestId("team-header")).toHaveAttribute("data-color", "green");
+  expect(within(screen.getByTestId("team-crest")).getByRole("img")).toHaveAttribute("src", "/api/uploads/logo.png");
+  expect(screen.queryByTestId("team-crest-placeholder")).toBeNull();
+  expect(screen.queryByTestId("team-header-crown")).toBeNull();
+  expect(screen.queryByTestId("team-game-plaque")).toBeNull();
+  expect(screen.queryAllByTestId("team-face-you")).toHaveLength(0);
+});
