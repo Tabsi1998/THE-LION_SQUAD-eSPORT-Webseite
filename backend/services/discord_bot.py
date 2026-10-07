@@ -661,19 +661,23 @@ class BotRunner:
                 return cls(match.group(0))
 
             async def callback(self, interaction):
-                await runner._reply(interaction, lambda: discord_registration.handle_button(db, interaction.user.id, self.button_id, interaction.guild_id))
+                await runner._reply(interaction, lambda: discord_registration.handle_button(db, interaction.user.id, self.button_id))
 
         client.add_dynamic_items(RegistrationButton)
 
         @tree.command(name="anmelden", description="Zu einem Event oder Turnier anmelden (nur mit verknüpftem Konto)")
         @app_commands.describe(auswahl="Welches Event oder Turnier")
         async def anmelden(interaction, auswahl: str | None = None):
-            await runner._reply(interaction, lambda: discord_registration.answer_anmelden(db, interaction.user.id, auswahl, interaction.guild_id))
+            async def produce():
+                scope = await discord_commands.server_scope(db, interaction.guild_id)
+                return await discord_registration.answer_anmelden(db, interaction.user.id, auswahl, scope.get("games"))
+            await runner._reply(interaction, produce)
 
         @anmelden.autocomplete("auswahl")
         async def anmelden_auswahl(interaction, current: str):
+            scope = await discord_commands.server_scope(db, interaction.guild_id)
             return [app_commands.Choice(name=row["name"], value=row["value"])
-                    for row in await discord_registration.choices(db, interaction.user.id, interaction.guild_id, current)]
+                    for row in await discord_registration.choices(db, interaction.user.id, scope.get("games"), current)]
 
         @tree.command(name="abmelden", description="Eine Event-Anmeldung zurückziehen (nur mit verknüpftem Konto)")
         @app_commands.describe(auswahl="Welches Event")

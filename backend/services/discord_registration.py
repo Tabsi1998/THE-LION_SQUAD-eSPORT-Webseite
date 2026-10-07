@@ -10,18 +10,17 @@ Event-Anmeldung geht. Discord schickt die Kennung mit jedem Klick, darum überle
 """
 from __future__ import annotations
 
-import re
+from datetime import datetime
 
 from fastapi import HTTPException
 
 from models import RegistrationCreate
 from services import event_days, event_registration, pricing, tournament_event_gate, tournament_fees
-from services.discord_commands import LINK_PATH, NOT_LINKED, answer, server_scope
+from services.discord_registration_rules import CUSTOM_ID_PATTERN, custom_id, enabled, event_blocker, tournament_blocker
+from services.discord_texts import LINK_PATH, NOT_LINKED, answer
 from services.event_registration import RegistrationError
 from services.visibility import user_can_see
 
-SETTINGS_KEY = "registration"
-CUSTOM_ID_PATTERN = re.compile(r"^tls:(?P<action>show|reg|unreg):(?P<kind>event|tournament):(?P<id>[A-Za-z0-9_-]+)(?::(?P<then>[A-Za-z0-9_-]+))?$")
 OFF = "Die Anmeldung über Discord ist gerade ausgeschaltet – auf der Website geht es weiter."
 DOUBLE = "Du bist schon angemeldet – ein zweiter Klick ändert nichts."
 LINK_BUTTON = {"label": "Konto verknüpfen", "url": LINK_PATH}
@@ -30,17 +29,7 @@ TOURNAMENT_STATUS_TEXT = {"approved": "angemeldet", "pending": "wartet auf Freig
 OPEN_EVENT_STATUSES = ("scheduled", "registration_open")
 
 
-def custom_id(action: str, kind: str, item_id: str, then: str | None = None) -> str:
-    return f"tls:{action}:{kind}:{item_id}" + (f":{then}" if then else "")
-
-
 # ---------------------------------------------------------------- Schalter
-
-async def enabled(db) -> bool:
-    """Der Schalter unter Verbindungen → Discord (Vorgabe an)."""
-    doc = await db.settings.find_one({"id": "discord"}, {"_id": 0, SETTINGS_KEY: 1}) or {}
-    return bool((doc.get(SETTINGS_KEY) or {}).get("enabled", True))
-
 
 async def status(db) -> dict:
     """Für die Einstellungen: Schalter und wie viele Anmeldungen bisher über Discord kamen."""
@@ -49,38 +38,25 @@ async def status(db) -> dict:
             "tournaments": await db.tournament_registrations.count_documents({"registered_via": "discord"})}
 
 
-def event_blocker(event: dict) -> str | None:
-    """Warum es dieses Event nicht im Discord gibt - als Satz, nie als stummer Knopf. Ein fehlender Schalter heißt an."""
-    if not event.get("has_registration"):
-        return "Dieses Event hat keine Anmeldung."
-    if event.get("discord_registration") is False:
-        return "Für dieses Event ist die Anmeldung über Discord ausgeschaltet."
-    if event.get("registration_url"):
-        return "Die Anmeldung zu diesem Event läuft über einen externen Link."
-    if event.get("allow_companions"):
-        return "Dieses Event hat Begleitpersonen – die Anmeldung geht auf der Website."
-    return None
-
-
-def tournament_blocker(tournament: dict) -> str | None:
-    if tournament.get("discord_registration") is False:
-        return "Für dieses Turnier ist die Anmeldung über Discord ausgeschaltet."
-    if tournament.get("is_invite_only"):
-        return "Dieses Turnier ist nur auf Einladung."
-    if tournament.get("registration_enabled") is False:
-        return "Die öffentliche Anmeldung zu diesem Turnier ist aus."
-    return None
-
-
 # ---------------------------------------------------------------- Person und Auswahl
 
 async def linked_user(db, discord_user_id) -> dict | None:
-    from services.discord_bot import linked_discord_ids
-
-    user_id = (await linked_discord_ids(db)).get(str(discord_user_id))
-    if not user_id:
+    """Die Person hinter dem Discord-Konto - nur mit Verknüpfung (#260), dieselbe Tabelle wie ``discord_bot.linked_discord_ids``."""
+    link = await db.platform_links.find_one({"platform": "discord", "external_id": str(discord_user_id)}, {"_id": 0, "user_id": 1})
+    if not link or not link.get("user_id"):
         return None
-    return await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+    return await db.users.find_one({"id": link["user_id"]}, {"_id": 0, "password_hash": 0, "mfa_secret": 0, "mfa_pending_secret": 0, "mfa_recovery_code_hashes": 0})
+
+
+def vienna(value) -> str:
+    """Zeit wie in den Ankündigungen: „16.10.2026, 18:00 Uhr“ in Wiener Zeit."""
+    if not value:
+        return ""
+    try:
+        parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return parsed.astimezone(event_days.VIENNA).strftime("%d.%m.%Y, %H:%M Uhr")
 
 
 def _event_url(event: dict) -> str:
@@ -114,13 +90,13 @@ async def _visible_tournament(db, tournament: dict, user: dict) -> bool:
     return True
 
 
-async def _open_tournaments(db, user: dict, guild_id=None) -> list[dict]:
+async def _open_tournaments(db, user: dict, games=None) -> list[dict]:
+    """Offene Turniere, die die Person sehen darf - ``games`` ist der Spielfilter des Servers (#630, None = alle)."""
     from routes.tournament_registration_routes import _registration_error
 
-    scope = await server_scope(db, guild_id)
     query: dict = {"status": "registration_open"}
-    if scope.get("games") is not None:
-        query["game_id"] = {"$in": sorted(scope["games"])}
+    if games is not None:
+        query["game_id"] = {"$in": sorted(games)}
     rows = await db.tournaments.find(query, {"_id": 0}).sort("start_date", 1).to_list(200)
     out = []
     for tournament in rows:
@@ -132,9 +108,9 @@ async def _open_tournaments(db, user: dict, guild_id=None) -> list[dict]:
     return out
 
 
-async def choices(db, discord_user_id, guild_id=None, typed: str = "", limit: int = 25) -> list[dict]:
+async def choices(db, discord_user_id, games=None, typed: str = "", limit: int = 25) -> list[dict]:
     """Die Auswahl für ``/anmelden``: nur, was die verknüpfte Person sehen darf und was offen ist; auf einem Spielserver
-    nur Turniere seiner Spiele (#630). Discord zeigt höchstens 25."""
+    nur Turniere seiner Spiele (#630, ``games`` vom Bot). Discord zeigt höchstens 25."""
     user = await linked_user(db, discord_user_id)
     if not user or not await enabled(db):
         return []
@@ -144,7 +120,7 @@ async def choices(db, discord_user_id, guild_id=None, typed: str = "", limit: in
         name = f"📅 {event.get('name') or 'Event'}"
         name += f" · {event_days.summary_text(event)}" if event_days.is_multi_day(event) else ""
         rows.append({"name": name[:100], "value": f"event:{event['id']}"})
-    for tournament in await _open_tournaments(db, user, guild_id):
+    for tournament in await _open_tournaments(db, user, games):
         rows.append({"name": f"🏆 {tournament.get('title') or 'Turnier'}"[:100], "value": f"tournament:{tournament['id']}"})
     if needle:
         rows = [row for row in rows if needle in row["name"].lower()]
@@ -170,8 +146,6 @@ async def own_choices(db, discord_user_id, typed: str = "", limit: int = 25) -> 
 # ---------------------------------------------------------------- Zusammenfassungen (privat)
 
 def _when(event: dict) -> str:
-    from services.discord_announcements import vienna
-
     if event_days.is_multi_day(event):
         return event_days.summary_text(event) + "\n" + "\n".join(event_days.lines(event))
     return vienna(event["start_date"]) if event.get("start_date") else "steht noch nicht fest"
@@ -285,8 +259,6 @@ async def tournament_summary(db, user: dict, tournament: dict) -> dict:
     places = "ohne Limit" if limit is None else (f"{max(limit - count, 0)} frei" if not full else "voll – du kämst auf die Warteliste")
     fields = []
     if tournament.get("start_date"):
-        from services.discord_announcements import vienna
-
         fields.append({"name": "Wann", "value": vienna(tournament["start_date"]), "inline": True})
     if team:
         fields.append({"name": "Team", "value": str(team.get("name") or ""), "inline": True})
@@ -308,15 +280,16 @@ async def _find_tournament(db, wanted: str) -> dict | None:
     return await db.tournaments.find_one({"$or": [{"id": wanted}, {"slug": wanted}]}, {"_id": 0})
 
 
-async def answer_anmelden(db, discord_user_id, wanted: str | None = None, guild_id=None, then: str | None = None) -> dict:
-    """``/anmelden`` und der Knopf „Anmelden“ unter einer Ankündigung: die private Zusammenfassung."""
+async def answer_anmelden(db, discord_user_id, wanted: str | None = None, games=None, then: str | None = None) -> dict:
+    """``/anmelden`` und der Knopf „Anmelden“ unter einer Ankündigung: die private Zusammenfassung. ``games`` ist der
+    Spielfilter des Servers für die Auswahl (vom Bot, #630)."""
     user = await linked_user(db, discord_user_id)
     if not user:
         return answer(NOT_LINKED, buttons=[LINK_BUTTON])
     if not await enabled(db):
         return answer(OFF)
     if not wanted:
-        rows = await choices(db, discord_user_id, guild_id)
+        rows = await choices(db, discord_user_id, games)
         if not rows:
             return answer("Gerade ist keine Anmeldung offen, die du im Discord erledigen kannst.")
         if len(rows) > 1:
@@ -447,29 +420,15 @@ async def withdraw(db, discord_user_id, kind: str, item_id: str) -> dict:
     return answer(f"Du bist von „{event.get('name') or 'Event'}“ abgemeldet.", buttons=[{"label": "Zum Event", "url": _event_url(event)}])
 
 
-async def handle_button(db, discord_user_id, button_id: str, guild_id=None) -> dict:
+async def handle_button(db, discord_user_id, button_id: str) -> dict:
     """Ein Klick auf einen Anmelde-Knopf - die Kennung sagt, was zu tun ist."""
     match = CUSTOM_ID_PATTERN.match(button_id or "")
     if not match:
         return answer("Diesen Knopf kenne ich nicht mehr.")
     action, kind, item_id, then = match["action"], match["kind"], match["id"], match["then"]
     if action == "show":
-        return await answer_anmelden(db, discord_user_id, f"{kind}:{item_id}", guild_id, then=then)
+        return await answer_anmelden(db, discord_user_id, f"{kind}:{item_id}", then=then)
     if action == "reg":
         return await confirm(db, discord_user_id, kind, item_id, then)
     return await withdraw(db, discord_user_id, kind, item_id)
 
-
-# ---------------------------------------------------------------- Knopf unter Ankündigungen
-
-async def announcement_button(db, kind: str, doc: dict, status: str | None = None) -> dict | None:
-    """„Anmelden“ unter der Ankündigung (und im Turnier-Thread): zeigt die private Zusammenfassung. Nur, wenn der Schalter
-    an ist und nichts dagegen spricht; bei Turnieren nur zur offenen Anmeldung."""
-    if not await enabled(db):
-        return None
-    if kind == "event":
-        if event_blocker(doc):
-            return None
-    elif tournament_blocker(doc) or status != "registration_open":
-        return None
-    return {"label": "Anmelden", "custom_id": custom_id("show", kind, doc["id"]), "style": "primary"}

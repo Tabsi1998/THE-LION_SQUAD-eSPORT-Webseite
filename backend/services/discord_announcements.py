@@ -197,7 +197,7 @@ async def designed_news(db, post: dict) -> dict:
 
 async def _with_registration(db, kind: str, doc: dict, message: dict, status: str | None = None) -> dict:
     """„Anmelden“ als erster Knopf (#885) - nur, wenn der Schalter an ist und nichts dagegen spricht."""
-    from services.discord_registration import announcement_button
+    from services.discord_registration_rules import announcement_button
 
     button = await announcement_button(db, kind, doc, status)
     return {**message, "buttons": [button, *(message.get("buttons") or [])]} if button else message

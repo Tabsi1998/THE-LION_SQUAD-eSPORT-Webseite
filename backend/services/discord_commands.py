@@ -14,16 +14,11 @@ from __future__ import annotations
 from datetime import date
 
 from models import now_utc
+from services.discord_texts import LINK_PATH, NOT_LINKED, answer  # noqa: F401 - Bausteine, auch für andere Module
 
 RUNNING_STATUSES = ("live", "paused")
-LINK_PATH = "/profile?tab=socials"
-NOT_LINKED = "Dein Discord-Konto ist nicht mit der Website verknüpft – mit `/verknuepfen` steht, wie es geht."
 MEMBER_AREA_PATH = "/member-area"
 APPLY_PATH = "/membership/apply"
-
-
-def answer(content: str | None = None, *, embed: dict | None = None, buttons: list[dict] | None = None) -> dict:
-    return {"content": content, "embed": embed, "buttons": list(buttons or [])}
 
 
 async def _linked_user_id(db, discord_user_id) -> str | None:
