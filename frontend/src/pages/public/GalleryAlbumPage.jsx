@@ -158,7 +158,7 @@ export default function GalleryAlbumPage() {
         <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}
           {a.event && <Link to={`/events/${a.event.slug}`} className="text-[#9F7AEA] hover:underline">→ {a.event.name}</Link>}
-          <span>{items.length} Medien</span>
+          {items.length > 0 && <span>{items.length} Medien</span>}
           {hasSections && <span className="inline-flex items-center gap-1.5"><Layers className="w-3.5 h-3.5" /> {sectionGroups.filter((group) => group.section).length} Abschnitte</span>}
         </div>
         {a.description && <p className="mt-3 text-white/70 max-w-2xl">{a.description}</p>}
@@ -173,7 +173,8 @@ export default function GalleryAlbumPage() {
         )}
 
         {items.length === 0 ? (
-          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">Noch keine Medien.</div>
+          // Leeres Album (#1224): ein direkter Link zeigt einen freundlichen Satz statt „0 Medien“.
+          <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/60" data-testid="album-empty">Hier kommen bald Fotos.</div>
         ) : (
           <div className="mt-10 space-y-14">
             {sectionGroups.map((group) => (

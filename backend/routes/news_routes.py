@@ -124,7 +124,21 @@ def _compact_album(album: dict) -> dict:
         "video_count": album.get("video_count", 0),
         "media_count": album.get("media_count", album.get("photo_count", 0)),
         "section_count": album.get("section_count", 0),
+        "is_empty": bool(album.get("is_empty")),
     }
+
+
+async def _without_empty_albums(albums: list[dict], user: dict | None) -> list[dict]:
+    """Leere Alben (#1224): ein Album ohne Fotos und Videos sieht nur, wer Inhalte pflegt (Bereich „content“) - mit dem
+    Hinweis ``is_empty``, damit die Verwaltung weiß, dass Besucher es nicht sehen. Sobald Medien da sind, erscheint es
+    von selbst. Erwartet die Zähler aus ``_attach_gallery_counts``."""
+    from services.permissions import user_has_area
+
+    if await user_has_area(user, "content"):
+        for album in albums:
+            album["is_empty"] = not album.get("media_count")
+        return albums
+    return [album for album in albums if album.get("media_count")]
 
 
 def _gallery_image_query(album_id: str) -> dict:
@@ -1495,6 +1509,7 @@ async def list_albums(
     visible = await _filter_visible(albums, user)
     for a in visible:
         await _attach_gallery_counts(db, a)
+    visible = await _without_empty_albums(visible, user)
     if compact:
         visible = [_compact_album(a) for a in visible]
         return _page_items(visible, limit, offset, paged)

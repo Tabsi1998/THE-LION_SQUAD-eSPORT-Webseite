@@ -1,4 +1,4 @@
-import { eventIsOver, matchIsOver, tournamentIsOver } from "@/lib/afterEnd";
+import { eventIsOver, matchIsOver, photosComingWindow, tournamentIsOver } from "@/lib/afterEnd";
 
 // Regel „vorbei“ (#1221): Event nach seinem letzten Tag in Wiener Zeit, Turnier mit Ende oder veröffentlichten
 // Ergebnissen, Match beendet, gewertet oder Freilos. Feste Zeitpunkte - kein Test hängt an der Uhr des Rechners.
@@ -44,4 +44,14 @@ test("Turnier: beendet oder Ergebnisse veröffentlicht", () => {
 test("Match: beendet, gewertet, Freilos oder abgesagt", () => {
   for (const status of ["completed", "forfeit", "bye", "archived", "cancelled"]) expect(matchIsOver({ status })).toBe(true);
   for (const status of ["scheduled", "ready", "in_progress", "waiting_result", "disputed"]) expect(matchIsOver({ status })).toBe(false);
+});
+
+// „Fotos folgen …“ (#1224): ab dem Beginn bis 14 Wiener Tage nach dem letzten Tag.
+test("Fotos-Satz: ab dem Beginn bis 14 Tage nach dem letzten Tag", () => {
+  const event = { status: "scheduled", start_date: "2026-06-20T08:00:00Z", end_date: "2026-06-21T18:00:00Z" };
+  expect(photosComingWindow(event, at("2026-06-19T10:00:00Z"))).toBe(false);
+  expect(photosComingWindow(event, at("2026-06-20T10:00:00Z"))).toBe(true);
+  expect(photosComingWindow(event, at("2026-07-05T20:00:00Z"))).toBe(true); // 14 Tage nach dem 21.6. (22:00 in Wien)
+  expect(photosComingWindow(event, at("2026-07-05T22:30:00Z"))).toBe(false); // 6.7. 00:30 in Wien - 15 Tage
+  expect(photosComingWindow({ status: "scheduled" }, at("2026-06-20T10:00:00Z"))).toBe(false);
 });

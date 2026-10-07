@@ -295,3 +295,29 @@ test("Warteliste: Satz in der Mehrzahl, zurückziehen vor dem Beginn möglich", 
   expect(screen.getByTestId("event-cancel-link")).toBeInTheDocument();
   expect(screen.queryByText(/Platz\/Plätze|Person\(en\)|davon 0/)).toBeNull();
 });
+
+// Leere Alben (#1224): statt einer leeren Karte „Fotos folgen in den nächsten Tagen“ - nur bis 14 Tage nach dem Event;
+// ohne Album steht gar nichts. Die Uhr steht fest (10.10.2026).
+test("leeres Album: der Satz bis 14 Tage nach dem Event, danach und ohne Album nichts", async () => {
+  const past = { ...base, status: "scheduled", start_date: "2026-10-03T08:00:00Z", end_date: "2026-10-04T18:00:00Z", albums: [], photos_coming: true };
+  const { unmount } = renderPage(past);
+  expect(await screen.findByTestId("event-photos-coming")).toHaveTextContent("Fotos folgen in den nächsten Tagen.");
+  unmount();
+
+  const { unmount: unmountOld } = renderPage({ ...past, start_date: "2026-09-10T08:00:00Z", end_date: "2026-09-11T18:00:00Z" });
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Vereinsausflug");
+  expect(screen.queryByTestId("event-photos-coming")).toBeNull();
+  expect(screen.queryByTestId("event-gallery")).toBeNull();
+  unmountOld();
+
+  renderPage({ ...past, photos_coming: false });
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Vereinsausflug");
+  expect(screen.queryByTestId("event-gallery")).toBeNull();
+});
+
+test("Verwaltung: ein leeres Album steht mit Hinweis da", async () => {
+  renderPage({ ...base, status: "scheduled", start_date: "2026-10-03T08:00:00Z", end_date: "2026-10-04T18:00:00Z", photos_coming: true,
+    albums: [{ id: "a1", slug: "ausflug-fotos", title: "Ausflug-Fotos", is_empty: true }] });
+  expect(await screen.findByTestId("event-album-empty-a1")).toHaveTextContent("leer – für Besucher unsichtbar");
+  expect(screen.getByTestId("event-photos-coming")).toBeInTheDocument();
+});

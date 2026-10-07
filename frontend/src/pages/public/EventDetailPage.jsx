@@ -19,7 +19,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { formatRoundName, formatTournamentDisplay, slotName } from "@/lib/tournamentLabels";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatWhen } from "@/lib/datetime";
-import { eventIsOver } from "@/lib/afterEnd";
+import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
 import { countText, ownSeatsSentence, seatsLabel } from "@/lib/eventSeats";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { hasArea } from "@/lib/permissions";
@@ -162,6 +162,7 @@ export default function EventDetailPage() {
   const organizerName = e.organizer_name || (e.owned_by_club ? "THE LION SQUAD - eSports" : "");
   const liveUrl = `/events/${e.slug || e.id}/live${accessSuffix(accessToken)}`;
   const over = eventIsOver(e);
+  const photosComing = Boolean(e.photos_coming) && (e.albums || []).every((album) => album.is_empty) && photosComingWindow(e);
 
   return (
     <PublicLayout>
@@ -313,19 +314,31 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {!!e.albums?.length && (
-          <div>
+        {/* Leere Alben (#1224): Besucher sehen nur Alben mit Fotos; ist eines angelegt, aber noch leer, steht bis 14 Tage
+            nach dem Event „Fotos folgen in den nächsten Tagen“. Die Verwaltung sieht leere Alben mit Hinweis. */}
+        {(!!e.albums?.length || photosComing) && (
+          <div data-testid="event-gallery">
             <h2 className="font-heading text-2xl font-black uppercase mb-5 inline-flex items-center gap-2"><ImageIcon className="w-5 h-5 text-[#29B6E8]" /> Galerie</h2>
+            {photosComing && (
+              <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/80" data-testid="event-photos-coming">
+                Fotos folgen in den nächsten Tagen.
+              </div>
+            )}
+            {!!e.albums?.length && (
             <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
               {e.albums.map((a) => (
                 <Link key={a.id} to={`/galerie/${a.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
                   <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
-                  <div className="p-4"><div className="font-heading font-bold">{a.title}</div></div>
+                  <div className="p-4">
+                    <div className="font-heading font-bold">{a.title}</div>
+                    {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                  </div>
                 </Link>
               ))}
             </div>
+            )}
           </div>
         )}
 

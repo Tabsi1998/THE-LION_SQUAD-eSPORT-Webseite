@@ -624,10 +624,18 @@ async def get_event(slug_or_id: str, include_draft: bool = False, access: str | 
     albums = await db.gallery_albums.find(
         {"event_id": event["id"], "published": True}, {"_id": 0},
     ).sort("order_index", 1).to_list(50)
-    event["albums"] = [
+    visible_albums = [
         album for album in albums
         if await _user_can_see(user, album.get("visibility") or "public")
     ]
+    # Leere Alben (#1224): ohne Fotos und Videos sieht ein Album nur, wer Inhalte pflegt (mit Hinweis). Für alle anderen
+    # sagt `photos_coming`, dass Fotos angelegt sind und folgen - die Seite schreibt dann einen Satz statt der Karte.
+    for album in visible_albums:
+        album["media_count"] = await db.gallery_photos.count_documents({"album_id": album["id"]})
+        album["is_empty"] = not album["media_count"]
+    shows_empty = await user_has_area(user, "content")
+    event["photos_coming"] = any(album["is_empty"] for album in visible_albums)
+    event["albums"] = [album for album in visible_albums if shows_empty or not album["is_empty"]]
     # Linked news
     news = await db.news_posts.find(
         {"linked_event_ids": event["id"], "published": True},
