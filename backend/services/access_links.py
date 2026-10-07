@@ -7,7 +7,9 @@ from urllib.parse import urlencode
 from models import now_utc
 
 TARGET_TYPES = {"event", "tournament", "fastlap"}
-ACCESS_GRANTS = {"view", "register", "submit"}
+# „display“ (#1110): nur den Turnierbaum-TV eines Turniers ansehen - kein Turnier, keine Anmeldung, kein Ergebnis.
+# Angelegt und widerrufen wird so ein Link nur unter TV & Beamer, nie über die allgemeinen Speziallinks.
+ACCESS_GRANTS = {"view", "register", "submit", "display"}
 
 
 def new_access_token() -> str:

@@ -90,7 +90,8 @@ async def list_access_links(
     me: dict = Depends(require_admin()),
 ):
     db = get_db()
-    query: dict = {}
+    # TV-Schlüssel (#1110) wohnen unter TV & Beamer - hier stünden sie doppelt.
+    query: dict = {"grants": {"$ne": "display"}}
     if target_type:
         if target_type not in TARGET_TYPES:
             raise HTTPException(status_code=400, detail="Ungültiger Zieltyp")

@@ -3,7 +3,7 @@ import { INTEGRATIONS, MENU_INTEGRATIONS } from "@/lib/integrations";
 import { NavLink, useLocation, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { Logo } from "@/components/tls/Logo";
-import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine } from "lucide-react";
+import { LayoutDashboard, Trophy, Gamepad2, Users as UsersIcon, CalendarDays, Flag, Building2, Newspaper, LogOut, ExternalLink, Menu, X, Code2, Star, Crown, Gift, Image as ImageIcon, Award, Inbox, UserCheck, Medal, FolderOpen, FileText, AlertTriangle, Handshake, BellRing, Search, Server, QrCode, Activity, MessagesSquare, ChevronDown, Sticker, Smartphone, Link2, Wallet, BookOpen, Mail, Palette, Share2, LogIn, Sparkles, CalendarHeart, Egg, ScanLine, Tv } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePublicSiteSettings } from "@/hooks/usePublicSiteSettings";
 
@@ -68,6 +68,8 @@ export const ADMIN_GROUPS = [
       { to: "/admin/seasons", label: "Jahreswertung", icon: Trophy, areas: ["tournaments"] },
       { to: "/admin/games", label: "Spiele", icon: Gamepad2, areas: ["tournaments"] },
       { to: "/admin/stations", label: "Stationen", icon: Building2, areas: ["tournaments", "moderation"], staff: true },
+      // TV & Beamer (#1110): Grundwerte aller Bildschirme, Link-Baukasten und die Anzeige-Schlüssel des Turnierbaum-TVs.
+      { to: "/admin/tv", label: "TV & Beamer", icon: Tv, areas: ["tournaments"] },
       { to: "/admin/game-servers", label: "Game-Server", icon: Server, areas: ["system"] },
       { to: "/admin/prizes", label: "Gewinne", icon: Award, areas: ["tournaments"] },
       { to: "/admin/penalties", label: "Strafen", icon: AlertTriangle, areas: ["tournaments"] },
@@ -150,6 +152,7 @@ const ADMIN_SEARCH_TERMS = {
   "/admin/seasons": ["wertung", "jahreswertung", "circuit", "saisons", "saison"],
   "/admin/games": ["spiele", "games"],
   "/admin/stations": ["geraete", "setup", "event"],
+  "/admin/tv": ["tv", "beamer", "fernseher", "display", "bildschirm", "anzeige", "turnierbaum tv", "hallen-tv", "schlüssel", "schluessel", "anzeige-schlüssel", "kontrast", "schrift", "sicherer bereich", "pixel", "wach halten", "bewegung reduzieren"],
   "/admin/game-servers": ["server", "communityserver"],
   "/admin/prizes": ["preise", "gewinn", "gewinnabholung", "abholung"],
   "/admin/penalties": ["strafen", "fairplay"],

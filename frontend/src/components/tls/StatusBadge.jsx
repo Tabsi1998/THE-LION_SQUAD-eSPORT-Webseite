@@ -29,6 +29,11 @@ const STATUS_MAP = {
   reserved: { label: "RESERVIERT", cls: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40" },
 };
 
+/** Die Beschriftung eines Zustands - auch für Schilder, die anders aussehen (TV-Seiten). */
+export function statusBadgeLabel(status) {
+  return STATUS_MAP[status]?.label || status?.toUpperCase() || "—";
+}
+
 export function StatusBadge({ status, className = "", size = "sm", testId }) {
   const info = STATUS_MAP[status] || { label: status?.toUpperCase() || "—", cls: "bg-white/10 text-white border-white/20" };
   const sz = size === "lg" ? "text-sm px-3 py-1" : "text-[10px] px-2 py-[3px]";

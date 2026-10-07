@@ -88,3 +88,14 @@ test("abgehakte Plattformen fehlen im Menü, Alle Verbindungen bleibt", () => {
   expect(targets).toContain("/admin/integrations/discord");
   expect(targets).toContain("/admin/integrations");
 });
+
+test("TV & Beamer (#1110): ein Eintrag unter eSports, nur mit dem Bereich Turniere, die Suche findet Beamer und Fernseher", () => {
+  const item = group("eSports").items.find((entry) => entry.to === "/admin/tv");
+  expect(item.label).toBe("TV & Beamer");
+  expect(item.areas).toEqual(["tournaments"]);
+  const find = (query, user = SYSTEM_USER) => navGroupsFor(user, query).flatMap((entry) => entry.items).map((entry) => entry.to);
+  expect(find("beamer")).toContain("/admin/tv");
+  expect(find("fernseher")).toContain("/admin/tv");
+  expect(find("anzeige-schlüssel")).toContain("/admin/tv");
+  expect(find("beamer", { role: "moderator" })).not.toContain("/admin/tv");
+});

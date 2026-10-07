@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { BrandedQRCode, qrLogoHref } from "@/components/tls/BrandedQRCode";
 import { useBrandingAssets } from "@/components/tls/Logo";
 import { downloadQrPng, downloadQrSvg } from "@/lib/qrExport";
+import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { CalendarDays, Copy, Download, Eye, Flag, Globe, Image as ImageIcon, Monitor, Printer, QrCode, Radio, Trophy } from "lucide-react";
 
 function safeWidgetUrl({ type, id, track, base }) {
@@ -231,13 +232,15 @@ export default function AdminWidgetsPage() {
 function qrMatchesFromBracket(payload) {
   const registrations = new Map((payload?.registrations || []).map((registration) => [registration.id, registration]));
   const tournament = payload?.tournament || {};
+  // Spiel-QR-Codes (#1113): leere Plätze im Klartext („Sieger aus A“), Setzplätze bleiben weg.
+  const finder = finderFor(payload?.matches_v2 || []);
   const multi = (payload?.matches_v2 || []).map((match) => ({
     id: match.id,
     tournamentTitle: tournament.title,
     stationId: match.station_id,
     stationLabel: match.station_label || match.station_name || match.station?.name || match.station_id,
     label: (match.slots || [])
-      .map((slot) => registrations.get(slot.registration_id)?.display_name || registrations.get(slot.registration_id)?.ingame_name || slot.source?.raw)
+      .map((slot) => registrations.get(slot.registration_id)?.display_name || registrations.get(slot.registration_id)?.ingame_name || sourceLabel(slot.source, finder(match)))
       .filter(Boolean)
       .join(" vs. ") || match.round_name || `Match ${match.match_key || match.id}`,
   }));

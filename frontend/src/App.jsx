@@ -3,7 +3,7 @@ import { lazy, Suspense } from "react";
 import { SeasonProvider } from "@/seasons/SeasonContext";
 import { SeasonStage } from "@/seasons/SeasonStage";
 import { SignalSync } from "@/seasons/SignalSync";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
@@ -57,6 +57,14 @@ function PlayerLegacyRedirect() {
   return <Navigate to={`/u/${username}`} replace />;
 }
 
+// Turnierbaum-TV (#1110): mit Anzeige-Schlüssel im Link läuft er ohne Anmeldung - der Schlüssel erlaubt nur das
+// Anschauen dieses Turniers. Ohne Schlüssel bleibt es bei der Anmeldung der Turnierleitung.
+function BracketTvRoute() {
+  const [params] = useSearchParams();
+  if (params.get("key")) return <BracketTVPage />;
+  return <ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>;
+}
+
 import HomePage from "@/pages/public/HomePage";
 const TournamentsPage = lazy(() => import("@/pages/public/TournamentsPage"));
 const TournamentDetailPage = lazy(() => import("@/pages/public/TournamentDetailPage"));
@@ -95,6 +103,7 @@ const AdminDashboardPage = lazy(() => import("@/pages/admin/AdminDashboardPage")
 const AdminTournamentsPage = lazy(() => import("@/pages/admin/AdminTournamentsPage"));
 const AdminTournamentNewPage = lazy(() => import("@/pages/admin/AdminTournamentNewPage"));
 const AdminTournamentGuidePage = lazy(() => import("@/pages/admin/AdminTournamentGuidePage"));
+const AdminTvPage = lazy(() => import("@/pages/admin/AdminTvPage"));
 const AdminTournamentEditPage = lazy(() => import("@/pages/admin/AdminTournamentEditPage"));
 const AdminF1Page = lazy(() => import("@/pages/admin/AdminF1Page"));
 const AdminF1NewPage = lazy(() => import("@/pages/admin/AdminF1NewPage"));
@@ -300,6 +309,7 @@ function App() {
           <Route path="/admin/tournaments" element={<ProtectedRoute requireModerator><AdminTournamentsPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/new" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentNewPage /></ProtectedRoute>} />
           <Route path="/admin/tournament-guide" element={<ProtectedRoute requireArea="tournaments"><AdminTournamentGuidePage /></ProtectedRoute>} />
+          <Route path="/admin/tv" element={<ProtectedRoute requireArea="tournaments"><AdminTvPage /></ProtectedRoute>} />
           <Route path="/admin/tournaments/:id" element={<ProtectedRoute requireModerator><AdminTournamentEditPage /></ProtectedRoute>} />
           <Route path="/admin/f1" element={<ProtectedRoute requireModerator><AdminF1Page /></ProtectedRoute>} />
           <Route path="/admin/f1/new" element={<ProtectedRoute requireArea="tournaments"><AdminF1NewPage /></ProtectedRoute>} />
@@ -380,7 +390,7 @@ function App() {
           {/* Display / TV */}
           <Route path="/display/f1/:id" element={<F1TVPage />} />
           <Route path="/display/event/:id" element={<EventTVPage />} />
-          <Route path="/display/bracket/:id" element={<ProtectedRoute requireModerator><BracketTVPage /></ProtectedRoute>} />
+          <Route path="/display/bracket/:id" element={<BracketTvRoute />} />
 
           {/* Error pages */}
           <Route path="/403" element={<ForbiddenPage />} />

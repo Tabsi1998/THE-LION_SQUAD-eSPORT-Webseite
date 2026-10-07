@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef,
 import { resolveMediaUrl } from "@/lib/api";
 import { formatBracketSection, formatMatchStatus, formatRoundName } from "@/lib/tournamentLabels";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { describeSlot, finderFor, initials } from "@/lib/slotSource";
 
 /**
  * Turnierbaum (#399): K.-o.-Runden als Spalten mit gemessenen Verbindungslinien, Mehrspieler-
@@ -22,12 +23,11 @@ const PathContext = createContext({ ids: null, show: () => {} });
 const FinishedContext = createContext(false);
 const FINISHED_TOURNAMENT = new Set(["completed", "results_published", "archived", "cancelled"]);
 
-/** Kürzel für Spieler ohne Bild (#833): die Anfangsbuchstaben von bis zu zwei Wörtern. */
-export function initials(label) {
-  const words = String(label || "").trim().split(/[\s_.-]+/).filter(Boolean);
-  if (!words.length) return "";
-  return words.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
-}
+// Kürzel für Spieler ohne Bild (#833) - seit #1113 an einer Stelle mit dem TV (lib/slotSource), auch für
+// zusammengeschriebene Namen: NeonFalke → NF.
+export { initials };
+// Wer in einen noch leeren Platz kommt (#1113): „Sieger aus A“ statt „—“. Setzplätze bleiben leer.
+const FinderContext = createContext(() => () => undefined);
 
 /** Liegt diese Partie auf dem hervorgehobenen Weg - oder wird sie gedämpft? */
 export function pathState(ids, registrationIds) {
@@ -74,8 +74,10 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
     return m;
   }, [registrations]);
   const mine = mineId || registrations.find((r) => r?.is_mine)?.id || null;
+  const finder = useMemo(() => finderFor(matches_v2), [matches_v2]);
 
   return (
+    <FinderContext.Provider value={finder}>
     <ChangedMatchesContext.Provider value={changedMatchIds || EMPTY_SET}>
       <MineContext.Provider value={mine}>
         <FinishedContext.Provider value={finished}>
@@ -95,6 +97,7 @@ export function BracketTree({ data, compact = false, viewMode = "standard", onMa
         </FinishedContext.Provider>
       </MineContext.Provider>
     </ChangedMatchesContext.Provider>
+    </FinderContext.Provider>
   );
 }
 
@@ -461,6 +464,12 @@ function isBye(slot) {
   return ["bye", "walkover"].includes(String(slot?.status || "").toLowerCase());
 }
 
+/** Klartext für einen leeren Platz einer späteren Runde (#1113) - Setzplätze und Unbekanntes bleiben leer. */
+function pendingLabel(slot, findMatch) {
+  const info = describeSlot(slot, () => "", findMatch);
+  return info.kind === "pending" ? info.label : "";
+}
+
 function LiveStatus({ status }) {
   const finished = useContext(FinishedContext);
   const isLive = LIVE_STATUSES.has(String(status || "").toLowerCase());
@@ -505,6 +514,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const players = slots.map((slot) => slot.registration_id).filter(Boolean);
   const onPath = pathState(pathIds, players);
   const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
+  const findMatch = useContext(FinderContext)(match);
 
   return (
     <button
@@ -532,6 +542,7 @@ function V2DuelNode({ match, regMap, podiumMap, compact = false, onClick }) {
             key={slot.slot || index}
             registrationId={slot.registration_id}
             label={slotLabel(slot, regMap)}
+            pending={reg ? "" : pendingLabel(slot, findMatch)}
             empty={!reg}
             bye={isBye(slot)}
             score={done || result ? (result?.score ?? result?.points ?? 0) : null}
@@ -573,6 +584,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   const players = slots.map((slot) => slot.registration_id).filter(Boolean);
   const onPath = pathState(pathIds, players);
   const live = !finished && LIVE_STATUSES.has(String(match.status || "").toLowerCase());
+  const findMatch = useContext(FinderContext)(match);
   return (
     <button
       type="button"
@@ -603,6 +615,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
             key={slot.slot}
             registrationId={slot.registration_id}
             registration={reg}
+            pending={reg ? "" : pendingLabel(slot, findMatch)}
             result={result}
             played={played}
             qualified={qualified}
@@ -616,7 +629,7 @@ function HeatNode({ match, regMap, podiumMap, compact = false, onClick }) {
   );
 }
 
-function HeatRow({ registrationId, registration, result, played, qualified, isMine, podiumRank, compact = false, sweep = false }) {
+function HeatRow({ registrationId, registration, pending = "", result, played, qualified, isMine, podiumRank, compact = false, sweep = false }) {
   const user = registration?.user || {};
   const label = registration ? (registration.display_name || user.display_name || registration.ingame_name || "-") : "";
   const score = result?.score ?? result?.points;
@@ -627,7 +640,7 @@ function HeatRow({ registrationId, registration, result, played, qualified, isMi
       <div className="flex items-center gap-2 min-w-0">
         <SlotAvatar avatar={user.avatar_url} label={label} empty={!registration} />
         <div className="min-w-0">
-          <div className={`${compact ? "text-sm" : "text-base"} truncate ${label ? "" : "text-white/25"} ${podium?.text || (qualified ? "text-[#29B6E8] font-semibold" : "text-white/85")}`}>{label || "—"}</div>
+          <div className={`${compact ? "text-sm" : "text-base"} truncate ${label ? (podium?.text || (qualified ? "text-[#29B6E8] font-semibold" : "text-white/85")) : pending ? "text-white/50" : "text-white/25"}`} data-pending={pending && !label ? "1" : undefined}>{label || pending || "—"}</div>
           {isMine ? <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">Du</div> : null}
         </div>
       </div>
@@ -665,15 +678,15 @@ function usePathHover(registrationId) {
   };
 }
 
-function Row({ registrationId, label, empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false, sweep = false }) {
+function Row({ registrationId, label, pending = "", empty, bye, score, isWinner, isLoser, isMine, podiumRank, avatar, compact = false, sweep = false }) {
   const podium = podiumMeta(podiumRank);
   const pathHandlers = usePathHover(registrationId);
   return (
     <div {...pathHandlers} data-sweep={sweep ? "1" : undefined} className={`flex items-center justify-between gap-2 ${compact ? "px-2.5 py-1.5" : "px-3 py-2"} ${podium?.row || (isWinner ? "bg-[#29B6E8]/10" : "")} ${sweep ? "tls-winner-sweep" : ""}`}>
       <div className="flex items-center gap-2 min-w-0">
         <SlotAvatar avatar={avatar} label={bye ? "" : label} empty={empty || bye} />
-        <span className={`${compact ? "text-sm" : "text-base"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-bold" : isLoser ? "text-white/45" : empty ? "text-white/25" : "text-white/85")}`}>
-          {bye ? "Freilos" : label || "—"}
+        <span className={`${compact ? "text-sm" : "text-base"} truncate ${podium?.text || (isWinner ? "text-[#29B6E8] font-bold" : isLoser ? "text-white/45" : empty && pending && !bye ? "text-white/50" : empty ? "text-white/25" : "text-white/85")}`} data-pending={empty && pending && !bye ? "1" : undefined}>
+          {bye ? "Freilos" : label || pending || "—"}
         </span>
         {isMine ? <span className="text-[10px] uppercase tracking-widest text-[#FFD700] shrink-0">Du</span> : null}
       </div>
