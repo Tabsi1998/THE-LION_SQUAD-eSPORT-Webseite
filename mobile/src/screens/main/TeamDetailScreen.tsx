@@ -7,11 +7,14 @@ import { Card } from "../../components/Card";
 import { EmptyState, ErrorState, SkeletonList } from "../../components/ListState";
 import { MediaImage } from "../../components/MediaImage";
 import { Screen } from "../../components/Screen";
+import { TeamSchedule } from "../../components/team/TeamSchedule";
+import { TeamInviteCard, TeamJoinInvite } from "../../components/team/TeamInvite";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
 import { formatDate, formatStatus } from "../../lib/format";
 import { isGuestUser } from "../../live";
+import type { TeamOverview } from "../../lib/teamPage";
 import { openSignIn } from "../../navigation/rootNavigation";
 import type { TeamStackParamList } from "../../navigation/types";
 import { colors } from "../../theme";
@@ -42,6 +45,9 @@ const emptySquad: SquadForm = { name: "", description: "", game_id: "", status: 
 export function TeamDetailScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const [team, setTeam] = useState<Team | undefined>();
+  // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladungs-Link mit QR-Code für Kapitäne.
+  const [overview, setOverview] = useState<TeamOverview | null>(null);
+  const inviteToken = route.params.invite || "";
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -59,8 +65,10 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     try {
       const { data } = await api.get<Team>(`/teams/${route.params.id}`);
       const squads = await api.get<TeamSquad[]>(`/teams/${route.params.id}/squads`).catch(() => ({ data: [] as TeamSquad[] }));
+      const plan = await api.get<TeamOverview>(`/teams/${route.params.id}/overview`).catch(() => ({ data: null }));
       const nextTeam = { ...data, squads: Array.isArray(squads.data) ? squads.data : [] };
       setTeam(nextTeam);
+      setOverview(plan.data && Array.isArray(plan.data.upcoming) ? plan.data : null);
       setTeamForm({
         name: nextTeam.name || "",
         tag: nextTeam.tag || "",
@@ -233,6 +241,21 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const joinedByLink = () => {
+    navigation.setParams({ invite: undefined });
+    setMessage("Du bist dem Team beigetreten.");
+    load();
+  };
+
+  if (!team && inviteToken) {
+    // Ein privates Team zeigt sich nur mit gültigem Einladungs-Link - dann gleich mit „Beitreten“.
+    return (
+      <Screen>
+        <TeamJoinInvite teamId={route.params.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
+      </Screen>
+    );
+  }
+
   if (!team) {
     return (
       <Screen>
@@ -280,6 +303,16 @@ export function TeamDetailScreen({ navigation, route }: Props) {
         {message ? <Muted style={styles.success}>{message}</Muted> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
 
+        {inviteToken && !isMember ? (
+          <TeamJoinInvite teamId={team.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
+        ) : null}
+
+        <TeamSchedule
+          overview={overview}
+          onOpenTournament={(id) => navigation.navigate("TournamentDetail", { id })}
+          onOpenMatch={(id) => navigation.navigate("MatchDetail", { id })}
+        />
+
         <Card style={styles.card}>
           <View style={styles.cardTop}>
             <Heading>Teamaktionen</Heading>
@@ -314,13 +347,7 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           </Card>
         ) : null}
 
-        {canManage && team.join_code ? (
-          <Card style={[styles.card, styles.manageCard]}>
-            <Heading>Join-Code</Heading>
-            <Muted>Mit diesem Code können Spieler dem Team direkt beitreten.</Muted>
-            <Body style={styles.joinCode}>{team.join_code}</Body>
-          </Card>
-        ) : null}
+        {canManage ? <TeamInviteCard teamId={team.id} teamName={team.name} joinCode={team.join_code} /> : null}
 
         {!isMember && user && !isGuestUser(user) ? (
           <Card style={styles.card}>
@@ -636,9 +663,6 @@ const styles = StyleSheet.create({
   card: {
     gap: 12,
   },
-  manageCard: {
-    borderColor: "rgba(255,215,0,0.3)",
-  },
   cardTop: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -667,17 +691,6 @@ const styles = StyleSheet.create({
   },
   inputMulti: {
     minHeight: 92,
-  },
-  joinCode: {
-    backgroundColor: colors.black,
-    borderColor: "rgba(255,215,0,0.28)",
-    borderRadius: 8,
-    borderWidth: 1,
-    color: colors.gold,
-    fontSize: 20,
-    fontWeight: "900",
-    letterSpacing: 0,
-    padding: 12,
   },
   memberRow: {
     alignItems: "flex-start",

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
@@ -21,10 +21,14 @@ import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Copy, Crown, Edit, Lock, MessageSquare, Plus, Search, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
+import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
+import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
+import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
+import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
+import { inviteTokenFrom } from "@/lib/teamPage";
 
 const emptyTeam = { name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "" };
 
@@ -148,9 +152,15 @@ function TeamDetail({ id }) {
   );
 
   const nav = useNavigate();
+  const location = useLocation();
   const { user, isAdmin } = useAuth();
   const [team, setTeam] = useState(null);
+  const [missing, setMissing] = useState(false);
   const [levelInfo, setLevelInfo] = useState(null);
+  // Termine und letzte Spiele (#1191) aus den Team-Anmeldungen; Einladen mit Link und QR-Code im Blatt.
+  const [overview, setOverview] = useState(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const inviteToken = inviteTokenFrom(location.search);
   const [editing, setEditing] = useState(null);
   const [joinCode, setJoinCode] = useState("");
   const { submitting: mutating, submitOnce } = useSubmissionGuard();
@@ -162,16 +172,47 @@ function TeamDetail({ id }) {
   const load = useCallback(async () => {
     const { data } = await api.get(`/teams/${id}`);
     setTeam(data);
+    setMissing(false);
     try {
       const { data: lvl } = await api.get(`/teams/${id}/level`);
       setLevelInfo(lvl);
     } catch {}
+    try {
+      const { data: plan } = await api.get(`/teams/${id}/overview`);
+      setOverview(plan);
+    } catch { setOverview(null); }
   }, [id]);
-  const refresh = useCallback(() => load().catch(() => setTeam(null)), [load]);
+  const refresh = useCallback(() => load().catch(() => { setTeam(null); setMissing(true); }), [load]);
 
   useEffect(() => { refresh(); }, [refresh]);
   useApiInvalidation(refresh, ["teams"]);
 
+  // Beigetreten über den Einladungs-Link: Schlüssel aus der Adresse, Seite neu.
+  const joinedByLink = async () => {
+    nav(`/teams/${id}`, { replace: true });
+    await refresh();
+  };
+
+  if (!team && missing && inviteToken) {
+    // Ein privates Team zeigt sich nur mit gültigem Link - dann gleich mit „Beitreten“.
+    return (
+      <PublicLayout>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
+          <TeamJoinCard teamId={id} token={inviteToken} user={user} onJoined={joinedByLink} />
+        </div>
+      </PublicLayout>
+    );
+  }
+  if (!team && missing) {
+    return (
+      <PublicLayout>
+        <div className="p-20 text-center" data-testid="team-missing">
+          <h1 className="font-heading text-3xl uppercase">Team nicht gefunden</h1>
+          <Link to="/teams" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zu den Teams</Link>
+        </div>
+      </PublicLayout>
+    );
+  }
   if (!team) return <PublicLayout><PublicLoadingState label="Lade Team" /></PublicLayout>;
 
   const isMember = !!user && (team.is_member || team.member_ids?.includes(user.id));
@@ -262,13 +303,6 @@ function TeamDetail({ id }) {
     }, "Leadership konnte nicht übertragen werden.");
   };
 
-  const copyJoin = async () => {
-    try {
-      await navigator.clipboard.writeText(team.join_code || "");
-      toast.success("Join-Code kopiert.");
-    } catch { toast.error("Kopieren fehlgeschlagen."); }
-  };
-
   return (
     <PublicLayout>
       <div className="relative border-b border-white/10 bg-grid-dense overflow-hidden">
@@ -312,6 +346,7 @@ function TeamDetail({ id }) {
             </div>
             {canEdit && (
               <div className="flex gap-2 flex-wrap">
+                <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
                 <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
                 <button onClick={remove} disabled={mutating} data-testid="team-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
               </div>
@@ -322,6 +357,8 @@ function TeamDetail({ id }) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
+          {inviteToken && !isMember ? <TeamJoinCard teamId={team.id} token={inviteToken} user={user} onJoined={joinedByLink} /> : null}
+          <TeamSchedule overview={overview} />
           {levelInfo && <TeamLevelPanel info={levelInfo} />}
           {(team.awards || []).length > 0 && (
             <section data-testid="team-awards">
@@ -407,16 +444,6 @@ function TeamDetail({ id }) {
         </div>
         <aside className="space-y-4">
           {actionError && <AuthFormAlert id="team-action-error">{actionError}</AuthFormAlert>}
-          {canEdit && (
-            <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4">
-              <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Join-Code</div>
-              <div className="mt-2 flex gap-2">
-                <code className="flex-1 bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm">{team.join_code}</code>
-                <button onClick={copyJoin} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
-              </div>
-            </div>
-          )}
-          {canEdit && <InviteMemberPanel team={team} />}
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
@@ -431,6 +458,7 @@ function TeamDetail({ id }) {
         </aside>
       </div>
       {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} />}
     </PublicLayout>
   );
 }
@@ -549,87 +577,6 @@ function TeamChat({ team, user }) {
         {sendError && <div className="border-t border-white/10 p-3"><AuthFormAlert id="team-chat-error">{sendError}</AuthFormAlert></div>}
       </div>
     </section>
-  );
-}
-
-function InviteMemberPanel({ team }) {
-  const [query, setQuery] = useState("");
-  const [candidates, setCandidates] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const { submitting: inviting, submitOnce } = useSubmissionGuard();
-  const [inviteError, setInviteError] = useState("");
-
-  useEffect(() => {
-    const needle = query.trim();
-    if (needle.length < 2) {
-      setCandidates([]);
-      return undefined;
-    }
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/teams/${team.id}/invite-candidates?q=${encodeURIComponent(needle)}`);
-        setCandidates(data || []);
-      } catch {
-        setCandidates([]);
-      } finally {
-        setLoading(false);
-      }
-    }, 220);
-    return () => clearTimeout(timer);
-  }, [query, team.id]);
-
-  const invite = async (user) => {
-    setInviteError("");
-    const attempt = await submitOnce(async () => {
-      await api.post(`/teams/${team.id}/invites`, { user_id: user.id });
-      toast.success(`${user.display_name || user.username} eingeladen.`);
-      setCandidates((rows) => rows.map((row) => row.id === user.id ? { ...row, has_pending_invite: true } : row));
-    });
-    if (attempt.started && attempt.error) {
-      const message = formatRequestError(attempt.error, "Einladung konnte nicht gesendet werden.");
-      setInviteError(message);
-      toast.error(message);
-    }
-  };
-
-  return (
-    <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
-      <div>
-        <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Mitglieder einladen</div>
-        <p className="mt-1 text-xs text-white/45">Benutzer suchen und eine Team-Einladung in deren Inbox senden.</p>
-      </div>
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
-        <input
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setInviteError(""); }}
-          placeholder="Username suchen"
-          className="w-full bg-[#0A0A0A] border border-white/10 pl-9 pr-3 py-2 rounded-sm text-sm"
-        />
-      </div>
-      <div className="space-y-2">
-        {loading && <div className="text-xs text-white/40">Suche läuft...</div>}
-        {candidates.map((candidate) => (
-          <div key={candidate.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-            <div className="min-w-0 flex-1">
-              <div className="font-bold text-sm truncate">{candidate.display_name || candidate.username}</div>
-              <div className="text-xs text-white/40 truncate">@{candidate.username}</div>
-            </div>
-            <button
-              type="button"
-              disabled={candidate.has_pending_invite || inviting}
-              onClick={() => invite(candidate)}
-              className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
-            >
-              <UserPlus className="w-3.5 h-3.5" /> {candidate.has_pending_invite ? "Offen" : "Einladen"}
-            </button>
-          </div>
-        ))}
-        {query.trim().length >= 2 && !loading && candidates.length === 0 && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
-        {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
-      </div>
-    </div>
   );
 }
 

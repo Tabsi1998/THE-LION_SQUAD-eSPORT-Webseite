@@ -5,13 +5,14 @@ import { qrRows } from "../lib/qr";
 // Ein QR-Code aus Views - ohne SVG-Bibliothek und ohne Bild vom Server (#346). Weißer Grund mit
 // „stiller Zone“, damit jede Kamera ihn liest, auch auf dem dunklen App-Hintergrund.
 
-export function QrCode({ value, size = 220, testID }: { value: string; size?: number; testID?: string }) {
+// `label` (#1191): was der Code enthält - für TalkBack; ohne Angabe wie bisher die Mitgliedskarte.
+export function QrCode({ value, size = 220, testID, label = "QR-Code der Mitgliedskarte" }: { value: string; size?: number; testID?: string; label?: string }) {
   const matrix = useMemo(() => qrRows(value), [value]);
   const quiet = 4;
   const cell = size / (matrix.size + quiet * 2);
   const offset = quiet * cell;
   return (
-    <View style={[styles.box, { width: size, height: size }]} testID={testID} accessibilityLabel="QR-Code der Mitgliedskarte" accessibilityRole="image">
+    <View style={[styles.box, { width: size, height: size }]} testID={testID} accessibilityLabel={label} accessibilityRole="image">
       {matrix.rows.map((runs, row) =>
         runs.map(([start, length]) => (
           <View

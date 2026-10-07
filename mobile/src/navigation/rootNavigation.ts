@@ -181,7 +181,8 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   if ((first === "fastlap" || first === "fastlaps") && second) return detail("FastLapDetail", { id: second });
   if (first === "f1" && second === "challenges" && third) return detail("FastLapDetail", { id: third });
   if (first === "f1" && second) return detail("FastLapDetail", { id: second });
-  if (first === "teams" && second) return detail("TeamDetail", { id: second });
+  // Einladungs-Link (#1191): der Schlüssel geht mit, die Team-Seite zeigt dann „Beitreten“.
+  if (first === "teams" && second) return detail("TeamDetail", query.get("einladung") ? { id: second, invite: query.get("einladung") } : { id: second });
   if (first === "news" && second) return detail("NewsDetail", { id: second });
   if ((first === "galerie" || first === "gallery") && second) return detail("GalleryAlbum", { id: second });
   if (first === "messages" && second) return detail("DirectThread", { userId: second });

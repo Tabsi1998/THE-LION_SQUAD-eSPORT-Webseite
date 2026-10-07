@@ -73,6 +73,8 @@ const ADDRESSES: Array<[string, unknown]> = [
   ["/f1/challenges/monza", detail("FastLapDetail", { id: "monza" })],
   ["/f1/monza", detail("FastLapDetail", { id: "monza" })],
   ["/teams/t-1", detail("TeamDetail", { id: "t-1" })],
+  // Einladungs-Link (#1191): der Schlüssel geht mit zur Team-Seite.
+  ["https://lionsquad.at/teams/t-1?einladung=AbC123", detail("TeamDetail", { id: "t-1", invite: "AbC123" })],
   ["/news/herbst-lan-plan", detail("NewsDetail", { id: "herbst-lan-plan" })],
   ["/galerie/sommerfest", detail("GalleryAlbum", { id: "sommerfest" })],
   ["/messages/u-9", detail("DirectThread", { userId: "u-9" })],

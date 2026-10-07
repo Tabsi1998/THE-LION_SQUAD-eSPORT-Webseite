@@ -45,7 +45,8 @@ export type DetailParamList = {
   FastLapDetail: { id: string };
   MatchDetail: { id: string };
   TournamentChat: { id: string; title?: string };
-  TeamDetail: { id: string };
+  // `invite` (#1191): der Schlüssel aus einem Einladungs-Link (/teams/<id>?einladung=…) - oben steht dann „Beitreten“.
+  TeamDetail: { id: string; invite?: string };
   TeamChat: { id: string; title?: string };
   PublicProfile: { username: string };
   DirectThread: { userId: string; title?: string };
