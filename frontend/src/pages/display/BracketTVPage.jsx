@@ -177,8 +177,9 @@ function BracketTv() {
       {t ? (
         <TvHeader
           className="tls-header-sweep"
-          kicker="THE LION SQUAD · LIVE"
-          live
+          // Rot heißt „läuft gerade“ (#1116): der Punkt in der Kopfleiste nur, solange das Turnier läuft.
+          kicker={toneFor(t.status) === "live" ? "THE LION SQUAD · LIVE" : "THE LION SQUAD · TURNIERBAUM"}
+          live={toneFor(t.status) === "live"}
           title={t.title}
           subtitle={hasMatches ? (parked ? "Turnier entschieden" : "Turnierbaum") : null}
           aside={(
