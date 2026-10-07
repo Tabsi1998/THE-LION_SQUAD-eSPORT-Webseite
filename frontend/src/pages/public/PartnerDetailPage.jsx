@@ -331,7 +331,7 @@ function ToolCard({ tool, active, onEmbed }) {
             <Eye className="w-3.5 h-3.5" /> {active ? "Ausblenden" : "Hier ansehen"}
           </button>
         )}
-        <a href={tool.url} target="_blank" rel="noopener noreferrer" data-testid={`partner-tool-open-${tool.id}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/60 transition">
+        <a href={tool.url} target="_blank" rel="noopener noreferrer" data-testid={`partner-tool-open-${tool.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">
           Öffnen <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>

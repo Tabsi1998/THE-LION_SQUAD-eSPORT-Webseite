@@ -83,7 +83,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
         <div className="space-y-3">
           <div className="text-sm text-[#FFD700] font-bold">Diese Codes werden nur einmal angezeigt.</div>
           <pre className="grid grid-cols-2 gap-2 bg-black/40 border border-white/10 p-4 text-center text-sm tracking-wider select-all">{recoveryCodes.join("\n")}</pre>
-          <button type="button" onClick={copyRecoveryCodes} className="px-4 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase rounded-sm">Codes kopieren</button>
+          <button type="button" onClick={copyRecoveryCodes} className="tls-btn tls-btn--primary px-4 py-2 text-xs font-bold uppercase rounded-sm">Codes kopieren</button>
         </div>
       ) : status?.enabled ? (
         <div className="space-y-3">
@@ -91,7 +91,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
           {required && !status.session_verified && <p className="text-xs text-[#FFD700]">Melde dich einmal neu an, um den Adminbereich freizuschalten.</p>}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Aktuelles Passwort" autoComplete="current-password" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MFA- oder Wiederherstellungscode" autoComplete="one-time-code" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
-          <button type="button" disabled={busy || !password || !code} onClick={disable} className="px-4 py-2 border border-[#FF3B30]/50 text-[#FF6B6B] text-xs font-bold uppercase disabled:opacity-40">MFA deaktivieren</button>
+          <button type="button" disabled={busy || !password || !code} onClick={disable} className="tls-btn tls-btn--danger px-4 py-2 text-xs font-bold uppercase disabled:opacity-40 rounded-sm">MFA deaktivieren</button>
         </div>
       ) : setup ? (
         <div className="space-y-4">
@@ -104,7 +104,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
         <div className="space-y-3">
           <p className={`text-sm ${required ? "text-[#FFD700]" : "text-white/60"}`}>{required ? "Noch nicht eingerichtet. Bis dahin bleibt dein Adminbereich gesperrt." : "Noch nicht eingerichtet."}</p>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Aktuelles Passwort" autoComplete="current-password" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
-          <button type="button" disabled={busy || !password} onClick={begin} className="px-4 py-2 bg-[#FFD700] text-black text-xs font-bold uppercase disabled:opacity-40">MFA einrichten</button>
+          <button type="button" disabled={busy || !password} onClick={begin} className="tls-btn tls-btn--primary px-4 py-2 text-xs font-bold uppercase disabled:opacity-40 rounded-sm">MFA einrichten</button>
         </div>
       )}
     </div>

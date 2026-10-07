@@ -320,12 +320,12 @@ function RoundSteps({ roundNums, rounds, regMap, podiumMap, compact, onMatchClic
   return (
     <div className="space-y-3" data-testid="bracket-steps">
       <div className="flex items-center justify-between gap-3">
-        <button type="button" onClick={() => setStep(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">← Vorige</button>
+        <button type="button" onClick={() => setStep(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">← Vorige</button>
         <div className="text-center min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-wider text-white/50" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
           <div className="font-heading text-base font-black uppercase truncate">{formatRoundName(rounds[rn][0].round_name, rn)}</div>
         </div>
-        <button type="button" onClick={() => setStep(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">Nächste →</button>
+        <button type="button" onClick={() => setStep(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-35">Nächste →</button>
       </div>
       <div className="flex flex-col gap-3">
         {rounds[rn].map((match) => (

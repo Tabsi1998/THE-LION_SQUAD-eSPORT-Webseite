@@ -107,7 +107,7 @@ export default function F1DetailPage() {
           <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{challenge.title}</h1>
           {challenge.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(challenge.description) }} />}
           {challenge.event && (
-            <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="mt-4 inline-flex items-center gap-2 border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+            <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
               <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}
             </Link>
           )}
@@ -148,7 +148,7 @@ export default function F1DetailPage() {
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/leaderboard.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#29B6E8]/45 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10 transition"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
                 <FileDown className="w-4 h-4" /> Ergebnis-PDF
               </a>
@@ -158,7 +158,7 @@ export default function F1DetailPage() {
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
                 <Award className="w-4 h-4" /> Urkunden
               </a>
@@ -168,7 +168,7 @@ export default function F1DetailPage() {
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship.pdf${f1ResultQuery({ access: accessToken })}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
                 <Trophy className="w-4 h-4" /> Gesamtwertung-PDF
               </a>
@@ -178,7 +178,7 @@ export default function F1DetailPage() {
                 href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates.pdf${f1ResultQuery({ access: accessToken })}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#FFD700]/40 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10 transition"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
                 <Award className="w-4 h-4" /> Gesamtwertungs-Urkunden
               </a>

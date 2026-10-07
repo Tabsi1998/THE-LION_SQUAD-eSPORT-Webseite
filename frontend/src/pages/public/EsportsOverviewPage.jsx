@@ -77,7 +77,7 @@ export default function EsportsOverviewPage() {
               <Link to="/tournaments" className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
                 Turniere <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/fastlap" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-5 py-3 text-xs font-bold uppercase tracking-wider text-white/80 hover:border-[#29B6E8]/55 hover:text-white">
+              <Link to="/fastlap" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
                 Fast Lap <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -185,7 +185,7 @@ function ActivityCard({ item, index = 0 }) {
         </div>
       </div>
       <div className="p-5">
-        <h3 className="font-heading text-2xl font-bold leading-tight text-white transition group-hover:text-[#29B6E8]">{item.title}</h3>
+        <h3 className="tls-card__title font-heading text-2xl font-bold leading-tight text-white">{item.title}</h3>
         {item.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/55">{item.description}</p>}
         <ActivityMeta item={item} />
       </div>

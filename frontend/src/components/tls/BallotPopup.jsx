@@ -129,7 +129,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
             )}
             {message ? <p className="text-sm text-white/80" role="status" data-testid="ballot-popup-message">{message}</p> : null}
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" onClick={() => postpone(ballot.id)} className="px-4 py-2 rounded-sm border border-white/15 text-white/70 text-xs font-bold uppercase tracking-wider" data-testid="ballot-popup-later">
+              <button type="button" onClick={() => postpone(ballot.id)} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="ballot-popup-later">
                 {ballot.secret ? "Verstanden" : "Später"}
               </button>
               {!ballot.secret ? (

@@ -68,10 +68,10 @@ export default function JoinMembershipPage() {
               <Step n="4" title="Freischaltung">Nach der Aufnahme schaltet dich der Vorstand offiziell als Vereinsmitglied frei. Du erhältst eine E-Mail mit deiner Mitgliedsnummer.</Step>
             </ol>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/register" data-testid="join-register-btn" className="inline-flex items-center gap-2 px-5 py-3 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#e8c200] transition">
+              <Link to="/register" data-testid="join-register-btn" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
                 <Users className="w-4 h-4" /> Jetzt registrieren
               </Link>
-              <Link to="/contact" data-testid="join-contact-btn" className="inline-flex items-center gap-2 px-5 py-3 border border-white/20 hover:border-[#FFD700]/60 text-white font-bold uppercase tracking-wider rounded-sm transition">
+              <Link to="/contact" data-testid="join-contact-btn" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
                 <Mail className="w-4 h-4" /> Kontakt aufnehmen
               </Link>
             </div>

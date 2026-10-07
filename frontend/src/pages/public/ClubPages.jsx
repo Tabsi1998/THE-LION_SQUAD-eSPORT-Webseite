@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { API, api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { SkeletonCards } from "@/components/tls/Skeleton";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
@@ -61,19 +62,19 @@ export function BoardPage() {
           </div>
         ) : (
           <div className="mt-10 space-y-8" data-testid="board-grid">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <Reveal className="tls-reveal-grid grid grid-cols-1 lg:grid-cols-3 gap-5">
               {getCoreBoardPositions(positions).map((p) => (
                 <BoardRoleColumn key={p.id} p={p} />
               ))}
-            </div>
+            </Reveal>
             {getSpecialBoardPositions(positions).length > 0 && (
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] mb-4">Sonderfunktionen</div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <Reveal className="tls-reveal-grid grid grid-cols-1 md:grid-cols-2 gap-5">
                   {getSpecialBoardPositions(positions).map((p) => (
-                    <BoardCard key={p.id} p={p} compact />
+                    <div key={p.id} className="tls-reveal-item"><BoardCard p={p} compact /></div>
                   ))}
-                </div>
+                </Reveal>
               </div>
             )}
           </div>
@@ -118,7 +119,7 @@ function StatutesBox({ statutes }) {
                 <div className="text-sm text-white font-bold">Geltende Fassung: Fassung {current.version}</div>
                 <div className="text-xs text-white/50">beschlossen am {formatDay(current.decided_on)} · gültig seit {formatDay(current.valid_from)}</div>
               </div>
-              <a href={`${API}/board/statutes/${current.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-[#FFD700]/60 text-[#FFD700] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#FFD700]/10">
+              <a href={`${API}/board/statutes/${current.id}/pdf`} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider text-xs rounded-sm">
                 <FileText className="w-4 h-4" /> Statuten (PDF)
               </a>
             </div>
@@ -156,7 +157,7 @@ function getSpecialBoardPositions(positions) {
 
 function BoardRoleColumn({ p }) {
   return (
-    <div className="space-y-3" data-testid={`board-position-${p.slug}`}>
+    <div className="tls-reveal-item space-y-3" data-testid={`board-position-${p.slug}`}>
       <BoardCard p={p} featured />
       {p.allow_deputy && (
         <BoardDeputyCard position={p} />
@@ -284,19 +285,19 @@ export function ValuesPage() {
           Was uns ausmacht, wofür wir stehen, und wohin wir wollen.
         </p>
 
-        <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <Reveal className="tls-reveal-grid mt-10 grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
             { icon: Heart, title: "Rudel-Mentalität", text: "Wir gewinnen gemeinsam, wir verlieren gemeinsam, wir feiern gemeinsam. Niemand wird zurückgelassen." },
             { icon: Sparkles, title: "Fairplay", text: "Respekt vor Gegnern, Schiedsrichtern, Teammates. Cheating, Toxic Behaviour und Diskriminierung haben bei uns keinen Platz." },
             { icon: Target, title: "Ambition", text: "Spaß zuerst — aber wir wollen besser werden, lernen, wachsen. Ob Casual oder Competitive: Jeder Pixel zählt." },
           ].map((v) => (
-            <div key={v.title} className="border border-white/10 rounded-sm p-6 bg-gradient-to-br from-white/[0.02] to-transparent">
+            <div key={v.title} className="tls-reveal-item border border-white/10 rounded-sm p-6 bg-gradient-to-br from-white/[0.02] to-transparent">
               <v.icon className="w-6 h-6 text-[#29B6E8] mb-3" />
               <div className="font-heading text-lg font-black uppercase">{v.title}</div>
               <p className="mt-2 text-sm text-white/70 leading-relaxed">{v.text}</p>
             </div>
           ))}
-        </div>
+        </Reveal>
 
         <div className="mt-10 border-t border-white/10 pt-8">
           <h2 className="font-heading text-2xl font-bold uppercase mb-4">Unsere Ziele</h2>

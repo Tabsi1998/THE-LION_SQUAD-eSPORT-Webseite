@@ -160,9 +160,9 @@ export default function NewsDetailPage() {
                 <div className="flex items-center gap-2 text-white/75"><Newspaper className="w-4 h-4 text-[#29B6E8] shrink-0" /> {newsCategoryLabel(post.category)}</div>
               </div>
               <div className="flex flex-wrap gap-2 pt-1" data-testid="news-share">
-                <button type="button" onClick={copyLink} data-testid="news-share-copy" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/75 hover:text-white hover:border-white/40"><Link2 className="w-3.5 h-3.5" /> Link kopieren</button>
-                <a href={`https://wa.me/?text=${encodeURIComponent(`${post.title} – ${shareUrl}`)}`} target="_blank" rel="noreferrer" data-testid="news-share-whatsapp" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/75 hover:text-white hover:border-white/40"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</a>
-                {canNativeShare && <button type="button" onClick={nativeShare} data-testid="news-share-native" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/75 hover:text-white hover:border-white/40"><Share2 className="w-3.5 h-3.5" /> Teilen …</button>}
+                <button type="button" onClick={copyLink} data-testid="news-share-copy" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><Link2 className="w-3.5 h-3.5" /> Link kopieren</button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(`${post.title} – ${shareUrl}`)}`} target="_blank" rel="noreferrer" data-testid="news-share-whatsapp" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</a>
+                {canNativeShare && <button type="button" onClick={nativeShare} data-testid="news-share-native" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><Share2 className="w-3.5 h-3.5" /> Teilen …</button>}
               </div>
             </div>
 

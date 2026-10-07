@@ -64,13 +64,13 @@ export default function PartnersPage() {
             <div className="text-sm mt-2">Du willst mit uns zusammenarbeiten? Schreib uns direkt über die Kontaktseite.</div>
           </div>
         ) : (
-          <Reveal className="tls-reveal-grid mt-12 space-y-8">
+          <Reveal className="tls-reveal-grid tls-dim-siblings mt-12 space-y-8">
             {partners.map((p, idx) => {
               const target = `/partners/${encodeURIComponent(p.slug || p.id)}`;
               const channels = Array.isArray(p.channels) ? p.channels : [];
               const since = p.since || (p.since_year ? String(p.since_year) : "");
               return (
-                <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="tls-reveal-item grid lg:grid-cols-2 gap-0 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm bg-[#101010] overflow-hidden transition">
+                <article key={p.id} data-testid={`partner-card-${p.slug || p.id}`} className="tls-card tls-reveal-item grid lg:grid-cols-2 gap-0 border border-white/10 rounded-sm bg-[#101010] overflow-hidden transition">
                   <Link to={target} className={`${idx % 2 === 1 ? "lg:order-2" : ""} min-h-72 bg-[#070707] border-b lg:border-b-0 ${idx % 2 === 1 ? "lg:border-l" : "lg:border-r"} border-white/10 flex items-center justify-center p-10`}>
                     {p.logo_url ? (
                       <SmartLogo src={resolveMediaUrl(p.logo_url)} alt={p.name} className="max-h-44 max-w-[80%] w-auto h-auto" />
@@ -81,7 +81,7 @@ export default function PartnersPage() {
                   <div className="p-7 md:p-10 flex flex-col justify-center min-w-0">
                     <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{p.kind || "Partner"}{since ? <span className="text-white/40"> · seit {since}</span> : null}</div>
                     <h3 className="mt-2 font-heading font-black uppercase text-2xl md:text-3xl leading-tight break-words">
-                      <Link to={target} data-testid={`partner-open-${p.slug || p.id}`} className="hover:text-[#29B6E8] transition">{p.name}</Link>
+                      <Link to={target} data-testid={`partner-open-${p.slug || p.id}`} className="tls-card__title">{p.name}</Link>
                     </h3>
                     {p.description && <p className="mt-4 text-white/70 leading-relaxed">{p.description}</p>}
                     {channels.length > 0 && (

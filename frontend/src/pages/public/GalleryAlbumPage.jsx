@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { motionAllowed } from "@/lib/motion";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { MOTION, motionAllowed } from "@/lib/motion";
+import { flyTransform, inViewport } from "@/lib/galleryFly";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { Link, useParams } from "react-router-dom";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -81,6 +83,7 @@ export default function GalleryAlbumPage() {
   const [active, setActive] = useState(null);
   // Galerie (#1079): die Kacheln merken sich ihr Element, damit das große Bild aus seiner Kachel wachsen kann.
   const tileRefs = useRef(new Map());
+  const returnFocus = useRef(null);
   const [dimensions, setDimensions] = useState({});
   const items = a?.photos || [];
   const sectionGroups = buildSectionGroups(items, a?.sections || []);
@@ -106,16 +109,13 @@ export default function GalleryAlbumPage() {
     load();
   }, [load]);
 
+  // Nach dem Schließen liegt der Fokus auf der Kachel des zuletzt gezeigten Bildes (#1079) - erst nach dem Abbau der
+  // Ansicht, die beim Abbau den Fokus an die Kachel zurückgibt, mit der sie geöffnet wurde.
   useEffect(() => {
-    if (active === null) return undefined;
-    const handler = (event) => {
-      if (event.key === "Escape") setActive(null);
-      if (event.key === "ArrowLeft") setActive((i) => (i - 1 + items.length) % items.length);
-      if (event.key === "ArrowRight") setActive((i) => (i + 1) % items.length);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [active, items.length]);
+    if (active !== null || !returnFocus.current) return;
+    returnFocus.current.focus({ preventScroll: true });
+    returnFocus.current = null;
+  }, [active]);
 
   useApiInvalidation(load, ["gallery"]);
 
@@ -165,7 +165,7 @@ export default function GalleryAlbumPage() {
         {hasSections && (
           <div className="mt-6 flex flex-wrap gap-2">
             {sectionGroups.map((group) => (
-              <a key={group.id} href={`#${sectionAnchor(group.section || { id: group.id })}`} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/70 hover:border-[#29B6E8]/50 hover:text-white">
+              <a key={group.id} href={`#${sectionAnchor(group.section || { id: group.id })}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
                 {group.title || "Medien"} <span className="text-white/35">{group.items.length}</span>
               </a>
             ))}
@@ -210,7 +210,8 @@ export default function GalleryAlbumPage() {
       </section>
 
       {active !== null && items[active] && (
-        <Lightbox item={items[active]} onClose={() => setActive(null)} origin={tileRefs.current.get(active) || null}
+        <Lightbox item={items[active]} tile={tileRefs.current.get(active) || null}
+          onClose={() => { returnFocus.current = tileRefs.current.get(active) || null; setActive(null); }}
           onPrev={() => setActive((i) => (i - 1 + items.length) % items.length)}
           onNext={() => setActive((i) => (i + 1) % items.length)}
         />
@@ -263,43 +264,87 @@ function GalleryTile({ item, onDimensions }) {
   );
 }
 
-// Galerie (#1079): das große Bild wächst aus seiner Kachel. Beim ersten Bild wird die Bühne an die Stelle und Größe
-// der Kachel gesetzt und gleitet dann an ihren Platz; weiterblättern wechselt nur den Inhalt. Mit „Bewegung
-// reduzieren“ oder ohne Kachel (Tastatur, Link) erscheint das Bild sofort.
+// Galerie (#1079): das große Bild wächst aus seiner Kachel und fliegt beim Schließen dorthin zurück. Weiterblättern
+// wechselt nur den Inhalt; zurück geht es zur Kachel des Bildes, das gerade offen ist. Liegt sie außerhalb des
+// Fensters, wird sie vorher hergeholt (unsichtbar, die Ansicht deckt die Seite ab). Mit „Bewegung reduzieren“, ohne
+// Kachel oder ohne Web-Animationen geht alles sofort.
+const FLY_EASE = `cubic-bezier(${MOTION.ease.join(", ")})`;
+
+function mediaRectOf(node) {
+  const media = node.querySelector("img, video, iframe");
+  return media ? media.getBoundingClientRect() : undefined;
+}
+
+function flyBetween(node, tile) {
+  if (!node || !tile || typeof node.animate !== "function" || typeof tile.getBoundingClientRect !== "function") return null;
+  if (!motionAllowed()) return null;
+  const fly = flyTransform(node.getBoundingClientRect(), tile.getBoundingClientRect(), mediaRectOf(node));
+  return fly ? `translate(${fly.dx}px, ${fly.dy}px) scale(${fly.scale})` : null;
+}
+
 function useGrowFrom(origin) {
   const stage = useRef(null);
-  useEffect(() => {
+  // Vor dem ersten Bild (Layout-Effekt): sonst stünde die Bühne einen Moment groß da und spränge dann auf die Kachel.
+  useLayoutEffect(() => {
     const node = stage.current;
-    if (!node || !origin || typeof origin.getBoundingClientRect !== "function" || !motionAllowed()) return undefined;
-    const from = origin.getBoundingClientRect();
-    const to = node.getBoundingClientRect();
-    if (!to.width || !to.height) return undefined;
-    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
-    const dy = from.top + from.height / 2 - (to.top + to.height / 2);
-    const scale = Math.max(0.05, Math.min(from.width / to.width, from.height / to.height));
-    node.style.transition = "none";
-    node.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-    node.style.opacity = "0.6";
-    const frame = window.requestAnimationFrame(() => {
-      node.style.transition = "";
-      node.style.transform = "none";
-      node.style.opacity = "1";
-    });
-    return () => window.cancelAnimationFrame(frame);
+    const from = flyBetween(node, origin);
+    if (!from) return undefined;
+    const animation = node.animate([{ transform: from, opacity: 0.6 }, { transform: "none", opacity: 1 }], { duration: MOTION.slow, easing: FLY_EASE });
+    return () => animation.cancel();
     // Nur beim Öffnen - beim Weiterblättern bleibt die Bühne, wo sie ist.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return stage;
 }
 
-function Lightbox({ item, onClose, onPrev, onNext, origin = null }) {
+function Lightbox({ item, onClose, onPrev, onNext, tile = null }) {
   const type = mediaTypeFromItem(item);
-  const stage = useGrowFrom(origin);
+  const stage = useGrowFrom(tile);
+  const [leaving, setLeaving] = useState(false);
+  const leavingRef = useRef(false);
+  const flight = useRef(null);
+  useEffect(() => () => flight.current?.cancel(), []);
+
+  const close = () => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    const node = stage.current;
+    if (tile && typeof tile.scrollIntoView === "function" && !inViewport(tile.getBoundingClientRect(), window.innerWidth, window.innerHeight)) {
+      tile.scrollIntoView({ block: "center" });
+    }
+    // Läuft das Öffnen noch, startet der Rückflug dort, wo die Bühne gerade ist.
+    const now = node ? window.getComputedStyle(node) : null;
+    const start = { transform: now?.transform || "none", opacity: Number.parseFloat(now?.opacity) || 1 };
+    if (node && typeof node.getAnimations === "function") node.getAnimations().forEach((animation) => animation.cancel());
+    const to = flyBetween(node, tile);
+    if (!to) {
+      onClose();
+      return;
+    }
+    setLeaving(true);
+    flight.current = node.animate([start, { transform: to, opacity: 0.6 }], { duration: MOTION.slow, easing: FLY_EASE, fill: "forwards" });
+    flight.current.finished.then(() => onClose(), () => {});
+  };
+
+  // Escape schließt, Tab bleibt in der Ansicht; der Fokus geht beim Öffnen auf „Schließen“.
+  const container = useModalBehavior(true, close);
+  useEffect(() => {
+    const handler = (event) => {
+      if (leavingRef.current) return;
+      if (event.key === "ArrowLeft") onPrev();
+      if (event.key === "ArrowRight") onNext();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  });
+
   return (
-    <div className="tls-lightbox fixed inset-0 z-50 bg-black/95 flex items-center justify-center" onClick={onClose} data-testid="gallery-lightbox">
-      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white z-10" aria-label="Schließen"><X className="w-6 h-6" /></button>
+    <div ref={container} role="dialog" aria-modal="true" aria-label={item.caption || "Bildansicht"} className={`tls-lightbox fixed inset-0 z-50 bg-black/95 flex items-center justify-center${leaving ? " is-leaving" : ""}`} data-testid="gallery-lightbox">
+      {/* Klick neben das Bild schließt - eine eigene Ebene hinter Bild und Knöpfen (der Dialog selbst hört nicht auf Klicks). */}
+      <div className="absolute inset-0" onClick={close} aria-hidden="true" data-testid="gallery-lightbox-backdrop" />
+      <button onClick={(e) => { e.stopPropagation(); close(); }} className="absolute top-4 right-4 p-2 text-white/70 hover:text-white z-10" aria-label="Schließen" data-testid="gallery-lightbox-close"><X className="w-6 h-6" /></button>
       <button onClick={(e) => { e.stopPropagation(); onPrev(); }} className="absolute left-4 p-3 text-white/70 hover:text-white z-10" aria-label="Vorheriges"><ChevronLeft className="w-6 h-6" /></button>
-      <div ref={stage} className="tls-lightbox__stage max-w-[92vw] max-h-[86vh] w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()} data-testid="gallery-lightbox-stage">
+      <div ref={stage} className="tls-lightbox__stage relative max-w-[92vw] max-h-[86vh] w-full flex items-center justify-center" data-testid="gallery-lightbox-stage">
         {type === "image" ? <LightboxImage item={item} /> : <LightboxVideo item={item} />}
       </div>
       <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white z-10" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
@@ -324,7 +369,7 @@ function LightboxImage({ item }) {
         className="max-w-[90vw] max-h-[78vh] object-contain"
       />
       {originalUrl && (
-        <a href={originalUrl} download={item.original_filename || undefined} className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/75 hover:text-white">
+        <a href={originalUrl} download={item.original_filename || undefined} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
           <Download className="w-3.5 h-3.5" /> Original herunterladen
         </a>
       )}
@@ -383,7 +428,7 @@ function LightboxVideo({ item }) {
           preload="metadata"
           className="max-w-[90vw] max-h-[78vh] bg-black"
         />
-        <a href={src} download className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-4 py-2 text-xs font-bold uppercase tracking-wider text-white/75 hover:text-white">
+        <a href={src} download className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
           <Download className="w-3.5 h-3.5" /> Video herunterladen
         </a>
       </div>

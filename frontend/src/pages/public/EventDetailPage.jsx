@@ -4,6 +4,7 @@ import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
+import { StepBar, eventStep, eventSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
@@ -198,7 +199,7 @@ export default function EventDetailPage() {
               <Link to={liveUrl} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <Radio className="w-4 h-4" /> Live verfolgen
               </Link>
-              <Link to={`/display/event/${e.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/70 text-xs uppercase tracking-wider font-bold rounded-sm hover:border-[#29B6E8]/45 hover:text-white transition">
+              <Link to={`/display/event/${e.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
                 <ExternalLink className="w-4 h-4" /> Display
               </Link>
             </div>
@@ -372,6 +373,10 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
   const maxCompanions = event.allow_companions ? Number(event.max_companions_per_registration || 0) : 0;
   const loginTarget = typeof window !== "undefined" ? `/login?next=${encodeURIComponent(`${window.location.pathname}${window.location.search}`)}` : "/login";
   const hasRegisterAccess = event.access_link?.grants?.includes("register");
+  // Wo die Anmeldung steht (#1081) - nur bei Kosten, ohne sie ist es ein einziger Schritt.
+  const steps = eventSteps(event, activeOwn ? own : null);
+  const step = eventStep(steps, activeOwn ? own : null);
+  const showSteps = !event.registration_url && step >= 0 && (activeOwn || (user && (registrationOpen || hasRegisterAccess)));
 
   useEffect(() => {
     setCompanionCount(0);
@@ -417,6 +422,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Anmeldung</div>
       <h2 className="mt-2 font-heading text-2xl font-black uppercase">{event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
+      {showSteps ? <StepBar steps={steps} current={step} className="mt-3" testId="event-register-steps" /> : null}
       <div className="mt-4 grid grid-cols-3 gap-2">
         <MiniStat label="Reserviert" value={`${summary.reserved_seats || 0}${event.max_participants ? `/${event.max_participants}` : ""}`} />
         <MiniStat label="Anmeldungen" value={summary.registered_count || 0} />
@@ -442,7 +448,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
         {summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (
-        <a href={event.registration_url} target="_blank" rel="noreferrer" className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
+        <a href={event.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
           Anmelden <ExternalLink className="w-3.5 h-3.5" />
         </a>
       ) : activeOwn ? (
@@ -469,14 +475,14 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             </div>
           )}
           {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
-          <button type="button" disabled={saving} onClick={cancel} className="mt-4 inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+          <button type="button" disabled={saving} onClick={cancel} className="tls-btn tls-btn--danger mt-4 inline-flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
         </div>
       ) : !registrationOpen && !hasRegisterAccess ? (
         <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
       ) : !user ? (
-        <Link to={loginTarget} className="mt-5 inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm">
+        <Link to={loginTarget} className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
           Einloggen zum Anmelden
         </Link>
       ) : (
@@ -509,7 +515,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged }) {
             <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
             <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
-          <button disabled={saving} data-testid="event-register-submit" className="inline-flex items-center gap-2 px-4 py-2 bg-[#9F7AEA] text-black text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+          <button disabled={saving} data-testid="event-register-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
             <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </form>

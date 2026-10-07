@@ -82,7 +82,7 @@ export function ModerationStandingCard({ compact = false }) {
             <div className="mt-3" data-testid="standing-appeal-form">
               <label htmlFor="standing-appeal" className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Einspruch – warum passt die Maßnahme nicht?</label>
               <textarea id="standing-appeal" value={message} onChange={(e) => setMessage(e.target.value)} rows={3} maxLength={2000} data-testid="standing-appeal-message" className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-sm" placeholder="Schreib der Moderation, was aus deiner Sicht passiert ist." />
-              <button type="button" onClick={sendAppeal} disabled={busy} data-testid="standing-appeal-send" className="mt-2 inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] hover:bg-[#29B6E8]/10 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              <button type="button" onClick={sendAppeal} disabled={busy} data-testid="standing-appeal-send" className="tls-btn tls-btn--secondary mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                 <Send className="w-3.5 h-3.5" /> Einspruch senden
               </button>
             </div>

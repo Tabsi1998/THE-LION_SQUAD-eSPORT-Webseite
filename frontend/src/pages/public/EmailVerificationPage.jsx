@@ -61,7 +61,7 @@ export default function EmailVerificationPage() {
         {status !== "success" && (
           <form onSubmit={resend} className="mt-6 space-y-3">
             <AuthTextField id="verify-email" label="E-Mail" type="email" value={email} onChange={setEmail} autoComplete="email" required />
-            <button type="submit" disabled={submitting || status === "checking"} className="w-full py-3 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase rounded-sm disabled:opacity-50" data-testid="verify-resend-submit">
+            <button type="submit" disabled={submitting || status === "checking"} className="tls-btn tls-btn--secondary w-full py-3 font-bold uppercase rounded-sm disabled:opacity-50" data-testid="verify-resend-submit">
               {submitting ? "Versand wird angefordert …" : "Bestätigungslink anfordern"}
             </button>
           </form>

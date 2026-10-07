@@ -142,7 +142,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       type="button"
       onClick={create}
       disabled={busy}
-      className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
+      className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
     >
       <Plus className="w-3.5 h-3.5" /> Erstellen
     </button>
@@ -160,7 +160,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           type="button"
           onClick={cleanup}
           disabled={busy}
-          className="inline-flex items-center gap-2 px-3 py-2 border border-white/10 text-white/65 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white disabled:opacity-50"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Alte deaktivieren
         </button>
@@ -178,7 +178,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
               await copyText(createdUrl);
               toast.success("Link kopiert.");
             }}
-            className="inline-flex items-center gap-2 px-3 py-2 border border-[#00FF88]/35 text-[#00FF88] rounded-sm text-xs uppercase tracking-wider font-bold"
+            className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
           >
             <Copy className="w-3.5 h-3.5" /> Kopieren
           </button>

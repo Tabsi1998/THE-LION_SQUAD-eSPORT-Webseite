@@ -237,7 +237,7 @@ export function AchievementGroupsView({
                 <span className="flex-1 min-w-[16rem]">
                   Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
                 </span>
-                <Link to="/membership/join" className="shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">
+                <Link to="/membership/join" className="tls-btn tls-btn--secondary shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm">
                   Mitglied werden
                 </Link>
               </div>
@@ -492,7 +492,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             aria-label={`${tier.name} teilen`}
             title="Teilen-Karte öffnen oder Link kopieren"
             data-testid={`achievement-share-${tier.code}`}
-            className="mt-1.5 ml-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm border border-white/15 text-white/50 hover:text-white hover:border-white/40 transition"
+            className="tls-btn tls-btn--quiet mt-1.5 ml-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm"
           >
             <Share2 className="w-3 h-3" /> Teilen
           </button>

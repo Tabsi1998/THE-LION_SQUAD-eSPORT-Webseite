@@ -89,7 +89,7 @@ export default function EventsPage() {
           <div className="flex flex-wrap gap-2 min-w-0">
             <button onClick={() => updateEventFilters({ view: "upcoming" })} data-testid="events-tab-upcoming" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "upcoming" ? "bg-[#9F7AEA] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Kommend</button>
             <button onClick={() => updateEventFilters({ view: "past" })} data-testid="events-tab-past" className={`px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition ${tab === "past" ? "bg-white/15 text-white" : "border border-white/10 text-white/60 hover:text-white"}`}>Vergangen</button>
-            <Link to="/calendar" data-testid="events-tab-calendar" className="px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm transition border border-white/10 text-white/60 hover:text-white inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Kalender</Link>
+            <Link to="/calendar" data-testid="events-tab-calendar" className="tls-btn tls-btn--quiet px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Kalender</Link>
           </div>
           <select value={typeFilter} onChange={(e) => updateEventFilters({ type: e.target.value })} data-testid="events-type-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm max-w-full">
             <option value="">Alle Typen</option>
@@ -146,7 +146,7 @@ function EventCard({ e, meta }) {
           <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status} />
           {VIcon && <VIcon className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <h3 className="mt-2 font-heading font-black text-lg group-hover:text-[#9F7AEA] transition break-words">{e.name}</h3>
+        <h3 className="tls-card__title mt-2 font-heading font-black text-lg break-words">{e.name}</h3>
         {e.start_date && (
           <div className="mt-2 inline-flex min-w-0 items-center gap-1.5 text-xs text-white/60">
             <Calendar className="w-3 h-3" />

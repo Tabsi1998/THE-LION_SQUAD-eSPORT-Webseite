@@ -89,14 +89,8 @@
     }
   },
   "src/pages/public/GalleryAlbumPage.jsx": {
-    "jsx-a11y/click-events-have-key-events": {
-      "count": 2
-    },
     "jsx-a11y/media-has-caption": {
       "count": 1
-    },
-    "jsx-a11y/no-static-element-interactions": {
-      "count": 2
     }
   },
   "src/pages/public/TournamentDetailPage.jsx": {

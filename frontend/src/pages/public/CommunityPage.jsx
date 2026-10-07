@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Crown, Gamepad2, Medal, Server, Shield, Trophy, Users } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
+import { Reveal } from "@/components/tls/Reveal";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
@@ -77,7 +78,7 @@ export default function CommunityPage() {
 
         <CommunityPaths />
 
-        <div className="mt-10 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <Reveal className="tls-reveal-grid mt-10 grid md:grid-cols-2 xl:grid-cols-4 gap-6">
           <CommunityBlock
             title="Community-Profile"
             text="Alle öffentlichen Benutzerkonten mit Profil, Achievements und Stats."
@@ -133,7 +134,7 @@ export default function CommunityPage() {
               image: s.game?.logo_url,
             }))}
           />
-        </div>
+        </Reveal>
       </section>
     </PublicLayout>
   );
@@ -159,20 +160,20 @@ function CommunityPaths() {
           Profile, Teams, Server, Referenzen und Achievements greifen ineinander, damit Besucher schneller verstehen, was in der TLS-Community passiert.
         </p>
       </div>
-      <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <Reveal className="tls-reveal-grid mt-5 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {paths.map(({ to, label, text, icon: Icon, color }) => (
-          <Link key={label} to={to} className="group flex min-w-0 items-center gap-3 rounded-sm border border-white/10 bg-black/20 p-3 transition hover:border-white/25 hover:bg-white/[0.04]">
+          <Link key={label} to={to} className="tls-card tls-reveal-item group flex min-w-0 items-center gap-3 rounded-sm border border-white/10 bg-black/20 p-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-white/10 bg-[#121212]">
               <Icon className="h-4 w-4" style={{ color }} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-heading font-bold uppercase leading-tight group-hover:text-[#29B6E8]">{label}</span>
+              <span className="tls-card__title block font-heading font-bold uppercase leading-tight">{label}</span>
               <span className="mt-1 block text-xs text-white/45 line-clamp-2">{text}</span>
             </span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-white/25 transition group-hover:text-[#29B6E8]" />
+            <ArrowRight className="tls-card__arrow h-4 w-4 shrink-0 text-white/25" />
           </Link>
         ))}
-      </div>
+      </Reveal>
     </section>
   );
 }
@@ -180,7 +181,7 @@ function CommunityPaths() {
 function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Icon = Gamepad2 }) {
   const color = accent === "gold" ? "#FFD700" : accent === "green" ? "#00FF88" : "#29B6E8";
   return (
-    <section className="border border-white/10 bg-[#121212] rounded-sm p-5">
+    <section className="tls-reveal-item border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-heading text-xl font-black uppercase">{title}</h2>
@@ -190,12 +191,12 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Ic
       </div>
       <div className="mt-5 space-y-2 min-h-64">
         {items.length ? items.map((item) => (
-          <Link key={item.key} to={item.to} className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-2 hover:border-white/25 transition">
+          <Link key={item.key} to={item.to} className="tls-card flex items-center gap-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-2">
             <div className="w-11 h-11 rounded-sm bg-[#121212] border border-white/10 overflow-hidden flex items-center justify-center">
               {item.image ? <img src={resolveMediaUrl(item.image)} alt="" className="w-full h-full object-cover" /> : <Users className="w-5 h-5 text-white/25" />}
             </div>
             <div className="min-w-0">
-              <div className="font-bold text-sm truncate">{item.title}</div>
+              <div className="tls-card__title font-bold text-sm truncate">{item.title}</div>
               <div className="text-[11px] text-white/40 truncate">{item.subtitle}</div>
             </div>
           </Link>
@@ -203,7 +204,7 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Ic
           <div className="py-10 text-center text-sm text-white/35">Noch keine Einträge.</div>
         )}
       </div>
-      <Link to={to} className="mt-5 inline-flex w-full items-center justify-center px-4 py-3 rounded-sm text-xs font-black uppercase tracking-wider border transition hover:bg-white/5" style={{ color, borderColor: `${color}55` }}>
+      <Link to={to} className="tls-btn tls-btn--secondary mt-5 inline-flex w-full items-center justify-center px-4 py-3 rounded-sm text-xs font-black uppercase tracking-wider">
         {cta}
       </Link>
     </section>

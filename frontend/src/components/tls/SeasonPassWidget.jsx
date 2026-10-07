@@ -75,7 +75,7 @@ export function SeasonPassWidget() {
               <Link
                 to={`/seasons/${s.slug || s.id}`}
                 data-testid="season-pass-cta"
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#E6C200] transition"
+                className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm"
               >
                 Gesamtwertung <ArrowRight className="w-4 h-4" />
               </Link>

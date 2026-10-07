@@ -119,7 +119,7 @@ export default function ServersPage() {
               <Lock className="w-4 h-4 text-[#29B6E8] mt-0.5 shrink-0" />
               <span>Nach dem Login siehst du zusätzlich Server, die nur für registrierte Community-Accounts freigegeben sind.</span>
             </div>
-            <Link to="/login?next=/servers" className="inline-flex justify-center px-4 py-2 border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
+            <Link to="/login?next=/servers" className="tls-btn tls-btn--secondary inline-flex justify-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm">
               Einloggen
             </Link>
           </div>
@@ -342,10 +342,10 @@ function ServerCard({ server }) {
                 </div>
                 {server.has_access_secret && (
                   <div className="shrink-0 flex flex-wrap gap-2">
-                    <button type="button" onClick={revealSecret} disabled={secretLoading} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/75 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#FFD700]/45 hover:text-[#FFD700] disabled:opacity-50" title="Zugang 10 Sekunden anzeigen">
+                    <button type="button" onClick={revealSecret} disabled={secretLoading} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50" title="Zugang 10 Sekunden anzeigen">
                       <Eye className="w-3.5 h-3.5" /> Anzeigen
                     </button>
-                    <button type="button" onClick={copySecret} disabled={secretLoading} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10 disabled:opacity-50">
+                    <button type="button" onClick={copySecret} disabled={secretLoading} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
                       <KeyRound className="w-3.5 h-3.5" /> Kopieren
                     </button>
                   </div>
@@ -355,22 +355,22 @@ function ServerCard({ server }) {
           )}
           <div className="flex gap-2 flex-wrap">
             {server.connect_url && (
-              <a href={server.connect_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#29B6E8]/10">
+              <a href={server.connect_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 Verbinden <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
             {server.map_url && (
-              <a href={server.map_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-xs font-bold uppercase tracking-wider hover:bg-[#FFD700]/10">
+              <a href={server.map_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 Karte <Map className="w-3.5 h-3.5" />
               </a>
             )}
             {server.external_status_url && (
-              <a href={server.external_status_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+              <a href={server.external_status_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 Status <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
             {server.rules_url && (
-              <a href={server.rules_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/65 rounded-sm text-xs font-bold uppercase tracking-wider hover:text-white">
+              <a href={server.rules_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
                 Regeln
               </a>
             )}

@@ -62,7 +62,7 @@ function ErrorCard({ error }) {
         </button>
         <Link
           to="/"
-          className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white font-bold uppercase tracking-wider rounded-sm text-xs hover:border-[#29B6E8] hover:text-[#29B6E8]"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs"
         >
           <Home className="w-4 h-4" /> Startseite
         </Link>

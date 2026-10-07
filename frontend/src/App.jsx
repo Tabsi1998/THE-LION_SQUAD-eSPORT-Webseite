@@ -10,6 +10,7 @@ import { ProtectedRoute } from "@/components/tls/ProtectedRoute";
 import { BrandingHead } from "@/components/tls/BrandingHead";
 import { ApiInvalidationBridge } from "@/components/tls/ApiInvalidationBridge";
 import { ScrollManager } from "@/components/tls/ScrollManager";
+import { ViewTransitions } from "@/components/tls/ViewTransitions";
 import { AchievementCatchUp } from "@/components/tls/AchievementCatchUp";
 import { CeremonyHost } from "@/components/achievements/ceremony/CeremonyHost";
 import { BallotPopup } from "@/components/tls/BallotPopup";
@@ -198,6 +199,8 @@ function App() {
             <AnalyticsHead />
             <ApiInvalidationBridge />
             <ScrollManager />
+            {/* Seitenwechsel mit der Übergangs-Funktion des Browsers (#1073) - nach ScrollManager, siehe dort. */}
+            <ViewTransitions />
             <AchievementCatchUp />
             {/* Saison-Signale (#678): was gesammelt wurde, geht an den Server - nach dem Login auch das von vorher. */}
             <SignalSync />

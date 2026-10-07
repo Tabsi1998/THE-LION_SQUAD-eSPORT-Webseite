@@ -86,6 +86,9 @@ test("mit Startgeld steht der Betrag vorne, und angemeldet wird erst mit dem Hak
   await user.click(screen.getByTestId("tournament-register-btn"));
 
   const submit = await screen.findByTestId("tournament-register-submit");
+  // Schritt-Leiste (#1081): im Formular steht man bei der Anmeldung, das Startgeld ist ein eigener Schritt.
+  expect(screen.getByTestId("tournament-register-steps")).toHaveAttribute("aria-label", "Schritt 1 von 4: Anmeldung");
+  expect(screen.getByTestId("tournament-register-steps")).toHaveTextContent("Startgeld");
   expect(submit).toBeDisabled();
   expect(screen.getByTestId("tournament-quote")).toHaveTextContent("10,00 €");
   await user.click(screen.getByTestId("tournament-accept-costs"));
@@ -118,12 +121,16 @@ test("die eigene Anmeldung zeigt den eingefrorenen Preis, Warteliste den Hinweis
   renderPage();
   expect(await screen.findByTestId("tournament-own-price")).toHaveTextContent("10,00 €");
   expect(screen.getByTestId("tournament-my-stand")).toHaveTextContent("Startgeld");
+  // Freigegeben, Rechnung offen: die Leiste steht beim Startgeld.
+  expect(screen.getByTestId("tournament-my-steps")).toHaveAttribute("aria-label", "Schritt 3 von 4: Startgeld");
   expect(screen.getByTestId("tournament-own-price")).toHaveTextContent("Meine Rechnungen");
   expect(screen.queryByTestId("tournament-register-btn")).not.toBeInTheDocument();
 
   mockApi({ ...base, offer: OFFER }, [{ id: "r1", user_id: "u1", display_name: "Paula", status: "waitlist" }]);
   renderPage();
   expect(await screen.findByTestId("tournament-price-pending")).toHaveTextContent("erst, wenn deine Teilnahme bestätigt ist");
+  const waitingStand = screen.getByTestId("tournament-price-pending").closest("[data-testid='tournament-my-stand']");
+  expect(waitingStand.querySelector("[data-testid='tournament-my-steps']")).toHaveAttribute("aria-label", "Schritt 2 von 4: Warteliste");
 });
 
 test("Partner II (#469): das Turnier nennt seine Partner mit Link auf die Partnerseite", async () => {
@@ -190,7 +197,8 @@ test("Turnier vorbei: die Rangliste ist die Hauptaktion", async () => {
   mockApi({ ...base, ...DATES, status: "completed", public_phase: { state: "completed", label: "Beendet" } });
   renderPage();
   const actions = await screen.findByTestId("tournament-actions");
-  expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("bg-[#FFD700]");
+  // Knöpfe (#1082): die Hauptaktion ist überall der wichtige Knopf.
+  expect(actions.querySelector("a[data-testid='tournament-standings-link']")).toHaveClass("tls-btn", "tls-btn--primary");
   expect(screen.queryByTestId("tournament-register-btn")).toBeNull();
   expect(screen.queryByTestId("tournament-closed-btn")).toBeNull();
 });

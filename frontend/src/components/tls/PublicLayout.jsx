@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { SOCIAL_ICONS, socialIconFor, socialInk } from "@/lib/socialIcons";
 import { motionTransition } from "@/lib/motion";
+import { takeTransitionShown, transitionPending } from "@/lib/viewTransition";
 import { ChannelIcon } from "@/components/tls/ChannelIcon";
 import { useAuth } from "@/context/AuthContext";
 import { userMenuEntries, userMenuTestId } from "@/pages/user/profile/constants";
@@ -109,7 +110,7 @@ export function PublicLayout({ children }) {
                   data-testid="nav-messages"
                   aria-label="Nachrichten"
                   title="Nachrichten"
-                  className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/80 border border-white/10 rounded-sm hover:border-[#29B6E8]/40 hover:text-[#29B6E8] transition"
+                  className="tls-btn tls-btn--quiet hidden md:inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                 </Link>
@@ -431,14 +432,19 @@ function bannerTickerDuration(text, configuredSpeed) {
 let pageShown = false;
 
 function useRouteFade(pathname) {
-  const [name, setName] = useState(() => (pageShown ? "a" : ""));
+  // Blendet der Browser selbst über (#1073, lib/viewTransition), blendet der Inhalt nicht noch einmal ein.
+  const [name, setName] = useState(() => (pageShown && !transitionPending() ? "a" : ""));
   const previous = useRef(pathname);
   useEffect(() => {
     pageShown = true;
+    takeTransitionShown(pathname);
+    // Nur beim ersten Aufbau - danach zählt der Wechsel unten.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (previous.current === pathname) return;
     previous.current = pathname;
+    if (takeTransitionShown(pathname)) return;
     setName((value) => (value === "a" ? "b" : "a"));
   }, [pathname]);
   return name;
