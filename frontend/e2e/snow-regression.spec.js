@@ -11,6 +11,39 @@ function snow(overrides = {}) {
 
 const NOW = "2026-12-07T18:00:00+01:00";
 
+// Bildbudget (Entscheidung des Betreibers vom 07.10.2026): Am PC gilt fest „im Schnitt unter 25 ms je Bild“. Auf
+// GitHub schwankt das Tempo der geteilten Rechner von Lauf zu Lauf - dort zählt nur das Verhältnis zur selben Seite ohne
+// Saison, im selben Lauf auf demselben Rechner vorher gemessen: Mit Schnee darf ein Bild im Schnitt höchstens doppelt so
+// lange dauern. (Gemessen am 07.10.2026: 16,7 → 26,2 ms und, bei ausgelastetem Rechner, 26,8 → 38,8 ms - beide Male
+// etwa das 1,5-Fache; die feste 34-ms-Grenze für „langsame Bilder“ kippte dort mit dem Rechner und zählt nur am PC.)
+const ON_GITHUB = process.env.GITHUB_ACTIONS === "true";
+const LIMIT_MS = 25;
+const RATIO_LIMIT = 2;
+const SLOW_MS = 34;
+const MAX_SLOW = 6;
+
+function frameGaps(page) {
+  return page.evaluate(() => new Promise((resolve) => {
+    const deltas = [];
+    let last = performance.now();
+    const step = (now) => {
+      deltas.push(now - last);
+      last = now;
+      if (deltas.length < 120) requestAnimationFrame(step);
+      else resolve(deltas.slice(10));
+    };
+    requestAnimationFrame(step);
+  }));
+}
+
+function summary(frames) {
+  return {
+    average: frames.reduce((sum, value) => sum + value, 0) / frames.length,
+    slow: frames.filter((value) => value > SLOW_MS).length,
+    frames,
+  };
+}
+
 defineSeasonQa({
   title: "Schnee: Abnahme auf Hauptseiten und Breakpoints",
   seasonKey: "snow",
@@ -46,31 +79,37 @@ defineSeasonQa({
 test.describe("Schnee: Bildbudget und Lebenszyklus", () => {
   test("240 Flocken auf dem PC: Zeichenzeit unter 3 ms je Bild, Hauben auf Karten, nachts Blauschein", async ({ page, isMobile }, testInfo) => {
     test.skip(Boolean(isMobile), "PC-Messung");
-    await mockSeason(page, activePayload({ season: snow({ data: { night: true, snowcap_stage: 3 } }), now: NOW }));
     await page.setViewportSize({ width: 1440, height: 900 });
+    let base = null;
+    if (ON_GITHUB) {
+      // Vergleich: dieselbe Seite ohne Saison, gleich lang eingeschwungen.
+      await mockSeason(page, { now: NOW, enabled: true, preview: false, weather: null, seasons: [] });
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(2500);
+      base = summary(await frameGaps(page));
+    }
+    await mockSeason(page, activePayload({ season: snow({ data: { night: true, snowcap_stage: 3 } }), now: NOW }));
     await page.goto("/");
     await page.waitForLoadState("networkidle");
     await expect.poll(() => page.evaluate(() => document.querySelectorAll("[data-testid='season-sky']").length), { timeout: 15000 }).toBe(1);
     await page.waitForTimeout(2500);
     expect(await page.evaluate(() => document.querySelectorAll("[data-testid='snow-tint']").length)).toBe(1);
     expect(await page.evaluate(() => document.querySelectorAll("[data-testid='snow-cap']").length)).toBeGreaterThan(0);
-    // Zeichenzeit: der Loop misst je Bild (performance.now um alle Ebenen); hier über requestAnimationFrame die Bildabstände.
-    const frames = await page.evaluate(() => new Promise((resolve) => {
-      const deltas = [];
-      let last = performance.now();
-      const step = (now) => {
-        deltas.push(now - last);
-        last = now;
-        if (deltas.length < 120) requestAnimationFrame(step);
-        else resolve(deltas.slice(10));
-      };
-      requestAnimationFrame(step);
-    }));
-    const average = frames.reduce((sum, value) => sum + value, 0) / frames.length;
-    const slow = frames.filter((value) => value > 34).length;
-    await testInfo.attach("schnee-bildzeiten.json", { body: JSON.stringify({ average, slow, frames }), contentType: "application/json" });
-    expect(average, `mittlerer Bildabstand ${average.toFixed(1)} ms`).toBeLessThan(25);
-    expect(slow, `Bilder über 34 ms: ${slow} von ${frames.length}`).toBeLessThanOrEqual(6);
+    // Bildabstände über requestAnimationFrame, mit Schnee.
+    const flakes = summary(await frameGaps(page));
+    await testInfo.attach("schnee-bildzeiten.json", { body: JSON.stringify({ base, snow: flakes }), contentType: "application/json" });
+    const line = base
+      ? `Schnee ${flakes.average.toFixed(1)} ms (${flakes.slow} langsam), ohne Saison ${base.average.toFixed(1)} ms (${base.slow} langsam)`
+      : `Schnee ${flakes.average.toFixed(1)} ms (${flakes.slow} langsam)`;
+    console.log(`Bildbudget: ${line}`);
+    if (base) {
+      const ratio = flakes.average / base.average;
+      expect(ratio, `Schnee braucht das ${ratio.toFixed(2)}-Fache je Bild (${line})`).toBeLessThan(RATIO_LIMIT);
+    } else {
+      expect(flakes.average, `mittlerer Bildabstand ${flakes.average.toFixed(1)} ms`).toBeLessThan(LIMIT_MS);
+      expect(flakes.slow, `Bilder über ${SLOW_MS} ms: ${flakes.slow} von ${flakes.frames.length}`).toBeLessThanOrEqual(MAX_SLOW);
+    }
     await testInfo.attach("schnee-start.png", { body: await page.screenshot({ fullPage: false }), contentType: "image/png" });
   });
 
