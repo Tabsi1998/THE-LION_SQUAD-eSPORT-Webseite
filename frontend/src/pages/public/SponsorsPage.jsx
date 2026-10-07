@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, resolveMediaUrl } from "@/lib/api";
+import { API, api, resolveMediaUrl } from "@/lib/api";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { SmartLogo } from "@/components/tls/SmartLogo";
-import { ArrowRight, Calendar, Handshake, Star } from "lucide-react";
+import { ArrowRight, Calendar, Check, FileText, Handshake, Mail, Minus, Star } from "lucide-react";
 
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
 const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
@@ -40,8 +40,11 @@ export default function SponsorsPage() {
   useDocumentTitle("Sponsoren", "Sponsoren, Hauptsponsoren und Unterstützer von THE LION SQUAD eSports, Turnieren, Events und Vereinsarbeit in Tirol.");
   const [list, setList] = useState([]);
   const [former, setFormer] = useState([]);
+  // Sponsor werden (#1254): Zahlen, Leistungen je Stufe, „Unterlagen anfordern“ - ohne gepflegte Inhalte die kleine Karte.
+  const [offer, setOffer] = useState(null);
   const load = useCallback(() => {
     api.get("/sponsors").then(({ data }) => setList(data)).catch(() => {});
+    api.get("/sponsoring/offer").then(({ data }) => setOffer(data?.available ? data : null)).catch(() => setOffer(null));
     // Ehemalige Unterstützer (#405): abgelaufene Sponsoren mit Logo bleiben mit ihren Jahren sichtbar.
     api.get("/sponsors/former").then(({ data }) => setFormer(Array.isArray(data) ? data : [])).catch(() => setFormer([]));
   }, []);
@@ -72,7 +75,7 @@ export default function SponsorsPage() {
         <Reveal className="tls-reveal-grid mt-8 grid md:grid-cols-3 gap-3">
           <SupportLink to="/events" icon={Calendar} label="Event-Sichtbarkeit" text="Sponsoren erscheinen dort, wo Events und Turniere stattfinden." />
           <SupportLink to="/partners" icon={Handshake} label="Partner-Netzwerk" text="Befreundete Vereine, Veranstalter und Communitys." />
-          <SupportLink to="/contact" icon={ArrowRight} label="Sponsor werden" text="Kontakt für Kooperationen, Pakete und gemeinsame Aktionen." />
+          <SupportLink to={offer ? "/sponsors#sponsor-werden" : "/contact"} icon={ArrowRight} label="Sponsor werden" text="Kontakt für Kooperationen, Pakete und gemeinsame Aktionen." testId="sponsors-become-card" />
         </Reveal>
 
         {publicSponsors.length === 0 && (
@@ -124,6 +127,8 @@ export default function SponsorsPage() {
           ) : null)}
         </div>
 
+        {offer ? <SponsorOffer offer={offer} /> : null}
+
         {former.length > 0 && (
           <div className="mt-16 border-t border-white/10 pt-10" data-testid="sponsors-former">
             <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/45">DANKE</span>
@@ -149,9 +154,84 @@ export default function SponsorsPage() {
   );
 }
 
-function SupportLink({ to, icon: Icon, label, text }) {
+export const OFFER_CONTACT = `/contact?topic=sponsorship&subject=${encodeURIComponent("Sponsoring: Unterlagen anfordern")}`;
+
+/** „Sponsor werden“ (#1254): Zahlen, was jede Stufe bekommt (Handy untereinander, Tablet nebeneinander, PC als Tabelle). */
+export function SponsorOffer({ offer }) {
+  const tiers = (offer.tiers || []).filter((tier) => tierLabel[tier]);
+  const benefits = offer.benefits || [];
+  const numbers = offer.numbers || [];
   return (
-    <Link to={to} className="tls-card tls-card--gold tls-reveal-item group rounded-sm border border-white/10 bg-[#101010] p-4">
+    <section id="sponsor-werden" className="mt-16 border-t border-white/10 pt-10 scroll-mt-24" data-testid="sponsors-offer">
+      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Für Firmen und Vereine</span>
+      <h2 className="mt-2 font-heading text-3xl md:text-4xl font-black uppercase">Sponsor werden</h2>
+      {offer.intro ? <p className="mt-3 text-white/70 max-w-2xl">{offer.intro}</p> : null}
+      {numbers.length > 0 && (
+        <dl className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-3xl" data-testid="sponsors-offer-numbers">
+          {numbers.map((row) => (
+            <div key={`${row.value}-${row.label}`} className="border border-white/10 rounded-sm bg-[#101010] p-4">
+              <dt className="sr-only">{row.label}</dt>
+              <dd className="font-heading text-3xl font-black tabular-nums">{row.value}</dd>
+              <dd className="text-[11px] uppercase tracking-widest font-bold text-white/50">{row.label}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {benefits.length > 0 && tiers.length > 0 && (
+        <>
+          <div className="mt-8 grid gap-3 md:grid-cols-3 lg:hidden" data-testid="sponsors-offer-cards">
+            {tiers.map((tier) => (
+              <div key={tier} className="border border-white/10 rounded-sm bg-[#101010] p-4" data-testid={`sponsors-offer-tier-${tier}`}>
+                <div className="flex items-center gap-2 font-heading font-black uppercase"><Star className="w-4 h-4" style={{ color: tierColor[tier] }} /> {tierLabel[tier]}</div>
+                <ul className="mt-3 space-y-2 text-sm text-white/75">
+                  {benefits.filter((row) => row.tiers.includes(tier)).map((row) => (
+                    <li key={row.label} className="flex gap-2"><Check className="w-4 h-4 shrink-0 text-[#29B6E8] mt-0.5" /> {row.label}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <table className="mt-8 hidden lg:table w-full max-w-4xl text-sm border border-white/10" data-testid="sponsors-offer-table">
+            <thead>
+              <tr className="bg-[#101010] text-left">
+                <th className="px-4 py-3 font-bold text-white/60">Was ihr bekommt</th>
+                {tiers.map((tier) => (
+                  <th key={tier} className="px-4 py-3 text-center font-heading font-black uppercase" style={{ color: tierColor[tier] }}>{tierLabel[tier]}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {benefits.map((row) => (
+                <tr key={row.label}>
+                  <td className="px-4 py-3 text-white/80">{row.label}</td>
+                  {tiers.map((tier) => (
+                    <td key={tier} className="px-4 py-3 text-center">
+                      {row.tiers.includes(tier) ? <Check className="inline w-4 h-4 text-[#29B6E8]" aria-label="ja" /> : <Minus className="inline w-4 h-4 text-white/20" aria-label="nein" />}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+      <div className="mt-8 flex flex-col sm:flex-row gap-3">
+        <Link to={OFFER_CONTACT} data-testid="sponsors-offer-contact" className="tls-btn tls-btn--primary inline-flex justify-center items-center gap-2 px-5 py-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <Mail className="w-4 h-4" /> Unterlagen anfordern
+        </Link>
+        {offer.pdf_url ? (
+          <a href={`${API}${offer.pdf_url.replace(/^\/api/, "")}`} target="_blank" rel="noreferrer" data-testid="sponsors-offer-pdf" className="tls-btn tls-btn--secondary inline-flex justify-center items-center gap-2 px-5 py-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <FileText className="w-4 h-4" /> Mappe als PDF
+          </a>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function SupportLink({ to, icon: Icon, label, text, testId }) {
+  return (
+    <Link to={to} data-testid={testId} className="tls-card tls-card--gold tls-reveal-item group rounded-sm border border-white/10 bg-[#101010] p-4">
       <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
