@@ -20,13 +20,15 @@ import { useChatRead } from "@/hooks/useChats";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { toast } from "sonner";
-import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, Star, Swords, Trash2, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
+import { Crown, Edit, Lock, MessageSquare, Plus, Send, Shield, Star, Swords, TrendingUp, Trophy, Users, UserPlus, Zap } from "lucide-react";
 import { AwardBanner } from "@/components/tls/AwardBanner";
 import { viennaDateTime } from "@/lib/vienna";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
 import { TeamSchedule } from "@/pages/public/team/TeamSchedule";
 import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
 import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
+import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
+import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS } from "@/lib/teamPage";
 import { AUTO_COLOR, TEAM_COLORS } from "@/lib/teamColors";
@@ -254,19 +256,6 @@ function TeamDetail({ id }) {
     }, "Team konnte nicht verlassen werden.");
   };
 
-  const remove = async () => {
-    await runAction(async () => {
-      if (!await confirm({
-        title: "Team endgültig löschen?",
-        description: "Das Team wird inklusive Verwaltung und Mitgliedschaften entfernt.",
-        confirmLabel: "Endgültig löschen",
-      })) return;
-      await api.delete(`/teams/${team.id}`);
-      toast.success("Team gelöscht.");
-      nav("/teams");
-    }, "Team konnte nicht gelöscht werden.");
-  };
-
   const kickMember = async (m) => {
     await runAction(async () => {
       if (!await confirm({
@@ -314,7 +303,6 @@ function TeamDetail({ id }) {
           <>
             <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
             <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
-            <button onClick={remove} disabled={mutating} data-testid="team-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
           </>
         ) : null}
       >
@@ -427,7 +415,15 @@ function TeamDetail({ id }) {
           {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
         </aside>
       </div>
-      {editing && <TeamModal team={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />}
+      {editing && (
+        <TeamModal
+          team={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load(); }}
+          canDissolve={!!user && (team.leader_id === user.id || ["club_admin", "superadmin"].includes(user.role))}
+          onDissolved={() => nav("/teams")}
+        />
+      )}
       {inviteOpen && <TeamInviteSheet team={team} onClose={() => setInviteOpen(false)} />}
     </PublicLayout>
   );
@@ -550,7 +546,7 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved }) {
+function TeamModal({ team, onClose, onSaved, canDissolve = false, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
@@ -582,29 +578,32 @@ function TeamModal({ team, onClose, onSaved }) {
     }
   };
 
+  // Bearbeiten-Blatt (#1274): am PC rechts, am Handy von unten; „Team auflösen“ steht ganz unten - nicht neben „Bearbeiten“.
   return (
-    <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={submit} className="w-full max-w-xl bg-[#121212] border border-white/10 rounded-sm">
-        <div className="flex items-center justify-between p-5 border-b border-white/10">
-          <h2 className="font-heading font-black uppercase">{isNew ? "Team erstellen" : "Team bearbeiten"}</h2>
-          <button type="button" onClick={onClose} className="text-white/50 hover:text-white">×</button>
-        </div>
-        <div className="p-5 space-y-4">
-          <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name" /></Field>
-          <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
-          <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
-          <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" allowLibrary /></Field>
-          <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" allowLibrary /></Field>
-          <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
-          {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
-        </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-          {submitError && <div className="mr-auto"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
+    <SideSheet
+      title={isNew ? "Team erstellen" : "Team bearbeiten"}
+      eyebrow={isNew ? "Teams" : `[${team.tag}] ${team.name}`}
+      onClose={onClose}
+      testId="team-edit-sheet"
+      footer={(
+        <>
+          {submitError && <div className="w-full"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
           <button type="button" onClick={onClose} disabled={saving} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
-          <button disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
-        </div>
+          <button type="submit" form="team-edit-form" disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary ml-auto px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
+        </>
+      )}
+    >
+      <form id="team-edit-form" onSubmit={submit} className="space-y-4">
+        <Field label="Name"><Input value={form.name} onChange={(v) => set("name", v)} required testId="team-name-input" /></Field>
+        <Field label="Tag"><Input value={form.tag} onChange={(v) => set("tag", v.toUpperCase().slice(0, 8))} required testId="team-tag" placeholder="TLS" /></Field>
+        <Field label="Beschreibung"><textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" /></Field>
+        <Field label="Logo"><ImageUpload value={form.logo_url || ""} onChange={(v) => set("logo_url", v)} testId="team-logo" variant="square" allowLibrary /></Field>
+        <Field label="Banner"><ImageUpload value={form.banner_url || ""} onChange={(v) => set("banner_url", v)} testId="team-banner" variant="wide" allowLibrary /></Field>
+        <Field label="Discord-Link"><Input value={form.discord_link || ""} onChange={(v) => set("discord_link", v)} placeholder="https://discord.gg/..." /></Field>
+        {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
       </form>
-    </div>
+      {!isNew && canDissolve ? <TeamDissolveSection team={team} onDissolved={onDissolved} /> : null}
+    </SideSheet>
   );
 }
 

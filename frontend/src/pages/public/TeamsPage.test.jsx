@@ -92,3 +92,56 @@ test("Einladungs-Link für ein privates Team: nur die Einladung mit „Beitreten
   fireEvent.click(screen.getByTestId("team-join-invite-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/teams/t-1/join-link", { token: "AbC123" }));
 });
+
+// „Löschen“ nicht neben „Bearbeiten“ (#1274): oben nur Einladen und Bearbeiten; „Team auflösen“ ganz unten im
+// Bearbeiten-Blatt, mit einem Satz, was passiert, und erst mit dem richtig eingetippten Teamnamen.
+test("oben nur Einladen und Bearbeiten - kein roter Lösch-Knopf", async () => {
+  serve();
+  renderAt("/teams/t-1");
+  await screen.findByTestId("team-header-actions");
+  expect(screen.getByTestId("team-invite-open")).toHaveTextContent("Einladen");
+  expect(screen.getByTestId("team-edit-open")).toHaveTextContent("Bearbeiten");
+  expect(screen.queryByTestId("team-delete")).toBeNull();
+  expect(screen.getByTestId("team-header-actions").querySelector(".tls-btn--danger")).toBeNull();
+});
+
+test("Auflösen im Bearbeiten-Blatt: falscher Name sperrt, richtiger Name löst auf", async () => {
+  serve(TEAM, {
+    "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 4, withdraw: [{ registration_id: "r-1", tournament_id: "tt-1", title: "Rocket League Herbst-Cup" }], blocked: [], can_dissolve: true },
+  });
+  apiMock.delete.mockResolvedValue({ data: { ok: true, withdrawn: 1 } });
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  const sheet = await screen.findByTestId("team-edit-sheet");
+  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent("Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 4 Nachrichten wird gelöscht und die Anmeldung für „Rocket League Herbst-Cup“ wird zurückgezogen."));
+  // Das Auflösen steht nach dem Formular, ganz unten im Blatt.
+  const order = [...sheet.querySelectorAll("[data-testid]")].map((node) => node.getAttribute("data-testid"));
+  expect(order.indexOf("team-dissolve")).toBeGreaterThan(order.indexOf("team-color-picker"));
+  const submit = screen.getByTestId("team-dissolve-submit");
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByTestId("team-dissolve-name"), { target: { value: "Lions" } });
+  expect(submit).toBeDisabled();
+  fireEvent.change(screen.getByTestId("team-dissolve-name"), { target: { value: "lions rocket" } });
+  expect(submit).not.toBeDisabled();
+  fireEvent.click(submit);
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/teams/t-1", { params: { confirm: "lions rocket" } }));
+});
+
+test("läuft ein Turnier, bleibt Auflösen gesperrt und das Turnier steht da; Co-Kapitäne sehen das Auflösen nicht", async () => {
+  serve(TEAM, {
+    "/teams/t-1/dissolve-preview": { member_count: 3, chat_messages: 0, withdraw: [], blocked: [{ registration_id: "r-9", tournament_id: "tt-9", slug: "liga", title: "Liga live", reason: "Das Turnier läuft gerade – das klärt die Turnierleitung." }], can_dissolve: false },
+  });
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  expect(await screen.findByTestId("team-dissolve-blocked")).toHaveTextContent("Liga live");
+  fireEvent.change(screen.getByTestId("team-dissolve-name"), { target: { value: "Lions Rocket" } });
+  expect(screen.getByTestId("team-dissolve-submit")).toBeDisabled();
+  unmount();
+
+  authState.user = { id: "u-co", username: "pixelpanther" };
+  serve();
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  await screen.findByTestId("team-edit-sheet");
+  expect(screen.queryByTestId("team-dissolve")).toBeNull();
+});

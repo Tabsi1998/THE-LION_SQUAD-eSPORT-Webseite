@@ -79,3 +79,32 @@ export function initials(name?: string | null): string {
   if (capitals.length >= 2) return (capitals[0] + capitals[1]).toUpperCase();
   return text.slice(0, 2).toUpperCase();
 }
+
+// Team auflösen (#1274): derselbe Satz wie im Web - Mitglieder, Chat und kommende Turnier-Anmeldungen.
+export type DissolvePreview = {
+  member_count?: number;
+  chat_messages?: number;
+  withdraw?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string }>;
+  blocked?: Array<{ registration_id?: string; tournament_id?: string; slug?: string | null; title: string; reason?: string }>;
+  can_dissolve?: boolean;
+};
+
+export function dissolveSentence(preview?: DissolvePreview | null): string {
+  if (!preview) return "";
+  const members = Number(preview.member_count || 0);
+  const chat = Number(preview.chat_messages || 0);
+  const parts = [
+    members === 1 ? "Das Mitglied verliert das Team" : `Alle ${members} Mitglieder verlieren das Team`,
+    chat ? `der Team-Chat mit ${chat === 1 ? "einer Nachricht" : `${chat} Nachrichten`} wird gelöscht` : "der Team-Chat wird gelöscht",
+  ];
+  const titles = (preview.withdraw || []).map((row) => `„${row.title}“`);
+  if (titles.length === 1) parts.push(`die Anmeldung für ${titles[0]} wird zurückgezogen`);
+  if (titles.length > 1) parts.push(`die Anmeldungen für ${titles.slice(0, -1).join(", ")} und ${titles[titles.length - 1]} werden zurückgezogen`);
+  const last = parts.pop();
+  return `${parts.join(", ")} und ${last}. Fertige Turniere und Auszeichnungen bleiben.`;
+}
+
+export function sameTeamName(team: { name?: string | null } | null | undefined, typed?: string | null): boolean {
+  const norm = (value?: string | null) => String(value || "").replace(/\s+/g, " ").trim().toLocaleLowerCase("de");
+  return Boolean(norm(typed)) && norm(typed) === norm(team?.name);
+}

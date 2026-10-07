@@ -22,7 +22,8 @@ jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 
 const navigate = jest.fn();
 const setParams = jest.fn();
-const navigation = { navigate, setOptions: jest.fn(), setParams } as never;
+const goBack = jest.fn();
+const navigation = { navigate, setOptions: jest.fn(), setParams, goBack, canGoBack: () => true } as never;
 const route = { key: "team", name: "TeamDetail", params: { id: "t1" } } as never;
 const TEAM = { id: "t1", name: "Lions", tag: "TLS", members: [], member_ids: [], is_member: false };
 
@@ -89,6 +90,9 @@ test("Kapitän: Einladen mit QR-Code und Link teilen, Join-Code als Rückfall", 
     "/teams/t1/invite-link": { url: "https://lionsquad.at/teams/t1?einladung=AbC123", token: "AbC123" },
   });
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-invite-open")).toBeTruthy());
+  expect(screen.queryByTestId("team-invite-qr")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-invite-open"));
   await waitFor(() => expect(screen.getByTestId("team-invite-qr")).toBeTruthy());
   expect(screen.getByText("Kx7pQ2")).toBeTruthy();
   expect(screen.getByTestId("team-invite-share")).toBeTruthy();
@@ -151,8 +155,44 @@ test("Kapitän wählt die Team-Farbe beim Bearbeiten", async () => {
   serve({ ...CREW, can_manage: true, color: "auto" }, { "/teams/t1/invite-link": { url: "https://lionsquad.at/teams/t1?einladung=x1", token: "x1" } });
   await render(<TeamDetailScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByTestId("team-manage-members")).toBeTruthy());
-  await fireEvent.press(screen.getByText("Team bearbeiten"));
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
   await fireEvent.press(screen.getByTestId("team-color-green"));
   await fireEvent.press(screen.getByText("Team speichern"));
   await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ color: "green" })));
+});
+
+// „Löschen“ nicht neben „Bearbeiten“ (#1274): oben Einladen und Bearbeiten, „Team auflösen“ ganz unten beim
+// Bearbeiten - erst mit dem richtig eingetippten Teamnamen.
+test("Auflösen nur unten beim Bearbeiten und nur mit dem richtigen Teamnamen", async () => {
+  mockAuth.user = { id: "u-cap", username: "neonfalke" };
+  const mockDelete = jest.fn().mockResolvedValue({ data: { ok: true } });
+  const api = jest.requireMock("../../lib/api").api as Record<string, unknown>;
+  api.delete = mockDelete;
+  serve({ ...CREW, name: "Lions Rocket", can_manage: true }, {
+    "/teams/t1/dissolve-preview": { member_count: 3, chat_messages: 2, withdraw: [{ title: "Herbst-Cup" }], blocked: [], can_dissolve: true },
+  });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-edit-open")).toBeTruthy());
+  expect(screen.queryByTestId("team-dissolve")).toBeNull();
+  expect(screen.queryByText("Team bearbeiten")).toBeNull();
+  await fireEvent.press(screen.getByTestId("team-edit-open"));
+  await waitFor(() => expect(screen.getByTestId("team-dissolve-sentence")).toHaveTextContent(
+    "Alle 3 Mitglieder verlieren das Team, der Team-Chat mit 2 Nachrichten wird gelöscht und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.",
+  ));
+  await fireEvent.changeText(screen.getByTestId("team-dissolve-name"), "Lions");
+  await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
+  expect(mockDelete).not.toHaveBeenCalled();
+  await fireEvent.changeText(screen.getByTestId("team-dissolve-name"), "lions rocket");
+  await fireEvent.press(screen.getByTestId("team-dissolve-submit"));
+  await waitFor(() => expect(mockDelete).toHaveBeenCalledWith("/teams/t1", { params: { confirm: "lions rocket" } }));
+  await waitFor(() => expect(goBack).toHaveBeenCalled());
+});
+
+test("Co-Kapitän bearbeitet, löst aber nicht auf", async () => {
+  mockAuth.user = { id: "u-co", username: "pixelpanther" };
+  serve({ ...CREW, can_manage: true });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await fireEvent.press(await screen.findByTestId("team-edit-open"));
+  await waitFor(() => expect(screen.getByTestId("team-color-picker")).toBeTruthy());
+  expect(screen.queryByTestId("team-dissolve")).toBeNull();
 });

@@ -9,6 +9,7 @@ import { Screen } from "../../components/Screen";
 import { TeamSchedule } from "../../components/team/TeamSchedule";
 import { TeamHeader, type TeamHeaderData } from "../../components/team/TeamHeader";
 import { TeamInviteCard, TeamJoinInvite } from "../../components/team/TeamInvite";
+import { TeamDissolve } from "../../components/team/TeamDissolve";
 import { Body, Heading, Muted } from "../../components/Text";
 import { useAuth } from "../../auth/AuthContext";
 import { api, errorMessage } from "../../lib/api";
@@ -57,6 +58,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
   const [message, setMessage] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  // Oben „Einladen“ und „Bearbeiten“ (#1274); der Link mit QR-Code öffnet sich auf Tippen.
+  const [inviteOpen, setInviteOpen] = useState(false);
   const [teamForm, setTeamForm] = useState<TeamForm>({ name: "", tag: "", description: "", logo_url: "", banner_url: "", discord_link: "", color: AUTO_COLOR });
   // Team-Level für die Kopfzeile (#1347): „Level 9“ und die kleine goldene Krone des punktebesten Teams.
   const [level, setLevel] = useState<{ level?: number; crown?: string | null } | null>(null);
@@ -249,6 +252,13 @@ export function TeamDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  // Aufgelöst (#1274): zurück dorthin, woher man kam - die Team-Seite gibt es nicht mehr.
+  const dissolved = () => {
+    setEditOpen(false);
+    if (typeof (navigation as { canGoBack?: () => boolean }).canGoBack === "function" && navigation.canGoBack()) navigation.goBack();
+    else navigation.navigate("CommunityHub", { section: "teams" });
+  };
+
   const joinedByLink = () => {
     navigation.setParams({ invite: undefined });
     setMessage("Du bist dem Team beigetreten.");
@@ -285,10 +295,37 @@ export function TeamDetailScreen({ navigation, route }: Props) {
           crown={level?.crown ?? null}
           userId={user?.id}
           onOpenProfile={openProfile}
+          actions={canManage ? (
+            <>
+              <View style={styles.headerAction}>
+                <Button label={inviteOpen ? "Einladen schließen" : "Einladen"} onPress={() => setInviteOpen((open) => !open)} testID="team-invite-open" />
+              </View>
+              <View style={styles.headerAction}>
+                <Button label={editOpen ? "Fertig" : "Bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} testID="team-edit-open" />
+              </View>
+            </>
+          ) : null}
         />
 
         {message ? <Muted style={styles.success}>{message}</Muted> : null}
         {error ? <Muted style={styles.error}>{error}</Muted> : null}
+
+        {editOpen && canManage ? (
+          <Card style={styles.card}>
+            <Heading>Basisdaten bearbeiten</Heading>
+            <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
+            <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
+            <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
+            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
+            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
+            <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
+            <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
+            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
+            {isLeader || isClubAdmin(user) ? <TeamDissolve team={team} onDissolved={dissolved} /> : null}
+          </Card>
+        ) : null}
+
+        {canManage && inviteOpen ? <TeamInviteCard teamId={team.id} teamName={team.name} joinCode={team.join_code} /> : null}
 
         {inviteToken && !isMember ? (
           <TeamJoinInvite teamId={team.id} token={inviteToken} signedIn={Boolean(user && !isGuestUser(user))} onSignIn={() => openSignIn()} onJoined={joinedByLink} />
@@ -316,26 +353,10 @@ export function TeamDetailScreen({ navigation, route }: Props) {
               <Button label="Team-Chat öffnen" onPress={() => navigation.navigate("TeamChat", { id: team.id, title: `${team.tag || team.name} Chat` })} />
             )}
             {team.discord_link ? <Button label="Discord öffnen" variant="secondary" onPress={() => Linking.openURL(normalizeLink(team.discord_link)).catch(() => setError("Discord-Link konnte nicht geöffnet werden."))} /> : null}
-            {canManage ? <Button label={editOpen ? "Bearbeitung schließen" : "Team bearbeiten"} variant="secondary" onPress={() => setEditOpen((open) => !open)} /> : null}
             {isMember && !isLeader ? <Button label="Team verlassen" variant="danger" disabled={busy} onPress={leave} /> : null}
           </View>
         </Card>
 
-        {editOpen && canManage ? (
-          <Card style={styles.card}>
-            <Heading>Basisdaten bearbeiten</Heading>
-            <Field label="Name" value={teamForm.name} onChangeText={(value) => setTeamForm((current) => ({ ...current, name: value }))} />
-            <Field label="Tag" value={teamForm.tag} onChangeText={(value) => setTeamForm((current) => ({ ...current, tag: value.toUpperCase().slice(0, 8) }))} />
-            <Field label="Beschreibung" value={teamForm.description} multiline onChangeText={(value) => setTeamForm((current) => ({ ...current, description: value }))} />
-            <Field label="Logo URL" value={teamForm.logo_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, logo_url: value }))} />
-            <Field label="Banner URL" value={teamForm.banner_url} onChangeText={(value) => setTeamForm((current) => ({ ...current, banner_url: value }))} />
-            <Field label="Discord-Link" value={teamForm.discord_link} onChangeText={(value) => setTeamForm((current) => ({ ...current, discord_link: value }))} />
-            <ColorPicker value={teamForm.color} onChange={(color) => setTeamForm((current) => ({ ...current, color }))} />
-            <Button label={busy ? "Speichert ..." : "Team speichern"} disabled={busy || !teamForm.name.trim() || !teamForm.tag.trim()} onPress={saveTeam} />
-          </Card>
-        ) : null}
-
-        {canManage ? <TeamInviteCard teamId={team.id} teamName={team.name} joinCode={team.join_code} /> : null}
 
         {!isMember && user && !isGuestUser(user) ? (
           <Card style={styles.card}>
@@ -603,6 +624,10 @@ function normalizeLink(url?: string | null) {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
+function isClubAdmin(user?: User | null) {
+  return ["club_admin", "superadmin"].includes(String(user?.role || ""));
+}
+
 function isAdmin(user?: User | null) {
   return ["moderator", "tournament_admin", "club_admin", "superadmin"].includes(String(user?.role || ""));
 }
@@ -615,6 +640,9 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 12,
+  },
+  headerAction: {
+    flex: 1,
   },
   cardTop: {
     alignItems: "flex-start",

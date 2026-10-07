@@ -5,6 +5,7 @@
 - ``POST /api/teams/{id}/invite-link``         neuer Link, der alte gilt nicht mehr
 - ``GET  /api/teams/{id}/invite-link/check``   gilt dieser Schlüssel? Mit Kurzinfo zum Team - auch für private Teams
 - ``POST /api/teams/{id}/join-link``           mit gültigem Schlüssel beitreten (nur noch „Beitreten“ tippen)
+- ``GET  /api/teams/{id}/dissolve-preview``    was beim Auflösen passiert (#1274) - Kapitän und Club-Admin
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from database import get_db
 from models import new_id, now_utc
 from routes.team_routes import _add_team_member, _can_manage, _is_member, _is_staff, _user_label
 from services import team_page
+from services.team_dissolve import dissolve_preview
 from services.user_notifications import build_public_url, create_user_notification
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -128,3 +130,13 @@ async def join_with_link(team_id: str, body: JoinLinkBody, me: dict = Depends(ge
     from services.change_events import publish_user_change
     await publish_user_change([*(team.get("member_ids") or []), me["id"]], "teams")
     return {"ok": True, "already_member": False}
+
+
+@router.get("/{team_id}/dissolve-preview")
+async def team_dissolve_preview(team_id: str, me: dict = Depends(get_current_user)):
+    """Für den Satz im Bearbeiten-Blatt: Mitglieder, Chat, kommende Anmeldungen - und was das Auflösen gerade sperrt."""
+    db = get_db()
+    team = await _team_or_404(db, team_id)
+    if team.get("leader_id") != me["id"] and me.get("role") not in ("club_admin", "superadmin"):
+        raise HTTPException(status_code=403, detail="Auflösen darf nur der Kapitän.")
+    return await dissolve_preview(db, team)

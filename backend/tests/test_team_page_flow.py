@@ -213,3 +213,50 @@ async def test_team_color_only_allowed_values_only_captains_and_game_fallback(fl
     flow.act_as(captain)
     assert (await flow.patch(f"/api/teams/{team['id']}", json={"color": "auto"})).status_code == 200
     assert (await flow.get(f"/api/teams/{team['id']}/overview")).json()["header"]["color_source"] == "game"
+
+
+@pytest.mark.asyncio
+async def test_dissolve_only_with_the_typed_name_and_says_what_happens(flow):
+    """Team auflösen (#1274): Vorschau nennt Mitglieder, Chat und Anmeldungen; nur der Kapitän, nur mit Namen;
+    laufende Turniere sperren, kommende werden zurückgezogen, fertige bleiben."""
+    captain = await flow.add_user(role="player", name="neonfalke")
+    co = await flow.add_user(role="player", name="pixelpanther")
+    team = await make_team(flow, captain, co, co=(co,))
+    upcoming = await flow.create_tournament(title="Herbst-Cup", status="registration_open", team_mode="team")
+    upcoming_reg = await team_registration(flow, upcoming, team)
+    running = await flow.create_tournament(title="Liga live", status="live", team_mode="team")
+    running_reg = await team_registration(flow, running, team, status="checked_in")
+    done = await flow.create_tournament(title="Sommer-Cup", status="results_published", team_mode="team")
+    done_reg = await team_registration(flow, done, team)
+    await flow.db.team_chat_messages.insert_one({"id": new_id(), "team_id": team["id"], "user_id": captain["id"], "message": "Hallo"})
+    flow.act_as(captain)
+    await flow.get(f"/api/teams/{team['id']}/invite-link")
+
+    flow.act_as(co)
+    assert (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).status_code == 403, "Co-Kapitäne lösen nicht auf"
+    assert (await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions Rocket"})).status_code == 403
+
+    flow.act_as(captain)
+    preview = (await flow.get(f"/api/teams/{team['id']}/dissolve-preview")).json()
+    assert preview["member_count"] == 2 and preview["chat_messages"] == 1
+    assert [row["title"] for row in preview["withdraw"]] == ["Herbst-Cup"]
+    assert [row["title"] for row in preview["blocked"]] == ["Liga live"] and preview["can_dissolve"] is False
+
+    assert (await flow.delete(f"/api/teams/{team['id']}")).status_code == 400, "ohne Namen nicht"
+    assert (await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "Lions"})).status_code == 400
+    blocked = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": "lions  rocket"})
+    assert blocked.status_code == 409 and "Liga live" in blocked.json()["detail"]
+    assert await flow.db.teams.find_one({"id": team["id"]}), "nichts passiert, solange etwas sperrt"
+
+    # Die Turnierleitung hat das laufende Turnier abgeschlossen - jetzt geht es.
+    await flow.db.tournaments.update_one({"id": running["id"]}, {"$set": {"status": "completed"}})
+    done_now = await flow.delete(f"/api/teams/{team['id']}", params={"confirm": " lions rocket "})
+    assert done_now.status_code == 200 and done_now.json() == {"ok": True, "withdrawn": 1}
+    assert not await flow.db.teams.find_one({"id": team["id"]})
+    assert not await flow.db.team_members.find_one({"team_id": team["id"]})
+    assert not await flow.db.team_chat_messages.find_one({"team_id": team["id"]})
+    assert not await flow.db.team_invite_links.find_one({"team_id": team["id"]})
+    assert not await flow.db.tournament_registrations.find_one({"id": upcoming_reg["id"]}), "kommende Anmeldung zurückgezogen"
+    assert await flow.db.tournament_registrations.find_one({"id": done_reg["id"]}), "fertige Turniere bleiben"
+    assert await flow.db.tournament_registrations.find_one({"id": running_reg["id"]})
+    assert await flow.db.audit_logs.find_one({"action": "team.dissolve", "target_id": team["id"]})

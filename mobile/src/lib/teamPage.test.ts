@@ -1,4 +1,4 @@
-import { INVITE_PARAM, outcomeLabel, recentLine, upcomingLine } from "./teamPage";
+import { dissolveSentence, INVITE_PARAM, outcomeLabel, recentLine, sameTeamName, upcomingLine } from "./teamPage";
 
 // Team-Seite (#1191): dieselben Zeilen wie im Web.
 
@@ -17,4 +17,11 @@ test("kommende Turniere: Event, Tag und Uhrzeit in Wien", () => {
   expect(line).toContain("17.10.");
   expect(line).toContain("16:00");
   expect(INVITE_PARAM).toBe("einladung");
+});
+
+test("Team auflösen (#1274): derselbe Satz wie im Web; der Name zählt ohne Groß/klein", () => {
+  expect(dissolveSentence({ member_count: 5, chat_messages: 12, withdraw: [{ title: "Herbst-Cup" }] }))
+    .toBe("Alle 5 Mitglieder verlieren das Team, der Team-Chat mit 12 Nachrichten wird gelöscht und die Anmeldung für „Herbst-Cup“ wird zurückgezogen. Fertige Turniere und Auszeichnungen bleiben.");
+  expect(sameTeamName({ name: "Lions Rocket" }, "  lions   ROCKET ")).toBe(true);
+  expect(sameTeamName({ name: "Lions Rocket" }, "Lions")).toBe(false);
 });

@@ -847,17 +847,18 @@ async def transfer_leader(team_id: str, body: dict, me: dict = Depends(get_curre
 
 
 @router.delete("/{team_id}")
-async def delete_team(team_id: str, me: dict = Depends(get_current_user)):
+async def delete_team(team_id: str, confirm: str | None = None, me: dict = Depends(get_current_user)):
     db = get_db()
-    team = await db.teams.find_one({"id": team_id})
+    team = await db.teams.find_one({"id": team_id}, {"_id": 0})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     if team["leader_id"] != me["id"] and me["role"] not in ("club_admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
-    await db.teams.delete_one({"id": team_id})
-    await db.team_members.delete_many({"team_id": team_id})
-    await db.team_squads.delete_many({"team_id": team_id})
-    return {"ok": True}
+    # Team auflösen (#1274): nur mit dem eingetippten Teamnamen; was dabei passiert, regelt services/team_dissolve.
+    from services.team_dissolve import dissolve, same_name
+    if not same_name(team, confirm):
+        raise HTTPException(status_code=400, detail="Zum Auflösen bitte den Teamnamen genau so eintippen, wie er dasteht.")
+    return await dissolve(db, team, me)
 
 
 @router.get("/{team_id}/squads")
