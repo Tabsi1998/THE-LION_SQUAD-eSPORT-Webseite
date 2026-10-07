@@ -110,8 +110,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
-    # Die Browser-Tests (Desktop und Handy) brauchen mit Ostern, Eiersuche, Geburtstag und Discord gut 25 Minuten.
-    timeout-minutes: 40
+    # Prüfen, Bauen und Unit-Tests; die Browser-Tests laufen parallel im Job darunter.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - name: Validate reverse-proxy deployment config
@@ -155,12 +155,6 @@ jobs:
       - name: Run frontend unit smoke
         working-directory: frontend
         run: yarn test:coverage
-      - name: Install Playwright browser
-        working-directory: frontend
-        run: npx playwright install --with-deps chromium
-      - name: Run browser smoke tests desktop and mobile
-        working-directory: frontend
-        run: yarn test:e2e
       - name: Upload frontend test diagnostics
         if: failure()
         uses: actions/upload-artifact@v7
@@ -168,6 +162,43 @@ jobs:
           name: frontend-test-results
           path: |
             frontend/coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  frontend-e2e:
+    # Die Browser-Tests (Desktop und Handy) brauchten in einem Job gut 30 Minuten. Vier Teile auf vier Rechnern
+    # gleichzeitig: dieselben Tests, ein Viertel der Wartezeit. Für ein öffentliches Repo kostet das nichts.
+    name: Browser-Tests (${{ matrix.shard }}/4)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+      - name: Install Playwright browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run browser smoke tests desktop and mobile (part ${{ matrix.shard }} of 4)
+        working-directory: frontend
+        run: yarn test:e2e --shard=${{ matrix.shard }}/4
+      - name: Upload browser test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-e2e-results-${{ matrix.shard }}
+          path: |
             frontend/playwright-report/
             frontend/test-results/
           if-no-files-found: ignore
